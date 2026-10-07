@@ -1,0 +1,20 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: experience-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/experience_db
+    username: postgres
+    password: password # Báo team tự đổi thành mật khẩu PostgreSQL trên máy họ
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
