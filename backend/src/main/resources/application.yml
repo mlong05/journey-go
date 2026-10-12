@@ -1,0 +1,50 @@
+server:
+  port: ${PORT:8088}
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: journey-go-backend
+  threads:
+    virtual:
+      enabled: true
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/journeygo_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:1}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+    open-in-view: false
+
+# JWT Configuration
+jwt:
+  # Secret key (Base64 or min 256-bit plain text for HMAC-SHA256)
+  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  # 15 minutes in milliseconds: 15 * 60 * 1000 = 900000
+  access-token-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
+  # 7 days in milliseconds: 7 * 24 * 60 * 60 * 1000 = 604800000
+  refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+
+# SpringDoc OpenAPI / Swagger UI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  show-actuator: true
+
+# CORS Configuration
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
