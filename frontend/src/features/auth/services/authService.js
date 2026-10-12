@@ -13,7 +13,23 @@ export const authService = {
     return apiClient.get("/auth/me");
   },
 
-  logout: async () => {
-    return apiClient.post("/auth/logout");
+  refreshToken: async (refreshToken) => {
+    let token = refreshToken;
+    if (!token && typeof window !== "undefined") {
+      token =
+        localStorage.getItem("jg_refresh_token") ||
+        JSON.parse(localStorage.getItem("journey_go_auth") || "{}")?.refreshToken;
+    }
+    return apiClient.post("/auth/refresh", { refreshToken: token });
+  },
+
+  logout: async (refreshToken) => {
+    let token = refreshToken;
+    if (!token && typeof window !== "undefined") {
+      token =
+        localStorage.getItem("jg_refresh_token") ||
+        JSON.parse(localStorage.getItem("journey_go_auth") || "{}")?.refreshToken;
+    }
+    return apiClient.post("/auth/logout", token ? { refreshToken: token } : {});
   },
 };
