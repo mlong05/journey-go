@@ -21,31 +21,71 @@ public class DataInitializer {
     @Bean
     public CommandLineRunner initDefaultUsers() {
         return args -> {
-            if (!userRepository.existsByEmail("admin@journeygo.com")) {
-                User admin = User.builder()
+            // Tài khoản admin mặc định
+            userRepository.findByEmail("admin@journeygo.com").ifPresentOrElse(admin -> {
+                admin.setPassword(passwordEncoder.encode("Password123@"));
+                admin.setRole(Role.ADMIN);
+                userRepository.save(admin);
+            }, () -> {
+                userRepository.save(User.builder()
                         .email("admin@journeygo.com")
-                        .password(passwordEncoder.encode("Admin@123456"))
+                        .password(passwordEncoder.encode("Password123@"))
                         .fullName("Hệ Thống Quản Trị")
                         .phone("0900000001")
                         .role(Role.ADMIN)
                         .active(true)
-                        .build();
-                userRepository.save(admin);
-                log.info("Khởi tạo tài khoản Quản trị viên mặc định: admin@journeygo.com / Admin@123456");
-            }
+                        .build());
+            });
 
-            if (!userRepository.existsByEmail("user@journeygo.com")) {
-                User user = User.builder()
-                        .email("user@journeygo.com")
-                        .password(passwordEncoder.encode("User@123456"))
-                        .fullName("Nguyễn Du Khách")
-                        .phone("0900000002")
-                        .role(Role.USER)
-                        .active(true)
-                        .build();
+            // Tài khoản user@journeygo.com đóng vai trò ADMIN theo yêu cầu
+            userRepository.findByEmail("user@journeygo.com").ifPresentOrElse(user -> {
+                user.setPassword(passwordEncoder.encode("Password123@"));
+                user.setRole(Role.ADMIN);
                 userRepository.save(user);
-                log.info("Khởi tạo tài khoản Người dùng mặc định: user@journeygo.com / User@123456");
-            }
+            }, () -> {
+                userRepository.save(User.builder()
+                        .email("user@journeygo.com")
+                        .password(passwordEncoder.encode("Password123@"))
+                        .fullName("Quản Trị Viên (User)")
+                        .phone("0900000002")
+                        .role(Role.ADMIN)
+                        .active(true)
+                        .build());
+            });
+
+            // Tài khoản Kiểm duyệt viên (MODERATOR)
+            userRepository.findByEmail("moderator@journeygo.com").ifPresentOrElse(mod -> {
+                mod.setPassword(passwordEncoder.encode("Password123@"));
+                mod.setRole(Role.MODERATOR);
+                userRepository.save(mod);
+            }, () -> {
+                userRepository.save(User.builder()
+                        .email("moderator@journeygo.com")
+                        .password(passwordEncoder.encode("Password123@"))
+                        .fullName("Chuyên Viên Thẩm Định")
+                        .phone("0900000003")
+                        .role(Role.MODERATOR)
+                        .active(true)
+                        .build());
+            });
+
+            // Tài khoản Đối tác điểm đến (PROVIDER)
+            userRepository.findByEmail("provider@journeygo.com").ifPresentOrElse(provider -> {
+                provider.setPassword(passwordEncoder.encode("Password123@"));
+                provider.setRole(Role.PROVIDER);
+                userRepository.save(provider);
+            }, () -> {
+                userRepository.save(User.builder()
+                        .email("provider@journeygo.com")
+                        .password(passwordEncoder.encode("Password123@"))
+                        .fullName("Ban Quản Lý Tràng An")
+                        .phone("0900000004")
+                        .role(Role.PROVIDER)
+                        .active(true)
+                        .build());
+            });
+
+            log.info("Khởi tạo và đồng bộ tài khoản mẫu (ADMIN, MODERATOR, PROVIDER) thành công với mật khẩu Password123@");
         };
     }
 }

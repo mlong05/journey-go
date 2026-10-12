@@ -5,17 +5,15 @@ import { useRouter } from "next/navigation";
 import { Landmark, ArrowLeft, LogOut, CheckCircle2, MapPin, Plus, BarChart3 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useAuthSession } from "@/hooks";
+import { useLogout, LogoutModal } from "@/features/auth";
 
 export default function ProviderDashboardPage() {
   const router = useRouter();
   const authData = useAuthSession();
+  const { performLogout, isLoggingOut, logoutModal } = useLogout();
 
   const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("journey_go_auth");
-      localStorage.removeItem("jg_access_token");
-    }
-    router.push(ROUTES.LOGIN);
+    performLogout();
   };
 
   return (
@@ -102,6 +100,13 @@ export default function ProviderDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Thông báo Đăng xuất cao cấp */}
+      <LogoutModal
+        isOpen={logoutModal.isOpen}
+        status={logoutModal.status}
+        message={logoutModal.message}
+      />
     </div>
   );
 }
