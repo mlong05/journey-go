@@ -19,6 +19,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Date;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -29,6 +31,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
     private final RefreshTokenService refreshTokenService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
@@ -113,7 +116,16 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(String refreshToken) {
+    public void logout(String accessToken, String refreshToken) {
+        if (accessToken != null && !accessToken.isBlank()) {
+            try {
+                Date expiration = tokenProvider.getExpirationFromToken(accessToken);
+                tokenBlacklistService.blacklistToken(accessToken, expiration.toInstant());
+            } catch (Exception e) {
+                log.warn("Không thể lấy hạn sử dụng token để blacklist: {}", e.getMessage());
+            }
+        }
+
         if (refreshToken != null && !refreshToken.isBlank()) {
             refreshTokenService.revokeToken(refreshToken);
         }
