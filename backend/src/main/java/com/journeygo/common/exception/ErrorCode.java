@@ -13,7 +13,10 @@ public enum ErrorCode {
     INVALID_TOKEN("Token không hợp lệ hoặc đã hết hạn", HttpStatus.UNAUTHORIZED),
     REFRESH_TOKEN_EXPIRED("Refresh token đã hết hạn, vui lòng đăng nhập lại", HttpStatus.UNAUTHORIZED),
     REFRESH_TOKEN_NOT_FOUND("Refresh token không tồn tại trong hệ thống", HttpStatus.NOT_FOUND),
-    VALIDATION_ERROR("Dữ liệu đầu vào không hợp lệ", HttpStatus.BAD_REQUEST);
+    VALIDATION_ERROR("Dữ liệu đầu vào không hợp lệ", HttpStatus.BAD_REQUEST),
+    DESTINATION_NOT_FOUND("Điểm đến không tồn tại", HttpStatus.NOT_FOUND),
+    DESTINATION_EXISTED("Điểm đến với tên và địa chỉ này đã tồn tại", HttpStatus.CONFLICT),
+    DESTINATION_COORDINATE_EXISTED("Đã tồn tại điểm đến với tọa độ này", HttpStatus.CONFLICT);
 
     private final String message;
     private final HttpStatus httpStatus;
