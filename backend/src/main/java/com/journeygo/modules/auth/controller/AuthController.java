@@ -11,11 +11,13 @@ import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -50,11 +52,19 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Đăng xuất", description = "Hủy phiên làm việc và thu hồi Refresh Token")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Đăng xuất", description = "Hủy phiên làm việc, thu hồi Refresh Token và vô hiệu hóa Access Token")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @RequestBody(required = false) RefreshTokenRequest request) {
-        String token = request != null ? request.refreshToken() : null;
-        authService.logout(token);
+            HttpServletRequest request,
+            @RequestBody(required = false) RefreshTokenRequest refreshTokenRequest) {
+        String bearerToken = request.getHeader("Authorization");
+        String accessToken = null;
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            accessToken = bearerToken.substring(7);
+        }
+
+        String refreshToken = refreshTokenRequest != null ? refreshTokenRequest.refreshToken() : null;
+        authService.logout(accessToken, refreshToken);
         return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công", null));
     }
 
