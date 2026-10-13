@@ -1,6 +1,11 @@
-export { default as LoginForm } from "./components/LoginForm";
 export { default as AuthScreen } from "./components/AuthScreen";
+export { default as LoginForm } from "./components/LoginForm";
+export { default as RegisterForm } from "./components/RegisterForm";
+export { default as AuthHeroCarousel } from "./components/AuthHeroCarousel";
+export { default as AuthFeedbackModal } from "./components/AuthFeedbackModal";
+export { default as RoleSelector } from "./components/RoleSelector";
 export { default as LogoutModal } from "./components/LogoutModal";
+export * from "./constants/authData";
 export * from "./hooks/useAuth";
 export * from "./hooks/useLogout";
 export * from "./services/authService";

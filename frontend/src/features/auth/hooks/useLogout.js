@@ -61,6 +61,9 @@ export function useLogout() {
         localStorage.removeItem("jg_refresh_token");
         localStorage.removeItem("jg_user_info");
         localStorage.removeItem("journey_go_auth");
+        if (window.google?.accounts?.id?.disableAutoSelect) {
+          window.google.accounts.id.disableAutoSelect();
+        }
         window.dispatchEvent(new Event("storage"));
       }
 

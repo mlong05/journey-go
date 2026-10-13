@@ -1,0 +1,32 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+class ApiConstants {
+  // Cổng mặc định của Spring Boot backend
+  static const int defaultPort = 8088;
+
+  // Đường dẫn cơ sở mặc định tự động nhận diện theo môi trường
+  static String getDefaultBaseUrl() {
+    if (kIsWeb) {
+      return 'http://localhost:$defaultPort/api/v1';
+    }
+    try {
+      if (Platform.isAndroid) {
+        // Android Emulator truy cập localhost của máy chủ host qua 10.0.2.2
+        return 'http://10.0.2.2:$defaultPort/api/v1';
+      }
+    } catch (_) {}
+    // iOS simulator / macOS / Windows / Linux
+    return 'http://127.0.0.1:$defaultPort/api/v1';
+  }
+
+  // Endpoints Xác thực (Auth)
+  static const String loginEndpoint = '/auth/login';
+  static const String logoutEndpoint = '/auth/logout';
+  static const String refreshEndpoint = '/auth/refresh';
+  static const String registerEndpoint = '/auth/register';
+  static const String meEndpoint = '/auth/me';
+
+  // Vai trò cho phép trên Mobile Tourist App
+  static const String requiredRole = 'USER';
+}
