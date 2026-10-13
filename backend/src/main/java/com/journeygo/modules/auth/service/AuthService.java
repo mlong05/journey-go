@@ -4,10 +4,13 @@ import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.modules.auth.dto.*;
 import com.journeygo.modules.auth.entity.RefreshToken;
+import com.journeygo.modules.user.entity.AuthProvider;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import com.journeygo.security.JwtTokenProvider;
+import com.journeygo.security.oauth2.GoogleTokenVerifierService;
+import com.journeygo.security.oauth2.GoogleUserInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -32,6 +36,7 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final RefreshTokenService refreshTokenService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final GoogleTokenVerifierService googleTokenVerifierService;
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
@@ -77,10 +82,68 @@ public class AuthService {
                 .fullName(request.fullName())
                 .phone(request.phone())
                 .role(assignedRole)
+                .authProvider(AuthProvider.LOCAL)
                 .active(true)
                 .build();
 
         user = userRepository.save(user);
+
+        String accessToken = tokenProvider.generateAccessToken(user.getEmail(), user.getId());
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken.getToken())
+                .tokenType("Bearer")
+                .expiresIn(tokenProvider.getAccessTokenExpirationMs())
+                .user(UserResponse.fromEntity(user))
+                .build();
+    }
+
+    @Transactional
+    public AuthResponse processGoogleAuth(GoogleAuthRequest request) {
+        GoogleUserInfo googleUser = googleTokenVerifierService.verify(request.idToken());
+
+        String email = googleUser.email().toLowerCase().trim();
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        if (user == null) {
+            Role assignedRole = request.role() != null ? request.role() : Role.USER;
+            String fullName = (googleUser.name() != null && !googleUser.name().isBlank())
+                    ? googleUser.name()
+                    : email.split("@")[0];
+
+            user = User.builder()
+                    .email(email)
+                    .fullName(fullName)
+                    .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                    .role(assignedRole)
+                    .authProvider(AuthProvider.GOOGLE)
+                    .providerId(googleUser.sub())
+                    .avatarUrl(googleUser.picture())
+                    .active(true)
+                    .build();
+
+            user = userRepository.save(user);
+            log.info("Tạo mới tài khoản thành công qua Google OAuth2: email={}, role={}", email, assignedRole);
+        } else {
+            if (!user.isActive()) {
+                throw new AppException(ErrorCode.UNAUTHORIZED, "Tài khoản của bạn đã bị vô hiệu hóa");
+            }
+
+            boolean modified = false;
+            if (user.getAvatarUrl() == null && googleUser.picture() != null) {
+                user.setAvatarUrl(googleUser.picture());
+                modified = true;
+            }
+            if (user.getProviderId() == null && googleUser.sub() != null) {
+                user.setProviderId(googleUser.sub());
+                modified = true;
+            }
+            if (modified) {
+                user = userRepository.save(user);
+            }
+        }
 
         String accessToken = tokenProvider.generateAccessToken(user.getEmail(), user.getId());
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
