@@ -25,3 +25,9 @@ replay_pid*
 
 .idea/
 **/target/
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+*.env
