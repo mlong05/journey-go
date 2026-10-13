@@ -1,60 +1,135 @@
 "use client";
 
-import { useState } from "react";
-import { useAuth } from "../hooks/useAuth";
-import Button from "@/components/ui/Button";
+import React from "react";
+import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
+import RoleSelector from "./RoleSelector";
 
-export default function LoginForm() {
-  const { login, loading, error } = useAuth();
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await login(formData);
-    } catch {
-      // Handled in hook
-    }
-  };
-
+/**
+ * Form Đăng nhập hệ thống kèm chọn mẫu vai trò nhanh
+ */
+export default function LoginForm({
+  loginForm,
+  setLoginForm,
+  roles,
+  selectedRoleId,
+  onSelectRole,
+  showPassword,
+  setShowPassword,
+  loading,
+  onSubmit,
+  onShowToast,
+}) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-sm">
-      {error && (
-        <div className="p-3 text-sm text-red-700 bg-red-100 rounded-lg">
-          {error}
+    <form onSubmit={onSubmit} className="space-y-3.5 w-full">
+      {/* BỘ CHỌN MẪU NHANH (Pill Badges) */}
+      <RoleSelector
+        roles={roles}
+        selectedRoleId={selectedRoleId}
+        onSelectRole={onSelectRole}
+      />
+
+      {/* Trường Email / Tên tài khoản */}
+      <div className="space-y-1 w-full">
+        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+          Tài khoản / Email đăng nhập
+        </label>
+        <div className="relative w-full">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <Mail className="w-4 h-4" />
+          </div>
+          <input
+            type="text"
+            required
+            value={loginForm.identifier}
+            onChange={(e) =>
+              setLoginForm((prev) => ({ ...prev, identifier: e.target.value }))
+            }
+            placeholder="email@journeygo.com"
+            className="w-full h-11 pl-10 pr-3.5 text-xs sm:text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-colors"
+          />
         </div>
-      )}
-
-      <div>
-        <label className="block text-sm font-medium mb-1">Email</label>
-        <input
-          type="email"
-          required
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 border-gray-300"
-          placeholder="name@example.com"
-        />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">Mật khẩu</label>
-        <input
-          type="password"
-          required
-          value={formData.password}
-          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 border-gray-300"
-          placeholder="••••••••"
-        />
+      {/* Trường Mật khẩu */}
+      <div className="space-y-1 w-full">
+        <div className="flex items-center justify-between">
+          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Mật khẩu
+          </label>
+          <button
+            type="button"
+            onClick={() =>
+              onShowToast?.(
+                "info",
+                "Vui lòng liên hệ quản trị viên để khôi phục mật khẩu."
+              )
+            }
+            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
+          >
+            Quên mật khẩu?
+          </button>
+        </div>
+        <div className="relative w-full">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <Lock className="w-4 h-4" />
+          </div>
+          <input
+            type={showPassword ? "text" : "password"}
+            required
+            value={loginForm.password}
+            onChange={(e) =>
+              setLoginForm((prev) => ({ ...prev, password: e.target.value }))
+            }
+            placeholder="••••••••••••"
+            className="w-full h-11 pl-10 pr-10 text-xs sm:text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-colors"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+          >
+            {showPassword ? (
+              <EyeOff className="w-4 h-4" />
+            ) : (
+              <Eye className="w-4 h-4" />
+            )}
+          </button>
+        </div>
       </div>
 
-      <Button type="submit" disabled={loading} className="w-full">
-        {loading ? "Đang xử lý..." : "Đăng nhập"}
-      </Button>
+      {/* Ghi nhớ đăng nhập */}
+      <div className="flex items-center justify-between pt-0.5 w-full">
+        <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 select-none">
+          <input
+            type="checkbox"
+            checked={loginForm.rememberMe}
+            onChange={(e) =>
+              setLoginForm((prev) => ({ ...prev, rememberMe: e.target.checked }))
+            }
+            className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+          />
+          <span>Ghi nhớ phiên đăng nhập trên thiết bị </span>
+        </label>
+      </div>
+
+      {/* Nút Đăng nhập chính */}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-3 rounded-xl font-bold text-xs sm:text-sm shadow-md bg-emerald-700 hover:bg-emerald-800 text-white active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
+            <span>Đang đăng nhập...</span>
+          </>
+        ) : (
+          <>
+            <span>Đăng nhập</span>
+            <ArrowRight className="w-4 h-4 text-white" />
+          </>
+        )}
+      </button>
     </form>
   );
 }

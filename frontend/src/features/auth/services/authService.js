@@ -5,6 +5,10 @@ export const authService = {
     return apiClient.post("/auth/login", credentials);
   },
 
+  loginWithGoogle: async (idToken, role = "USER") => {
+    return apiClient.post("/auth/google", { idToken, role });
+  },
+
   register: async (userData) => {
     return apiClient.post("/auth/register", userData);
   },

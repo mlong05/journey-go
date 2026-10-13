@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'core/models/auth_models.dart';
+import 'core/services/token_storage.dart';
+import 'screens/tourist_home_screen.dart';
 import 'tourist_auth_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Đặt thanh trạng thái trong suốt cho Hero Banner tràn viền
   SystemChrome.setSystemUIOverlayStyle(
@@ -12,11 +15,26 @@ void main() {
       statusBarBrightness: Brightness.dark,
     ),
   );
-  runApp(const JourneyGoTouristApp());
+
+  // Kiểm tra phiên đăng nhập đã lưu
+  UserModel? savedUser;
+  final bool isLoggedIn = await TokenStorage.hasValidSession();
+  if (isLoggedIn) {
+    savedUser = await TokenStorage.getUser();
+    // Nếu role không phải USER thì xóa session cũ
+    if (savedUser != null && !savedUser.isUserRole) {
+      await TokenStorage.clearSession();
+      savedUser = null;
+    }
+  }
+
+  runApp(JourneyGoTouristApp(initialUser: savedUser));
 }
 
 class JourneyGoTouristApp extends StatelessWidget {
-  const JourneyGoTouristApp({super.key});
+  final UserModel? initialUser;
+
+  const JourneyGoTouristApp({super.key, this.initialUser});
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +51,9 @@ class JourneyGoTouristApp extends StatelessWidget {
           surface: AppCultureColors.background,
         ),
       ),
-      home: const TouristAuthScreen(),
+      home: initialUser != null
+          ? TouristHomeScreen(initialUser: initialUser!)
+          : const TouristAuthScreen(),
     );
   }
 }

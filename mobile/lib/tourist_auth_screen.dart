@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'core/models/auth_models.dart';
+import 'core/services/auth_service.dart';
+import 'core/services/token_storage.dart';
+import 'screens/tourist_home_screen.dart';
 
 /// Bảng màu chuẩn Cổng Du Lịch Văn Hóa Việt Nam
 class AppCultureColors {
@@ -42,6 +46,8 @@ class TouristAuthScreen extends StatefulWidget {
 
 class _TouristAuthScreenState extends State<TouristAuthScreen>
     with SingleTickerProviderStateMixin {
+  final AuthService _authService = AuthService();
+
   // GlobalKey cho Form validation
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
@@ -79,6 +85,15 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
   @override
   void initState() {
     super.initState();
+    // Khôi phục email đã ghi nhớ nếu có
+    TokenStorage.getSavedEmail().then((saved) {
+      if (saved != null && saved.isNotEmpty && mounted) {
+        setState(() {
+          _emailController.text = saved;
+        });
+      }
+    });
+
     // Lắng nghe focus để cập nhật viền input
     _fullNameFocus.addListener(() => setState(() {}));
     _emailFocus.addListener(() => setState(() {}));
@@ -124,28 +139,373 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
       _isLoading = true;
     });
 
-    // Giả lập độ trễ kết nối API thực tế
-    await Future.delayed(const Duration(milliseconds: 1200));
+    try {
+      if (_isLogin) {
+        // ĐĂNG NHẬP (POST /api/v1/auth/login) VỚI ROLE USER
+        final auth = await _authService.login(
+          email: _emailController.text,
+          password: _passwordController.text,
+        );
+
+        if (_rememberMe) {
+          await TokenStorage.setRememberMe(true, email: _emailController.text);
+        } else {
+          await TokenStorage.setRememberMe(false);
+        }
+
+        if (!mounted) return;
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        _showSuccessFeedback(
+          title: 'Đăng nhập thành công!',
+          message: 'Chào mừng du khách ${auth.user.fullName} quay trở lại với Di sản Việt Nam.',
+          isReward: false,
+        );
+
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TouristHomeScreen(initialUser: auth.user),
+          ),
+        );
+      } else {
+        // ĐĂNG KÝ (POST /api/v1/auth/register) VỚI ROLE USER
+        final auth = await _authService.register(
+          email: _emailController.text,
+          password: _passwordController.text,
+          fullName: _fullNameController.text,
+          phone: _phoneController.text,
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        _showSuccessFeedback(
+          title: 'Khởi tạo tài khoản thành công!',
+          message: '🎉 Quý khách đã nhận được +100 điểm thưởng khám phá di sản!',
+          isReward: true,
+        );
+
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TouristHomeScreen(initialUser: auth.user),
+          ),
+        );
+      }
+    } on AuthRoleException catch (roleEx) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      _showRoleWarningDialog(roleEx.message, roleEx.actualRole);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorFeedback(
+        title: _isLogin ? 'Đăng nhập không thành công' : 'Đăng ký không thành công',
+        message: e.toString().replaceAll('Exception: ', ''),
+      );
+    }
+  }
+
+  // Thông báo lỗi dạng SnackBar cao cấp
+  void _showErrorFeedback({
+    required String title,
+    required String message,
+  }) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppCultureColors.error,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppCultureColors.error.withValues(alpha: 0.35),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      message,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontWeight: FontWeight.w400,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  // Hộp thoại cảnh báo khi tài khoản đăng nhập không phải vai trò USER
+  void _showRoleWarningDialog(String message, String actualRole) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: const Row(
+          children: [
+            Icon(Icons.gpp_bad_rounded, color: Color(0xFFE65100), size: 24),
+            SizedBox(width: 10),
+            Text(
+              'Vai trò không hợp lệ',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: AppCultureColors.textDark,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFCC80)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, color: Color(0xFFE65100), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tài khoản đăng nhập có vai trò: $actualRole',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFE65100),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppCultureColors.textDark,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '💡 Tài khoản Khách du lịch (USER) mẫu:\n• Email: user@journeygo.com\n• Mật khẩu: User@123456',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: AppCultureColors.textMuted,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _emailController.text = 'user@journeygo.com';
+                _passwordController.text = 'User@123456';
+              });
+            },
+            child: const Text(
+              'Điền tài khoản USER',
+              style: TextStyle(
+                color: AppCultureColors.heritageJade,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppCultureColors.heritageJade,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Hộp thoại tùy chỉnh cấu hình máy chủ Backend API
+  void _showServerConfigDialog() async {
+    final currentUrl = await TokenStorage.getBaseUrl();
+    final urlController = TextEditingController(text: currentUrl);
 
     if (!mounted) return;
 
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (_isLogin) {
-      _showSuccessFeedback(
-        title: 'Đăng nhập thành công!',
-        message: 'Chào mừng quý khách quay trở lại với Di sản Việt Nam.',
-        isReward: false,
-      );
-    } else {
-      _showSuccessFeedback(
-        title: 'Khởi tạo tài khoản thành công!',
-        message: '🎉 Quý khách đã nhận được +100 điểm thưởng khám phá di sản!',
-        isReward: true,
-      );
-    }
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: const Row(
+          children: [
+            Icon(Icons.dns_rounded, color: AppCultureColors.oceanBlue, size: 22),
+            SizedBox(width: 10),
+            Text(
+              'Cấu hình Máy chủ API',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: AppCultureColors.textDark,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Địa chỉ API Backend Spring Boot (mặc định cổng 8088):',
+              style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: urlController,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: AppCultureColors.surface,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppCultureColors.border),
+                ),
+              ),
+              style: const TextStyle(fontSize: 12.5, fontFamily: 'monospace'),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Chọn nhanh theo thiết bị:',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: AppCultureColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ActionChip(
+                  label: const Text('Android Emulator (10.0.2.2)'),
+                  labelStyle: const TextStyle(fontSize: 10.5),
+                  onPressed: () {
+                    urlController.text = 'http://10.0.2.2:8088/api/v1';
+                  },
+                ),
+                ActionChip(
+                  label: const Text('Localhost (127.0.0.1)'),
+                  labelStyle: const TextStyle(fontSize: 10.5),
+                  onPressed: () {
+                    urlController.text = 'http://127.0.0.1:8088/api/v1';
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await TokenStorage.resetBaseUrl();
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Mặc định', style: TextStyle(color: AppCultureColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newUrl = urlController.text.trim();
+              if (newUrl.isNotEmpty) {
+                await TokenStorage.setBaseUrl(newUrl);
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppCultureColors.oceanBlue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text('Lưu cấu hình'),
+          ),
+        ],
+      ),
+    );
   }
 
   // Hiển thị SnackBar chúc mừng đạt chuẩn thông báo thương mại
@@ -758,8 +1118,53 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
 
                   // Thanh Top: Logo thương hiệu Hoa Sen Journey Go
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // Nút cấu hình máy chủ Backend API
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _showServerConfigDialog,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.92),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x1A000000),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.dns_rounded,
+                                  size: 14,
+                                  color: AppCultureColors.oceanBlue,
+                                ),
+                                SizedBox(width: 5),
+                                Text(
+                                  'API :8088',
+                                  style: TextStyle(
+                                    color: AppCultureColors.textDark,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
                       // Logo thương hiệu "journey go" có hoa sen cách điệu
                       Container(
                         padding: const EdgeInsets.symmetric(
