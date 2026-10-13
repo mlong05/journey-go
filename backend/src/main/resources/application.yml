@@ -25,6 +25,19 @@ spring:
     show-sql: false
     open-in-view: false
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:journeygo-client-id.apps.googleusercontent.com}
+            client-secret: ${GOOGLE_CLIENT_SECRET:journeygo-client-secret}
+            scope:
+              - email
+              - profile
+              - openid
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+
 # JWT Configuration
 jwt:
   # Secret key (Base64 or min 256-bit plain text for HMAC-SHA256)
@@ -44,7 +57,10 @@ springdoc:
     tags-sorter: alpha
   show-actuator: true
 
-# CORS Configuration
+# CORS & OAuth2 Configuration
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+  oauth2:
+    default-redirect-uri: ${OAUTH2_DEFAULT_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
+    authorized-redirect-uris: ${OAUTH2_AUTHORIZED_REDIRECT_URIS:http://localhost:3000/oauth2/redirect,http://127.0.0.1:3000/oauth2/redirect}

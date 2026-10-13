@@ -1,5 +1,6 @@
 package com.journeygo.modules.auth.dto;
 
+import com.journeygo.modules.user.entity.AuthProvider;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import lombok.Builder;
@@ -13,6 +14,8 @@ public record UserResponse(
         String fullName,
         String phone,
         Role role,
+        AuthProvider authProvider,
+        String avatarUrl,
         boolean active,
         Instant createdAt
 ) {
@@ -23,6 +26,8 @@ public record UserResponse(
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
                 .role(user.getRole())
+                .authProvider(user.getAuthProvider())
+                .avatarUrl(user.getAvatarUrl())
                 .active(user.isActive())
                 .createdAt(user.getCreatedAt())
                 .build();
