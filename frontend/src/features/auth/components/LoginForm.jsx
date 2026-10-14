@@ -18,6 +18,7 @@ export default function LoginForm({
   loading,
   onSubmit,
   onShowToast,
+  onForgotPassword,
 }) {
   return (
     <form onSubmit={onSubmit} className="space-y-3.5 w-full">
@@ -58,12 +59,16 @@ export default function LoginForm({
           </label>
           <button
             type="button"
-            onClick={() =>
-              onShowToast?.(
-                "info",
-                "Vui lòng liên hệ quản trị viên để khôi phục mật khẩu."
-              )
-            }
+            onClick={() => {
+              if (onForgotPassword) {
+                onForgotPassword(loginForm.identifier);
+              } else {
+                onShowToast?.(
+                  "info",
+                  "Vui lòng liên hệ quản trị viên để khôi phục mật khẩu."
+                );
+              }
+            }}
             className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
           >
             Quên mật khẩu?

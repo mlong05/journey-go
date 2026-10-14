@@ -14,6 +14,7 @@ import AuthFeedbackModal from "./AuthFeedbackModal";
 import AuthToast from "./AuthToast";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
+import ForgotPasswordFlow from "./ForgotPasswordFlow";
 import SocialLoginButtons from "./SocialLoginButtons";
 
 export default function AuthScreen({ initialTab = "login" }) {
@@ -522,72 +523,98 @@ export default function AuthScreen({ initialTab = "login" }) {
         {/* Cột phải Form Xác thực (7/12) */}
         <div className="relative lg:col-span-7 col-span-12 flex flex-col justify-between overflow-hidden h-full bg-white p-8 xl:p-12">
           <div className="w-full flex flex-col justify-between h-full space-y-4">
-            {/* Header & Chuyển đổi Tab */}
-            <div className="space-y-3">
-              <div className="inline-flex p-1 bg-slate-100 rounded-xl gap-1 w-fit border border-slate-200/60">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("login")}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === "login"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-700"
-                    }`}
-                >
-                  Đăng nhập
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("register")}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === "register"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-700"
-                    }`}
-                >
-                  Đăng ký tài khoản
-                </button>
-              </div>
-
-              <div>
-                <h1 className="text-2xl xl:text-3xl font-black text-slate-900 tracking-tight">
-                  {activeTab === "login" ? "Đăng Nhập Hệ Thống" : "Đăng Ký Thành Viên"}
-                </h1>
-
-              </div>
-            </div>
-
-            {/* Form Đăng nhập hoặc Form Đăng ký */}
-            {activeTab === "login" ? (
-              <LoginForm
-                loginForm={loginForm}
-                setLoginForm={setLoginForm}
-                roles={ROLES}
-                selectedRoleId={selectedRoleId}
-                onSelectRole={handleSelectRole}
-                showPassword={showPassword}
-                setShowPassword={setShowPassword}
-                loading={loading}
-                onSubmit={handleLoginSubmit}
-                onShowToast={showToast}
+            {/* Chế độ Quên mật khẩu & Khôi phục bằng OTP */}
+            {activeTab === "forgot_password" ? (
+              <ForgotPasswordFlow
+                initialEmail={loginForm.identifier}
+                onBackToLogin={() => setActiveTab("login")}
+                onResetSuccess={(resetEmail) => {
+                  setLoginForm((prev) => ({
+                    ...prev,
+                    identifier: resetEmail,
+                    password: "",
+                  }));
+                  setActiveTab("login");
+                  showToast(
+                    "success",
+                    "Đặt lại mật khẩu thành công! Vui lòng đăng nhập với mật khẩu mới."
+                  );
+                }}
               />
             ) : (
-              <RegisterForm
-                registerForm={registerForm}
-                setRegisterForm={setRegisterForm}
-                showPassword={showPassword}
-                showConfirmPassword={showConfirmPassword}
-                setShowPassword={setShowPassword}
-                setShowConfirmPassword={setShowConfirmPassword}
-                loading={loading}
-                onSubmit={handleRegisterSubmit}
-              />
-            )}
+              <>
+                {/* Header & Chuyển đổi Tab Đăng nhập / Đăng ký */}
+                <div className="space-y-3">
+                  <div className="inline-flex p-1 bg-slate-100 rounded-xl gap-1 w-fit border border-slate-200/60">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("login")}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        activeTab === "login"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      Đăng nhập
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("register")}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        activeTab === "register"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      Đăng ký tài khoản
+                    </button>
+                  </div>
 
-            {/* Các nút Đăng nhập nhanh SSO / Doanh nghiệp */}
-            <SocialLoginButtons
-              onSocialLogin={handleSocialLogin}
-              onGoogleLogin={handleGoogleClick}
-              loading={loading}
-            />
+                  <div>
+                    <h1 className="text-2xl xl:text-3xl font-black text-slate-900 tracking-tight">
+                      {activeTab === "login"
+                        ? "Đăng Nhập Hệ Thống"
+                        : "Đăng Ký Thành Viên"}
+                    </h1>
+                  </div>
+                </div>
+
+                {/* Form Đăng nhập hoặc Form Đăng ký */}
+                {activeTab === "login" ? (
+                  <LoginForm
+                    loginForm={loginForm}
+                    setLoginForm={setLoginForm}
+                    roles={ROLES}
+                    selectedRoleId={selectedRoleId}
+                    onSelectRole={handleSelectRole}
+                    showPassword={showPassword}
+                    setShowPassword={setShowPassword}
+                    loading={loading}
+                    onSubmit={handleLoginSubmit}
+                    onShowToast={showToast}
+                    onForgotPassword={() => setActiveTab("forgot_password")}
+                  />
+                ) : (
+                  <RegisterForm
+                    registerForm={registerForm}
+                    setRegisterForm={setRegisterForm}
+                    showPassword={showPassword}
+                    showConfirmPassword={showConfirmPassword}
+                    setShowPassword={setShowPassword}
+                    setShowConfirmPassword={setShowConfirmPassword}
+                    loading={loading}
+                    onSubmit={handleRegisterSubmit}
+                  />
+                )}
+
+                {/* Các nút Đăng nhập nhanh SSO / Doanh nghiệp */}
+                <SocialLoginButtons
+                  onSocialLogin={handleSocialLogin}
+                  onGoogleLogin={handleGoogleClick}
+                  loading={loading}
+                />
+              </>
+            )}
 
             {/* Footer bản quyền */}
             <div className="text-center pt-1 w-full">

@@ -289,53 +289,22 @@ export default function Sidebar({
         </div>
 
         {/* ══════════════════════════════════════════════════════════
-            PHẦN ĐÁY: THẺ TÀI KHOẢN & NÚT ĐĂNG XUẤT
+            PHẦN ĐÁY: NÚT ĐĂNG XUẤT DUY NHẤT (ĐÃ XÓA KHUNG TÀI KHOẢN)
         ══════════════════════════════════════════════════════════ */}
-        <div className={`p-3 border-t border-white/10 space-y-2 ${!isWide ? "px-2" : "p-3"}`}>
-          {/* Thẻ thông tin người dùng kính mờ */}
-          <div
-            className={`bg-white/5 border border-white/10 select-none backdrop-blur-xs transition-colors ${
-              isWide ? "p-3 rounded-2xl" : "p-2 rounded-xl flex justify-center"
-            }`}
-            title={`${user.name} (${user.email})`}
-          >
-            <div className={`flex items-center gap-2.5 min-w-0 ${!isWide ? "justify-center" : ""}`}>
-              {/* Avatar tròn với chữ initials trên nền gradient role */}
-              <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black tracking-wider shrink-0 shadow-sm ${theme.avatar}`}
-              >
-                {initials}
-              </div>
-
-              {isWide && (
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-white truncate leading-tight">
-                    {user.name}
-                  </p>
-                  <p className="text-[10px] text-slate-400 truncate mt-0.5 leading-tight">
-                    {user.email}
-                  </p>
-                  <span
-                    className={`inline-block text-[9.5px] font-semibold mt-1 leading-none ${theme.avatarRoleTag}`}
-                  >
-                    {user.roleDesc || user.statusText || theme.badgeText}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Nút Đăng xuất */}
+        <div className={`border-t border-white/10 ${isWide ? "p-3" : "p-2"}`}>
           {onLogout && (
             <button
               type="button"
               onClick={onLogout}
-              className={`w-full text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/15 py-2 px-3 rounded-xl flex items-center gap-2 font-semibold text-xs transition-colors cursor-pointer border border-transparent hover:border-rose-500/20 ${
-                isWide ? "justify-start" : "justify-center px-0"
-              }`}
-              title="Đăng xuất khỏi phiên làm việc"
+              className={
+                isWide
+                  ? "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 font-semibold text-xs transition-all cursor-pointer"
+                  : "w-full flex items-center justify-center p-3 rounded-xl text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 transition-all cursor-pointer"
+              }
+              title="Đăng xuất khỏi hệ thống"
+              aria-label="Đăng xuất"
             >
-              <LogOut size={16} className="shrink-0" />
+              <LogOut size={18} className="shrink-0 stroke-[2.2]" />
               {isWide && <span>Đăng xuất</span>}
             </button>
           )}

@@ -58,7 +58,18 @@ class ApiClient {
 
   async request(endpoint, options = {}, isRetry = false) {
     const url = `${this.baseUrl}${endpoint}`;
-    const token = typeof window !== "undefined" ? localStorage.getItem("jg_access_token") : null;
+    let token = null;
+    if (typeof window !== "undefined") {
+      token = localStorage.getItem("jg_access_token");
+      if (!token) {
+        try {
+          const authObj = JSON.parse(localStorage.getItem("journey_go_auth") || "{}");
+          token = authObj?.token || authObj?.accessToken || null;
+        } catch {
+          token = null;
+        }
+      }
+    }
 
     const headers = {
       "Content-Type": "application/json",
