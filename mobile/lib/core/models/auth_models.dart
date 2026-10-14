@@ -1,3 +1,16 @@
+/// Thông điệp lỗi chuẩn bảo mật - không làm lộ vai trò người dùng
+const String kInvalidAuthErrorMessage = 'Tài khoản hoặc mật khẩu không hợp lệ!';
+
+/// Kiểm tra vai trò hợp lệ cho ứng dụng di động Khách du lịch
+bool isTouristRole(String? role) {
+  if (role == null) return false;
+  final normalized = role.trim().toUpperCase();
+  return normalized == 'USER' ||
+      normalized == 'TOURIST' ||
+      normalized == 'ROLE_USER' ||
+      normalized == 'ROLE_TOURIST';
+}
+
 class UserModel {
   final int id;
   final String email;
@@ -21,7 +34,9 @@ class UserModel {
     this.createdAt,
   });
 
-  bool get isUserRole => role.toUpperCase() == 'USER';
+  /// Kiểm tra tài khoản có vai trò Khách du lịch (USER/TOURIST) hợp lệ cho Mobile
+  bool get isUserRole => isTouristRole(role);
+  bool get isTourist => isTouristRole(role);
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
@@ -121,11 +136,11 @@ class ApiResponseModel<T> {
 
 class AuthRoleException implements Exception {
   final String message;
-  final String actualRole;
+  final String? actualRole;
 
   AuthRoleException({
-    required this.message,
-    required this.actualRole,
+    this.message = kInvalidAuthErrorMessage,
+    this.actualRole,
   });
 
   @override

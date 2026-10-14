@@ -91,6 +91,34 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin thành công", UserResponse.fromEntity(user)));
     }
 
+    @PutMapping("/profile")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Cập nhật thông tin cá nhân", description = "Cập nhật họ tên, số điện thoại, avatar của người dùng hiện tại")
+    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestBody UpdateProfileRequest request) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error(401, "Người dùng chưa đăng nhập"));
+        }
+
+        User user = userRepository.findById(userPrincipal.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (StringUtils.hasText(request.fullName())) {
+            user.setFullName(request.fullName().trim());
+        }
+        if (request.phone() != null) {
+            user.setPhone(request.phone().trim());
+        }
+        if (request.avatarUrl() != null) {
+            user.setAvatarUrl(request.avatarUrl().trim());
+        }
+
+        user = userRepository.save(user);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin thành công", UserResponse.fromEntity(user)));
+    }
+
     @PostMapping("/forgot-password")
     @Operation(summary = "Quên mật khẩu - Gửi mã OTP", description = "Gửi mã OTP 6 chữ số đến email của người dùng để xác thực khôi phục mật khẩu")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {

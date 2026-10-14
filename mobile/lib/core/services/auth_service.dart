@@ -87,6 +87,42 @@ class AuthService {
     }
   }
 
+  /// Gửi yêu cầu HTTP PUT
+  Future<http.Response> _put({
+    required String path,
+    Map<String, dynamic>? body,
+    String? bearerToken,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    final baseUrl = await TokenStorage.getBaseUrl();
+    final uri = Uri.parse('$baseUrl$path');
+
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (bearerToken != null && bearerToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $bearerToken';
+    }
+
+    try {
+      final response = await http
+          .put(
+            uri,
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(timeout);
+      return response;
+    } on SocketException catch (e) {
+      throw Exception('Không thể kết nối máy chủ: ${e.message}');
+    } on TimeoutException {
+      throw Exception('Kết nối quá hạn. Vui lòng thử lại.');
+    } catch (e) {
+      throw Exception('Lỗi mạng: $e');
+    }
+  }
+
   /// Trích xuất thông điệp lỗi từ Response của Spring Boot
   String _extractErrorMessage(http.Response response) {
     try {
@@ -140,14 +176,11 @@ class AuthService {
         data as Map<String, dynamic>,
       );
 
-      // YÊU CẦU: Kiểm tra role là USER
-      final role = authResponse.user.role.toUpperCase();
-      if (role != ApiConstants.requiredRole) {
-        throw AuthRoleException(
-          message:
-              'Tài khoản này có vai trò [$role].\nỨng dụng di động JourneyGo chỉ hỗ trợ đăng nhập với vai trò Khách du lịch (${ApiConstants.requiredRole}).',
-          actualRole: role,
-        );
+      // YÊU CẦU BẢO MẬT: Kiểm tra vai trò hợp lệ cho Mobile (chỉ chấp nhận USER/TOURIST)
+      // Nếu role không hợp lệ -> xóa sạch token ngay lập tức và ném lỗi chung tránh lộ thông tin vai trò
+      if (!isTouristRole(authResponse.user.role)) {
+        await TokenStorage.clear();
+        throw Exception(kInvalidAuthErrorMessage);
       }
 
       // Lưu trữ phiên đăng nhập vào SharedPreferences
@@ -156,6 +189,76 @@ class AuthService {
     } else {
       final errorMsg = _extractErrorMessage(response);
       throw Exception(errorMsg);
+    }
+  }
+
+  // ==========================================================================
+  // 1b. ĐĂNG NHẬP GOOGLE (POST /api/v1/auth/google) - KIỂM TRA ROLE USER
+  // ==========================================================================
+  Future<AuthResponseModel> loginWithGoogle({required String idToken}) async {
+    final response = await _post(
+      path: '/auth/google',
+      body: {
+        'idToken': idToken,
+        'role': 'USER',
+      },
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final dynamic decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      final dynamic data = (decoded is Map && decoded.containsKey('data'))
+          ? decoded['data']
+          : decoded;
+
+      final authResponse = AuthResponseModel.fromJson(
+        data as Map<String, dynamic>,
+      );
+
+      if (!isTouristRole(authResponse.user.role)) {
+        await TokenStorage.clear();
+        throw Exception(kInvalidAuthErrorMessage);
+      }
+
+      await TokenStorage.saveAuthSession(authResponse);
+      return authResponse;
+    } else {
+      await TokenStorage.clear();
+      throw Exception(kInvalidAuthErrorMessage);
+    }
+  }
+
+  // ==========================================================================
+  // 1c. ĐĂNG NHẬP APPLE (POST /api/v1/auth/apple) - KIỂM TRA ROLE USER
+  // ==========================================================================
+  Future<AuthResponseModel> loginWithApple({required String identityToken}) async {
+    final response = await _post(
+      path: '/auth/apple',
+      body: {
+        'identityToken': identityToken,
+        'role': 'USER',
+      },
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final dynamic decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      final dynamic data = (decoded is Map && decoded.containsKey('data'))
+          ? decoded['data']
+          : decoded;
+
+      final authResponse = AuthResponseModel.fromJson(
+        data as Map<String, dynamic>,
+      );
+
+      if (!isTouristRole(authResponse.user.role)) {
+        await TokenStorage.clear();
+        throw Exception(kInvalidAuthErrorMessage);
+      }
+
+      await TokenStorage.saveAuthSession(authResponse);
+      return authResponse;
+    } else {
+      await TokenStorage.clear();
+      throw Exception(kInvalidAuthErrorMessage);
     }
   }
 
@@ -209,6 +312,12 @@ class AuthService {
         data as Map<String, dynamic>,
       );
 
+      // Kiểm tra bảo mật: Chỉ duy trì phiên nếu là USER / TOURIST
+      if (!isTouristRole(authResponse.user.role)) {
+        await TokenStorage.clear();
+        throw Exception(kInvalidAuthErrorMessage);
+      }
+
       // Cập nhật lại Access Token mới và Refresh Token (nếu có cấp mới)
       await TokenStorage.updateTokens(
         accessToken: authResponse.accessToken,
@@ -224,7 +333,7 @@ class AuthService {
       return authResponse;
     } else {
       // Refresh token không hợp lệ hoặc đã hết hạn
-      await TokenStorage.clearSession();
+      await TokenStorage.clear();
       final errorMsg = _extractErrorMessage(response);
       throw Exception('Phiên đăng nhập đã hết hạn: $errorMsg');
     }
@@ -259,6 +368,11 @@ class AuthService {
       final authResponse = AuthResponseModel.fromJson(
         data as Map<String, dynamic>,
       );
+
+      if (!isTouristRole(authResponse.user.role)) {
+        await TokenStorage.clear();
+        throw Exception(kInvalidAuthErrorMessage);
+      }
 
       await TokenStorage.saveAuthSession(authResponse);
       return authResponse;
@@ -303,8 +417,50 @@ class AuthService {
           : decoded;
 
       final user = UserModel.fromJson(data as Map<String, dynamic>);
+      if (!isTouristRole(user.role)) {
+        await TokenStorage.clear();
+        throw Exception(kInvalidAuthErrorMessage);
+      }
+
       await TokenStorage.saveUser(user);
       return user;
+    } else {
+      throw Exception(_extractErrorMessage(response));
+    }
+  }
+
+  // ==========================================================================
+  // 6. CẬP NHẬT THÔNG TIN CÁ NHÂN (PUT /api/v1/auth/profile)
+  // ==========================================================================
+  Future<UserModel> updateProfile({
+    required String fullName,
+    String? phone,
+    String? avatarUrl,
+  }) async {
+    final token = await TokenStorage.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Chưa đăng nhập');
+    }
+
+    final response = await _put(
+      path: ApiConstants.profileEndpoint,
+      bearerToken: token,
+      body: {
+        'fullName': fullName.trim(),
+        'phone': phone?.trim() ?? '',
+        'avatarUrl': avatarUrl?.trim() ?? '',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final dynamic decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      final dynamic data = (decoded is Map && decoded.containsKey('data'))
+          ? decoded['data']
+          : decoded;
+
+      final updated = UserModel.fromJson(data as Map<String, dynamic>);
+      await TokenStorage.saveUser(updated);
+      return updated;
     } else {
       throw Exception(_extractErrorMessage(response));
     }

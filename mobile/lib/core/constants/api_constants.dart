@@ -26,6 +26,8 @@ class ApiConstants {
   static const String refreshEndpoint = '/auth/refresh';
   static const String registerEndpoint = '/auth/register';
   static const String meEndpoint = '/auth/me';
+  static const String profileEndpoint = '/auth/profile';
+  static const String destinationsEndpoint = '/destinations';
 
   // Vai trò cho phép trên Mobile Tourist App
   static const String requiredRole = 'USER';
