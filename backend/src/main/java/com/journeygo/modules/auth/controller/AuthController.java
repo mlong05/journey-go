@@ -90,4 +90,40 @@ public class AuthController {
 
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin thành công", UserResponse.fromEntity(user)));
     }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Quên mật khẩu - Gửi mã OTP", description = "Gửi mã OTP 6 chữ số đến email của người dùng để xác thực khôi phục mật khẩu")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("Mã OTP khôi phục mật khẩu đã được gửi đến email của bạn", null));
+    }
+
+    @PostMapping("/verify-otp")
+    @Operation(summary = "Xác thực mã OTP", description = "Kiểm tra mã OTP 6 chữ số có hợp lệ và còn hiệu lực hay không trước khi đổi mật khẩu")
+    public ResponseEntity<ApiResponse<Boolean>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        boolean valid = authService.verifyOtp(request);
+        return ResponseEntity.ok(ApiResponse.success("Mã OTP hợp lệ", valid));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Đặt lại mật khẩu mới bằng OTP", description = "Xác thực OTP và đặt mật khẩu mới cho tài khoản (không cần đăng nhập)")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("Đặt lại mật khẩu thành công, vui lòng đăng nhập bằng mật khẩu mới", null));
+    }
+
+    @PostMapping("/change-password")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Đổi mật khẩu tài khoản", description = "Người dùng đang đăng nhập đổi mật khẩu tài khoản bằng mật khẩu hiện tại")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error(401, "Người dùng chưa đăng nhập"));
+        }
+
+        authService.changePassword(userPrincipal.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Đổi mật khẩu thành công", null));
+    }
 }

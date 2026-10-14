@@ -37,6 +37,11 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final TokenBlacklistService tokenBlacklistService;
     private final GoogleTokenVerifierService googleTokenVerifierService;
+    private final com.journeygo.modules.auth.repository.PasswordResetOtpRepository passwordResetOtpRepository;
+    private final EmailService emailService;
+
+    @org.springframework.beans.factory.annotation.Value("${app.mail.otp-expiration-minutes:10}")
+    private int otpExpirationMinutes;
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
@@ -200,5 +205,115 @@ public class AuthService {
         }
 
         SecurityContextHolder.clearContext();
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        String email = request.email().toLowerCase().trim();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED, "Không tìm thấy người dùng với email: " + email));
+
+        if (!user.isActive()) {
+            throw new AppException(ErrorCode.UNAUTHORIZED, "Tài khoản của bạn đã bị vô hiệu hóa");
+        }
+
+        // Xóa các mã OTP cũ chưa dùng của email này nếu có
+        passwordResetOtpRepository.deleteByEmail(email);
+
+        // Sinh mã OTP 6 chữ số ngẫu nhiên
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        String otp = String.format("%06d", random.nextInt(1_000_000));
+
+        com.journeygo.modules.auth.entity.PasswordResetOtp resetOtp = com.journeygo.modules.auth.entity.PasswordResetOtp.builder()
+                .email(email)
+                .otp(otp)
+                .expiryDate(java.time.Instant.now().plus(otpExpirationMinutes, java.time.temporal.ChronoUnit.MINUTES))
+                .used(false)
+                .build();
+
+        passwordResetOtpRepository.save(resetOtp);
+
+        // Gửi email chứa OTP
+        emailService.sendPasswordResetOtp(email, user.getFullName(), otp, otpExpirationMinutes);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean verifyOtp(VerifyOtpRequest request) {
+        String email = request.email().toLowerCase().trim();
+        String otp = request.otp().trim();
+
+        com.journeygo.modules.auth.entity.PasswordResetOtp resetOtp = passwordResetOtpRepository
+                .findTopByEmailAndOtpAndUsedFalseOrderByCreatedAtDesc(email, otp)
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_OTP));
+
+        if (resetOtp.isExpired()) {
+            throw new AppException(ErrorCode.OTP_EXPIRED);
+        }
+
+        return true;
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new AppException(ErrorCode.PASSWORD_NOT_MATCH);
+        }
+
+        String email = request.email().toLowerCase().trim();
+        String otp = request.otp().trim();
+
+        com.journeygo.modules.auth.entity.PasswordResetOtp resetOtp = passwordResetOtpRepository
+                .findTopByEmailAndOtpAndUsedFalseOrderByCreatedAtDesc(email, otp)
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_OTP));
+
+        if (resetOtp.isExpired()) {
+            throw new AppException(ErrorCode.OTP_EXPIRED);
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (user.getPassword() != null && passwordEncoder.matches(request.newPassword(), user.getPassword())) {
+            throw new AppException(ErrorCode.SAME_OLD_PASSWORD);
+        }
+
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+
+        resetOtp.setUsed(true);
+        passwordResetOtpRepository.save(resetOtp);
+
+        // Hủy toàn bộ refresh token cũ để buộc đăng nhập lại
+        refreshTokenService.revokeAllUserTokens(user);
+        log.info("Đặt lại mật khẩu thành công cho tài khoản email: {}", email);
+    }
+
+    @Transactional
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new AppException(ErrorCode.PASSWORD_NOT_MATCH);
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // Nếu tài khoản có mật khẩu cũ (tài khoản LOCAL hoặc OAuth2 đã từng đặt password)
+        if (user.getPassword() != null && !user.getPassword().isBlank()) {
+            if (request.currentPassword() == null || request.currentPassword().isBlank()) {
+                throw new AppException(ErrorCode.VALIDATION_ERROR, "Vui lòng nhập mật khẩu hiện tại");
+            }
+            if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
+                throw new AppException(ErrorCode.INVALID_CREDENTIALS, "Mật khẩu hiện tại không chính xác");
+            }
+            if (passwordEncoder.matches(request.newPassword(), user.getPassword())) {
+                throw new AppException(ErrorCode.SAME_OLD_PASSWORD);
+            }
+        }
+
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+
+        refreshTokenService.revokeAllUserTokens(user);
+        log.info("Người dùng id={} đổi mật khẩu thành công", userId);
     }
 }
