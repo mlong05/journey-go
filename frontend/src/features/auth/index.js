@@ -1,6 +1,7 @@
 export { default as AuthScreen } from "./components/AuthScreen";
 export { default as LoginForm } from "./components/LoginForm";
 export { default as RegisterForm } from "./components/RegisterForm";
+export { default as ForgotPasswordFlow } from "./components/ForgotPasswordFlow";
 export { default as AuthHeroCarousel } from "./components/AuthHeroCarousel";
 export { default as AuthFeedbackModal } from "./components/AuthFeedbackModal";
 export { default as RoleSelector } from "./components/RoleSelector";

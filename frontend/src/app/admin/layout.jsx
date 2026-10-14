@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
-import { ExpandingSideRail } from "@/components/layout";
+import { ExpandingSideRail, UserProfilePill } from "@/components/layout";
 
 /**
  * Layout Quản Trị Hệ Thống Toàn Sàn - JourneyGo
@@ -109,7 +109,7 @@ export default function AdminLayout({ children }) {
     : "QT";
 
   return (
-    <div className="h-screen w-screen flex bg-slate-50 overflow-hidden p-0 m-0 text-slate-800 font-sans antialiased">
+    <div className="h-screen w-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
       {/* ────────────────────────────────────────────────────────
           1. CỘT 1 (SIDEBAR): MÔ HÌNH FLEXBOX CHUẨN DASHBOARD
       ──────────────────────────────────────────────────────── */}
@@ -133,7 +133,7 @@ export default function AdminLayout({ children }) {
       {/* ────────────────────────────────────────────────────────
           2. CỘT 2 (VÙNG NỘI DUNG BÊN PHẢI): CỐ ĐỊNH 100VH, KHÔNG BỊ TRÔI TOPBAR
       ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 h-screen flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 w-full h-screen flex flex-col overflow-hidden">
         {/* Topbar trên cùng: h-16 shrink-0, cố định vĩnh viễn trên cùng */}
         <header className="h-16 shrink-0 w-full bg-white border-b border-slate-200 px-6 flex items-center justify-between z-30 shadow-2xs">
           {/* Cụm trái: Menu mobile + Tiêu đề */}
@@ -192,18 +192,16 @@ export default function AdminLayout({ children }) {
               </Link>
             </div>
 
-            {/* Badge Trạng thái quyền hạn */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-800 shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-              <span className="hidden sm:inline">Quản Trị Tối Cao</span>
-              <span className="sm:hidden">Admin</span>
-            </div>
+            {/* Cụm Thẻ Định Danh Người Dùng (User Profile Pill) */}
+            <UserProfilePill role="admin" user={authData?.user} />
           </div>
         </header>
 
-        {/* Main Content bên dưới: flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50 */}
-        <main className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
-          {children}
+        {/* Main Content bên dưới: flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50 */}
+        <main className="flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50">
+          <div className="w-full max-w-[1600px] mx-auto space-y-6">
+            {children}
+          </div>
         </main>
       </div>
 

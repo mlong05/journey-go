@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
-import { ExpandingSideRail } from "@/components/layout";
+import { ExpandingSideRail, UserProfilePill } from "@/components/layout";
 
 /**
  * Layout Quản Trị Dành Cho Đối Tác Điểm Đến - JourneyGo
@@ -103,7 +103,7 @@ export default function ProviderLayout({ children }) {
   const partnerCode = authData?.user?.id ? `DT-${String(authData.user.id).slice(-4).toUpperCase()}` : "DT-JG-01";
 
   return (
-    <div className="h-screen w-screen flex bg-slate-50 overflow-hidden p-0 m-0 font-sans antialiased text-slate-800">
+    <div className="h-screen w-full overflow-hidden flex bg-slate-50 m-0 p-0 font-sans antialiased text-slate-800">
       {/* ══════════════════════════════════════════════════════════
           1. EXPANDING SIDE RAIL (PROMPT #040 - MENUS & TABS)
       ══════════════════════════════════════════════════════════ */}
@@ -127,7 +127,7 @@ export default function ProviderLayout({ children }) {
       {/* ══════════════════════════════════════════════════════════
           2. KHU VỰC NỘI DUNG CHÍNH & HEADER TRÊN CÙNG (ĐẨY THEO RAIL)
       ══════════════════════════════════════════════════════════ */}
-      <div className="flex-1 min-w-0 h-screen flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 w-full h-screen flex flex-col overflow-hidden">
         {/* HEADER TRÊN CÙNG (SHRINK-0): CỐ ĐỊNH VĨNH VIỄN */}
         <header className="h-16 shrink-0 w-full bg-white border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 z-30 shadow-2xs">
           {/* Cụm trái: Nút mở mobile menu & Thanh tìm kiếm nhanh */}
@@ -154,8 +154,19 @@ export default function ProviderLayout({ children }) {
             </div>
           </div>
 
-          {/* Cụm phải: Chuông thông báo & Nút [+ Tạo Điểm đến / Lộ trình mới] */}
+          {/* Cụm phải: Nút tạo mới + Chuông thông báo + Thẻ định danh người dùng */}
           <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Nút bấm nổi bật: [+ Tạo Điểm đến / Lộ trình mới] */}
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center gap-2 shadow-sm shadow-emerald-600/20 text-xs sm:text-sm transition-all duration-200 cursor-pointer"
+            >
+              <Plus size={18} strokeWidth={2.4} />
+              <span className="hidden sm:inline">Tạo Điểm đến / Lộ trình mới</span>
+              <span className="sm:hidden">Tạo mới</span>
+            </button>
+
             {/* Chuông thông báo */}
             <div className="relative">
               <button
@@ -209,22 +220,16 @@ export default function ProviderLayout({ children }) {
               )}
             </div>
 
-            {/* Nút bấm nổi bật: [+ Tạo Điểm đến / Lộ trình mới] */}
-            <button
-              type="button"
-              onClick={() => setIsCreateModalOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center gap-2 shadow-sm shadow-emerald-600/20 text-xs sm:text-sm transition-all duration-200 cursor-pointer"
-            >
-              <Plus size={18} strokeWidth={2.4} />
-              <span className="hidden sm:inline">Tạo Điểm đến / Lộ trình mới</span>
-              <span className="sm:hidden">Tạo mới</span>
-            </button>
+            {/* Cụm Thẻ Định Danh Người Dùng (User Profile Pill) */}
+            <UserProfilePill role="provider" user={authData?.user} />
           </div>
         </header>
 
-        {/* ── NỘI DUNG TRANG CHÍNH: DUY NHẤT VÙNG NÀY CUỘN DỌC ── */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          {children}
+        {/* ── NỘI DUNG TRANG CHÍNH: flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 ── */}
+        <main className="flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8">
+          <div className="w-full max-w-[1600px] mx-auto space-y-6">
+            {children}
+          </div>
         </main>
       </div>
 

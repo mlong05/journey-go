@@ -188,34 +188,22 @@ export default function ExpandingSideRail({
               })}
             </ul>
 
-            {/* Phần Đáy: Profile & Đăng xuất */}
-            <div className="u040-bottom">
-              {/* User Card */}
-              <div
-                className="u040-me select-none"
-                title={`${user.name} (${user.email})`}
-              >
-                <i aria-hidden="true">{user.initials || "JG"}</i>
-                <span>
-                  <strong className="block text-white font-bold leading-tight truncate max-w-[150px]">
-                    {user.name}
-                  </strong>
-                  <small className="text-slate-300 truncate max-w-[150px]">
-                    {user.email}
-                  </small>
-                </span>
-              </div>
-
-              {/* Nút Đăng Xuất */}
+            {/* Phần Đáy: Nút Đăng xuất duy nhất */}
+            <div className="u040-bottom border-t border-white/10 pt-2">
               {onLogout && (
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="u040-logout-btn"
+                  className={
+                    isWide
+                      ? "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 font-semibold text-xs transition-all cursor-pointer"
+                      : "w-full flex items-center justify-center p-3 rounded-xl text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 transition-all cursor-pointer"
+                  }
                   title="Đăng xuất khỏi phiên làm việc"
+                  aria-label="Đăng xuất"
                 >
-                  <LogOut aria-hidden="true" />
-                  <span>Đăng xuất</span>
+                  <LogOut size={18} className="shrink-0 stroke-[2.2]" />
+                  {isWide && <span>Đăng xuất</span>}
                 </button>
               )}
             </div>
