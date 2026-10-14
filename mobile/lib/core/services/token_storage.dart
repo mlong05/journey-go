@@ -79,7 +79,7 @@ class TokenStorage {
     return token != null && token.isNotEmpty && user != null;
   }
 
-  /// Xóa toàn bộ token & phiên đăng nhập khi Logout
+  /// Xóa toàn bộ token & phiên đăng nhập (Hỗ trợ gọi cả clear() lẫn clearSession())
   static Future<void> clearSession() async {
     final prefs = await _getPrefs();
     await prefs.remove(_keyAccessToken);
@@ -87,6 +87,9 @@ class TokenStorage {
     await prefs.remove(_keyUserInfo);
     await prefs.remove(_keyTokenIssuedAt);
   }
+
+  /// Alias xóa toàn bộ phiên đăng nhập
+  static Future<void> clear() async => clearSession();
 
   /// Lấy cấu hình Base URL máy chủ
   static Future<String> getBaseUrl() async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'core/constants/app_colors.dart';
 import 'core/models/auth_models.dart';
 import 'core/services/token_storage.dart';
 import 'screens/tourist_home_screen.dart';
@@ -21,11 +22,15 @@ void main() async {
   final bool isLoggedIn = await TokenStorage.hasValidSession();
   if (isLoggedIn) {
     savedUser = await TokenStorage.getUser();
-    // Nếu role không phải USER thì xóa session cũ
-    if (savedUser != null && !savedUser.isUserRole) {
-      await TokenStorage.clearSession();
+    // BẢO MẬT: Ứng dụng di động chỉ hỗ trợ duy nhất Khách du lịch (USER/TOURIST)
+    // Nếu role không phải USER/TOURIST -> lập tức xóa sạch token/session và gán null
+    if (savedUser != null && !isTouristRole(savedUser.role)) {
+      await TokenStorage.clear();
       savedUser = null;
     }
+  } else {
+    // Dọn dẹp token rác nếu không có phiên đăng nhập hợp lệ
+    await TokenStorage.clear();
   }
 
   runApp(JourneyGoTouristApp(initialUser: savedUser));

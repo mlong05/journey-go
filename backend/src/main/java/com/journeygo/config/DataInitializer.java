@@ -1,5 +1,7 @@
 package com.journeygo.config;
 
+import com.journeygo.modules.destination.entity.Destination;
+import com.journeygo.modules.destination.repository.DestinationRepository;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
@@ -16,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 public class DataInitializer {
 
     private final UserRepository userRepository;
+    private final DestinationRepository destinationRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Bean
@@ -85,7 +88,75 @@ public class DataInitializer {
                         .build());
             });
 
-            log.info("Khởi tạo và đồng bộ tài khoản mẫu (ADMIN, MODERATOR, PROVIDER) thành công với mật khẩu Password123@");
+            // Tài khoản Khách du lịch (USER/TOURIST) dành riêng cho ứng dụng Mobile
+            userRepository.findByEmail("tourist@journeygo.com").ifPresentOrElse(tourist -> {
+                tourist.setPassword(passwordEncoder.encode("Password123@"));
+                tourist.setRole(Role.USER);
+                tourist.setFullName("Nguyễn An");
+                userRepository.save(tourist);
+            }, () -> {
+                userRepository.save(User.builder()
+                        .email("tourist@journeygo.com")
+                        .password(passwordEncoder.encode("Password123@"))
+                        .fullName("Nguyễn An")
+                        .phone("0988123456")
+                        .role(Role.USER)
+                        .active(true)
+                        .build());
+            });
+
+            // Khởi tạo các điểm di tích văn hóa lịch sử mẫu nếu chưa có
+            if (destinationRepository.count() == 0) {
+                User admin = userRepository.findByEmail("admin@journeygo.com").orElse(null);
+                destinationRepository.save(Destination.builder()
+                        .name("Văn Miếu – Quốc Tử Giám")
+                        .address("58 Quốc Tử Giám, Văn Miếu, Đống Đa, Hà Nội")
+                        .latitude(new java.math.BigDecimal("21.0277000"))
+                        .longitude(new java.math.BigDecimal("105.8351000"))
+                        .capacity(5000)
+                        .approved(true)
+                        .createdBy(admin)
+                        .build());
+                destinationRepository.save(Destination.builder()
+                        .name("Hoàng Thành Thăng Long")
+                        .address("19C Hoàng Diệu, Quán Thánh, Ba Đình, Hà Nội")
+                        .latitude(new java.math.BigDecimal("21.0364000"))
+                        .longitude(new java.math.BigDecimal("105.8353000"))
+                        .capacity(8000)
+                        .approved(true)
+                        .createdBy(admin)
+                        .build());
+                destinationRepository.save(Destination.builder()
+                        .name("Làng Gốm Bát Tràng")
+                        .address("Bát Tràng, Gia Lâm, Hà Nội")
+                        .latitude(new java.math.BigDecimal("20.9785000"))
+                        .longitude(new java.math.BigDecimal("105.9126000"))
+                        .capacity(3000)
+                        .approved(true)
+                        .createdBy(admin)
+                        .build());
+                destinationRepository.save(Destination.builder()
+                        .name("Quần Thể Di Sản Tràng An")
+                        .address("Tràng An, Hoa Lư, Ninh Bình")
+                        .latitude(new java.math.BigDecimal("20.2506000"))
+                        .longitude(new java.math.BigDecimal("105.9048000"))
+                        .capacity(10000)
+                        .approved(true)
+                        .createdBy(admin)
+                        .build());
+                destinationRepository.save(Destination.builder()
+                        .name("Chùa Trấn Quốc & Hồ Tây")
+                        .address("Đường Thanh Niên, Yên Phụ, Tây Hồ, Hà Nội")
+                        .latitude(new java.math.BigDecimal("21.0483000"))
+                        .longitude(new java.math.BigDecimal("105.8368000"))
+                        .capacity(4000)
+                        .approved(true)
+                        .createdBy(admin)
+                        .build());
+                log.info("Khởi tạo danh mục di sản văn hóa trọng điểm thành công!");
+            }
+
+            log.info("Khởi tạo và đồng bộ tài khoản mẫu (ADMIN, MODERATOR, PROVIDER, TOURIST) thành công với mật khẩu Password123@");
         };
     }
 }

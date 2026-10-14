@@ -4,37 +4,7 @@ import 'core/services/auth_service.dart';
 import 'core/services/token_storage.dart';
 import 'screens/tourist_home_screen.dart';
 
-/// Bảng màu chuẩn Cổng Du Lịch Văn Hóa Việt Nam
-class AppCultureColors {
-  // Nền sáng và trung tính cao cấp
-  static const Color background = Color(0xFFFFFFFF);
-  static const Color surface = Color(0xFFF8FAFC);
-  static const Color surfaceSubtle = Color(0xFFF1F5F9);
-  static const Color border = Color(0xFFE2E8F0);
-
-  // Gam màu di sản chủ đạo
-  static const Color heritageJade = Color(0xFF00A86B); // Xanh ngọc di sản
-  static const Color jadeLight = Color(0xFFE6F7F0);
-  static const Color jadeDark = Color(0xFF008F5A);
-
-  // Gam màu biển trời thứ cấp
-  static const Color oceanBlue = Color(0xFF0288D1); // Xanh biển trời
-  static const Color oceanLight = Color(0xFFE1F5FE);
-  static const Color oceanDark = Color(0xFF01579B);
-
-  // Màu chữ & tương phản
-  static const Color textDark = Color(0xFF1E293B); // Xám đậm cao cấp
-  static const Color textMuted = Color(0xFF64748B);
-  static const Color textLight = Color(0xFF94A3B8);
-
-  // Thưởng & Ưu đãi
-  static const Color rewardBg = Color(0xFFFEF3C7); // Vàng kem nhạt
-  static const Color rewardBorder = Color(0xFFFDE68A);
-  static const Color rewardText = Color(0xFF92400E);
-
-  // Trạng thái
-  static const Color error = Color(0xFFEF4444);
-}
+import 'core/constants/app_colors.dart';
 
 /// Màn hình Đăng nhập & Đăng ký Khách du lịch (Tourist Auth Screen)
 class TouristAuthScreen extends StatefulWidget {
@@ -147,6 +117,12 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
           password: _passwordController.text,
         );
 
+        // BẢO MẬT: Kiểm tra vai trò Khách du lịch (USER / TOURIST)
+        if (!isTouristRole(auth.user.role)) {
+          await TokenStorage.clear();
+          throw Exception(kInvalidAuthErrorMessage);
+        }
+
         if (_rememberMe) {
           await TokenStorage.setRememberMe(true, email: _emailController.text);
         } else {
@@ -176,12 +152,19 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
         );
       } else {
         // ĐĂNG KÝ (POST /api/v1/auth/register) VỚI ROLE USER
+        final cleanPhone = _phoneController.text.replaceAll(RegExp(r'\s+'), '').trim();
         final auth = await _authService.register(
-          email: _emailController.text,
+          email: _emailController.text.trim(),
           password: _passwordController.text,
-          fullName: _fullNameController.text,
-          phone: _phoneController.text,
+          fullName: _fullNameController.text.trim(),
+          phone: cleanPhone,
         );
+
+        // BẢO MẬT: Kiểm tra vai trò Khách du lịch (USER / TOURIST)
+        if (!isTouristRole(auth.user.role)) {
+          await TokenStorage.clear();
+          throw Exception(kInvalidAuthErrorMessage);
+        }
 
         if (!mounted) return;
 
@@ -205,20 +188,45 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
           ),
         );
       }
-    } on AuthRoleException catch (roleEx) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
-      _showRoleWarningDialog(roleEx.message, roleEx.actualRole);
-    } catch (e) {
+    } on AuthRoleException {
+      // TUYỆT ĐỐI KHÔNG hiển thị dialog lộ thông tin vai trò hệ thống
+      await TokenStorage.clear();
       if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
       _showErrorFeedback(
+        title: 'Đăng nhập không thành công',
+        message: kInvalidAuthErrorMessage,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      final rawError = e.toString().replaceAll('Exception: ', '').trim();
+
+      String displayMessage;
+      if (_isLogin) {
+        // Luồng ĐĂNG NHẬP: Bảo mật tuyệt đối, chặn lộ vai trò hệ thống
+        displayMessage = (rawError.contains('vai trò') ||
+                rawError.contains('role') ||
+                rawError.contains('Role') ||
+                rawError.contains('không hợp lệ') ||
+                rawError.contains('401') ||
+                rawError.contains('403'))
+            ? kInvalidAuthErrorMessage
+            : (rawError.isNotEmpty ? rawError : kInvalidAuthErrorMessage);
+      } else {
+        // Luồng ĐĂNG KÝ: Hiển thị thông báo nghiệp vụ chi tiết từ backend (email trùng lặp, định dạng...)
+        displayMessage = (rawError.contains('vai trò') || rawError.contains('Role'))
+            ? kInvalidAuthErrorMessage
+            : (rawError.isNotEmpty ? rawError : 'Đăng ký tài khoản không thành công. Vui lòng thử lại.');
+      }
+
+      _showErrorFeedback(
         title: _isLogin ? 'Đăng nhập không thành công' : 'Đăng ký không thành công',
-        message: e.toString().replaceAll('Exception: ', ''),
+        message: displayMessage,
       );
     }
   }
@@ -298,105 +306,89 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
     );
   }
 
-  // Hộp thoại cảnh báo khi tài khoản đăng nhập không phải vai trò USER
-  void _showRoleWarningDialog(String message, String actualRole) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: Colors.white,
-        title: const Row(
-          children: [
-            Icon(Icons.gpp_bad_rounded, color: Color(0xFFE65100), size: 24),
-            SizedBox(width: 10),
-            Text(
-              'Vai trò không hợp lệ',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: AppCultureColors.textDark,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF3E0),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFFCC80)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline_rounded, color: Color(0xFFE65100), size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Tài khoản đăng nhập có vai trò: $actualRole',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFE65100),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppCultureColors.textDark,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              '💡 Tài khoản Khách du lịch (USER) mẫu:\n• Email: user@journeygo.com\n• Mật khẩu: User@123456',
-              style: TextStyle(
-                fontSize: 11.5,
-                color: AppCultureColors.textMuted,
-                height: 1.4,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() {
-                _emailController.text = 'user@journeygo.com';
-                _passwordController.text = 'User@123456';
-              });
-            },
-            child: const Text(
-              'Điền tài khoản USER',
-              style: TextStyle(
-                color: AppCultureColors.heritageJade,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+  // Xử lý đăng nhập Mạng xã hội (Google / Apple) với kiểm tra bảo mật vai trò nghiêm ngặt
+  Future<void> _handleSocialLogin(String provider, {String? token}) async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      AuthResponseModel? auth;
+      if (token != null && token.isNotEmpty) {
+        if (provider.toLowerCase().contains('google')) {
+          auth = await _authService.loginWithGoogle(idToken: token);
+        } else if (provider.toLowerCase().contains('apple')) {
+          auth = await _authService.loginWithApple(identityToken: token);
+        }
+      } else {
+        // Mô phỏng kết nối xác thực mạng xã hội
+        await Future.delayed(const Duration(milliseconds: 600));
+        // Mặc định từ chối nếu chưa cấu hình OAuth SDK hoặc tài khoản không hợp lệ
+        throw Exception(kInvalidAuthErrorMessage);
+      }
+
+      if (auth != null) {
+        final loggedInUser = auth.user;
+        // KIỂM TRA BẢO MẬT: Chỉ cho phép USER / TOURIST
+        if (!isTouristRole(loggedInUser.role)) {
+          await TokenStorage.clear();
+          throw Exception(kInvalidAuthErrorMessage);
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+        });
+
+        _showSuccessFeedback(
+          title: 'Đăng nhập thành công!',
+          message: 'Chào mừng quý khách quay trở lại với JourneyGo!',
+          isReward: false,
+        );
+
+        await Future.delayed(const Duration(milliseconds: 250));
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TouristHomeScreen(initialUser: loggedInUser),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppCultureColors.heritageJade,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              elevation: 0,
-            ),
-            child: const Text('Đã hiểu'),
-          ),
-        ],
-      ),
-    );
+        );
+      }
+    } on AuthRoleException {
+      // TUYỆT ĐỐI KHÔNG hiển thị dialog lộ thông tin vai trò hệ thống
+      await TokenStorage.clear();
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorFeedback(
+        title: 'Đăng nhập không thành công',
+        message: kInvalidAuthErrorMessage,
+      );
+    } catch (e) {
+      await TokenStorage.clear();
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      final rawError = e.toString().replaceAll('Exception: ', '').trim();
+      final displayMessage = (rawError.contains('vai trò') ||
+              rawError.contains('role') ||
+              rawError.contains('Role') ||
+              rawError.contains('không hợp lệ') ||
+              rawError.contains('401') ||
+              rawError.contains('403'))
+          ? kInvalidAuthErrorMessage
+          : (rawError.isNotEmpty ? rawError : kInvalidAuthErrorMessage);
+
+      _showErrorFeedback(
+        title: 'Đăng nhập không thành công',
+        message: displayMessage,
+      );
+    }
   }
 
   // Hộp thoại tùy chỉnh cấu hình máy chủ Backend API
@@ -1730,14 +1722,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                   size: const Size(18, 18),
                   painter: GoogleLogoPainter(),
                 ),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Đang kết nối xác thực tài khoản Google...'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
+                onTap: () => _handleSocialLogin('Google'),
               ),
             ),
 
@@ -1752,14 +1737,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                   size: 21,
                   color: AppCultureColors.textDark,
                 ),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Đang kết nối Apple Sign-In...'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
+                onTap: () => _handleSocialLogin('Apple'),
               ),
             ),
           ],
