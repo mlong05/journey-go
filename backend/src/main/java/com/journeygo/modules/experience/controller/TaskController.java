@@ -32,8 +32,6 @@ public class TaskController {
 
     private final TaskService taskService;
 
-    // ── Reads (public cho PUBLISHED — auth filter trong service) ───────────
-
     @GetMapping("/tasks/{id}")
     @Operation(summary = "Lấy Task theo ID")
     public ResponseEntity<ApiResponse<TaskResponse>> getById(@PathVariable Long id) {
@@ -47,8 +45,6 @@ public class TaskController {
         return ResponseEntity.ok(ApiResponse.success(
                 taskService.listByExperience(experienceId)));
     }
-
-    // ── Writes — cần PROVIDER/ADMIN + ownership ────────────────────────────
 
     @PostMapping("/experiences/{experienceId}/tasks")
     @SecurityRequirement(name = "Bearer Authentication")

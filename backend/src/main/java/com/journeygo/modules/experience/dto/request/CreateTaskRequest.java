@@ -3,12 +3,6 @@ package com.journeygo.modules.experience.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
-/**
- * Tạo Task cho Experience (CONTEXT §7 — POST /api/v1/experiences/{experienceId}/tasks).
- *
- * BR-TASK-3: nếu taskType có has_questions=true → validate có ≥1 Question sau khi tạo.
- * BR-TASK-4: nếu taskType có requires_location=true → bắt buộc checkInPointId.
- */
 @Schema(description = "Yêu cầu tạo Task trong Experience")
 public record CreateTaskRequest(
 

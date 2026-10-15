@@ -8,11 +8,6 @@ import lombok.Builder;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Response UserCheckInPoint - ghi nhận Tourist đã check-in tại CheckInPoint vi mô.
- *
- * BR-UCIP-2: isValid = true khi distance <= radius_meters (hoặc QR khớp với check_in_point.qr_token).
- */
 @Builder
 @Schema(description = "Response check-in của Tourist tại CheckInPoint vi mô")
 public record UserCheckInResponse(

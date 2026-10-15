@@ -6,18 +6,6 @@ import lombok.*;
 
 import java.time.Instant;
 
-/**
- * Master data: loại task trong Experience.
- *
- * Theo CONTEXT §3 mới: chỉ 2 loại:
- *   - QUIZ: câu hỏi trắc nghiệm / text 4 phương án. has_questions=true, requires_location=false.
- *           verification: ANSWER_MATCH.
- *   - REAL_WORLD_INTERACTIVE: câu hỏi tương tác ngoài thực tế — Tourist phải đến vị trí (GPS check-in)
- *           thì mới được phép trả lời text answer. has_questions=true, requires_location=true.
- *           verification: ANSWER_MATCH (sau khi pass Location Verification).
- *
- * Seed 2 loại trong DataInitializer.
- */
 @Entity
 @Table(name = "task_type")
 @Getter

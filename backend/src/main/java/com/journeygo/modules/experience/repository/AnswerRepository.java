@@ -16,10 +16,7 @@ public interface AnswerRepository extends JpaRepository<Answer, Long> {
 
     boolean existsByQuestionIdAndIsCorrectTrue(Long questionId);
 
-    /**
-     * Load Answer cùng Question → Task → Experience → createdBy trong 1 query.
-     * Dùng cho ownership check — tránh LazyInitException.
-     */
+
     @Query("""
             SELECT a FROM Answer a
             JOIN FETCH a.question q

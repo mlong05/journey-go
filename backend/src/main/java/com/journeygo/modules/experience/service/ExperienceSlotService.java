@@ -19,11 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Service ExperienceSlot — phân bổ quota (theo TOUR) cho Experience theo ngày.
- *
- * Vì Experience 1-1 Destination, slot này ngầm định quản lý cả quota cho destination tương ứng.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -55,7 +50,6 @@ public class ExperienceSlotService {
                     "Chỉ tạo slot khi Experience ở DRAFT hoặc PUBLISHED");
         }
 
-        // UNIQUE (experience_id, slot_date) — dùng upsert behavior
         ExperienceSlot slot = slotRepository.findByExperienceIdAndSlotDate(experienceId, req.slotDate())
                 .orElse(null);
         if (slot == null) {
@@ -79,8 +73,7 @@ public class ExperienceSlotService {
         ExperienceSlot s = findOrThrow(id);
         if (req.maxTourPerDay() != null) s.setMaxTourPerDay(req.maxTourPerDay());
         if (req.status() != null) {
-            // Enum đã được Jackson validate khi parse JSON request body
-            // → giá trị không hợp lệ sẽ bị reject trước khi vào service
+
             s.setStatus(req.status());
         }
         ExperienceSlot saved = slotRepository.save(s);

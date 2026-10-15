@@ -5,13 +5,6 @@ import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
-/**
- * Sửa Experience — BR-EXP-2: chỉ update được khi status = DRAFT.
- *
- * Tất cả field optional — chỉ field nào gửi lên mới được update.
- *
- * Lưu ý: KHÔNG có experienceType — phân biệt qua Task con.
- */
 @Schema(description = "Yêu cầu cập nhật Experience (chỉ DRAFT — BR-EXP-2)")
 public record UpdateExperienceRequest(
 

@@ -10,25 +10,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Entity chính của module Experience.
- *
- * Theo CONTEXT §3 mới:
- *   - destination_id BIGINT NOT NULL UNIQUE (1 Experience ↔ 1 Destination — BR-EXP-1).
- *   - status VARCHAR(20) NOT NULL DEFAULT 'DRAFT'.
- *   - KHÔNG có ExperienceType: mỗi Experience mặc định gồm cả 2 phần (Quiz + Real-world Interactive)
- *     thông qua danh sách Task.
- *
- * Quan hệ:
- *   - 1 Experience có nhiều Task (cascade khi tạo xóa Experience).
- *   - 1 Experience có nhiều CheckInPoint (cho task GPS/QR).
- *   - 1 Experience có nhiều ExperienceSlot (khung giờ mở bán).
- *   - Destination chỉ là FK long (không @ManyToOne — Destination thuộc module khác, lookup qua destinationRepository).
- *
- * Lưu ý: KHÔNG có field needsPartnerConfirmation / moderatedBy / moderationReason
- * vì moderation workflow cần chờ content cultural từ module destination.
- * Khi có sẽ thêm lại.
- */
 @Entity
 @Table(name = "experience", uniqueConstraints = {
         @UniqueConstraint(name = "uk_experience_destination", columnNames = "destination_id")
@@ -69,7 +50,7 @@ public class Experience {
     @Builder.Default
     private ExperienceStatus status = ExperienceStatus.DRAFT;
 
-    /** User tạo Experience (Content Provider — Role.PROVIDER). */
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;
@@ -79,8 +60,6 @@ public class Experience {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
-
-    // ── Quan hệ 1-N (mapped ở đây để cascade hợp lý) ────────────────────────
 
     @OneToMany(mappedBy = "experience", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("sequenceOrder ASC")

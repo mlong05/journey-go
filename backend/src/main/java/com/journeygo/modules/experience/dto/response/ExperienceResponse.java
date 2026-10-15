@@ -8,15 +8,6 @@ import lombok.Builder;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Response chi tiết Experience.
- *
- * Theo CONTEXT §3 mới: KHÔNG trả experienceType vì Experience luôn gồm cả Quiz + Real-world
- * (phân biệt qua các Task con).
- *
- * Lưu ý: KHÔNG có moderatedBy/moderationReason vì moderation workflow chờ content
- * cultural từ module destination. Sẽ thêm lại sau.
- */
 @Builder
 @Schema(description = "Response chi tiết Experience (không có experienceType — phân biệt qua Task)")
 public record ExperienceResponse(
@@ -35,12 +26,7 @@ public record ExperienceResponse(
         @Schema(description = "Ngày tạo") Instant createdAt,
         @Schema(description = "Ngày cập nhật") Instant updatedAt
 ) {
-    /**
-     * Map từ entity với count đã được truyền vào sẵn — DÙNG Ở LISTING.
-     *
-     * <p>Tránh N+1: KHÔNG gọi {@code e.getTasks().size()} vì sẽ trigger lazy load
-     * cho mỗi Experience trong page.</p>
-     */
+
     public static ExperienceResponse fromEntity(Experience e, int taskCount, int checkInPointCount) {
         return ExperienceResponse.builder()
                 .id(e.getId())
@@ -59,9 +45,7 @@ public record ExperienceResponse(
                 .build();
     }
 
-    /**
-     * Map từ entity (single record, đã fetch EAGER) — DÙNG Ở getById / getByDestinationId.
-     */
+
     public static ExperienceResponse fromEntity(Experience e) {
         return ExperienceResponse.builder()
                 .id(e.getId())

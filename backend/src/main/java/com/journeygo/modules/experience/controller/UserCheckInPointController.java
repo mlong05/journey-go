@@ -18,12 +18,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * Controller Tourist check-in tại CheckInPoint vi mô.
- *
- * <p>Authorization dùng {@code @PreAuthorize}: role gate {@code TOURIST} hoặc {@code ADMIN}.
- * Endpoint lịch sử check-in: dùng {@code /me/...} lấy userId từ JWT.</p>
- */
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
@@ -32,12 +26,7 @@ public class UserCheckInPointController {
 
     private final UserCheckInPointService userCheckInPointService;
 
-    /**
-     * Tourist check-in tại CheckInPoint.
-     *
-     * <p>BR-UCIP-1: idempotent — gọi lại trả về record cũ.</p>
-     * <p>BR-UCIP-2: GPS → server tính Haversine, isValid khi distance <= radius.</p>
-     */
+
     @PostMapping("/check-in-points/{id}/check-in")
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('TOURIST','ADMIN')")
@@ -52,7 +41,7 @@ public class UserCheckInPointController {
                 .body(ApiResponse.success("Check-in thành công", r));
     }
 
-    /** Lịch sử check-in của chính mình — lấy userId từ JWT. */
+
     @GetMapping("/me/check-in-points")
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('TOURIST','ADMIN')")
@@ -63,7 +52,7 @@ public class UserCheckInPointController {
                 userCheckInPointService.listByUser(principal.getId())));
     }
 
-    /** Lịch sử check-in theo Experience — lấy userId từ JWT. */
+
     @GetMapping("/me/experiences/{experienceId}/check-in-points")
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('TOURIST','ADMIN')")

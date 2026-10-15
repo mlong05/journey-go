@@ -16,14 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service Answer con của Question.
- *
- * BR-TASK-6:
- *   - MULTIPLE_CHOICE: đúng 1 isCorrect=true trong các answer của question.
- *   - TEXT: tất cả answer isCorrect=true (mỗi answer là 1 cách viết được chấp nhận).
- * BR-TASK-5: KHÔNG BAO GIỜ gửi isCorrect xuống Tourist — dùng AnswerResponse.forTourist().
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -71,7 +63,7 @@ public class AnswerService {
         }
 
         boolean newIsCorrect = req.isCorrect() != null ? req.isCorrect() : a.isCorrect();
-        // Validate lại khi isCorrect thay đổi
+
         if (req.isCorrect() != null && req.isCorrect() != a.isCorrect()) {
             validateAnswerCorrectness(a.getQuestion(), a.getId(), newIsCorrect);
         }
@@ -96,12 +88,7 @@ public class AnswerService {
         log.info("Deleted Answer id={}", id);
     }
 
-    /**
-     * BR-TASK-6: validate số lượng isCorrect=true theo questionType.
-     *
-     * - MULTIPLE_CHOICE: đúng 1 isCorrect=true (loại trừ answer hiện tại nếu update).
-     * - TEXT: tất cả isCorrect=true (không giới hạn số lượng).
-     */
+
     private void validateAnswerCorrectness(Question q, Long excludeAnswerId, boolean newIsCorrect) {
         if (!newIsCorrect) return;     // thêm/sửa thành false → không cần check
 
@@ -115,10 +102,8 @@ public class AnswerService {
                         "MULTIPLE_CHOICE chỉ cho phép đúng 1 đáp án isCorrect=true");
             }
         }
-        // QuestionType.TEXT không giới hạn số isCorrect=true → không cần check
-    }
 
-    // ── internal ────────────────────────────────────────────────────────────
+    }
 
     private Answer findOrThrow(Long id) {
         return answerRepository.findById(id)

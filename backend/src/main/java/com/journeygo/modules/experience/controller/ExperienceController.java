@@ -22,17 +22,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Controller Experience — CRUD thuần.
- *
- * <p>Authorization dùng {@code @PreAuthorize}:</p>
- * <ul>
- *   <li>Role gate: {@code hasAnyRole('PROVIDER','ADMIN')}</li>
- *   <li>Ownership gate (chỉ trên resource đã có): {@code @experienceSecurityBean.isOwnerOf*(#id)}</li>
- * </ul>
- *
- * <p>Khi fail → Spring ném {@code AccessDeniedException} → {@code GlobalExceptionHandler} → 403.</p>
- */
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
@@ -40,8 +29,6 @@ import org.springframework.web.bind.annotation.*;
 public class ExperienceController {
 
     private final ExperienceService experienceService;
-
-    // ── Public / authenticated reads ────────────────────────────────────────
 
     @GetMapping("/experiences/{id}")
     @Operation(summary = "Lấy Experience theo ID")
@@ -80,8 +67,6 @@ public class ExperienceController {
         return ResponseEntity.ok(ApiResponse.success(
                 experienceService.list(status, includeInactive, pageable)));
     }
-
-    // ── CP: tạo / sửa / xóa ────────────────────────────────────────────────
 
     @PostMapping("/experiences")
     @SecurityRequirement(name = "Bearer Authentication")

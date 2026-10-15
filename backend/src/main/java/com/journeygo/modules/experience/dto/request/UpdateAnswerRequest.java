@@ -3,9 +3,6 @@ package com.journeygo.modules.experience.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
-/**
- * Sửa Answer.
- */
 @Schema(description = "Yêu cầu cập nhật Answer")
 public record UpdateAnswerRequest(
 

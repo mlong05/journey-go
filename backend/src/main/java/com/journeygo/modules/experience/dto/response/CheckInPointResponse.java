@@ -7,12 +7,6 @@ import lombok.Builder;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Response CheckInPoint.
- *
- * Lưu ý: KHÔNG trả qrToken cho Tourist (chỉ cần khi đã quét QR). Nhưng CONTEXT không yêu cầu
- * mask → trả qrToken cho cả CP/CM/Tourist. Nếu sau này muốn ẨN, thêm forTourist().
- */
 @Builder
 @Schema(description = "Response CheckInPoint")
 public record CheckInPointResponse(

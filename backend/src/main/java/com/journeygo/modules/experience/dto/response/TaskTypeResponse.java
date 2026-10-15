@@ -5,9 +5,6 @@ import com.journeygo.modules.experience.entity.enums.VerificationMethod;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
-/**
- * Response TaskType (master data, PUBLIC — không cần auth).
- */
 @Builder
 @Schema(description = "Response TaskType")
 public record TaskTypeResponse(

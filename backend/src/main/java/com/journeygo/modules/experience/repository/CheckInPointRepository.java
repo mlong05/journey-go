@@ -16,13 +16,10 @@ public interface CheckInPointRepository extends JpaRepository<CheckInPoint, Long
 
     boolean existsByQrToken(String qrToken);
 
-    /** Đếm tất cả CheckInPoint của 1 Experience (dùng cho response listing — tránh N+1). */
+
     long countByExperienceId(Long experienceId);
 
-    /**
-     * Load CheckInPoint cùng Experience và createdBy trong 1 query.
-     * Dùng cho ownership check — tránh LazyInitException.
-     */
+
     @Query("""
             SELECT c FROM CheckInPoint c
             JOIN FETCH c.experience e

@@ -5,9 +5,6 @@ import com.journeygo.modules.experience.entity.enums.UnlockConditionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
-/**
- * Response UnlockCondition - điều kiện mở khóa cho 1 Task.
- */
 @Builder
 @Schema(description = "Response UnlockCondition")
 public record UnlockConditionResponse(

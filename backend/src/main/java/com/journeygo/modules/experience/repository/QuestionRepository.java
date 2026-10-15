@@ -14,10 +14,7 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
 
     List<Question> findByTaskIdOrderBySequenceOrderAsc(Long taskId);
 
-    /**
-     * Load Question cùng Task → Experience → createdBy trong 1 query.
-     * Dùng cho ownership check — tránh LazyInitException.
-     */
+
     @Query("""
             SELECT q FROM Question q
             JOIN FETCH q.task t

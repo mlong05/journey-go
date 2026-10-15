@@ -3,13 +3,6 @@ package com.journeygo.modules.experience.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
-/**
- * Tạo Answer.
- *
- * BR-TASK-6:
- *   - MULTIPLE_CHOICE: đúng 1 isCorrect=true trong các answer.
- *   - TEXT: tất cả isCorrect=true (mỗi answer là 1 cách viết được chấp nhận).
- */
 @Schema(description = "Yêu cầu tạo Answer cho Question")
 public record CreateAnswerRequest(
 

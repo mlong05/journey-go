@@ -7,9 +7,6 @@ import lombok.Builder;
 import java.math.BigDecimal;
 import java.util.Map;
 
-/**
- * Response PointRule - cấu hình cách tính điểm cho 1 loại task.
- */
 @Builder
 @Schema(description = "Response PointRule")
 public record PointRuleResponse(

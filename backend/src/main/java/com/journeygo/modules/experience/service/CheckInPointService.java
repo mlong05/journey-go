@@ -17,13 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Service CheckInPoint.
- *
- * BR-CIP-1: qr_token UNIQUE toàn cục.
- * Chỉ thêm/sửa khi Experience còn DRAFT (sau khi publish thì thay đổi CheckInPoint
- * sẽ ảnh hưởng tới Tourist đang chơi).
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -51,7 +44,7 @@ public class CheckInPointService {
             throw new BusinessException("BR-CIP-CREATE",
                     "Chỉ tạo CheckInPoint khi Experience ở trạng thái DRAFT");
         }
-        // BR-CIP-1
+
         if (checkInPointRepository.existsByQrToken(req.qrToken())) {
             throw new BusinessException("BR-CIP-1",
                     "qrToken '" + req.qrToken() + "' đã tồn tại trong hệ thống");
@@ -67,7 +60,6 @@ public class CheckInPointService {
                 .sequenceOrder(req.sequenceOrder())
                 .build();
 
-        // saveAndFlush để QR UNIQUE (BR-CIP-1) nổ ngay → 400 thay vì 500 nếu race
         CheckInPoint saved = checkInPointRepository.saveAndFlush(c);
         log.info("Created CheckInPoint id={} qr={}", saved.getId(), saved.getQrToken());
         return CheckInPointResponse.fromEntity(saved);
@@ -93,7 +85,6 @@ public class CheckInPointService {
         }
         if (req.sequenceOrder() != null) c.setSequenceOrder(req.sequenceOrder());
 
-        // saveAndFlush để QR UNIQUE (BR-CIP-1) nổ ngay → 400 thay vì 500 nếu race
         CheckInPoint saved = checkInPointRepository.saveAndFlush(c);
         log.info("Updated CheckInPoint id={}", saved.getId());
         return CheckInPointResponse.fromEntity(saved);

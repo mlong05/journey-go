@@ -6,11 +6,6 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.util.Map;
 
-/**
- * Tạo hoặc cập nhật PointRule cho 1 TaskType.
- *
- * Công thức runtime: điểm_thực_nhận = base_points × bonus_multiplier × task.points_reward.
- */
 @Schema(description = "Tạo/cập nhật PointRule cho TaskType")
 public record SetPointRuleRequest(
 

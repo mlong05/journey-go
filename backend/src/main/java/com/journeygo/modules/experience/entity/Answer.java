@@ -5,15 +5,6 @@ import lombok.*;
 
 import java.time.Instant;
 
-/**
- * Đáp án cho một Question.
- *
- * BR-TASK-6:
- *   - MULTIPLE_CHOICE: nhiều answer, đúng 1 is_correct=true.
- *   - TEXT: 0 hoặc nhiều answer, TẤT CẢ is_correct=true (mỗi answer là 1 cách viết được chấp nhận).
- *
- * BR-TASK-5: KHÔNG BAO GIỜ gửi isCorrect / explanation xuống Tourist — dùng AnswerResponse.forTourist().
- */
 @Entity
 @Table(name = "answer")
 @Getter
@@ -42,7 +33,7 @@ public class Answer {
     @Builder.Default
     private Integer sequenceOrder = 0;
 
-    /** Lý do giải thích — KHÔNG BAO GIỜ trả xuống Tourist. */
+
     @Column(columnDefinition = "TEXT")
     private String explanation;
 

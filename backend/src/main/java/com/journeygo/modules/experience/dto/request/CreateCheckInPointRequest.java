@@ -5,12 +5,6 @@ import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
-/**
- * Tạo CheckInPoint cho Experience.
- *
- * BR-CIP-1: qr_token UNIQUE toàn cục.
- * Theo schema ĐÚ-02 §3.4: precision(10,8) cho lat, (11,8) cho lng.
- */
 @Schema(description = "Yêu cầu tạo CheckInPoint")
 public record CreateCheckInPointRequest(
 

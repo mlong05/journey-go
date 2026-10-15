@@ -10,9 +10,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Repository ExperienceSlot — quota (theo TOUR) cho Experience theo ngày.
- */
 @Repository
 public interface ExperienceSlotRepository extends JpaRepository<ExperienceSlot, Long> {
 
@@ -20,10 +17,7 @@ public interface ExperienceSlotRepository extends JpaRepository<ExperienceSlot, 
 
     Optional<ExperienceSlot> findByExperienceIdAndSlotDate(Long experienceId, LocalDate slotDate);
 
-    /**
-     * Load Slot cùng Experience và createdBy trong 1 query.
-     * Dùng cho ownership check — tránh LazyInitException.
-     */
+
     @Query("""
             SELECT s FROM ExperienceSlot s
             JOIN FETCH s.experience e

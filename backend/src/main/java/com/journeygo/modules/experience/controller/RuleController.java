@@ -25,8 +25,6 @@ public class RuleController {
     private final PointRuleService pointRuleService;
     private final UnlockConditionService unlockConditionService;
 
-    // ── PointRule ────────────────────────────────────────────────────────────
-
     @GetMapping("/task-types/{taskTypeId}/point-rule")
     @Operation(summary = "Lấy PointRule của TaskType (PUBLIC — master data)")
     public ResponseEntity<ApiResponse<PointRuleResponse>> getPointRule(
@@ -45,8 +43,6 @@ public class RuleController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Cập nhật PointRule thành công", pr));
     }
-
-    // ── UnlockCondition ──────────────────────────────────────────────────────
 
     @GetMapping("/tasks/{taskId}/unlock-condition")
     @Operation(summary = "Lấy UnlockCondition của Task (PUBLIC — metadata của experience)")

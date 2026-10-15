@@ -28,23 +28,14 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
 
     List<Experience> findByStatusAndCreatedById(ExperienceStatus status, Long createdById);
 
-    // ── Fetch-join variants để tránh N+1 ở listing ───────────────────────────
 
-    /**
-     * Chỉ fetch Experience + createdBy (1-1) — dùng cho single-record read.
-     * Tránh {@code MultipleBagFetchException} vì tasks / checkInPoints là 2 collection riêng.
-     * Service sẽ tự count từng collection bằng repo {@code countByExperienceId}.
-     */
     @Query("SELECT e FROM Experience e JOIN FETCH e.createdBy WHERE e.id = :id")
     Optional<Experience> findByIdWithOwner(@Param("id") Long id);
 
     @Query("SELECT e FROM Experience e JOIN FETCH e.createdBy WHERE e.destinationId = :destinationId")
     Optional<Experience> findByDestinationIdWithOwner(@Param("destinationId") Long destinationId);
 
-    /**
-     * List phân trang, fetch sẵn createdBy (tasks/checkInPoints sẽ được count bằng sub-query
-     * ở response mapper để tránh load full list — xem {@code ExperienceResponse.fromEntity}).
-     */
+
     @EntityGraph(attributePaths = {"createdBy"})
     @Query(value = "SELECT e FROM Experience e",
            countQuery = "SELECT count(e) FROM Experience e")

@@ -2,14 +2,6 @@ package com.journeygo.modules.experience.exception;
 
 import lombok.Getter;
 
-/**
- * Exception ném khi không tìm thấy entity theo id (hoặc theo điều kiện).
- *
- * Xử lý bởi {@link com.journeygo.common.exception.GlobalExceptionHandler} - trả về
- * HTTP 404 Not Found.
- *
- * Ví dụ: experienceRepository.findById(id) không có → ResourceNotFoundException("Experience", id).
- */
 @Getter
 public class ResourceNotFoundException extends RuntimeException {
 

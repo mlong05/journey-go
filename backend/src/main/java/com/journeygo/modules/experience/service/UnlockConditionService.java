@@ -9,12 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service truy vấn UnlockCondition.
- *
- * Việc set/update UnlockCondition đã được gộp vào TaskService.setUnlockCondition().
- * Service này chỉ phục vụ GET endpoint.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

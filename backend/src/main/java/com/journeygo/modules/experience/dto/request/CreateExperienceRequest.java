@@ -5,15 +5,6 @@ import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
-/**
- * Tạo Experience mới (CONTEXT §3 — POST /api/v1/experiences).
- *
- * BR-EXP-1: destinationId phải chưa có Experience nào khác (UNIQUE destination_id).
- * Status mặc định = DRAFT do service set.
- *
- * Lưu ý: KHÔNG có experienceType — mỗi Experience mặc định gồm cả Quiz + Real-world Interactive
- * (phân biệt qua Task con).
- */
 @Schema(description = "Yêu cầu tạo Experience mới (không có experienceType — dùng Task)")
 public record CreateExperienceRequest(
 
