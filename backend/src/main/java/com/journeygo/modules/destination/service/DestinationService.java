@@ -6,6 +6,7 @@ import com.journeygo.modules.destination.dto.DestinationRequest;
 import com.journeygo.modules.destination.dto.DestinationResponse;
 import com.journeygo.modules.destination.entity.Destination;
 import com.journeygo.modules.destination.repository.DestinationRepository;
+import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -79,10 +80,21 @@ public class DestinationService {
         return DestinationResponse.fromEntity(saved);
     }
 
-    /** Update an existing destination and reset approval. */
+    /** Update an existing destination and reset approval.
+     * PROVIDER may only update destinations they created;
+     * ADMIN and MODERATOR may update any destination. */
     @Transactional
-    public DestinationResponse update(Long id, DestinationRequest request) {
+    public DestinationResponse update(Long id, DestinationRequest request, Long callerId, Role callerRole) {
         Destination existing = findOrThrow(id);
+
+        // PROVIDER can only edit their own destination
+        if (callerRole == Role.PROVIDER) {
+            Long ownerId = existing.getCreatedBy() != null ? existing.getCreatedBy().getId() : null;
+            if (!callerId.equals(ownerId)) {
+                throw new AppException(ErrorCode.UNAUTHORIZED);
+            }
+        }
+
         if (destinationRepository.existsByLatitudeAndLongitudeAndDeletedFalseAndIdNot(request.latitude(), request.longitude(), id)) {
             throw new AppException(ErrorCode.DESTINATION_COORDINATE_EXISTED);
         }
@@ -93,7 +105,7 @@ public class DestinationService {
         existing.setCapacity(request.capacity());
         existing.setApproved(false);
         Destination saved = destinationRepository.save(existing);
-        log.info("Updated destination id={}", saved.getId());
+        log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
         return DestinationResponse.fromEntity(saved);
     }
 
