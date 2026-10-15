@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/models/auth_models.dart';
 import 'core/services/auth_service.dart';
+import 'core/services/google_auth_service.dart';
 import 'core/services/token_storage.dart';
 import 'screens/tourist_home_screen.dart';
 
@@ -322,10 +323,14 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
           auth = await _authService.loginWithApple(identityToken: token);
         }
       } else {
-        // Mô phỏng kết nối xác thực mạng xã hội
-        await Future.delayed(const Duration(milliseconds: 600));
-        // Mặc định từ chối nếu chưa cấu hình OAuth SDK hoặc tài khoản không hợp lệ
-        throw Exception(kInvalidAuthErrorMessage);
+        // Chưa có token -> mở SDK Google/Apple thật
+        if (provider.toLowerCase().contains('google')) {
+          final idToken = await GoogleAuthService.signInAndGetIdToken();
+          auth = await _authService.loginWithGoogle(idToken: idToken);
+        } else if (provider.toLowerCase().contains('apple')) {
+          // TODO: tích hợp sign_in_with_apple sau. Hiện tại chưa hỗ trợ Apple trên Android.
+          throw Exception('Đăng nhập Apple ID hiện chưa hỗ trợ trên Android.');
+        }
       }
 
       if (auth != null) {

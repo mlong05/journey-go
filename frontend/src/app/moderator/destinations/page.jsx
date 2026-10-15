@@ -13,13 +13,17 @@ import {
   Users,
   Navigation,
   AlertCircle,
-  ShieldCheck,
   Building2,
-  ChevronRight,
   RefreshCw,
-  ListChecks,
+  Layers,
+  Clock,
 } from "lucide-react";
 import { destinationService } from "@/features/destination/services/destinationService";
+
+/* =========================================================================
+ *  TRANG: Thẩm định điểm đến di sản (Moderator)
+ *  Layout: Compact Header → 3 KPI Cards → Unified Workspace (Toolbar + List)
+ * ========================================================================= */
 
 const STATUS = {
   PENDING: "pending",
@@ -29,6 +33,7 @@ const STATUS = {
 
 const CUBIC = "transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]";
 
+/* Chuẩn hoá dữ liệu thô từ API về dạng dùng chung */
 function normalizeDestination(raw) {
   if (!raw || typeof raw !== "object") return null;
   const approvedFlag = raw.approved === true;
@@ -59,72 +64,114 @@ function normalizeDestination(raw) {
   };
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
-   BEZEL CARD: Outer shell (hairline + tint) + Inner core (gradient + inset)
-   used as the canonical "premium hardware" container for every panel.
-   ────────────────────────────────────────────────────────────────────────── */
-function Bezel({ children, className = "", tone = "neutral" }) {
-  const tones = {
-    neutral: "bg-slate-100/60 ring-slate-200/80",
-    teal: "bg-teal-50/40 ring-teal-200/70",
-    rose: "bg-rose-50/50 ring-rose-200/70",
-    amber: "bg-amber-50/50 ring-amber-200/70",
-  };
+/* Toast nội bộ (success/error) */
+function Toast({ msg, tone }) {
+  if (!msg) return null;
+  const palette =
+    tone === "error"
+      ? "bg-rose-900 border-rose-600 text-white"
+      : "bg-slate-900 border-slate-700 text-white";
+  const Icon = tone === "error" ? AlertCircle : CheckCircle2;
   return (
-    <div className={`rounded-[1.75rem] p-1.5 ring-1 ${tones[tone]} ${className}`}>
-      <div className="rounded-[calc(1.75rem-0.375rem)] bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
-        {children}
-      </div>
+    <div
+      className={`fixed top-5 right-5 z-50 ${palette} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2 ${CUBIC} max-w-md animate-in slide-in-from-top-3`}
+    >
+      <Icon size={16} className="shrink-0" />
+      <span>{msg}</span>
     </div>
   );
 }
 
-/* Pill button following the "button-in-button" trailing-icon pattern. */
-function PillButton({
-  children,
-  onClick,
-  tone = "slate",
-  icon: Icon,
-  iconTrailing = true,
-  loading = false,
-  disabled = false,
-  title,
-}) {
-  const palette = {
-    slate: "bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.98]",
-    teal: "bg-teal-700 text-white hover:bg-teal-800 active:scale-[0.98]",
-    rose: "bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100",
-    emerald: "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]",
-    sky: "bg-sky-50 text-sky-800 ring-1 ring-sky-200 hover:bg-sky-100",
-  };
+/* Thẻ KPI tương tác — click để lọc */
+function KpiCard({ active, onClick, icon: Icon, label, value, accent, valueColor, dot = false }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled || loading}
-      title={title}
-      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11.5px] font-bold tracking-tight ${CUBIC} cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${palette[tone]}`}
+      className={`text-left bg-white rounded-2xl border border-slate-200/80 p-5 ${CUBIC} hover:shadow-md hover:-translate-y-[1px] cursor-pointer ${
+        active ? `border-l-4 ${accent} shadow-md` : "border-l-4 border-l-transparent"
+      }`}
     >
-      {!iconTrailing && Icon && (
-        <span className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center">
-          {loading ? <Loader2 size={12} className="animate-spin" /> : <Icon size={12} />}
-        </span>
-      )}
-      <span className="whitespace-nowrap">{children}</span>
-      {iconTrailing && Icon && (
-        <span
-          className={`w-6 h-6 rounded-full flex items-center justify-center ${
-            tone === "rose" || tone === "sky" ? "bg-black/5" : "bg-white/15"
-          } group-hover:translate-x-0.5 ${CUBIC}`}
+      <div className="flex items-center gap-4">
+        <div
+          className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+            active ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"
+          } ${CUBIC}`}
         >
-          {loading ? <Loader2 size={12} className="animate-spin" /> : <Icon size={12} />}
-        </span>
-      )}
+          <Icon size={20} />
+        </div>
+        <div>
+          <p className="text-[10.5px] font-black uppercase tracking-[0.16em] text-slate-500 flex items-center gap-1.5">
+            {label}
+            {dot && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  active ? "bg-current" : "bg-slate-300"
+                }`}
+              />
+            )}
+          </p>
+          <p className={`text-2xl font-black leading-none mt-1.5 ${valueColor}`}>
+            {value}
+          </p>
+        </div>
+      </div>
     </button>
   );
 }
 
+/* Segmented Tab filter */
+function StatusTab({ active, onClick, children, accent = "slate" }) {
+  const palette = {
+    slate: {
+      active: "bg-slate-900 text-white border-slate-900",
+      dot: "bg-emerald-500",
+    },
+    amber: {
+      active: "bg-amber-500 text-white border-amber-500",
+      dot: "bg-white animate-pulse",
+    },
+    emerald: {
+      active: "bg-emerald-600 text-white border-emerald-600",
+      dot: "bg-white",
+    },
+  };
+  const t = palette[accent] || palette.slate;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border ${CUBIC} cursor-pointer flex items-center gap-1.5 ${
+        active
+          ? t.active
+          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/* Badge trạng thái dùng trong danh sách */
+function StatusBadge({ status }) {
+  if (status === STATUS.APPROVED) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+        Đã duyệt
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+      Chờ duyệt
+    </span>
+  );
+}
+
 export default function ModeratorDestinationsPage() {
+  /* ── State ────────────────────────────────────────────────── */
   const [searchQuery, setSearchQuery] = useState("");
   const [statusTab, setStatusTab] = useState("all");
   const [destinations, setDestinations] = useState([]);
@@ -138,13 +185,13 @@ export default function ModeratorDestinationsPage() {
   const [toastMsg, setToastMsg] = useState("");
   const [toastTone, setToastTone] = useState("success");
 
+  /* ── Helpers ──────────────────────────────────────────────── */
   const showToast = useCallback((msg, tone = "success") => {
     setToastMsg(msg);
     setToastTone(tone);
     setTimeout(() => setToastMsg(""), 3500);
   }, []);
 
-  /* Always fetch the full list so the "Chờ duyệt" counter stays honest. */
   const loadAll = useCallback(async () => {
     setIsLoading(true);
     setFetchError("");
@@ -219,7 +266,7 @@ export default function ModeratorDestinationsPage() {
     [detailTarget, showToast]
   );
 
-  /* Counts are computed from the FULL list (including non-deleted). */
+  /* ── Counts (luôn đếm trên FULL list, loại trừ deleted) ──── */
   const counts = useMemo(
     () => ({
       all: destinations.filter((d) => d.status !== "deleted").length,
@@ -229,6 +276,7 @@ export default function ModeratorDestinationsPage() {
     [destinations]
   );
 
+  /* ── Filtered list ────────────────────────────────────────── */
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return destinations
@@ -240,138 +288,112 @@ export default function ModeratorDestinationsPage() {
         return (
           (item.name || "").toLowerCase().includes(q) ||
           (item.address || "").toLowerCase().includes(q) ||
+          (item.createdBy || "").toLowerCase().includes(q) ||
           String(item.id).toLowerCase().includes(q)
         );
       });
   }, [destinations, searchQuery, statusTab]);
 
   return (
-    <div className="space-y-6 animate-in fade-in-50 duration-300">
-      {toastMsg && (
-        <div
-          className={`fixed top-5 right-5 z-50 px-4 py-2.5 rounded-full shadow-xl border text-xs font-bold flex items-center gap-2 ${CUBIC} max-w-md ${
-            toastTone === "success"
-              ? "bg-teal-800 border-teal-600 text-white"
-              : "bg-rose-900 border-rose-600 text-white"
-          }`}
-        >
-          {toastTone === "success" ? (
-            <CheckCircle2 size={14} className="text-teal-300" />
-          ) : (
-            <AlertCircle size={14} className="text-rose-300" />
-          )}
-          <span>{toastMsg}</span>
-        </div>
-      )}
+    <div className="space-y-5 animate-in fade-in-50 duration-300">
+      <Toast msg={toastMsg} tone={toastTone} />
 
-      {/* HEADER */}
-      <Bezel className="bg-gradient-to-br from-teal-50/30 via-white to-slate-50/30" tone="teal">
-        <div className="px-6 py-5 sm:px-8 sm:py-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-          <div className="space-y-2.5 max-w-2xl">
-            <div className="inline-flex items-center gap-2 text-[10.5px] font-black uppercase tracking-[0.18em] text-teal-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-              Hội đồng thẩm định văn hóa
-            </div>
-            <h1 className="text-[26px] sm:text-[32px] leading-[1.05] tracking-[-0.02em] font-black text-slate-900">
-              Thẩm định điểm đến di sản
-            </h1>
-            <p className="text-[13px] leading-relaxed text-slate-500 max-w-prose">
-              Xem chi tiết hồ sơ và phê duyệt hoặc hủy duyệt điểm đến do
-              Đối tác hoặc Quản trị viên khởi tạo.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10.5px] font-bold text-teal-800 bg-white/70 ring-1 ring-teal-200 rounded-full px-3 py-1.5">
-              <ShieldCheck size={12} />
-              Quyền MODERATOR
-            </span>
-            <PillButton
-              tone="slate"
-              icon={RefreshCw}
-              iconTrailing={false}
-              onClick={loadAll}
-              loading={isLoading}
-            >
-              Làm mới
-            </PillButton>
-          </div>
-        </div>
-      </Bezel>
-
-      {/* STATS BENTO */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+      {/* ══════════════════════════════════════════════════════════
+          TẦNG 1 — COMPACT HEADER BAR
+         ══════════════════════════════════════════════════════════ */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
+        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          Thẩm định điểm đến di sản
+        </h1>
         <button
           type="button"
-          onClick={() => setStatusTab("all")}
-          className={`text-left ${CUBIC} ${statusTab === "all" ? "scale-[1.01]" : ""}`}
+          onClick={loadAll}
+          disabled={isLoading}
+          className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
         >
-          <Bezel tone="neutral">
-            <div className="p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-                <ListChecks size={20} />
-              </div>
-              <div>
-                <p className="text-[10.5px] font-black uppercase tracking-[0.16em] text-slate-500">
-                  Tổng hồ sơ
-                </p>
-                <p className="text-2xl font-black text-slate-900 leading-none mt-1">
-                  {counts.all}
-                </p>
-              </div>
-            </div>
-          </Bezel>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusTab("pending")}
-          className={`text-left ${CUBIC} ${statusTab === "pending" ? "scale-[1.01]" : ""}`}
-        >
-          <Bezel tone="amber">
-            <div className="p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0">
-                <span className="w-3 h-3 rounded-full bg-white animate-pulse" />
-              </div>
-              <div>
-                <p className="text-[10.5px] font-black uppercase tracking-[0.16em] text-amber-700">
-                  Chờ duyệt
-                </p>
-                <p className="text-2xl font-black text-slate-900 leading-none mt-1">
-                  {counts.pending}
-                </p>
-              </div>
-            </div>
-          </Bezel>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusTab("approved")}
-          className={`text-left ${CUBIC} ${statusTab === "approved" ? "scale-[1.01]" : ""}`}
-        >
-          <Bezel tone="teal">
-            <div className="p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center shrink-0">
-                <CheckCircle2 size={20} />
-              </div>
-              <div>
-                <p className="text-[10.5px] font-black uppercase tracking-[0.16em] text-teal-700">
-                  Đang lưu hành
-                </p>
-                <p className="text-2xl font-black text-slate-900 leading-none mt-1">
-                  {counts.approved}
-                </p>
-              </div>
-            </div>
-          </Bezel>
+          <RefreshCw
+            size={14}
+            className={isLoading ? "animate-spin" : ""}
+          />
+          <span>Làm mới dữ liệu</span>
         </button>
       </div>
 
-      {/* SEARCH */}
-      <Bezel>
-        <div className="p-3 sm:p-4 flex items-center gap-2.5">
-          <div className="relative flex-1">
+      {/* ══════════════════════════════════════════════════════════
+          TẦNG 2 — 3 INTERACTIVE KPI CARDS
+         ══════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <KpiCard
+          active={statusTab === "all"}
+          onClick={() => setStatusTab("all")}
+          icon={Layers}
+          label="TỔNG HỒ SƠ"
+          value={counts.all}
+          accent="border-l-slate-900"
+          valueColor="text-slate-900"
+        />
+        <KpiCard
+          active={statusTab === "pending"}
+          onClick={() => setStatusTab("pending")}
+          icon={Clock}
+          label="CHỜ PHÊ DUYỆT"
+          value={counts.pending}
+          accent="border-l-amber-500"
+          valueColor="text-amber-600"
+          dot
+        />
+        <KpiCard
+          active={statusTab === "approved"}
+          onClick={() => setStatusTab("approved")}
+          icon={CheckCircle2}
+          label="ĐANG LƯU HÀNH"
+          value={counts.approved}
+          accent="border-l-emerald-500"
+          valueColor="text-emerald-600"
+          dot
+        />
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════
+          TẦNG 3 — UNIFIED WORKSPACE (Toolbar + List)
+         ══════════════════════════════════════════════════════════ */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+        {/* Toolbar */}
+        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusTab
+              active={statusTab === "all"}
+              onClick={() => setStatusTab("all")}
+            >
+              <span>Tất cả ({counts.all})</span>
+            </StatusTab>
+            <StatusTab
+              active={statusTab === "pending"}
+              onClick={() => setStatusTab("pending")}
+              accent="amber"
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  statusTab === "pending" ? "bg-white animate-pulse" : "bg-amber-500"
+                }`}
+              />
+              <span>Chờ duyệt ({counts.pending})</span>
+            </StatusTab>
+            <StatusTab
+              active={statusTab === "approved"}
+              onClick={() => setStatusTab("approved")}
+              accent="emerald"
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  statusTab === "approved" ? "bg-white" : "bg-emerald-500"
+                }`}
+              />
+              <span>Đang lưu hành ({counts.approved})</span>
+            </StatusTab>
+          </div>
+
+          <div className="relative w-full sm:w-80">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
               <Search size={14} />
             </div>
@@ -379,299 +401,331 @@ export default function ModeratorDestinationsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm tên điểm đến, địa chỉ hoặc mã hồ sơ"
-              className={`w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-[12.5px] text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 ${CUBIC}`}
+              placeholder="Tìm tên điểm đến, địa chỉ, đơn vị..."
+              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
             />
           </div>
         </div>
-      </Bezel>
 
-      {fetchError && (
-        <Bezel tone="rose">
-          <div className="p-4 flex items-start gap-2.5">
+        {/* Error banner */}
+        {fetchError && (
+          <div className="m-4 flex items-start gap-2.5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
             <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
             <div className="flex-1">
-              <p className="text-xs font-bold text-rose-800">Không thể tải danh sách</p>
+              <p className="text-xs font-bold text-rose-800">
+                Không thể tải danh sách điểm đến
+              </p>
               <p className="text-[11px] text-rose-700 mt-0.5">{fetchError}</p>
               <button
                 type="button"
                 onClick={loadAll}
-                className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900"
+                className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900 cursor-pointer"
               >
                 Thử lại
               </button>
             </div>
           </div>
-        </Bezel>
-      )}
+        )}
 
-      {/* LIST */}
-      <div className="space-y-3">
+        {/* List / Empty / Loading */}
         {isLoading && destinations.length === 0 ? (
-          <Bezel>
-            <div className="p-16 text-center">
-              <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
-              <p className="text-xs text-slate-400 mt-3">Đang tải bảng kiểm duyệt</p>
-            </div>
-          </Bezel>
+          <div className="p-16 text-center">
+            <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
+            <p className="text-xs text-slate-400 mt-3 font-semibold">
+              Đang tải bảng kiểm duyệt…
+            </p>
+          </div>
         ) : filtered.length === 0 ? (
-          <Bezel>
-            <div className="p-16 text-center space-y-3">
-              <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
-                <Inbox size={28} />
-              </div>
-              <h3 className="text-base font-bold text-slate-800">
-                {searchQuery
-                  ? "Không tìm thấy điểm đến nào phù hợp"
-                  : statusTab === "pending"
-                    ? "Không có hồ sơ nào đang chờ thẩm định"
-                    : "Chưa có điểm đến nào đang lưu hành"}
-              </h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                Danh sách điểm đến đã được Đối tác hoặc Quản trị viên đăng ký sẽ
-                xuất hiện tại đây.
-              </p>
+          <div className="p-16 text-center space-y-3">
+            <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
+              <Inbox size={28} />
             </div>
-          </Bezel>
+            <h3 className="text-base font-bold text-slate-800">
+              {searchQuery
+                ? "Không tìm thấy điểm đến nào phù hợp với bộ lọc"
+                : statusTab === "pending"
+                ? "Không có hồ sơ nào đang chờ thẩm định"
+                : statusTab === "approved"
+                ? "Chưa có điểm đến nào đang lưu hành"
+                : "Chưa có điểm đến nào trong hệ thống"}
+            </h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              Danh sách điểm đến do Đối tác hoặc Quản trị viên khởi tạo sẽ hiển
+              thị tại đây.
+            </p>
+          </div>
         ) : (
-          filtered.map((item) => {
-            const isApproved = item.approved === true;
-            const isLoadingAction = actionLoadingId === item.id;
-            return (
-              <article
-                key={item.id}
-                className={`group ${CUBIC} hover:-translate-y-[2px] hover:shadow-lg`}
-              >
-                <Bezel>
-                  <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-teal-100 via-emerald-50 to-sky-100 ring-1 ring-teal-200/60 flex items-center justify-center shrink-0">
-                        <Compass size={26} className="text-teal-700" />
+          <ul className="divide-y divide-slate-100">
+            {filtered.map((item) => {
+              const isApproved = item.approved === true;
+              const isLoadingAction = actionLoadingId === item.id;
+              return (
+                <li
+                  key={item.id}
+                  className={`p-4 sm:p-5 hover:bg-slate-50/60 ${CUBIC}`}
+                >
+                  <div className="grid grid-cols-12 gap-3 sm:gap-4 items-center">
+                    {/* Cột 1 — Thông tin điểm đến */}
+                    <div className="col-span-12 md:col-span-4 flex items-start gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
+                        <Compass size={18} />
                       </div>
-
-                      <div className="space-y-1.5 min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full ring-1 bg-sky-50 text-sky-800 ring-sky-200">
-                            Điểm di tích
-                          </span>
-                          {isApproved ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              Đang lưu hành
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 ring-1 ring-amber-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                              Chờ duyệt
-                            </span>
-                          )}
-                        </div>
-
-                        <h3 className="text-[14.5px] sm:text-[15.5px] font-black text-slate-900 truncate group-hover:text-teal-700">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-bold text-slate-900 truncate">
                           {item.name}
                         </h3>
-
-                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-slate-500">
-                          <span className="flex items-center gap-1 font-semibold text-slate-700">
-                            <Building2 size={11} className="text-slate-400" />
-                            {item.createdBy || "Đối tác không xác định"}
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
+                          <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                            #{item.id}
                           </span>
-                          <span className="text-slate-300">/</span>
-                          <span className="flex items-center gap-1">
-                            <MapPin size={11} className="text-teal-600" />
-                            {item.address}
+                          <span className="flex items-center gap-1 font-semibold text-slate-600 truncate">
+                            <Building2 size={11} className="text-slate-400 shrink-0" />
+                            <span className="truncate">
+                              {item.createdBy || "Đơn vị không xác định"}
+                            </span>
                           </span>
                         </div>
-
-                        {item.latitude !== null && item.longitude !== null && (
-                          <div className="inline-flex items-center gap-1.5 text-[10.5px] font-mono font-bold text-sky-800 bg-sky-50 ring-1 ring-sky-200 px-2.5 py-0.5 rounded-full">
-                            <Navigation size={10} className="text-sky-600" />
-                            <span>
-                              {item.latitude.toFixed(4)} / {item.longitude.toFixed(4)}
-                            </span>
-                          </div>
-                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
-                      <PillButton
-                        tone="sky"
-                        icon={Eye}
+                    {/* Cột 2 — Địa chỉ & tọa độ GPS */}
+                    <div className="col-span-12 md:col-span-3 space-y-1">
+                      <p className="text-xs font-medium text-slate-700 flex items-center gap-1 truncate">
+                        <MapPin size={12} className="text-slate-400 shrink-0" />
+                        <span className="truncate">
+                          {item.address || "—"}
+                        </span>
+                      </p>
+                      {item.latitude !== null && item.longitude !== null && (
+                        <span className="font-mono text-[11px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-md border border-sky-200/60 inline-flex items-center gap-1">
+                          <Navigation size={10} />
+                          {item.latitude.toFixed(4)} / {item.longitude.toFixed(4)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Cột 3 — Sức chứa */}
+                    <div className="col-span-6 md:col-span-2">
+                      <p className="text-xs text-slate-500 font-semibold flex items-center gap-1.5">
+                        <Users size={12} className="text-slate-400" />
+                        Sức chứa
+                      </p>
+                      <p className="text-sm font-black text-slate-900 mt-0.5">
+                        {item.capacity ?? "—"}{" "}
+                        <span className="text-[10.5px] font-medium text-slate-400">
+                          du khách/lượt
+                        </span>
+                      </p>
+                    </div>
+
+                    {/* Cột 4 — Trạng thái */}
+                    <div className="col-span-6 md:col-span-1 flex md:justify-start">
+                      <StatusBadge status={item.status} />
+                    </div>
+
+                    {/* Cột 5 — Thao tác thẩm định */}
+                    <div className="col-span-12 md:col-span-2 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
                         onClick={() => openDetail(item.id)}
+                        className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                       >
-                        Kiểm tra
-                      </PillButton>
+                        <Eye size={13} />
+                        <span>Chi tiết</span>
+                      </button>
                       {isApproved ? (
-                        <PillButton
-                          tone="rose"
-                          icon={X}
-                          onClick={() => handleApprove(item.id, false, item.name)}
-                          loading={isLoadingAction}
-                          title="Hủy phê duyệt"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleApprove(item.id, false, item.name)
+                          }
+                          disabled={isLoadingAction}
+                          className="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
-                          Hủy duyệt
-                        </PillButton>
+                          {isLoadingAction ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <X size={12} />
+                          )}
+                          <span>Hủy duyệt</span>
+                        </button>
                       ) : (
-                        <PillButton
-                          tone="emerald"
-                          icon={CheckCircle2}
+                        <button
+                          type="button"
                           onClick={() => handleApprove(item.id, true, item.name)}
-                          loading={isLoadingAction}
-                          title="Phê duyệt"
+                          disabled={isLoadingAction}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
                         >
-                          Phê duyệt
-                        </PillButton>
+                          {isLoadingAction ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <CheckCircle2 size={12} />
+                          )}
+                          <span>Phê duyệt</span>
+                        </button>
                       )}
                     </div>
                   </div>
-                </Bezel>
-              </article>
-            );
-          })
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
-      {/* MODAL DETAIL */}
+      {/* ══════════════════════════════════════════════════════════
+          MODAL — Xem chi tiết điểm đến
+         ══════════════════════════════════════════════════════════ */}
       {(detailTarget || detailLoading || detailError) && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
           onClick={closeDetail}
         >
           <div
-            className="w-full max-w-2xl bg-white rounded-[2rem] p-1.5 ring-1 ring-slate-200 shadow-2xl max-h-[92vh] overflow-hidden"
+            className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="rounded-[calc(2rem-0.375rem)] bg-white max-h-[calc(92vh-0.75rem)] overflow-y-auto">
-              <div className="flex items-start justify-between p-5 sm:p-7 border-b border-slate-100">
-                <div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="font-mono text-[10.5px] font-black text-teal-800 bg-teal-50 ring-1 ring-teal-200 px-2 py-0.5 rounded-full">
-                      #{detailTarget?.id ?? "—"}
-                    </span>
-                    {detailTarget?.approved ? (
-                      <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 px-2 py-0.5 rounded-full">
-                        Đã phê duyệt
-                      </span>
-                    ) : (
-                      <span className="text-[10.5px] font-bold text-amber-700 bg-amber-50 ring-1 ring-amber-200 px-2 py-0.5 rounded-full">
-                        Chờ thẩm định
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-[17px] sm:text-[19px] font-black text-slate-900 tracking-tight">
-                    {detailTarget?.name || "Đang tải..."}
-                  </h3>
-                  <p className="text-[12px] text-slate-500 mt-1 flex items-center gap-1">
-                    <MapPin size={11} className="text-slate-400" />
-                    {detailTarget?.address}
-                  </p>
+            {/* Modal header */}
+            <div className="px-5 sm:px-7 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="font-mono text-[10.5px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                    #{detailTarget?.id ?? "—"}
+                  </span>
+                  {detailTarget && (
+                    <StatusBadge status={detailTarget.status} />
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={closeDetail}
-                  className={`w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center ${CUBIC} cursor-pointer`}
-                >
-                  <X size={15} />
-                </button>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 truncate">
+                  {detailTarget?.name || "Đang tải..."}
+                </h3>
+                {detailTarget?.address && (
+                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 truncate">
+                    <MapPin size={12} className="text-slate-400 shrink-0" />
+                    <span className="truncate">{detailTarget.address}</span>
+                  </p>
+                )}
               </div>
+              <button
+                type="button"
+                onClick={closeDetail}
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer shrink-0"
+                aria-label="Đóng"
+              >
+                <X size={15} />
+              </button>
+            </div>
 
-              <div className="p-5 sm:p-7">
-                {detailLoading ? (
-                  <div className="py-14 flex flex-col items-center gap-3 text-slate-500">
-                    <Loader2 size={28} className="animate-spin text-slate-400" />
-                    <p className="text-xs font-bold">Đang tải dữ liệu điểm đến</p>
+            {/* Modal body */}
+            <div className="px-5 sm:px-7 py-5 max-h-[calc(92vh-150px)] overflow-y-auto">
+              {detailLoading ? (
+                <div className="py-12 flex flex-col items-center gap-3 text-slate-500">
+                  <Loader2 size={28} className="animate-spin text-slate-400" />
+                  <p className="text-xs font-bold">Đang tải dữ liệu điểm đến…</p>
+                </div>
+              ) : detailError ? (
+                <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
+                  <AlertCircle
+                    size={16}
+                    className="text-rose-600 mt-0.5 shrink-0"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-rose-800">
+                      Không thể tải chi tiết
+                    </p>
+                    <p className="text-[11px] text-rose-700 mt-0.5">
+                      {detailError}
+                    </p>
                   </div>
-                ) : detailError ? (
-                  <Bezel tone="rose">
-                    <div className="p-4 flex items-start gap-2.5">
-                      <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-xs font-bold text-rose-800">Không thể tải chi tiết</p>
-                        <p className="text-[11px] text-rose-700 mt-0.5">{detailError}</p>
+                </div>
+              ) : detailTarget ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="rounded-2xl bg-sky-50/70 border border-sky-200 p-4">
+                    <p className="text-[10px] font-black text-sky-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <Navigation size={10} /> Tọa độ GPS
+                    </p>
+                    <div className="space-y-1 text-[11.5px] font-mono">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Vĩ độ</span>
+                        <span className="font-black text-slate-800">
+                          {detailTarget.latitude?.toFixed(6) ?? "—"}
+                        </span>
                       </div>
-                    </div>
-                  </Bezel>
-                ) : detailTarget ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <div className="rounded-2xl bg-sky-50/70 ring-1 ring-sky-200 p-4">
-                        <p className="text-[10px] font-black text-sky-700 uppercase tracking-[0.16em] mb-2 flex items-center gap-1">
-                          <Navigation size={10} /> Tọa độ GPS
-                        </p>
-                        <div className="space-y-1 text-[11.5px] font-mono">
-                          <div className="flex justify-between">
-                            <span className="text-slate-500">Vĩ độ</span>
-                            <span className="font-black text-slate-800">
-                              {detailTarget.latitude?.toFixed(6) ?? "—"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-500">Kinh độ</span>
-                            <span className="font-black text-slate-800">
-                              {detailTarget.longitude?.toFixed(6) ?? "—"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="rounded-2xl bg-emerald-50/70 ring-1 ring-emerald-200 p-4">
-                        <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.16em] mb-2 flex items-center gap-1">
-                          <Users size={10} /> Sức chứa tối đa
-                        </p>
-                        <p className="text-[18px] font-black text-slate-900 leading-none">
-                          {detailTarget.capacity ?? "—"}
-                          <span className="text-[10.5px] font-bold text-slate-500 ml-1.5">
-                            du khách / lượt
-                          </span>
-                        </p>
-                      </div>
-                      <div className="rounded-2xl bg-slate-50 ring-1 ring-slate-200 p-4 sm:col-span-2">
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.16em] mb-1">
-                          Đơn vị khởi tạo
-                        </p>
-                        <p className="text-[13px] font-bold text-slate-800">
-                          {detailTarget.createdBy || "—"}
-                        </p>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Kinh độ</span>
+                        <span className="font-black text-slate-800">
+                          {detailTarget.latitude?.toFixed(6) ?? "—"}
+                        </span>
                       </div>
                     </div>
                   </div>
-                ) : null}
-              </div>
+                  <div className="rounded-2xl bg-emerald-50/70 border border-emerald-200 p-4">
+                    <p className="text-[10px] font-black text-emerald-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <Users size={10} /> Sức chứa tối đa
+                    </p>
+                    <p className="text-[18px] font-black text-slate-900 leading-none">
+                      {detailTarget.capacity ?? "—"}
+                      <span className="text-[10.5px] font-bold text-slate-500 ml-1.5">
+                        du khách / lượt
+                      </span>
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 sm:col-span-2">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                      Đơn vị khởi tạo
+                    </p>
+                    <p className="text-[13px] font-bold text-slate-800 flex items-center gap-1.5">
+                      <Building2 size={12} className="text-slate-400" />
+                      {detailTarget.createdBy || "—"}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
-              <div className="px-5 sm:px-7 py-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
-                {detailTarget && !detailTarget.approved && (
-                  <PillButton
-                    tone="emerald"
-                    icon={CheckCircle2}
-                    onClick={() =>
-                      handleApprove(detailTarget.id, true, detailTarget.name)
-                    }
-                    loading={actionLoadingId === detailTarget.id}
-                  >
-                    Phê duyệt
-                    <ChevronRight size={12} />
-                  </PillButton>
-                )}
-                {detailTarget && detailTarget.approved && (
-                  <PillButton
-                    tone="rose"
-                    icon={X}
-                    onClick={() =>
-                      handleApprove(detailTarget.id, false, detailTarget.name)
-                    }
-                    loading={actionLoadingId === detailTarget.id}
-                  >
-                    Hủy duyệt
-                  </PillButton>
-                )}
+            {/* Modal footer */}
+            <div className="px-5 sm:px-7 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50/40">
+              {detailTarget && !detailTarget.approved && (
                 <button
                   type="button"
-                  onClick={closeDetail}
-                  className={`px-5 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11.5px] ${CUBIC} cursor-pointer`}
+                  onClick={() =>
+                    handleApprove(detailTarget.id, true, detailTarget.name)
+                  }
+                  disabled={actionLoadingId === detailTarget.id}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
                 >
-                  Đóng
+                  {actionLoadingId === detailTarget.id ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={12} />
+                  )}
+                  <span>Phê duyệt</span>
                 </button>
-              </div>
+              )}
+              {detailTarget && detailTarget.approved && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApprove(detailTarget.id, false, detailTarget.name)
+                  }
+                  disabled={actionLoadingId === detailTarget.id}
+                  className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {actionLoadingId === detailTarget.id ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <X size={12} />
+                  )}
+                  <span>Hủy duyệt</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={closeDetail}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>
