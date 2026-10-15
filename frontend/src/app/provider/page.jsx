@@ -101,7 +101,7 @@ export default function ProviderOverviewPage() {
   const partnerName =
     authData?.user?.fullName ||
     authData?.user?.name ||
-    "Ban Quản Lý Di Tích Đối Tác";
+    "BQL Di tích Văn Miếu - Quốc Tử Giám";
 
   const kpiStats = [
     {
@@ -170,34 +170,82 @@ export default function ProviderOverviewPage() {
       {/* ══════════════════════════════════════════════════════════
           HERO BANNER CHÀO MỪNG ĐỐI TÁC
       ══════════════════════════════════════════════════════════ */}
-      <div className="relative rounded-3xl bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white p-6 sm:p-8 overflow-hidden shadow-lg shadow-emerald-950/20 border border-emerald-900/40">
+      <div className="relative rounded-2xl bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white p-6 sm:p-8 overflow-hidden shadow-md border border-emerald-900/40">
+        {/* Watermark silhouette Văn Miếu - Quốc Tử Giám (góc phải phía dưới) */}
+        <div
+          aria-hidden="true"
+          className="absolute -right-4 -bottom-6 w-64 h-64 opacity-15 pointer-events-none select-none"
+        >
+          <svg
+            viewBox="0 0 256 256"
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-full h-full text-white"
+            fill="currentColor"
+          >
+            {/* Mái Khuê Văn Các (mái cong kép) */}
+            <path d="M40 78 L128 36 L216 78 L200 88 L196 82 L196 96 L188 100 L188 86 L128 56 L68 86 L68 100 L60 96 L60 82 L56 88 Z" />
+            {/* Thân Khuê Văn Các (4 cột) */}
+            <rect x="64" y="100" width="8" height="56" />
+            <rect x="120" y="100" width="16" height="56" />
+            <rect x="184" y="100" width="8" height="56" />
+            {/* Bệ đá trên (mai) */}
+            <rect x="48" y="96" width="160" height="6" />
+            <rect x="48" y="156" width="160" height="6" />
+            {/* Hệ mái dưới (cánh phụ) */}
+            <path d="M28 110 L128 70 L228 110 L212 120 L208 116 L208 128 L200 132 L200 118 L128 88 L56 118 L56 132 L48 128 L48 116 L44 120 Z" />
+            <rect x="24" y="128" width="208" height="6" />
+            {/* Cột tầng dưới */}
+            <rect x="48" y="134" width="8" height="42" />
+            <rect x="124" y="134" width="8" height="42" />
+            <rect x="200" y="134" width="8" height="42" />
+            {/* Bệ đế tam cấp */}
+            <rect x="24" y="176" width="208" height="8" />
+            <rect x="20" y="184" width="216" height="8" />
+            <rect x="16" y="192" width="224" height="10" />
+            {/* Cột trụ cổng chính bậc thềm */}
+            <rect x="116" y="192" width="24" height="34" />
+            <rect x="112" y="226" width="32" height="6" />
+          </svg>
+        </div>
+
+        {/* Soft glow accents */}
         <div className="absolute -right-10 -top-10 w-60 h-60 bg-amber-400/15 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -left-10 -bottom-10 w-60 h-60 bg-emerald-400/15 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 mb-2.5">
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/30 border border-emerald-300/30 text-emerald-200 text-xs font-bold uppercase tracking-wider">
-                Trung tâm Quản trị Đối tác JourneyGo
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[11px] font-bold uppercase tracking-wider">
+                Trung tâm Quản trị Đối tác
               </span>
               <span className="text-xs text-slate-300">• Hà Nội, Việt Nam</span>
             </div>
 
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-snug">
+            <h1 className="text-2xl font-bold tracking-tight text-white leading-snug">
               {partnerName}
             </h1>
 
-            <p className="mt-2 text-xs sm:text-sm text-slate-200 font-light leading-relaxed">
-              Theo dõi thời gian thực lưu lượng du khách check-in, hiệu quả kinh doanh vé điện tử và chất lượng bài thuyết minh đa ngôn ngữ.
-            </p>
+            {/* Hàng chip trạng thái vận hành */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-500/30 text-xs font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Đang mở cửa đón khách
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-slate-200 border border-white/10 text-xs">
+                GPS &amp; Check-in: Sẵn sàng
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-slate-300 border border-white/10 text-xs font-mono">
+                Mã: VM-HN-01
+              </span>
+            </div>
           </div>
 
-          {/* Bộ lọc phạm vi thời gian */}
-          <div className="flex items-center gap-1.5 bg-black/25 backdrop-blur-md p-1.5 rounded-2xl border border-white/15 self-start md:self-auto">
+          {/* Bộ lọc phạm vi thời gian - giao diện kính mờ */}
+          <div className="flex items-center gap-1 bg-black/30 backdrop-blur-sm border border-white/15 p-1 rounded-xl self-start md:self-auto">
             <button
               type="button"
               onClick={() => setTimeRange("today")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                 timeRange === "today"
                   ? "bg-white text-emerald-950 shadow-xs"
                   : "text-white/80 hover:text-white"
@@ -208,7 +256,7 @@ export default function ProviderOverviewPage() {
             <button
               type="button"
               onClick={() => setTimeRange("week")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                 timeRange === "week"
                   ? "bg-white text-emerald-950 shadow-xs"
                   : "text-white/80 hover:text-white"
@@ -219,7 +267,7 @@ export default function ProviderOverviewPage() {
             <button
               type="button"
               onClick={() => setTimeRange("month")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                 timeRange === "month"
                   ? "bg-white text-emerald-950 shadow-xs"
                   : "text-white/80 hover:text-white"

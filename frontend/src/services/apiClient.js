@@ -149,6 +149,14 @@ class ApiClient {
   delete(endpoint, options = {}) {
     return this.request(endpoint, { ...options, method: "DELETE" });
   }
+
+  patch(endpoint, body, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: "PATCH",
+      body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
+    });
+  }
 }
 
 export const apiClient = new ApiClient(BASE_URL);

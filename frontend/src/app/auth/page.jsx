@@ -99,10 +99,10 @@ export default function AuthPage() {
   // Vai trò mẫu đang chọn
   const [selectedRoleId, setSelectedRoleId] = useState("admin");
 
-  // Form Đăng nhập
+  // Form Đăng nhập (để trống — người dùng tự nhập)
   const [loginForm, setLoginForm] = useState({
-    identifier: "user@journeygo.com",
-    password: "Password123@",
+    identifier: "",
+    password: "",
     rememberMe: true,
   });
 
@@ -180,15 +180,9 @@ export default function AuthPage() {
   };
 
   const handleSelectRole = (roleId) => {
+    // Chỉ đổi pill vai trò — KHÔNG tự động điền tài khoản/mật khẩu mẫu.
+    // Người dùng phải tự nhập email và mật khẩu.
     setSelectedRoleId(roleId);
-    const target = SAMPLE_ROLES.find((r) => r.id === roleId);
-    if (target) {
-      setLoginForm((prev) => ({
-        ...prev,
-        identifier: target.sampleEmail,
-        password: target.samplePassword,
-      }));
-    }
   };
 
   // Mở luồng Quên mật khẩu
