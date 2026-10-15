@@ -1,10 +1,37 @@
-import { AuthScreen } from "@/features/auth";
+"use client";
 
-export const metadata = {
-  title: "Đăng ký đối tác | Journey Go",
-  description: "Đăng ký tài khoản Đối tác cung cấp nội dung du lịch & di sản trên nền tảng Journey Go.",
-};
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+
+const AuthScreen = dynamic(
+  () => import("@/features/auth").then((m) => m.AuthScreen),
+  {
+    ssr: false,
+    loading: () => null,
+  }
+);
+
+function LoadingFallback({ message }) {
+  return (
+    <div
+      suppressHydrationWarning
+      className="h-screen w-screen flex items-center justify-center bg-slate-100"
+      aria-hidden="true"
+    >
+      <div className="animate-pulse text-slate-400 text-sm font-medium">
+        {message}
+      </div>
+    </div>
+  );
+}
 
 export default function RegisterPage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return <LoadingFallback message="Đang tải cổng đăng ký…" />;
+  }
+
   return <AuthScreen initialTab="register" />;
 }

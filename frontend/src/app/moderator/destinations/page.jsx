@@ -1,599 +1,677 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Search,
-  Filter,
   MapPin,
-  Compass,
   CheckCircle2,
-  AlertTriangle,
-  Clock,
-  ArrowUpRight,
   Eye,
-  Building2,
-  Ticket,
-  Navigation,
-  HelpCircle,
-  Camera,
-  Layers,
   X,
-  Send,
-  ExternalLink,
-  ChevronRight,
-  Sparkles,
-  ShieldCheck,
-  FileCheck,
+  Compass,
   Inbox,
+  Loader2,
+  Users,
+  Navigation,
+  AlertCircle,
+  ShieldCheck,
+  Building2,
+  ChevronRight,
+  RefreshCw,
+  ListChecks,
 } from "lucide-react";
+import { destinationService } from "@/features/destination/services/destinationService";
 
-/**
- * Trang Thẩm Định Điểm Đến & Lộ Trình Di Sản - JourneyGo
- * Đường dẫn: /moderator/destinations
- * - Quản lý danh sách hồ sơ điểm đến, lộ trình gửi từ đối tác
- * - Bộ lọc 4 tab trạng thái, tìm kiếm, lọc theo tỉnh thành / thể loại
- * - Modal xem trước nhanh (Quick Preview Modal) và duyệt nhanh
- * - Dynamic state sẵn sàng kết nối API (không mock data tĩnh)
- * - Đảm bảo ngôn ngữ thuần Việt, không chứa chữ tiếng Anh trong ngoặc đơn
- */
+const STATUS = {
+  PENDING: "pending",
+  APPROVED: "approved",
+  REVOKED: "revoked",
+};
+
+const CUBIC = "transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]";
+
+function normalizeDestination(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const approvedFlag = raw.approved === true;
+  const deletedFlag = raw.deleted === true;
+  let status;
+  if (deletedFlag) status = "deleted";
+  else if (approvedFlag) status = STATUS.APPROVED;
+  else status = STATUS.PENDING;
+  return {
+    id: raw.id,
+    name: raw.name || "",
+    address: raw.address || "",
+    latitude:
+      raw.latitude !== undefined && raw.latitude !== null
+        ? Number(raw.latitude)
+        : null,
+    longitude:
+      raw.longitude !== undefined && raw.longitude !== null
+        ? Number(raw.longitude)
+        : null,
+    capacity: raw.capacity ?? null,
+    approved: approvedFlag,
+    deleted: deletedFlag,
+    createdBy: raw.createdBy || "",
+    createdAt: raw.createdAt || null,
+    updatedAt: raw.updatedAt || null,
+    status,
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   BEZEL CARD: Outer shell (hairline + tint) + Inner core (gradient + inset)
+   used as the canonical "premium hardware" container for every panel.
+   ────────────────────────────────────────────────────────────────────────── */
+function Bezel({ children, className = "", tone = "neutral" }) {
+  const tones = {
+    neutral: "bg-slate-100/60 ring-slate-200/80",
+    teal: "bg-teal-50/40 ring-teal-200/70",
+    rose: "bg-rose-50/50 ring-rose-200/70",
+    amber: "bg-amber-50/50 ring-amber-200/70",
+  };
+  return (
+    <div className={`rounded-[1.75rem] p-1.5 ring-1 ${tones[tone]} ${className}`}>
+      <div className="rounded-[calc(1.75rem-0.375rem)] bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* Pill button following the "button-in-button" trailing-icon pattern. */
+function PillButton({
+  children,
+  onClick,
+  tone = "slate",
+  icon: Icon,
+  iconTrailing = true,
+  loading = false,
+  disabled = false,
+  title,
+}) {
+  const palette = {
+    slate: "bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.98]",
+    teal: "bg-teal-700 text-white hover:bg-teal-800 active:scale-[0.98]",
+    rose: "bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100",
+    emerald: "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]",
+    sky: "bg-sky-50 text-sky-800 ring-1 ring-sky-200 hover:bg-sky-100",
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || loading}
+      title={title}
+      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11.5px] font-bold tracking-tight ${CUBIC} cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${palette[tone]}`}
+    >
+      {!iconTrailing && Icon && (
+        <span className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center">
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <Icon size={12} />}
+        </span>
+      )}
+      <span className="whitespace-nowrap">{children}</span>
+      {iconTrailing && Icon && (
+        <span
+          className={`w-6 h-6 rounded-full flex items-center justify-center ${
+            tone === "rose" || tone === "sky" ? "bg-black/5" : "bg-white/15"
+          } group-hover:translate-x-0.5 ${CUBIC}`}
+        >
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <Icon size={12} />}
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function ModeratorDestinationsPage() {
-  // State bộ lọc Tab trạng thái: 'all' | 'urgent' | 'revision' | 'approved'
-  const [statusTab, setStatusTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [regionFilter, setRegionFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-
-  // State Modal xem trước nhanh
-  const [previewItem, setPreviewItem] = useState(null);
-  const [quickFeedbackNote, setQuickFeedbackNote] = useState("");
-  const [toastMsg, setToastMsg] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Dynamic Destinations List - Khởi tạo mảng rỗng để gắn API sau
+  const [statusTab, setStatusTab] = useState("all");
   const [destinations, setDestinations] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState("");
 
-  useEffect(() => {
-    // [API INTEGRATION] Gắn hàm gọi API lấy danh sách hồ sơ kiểm duyệt tại đây
-    // async function fetchDestinations() {
-    //   setIsLoading(true);
-    //   try {
-    //     const res = await api.get("/moderator/destinations");
-    //     setDestinations(res.data);
-    //   } catch (err) {
-    //     console.error("Lỗi tải danh sách điểm đến:", err);
-    //   } finally {
-    //     setIsLoading(false);
-    //   }
-    // }
-    // fetchDestinations();
+  const [detailTarget, setDetailTarget] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [toastMsg, setToastMsg] = useState("");
+  const [toastTone, setToastTone] = useState("success");
+
+  const showToast = useCallback((msg, tone = "success") => {
+    setToastMsg(msg);
+    setToastTone(tone);
+    setTimeout(() => setToastMsg(""), 3500);
   }, []);
 
-  // Toast helper
-  const showToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 3500);
-  };
-
-  // Thao tác nhanh: Duyệt nhanh
-  const handleQuickApprove = (id, title) => {
-    // [API INTEGRATION] Gọi API duyệt hồ sơ
-    // api.post(`/moderator/destinations/${id}/approve`)
-    setDestinations((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: "approved",
-              statusLabel: "Đã phê duyệt",
-              statusBadge: "bg-emerald-100 text-emerald-800 border-emerald-300",
-            }
-          : item
-      )
-    );
-    showToast(`Đã duyệt và xuất bản thành công hồ sơ: "${title}"`);
-    if (previewItem?.id === id) {
-      setPreviewItem(null);
+  /* Always fetch the full list so the "Chờ duyệt" counter stays honest. */
+  const loadAll = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError("");
+    try {
+      const data = await destinationService.getAll();
+      const list = Array.isArray(data) ? data : [];
+      setDestinations(list.map(normalizeDestination).filter(Boolean));
+    } catch (err) {
+      console.error("[Moderator Destinations] Fetch error:", err);
+      setFetchError(
+        err?.message ||
+          "Không thể tải danh sách điểm đến. Vui lòng kiểm tra kết nối."
+      );
+      setDestinations([]);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, []);
 
-  // Thao tác nhanh: Yêu cầu sửa
-  const handleQuickRevision = (id, title) => {
-    // [API INTEGRATION] Gọi API gửi phản hồi yêu cầu chỉnh sửa
-    // api.post(`/moderator/destinations/${id}/request-revision`, { note: quickFeedbackNote })
-    setDestinations((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: "revision",
-              statusLabel: "Cần rà soát lại",
-              statusBadge: "bg-amber-100 text-amber-800 border-amber-300",
-            }
-          : item
-      )
-    );
-    showToast(`Đã gửi yêu cầu đính chính tới đối tác cho hồ sơ: "${title}"`);
-    if (previewItem?.id === id) {
-      setPreviewItem(null);
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  const openDetail = useCallback(async (id) => {
+    setDetailTarget({ id });
+    setDetailLoading(true);
+    setDetailError("");
+    try {
+      const detail = await destinationService.getById(id);
+      const normalized = normalizeDestination(detail);
+      if (normalized) setDetailTarget(normalized);
+    } catch (err) {
+      console.error("[Moderator Destinations] Detail error:", err);
+      setDetailError(err?.message || "Không thể tải chi tiết điểm đến.");
+    } finally {
+      setDetailLoading(false);
     }
-  };
+  }, []);
 
-  // Thống kê số lượng theo từng tab
-  const urgentCount = destinations.filter((i) => i.status === "urgent").length;
-  const revisionCount = destinations.filter((i) => i.status === "revision").length;
-  const approvedCount = destinations.filter((i) => i.status === "approved").length;
+  const closeDetail = useCallback(() => {
+    setDetailTarget(null);
+    setDetailError("");
+  }, []);
 
-  // Lọc dữ liệu theo tab và bộ lọc
-  const filteredList = destinations.filter((item) => {
-    // Tab lọc trạng thái
-    if (statusTab === "urgent" && item.status !== "urgent") return false;
-    if (statusTab === "revision" && item.status !== "revision") return false;
-    if (statusTab === "approved" && item.status !== "approved") return false;
+  const handleApprove = useCallback(
+    async (id, approved, displayName) => {
+      setActionLoadingId(id);
+      try {
+        const updated = await destinationService.setApproval(id, approved);
+        const updatedNorm = normalizeDestination(updated);
+        if (updatedNorm) {
+          setDestinations((prev) =>
+            prev.map((d) => (d.id === id ? { ...d, ...updatedNorm } : d))
+          );
+          if (detailTarget?.id === id) setDetailTarget(updatedNorm);
+        }
+        showToast(
+          approved
+            ? `Đã phê duyệt điểm đến "${displayName}".`
+            : `Đã hủy phê duyệt điểm đến "${displayName}".`
+        );
+      } catch (err) {
+        console.error("[Moderator Approve] error:", err);
+        showToast(
+          err?.message || "Không thể cập nhật trạng thái phê duyệt.",
+          "error"
+        );
+      } finally {
+        setActionLoadingId(null);
+      }
+    },
+    [detailTarget, showToast]
+  );
 
-    // Tìm kiếm
-    const matchSearch =
-      (item.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.sender || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.id || "").toLowerCase().includes(searchQuery.toLowerCase());
+  /* Counts are computed from the FULL list (including non-deleted). */
+  const counts = useMemo(
+    () => ({
+      all: destinations.filter((d) => d.status !== "deleted").length,
+      pending: destinations.filter((d) => d.status === STATUS.PENDING).length,
+      approved: destinations.filter((d) => d.status === STATUS.APPROVED).length,
+    }),
+    [destinations]
+  );
 
-    // Khu vực
-    const matchRegion =
-      regionFilter === "all" ||
-      (item.region || "").toLowerCase().includes(regionFilter.toLowerCase());
-
-    // Thể loại
-    const matchCategory =
-      categoryFilter === "all" || item.category === categoryFilter;
-
-    return matchSearch && matchRegion && matchCategory;
-  });
-
-  // Mở modal xem trước
-  const handleOpenPreview = (item) => {
-    setPreviewItem(item);
-    setQuickFeedbackNote(
-      `Đã rà soát hồ sơ ${item.title}. Tọa độ thực địa ${item.lat || ""}° N, ${item.lng || ""}° E. Nội dung đạt chuẩn văn hóa.`
-    );
-  };
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return destinations
+      .filter((d) => d.status !== "deleted")
+      .filter((item) => {
+        if (statusTab === "pending" && item.status !== STATUS.PENDING) return false;
+        if (statusTab === "approved" && item.status !== STATUS.APPROVED) return false;
+        if (!q) return true;
+        return (
+          (item.name || "").toLowerCase().includes(q) ||
+          (item.address || "").toLowerCase().includes(q) ||
+          String(item.id).toLowerCase().includes(q)
+        );
+      });
+  }, [destinations, searchQuery, statusTab]);
 
   return (
-    <div className="space-y-6 animate-in fade-in-50 duration-200">
-      {/* Toast thông báo nhanh */}
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       {toastMsg && (
-        <div className="fixed top-5 right-5 z-50 bg-teal-800 text-white px-4 py-2.5 rounded-2xl shadow-xl border border-teal-600 text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-3">
-          <CheckCircle2 size={16} className="text-teal-300" />
+        <div
+          className={`fixed top-5 right-5 z-50 px-4 py-2.5 rounded-full shadow-xl border text-xs font-bold flex items-center gap-2 ${CUBIC} max-w-md ${
+            toastTone === "success"
+              ? "bg-teal-800 border-teal-600 text-white"
+              : "bg-rose-900 border-rose-600 text-white"
+          }`}
+        >
+          {toastTone === "success" ? (
+            <CheckCircle2 size={14} className="text-teal-300" />
+          ) : (
+            <AlertCircle size={14} className="text-rose-300" />
+          )}
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* ────────────────────────────────────────────────────────
-          1. TIÊU ĐỀ & BỘ LỌC HÀNG CHỜ
-      ──────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
-        {/* Tiêu đề trang */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-teal-500" />
-              <span className="text-[11px] font-black uppercase tracking-wider text-teal-700">
-                Hội Đồng Thẩm Định Văn Hóa
-              </span>
+      {/* HEADER */}
+      <Bezel className="bg-gradient-to-br from-teal-50/30 via-white to-slate-50/30" tone="teal">
+        <div className="px-6 py-5 sm:px-8 sm:py-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+          <div className="space-y-2.5 max-w-2xl">
+            <div className="inline-flex items-center gap-2 text-[10.5px] font-black uppercase tracking-[0.18em] text-teal-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+              Hội đồng thẩm định văn hóa
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              Thẩm Định Điểm Đến & Lộ Trình Di Sản
+            <h1 className="text-[26px] sm:text-[32px] leading-[1.05] tracking-[-0.02em] font-black text-slate-900">
+              Thẩm định điểm đến di sản
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Rà soát tính xác thực lịch sử, tọa độ kích hoạt thực địa và quyền lợi du khách trước khi công bố
+            <p className="text-[13px] leading-relaxed text-slate-500 max-w-prose">
+              Xem chi tiết hồ sơ và phê duyệt hoặc hủy duyệt điểm đến do
+              Đối tác hoặc Quản trị viên khởi tạo.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-              Tổng số: <strong>{destinations.length} hồ sơ</strong>
+          <div className="flex items-center gap-2.5">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10.5px] font-bold text-teal-800 bg-white/70 ring-1 ring-teal-200 rounded-full px-3 py-1.5">
+              <ShieldCheck size={12} />
+              Quyền MODERATOR
             </span>
+            <PillButton
+              tone="slate"
+              icon={RefreshCw}
+              iconTrailing={false}
+              onClick={loadAll}
+              loading={isLoading}
+            >
+              Làm mới
+            </PillButton>
           </div>
         </div>
+      </Bezel>
 
-        {/* Thanh Tab trạng thái */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={() => setStatusTab("all")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              statusTab === "all"
-                ? "bg-teal-600 text-white shadow-xs"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
-            }`}
-          >
-            Tất cả ({destinations.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab("urgent")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === "urgent"
-                ? "bg-rose-600 text-white shadow-xs"
-                : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-            <span>Chờ duyệt gấp ({urgentCount})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab("revision")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              statusTab === "revision"
-                ? "bg-amber-600 text-white shadow-xs"
-                : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
-            }`}
-          >
-            Yêu cầu chỉnh sửa ({revisionCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab("approved")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              statusTab === "approved"
-                ? "bg-emerald-600 text-white shadow-xs"
-                : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
-            }`}
-          >
-            Đã phê duyệt ({approvedCount})
-          </button>
-        </div>
+      {/* STATS BENTO */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <button
+          type="button"
+          onClick={() => setStatusTab("all")}
+          className={`text-left ${CUBIC} ${statusTab === "all" ? "scale-[1.01]" : ""}`}
+        >
+          <Bezel tone="neutral">
+            <div className="p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+                <ListChecks size={20} />
+              </div>
+              <div>
+                <p className="text-[10.5px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Tổng hồ sơ
+                </p>
+                <p className="text-2xl font-black text-slate-900 leading-none mt-1">
+                  {counts.all}
+                </p>
+              </div>
+            </div>
+          </Bezel>
+        </button>
 
-        {/* Thanh tìm kiếm & Dropdown lọc Tỉnh/Thành + Thể loại */}
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-1">
-          {/* Ô tìm kiếm */}
-          <div className="sm:col-span-6 relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+        <button
+          type="button"
+          onClick={() => setStatusTab("pending")}
+          className={`text-left ${CUBIC} ${statusTab === "pending" ? "scale-[1.01]" : ""}`}
+        >
+          <Bezel tone="amber">
+            <div className="p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                <span className="w-3 h-3 rounded-full bg-white animate-pulse" />
+              </div>
+              <div>
+                <p className="text-[10.5px] font-black uppercase tracking-[0.16em] text-amber-700">
+                  Chờ duyệt
+                </p>
+                <p className="text-2xl font-black text-slate-900 leading-none mt-1">
+                  {counts.pending}
+                </p>
+              </div>
+            </div>
+          </Bezel>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStatusTab("approved")}
+          className={`text-left ${CUBIC} ${statusTab === "approved" ? "scale-[1.01]" : ""}`}
+        >
+          <Bezel tone="teal">
+            <div className="p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center shrink-0">
+                <CheckCircle2 size={20} />
+              </div>
+              <div>
+                <p className="text-[10.5px] font-black uppercase tracking-[0.16em] text-teal-700">
+                  Đang lưu hành
+                </p>
+                <p className="text-2xl font-black text-slate-900 leading-none mt-1">
+                  {counts.approved}
+                </p>
+              </div>
+            </div>
+          </Bezel>
+        </button>
+      </div>
+
+      {/* SEARCH */}
+      <Bezel>
+        <div className="p-3 sm:p-4 flex items-center gap-2.5">
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
               <Search size={14} />
             </div>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm tên di tích, đơn vị gửi, mã hồ sơ..."
-              className="w-full pl-8.5 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+              placeholder="Tìm tên điểm đến, địa chỉ hoặc mã hồ sơ"
+              className={`w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-[12.5px] text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 ${CUBIC}`}
             />
           </div>
-
-          {/* Lọc Tỉnh / Thành phố */}
-          <div className="sm:col-span-3">
-            <select
-              value={regionFilter}
-              onChange={(e) => setRegionFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-            >
-              <option value="all">Tất cả Tỉnh / Thành phố</option>
-              <option value="Hà Nội">Hà Nội</option>
-              <option value="Ninh Bình">Ninh Bình</option>
-              <option value="Huế">Huế / Miền Trung</option>
-              <option value="Đà Nẵng">Đà Nẵng</option>
-              <option value="Quảng Nam">Quảng Nam</option>
-            </select>
-          </div>
-
-          {/* Lọc Thể loại */}
-          <div className="sm:col-span-3">
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-            >
-              <option value="all">Tất cả Thể loại</option>
-              <option value="Di tích">Di tích lịch sử</option>
-              <option value="Làng nghề">Làng nghề truyền thống</option>
-              <option value="Tuyến du khảo">Tuyến du khảo / Lộ trình</option>
-            </select>
-          </div>
         </div>
-      </div>
+      </Bezel>
 
-      {/* ────────────────────────────────────────────────────────
-          2 & 3. DANH SÁCH THẺ HỒ SƠ ĐIỂM ĐẾN & LỘ TRÌNH
-      ──────────────────────────────────────────────────────── */}
-      <div className="space-y-3.5">
-        {filteredList.length === 0 ? (
-          <div className="bg-white rounded-2xl p-16 text-center border border-slate-200 shadow-2xs space-y-3">
-            <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
-              <Inbox size={28} />
+      {fetchError && (
+        <Bezel tone="rose">
+          <div className="p-4 flex items-start gap-2.5">
+            <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-xs font-bold text-rose-800">Không thể tải danh sách</p>
+              <p className="text-[11px] text-rose-700 mt-0.5">{fetchError}</p>
+              <button
+                type="button"
+                onClick={loadAll}
+                className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900"
+              >
+                Thử lại
+              </button>
             </div>
-            <h3 className="text-base font-bold text-slate-800">
-              {searchQuery || statusTab !== "all" || regionFilter !== "all" || categoryFilter !== "all"
-                ? "Không tìm thấy hồ sơ di tích phù hợp với tiêu chí lọc"
-                : "Chưa có hồ sơ điểm đến nào trong danh sách"}
-            </h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
-              {searchQuery || statusTab !== "all"
-                ? "Thử xóa từ khóa tìm kiếm hoặc đặt lại các bộ lọc về mặc định."
-                : "Các hồ sơ do đối tác gửi lên sẽ được hiển thị tại đây khi kết nối máy chủ."}
-            </p>
           </div>
-        ) : (
-          filteredList.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs hover:border-teal-300 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4 group"
-            >
-              {/* Trái: Thumbnail + Nội dung chính */}
-              <div className="flex items-start gap-3.5 sm:gap-4 flex-1 min-w-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={item.image || "/image/vanmieu.png"}
-                  alt={item.title}
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0 group-hover:scale-102 transition-transform"
-                  onError={(e) => {
-                    e.currentTarget.src = "/image/vanmieu.png";
-                  }}
-                />
+        </Bezel>
+      )}
 
-                <div className="space-y-1.5 min-w-0 flex-1">
-                  {/* Badges thể loại & Mức độ ưu tiên */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md border ${
-                        item.typeColor || "bg-sky-50 text-sky-800 border-sky-200"
-                      }`}
-                    >
-                      {item.typeBadge || item.category || "Điểm di tích"}
-                    </span>
-
-                    {item.priority && (
-                      <span
-                        className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                          item.priorityBadge || "bg-rose-600 text-white"
-                        }`}
-                      >
-                        {item.priority}
-                      </span>
-                    )}
-
-                    <span
-                      className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-full border ${
-                        item.statusBadge || "bg-amber-50 text-amber-800 border-amber-200"
-                      }`}
-                    >
-                      {item.statusLabel || "Chờ duyệt"}
-                    </span>
-                  </div>
-
-                  {/* Tên di tích */}
-                  <h3 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-teal-700 transition-colors truncate">
-                    {item.title}
-                  </h3>
-
-                  {/* Đơn vị cung cấp & Khu vực */}
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    <span className="flex items-center gap-1 font-semibold text-slate-700">
-                      <Building2 size={13} className="text-slate-400" />
-                      <span>{item.sender}</span>
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <MapPin size={12} className="text-teal-600" />
-                      <span>{item.region}</span>
-                    </span>
-                    {item.pricing?.price !== undefined && (
-                      <>
-                        <span>•</span>
-                        <span className="font-bold text-rose-600">
-                          {item.pricing.price.toLocaleString("vi-VN")} đ
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Tọa độ thực địa rút gọn kèm bán kính */}
-                  {item.lat && item.lng && (
-                    <div className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-sky-800 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-md">
-                      <Navigation size={11} className="text-sky-600" />
-                      <span>
-                        {item.lat}° N, {item.lng}° E {item.radius ? `• Bán kính: ${item.radius}m` : ""}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Phải: Cụm nút thao tác */}
-              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 self-end lg:self-center shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 w-full lg:w-auto justify-end">
-                {/* Nút Xem chi tiết (Mở Modal xem trước nhanh) */}
-                <button
-                  type="button"
-                  onClick={() => handleOpenPreview(item)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                  title="Mở bảng so sánh kiểm định nhanh"
-                >
-                  <Eye size={14} />
-                  <span>So sánh nhanh</span>
-                </button>
-
-                {/* Nút [Xem chi tiết & Kiểm định] dẫn sang trang duyệt chi tiết */}
-                <Link
-                  href={`/moderator/destinations/${item.id}`}
-                  className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <span>Xem chi tiết & Kiểm định</span>
-                  <ArrowUpRight size={14} />
-                </Link>
-
-                {/* Thao tác nhanh */}
-                <button
-                  type="button"
-                  onClick={() => handleQuickApprove(item.id, item.title)}
-                  className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-colors cursor-pointer"
-                  title="Duyệt nhanh và xuất bản"
-                >
-                  <CheckCircle2 size={16} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickRevision(item.id, item.title)}
-                  className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition-colors cursor-pointer"
-                  title="Yêu cầu sửa"
-                >
-                  <AlertTriangle size={16} />
-                </button>
-              </div>
+      {/* LIST */}
+      <div className="space-y-3">
+        {isLoading && destinations.length === 0 ? (
+          <Bezel>
+            <div className="p-16 text-center">
+              <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
+              <p className="text-xs text-slate-400 mt-3">Đang tải bảng kiểm duyệt</p>
             </div>
-          ))
+          </Bezel>
+        ) : filtered.length === 0 ? (
+          <Bezel>
+            <div className="p-16 text-center space-y-3">
+              <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
+                <Inbox size={28} />
+              </div>
+              <h3 className="text-base font-bold text-slate-800">
+                {searchQuery
+                  ? "Không tìm thấy điểm đến nào phù hợp"
+                  : statusTab === "pending"
+                    ? "Không có hồ sơ nào đang chờ thẩm định"
+                    : "Chưa có điểm đến nào đang lưu hành"}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Danh sách điểm đến đã được Đối tác hoặc Quản trị viên đăng ký sẽ
+                xuất hiện tại đây.
+              </p>
+            </div>
+          </Bezel>
+        ) : (
+          filtered.map((item) => {
+            const isApproved = item.approved === true;
+            const isLoadingAction = actionLoadingId === item.id;
+            return (
+              <article
+                key={item.id}
+                className={`group ${CUBIC} hover:-translate-y-[2px] hover:shadow-lg`}
+              >
+                <Bezel>
+                  <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-teal-100 via-emerald-50 to-sky-100 ring-1 ring-teal-200/60 flex items-center justify-center shrink-0">
+                        <Compass size={26} className="text-teal-700" />
+                      </div>
+
+                      <div className="space-y-1.5 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full ring-1 bg-sky-50 text-sky-800 ring-sky-200">
+                            Điểm di tích
+                          </span>
+                          {isApproved ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              Đang lưu hành
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 ring-1 ring-amber-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              Chờ duyệt
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="text-[14.5px] sm:text-[15.5px] font-black text-slate-900 truncate group-hover:text-teal-700">
+                          {item.name}
+                        </h3>
+
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-slate-500">
+                          <span className="flex items-center gap-1 font-semibold text-slate-700">
+                            <Building2 size={11} className="text-slate-400" />
+                            {item.createdBy || "Đối tác không xác định"}
+                          </span>
+                          <span className="text-slate-300">/</span>
+                          <span className="flex items-center gap-1">
+                            <MapPin size={11} className="text-teal-600" />
+                            {item.address}
+                          </span>
+                        </div>
+
+                        {item.latitude !== null && item.longitude !== null && (
+                          <div className="inline-flex items-center gap-1.5 text-[10.5px] font-mono font-bold text-sky-800 bg-sky-50 ring-1 ring-sky-200 px-2.5 py-0.5 rounded-full">
+                            <Navigation size={10} className="text-sky-600" />
+                            <span>
+                              {item.latitude.toFixed(4)} / {item.longitude.toFixed(4)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
+                      <PillButton
+                        tone="sky"
+                        icon={Eye}
+                        onClick={() => openDetail(item.id)}
+                      >
+                        Kiểm tra
+                      </PillButton>
+                      {isApproved ? (
+                        <PillButton
+                          tone="rose"
+                          icon={X}
+                          onClick={() => handleApprove(item.id, false, item.name)}
+                          loading={isLoadingAction}
+                          title="Hủy phê duyệt"
+                        >
+                          Hủy duyệt
+                        </PillButton>
+                      ) : (
+                        <PillButton
+                          tone="emerald"
+                          icon={CheckCircle2}
+                          onClick={() => handleApprove(item.id, true, item.name)}
+                          loading={isLoadingAction}
+                          title="Phê duyệt"
+                        >
+                          Phê duyệt
+                        </PillButton>
+                      )}
+                    </div>
+                  </div>
+                </Bezel>
+              </article>
+            );
+          })
         )}
       </div>
 
-      {/* ────────────────────────────────────────────────────────
-          4. MODAL XEM TRƯỚC NHANH
-      ──────────────────────────────────────────────────────── */}
-      {previewItem && (
+      {/* MODAL DETAIL */}
+      {(detailTarget || detailLoading || detailError) && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150"
-          onClick={() => setPreviewItem(null)}
+          className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
+          onClick={closeDetail}
         >
           <div
-            className="w-full max-w-3xl bg-white rounded-3xl p-5 sm:p-7 shadow-2xl border border-slate-100 relative animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto space-y-4"
+            className="w-full max-w-2xl bg-white rounded-[2rem] p-1.5 ring-1 ring-slate-200 shadow-2xl max-h-[92vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header Modal */}
-            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-black text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                    #{previewItem.id}
-                  </span>
-                  <span className="text-xs font-bold text-slate-500">{previewItem.category}</span>
-                </div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 mt-1">
-                  {previewItem.title}
-                </h3>
-                <p className="text-xs text-slate-500">{previewItem.sender} • {previewItem.region}</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setPreviewItem(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Nội dung đối chiếu */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Cột 1: Văn bản thuyết minh & Tọa độ */}
-              <div className="space-y-3">
+            <div className="rounded-[calc(2rem-0.375rem)] bg-white max-h-[calc(92vh-0.75rem)] overflow-y-auto">
+              <div className="flex items-start justify-between p-5 sm:p-7 border-b border-slate-100">
                 <div>
-                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">
-                    Nội Dung Thuyết Minh Lịch Sử
-                  </h4>
-                  <p className="text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200 leading-relaxed">
-                    {previewItem.description || "Chưa có nội dung thuyết minh."}
-                  </p>
-                </div>
-
-                {/* Bản đồ mô phỏng tọa độ */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                      Tọa Độ Thực Địa Bản Đồ
-                    </h4>
-                    {previewItem.lat && previewItem.lng && (
-                      <span className="text-[10.5px] text-sky-700 font-bold">
-                        {previewItem.lat}° N, {previewItem.lng}° E ({previewItem.radius || 60}m)
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="font-mono text-[10.5px] font-black text-teal-800 bg-teal-50 ring-1 ring-teal-200 px-2 py-0.5 rounded-full">
+                      #{detailTarget?.id ?? "—"}
+                    </span>
+                    {detailTarget?.approved ? (
+                      <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 px-2 py-0.5 rounded-full">
+                        Đã phê duyệt
+                      </span>
+                    ) : (
+                      <span className="text-[10.5px] font-bold text-amber-700 bg-amber-50 ring-1 ring-amber-200 px-2 py-0.5 rounded-full">
+                        Chờ thẩm định
                       </span>
                     )}
                   </div>
+                  <h3 className="text-[17px] sm:text-[19px] font-black text-slate-900 tracking-tight">
+                    {detailTarget?.name || "Đang tải..."}
+                  </h3>
+                  <p className="text-[12px] text-slate-500 mt-1 flex items-center gap-1">
+                    <MapPin size={11} className="text-slate-400" />
+                    {detailTarget?.address}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDetail}
+                  className={`w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center ${CUBIC} cursor-pointer`}
+                >
+                  <X size={15} />
+                </button>
+              </div>
 
-                  <div className="relative rounded-xl overflow-hidden border border-slate-200 aspect-[16/8] bg-slate-900/10 flex items-center justify-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={previewItem.image || "/image/vanmieu.png"}
-                      alt="Bản đồ"
-                      className="w-full h-full object-cover opacity-80"
-                    />
-                    <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center">
-                      <div className="relative flex items-center justify-center">
-                        <div className="w-24 h-24 rounded-full border-2 border-dashed border-emerald-400 bg-emerald-500/25 animate-pulse" />
-                        <div className="absolute w-7 h-7 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-md ring-2 ring-white">
-                          <MapPin size={14} />
+              <div className="p-5 sm:p-7">
+                {detailLoading ? (
+                  <div className="py-14 flex flex-col items-center gap-3 text-slate-500">
+                    <Loader2 size={28} className="animate-spin text-slate-400" />
+                    <p className="text-xs font-bold">Đang tải dữ liệu điểm đến</p>
+                  </div>
+                ) : detailError ? (
+                  <Bezel tone="rose">
+                    <div className="p-4 flex items-start gap-2.5">
+                      <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-xs font-bold text-rose-800">Không thể tải chi tiết</p>
+                        <p className="text-[11px] text-rose-700 mt-0.5">{detailError}</p>
+                      </div>
+                    </div>
+                  </Bezel>
+                ) : detailTarget ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div className="rounded-2xl bg-sky-50/70 ring-1 ring-sky-200 p-4">
+                        <p className="text-[10px] font-black text-sky-700 uppercase tracking-[0.16em] mb-2 flex items-center gap-1">
+                          <Navigation size={10} /> Tọa độ GPS
+                        </p>
+                        <div className="space-y-1 text-[11.5px] font-mono">
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Vĩ độ</span>
+                            <span className="font-black text-slate-800">
+                              {detailTarget.latitude?.toFixed(6) ?? "—"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Kinh độ</span>
+                            <span className="font-black text-slate-800">
+                              {detailTarget.longitude?.toFixed(6) ?? "—"}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Cột 2: Câu hỏi trắc nghiệm & Khung phản hồi */}
-              <div className="space-y-3">
-                {previewItem.quiz && (
-                  <div>
-                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">
-                      Câu Hỏi Đố Vui Trải Nghiệm
-                    </h4>
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
-                      <p className="font-bold text-slate-900">{previewItem.quiz.question}</p>
-                      <div className="space-y-1">
-                        {previewItem.quiz.options?.map((opt) => (
-                          <div
-                            key={opt.key}
-                            className={`p-1.5 rounded-lg border text-[11px] flex items-center justify-between ${
-                              opt.isCorrect
-                                ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-bold"
-                                : "bg-white border-slate-200 text-slate-700"
-                            }`}
-                          >
-                            <span>
-                              <strong>{opt.key}.</strong> {opt.text}
-                            </span>
-                            {opt.isCorrect && (
-                              <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.2 rounded uppercase font-black">
-                                Đáp án chuẩn
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                      <div className="rounded-2xl bg-emerald-50/70 ring-1 ring-emerald-200 p-4">
+                        <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.16em] mb-2 flex items-center gap-1">
+                          <Users size={10} /> Sức chứa tối đa
+                        </p>
+                        <p className="text-[18px] font-black text-slate-900 leading-none">
+                          {detailTarget.capacity ?? "—"}
+                          <span className="text-[10.5px] font-bold text-slate-500 ml-1.5">
+                            du khách / lượt
+                          </span>
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 ring-1 ring-slate-200 p-4 sm:col-span-2">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.16em] mb-1">
+                          Đơn vị khởi tạo
+                        </p>
+                        <p className="text-[13px] font-bold text-slate-800">
+                          {detailTarget.createdBy || "—"}
+                        </p>
                       </div>
                     </div>
                   </div>
-                )}
-
-                {/* Khung nhập ghi chú phản hồi */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Ghi Chú Phản Hồi Của Thẩm Định Viên
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={quickFeedbackNote}
-                    onChange={(e) => setQuickFeedbackNote(e.target.value)}
-                    placeholder="Nhập yêu cầu bổ sung hoặc căn cứ duyệt..."
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 leading-relaxed"
-                  />
-                </div>
+                ) : null}
               </div>
-            </div>
 
-            {/* Footer Modal */}
-            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => handleQuickRevision(previewItem.id, previewItem.title)}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <AlertTriangle size={14} />
-                <span>Yêu cầu bổ sung thông tin</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickApprove(previewItem.id, previewItem.title)}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <CheckCircle2 size={15} />
-                <span>Phê duyệt ngay & Xuất bản</span>
-              </button>
+              <div className="px-5 sm:px-7 py-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                {detailTarget && !detailTarget.approved && (
+                  <PillButton
+                    tone="emerald"
+                    icon={CheckCircle2}
+                    onClick={() =>
+                      handleApprove(detailTarget.id, true, detailTarget.name)
+                    }
+                    loading={actionLoadingId === detailTarget.id}
+                  >
+                    Phê duyệt
+                    <ChevronRight size={12} />
+                  </PillButton>
+                )}
+                {detailTarget && detailTarget.approved && (
+                  <PillButton
+                    tone="rose"
+                    icon={X}
+                    onClick={() =>
+                      handleApprove(detailTarget.id, false, detailTarget.name)
+                    }
+                    loading={actionLoadingId === detailTarget.id}
+                  >
+                    Hủy duyệt
+                  </PillButton>
+                )}
+                <button
+                  type="button"
+                  onClick={closeDetail}
+                  className={`px-5 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11.5px] ${CUBIC} cursor-pointer`}
+                >
+                  Đóng
+                </button>
+              </div>
             </div>
           </div>
         </div>
