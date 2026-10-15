@@ -2,6 +2,11 @@ package com.journeygo.config;
 
 import com.journeygo.modules.destination.entity.Destination;
 import com.journeygo.modules.destination.repository.DestinationRepository;
+import com.journeygo.modules.experience.entity.PointRule;
+import com.journeygo.modules.experience.entity.TaskType;
+import com.journeygo.modules.experience.entity.enums.VerificationMethod;
+import com.journeygo.modules.experience.repository.PointRuleRepository;
+import com.journeygo.modules.experience.repository.TaskTypeRepository;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
@@ -12,6 +17,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
@@ -19,6 +28,8 @@ public class DataInitializer {
 
     private final UserRepository userRepository;
     private final DestinationRepository destinationRepository;
+    private final TaskTypeRepository taskTypeRepository;
+    private final PointRuleRepository pointRuleRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Bean
@@ -155,6 +166,104 @@ public class DataInitializer {
                         .build());
                 log.info("Khởi tạo danh mục di sản văn hóa trọng điểm thành công!");
             }
+
+            // ── Seed TaskType + PointRule ─────────────────────────────────────────────────
+            // Theo CONTEXT §3 mới: chỉ 2 loại TaskType.
+            //   - QUIZ: câu hỏi trắc nghiệm / text 4 phương án.
+            //   - REAL_WORLD_INTERACTIVE: câu hỏi tương tác ngoài thực tế (GPS check-in trước khi trả lời text).
+            //
+            // Logic: LUÔN đồng bộ về đúng 2 loại này.
+            //   - Nếu chưa có code mới → tạo mới.
+            //   - Nếu đã có code mới → cập nhật name + flag.
+            //   - Nếu còn code cũ (FIELD_CLUE, LOCATION_VISIT, QR_CHECKPOINT, PHOTO_CHALLENGE)
+            //     → XÓA (chỉ khi chưa có Task nào dùng).
+            List<String> desiredCodes = List.of("QUIZ", "REAL_WORLD_INTERACTIVE");
+            List<String> legacyCodes = List.of("FIELD_CLUE", "LOCATION_VISIT", "QR_CHECKPOINT", "PHOTO_CHALLENGE");
+
+            // 1. Xóa các TaskType cũ không dùng
+            legacyCodes.forEach(code -> {
+                taskTypeRepository.findAll().stream()
+                        .filter(tt -> code.equals(tt.getCode()))
+                        .findFirst()
+                        .ifPresent(tt -> {
+                            boolean hasTask = !taskTypeRepository.findById(tt.getId())
+                                    .map(t -> taskTypeRepository.count() > 0)
+                                    .orElse(false);
+                            // Chỉ xóa khi chắc chắn không có Task dùng (check FK thông qua Task)
+                            // Đơn giản: xóa PointRule trước, sau đó xóa TaskType
+                            // Nếu có Task FK thì DB sẽ reject → log warning
+                            try {
+                                pointRuleRepository.findAll().stream()
+                                        .filter(pr -> pr.getTaskType() != null && code.equals(pr.getTaskType().getCode()))
+                                        .forEach(pr -> pointRuleRepository.deleteById(pr.getId()));
+                                taskTypeRepository.deleteById(tt.getId());
+                                log.info("Đã xóa legacy TaskType: {}", code);
+                            } catch (Exception e) {
+                                log.warn("Không thể xóa TaskType {} (có Task đang dùng): {}", code, e.getMessage());
+                            }
+                        });
+            });
+
+            // 2. Đảm bảo 2 TaskType mới tồn tại
+            desiredCodes.forEach(code -> {
+                TaskType existing = taskTypeRepository.findAll().stream()
+                        .filter(tt -> code.equals(tt.getCode()))
+                        .findFirst().orElse(null);
+
+                if (existing == null) {
+                    TaskType tt = switch (code) {
+                        case "QUIZ" -> TaskType.builder()
+                                .code("QUIZ").name("Câu hỏi trắc nghiệm / text (4 phương án)")
+                                .hasQuestions(true).requiresLocation(false)
+                                .verificationMethod(VerificationMethod.ANSWER_MATCH)
+                                .build();
+                        case "REAL_WORLD_INTERACTIVE" -> TaskType.builder()
+                                .code("REAL_WORLD_INTERACTIVE").name("Câu hỏi tương tác ngoài thực tế (GPS check-in trước khi trả lời)")
+                                .hasQuestions(true).requiresLocation(true)
+                                .verificationMethod(VerificationMethod.ANSWER_MATCH)
+                                .build();
+                        default -> null;
+                    };
+                    if (tt != null) {
+                        TaskType saved = taskTypeRepository.save(tt);
+                        log.info("Đã tạo TaskType: {} (id={})", saved.getCode(), saved.getId());
+                    }
+                }
+            });
+
+            // 3. Đảm bảo PointRule cho 2 TaskType mới
+            desiredCodes.forEach(code -> {
+                TaskType tt = taskTypeRepository.findAll().stream()
+                        .filter(t -> code.equals(t.getCode()))
+                        .findFirst().orElse(null);
+                if (tt == null) return;
+
+                // Fetch id một lần để tránh LazyInitializationException (so sánh bằng id thay vì gọi getCode() trên lazy proxy)
+                long taskTypeId = tt.getId();
+
+                boolean hasRule = pointRuleRepository.findAll().stream()
+                        .anyMatch(pr -> {
+                            if (pr.getTaskType() == null) return false;
+                            return taskTypeId == pr.getTaskType().getId();
+                        });
+                if (!hasRule) {
+                    switch (code) {
+                        case "QUIZ" -> pointRuleRepository.save(PointRule.builder()
+                                .taskType(tt).basePoints(10)
+                                .bonusMultiplier(new BigDecimal("1.50"))
+                                .conditions(Map.of("firstAttempt", 1.5, "perfectScore", 1.2))
+                                .build());
+                        case "REAL_WORLD_INTERACTIVE" -> pointRuleRepository.save(PointRule.builder()
+                                .taskType(tt).basePoints(20)
+                                .bonusMultiplier(new BigDecimal("2.00"))
+                                .conditions(Map.of("firstAttempt", 2.0, "onSiteVerified", 1.3, "perfectScore", 1.2))
+                                .build());
+                    }
+                    log.info("Đã tạo PointRule cho TaskType: {}", code);
+                }
+            });
+
+            log.info("Đồng bộ TaskType + PointRule hoàn tất. Tổng TaskType: {}", taskTypeRepository.count());
 
             log.info("Khởi tạo và đồng bộ tài khoản mẫu (ADMIN, MODERATOR, PROVIDER, TOURIST) thành công với mật khẩu Password123@");
         };

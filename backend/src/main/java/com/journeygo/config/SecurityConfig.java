@@ -47,6 +47,17 @@ public class SecurityConfig {
             "/error"
     };
 
+    private static final String[] PUBLIC_GET_ENDPOINTS = {
+            "/api/v1/destinations/**",
+            // Master data: public read, admin write
+            "/api/v1/task-types",
+            "/api/v1/task-types/*",
+            "/api/v1/task-types/code/*",
+            "/api/v1/task-types/*/point-rule",
+            // Metadata public
+            "/api/v1/tasks/*/unlock-condition"
+    };
+
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
@@ -62,6 +73,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/destinations/**").permitAll()
                         .anyRequest().authenticated()
                 )
