@@ -12,30 +12,32 @@ import {
   AlertCircle,
   CheckCircle2,
   Save,
-  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { destinationService } from "../services/destinationService";
 
 /**
  * Modal "Cập Nhật Điểm Đến Di Sản" — dùng chung cho Provider & Admin.
- *
- * LƯU Ý NGHIỆP VỤ: Khi cập nhật thành công, điểm đến sẽ TỰ ĐỘNG HỦY DUYỆT
- * (approved: false / PENDING) để Moderator thẩm định lại.
+ * Khi submit sẽ gọi PUT /api/v1/destinations/{id}.
  *
  * Props:
+ *  - destinationId: number | null        (required — ID của điểm đến cần sửa)
  *  - isOpen: boolean
  *  - onClose: () => void
  *  - onUpdated?: (updatedDest) => void  -> callback sau khi cập nhật thành công
- *  - destinationId: string|number       -> ID điểm đến cần sửa
- *  - theme: "emerald" | "slate"          -> đổi tông màu chủ đạo
+ *  - theme: "emerald" | "slate"         -> đổi tông màu chủ đạo
+ *  - title?: string
+ *  - subtitle?: string
  */
 export default function EditDestinationModal({
+  destinationId,
   isOpen,
   onClose,
   onUpdated,
-  destinationId,
   theme = "emerald",
+  title = "Cập Nhật Điểm Đến Di Sản",
 }) {
+  // ── Theme tokens ───────────────────────────────────────────────
   const palette =
     theme === "slate"
       ? {
@@ -43,6 +45,7 @@ export default function EditDestinationModal({
           ringBorder: "focus:border-slate-700",
           primary: "bg-slate-900 hover:bg-slate-800 active:bg-slate-950",
           primaryShadow: "shadow-slate-900/20",
+          chip: "bg-slate-100 text-slate-700 border-slate-200",
           icon: "text-slate-900",
           badge: "bg-slate-900/5 text-slate-700 border-slate-200",
         }
@@ -51,10 +54,12 @@ export default function EditDestinationModal({
           ringBorder: "focus:border-emerald-600",
           primary: "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800",
           primaryShadow: "shadow-emerald-600/20",
+          chip: "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100",
           icon: "text-emerald-700",
           badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
         };
 
+  // ── Form state ───────────────────────────────────────────────
   const initialForm = {
     name: "",
     address: "",
@@ -62,65 +67,64 @@ export default function EditDestinationModal({
     longitude: "",
     capacity: "",
   };
-
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(false);
+  const [fetchingDest, setFetchingDest] = useState(false);
   const [success, setSuccess] = useState(false);
   const [updatedItem, setUpdatedItem] = useState(null);
   const [gettingLocation, setGettingLocation] = useState(false);
   const dialogRef = useRef(null);
 
+  // ── Load destination data khi mở modal ──────────────────────
   useEffect(() => {
-    if (isOpen && destinationId) {
-      const fetchDetail = async () => {
-        setLoadingData(true);
-        setApiError("");
-        try {
-          const detail = await destinationService.getById(destinationId);
-          if (detail && typeof detail === "object") {
-            setForm({
-              name: detail.name || "",
-              address: detail.address || "",
-              latitude:
-                detail.latitude !== undefined && detail.latitude !== null
-                  ? String(detail.latitude)
-                  : "",
-              longitude:
-                detail.longitude !== undefined && detail.longitude !== null
-                  ? String(detail.longitude)
-                  : "",
-              capacity:
-                detail.capacity !== undefined && detail.capacity !== null
-                  ? String(detail.capacity)
-                  : "",
-            });
-          }
-        } catch (err) {
-          console.error("[Edit Destination] Load detail error:", err);
-          setApiError(
-            err?.message ||
-              "Không thể tải thông tin điểm đến. Vui lòng thử lại."
-          );
-        } finally {
-          setLoadingData(false);
-        }
-      };
-      fetchDetail();
-    }
+    if (!isOpen || !destinationId) return;
+
+    setApiError("");
+    setSuccess(false);
+    setErrors({});
+    setFetchingDest(true);
+
+    destinationService
+      .getById(destinationId)
+      .then((dest) => {
+        setForm({
+          name: dest.name ?? "",
+          address: dest.address ?? "",
+          latitude:
+            dest.latitude != null ? String(dest.latitude) : "",
+          longitude:
+            dest.longitude != null ? String(dest.longitude) : "",
+          capacity:
+            dest.capacity != null ? String(dest.capacity) : "",
+        });
+      })
+      .catch((err) => {
+        console.error("[Edit Destination] Fetch error:", err);
+        setApiError(
+          err?.message ||
+            "Không thể tải thông tin điểm đến. Vui lòng thử lại."
+        );
+      })
+      .finally(() => {
+        setFetchingDest(false);
+      });
   }, [isOpen, destinationId]);
 
+  // Reset state khi đóng modal
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      setForm(initialForm);
       setErrors({});
+      setApiError("");
       setSuccess(false);
       setUpdatedItem(null);
-      setApiError("");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
+  // Phím ESC để đóng
   useEffect(() => {
     if (!isOpen) return;
     const handleKey = (e) => {
@@ -130,6 +134,7 @@ export default function EditDestinationModal({
     return () => document.removeEventListener("keydown", handleKey);
   }, [isOpen, loading, onClose]);
 
+  // Khóa scroll body khi mở modal
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -183,10 +188,16 @@ export default function EditDestinationModal({
     setApiError("");
   };
 
+  // ── Validation ────────────────────────────────────────────────
   const validate = () => {
     const e = {};
-    if (!form.name.trim()) e.name = "Vui lòng nhập tên điểm đến di sản.";
-    if (!form.address.trim()) e.address = "Vui lòng nhập địa chỉ hành chính.";
+
+    if (!form.name.trim()) {
+      e.name = "Vui lòng nhập tên điểm đến di sản.";
+    }
+    if (!form.address.trim()) {
+      e.address = "Vui lòng nhập địa chỉ hành chính.";
+    }
 
     const lat = Number(form.latitude);
     if (form.latitude === "" || Number.isNaN(lat)) {
@@ -211,8 +222,9 @@ export default function EditDestinationModal({
     return Object.keys(e).length === 0;
   };
 
+  // ── Submit (PUT) ──────────────────────────────────────────────
   const handleSubmit = async (e) => {
-    e?.preventDefault?.();
+    e.preventDefault();
     setApiError("");
     if (!validate()) return;
 
@@ -226,20 +238,9 @@ export default function EditDestinationModal({
         capacity: parseInt(form.capacity, 10),
       };
       const updated = await destinationService.update(destinationId, payload);
-      const normalized = {
-        ...updated,
-        id: updated?.id ?? destinationId,
-        name: updated?.name ?? payload.name,
-        address: updated?.address ?? payload.address,
-        latitude: updated?.latitude ?? payload.latitude,
-        longitude: updated?.longitude ?? payload.longitude,
-        capacity: updated?.capacity ?? payload.capacity,
-        approved: false,
-        _wasUpdated: true,
-      };
-      setUpdatedItem(normalized);
+      setUpdatedItem(updated);
       setSuccess(true);
-      onUpdated?.(normalized);
+      onUpdated?.(updated);
     } catch (err) {
       console.error("[Edit Destination Error]", err);
       setApiError(
@@ -256,6 +257,14 @@ export default function EditDestinationModal({
     onClose?.();
   };
 
+  const handleReset = () => {
+    setForm(initialForm);
+    setErrors({});
+    setApiError("");
+    setSuccess(false);
+    setUpdatedItem(null);
+  };
+
   return (
     <div
       className="fixed inset-0 z-[60] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
@@ -265,10 +274,11 @@ export default function EditDestinationModal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Cập nhật điểm đến di sản"
+        aria-label={title}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
       >
+        {/* ── HEADER ─────────────────────────────────────────── */}
         <div className="relative px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-white via-white to-slate-50/60">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
@@ -280,13 +290,17 @@ export default function EditDestinationModal({
               <div>
                 <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                   {success
-                    ? "Đã cập nhật — hồ sơ chuyển về Chờ thẩm định lại"
-                    : "Cập nhật điểm đến di sản"}
+                    ? "Cập nhật điểm đến thành công!"
+                    : fetchingDest
+                    ? "Đang tải thông tin..."
+                    : title}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-md">
                   {success
-                    ? "Bản cập nhật đã được gửi. Hồ sơ đang ở trạng thái chờ Moderator thẩm định lại."
-                    : "Chỉnh sửa tọa độ GPS, địa chỉ hành chính và sức chứa tối đa của điểm đến."}
+                    ? "Hồ sơ sẽ tự động chuyển về trạng thái chờ duyệt lại."
+                    : fetchingDest
+                    ? "Vui lòng chờ trong giây lát."
+                    : "Chỉnh sửa tọa độ GPS, địa chỉ hoặc sức chứa. Hồ sơ sẽ tự động chuyển về trạng thái chờ duyệt sau khi lưu."}
                 </p>
               </div>
             </div>
@@ -302,24 +316,31 @@ export default function EditDestinationModal({
           </div>
         </div>
 
+        {/* ── BODY (scrollable) ──────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          {loadingData ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
-              <Loader2 size={28} className="animate-spin text-slate-400" />
-              <p className="text-xs font-bold">Đang tải dữ liệu điểm đến…</p>
+          {/* Đang tải dữ liệu gốc */}
+          {fetchingDest ? (
+            <div className="flex flex-col items-center justify-center py-16 space-y-3">
+              <Loader2 size={32} className="text-slate-300 animate-spin" />
+              <p className="text-xs text-slate-400 font-semibold">
+                Đang tải thông tin điểm đến…
+              </p>
             </div>
           ) : success ? (
+            // Trạng thái thành công
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
-                <div className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
-                  <AlertTriangle size={20} />
+                <div className="w-10 h-10 rounded-full bg-amber-600 text-white flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={20} />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-black text-amber-900">
-                    Đã cập nhật & chuyển về trạng thái Chờ thẩm định lại!
+                    Cập nhật điểm đến thành công!
                   </p>
                   <p className="text-xs text-amber-800/80 mt-0.5">
-                    Điểm đến sẽ hiển thị với badge <strong>"Chờ duyệt lại (Đã hủy duyệt)"</strong> cho đến khi Moderator duyệt lại.
+                    Hồ sơ tự động chuyển về trạng thái{" "}
+                    <strong>chờ duyệt lại</strong> để Hội đồng Thẩm định
+                    xác nhận thay đổi.
                   </p>
                 </div>
               </div>
@@ -332,12 +353,12 @@ export default function EditDestinationModal({
                         Tên điểm đến
                       </p>
                       <p className="text-sm font-black text-slate-900">
-                        {updatedItem.name}
+                        {updatedItem.name || form.name}
                       </p>
                     </div>
-                    <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                      Chờ duyệt lại (Đã hủy duyệt)
+                    <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                      Chờ duyệt lại
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/70">
@@ -346,7 +367,7 @@ export default function EditDestinationModal({
                         Địa chỉ
                       </p>
                       <p className="text-slate-800 font-semibold">
-                        {updatedItem.address}
+                        {updatedItem.address || form.address}
                       </p>
                     </div>
                     <div>
@@ -354,7 +375,7 @@ export default function EditDestinationModal({
                         Sức chứa
                       </p>
                       <p className="text-slate-800 font-semibold">
-                        {updatedItem.capacity} du khách/lượt
+                        {updatedItem.capacity ?? form.capacity} du khách/lượt
                       </p>
                     </div>
                     <div>
@@ -362,7 +383,7 @@ export default function EditDestinationModal({
                         Vĩ độ
                       </p>
                       <p className="text-slate-800 font-mono">
-                        {updatedItem.latitude}
+                        {updatedItem.latitude ?? form.latitude}
                       </p>
                     </div>
                     <div>
@@ -370,7 +391,7 @@ export default function EditDestinationModal({
                         Kinh độ
                       </p>
                       <p className="text-slate-800 font-mono">
-                        {updatedItem.longitude}
+                        {updatedItem.longitude ?? form.longitude}
                       </p>
                     </div>
                   </div>
@@ -379,25 +400,20 @@ export default function EditDestinationModal({
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-              <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
-                <AlertTriangle
-                  size={16}
-                  className="text-amber-600 mt-0.5 shrink-0"
-                />
-                <p className="text-xs text-amber-800 font-semibold leading-relaxed">
-                  <strong>Lưu ý:</strong> Việc cập nhật thông tin điểm đến sẽ tự động hủy trạng thái đã duyệt hiện tại và chuyển hồ sơ về trạng thái Chờ thẩm định lại.
-                </p>
-              </div>
-
+              {/* ── Lỗi từ API ──────────────────────────────── */}
               {apiError && (
                 <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
-                  <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
+                  <AlertCircle
+                    size={16}
+                    className="text-rose-600 mt-0.5 shrink-0"
+                  />
                   <p className="text-xs text-rose-800 font-semibold leading-relaxed">
                     {apiError}
                   </p>
                 </div>
               )}
 
+              {/* ── Trường 1: Tên điểm đến ─────────────────── */}
               <div className="space-y-1.5">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
                   <Landmark size={13} className={palette.icon} />
@@ -415,10 +431,13 @@ export default function EditDestinationModal({
                   }`}
                 />
                 {errors.name && (
-                  <p className="text-[11px] text-rose-600 font-bold">{errors.name}</p>
+                  <p className="text-[11px] text-rose-600 font-bold">
+                    {errors.name}
+                  </p>
                 )}
               </div>
 
+              {/* ── Trường 2: Địa chỉ ──────────────────────── */}
               <div className="space-y-1.5">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
                   <MapPin size={13} className={palette.icon} />
@@ -436,10 +455,13 @@ export default function EditDestinationModal({
                   }`}
                 />
                 {errors.address && (
-                  <p className="text-[11px] text-rose-600 font-bold">{errors.address}</p>
+                  <p className="text-[11px] text-rose-600 font-bold">
+                    {errors.address}
+                  </p>
                 )}
               </div>
 
+              {/* ── Trường 3+4: Tọa độ GPS ────────────────── */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -451,11 +473,7 @@ export default function EditDestinationModal({
                     type="button"
                     onClick={handleGetCurrentLocation}
                     disabled={loading || gettingLocation}
-                    className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer disabled:opacity-60 ${
-                      theme === "slate"
-                        ? "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
-                        : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                    }`}
+                    className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer disabled:opacity-60 ${palette.chip}`}
                   >
                     {gettingLocation ? (
                       <Loader2 size={12} className="animate-spin" />
@@ -475,7 +493,9 @@ export default function EditDestinationModal({
                       type="number"
                       step="any"
                       value={form.latitude}
-                      onChange={(e) => handleChange("latitude", e.target.value)}
+                      onChange={(e) =>
+                        handleChange("latitude", e.target.value)
+                      }
                       placeholder="20.9101"
                       disabled={loading}
                       className={`w-full px-3 py-2 bg-slate-50 border rounded-xl text-sm font-mono font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} disabled:opacity-60 ${
@@ -496,11 +516,15 @@ export default function EditDestinationModal({
                       type="number"
                       step="any"
                       value={form.longitude}
-                      onChange={(e) => handleChange("longitude", e.target.value)}
+                      onChange={(e) =>
+                        handleChange("longitude", e.target.value)
+                      }
                       placeholder="107.1839"
                       disabled={loading}
                       className={`w-full px-3 py-2 bg-slate-50 border rounded-xl text-sm font-mono font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} disabled:opacity-60 ${
-                        errors.longitude ? "border-rose-300" : "border-slate-200"
+                        errors.longitude
+                          ? "border-rose-300"
+                          : "border-slate-200"
                       }`}
                     />
                     {errors.longitude && (
@@ -512,6 +536,7 @@ export default function EditDestinationModal({
                 </div>
               </div>
 
+              {/* ── Trường 5: Sức chứa ────────────────────── */}
               <div className="space-y-1.5">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
                   <Users size={13} className={palette.icon} />
@@ -536,50 +561,75 @@ export default function EditDestinationModal({
                   </span>
                 </div>
                 {errors.capacity && (
-                  <p className="text-[11px] text-rose-600 font-bold">{errors.capacity}</p>
+                  <p className="text-[11px] text-rose-600 font-bold">
+                    {errors.capacity}
+                  </p>
                 )}
+              </div>
+
+              {/* ── Cảnh báo trạng thái duyệt ─────────────── */}
+              <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
+                <AlertCircle size={15} className="text-amber-600 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-800 font-semibold leading-relaxed">
+                  Sau khi lưu, hồ sơ điểm đến sẽ tự động chuyển về trạng thái{" "}
+                  <strong>Chờ duyệt lại</strong> để Hội đồng Thẩm định xác nhận
+                  thay đổi.
+                </p>
               </div>
             </form>
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2.5">
+        {/* ── FOOTER ─────────────────────────────────────────── */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2.5">
           {success ? (
             <button
               type="button"
               onClick={handleClose}
               className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs transition-colors cursor-pointer ${palette.primary} ${palette.primaryShadow} shadow-sm`}
             >
-              Đóng
+              Đóng & hoàn tất
             </button>
           ) : (
             <>
               <button
                 type="button"
-                onClick={handleClose}
-                disabled={loading}
-                className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
+                onClick={handleReset}
+                disabled={loading || fetchingDest}
+                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 font-bold text-xs border border-slate-200 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
               >
-                Hủy bỏ
+                <RotateCcw size={13} />
+                <span>Đặt lại</span>
               </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={loading}
-                className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 ${palette.primary} ${palette.primaryShadow} shadow-sm`}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Đang lưu cập nhật...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save size={14} />
-                    <span>Lưu cập nhật</span>
-                  </>
-                )}
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  disabled={loading || fetchingDest}
+                  className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={loading || fetchingDest}
+                  className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 ${palette.primary} ${palette.primaryShadow} shadow-sm`}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Đang cập nhật...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={14} />
+                      <span>Lưu & gửi duyệt lại</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </>
           )}
         </div>

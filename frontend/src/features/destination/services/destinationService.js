@@ -69,9 +69,8 @@ export async function getDestinationById(id) {
 }
 
 export async function setDestinationApproval(id, approved) {
-  const res = await apiClient.patch(ENDPOINTS.APPROVE(id), null, {
-    params: { approved: Boolean(approved) },
-  });
+  const query = `?approved=${Boolean(approved)}`;
+  const res = await apiClient.patch(ENDPOINTS.APPROVE(id) + query);
   return unwrap(res);
 }
 

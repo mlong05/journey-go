@@ -32,10 +32,10 @@ export default function AuthScreen({ initialTab = "login" }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Form Đăng nhập
+  // Form Đăng nhập (để trống — người dùng tự nhập)
   const [loginForm, setLoginForm] = useState({
-    identifier: "user@journeygo.com",
-    password: "Password123@",
+    identifier: "",
+    password: "",
     rememberMe: true,
   });
 
@@ -49,7 +49,7 @@ export default function AuthScreen({ initialTab = "login" }) {
     agreeTerms: false,
   });
 
-  // Trạng thái tải & Toast thông báo nhanh (cho lỗi / cảnh báo)
+  
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -64,17 +64,11 @@ export default function AuthScreen({ initialTab = "login" }) {
     redirectPath: "/",
   });
 
-  // Chọn vai trò qua pill buttons & tự động điền tài khoản mẫu tương ứng
+  
   const handleSelectRole = (roleId) => {
+    // Chỉ đổi pill vai trò — KHÔNG tự động điền tài khoản/mật khẩu mẫu.
+    // Người dùng phải tự nhập email và mật khẩu.
     setSelectedRoleId(roleId);
-    const targetRole = ROLES.find((r) => r.id === roleId);
-    if (targetRole) {
-      setLoginForm((prev) => ({
-        ...prev,
-        identifier: targetRole.sampleEmail,
-        password: targetRole.samplePassword,
-      }));
-    }
   };
 
   const showToast = (type, message) => {
@@ -116,6 +110,23 @@ export default function AuthScreen({ initialTab = "login" }) {
       }
 
       const roleStr = String(user.role || "").toUpperCase();
+
+      // ==========================================================================
+      // KIỂM TRA KHỚP VAI TRÒ: Tài khoản phải thuộc đúng role đã chọn ở UI
+      // Ví dụ: chọn "Quản trị viên" thì chỉ user.role = ADMIN mới được vào.
+      // Lưu ý: Thông báo lỗi chỉ nêu chung "tài khoản/mật khẩu không đúng"
+      // để không lộ thông tin role thật của tài khoản.
+      // ==========================================================================
+      const expectedRole = String(selectedRole?.roleEnum || "").toUpperCase();
+      if (expectedRole && roleStr !== expectedRole) {
+        setLoading(false);
+        showToast(
+          "error",
+          "Tài khoản hoặc mật khẩu không đúng. Vui lòng kiểm tra lại hoặc chọn đúng vai trò tương ứng."
+        );
+        return;
+      }
+
       let targetPath = "/";
       let roleTitle = "Du khách khám phá";
       let roleScope = "Khám phá danh lam thắng cảnh & di sản";
@@ -338,6 +349,24 @@ export default function AuthScreen({ initialTab = "login" }) {
 
       if (res?.success) {
         const user = res.user;
+
+        // ==========================================================================
+        // KIỂM TRA KHỚP VAI TRÒ cho luồng Google OAuth.
+        // Thông báo lỗi chung chung, không lộ role thật của tài khoản.
+        // ==========================================================================
+        const actualRole = String(user?.role || "").toUpperCase();
+        const expectedRole = String(
+          selectedRole?.roleEnum || targetRoleEnum || ""
+        ).toUpperCase();
+        if (expectedRole && actualRole && actualRole !== expectedRole) {
+          setLoading(false);
+          showToast(
+            "error",
+            "Tài khoản hoặc mật khẩu không đúng. Vui lòng kiểm tra lại hoặc chọn đúng vai trò tương ứng."
+          );
+          return;
+        }
+
         const roleTitle = res.roleTitle || "Người dùng";
         const targetPath = res.targetPath || ROUTES.HOME || "/";
 
@@ -366,55 +395,40 @@ export default function AuthScreen({ initialTab = "login" }) {
     }
   };
 
-  // Khởi tạo Google Identity Services và hiển thị nút Google chuẩn
+  // Khởi tạo Google Identity Services: chỉ gọi initialize() để có thể dùng
+  // prompt() khi người dùng bấm nút. KHÔNG dùng renderButton() vì nút chính
+  // thức của Google sẽ render lại mỗi lần đổi role gây nhấp nháy text
+  // (đổi qua lại giữa "Sign in with Google" và "Đăng nhập với Google").
+  // Thay vào đó, dùng nút custom "Đăng nhập với Google" trong SocialLoginButtons.
   useEffect(() => {
+    let attempts = 0;
     let timer;
-    const renderGoogleBtn = () => {
-      if (typeof window === "undefined" || !window.google?.accounts?.id) return false;
+    const tryInit = () => {
+      if (typeof window === "undefined" || !window.google?.accounts?.id) {
+        return false;
+      }
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-      if (!clientId || clientId.includes("your-google-client-id")) return false;
-
-      const container = document.getElementById("google-signin-btn");
-      if (!container) return false;
-
+      if (!clientId || clientId.includes("your-google-client-id")) {
+        return true; // không có clientId thì khỏi retry
+      }
       try {
         window.google.accounts.id.initialize({
           client_id: clientId,
           callback: handleGoogleCredentialResponse,
           auto_select: false,
         });
-
-        // Xóa fallback placeholder trước khi Google vẽ nút chính thức
-        container.innerHTML = "";
-
-        // Tính toán độ rộng nút vừa vặn với cột
-        const containerWidth = container.offsetWidth || 220;
-        const btnWidth = Math.max(200, Math.min(containerWidth, 340));
-
-        window.google.accounts.id.renderButton(container, {
-          theme: "outline",
-          size: "medium", // Google quy định: chỉ size "medium" hoặc "small" mới tắt chế độ personalized "Sign in as..."
-          type: "standard",
-          text: "signin_with",
-          shape: "rectangular",
-          logo_alignment: "left",
-          width: btnWidth,
-          locale: "vi",
-        });
-
         googleInitializedRef.current = true;
         return true;
       } catch (e) {
-        console.warn("[Google GIS Render Button Error]", e);
+        console.warn("[Google GIS Init Error]", e);
         return false;
       }
     };
 
-    if (!renderGoogleBtn()) {
-      let attempts = 0;
+    if (!tryInit()) {
       timer = setInterval(() => {
         attempts++;
-        if (renderGoogleBtn() || attempts > 25) {
+        if (tryInit() || attempts > 25) {
           clearInterval(timer);
         }
       }, 200);
@@ -423,6 +437,7 @@ export default function AuthScreen({ initialTab = "login" }) {
     return () => {
       if (timer) clearInterval(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoleId, selectedRole]);
 
   const handleGoogleClick = () => {
@@ -462,6 +477,26 @@ export default function AuthScreen({ initialTab = "login" }) {
     showToast("info", `Đang kết nối xác thực ${providerName}...`);
 
     setTimeout(() => {
+      // ==========================================================================
+      // KIỂM TRA KHỚP VAI TRÒ cho luồng SSO mô phỏng:
+      // Account SSO mặc định thuộc role của providerName đó (mỗi nhà cung cấp
+      // gắn với 1 role cố định). Nếu role đó khác pill đã chọn → chặn.
+      // Thông báo lỗi chung chung, không lộ role thật của tài khoản.
+      // ==========================================================================
+      const ssoRoleMap = {
+        "Doanh nghiệp": "PROVIDER",
+      };
+      const ssoAccountRole = ssoRoleMap[providerName] || "USER";
+      const expectedRole = String(selectedRole?.roleEnum || "").toUpperCase();
+      if (expectedRole && ssoAccountRole !== expectedRole) {
+        setLoading(false);
+        showToast(
+          "error",
+          "Tài khoản hoặc mật khẩu không đúng. Vui lòng kiểm tra lại hoặc chọn đúng vai trò tương ứng."
+        );
+        return;
+      }
+
       const authSession = {
         user: {
           email: `${providerName.toLowerCase().replace(/\s+/g, "")}@journeygo.vn`,
