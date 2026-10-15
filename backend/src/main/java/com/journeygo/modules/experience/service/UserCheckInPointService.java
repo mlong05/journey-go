@@ -24,14 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
-/**
- * Service xử lý Tourist check-in tại CheckInPoint vi mô.
- *
- * BR-UCIP-1: User chỉ check-in 1 lần / CheckInPoint.
- * BR-UCIP-2: Check-in hợp lệ khi distance <= radius_meters (với GPS) hoặc QR khớp token.
- *
- * Phân biệt với CheckIn vĩ mô (User↔Destination) thuộc module Gamification.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -54,16 +46,7 @@ public class UserCheckInPointService {
                 .stream().map(UserCheckInResponse::fromEntity).toList();
     }
 
-    /**
-     * Tourist check-in tại CheckInPoint vi mô.
-     *
-     * Flow:
-     *   1. Validate CheckInPoint + Experience ở PUBLISHED.
-     *   2. BR-UCIP-1: đã check-in trước đó → trả về record cũ (idempotent).
-     *   3. Với GPS: tính distance bằng Haversine (BR-UCIP-2).
-     *   4. Với QR: so sánh qrValue với check_in_point.qr_token.
-     *   5. Lưu UserCheckInPoint với isValid = kết quả validation.
-     */
+
     @Transactional
     public UserCheckInResponse checkIn(Long checkInPointId, CheckInRequest body, Long userId) {
         CheckInPoint cip = checkInPointRepository.findById(checkInPointId)
@@ -75,7 +58,6 @@ public class UserCheckInPointService {
                     "Chỉ check-in tại Experience đã PUBLISHED");
         }
 
-        // BR-UCIP-1: idempotent — user đã check-in trước đó
         var existing = userCheckInPointRepository.findByUserIdAndCheckInPointId(userId, checkInPointId);
         if (existing.isPresent()) {
             log.info("User {} đã check-in CheckInPoint {} trước đó — idempotent", userId, checkInPointId);
@@ -104,8 +86,7 @@ public class UserCheckInPointService {
                 distance = GeoUtils.haversineMeters(
                         body.latitude(), body.longitude(),
                         cip.getLatitude(), cip.getLongitude());
-                // Dùng compareTo, TUYỆT ĐỐI KHÔNG dùng intValue() vì sẽ truncate
-                // (vd 50.99m → intValue=50 → vượt radius=50 mà vẫn pass check-in).
+
                 BigDecimal radius = BigDecimal.valueOf(cip.getRadiusMeters());
                 isValid = distance.compareTo(radius) <= 0;
                 log.info("CheckIn GPS distance={}m radius={}m isValid={}", distance, cip.getRadiusMeters(), isValid);
@@ -119,11 +100,11 @@ public class UserCheckInPointService {
                 log.info("CheckIn QR match={}", isValid);
             }
             case MANUAL -> {
-                // MANUAL: do CM/CP xác nhận → isValid = true luôn
+
                 isValid = true;
             }
             case BEACON -> {
-                // TODO: integrate với beacon hardware — placeholder
+
                 isValid = false;
             }
         }
@@ -141,9 +122,6 @@ public class UserCheckInPointService {
                 .isValid(isValid)
                 .build();
 
-        // saveAndFlush thay vì save để UNIQUE violation (BR-UCIP-1) nổ ngay lập tức
-        // → GlobalExceptionHandler map thành 400. Nếu dùng save(), exception chỉ nổ ở
-        // commit time → caller nhận 500 thay vì 400 + mã BR-UCIP-1.
         UserCheckInPoint saved = userCheckInPointRepository.saveAndFlush(ucp);
         log.info("User {} check-in CheckInPoint {} isValid={}", userId, checkInPointId, isValid);
         return UserCheckInResponse.fromEntity(saved);

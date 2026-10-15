@@ -17,12 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Service Question con của Task.
- *
- * BR-TASK-3: QUIZ/FIELD_CLUE phải có ≥1 Question (validate khi Experience submit).
- * BR-TASK-6: MULTIPLE_CHOICE đúng 1 isCorrect=true; TEXT tất cả isCorrect=true.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -48,7 +42,7 @@ public class QuestionService {
     @Transactional
     public QuestionResponse create(Long taskId, CreateQuestionRequest req) {
         Task task = findTaskOrThrow(taskId);
-        // Chỉ tạo Question khi Task còn DRAFT
+
         if (task.getStatus() != TaskStatus.DRAFT) {
             throw new BusinessException("BR-Q-CREATE",
                     "Chỉ tạo Question khi Task ở trạng thái DRAFT");
@@ -71,7 +65,7 @@ public class QuestionService {
     @Transactional
     public QuestionResponse setExpectedText(Long id, SetExpectedTextRequest req) {
         Question q = findOrThrow(id);
-        // Chỉ CP/CM chỉnh khi Task còn DRAFT
+
         if (q.getTask().getStatus() != TaskStatus.DRAFT) {
             throw new BusinessException("BR-Q-EDIT",
                     "Chỉ chỉnh expectedText khi Task ở trạng thái DRAFT");
@@ -91,8 +85,6 @@ public class QuestionService {
         questionRepository.delete(q);
         log.info("Deleted Question id={}", id);
     }
-
-    // ── internal ────────────────────────────────────────────────────────────
 
     private Question findOrThrow(Long id) {
         return questionRepository.findById(id)

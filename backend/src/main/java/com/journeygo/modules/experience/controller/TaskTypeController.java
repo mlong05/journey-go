@@ -25,7 +25,7 @@ public class TaskTypeController {
 
     private final TaskTypeService taskTypeService;
 
-    /** List tất cả TaskType — PUBLIC, không cần auth. */
+
     @GetMapping("/task-types")
     @Operation(summary = "Danh sách TaskType (PUBLIC — không cần auth)")
     public ResponseEntity<ApiResponse<List<TaskTypeResponse>>> list() {

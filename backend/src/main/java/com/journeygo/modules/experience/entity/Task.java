@@ -6,13 +6,6 @@ import lombok.*;
 
 import java.time.Instant;
 
-/**
- * Một task con trong Experience (câu đố / nhiệm vụ thực địa / check-in / ảnh thử thách).
- *
- * Schema theo ĐÚ-02 §3.3:
- *   - (experience_id, sequence_order) UNIQUE — BR-TASK-2.
- *   - check_in_point_id optional (chỉ task GPS/QR/Field cần).
- */
 @Entity
 @Table(name = "task", uniqueConstraints = {
         @UniqueConstraint(name = "uk_task_experience_sequence", columnNames = {"experience_id", "sequence_order"})
@@ -54,7 +47,7 @@ public class Task {
     @Builder.Default
     private Integer maxAttempts = 3;
 
-    /** Chỉ áp dụng cho task GPS / QR / FIELD_CLUE — BR-TASK-4. */
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "check_in_point_id")
     private CheckInPoint checkInPoint;

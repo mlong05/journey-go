@@ -4,16 +4,6 @@ import com.journeygo.modules.experience.entity.enums.UnlockConditionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
-/**
- * Set / cập nhật UnlockCondition cho 1 Task.
- *
- * Theo CONTEXT §3.2:
- *   - SEQUENTIAL          → yêu cầu prerequisiteTaskId (cùng Experience)
- *   - SCORE_BASED         → yêu cầu minimumScorePercent (0-100)
- *   - TIME_BASED          → yêu cầu timeWindowMinutes (>0)
- *   - LOCATION_VERIFICATION → yêu cầu checkInPointId (task phải gắn CIP)
- *   - NONE                → luôn mở, các field khác null
- */
 @Schema(description = "Cấu hình UnlockCondition cho Task")
 public record SetUnlockConditionRequest(
 

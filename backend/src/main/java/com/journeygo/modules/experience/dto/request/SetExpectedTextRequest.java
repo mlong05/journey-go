@@ -3,9 +3,6 @@ package com.journeygo.modules.experience.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
-/**
- * Set lại expectedText cho Question (CP chỉnh đáp án câu TEXT).
- */
 @Schema(description = "Cập nhật expectedText cho Question")
 public record SetExpectedTextRequest(
 

@@ -5,11 +5,6 @@ import jakarta.validation.constraints.*;
 
 import java.util.List;
 
-/**
- * Body gửi lên khi sắp xếp lại thứ tự Task.
- *
- * Danh sách id theo thứ tự mới → service sẽ set sequenceOrder theo index.
- */
 @Schema(description = "Sắp xếp lại thứ tự Task trong Experience")
 public record ReorderTasksRequest(
 

@@ -6,11 +6,6 @@ import lombok.Builder;
 
 import java.time.Instant;
 
-/**
- * Response Answer.
- *
- * forTourist(): ẨN isCorrect + explanation (BR-TASK-5).
- */
 @Builder
 @Schema(description = "Response Answer (CP/CM thấy isCorrect; Tourist dùng forTourist() để ẨN)")
 public record AnswerResponse(
@@ -35,7 +30,7 @@ public record AnswerResponse(
                 .build();
     }
 
-    /** Mask cho Tourist: ẨN isCorrect + explanation. BR-TASK-5. */
+
     public static AnswerResponse forTourist(Answer a) {
         return AnswerResponse.builder()
                 .id(a.getId())

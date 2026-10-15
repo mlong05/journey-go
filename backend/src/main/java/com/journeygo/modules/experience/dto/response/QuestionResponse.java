@@ -8,12 +8,6 @@ import lombok.Builder;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Response Question.
- *
- * forTourist(): ẨN expectedText để không lộ đáp án câu TEXT (BR-TASK-5).
- * Answers bên trong cũng phải dùng AnswerResponse.forTourist() để ẨN isCorrect + explanation.
- */
 @Builder
 @Schema(description = "Response Question (CP/CM xem đầy đủ; Tourist dùng forTourist() để ẨN đáp án)")
 public record QuestionResponse(
@@ -44,10 +38,7 @@ public record QuestionResponse(
                 .build();
     }
 
-    /**
-     * Mask cho Tourist: ẨN expectedText + answers dùng forTourist() (ẨN isCorrect/explanation).
-     * BR-TASK-5.
-     */
+
     public static QuestionResponse forTourist(Question q) {
         return QuestionResponse.builder()
                 .id(q.getId())

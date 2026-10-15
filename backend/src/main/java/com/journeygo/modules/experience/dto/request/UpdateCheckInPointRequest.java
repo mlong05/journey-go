@@ -5,9 +5,6 @@ import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
-/**
- * Sửa CheckInPoint.
- */
 @Schema(description = "Cập nhật CheckInPoint")
 public record UpdateCheckInPointRequest(
 

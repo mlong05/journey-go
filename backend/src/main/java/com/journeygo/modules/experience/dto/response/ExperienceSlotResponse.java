@@ -8,9 +8,6 @@ import lombok.Builder;
 import java.time.Instant;
 import java.time.LocalDate;
 
-/**
- * Response ExperienceSlot — quota PLATFORM cho Experience theo ngày (đếm theo TOUR).
- */
 @Builder
 @Schema(description = "Response ExperienceSlot (quota platform, đếm theo tour)")
 public record ExperienceSlotResponse(

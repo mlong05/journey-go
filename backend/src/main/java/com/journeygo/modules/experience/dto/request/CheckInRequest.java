@@ -6,12 +6,6 @@ import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
-/**
- * Tourist gửi yêu cầu check-in tại một CheckInPoint vi mô (CONTEXT §5.2).
- *
- * BR-UCIP-2: với method = GPS → server tính khoảng cách bằng Haversine, isValid khi distance <= radius.
- * BR-UCIP-1: User chỉ check-in 1 lần / CheckInPoint.
- */
 @Schema(description = "Yêu cầu check-in của Tourist")
 public record CheckInRequest(
 

@@ -30,14 +30,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Service Task con trong Experience.
- *
- * BR-TASK-1: chỉ update khi DRAFT.
- * BR-TASK-2: sequence_order UNIQUE trong experience.
- * BR-TASK-3: QUIZ/FIELD_CLUE phải có ≥1 Question (validate trong TaskService.create khi Experience publish).
- * BR-TASK-4: LOCATION_VISIT/QR_CHECKPOINT phải có check_in_point_id.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -65,7 +57,6 @@ public class TaskService {
         Experience exp = experienceRepository.findById(experienceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Experience", experienceId));
 
-        // Chỉ thêm Task khi Experience còn DRAFT
         if (exp.getStatus() != com.journeygo.modules.experience.entity.enums.ExperienceStatus.DRAFT) {
             throw new BusinessException("BR-TASK-CREATE",
                     "Chỉ tạo Task khi Experience ở trạng thái DRAFT");
@@ -74,13 +65,11 @@ public class TaskService {
         TaskType taskType = taskTypeRepository.findById(req.taskTypeId())
                 .orElseThrow(() -> new ResourceNotFoundException("TaskType", req.taskTypeId()));
 
-        // BR-TASK-2: sequence_order unique
         if (taskRepository.existsByExperienceIdAndSequenceOrder(experienceId, req.sequenceOrder())) {
             throw new BusinessException("BR-TASK-2",
                     "Sequence order " + req.sequenceOrder() + " đã tồn tại trong Experience " + experienceId);
         }
 
-        // BR-TASK-4: requires_location → bắt buộc checkInPointId
         CheckInPoint checkInPoint = null;
         if (taskType.isRequiresLocation()) {
             if (req.checkInPointId() == null) {
@@ -90,7 +79,7 @@ public class TaskService {
             checkInPoint = checkInPointRepository.findById(req.checkInPointId())
                     .orElseThrow(() -> new ResourceNotFoundException("CheckInPoint", req.checkInPointId()));
         } else if (req.checkInPointId() != null) {
-            // Nếu có gửi nhưng taskType không yêu cầu location → vẫn accept (cho linh hoạt)
+
             checkInPoint = checkInPointRepository.findById(req.checkInPointId())
                     .orElseThrow(() -> new ResourceNotFoundException("CheckInPoint", req.checkInPointId()));
         }
@@ -115,7 +104,7 @@ public class TaskService {
     @Transactional
     public TaskResponse update(Long id, UpdateTaskRequest req) {
         Task t = findOrThrow(id);
-        // BR-TASK-1: chỉ update khi DRAFT
+
         if (t.getStatus() != TaskStatus.DRAFT) {
             throw new BusinessException("BR-TASK-1",
                     "Task chỉ cập nhật được khi status = DRAFT. Hiện tại: " + t.getStatus());
@@ -139,7 +128,6 @@ public class TaskService {
             t.setCheckInPoint(cip);
         }
 
-        // saveAndFlush để (experience_id, sequence_order) UNIQUE nổ ngay → 400 thay vì 500
         Task saved = taskRepository.saveAndFlush(t);
         log.info("Updated Task id={}", saved.getId());
         return TaskResponse.fromEntity(saved);
@@ -157,8 +145,6 @@ public class TaskService {
     public List<TaskResponse> reorder(Long experienceId, ReorderTasksRequest req) {
         List<Task> tasks = taskRepository.findByExperienceIdOrderBySequenceOrderAsc(experienceId);
 
-        // BR-TASK-REORDER: yêu cầu req.taskIds() phải là permutation đầy đủ
-        // các task hiện có — tránh sequenceOrder bị trùng/bỏ sót → vi phạm BR-TASK-2
         if (req.taskIds() == null || req.taskIds().size() != tasks.size()) {
             throw new BusinessException("BR-TASK-REORDER",
                     "Danh sách taskIds phải chứa đủ " + tasks.size() + " task hiện có");
@@ -219,7 +205,6 @@ public class TaskService {
         uc.setTimeWindowMinutes(req.timeWindowMinutes());
         uc.setDescription(req.description());
 
-        // Pre-switch validation: một số ConditionType yêu cầu field bắt buộc
         if (req.conditionType() == UnlockConditionType.SCORE_BASED
                 && req.minimumScorePercent() == null) {
             throw new BusinessException("BR-UC-SCORE",
@@ -260,7 +245,7 @@ public class TaskService {
                 uc.setPrerequisiteTask(null);
             }
             default -> {
-                // SCORE_BASED / TIME_BASED / ALWAYS: không cần FK tới task/cip
+
                 uc.setPrerequisiteTask(null);
                 uc.setCheckInPoint(null);
             }
@@ -269,8 +254,6 @@ public class TaskService {
         UnlockCondition saved = unlockConditionRepository.saveAndFlush(uc);
         return UnlockConditionResponse.fromEntity(saved);
     }
-
-    // ── internal ────────────────────────────────────────────────────────────
 
     private Task findOrThrow(Long id) {
         return taskRepository.findById(id)

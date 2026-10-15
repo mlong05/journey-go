@@ -7,12 +7,6 @@ import lombok.Builder;
 
 import java.time.Instant;
 
-/**
- * Response Task.
- *
- * Lưu ý: KHÔNG trả task.questions ở đây (riêng endpoint GET /tasks/{id}/questions).
- * Nếu Tourist xem Question → phải dùng QuestionResponse.forTourist() để ẨN expectedText + isCorrect.
- */
 @Builder
 @Schema(description = "Response Task")
 public record TaskResponse(

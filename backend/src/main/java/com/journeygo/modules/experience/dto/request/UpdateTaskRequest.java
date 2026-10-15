@@ -3,9 +3,6 @@ package com.journeygo.modules.experience.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
-/**
- * Sửa Task — BR-TASK-1: chỉ update được khi status = DRAFT.
- */
 @Schema(description = "Yêu cầu cập nhật Task (chỉ DRAFT — BR-TASK-1)")
 public record UpdateTaskRequest(
 

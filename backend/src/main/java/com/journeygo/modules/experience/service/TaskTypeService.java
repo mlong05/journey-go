@@ -15,11 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Service TaskType (master data — chỉ Admin thao tác, PUBLIC đọc).
- *
- * 5 loại seed sẵn trong DataInitializer: QUIZ / FIELD_CLUE / LOCATION_VISIT / QR_CHECKPOINT / PHOTO_CHALLENGE.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -27,7 +22,7 @@ public class TaskTypeService {
 
     private final TaskTypeRepository taskTypeRepository;
 
-    /** List tất cả TaskType — PUBLIC, không cần auth. */
+
     @Transactional(readOnly = true)
     public List<TaskTypeResponse> list() {
         return taskTypeRepository.findAll().stream().map(TaskTypeResponse::fromEntity).toList();
@@ -80,8 +75,7 @@ public class TaskTypeService {
 
     private VerificationMethod parseVerificationMethod(VerificationMethod vm) {
         if (vm == null) return null;
-        // Enum đã được Jackson validate khi parse JSON. Nếu giá trị không hợp lệ
-        // → 400 Bad Request từ HttpMessageNotReadableException, không vào được đây.
+
         return vm;
     }
 

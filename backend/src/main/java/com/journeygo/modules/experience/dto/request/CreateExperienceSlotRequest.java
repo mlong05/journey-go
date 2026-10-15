@@ -5,9 +5,6 @@ import jakarta.validation.constraints.*;
 
 import java.time.LocalDate;
 
-/**
- * Tạo ExperienceSlot — phân bổ quota PLATFORM cho Experience theo ngày (đếm theo TOUR).
- */
 @Schema(description = "Yêu cầu tạo ExperienceSlot (phân bổ quota platform theo tour)")
 public record CreateExperienceSlotRequest(
 
