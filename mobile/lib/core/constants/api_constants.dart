@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiConstants {
   // Cổng mặc định của Spring Boot backend
@@ -31,4 +32,17 @@ class ApiConstants {
 
   // Vai trò cho phép trên Mobile Tourist App
   static const String requiredRole = 'USER';
+
+  // Google OAuth Client ID - ƯU TIÊN:
+  //   1. File .env (khuyến nghị cho dev)
+  //   2. --dart-define=GOOGLE_ANDROID_CLIENT_ID=... (CI/CD)
+  //   3. Rỗng (sẽ báo lỗi rõ ràng khi khởi tạo GoogleAuthService)
+  static String get googleAndroidClientId {
+    // 1) Đọc từ .env (đã được dotenv.load() trong main.dart)
+    final fromEnv = dotenv.maybeGet('GOOGLE_ANDROID_CLIENT_ID');
+    if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
+
+    // 2) Fallback: --dart-define khi build
+    return const String.fromEnvironment('GOOGLE_ANDROID_CLIENT_ID');
+  }
 }

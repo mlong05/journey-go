@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/constants/app_colors.dart';
 import 'core/models/auth_models.dart';
+import 'core/services/google_auth_service.dart';
 import 'core/services/token_storage.dart';
 import 'screens/tourist_home_screen.dart';
 import 'tourist_auth_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load biến môi trường từ file .env (nếu có). Nếu thiếu file, vẫn chạy tiếp
+  // và dùng --dart-define làm fallback.
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('Không tìm thấy file .env, sẽ dùng --dart-define làm fallback. Lỗi: $e');
+  }
+
   // Đặt thanh trạng thái trong suốt cho Hero Banner tràn viền
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -16,6 +27,14 @@ void main() async {
       statusBarBrightness: Brightness.dark,
     ),
   );
+
+  // Khởi tạo Google Sign-In (chỉ dùng cho Android).
+  // Nếu chưa truyền --dart-define=GOOGLE_ANDROID_CLIENT_ID=... thì sẽ in lỗi ra console nhưng không crash app.
+  try {
+    await GoogleAuthService.init();
+  } catch (e) {
+    debugPrint('GoogleAuthService.init() lỗi: $e');
+  }
 
   // Kiểm tra phiên đăng nhập đã lưu
   UserModel? savedUser;
