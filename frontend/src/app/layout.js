@@ -22,6 +22,10 @@ export default function RootLayout({ children }) {
     <html
       lang="vi"
       suppressHydrationWarning
+      // data-bisskin="disabled" — vô hiệu hoá Browser Identity Service (BIS) extension
+      // BIS chèn thuộc tính bis_skin_checked="1" vào DOM và phá vỡ hydration của React.
+      // Đặt attribute này trên <html> giúp BIS bỏ qua toàn bộ trang.
+      data-bisskin="disabled"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>

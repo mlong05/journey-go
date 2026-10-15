@@ -32,6 +32,7 @@ export default function AuthHeroCarousel() {
     <div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      suppressHydrationWarning
       className="relative lg:col-span-5 hidden lg:flex flex-col justify-between overflow-hidden text-white p-8 xl:p-10 select-none h-full"
     >
       {/* Nền ảnh chuyển động điện ảnh với AnimatePresence & Ken Burns Effect */}

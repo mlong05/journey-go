@@ -21,6 +21,8 @@
         <java.version>21</java.version>
         <springdoc.version>2.6.0</springdoc.version>
         <jjwt.version>0.12.6</jjwt.version>
+        <!-- Pin Lombok version explicitly so annotation processor matches the runtime jar (required for JDK 21) -->
+        <lombok.version>1.18.34</lombok.version>
     </properties>
 
     <dependencies>
