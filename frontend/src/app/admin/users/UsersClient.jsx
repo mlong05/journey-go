@@ -1,0 +1,2081 @@
+"use client";
+
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import {
+  Users,
+  Search,
+  X,
+  RefreshCw,
+  Download,
+  Building2,
+  ShieldCheck,
+  Compass,
+  Eye,
+  Phone,
+  KeyRound,
+  Globe,
+  CheckCircle2,
+  AlertCircle,
+  Inbox,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Mail,
+  Calendar,
+  RotateCcw,
+  Sparkles,
+  UserCog,
+  Save,
+  Pencil,
+  ShieldAlert,
+} from "lucide-react";
+import { apiClient } from "@/services/apiClient";
+
+// URL chỉ dùng để hiển thị trong banner cảnh báo khi fallback.
+// Việc gọi API thực sự dùng apiClient (đã cấu hình base URL đúng ở services/apiClient.js).
+const API_BASE_URL_DISPLAY =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8088/api/v1";
+
+/* =========================================================================
+   CÁC HẰNG SỐ PHÂN HỆ (ROLE / STATUS / AUTH PROVIDER)
+   ========================================================================= */
+
+const ROLES = {
+  ADMIN: "ADMIN",
+  MODERATOR: "MODERATOR",
+  PROVIDER: "PROVIDER",
+  USER: "USER",
+};
+
+const ROLE_LABELS = {
+  [ROLES.ADMIN]: "Quản trị viên",
+  [ROLES.MODERATOR]: "Kiểm duyệt viên",
+  [ROLES.PROVIDER]: "Đối tác Điểm đến",
+  [ROLES.USER]: "Khách du lịch",
+};
+
+const ROLE_BADGE_CLASS = {
+  [ROLES.ADMIN]:
+    "bg-rose-50 text-rose-700 border-rose-200",
+  [ROLES.MODERATOR]:
+    "bg-indigo-50 text-indigo-700 border-indigo-200",
+  [ROLES.PROVIDER]:
+    "bg-emerald-50 text-emerald-700 border-emerald-200",
+  [ROLES.USER]: "bg-sky-50 text-sky-700 border-sky-200",
+};
+
+const ROLE_AVATAR_BG = {
+  [ROLES.ADMIN]: "bg-rose-100 text-rose-700",
+  [ROLES.MODERATOR]: "bg-indigo-100 text-indigo-700",
+  [ROLES.PROVIDER]: "bg-emerald-100 text-emerald-700",
+  [ROLES.USER]: "bg-sky-100 text-sky-700",
+};
+
+const SORT_OPTIONS = [
+  { value: "id,ASC", label: "ID: Tăng dần" },
+  { value: "id,DESC", label: "ID: Giảm dần" },
+  { value: "createdAt,DESC", label: "Mới tham gia" },
+  { value: "fullName,ASC", label: "Tên A-Z" },
+];
+
+const SIZE_OPTIONS = [10, 20, 50];
+
+/* =========================================================================
+   HELPER FUNCTIONS
+   ========================================================================= */
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mi = String(date.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+}
+
+function getInitials(fullName = "") {
+  if (!fullName) return "??";
+  const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "??";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getErrorMessage(err, fallback) {
+  return (
+    err?.message ||
+    err?.data?.message ||
+    err?.response?.data?.message ||
+    fallback
+  );
+}
+
+/* =========================================================================
+   COMPONENT CHÍNH: TRANG QUẢN LÝ NGƯỜI DÙNG & PHÂN QUYỀN
+   ========================================================================= */
+
+export default function AdminUsersClient() {
+  /* ----------------------------- STATE ----------------------------- */
+  const [pageData, setPageData] = useState({
+    content: [],
+    totalElements: 0,
+    totalPages: 0,
+    size: 20,
+    number: 0,
+    first: true,
+    last: true,
+    empty: true,
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFallback, setIsFallback] = useState(false);
+  const [fetchError, setFetchError] = useState("");
+  const [errorType, setErrorType] = useState("");
+
+  // Filter states
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [sortValue, setSortValue] = useState("id,ASC");
+  const [pageSize, setPageSize] = useState(20);
+  const [pageNumber, setPageNumber] = useState(0);
+  const [keywordInput, setKeywordInput] = useState("");
+  const [keywordApplied, setKeywordApplied] = useState("");
+
+  // Detail modal
+  const [detailUser, setDetailUser] = useState(null);
+
+  // Edit modal (chỉnh sửa thông tin + role + active)
+  const [editUser, setEditUser] = useState(null);
+
+  // Row đang được mutate (id của user) — disable nút để tránh double-click
+  const [mutatingId, setMutatingId] = useState(null);
+  // Map id → action đang chạy: "role" | "status" | "save"
+  const [mutatingAction, setMutatingAction] = useState({});
+
+  // Toast
+  const [toast, setToast] = useState({ visible: false, message: "", tone: "success" });
+
+  /* --------------------------- REFS & DEBOUNCE -------------------- */
+  const debounceRef = useRef(null);
+
+  /* --------------------------- DERIVED ----------------------------- */
+  const showToast = useCallback((message, tone = "success") => {
+    setToast({ visible: true, message, tone });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, visible: false }));
+    }, 3500);
+  }, []);
+
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (roleFilter !== "all") count += 1;
+    if (activeFilter !== "all") count += 1;
+    if (keywordApplied) count += 1;
+    return count;
+  }, [roleFilter, activeFilter, keywordApplied]);
+
+  const roleStats = useMemo(() => {
+    const content = Array.isArray(pageData.content) ? pageData.content : [];
+    return {
+      total: pageData.totalElements || 0,
+      providers: content.filter((u) => u.role === ROLES.PROVIDER).length,
+      moderators: content.filter((u) => u.role === ROLES.MODERATOR).length,
+      users: content.filter((u) => u.role === ROLES.USER).length,
+    };
+  }, [pageData]);
+
+  /* --------------------------- API CALL --------------------------- */
+  const fetchUsers = useCallback(
+    async (override = {}) => {
+      const params = {
+        page: override.page ?? pageNumber,
+        size: override.size ?? pageSize,
+        sort: override.sort ?? sortValue,
+        keyword: override.keyword ?? keywordApplied,
+        role: override.role ?? roleFilter,
+        active: override.active ?? activeFilter,
+      };
+
+      setIsLoading(true);
+      setFetchError("");
+      setErrorType("");
+
+      // apiClient đã tự gắn base URL (`http://localhost:8088/api/v1`) + Authorization header.
+      // Chỉ truyền path tương đối `/users?...` để tránh lặp `/api/v1/api/v1/...`.
+      const query = new URLSearchParams();
+
+      if (params.keyword) query.append("keyword", params.keyword);
+      if (params.role && params.role !== "all") query.append("role", params.role);
+      if (params.active === true || params.active === false) {
+        query.append("active", String(params.active));
+      }
+      query.append("page", String(params.page));
+      query.append("size", String(params.size));
+      if (params.sort) query.append("sort", params.sort);
+
+      const endpoint = `/users?${query.toString()}`;
+
+      try {
+        // apiClient.request trả về body đã parse; ApiResponse<T> có dạng { code, message, data, timestamp }
+        const json = await apiClient.get(endpoint);
+        const payload = json?.data !== undefined ? json.data : json;
+
+        if (!payload) {
+          throw new Error(json?.message || "Response rỗng từ máy chủ");
+        }
+
+        // Trường hợp 1: trả về Page object đầy đủ
+        if (Array.isArray(payload.content)) {
+          setPageData(payload);
+          setIsFallback(false);
+        }
+        // Trường hợp 2: trả về mảng thuần (không phân trang)
+        else if (Array.isArray(payload)) {
+          const size = params.size || 20;
+          setPageData({
+            content: payload,
+            totalElements: payload.length,
+            totalPages: 1,
+            size,
+            number: 0,
+            first: true,
+            last: true,
+            empty: payload.length === 0,
+          });
+          setIsFallback(false);
+        }
+        // Trường hợp 3: response không đúng schema → fallback mock
+        else {
+          throw new Error("Schema response không hợp lệ.");
+        }
+      } catch (err) {
+        // Phân loại lỗi chi tiết để hiển thị banner phù hợp.
+        // Lưu ý: lỗi SQL 5xx (như "function lower(bytea) does not exist")
+        // thường có message chứa "JDBC" hoặc "SQL" hoặc "ERROR:" → phân loại là "server".
+        const rawMsg = String(err?.message || "");
+        let detectedType = "unknown";
+        if (/Failed to fetch|NetworkError|TypeError/i.test(rawMsg)) {
+          detectedType = "network";
+        } else if (/401|Unauthorized|hết hạn|phiên/i.test(rawMsg)) {
+          detectedType = "auth";
+        } else if (/403|Forbidden/i.test(rawMsg)) {
+          detectedType = "forbidden";
+        } else if (
+          /404|Not Found|static resource|api\/v1\/api/i.test(rawMsg)
+        ) {
+          detectedType = "notfound";
+        } else if (
+          /500|Internal Server|JDBC|SQL|ERROR:|function .* does not exist|bytea|cast/i.test(
+            rawMsg
+          )
+        ) {
+          detectedType = "server";
+        }
+
+        console.error(
+          `[Admin Users] Lỗi khi gọi API [${detectedType}]:`,
+          rawMsg
+        );
+        // KHÔNG dùng mock data: set content rỗng để chỉ hiện banner lỗi
+        setPageData({
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          size: params.size,
+          number: 0,
+          first: true,
+          last: true,
+          empty: true,
+        });
+        setIsFallback(true);
+        setErrorType(detectedType);
+        setFetchError(rawMsg || "Không thể kết nối tới máy chủ.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [pageNumber, pageSize, sortValue, keywordApplied, roleFilter, activeFilter]
+  );
+
+  /* --------------------------- EFFECTS ----------------------------- */
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // Debounce keyword input -> áp dụng sau 400ms
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setPageNumber(0);
+      setKeywordApplied(keywordInput.trim());
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [keywordInput]);
+
+  /* ----------------------------------------------------------------
+     LAYOUT FULL-SCREEN: Ép <main> của layout cha thành
+     flex-col + overflow-hidden + padding p-0 để trang này
+     có thể tự quản lý chiều cao 100% mà không bị cuộn toàn trang.
+     Cleanup khi unmount để không ảnh hưởng các trang admin khác.
+     ---------------------------------------------------------------- */
+  useEffect(() => {
+    const main = document.querySelector("main");
+    const wrapper = main?.firstElementChild;
+    if (!main) return undefined;
+
+    const prevMainClass = main.className;
+    const prevWrapperClass = wrapper ? wrapper.className : "";
+    const prevMainStyle = main.getAttribute("style") || "";
+
+    main.className =
+      "flex-1 w-full h-full overflow-hidden bg-slate-50";
+    if (wrapper) {
+      wrapper.className = "h-full w-full flex flex-col p-4 overflow-hidden";
+    }
+
+    return () => {
+      main.className = prevMainClass;
+      if (wrapper) wrapper.className = prevWrapperClass;
+      if (prevMainStyle) main.setAttribute("style", prevMainStyle);
+      else main.removeAttribute("style");
+    };
+  }, []);
+
+  /* --------------------------- HANDLERS --------------------------- */
+  const handleRefresh = () => {
+    fetchUsers();
+    showToast("Đang làm mới danh sách người dùng…", "info");
+  };
+
+  const handleRoleFilterChange = (role) => {
+    setRoleFilter(role);
+    setPageNumber(0);
+  };
+
+  const handleActiveFilterChange = (value) => {
+    setActiveFilter(value);
+    setPageNumber(0);
+  };
+
+  const handleSortChange = (value) => {
+    setSortValue(value);
+    setPageNumber(0);
+  };
+
+  const handleSizeChange = (value) => {
+    setPageSize(Number(value));
+    setPageNumber(0);
+  };
+
+  const handleResetFilters = () => {
+    setRoleFilter("all");
+    setActiveFilter("all");
+    setSortValue("id,ASC");
+    setKeywordInput("");
+    setKeywordApplied("");
+    setPageNumber(0);
+    showToast("Đã đặt lại toàn bộ bộ lọc.", "info");
+  };
+
+  const handleClearKeyword = () => {
+    setKeywordInput("");
+    setKeywordApplied("");
+    setPageNumber(0);
+  };
+
+  const handleKpiClick = (role) => {
+    console.log("[KPI Click] role =", role);
+    setRoleFilter(role);
+    setActiveFilter("all");
+    setPageNumber(0);
+    setKeywordInput("");
+    setKeywordApplied("");
+  };
+
+  const handlePageChange = (nextPage) => {
+    if (nextPage < 0 || nextPage >= pageData.totalPages) return;
+    setPageNumber(nextPage);
+  };
+
+  const handleExportCSV = () => {
+    const rows = Array.isArray(pageData.content) ? pageData.content : [];
+    if (rows.length === 0) {
+      showToast("Không có dữ liệu để xuất CSV.", "error");
+      return;
+    }
+
+    const headers = [
+      "ID",
+      "Email",
+      "Họ và tên",
+      "Số điện thoại",
+      "Vai trò",
+      "Trạng thái",
+      "Ngày tạo",
+      "Ngày cập nhật",
+    ];
+
+    const escape = (val) => {
+      const str = val === null || val === undefined ? "" : String(val);
+      if (/[",\n]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const csvLines = [
+      headers.join(","),
+      ...rows.map((u) =>
+        [
+          u.id,
+          u.email,
+          u.fullName,
+          u.phone,
+          ROLE_LABELS[u.role] || u.role,
+          u.active ? "Đang hoạt động" : "Đã khóa",
+          formatDateTime(u.createdAt),
+          formatDateTime(u.updatedAt),
+        ]
+          .map(escape)
+          .join(",")
+      ),
+    ];
+
+    const blob = new Blob(["\uFEFF" + csvLines.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const stamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-")
+      .slice(0, 19);
+    link.download = `journeygo-users-${stamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Đã xuất ${rows.length} tài khoản ra file CSV.`, "success");
+  };
+
+  /* ----------------------------------------------------------------
+     MUTATION: cập nhật role của 1 user
+     PATCH /api/v1/users/{id}/role  body: { role }
+     ---------------------------------------------------------------- */
+  const handleChangeRole = useCallback(
+    async (user, nextRole) => {
+      if (!user || !nextRole || user.role === nextRole) return;
+      setMutatingId(user.id);
+      setMutatingAction((prev) => ({ ...prev, [user.id]: "role" }));
+      try {
+        const json = await apiClient.patch(
+          `/users/${user.id}/role`,
+          { role: nextRole }
+        );
+        const updated = json?.data || json;
+        // Cập nhật row trong state ngay để UX mượt, không cần refetch
+        setPageData((prev) => {
+          const list = Array.isArray(prev.content) ? prev.content : [];
+          return {
+            ...prev,
+            content: list.map((u) =>
+              u.id === user.id ? { ...u, ...updated } : u
+            ),
+          };
+        });
+        // Đồng bộ lại modal chi tiết / modal edit nếu đang mở
+        if (detailUser?.id === user.id) {
+          setDetailUser((prev) => ({ ...prev, ...updated }));
+        }
+        if (editUser?.id === user.id) {
+          setEditUser((prev) => ({ ...prev, ...updated }));
+        }
+        showToast(
+          `Đã chuyển ${user.fullName || user.email} sang vai trò ${
+            ROLE_LABELS[nextRole] || nextRole
+          }.`,
+          "success"
+        );
+      } catch (err) {
+        console.error("[Admin Users] Lỗi đổi role:", err);
+        showToast(
+          `Không thể đổi vai trò: ${
+            err?.message || "Lỗi không xác định"
+          }`,
+          "error"
+        );
+      } finally {
+        setMutatingId(null);
+        setMutatingAction((prev) => {
+          const next = { ...prev };
+          delete next[user.id];
+          return next;
+        });
+      }
+    },
+    [detailUser, editUser, showToast]
+  );
+
+  /* ----------------------------------------------------------------
+     MUTATION: cập nhật trạng thái active của 1 user
+     PATCH /api/v1/users/{id}/status  body: { active }
+     ---------------------------------------------------------------- */
+  const handleToggleActive = useCallback(
+    async (user, nextActive) => {
+      if (!user || typeof nextActive !== "boolean") return;
+      if (user.active === nextActive) return;
+      setMutatingId(user.id);
+      setMutatingAction((prev) => ({ ...prev, [user.id]: "status" }));
+      try {
+        const json = await apiClient.patch(
+          `/users/${user.id}/status`,
+          { active: nextActive }
+        );
+        const updated = json?.data || json;
+        setPageData((prev) => {
+          const list = Array.isArray(prev.content) ? prev.content : [];
+          return {
+            ...prev,
+            content: list.map((u) =>
+              u.id === user.id ? { ...u, ...updated } : u
+            ),
+          };
+        });
+        if (detailUser?.id === user.id) {
+          setDetailUser((prev) => ({ ...prev, ...updated }));
+        }
+        if (editUser?.id === user.id) {
+          setEditUser((prev) => ({ ...prev, ...updated }));
+        }
+        showToast(
+          nextActive
+            ? `Đã mở khóa tài khoản ${user.fullName || user.email}.`
+            : `Đã khóa tài khoản ${user.fullName || user.email}.`,
+          nextActive ? "success" : "info"
+        );
+      } catch (err) {
+        console.error("[Admin Users] Lỗi đổi trạng thái:", err);
+        showToast(
+          `Không thể đổi trạng thái: ${
+            err?.message || "Lỗi không xác định"
+          }`,
+          "error"
+        );
+      } finally {
+        setMutatingId(null);
+        setMutatingAction((prev) => {
+          const next = { ...prev };
+          delete next[user.id];
+          return next;
+        });
+      }
+    },
+    [detailUser, editUser, showToast]
+  );
+
+  /* ----------------------------------------------------------------
+     MUTATION: cập nhật thông tin user (fullName, phone, role, active)
+     PUT /api/v1/users/{id}
+     ---------------------------------------------------------------- */
+  const handleSaveUser = useCallback(
+    async (user, payload) => {
+      if (!user || !payload) return false;
+      setMutatingId(user.id);
+      setMutatingAction((prev) => ({ ...prev, [user.id]: "save" }));
+      try {
+        const json = await apiClient.put(`/users/${user.id}`, payload);
+        const updated = json?.data || json;
+        setPageData((prev) => {
+          const list = Array.isArray(prev.content) ? prev.content : [];
+          return {
+            ...prev,
+            content: list.map((u) =>
+              u.id === user.id ? { ...u, ...updated } : u
+            ),
+          };
+        });
+        if (detailUser?.id === user.id) {
+          setDetailUser((prev) => ({ ...prev, ...updated }));
+        }
+        setEditUser((prev) => ({ ...prev, ...updated }));
+        showToast(
+          `Đã lưu thay đổi cho ${updated.fullName || user.email}.`,
+          "success"
+        );
+        return true;
+      } catch (err) {
+        console.error("[Admin Users] Lỗi cập nhật user:", err);
+        showToast(
+          `Không thể lưu thay đổi: ${
+            err?.message || "Lỗi không xác định"
+          }`,
+          "error"
+        );
+        return false;
+      } finally {
+        setMutatingId(null);
+        setMutatingAction((prev) => {
+          const next = { ...prev };
+          delete next[user.id];
+          return next;
+        });
+      }
+    },
+    [detailUser, showToast]
+  );
+
+  /* =========================================================================
+     RENDER
+     ========================================================================= */
+
+  const toastPalette = {
+    success: "bg-emerald-900 border-emerald-600 text-white",
+    error: "bg-rose-900 border-rose-600 text-white",
+    info: "bg-slate-900 border-slate-700 text-white",
+  };
+
+  const content = Array.isArray(pageData.content) ? pageData.content : [];
+  const isEmpty = pageData.empty === true || content.length === 0;
+
+  return (
+    <div className="h-full w-full flex flex-col overflow-hidden">
+      {/* ============================================================
+          TOAST
+          ============================================================ */}
+      {toast.visible && (
+        <div
+          className={`fixed top-5 right-5 z-50 ${toastPalette[toast.tone]} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2.5 animate-in slide-in-from-top-3 max-w-md`}
+        >
+          {toast.tone === "success" ? (
+            <CheckCircle2 size={16} className="text-emerald-300 shrink-0" />
+          ) : toast.tone === "error" ? (
+            <AlertCircle size={16} className="text-rose-300 shrink-0" />
+          ) : (
+            <Sparkles size={16} className="text-sky-300 shrink-0" />
+          )}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
+      {/* ============================================================
+          TẦNG 1: HEADER + NÚT TIỆN ÍCH (shrink-0, không cuộn)
+          ============================================================ */}
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            Quản lý Người dùng &amp; Phân quyền
+          </h1>
+          {isFallback && (
+            <p className="text-xs text-rose-700 font-bold mt-1">
+              Chưa kết nối được backend. Vui lòng kiểm tra server / đăng nhập /
+              quyền truy cập rồi bấm Thử lại.
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+            <span className="hidden sm:inline">Làm mới dữ liệu</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm shadow-slate-900/20 text-xs sm:text-sm transition-all cursor-pointer"
+          >
+            <Download size={16} strokeWidth={2.4} />
+            <span>Xuất danh sách CSV</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ============================================================
+          THÔNG BÁO FALLBACK (PHÂN LOẠI LỖI CHI TIẾT)
+          ============================================================ */}
+      {isFallback && fetchError && (
+        <div className="shrink-0 mt-4">
+          <FallbackBanner
+            errorType={errorType}
+            message={fetchError}
+            apiBaseUrl={API_BASE_URL_DISPLAY}
+            onRetry={handleRefresh}
+          />
+        </div>
+      )}
+
+      {/* ============================================================
+          TẦNG 2: 4 THẺ KPI TƯƠNG TÁC NHANH (shrink-0, không cuộn)
+          ============================================================ */}
+      <section className="shrink-0 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-4">
+        <KpiCard
+          title="Tổng tài khoản hệ thống"
+          count={pageData.totalElements}
+          unit="tài khoản"
+          icon={Users}
+          iconClass="text-slate-700 bg-slate-100"
+          borderClass="border-l-4 border-slate-800"
+          active={roleFilter === "all" && activeFilter === "all"}
+          onClick={() => {
+            setRoleFilter("all");
+            setActiveFilter("all");
+            setPageNumber(0);
+          }}
+        />
+        <KpiCard
+          title="Đối tác Điểm đến"
+          count={roleStats.providers}
+          unit="đối tác"
+          icon={Building2}
+          iconClass="text-emerald-600 bg-emerald-50"
+          borderClass="border-l-4 border-emerald-500"
+          active={roleFilter === ROLES.PROVIDER}
+          onClick={() => handleKpiClick(ROLES.PROVIDER)}
+        />
+        <KpiCard
+          title="Kiểm duyệt viên"
+          count={roleStats.moderators}
+          unit="kiểm duyệt viên"
+          icon={ShieldCheck}
+          iconClass="text-indigo-600 bg-indigo-50"
+          borderClass="border-l-4 border-indigo-500"
+          active={roleFilter === ROLES.MODERATOR}
+          onClick={() => handleKpiClick(ROLES.MODERATOR)}
+        />
+        <KpiCard
+          title="Du khách"
+          count={roleStats.users}
+          unit="khách du lịch"
+          icon={Compass}
+          iconClass="text-sky-600 bg-sky-50"
+          borderClass="border-l-4 border-sky-500"
+          active={roleFilter === ROLES.USER}
+          onClick={() => handleKpiClick(ROLES.USER)}
+        />
+      </section>
+
+      {/* ============================================================
+          TẦNG 3: KHUNG LÀM VIỆC HỢP NHẤT
+          - flex-1 min-h-0: chiếm phần còn lại
+          - flex flex-col: xếp dọc 3 vùng (filter / table / pagination)
+          - overflow-hidden: không cuộn ở khung ngoài
+          ============================================================ */}
+      <div className="flex-1 min-h-0 mt-4 flex flex-col bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+        {/* ---- THANH CÔNG CỤ LỌC (shrink-0, không cuộn) ---- */}
+        <div className="shrink-0 p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+          {/* Hàng 1: Segmented Tabs lọc nhanh theo role */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleRoleFilterChange("all")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                roleFilter === "all"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
+              }`}
+            >
+              Tất cả vai trò
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRoleFilterChange(ROLES.USER)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                roleFilter === ROLES.USER
+                  ? "bg-sky-600 text-white shadow-xs"
+                  : "bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200"
+              }`}
+            >
+              <Compass size={13} />
+              <span>Du khách (USER)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRoleFilterChange(ROLES.PROVIDER)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                roleFilter === ROLES.PROVIDER
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
+              }`}
+            >
+              <Building2 size={13} />
+              <span>Đối tác (PROVIDER)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRoleFilterChange(ROLES.MODERATOR)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                roleFilter === ROLES.MODERATOR
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200"
+              }`}
+            >
+              <ShieldCheck size={13} />
+              <span>Kiểm duyệt (MODERATOR)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRoleFilterChange(ROLES.ADMIN)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                roleFilter === ROLES.ADMIN
+                  ? "bg-rose-600 text-white shadow-xs"
+                  : "bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200"
+              }`}
+            >
+              <Users size={13} />
+              <span>Quản trị (ADMIN)</span>
+            </button>
+          </div>
+
+          {/* Hàng 2: Search + Filter + Sort + Reset */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5">
+            {/* Keyword */}
+            <div className="md:col-span-5 relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <Search size={14} />
+              </div>
+              <input
+                type="text"
+                value={keywordInput}
+                onChange={(e) => setKeywordInput(e.target.value)}
+                placeholder="Tìm theo họ tên, email, số điện thoại..."
+                className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-700 transition-all"
+              />
+              {keywordInput && (
+                <button
+                  type="button"
+                  onClick={handleClearKeyword}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Xóa từ khóa"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Active filter */}
+            <div className="md:col-span-3">
+              <select
+                value={activeFilter}
+                onChange={(e) => handleActiveFilterChange(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="true">● Đang hoạt động (true)</option>
+                <option value="false">● Đã khóa / Ngưng (false)</option>
+              </select>
+            </div>
+
+            {/* Sort */}
+            <div className="md:col-span-3">
+              <select
+                value={sortValue}
+                onChange={(e) => handleSortChange(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Reset */}
+            <div className="md:col-span-1">
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                disabled={activeFiltersCount === 0}
+                className="w-full px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                title="Đặt lại bộ lọc"
+              >
+                <RotateCcw size={13} />
+                <span className="hidden lg:inline">Đặt lại</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ---- VÙNG CHỨA BẢNG (cuộn độc lập, thead sticky) ---- */}
+        <div className="flex-1 min-h-0 w-full overflow-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold uppercase text-slate-500 tracking-wider">
+                <th className="py-3.5 px-4 whitespace-nowrap">Định danh &amp; Thành viên</th>
+                <th className="py-3.5 px-3 whitespace-nowrap">Liên hệ</th>
+                <th className="py-3.5 px-3 whitespace-nowrap">Vai trò</th>
+                <th className="py-3.5 px-3 whitespace-nowrap">Trạng thái</th>
+                <th className="py-3.5 px-3 whitespace-nowrap">Ngày tạo / Cập nhật</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                <SkeletonRows />
+              ) : isEmpty ? (
+                <EmptyState
+                  hasFilter={activeFiltersCount > 0}
+                  onReset={handleResetFilters}
+                  isFallback={isFallback}
+                />
+              ) : (
+                content.map((u) => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    isMutating={mutatingId === u.id}
+                    mutatingAction={mutatingAction[u.id]}
+                    onView={() => setDetailUser(u)}
+                    onEdit={() => setEditUser({ ...u })}
+                    onChangeRole={(nextRole) => handleChangeRole(u, nextRole)}
+                    onToggleActive={(nextActive) =>
+                      handleToggleActive(u, nextActive)
+                    }
+                  />
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ---- THANH PHÂN TRANG (shrink-0, cố định ở đáy) ---- */}
+        <div className="shrink-0 border-t border-slate-100 bg-white">
+          <PaginationBar
+            pageData={pageData}
+            pageNumber={pageNumber}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            onSizeChange={handleSizeChange}
+          />
+        </div>
+      </div>
+
+      {/* ============================================================
+          MODAL CHI TIẾT NGƯỜI DÙNG
+          ============================================================ */}
+      {detailUser && (
+        <DetailModal
+          user={detailUser}
+          onClose={() => setDetailUser(null)}
+          onEdit={() => {
+            setEditUser({ ...detailUser });
+            setDetailUser(null);
+          }}
+          isMutating={mutatingId === detailUser.id}
+          mutatingAction={mutatingAction[detailUser.id]}
+          onChangeRole={(nextRole) => handleChangeRole(detailUser, nextRole)}
+          onToggleActive={(nextActive) =>
+            handleToggleActive(detailUser, nextActive)
+          }
+        />
+      )}
+
+      {editUser && (
+        <EditModal
+          user={editUser}
+          isMutating={mutatingId === editUser.id}
+          onClose={() => setEditUser(null)}
+          onSave={async (payload) => {
+            const ok = await handleSaveUser(editUser, payload);
+            if (ok) {
+              // Đóng modal sau 600ms để user kịp đọc toast
+              setTimeout(() => setEditUser(null), 600);
+            }
+            return ok;
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
+   SUB-COMPONENT: KpiCard
+   ========================================================================= */
+
+function KpiCard({
+  title,
+  count,
+  unit,
+  subtitle,
+  icon: Icon,
+  iconClass,
+  borderClass,
+  active,
+  onClick,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-left bg-white rounded-xl p-3 border border-slate-200/90 ${borderClass} shadow-xs hover:shadow-sm transition-all cursor-pointer ${
+        active ? "ring-2 ring-slate-300/80" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 truncate">
+            {title}
+          </p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg font-extrabold text-slate-900 tabular-nums">
+              {(count ?? 0).toLocaleString("vi-VN")}
+            </span>
+            <span className="text-[10px] font-bold text-slate-500">{unit}</span>
+          </div>
+          {subtitle && (
+            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+              {subtitle}
+            </p>
+          )}
+        </div>
+        <div
+          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}
+        >
+          <Icon size={14} strokeWidth={2.2} />
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/* =========================================================================
+   SUB-COMPONENT: UserRow
+   ========================================================================= */
+
+function UserRow({
+  user,
+  onView,
+  onEdit,
+  onChangeRole,
+  onToggleActive,
+  isMutating = false,
+  mutatingAction = null,
+}) {
+  const [avatarError, setAvatarError] = useState(false);
+  const showAvatar =
+    user.avatarUrl &&
+    /^https?:\/\//i.test(user.avatarUrl) &&
+    !avatarError;
+
+  const rowDisabled = isMutating;
+  const roleBusy = isMutating && mutatingAction === "role";
+
+  return (
+    <tr
+      className={`hover:bg-slate-50/70 transition-colors ${
+        rowDisabled ? "opacity-60" : ""
+      }`}
+    >
+      {/* Cột 1 - Định danh & Thành viên */}
+      <td className="py-3.5 px-4 whitespace-nowrap">
+        <div className="flex items-center gap-3">
+          <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0">
+            {showAvatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.avatarUrl}
+                alt={user.fullName}
+                onError={() => setAvatarError(true)}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div
+                className={`w-full h-full flex items-center justify-center font-bold text-xs ${
+                  ROLE_AVATAR_BG[user.role] ||
+                  "bg-slate-100 text-slate-700"
+                }`}
+              >
+                {getInitials(user.fullName)}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="font-mono text-[10.5px] text-slate-400">
+              #{user.id}
+            </p>
+            <p className="font-bold text-sm text-slate-900 truncate max-w-[220px]">
+              {user.fullName}
+            </p>
+            <p className="text-[11px] text-slate-500 font-mono mt-0.5 truncate max-w-[220px]">
+              {user.email}
+            </p>
+          </div>
+        </div>
+      </td>
+
+      {/* Cột 2 - Liên hệ */}
+      <td className="py-3.5 px-3 whitespace-nowrap">
+        {user.phone ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+            <Phone size={11} className="text-slate-400" />
+            {user.phone}
+          </span>
+        ) : (
+          <span className="text-[11px] italic text-slate-400">
+            Chưa cập nhật
+          </span>
+        )}
+      </td>
+
+      {/* Cột 3 - Vai trò (Dropdown đổi nhanh) */}
+      <td className="py-3.5 px-3 whitespace-nowrap">
+        <div className="relative inline-flex items-center">
+          <select
+            value={user.role}
+            disabled={rowDisabled}
+            onChange={(e) => onChangeRole?.(e.target.value)}
+            className={`appearance-none pr-7 pl-2.5 py-1 rounded-full text-[10.5px] font-bold border cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500/30 disabled:cursor-not-allowed ${
+              ROLE_BADGE_CLASS[user.role] ||
+              "bg-slate-100 text-slate-700 border-slate-200"
+            }`}
+            title="Bấm để đổi vai trò nhanh"
+          >
+            {Object.values(ROLES).map((r) => (
+              <option key={r} value={r}>
+                {ROLE_LABELS[r] || r}
+              </option>
+            ))}
+          </select>
+          {roleBusy ? (
+            <Loader2
+              size={11}
+              className="absolute right-1.5 animate-spin text-current pointer-events-none"
+            />
+          ) : (
+            <UserCog
+              size={10}
+              className="absolute right-2 pointer-events-none opacity-70"
+            />
+          )}
+        </div>
+      </td>
+
+      {/* Cột 5 - Trạng thái (chỉ hiển thị, chỉnh sửa qua nút Sửa) */}
+      <td className="py-3.5 px-3 whitespace-nowrap">
+        {user.active ? (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Đang hoạt động
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+            Đã khóa
+          </span>
+        )}
+      </td>
+
+      {/* Cột 6 - Ngày tạo / Cập nhật */}
+      <td className="py-3.5 px-3 whitespace-nowrap">
+        <div className="flex flex-col gap-0.5 text-[11px]">
+          <span className="text-slate-700 font-mono inline-flex items-center gap-1">
+            <Calendar size={10} className="text-slate-400" />
+            {formatDateTime(user.createdAt)}
+          </span>
+          <span className="text-slate-400 font-mono text-[10.5px]">
+            ↻ {formatDateTime(user.updatedAt)}
+          </span>
+        </div>
+      </td>
+
+      {/* Cột 7 - Thao tác */}
+      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+        <div className="inline-flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onEdit}
+            disabled={rowDisabled}
+            className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Chỉnh sửa thông tin, vai trò và trạng thái"
+          >
+            <Pencil size={12} />
+            Sửa
+          </button>
+          <button
+            type="button"
+            onClick={onView}
+            disabled={rowDisabled}
+            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Xem chi tiết"
+          >
+            <Eye size={12} />
+            Chi tiết
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+/* =========================================================================
+   SUB-COMPONENT: SkeletonRows (Trạng thái Loading)
+   ========================================================================= */
+
+function SkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: 6 }).map((_, idx) => (
+        <tr key={`skeleton-${idx}`} className="border-b border-slate-100">
+          <td className="py-3.5 px-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 animate-pulse" />
+              <div className="space-y-1.5">
+                <div className="h-2.5 w-12 bg-slate-100 rounded animate-pulse" />
+                <div className="h-3 w-32 bg-slate-100 rounded animate-pulse" />
+                <div className="h-2.5 w-40 bg-slate-100 rounded animate-pulse" />
+              </div>
+            </div>
+          </td>
+          <td className="py-3.5 px-3">
+            <div className="h-3 w-24 bg-slate-100 rounded animate-pulse" />
+          </td>
+          <td className="py-3.5 px-3">
+            <div className="h-5 w-20 bg-slate-100 rounded-full animate-pulse" />
+          </td>
+          <td className="py-3.5 px-3">
+            <div className="h-5 w-16 bg-slate-100 rounded-full animate-pulse" />
+          </td>
+          <td className="py-3.5 px-3">
+            <div className="h-3 w-28 bg-slate-100 rounded animate-pulse" />
+            <div className="h-2.5 w-24 bg-slate-100 rounded animate-pulse mt-1" />
+          </td>
+          <td className="py-3.5 px-4 text-right">
+            <div className="h-7 w-16 bg-slate-100 rounded-lg animate-pulse ml-auto" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+/* =========================================================================
+   SUB-COMPONENT: EmptyState (Trạng thái Trống)
+   ========================================================================= */
+
+function EmptyState({ hasFilter, onReset, isFallback }) {
+  if (isFallback) {
+    return (
+      <tr>
+        <td colSpan={6} className="py-20 text-center">
+          <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full mx-auto flex items-center justify-center">
+            <AlertCircle size={32} />
+          </div>
+          <h3 className="text-base font-extrabold text-slate-800 mt-3">
+            Không thể tải danh sách người dùng
+          </h3>
+          <p className="text-xs text-slate-500 mt-1.5 max-w-lg mx-auto">
+            Hệ thống <strong className="text-rose-700">chưa kết nối được backend</strong>.
+            Vui lòng kiểm tra lại máy chủ Spring Boot, quyền truy cập và
+            đăng nhập bằng tài khoản <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">ADMIN</code>{" "}
+            — xem hướng dẫn chi tiết ở banner bên trên.
+          </p>
+        </td>
+      </tr>
+    );
+  }
+  return (
+    <tr>
+      <td colSpan={6} className="py-16 text-center">
+        <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
+          <Inbox size={28} />
+        </div>
+        <h3 className="text-base font-bold text-slate-800 mt-3">
+          Không có tài khoản nào phù hợp
+        </h3>
+        <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+          {hasFilter
+            ? "Không tìm thấy kết quả với bộ lọc hiện tại. Hãy thử đặt lại bộ lọc để xem toàn bộ danh sách."
+            : "Hệ thống chưa có tài khoản nào. Dữ liệu sẽ xuất hiện khi có người dùng đăng ký."}
+        </p>
+        {hasFilter && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="mt-4 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <RotateCcw size={13} />
+            Xóa bộ lọc tìm kiếm
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+/* =========================================================================
+   SUB-COMPONENT: PaginationBar
+   ========================================================================= */
+
+function PaginationBar({
+  pageData,
+  pageNumber,
+  pageSize,
+  onPageChange,
+  onSizeChange,
+}) {
+  const totalPages = Math.max(pageData.totalPages || 0, 1);
+  const currentPage = (pageData.number ?? pageNumber) + 1;
+  const totalElements = pageData.totalElements || 0;
+
+  // Tính danh sách số trang hiển thị (tối đa 5 nút quanh trang hiện tại)
+  const visiblePageNumbers = useMemo(() => {
+    const total = totalPages;
+    const curr = currentPage;
+    if (total <= 5) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const start = Math.max(1, curr - 2);
+    const end = Math.min(total, curr + 2);
+    const pages = [];
+    for (let p = start; p <= end; p += 1) pages.push(p);
+    if (start > 1) {
+      pages.unshift(1);
+      if (start > 2) pages.splice(1, 0, "...");
+    }
+    if (end < total) {
+      if (end < total - 1) pages.push("...");
+      pages.push(total);
+    }
+    return pages;
+  }, [totalPages, currentPage]);
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-3.5 bg-slate-50/60 border-t border-slate-100">
+      {/* Bên trái: Thông tin + chọn size */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+        <span className="text-xs text-slate-600 font-semibold">
+          Đang xem trang{" "}
+          <strong className="text-slate-900">{currentPage}</strong> /{" "}
+          <strong className="text-slate-900">{totalPages}</strong>{" "}
+          <span className="text-slate-400">
+            (Tổng{" "}
+            <strong className="text-slate-700">
+              {totalElements.toLocaleString("vi-VN")}
+            </strong>{" "}
+            tài khoản)
+          </span>
+        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-slate-500 font-semibold">
+            Số dòng/trang:
+          </span>
+          <select
+            value={pageSize}
+            onChange={(e) => onSizeChange(e.target.value)}
+            className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/20"
+          >
+            {SIZE_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Bên phải: Nút điều hướng */}
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onPageChange(0)}
+          disabled={pageData.first}
+          className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Trang đầu"
+        >
+          <ChevronsLeft size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(pageNumber - 1)}
+          disabled={pageData.first}
+          className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Trang trước"
+        >
+          <ChevronLeft size={14} />
+        </button>
+        {visiblePageNumbers.map((p, idx) =>
+          p === "..." ? (
+            <span
+              key={`dots-${idx}`}
+              className="px-2 text-xs text-slate-400 font-bold select-none"
+            >
+              …
+            </span>
+          ) : (
+            <button
+              key={`page-${p}`}
+              type="button"
+              onClick={() => onPageChange(Number(p) - 1)}
+              className={`min-w-[32px] h-7 px-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                p === currentPage
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              {p}
+            </button>
+          )
+        )}
+        <button
+          type="button"
+          onClick={() => onPageChange(pageNumber + 1)}
+          disabled={pageData.last}
+          className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Trang sau"
+        >
+          <ChevronRight size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(totalPages - 1)}
+          disabled={pageData.last}
+          className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Trang cuối"
+        >
+          <ChevronsRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   SUB-COMPONENT: DetailModal
+   ========================================================================= */
+
+function DetailModal({
+  user,
+  onClose,
+  onEdit,
+  onChangeRole,
+  onToggleActive,
+  isMutating = false,
+  mutatingAction = null,
+}) {
+  const roleBusy = isMutating && mutatingAction === "role";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/60 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="relative w-14 h-14 rounded-2xl overflow-hidden shrink-0">
+              {user.avatarUrl && /^https?:\/\//i.test(user.avatarUrl) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.avatarUrl}
+                  alt={user.fullName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div
+                  className={`w-full h-full flex items-center justify-center font-extrabold text-base ${
+                    ROLE_AVATAR_BG[user.role] ||
+                    "bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  {getInitials(user.fullName)}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-mono text-[10.5px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  #{user.id}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border ${
+                    ROLE_BADGE_CLASS[user.role] ||
+                    "bg-slate-100 text-slate-700 border-slate-200"
+                  }`}
+                >
+                  {ROLE_LABELS[user.role] || user.role}
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">
+                {user.fullName}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5 inline-flex items-center gap-1">
+                <Mail size={11} className="text-slate-400" />
+                {user.email}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors cursor-pointer border border-slate-200 shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <DetailRow label="Mã định danh" value={`#${user.id}`} mono />
+          <DetailRow
+            label="Số điện thoại"
+            value={user.phone || "Chưa cập nhật"}
+            icon={Phone}
+            muted={!user.phone}
+          />
+
+          {/* Vai trò — đổi nhanh (style đồng nhất, không tô màu) */}
+          <div
+            className={`p-3 rounded-2xl border bg-white border-slate-200 ${
+              roleBusy ? "opacity-60" : ""
+            }`}
+          >
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 inline-flex items-center gap-1">
+              <ShieldAlert size={10} className="text-slate-400" />
+              Vai trò
+            </p>
+            <div className="flex items-center gap-2">
+              <select
+                value={user.role}
+                disabled={isMutating}
+                onChange={(e) => onChangeRole?.(e.target.value)}
+                className="flex-1 appearance-none px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500/30 focus:border-slate-700 disabled:cursor-not-allowed"
+              >
+                {Object.values(ROLES).map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABELS[r] || r}
+                  </option>
+                ))}
+              </select>
+              {roleBusy && (
+                <Loader2 size={14} className="animate-spin text-slate-500" />
+              )}
+            </div>
+          </div>
+
+          {/* Trạng thái — chỉ hiển thị, chỉnh sửa qua nút "Chỉnh sửa" */}
+          <DetailRow
+            label="Trạng thái"
+            value={
+              user.active ? (
+                <span className="inline-flex items-center gap-1.5 text-emerald-700 font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Đang hoạt động
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-rose-700 font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  Đã khóa
+                </span>
+              )
+            }
+          />
+
+          <DetailRow
+            label="Ngày tạo tài khoản"
+            value={formatDateTime(user.createdAt)}
+            icon={Calendar}
+          />
+          <DetailRow
+            label="Cập nhật lần cuối"
+            value={formatDateTime(user.updatedAt)}
+            icon={Calendar}
+          />
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between gap-2.5">
+          <p className="text-[11px] text-slate-500">
+            Mọi thay đổi sẽ được ghi nhật ký phía máy chủ.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={isMutating}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Pencil size={12} />
+              Chỉnh sửa
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditModal({ user, onClose, onSave, isMutating = false }) {
+  // Form state — khởi tạo từ user được truyền vào
+  const [fullName, setFullName] = useState(user?.fullName || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [role, setRole] = useState(user?.role || ROLES.USER);
+  const [active, setActive] = useState(Boolean(user?.active));
+  const [touched, setTouched] = useState(false);
+
+  // Reset khi user thay đổi (mở modal khác) — dùng derived state pattern.
+  // Lưu id của user đang edit vào ref để so sánh; chỉ reset khi id thực sự đổi.
+  const lastUserIdRef = useRef(user?.id);
+  if (lastUserIdRef.current !== user?.id) {
+    lastUserIdRef.current = user?.id;
+    setFullName(user?.fullName || "");
+    setPhone(user?.phone || "");
+    setRole(user?.role || ROLES.USER);
+    setActive(Boolean(user?.active));
+    setTouched(false);
+  }
+
+  const fullNameError =
+    touched && !String(fullName).trim()
+      ? "Họ tên không được để trống"
+      : "";
+  const phoneError =
+    touched && phone && !/^[0-9+\-\s()]{6,20}$/.test(phone)
+      ? "Số điện thoại không hợp lệ"
+      : "";
+
+  const dirty =
+    String(fullName).trim() !== String(user?.fullName || "") ||
+    String(phone || "") !== String(user?.phone || "") ||
+    role !== user?.role ||
+    Boolean(active) !== Boolean(user?.active);
+
+  const canSubmit =
+    !isMutating &&
+    !fullNameError &&
+    !phoneError &&
+    String(fullName).trim().length > 0 &&
+    dirty;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setTouched(true);
+    if (fullNameError || phoneError) return;
+    const payload = {
+      fullName: String(fullName).trim(),
+      phone: String(phone || "").trim() || null,
+      role,
+      active: Boolean(active),
+    };
+    await onSave?.(payload);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/60 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <Pencil size={18} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">
+                Chỉnh sửa người dùng
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                #{user?.id} · {user?.email}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isMutating}
+            className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors cursor-pointer border border-slate-200 shrink-0 disabled:opacity-50"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          {/* Họ tên */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+              Họ và tên <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              onBlur={() => setTouched(true)}
+              disabled={isMutating}
+              placeholder="Nhập họ và tên đầy đủ"
+              className={`w-full px-3 py-2 bg-white border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+                fullNameError
+                  ? "border-rose-300 focus:ring-rose-500/20 focus:border-rose-500"
+                  : "border-slate-200 focus:ring-slate-500/20 focus:border-slate-700"
+              }`}
+            />
+            {fullNameError && (
+              <p className="text-[11px] text-rose-600 font-semibold mt-1">
+                {fullNameError}
+              </p>
+            )}
+          </div>
+
+          {/* Số điện thoại */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+              Số điện thoại
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => setTouched(true)}
+              disabled={isMutating}
+              placeholder="VD: 0987654321"
+              className={`w-full px-3 py-2 bg-white border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+                phoneError
+                  ? "border-rose-300 focus:ring-rose-500/20 focus:border-rose-500"
+                  : "border-slate-200 focus:ring-slate-500/20 focus:border-slate-700"
+              }`}
+            />
+            {phoneError && (
+              <p className="text-[11px] text-rose-600 font-semibold mt-1">
+                {phoneError}
+              </p>
+            )}
+          </div>
+
+          {/* Vai trò + Trạng thái */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                Vai trò
+              </label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                disabled={isMutating}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-700"
+              >
+                {Object.values(ROLES).map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABELS[r] || r}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                Trạng thái
+              </label>
+              <button
+                type="button"
+                disabled={isMutating}
+                onClick={() => setActive((v) => !v)}
+                className={`w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors cursor-pointer disabled:cursor-not-allowed ${
+                  active
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                    : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    active ? "bg-emerald-500" : "bg-rose-500"
+                  }`}
+                />
+                {active ? "Đang hoạt động" : "Đã khóa"}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 leading-relaxed">
+            <strong className="text-slate-700">Lưu ý:</strong> Email và mã
+            định danh là bất biến. Mọi thay đổi sẽ được ghi nhật ký phía máy
+            chủ.
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isMutating}
+            className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs shadow-sm shadow-slate-900/20 transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isMutating ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Save size={12} />
+            )}
+            {isMutating ? "Đang lưu…" : "Lưu thay đổi"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function DetailRow({ label, value, icon: Icon, mono, muted }) {
+  return (
+    <div
+      className={`p-3 rounded-2xl border ${
+        muted
+          ? "bg-slate-50 border-slate-200"
+          : "bg-white border-slate-200"
+      }`}
+    >
+      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 inline-flex items-center gap-1">
+        {Icon && <Icon size={10} className="text-slate-400" />}
+        {label}
+      </p>
+      <p
+        className={`text-sm ${
+          mono ? "font-mono" : "font-semibold"
+        } ${
+          muted ? "italic text-slate-400 font-normal" : "text-slate-800"
+        } break-all`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+/* =========================================================================
+   SUB-COMPONENT: FallbackBanner (Phân loại lỗi + hướng dẫn khắc phục)
+   ========================================================================= */
+
+const ERROR_DIAGNOSIS = {
+  network: {
+    title: "Không kết nối được máy chủ Backend",
+    bgClass: "bg-amber-50 border-amber-200",
+    iconClass: "text-amber-600",
+    titleClass: "text-amber-800",
+    bodyClass: "text-amber-700",
+    codeClass: "bg-amber-100",
+  },
+  auth: {
+    title: "Phiên đăng nhập đã hết hạn hoặc không hợp lệ",
+    bgClass: "bg-rose-50 border-rose-200",
+    iconClass: "text-rose-600",
+    titleClass: "text-rose-800",
+    bodyClass: "text-rose-700",
+    codeClass: "bg-rose-100",
+  },
+  forbidden: {
+    title: "Tài khoản không có quyền ADMIN",
+    bgClass: "bg-rose-50 border-rose-200",
+    iconClass: "text-rose-600",
+    titleClass: "text-rose-800",
+    bodyClass: "text-rose-700",
+    codeClass: "bg-rose-100",
+  },
+  notfound: {
+    title: "API endpoint không tồn tại (404)",
+    bgClass: "bg-orange-50 border-orange-200",
+    iconClass: "text-orange-600",
+    titleClass: "text-orange-800",
+    bodyClass: "text-orange-700",
+    codeClass: "bg-orange-100",
+  },
+  server: {
+    title: "Máy chủ Backend gặp lỗi nội bộ (5xx)",
+    bgClass: "bg-rose-50 border-rose-200",
+    iconClass: "text-rose-600",
+    titleClass: "text-rose-800",
+    bodyClass: "text-rose-700",
+    codeClass: "bg-rose-100",
+  },
+  unknown: {
+    title: "Lỗi không xác định",
+    bgClass: "bg-slate-50 border-slate-200",
+    iconClass: "text-slate-600",
+    titleClass: "text-slate-800",
+    bodyClass: "text-slate-700",
+    codeClass: "bg-slate-100",
+  },
+};
+
+const ERROR_GUIDE = {
+  network: (
+    <>
+      <strong>Cách khắc phục:</strong> Khởi động backend Spring Boot ở
+      terminal <code>backend/</code> bằng lệnh{" "}
+      <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">
+        mvn spring-boot:run
+      </code>{" "}
+      hoặc{" "}
+      <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">
+        ./mvnw spring-boot:run
+      </code>
+      . Đảm bảo PostgreSQL đang chạy ở{" "}
+      <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">
+        localhost:5432
+      </code>
+      .
+    </>
+  ),
+  auth: (
+    <>
+      <strong>Cách khắc phục:</strong> Vui lòng đăng nhập lại với tài khoản
+      ADMIN. Truy cập{" "}
+      <a
+        href="/auth/login"
+        className="underline font-bold"
+        target="_self"
+      >
+        trang đăng nhập
+      </a>{" "}
+      để cấp lại token.
+    </>
+  ),
+  forbidden: (
+    <>
+      <strong>Cách khắc phục:</strong> Endpoint{" "}
+      <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">
+        /api/v1/users
+      </code>{" "}
+      yêu cầu quyền <code>ADMIN</code>. Tài khoản hiện tại có thể là{" "}
+      <code>USER</code>/<code>MODERATOR</code>/<code>PROVIDER</code>.
+    </>
+  ),
+  notfound: (
+    <>
+      <strong>Cách khắc phục:</strong> Kiểm tra URL gốc đã đúng{" "}
+      <code className="font-mono bg-orange-100 px-1 py-0.5 rounded">
+        /api/v1/users
+      </code>{" "}
+      chưa. Nếu backend đang chạy ở context-path khác, cập nhật biến môi
+      trường <code>NEXT_PUBLIC_API_URL</code>.
+    </>
+  ),
+  server: (
+    <>
+      <strong>Lỗi SQL/JDBC từ backend.</strong> Backend đã được cập nhật để
+      dùng <code>JpaSpecificationExecutor</code> +{" "}
+      <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">
+        cb.coalesce(phone, &quot;&quot;)
+      </code>{" "}
+      nên không còn lỗi{" "}
+      <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">
+        could not determine data type of parameter
+      </code>
+      . Vui lòng <strong>restart Spring Boot</strong> (
+      <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">
+        Ctrl+C
+      </code>{" "}
+      rồi{" "}
+      <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">
+        mvn spring-boot:run
+      </code>
+      ) để áp dụng code mới.
+    </>
+  ),
+  unknown: (
+    <>
+      <strong>Cách khắc phục:</strong> Mở DevTools (F12) → tab Network để xem
+      chi tiết request/response.
+    </>
+  ),
+};
+
+function FallbackBanner({ errorType, message, apiBaseUrl, onRetry }) {
+  const diag = ERROR_DIAGNOSIS[errorType] || ERROR_DIAGNOSIS.unknown;
+  const guide = ERROR_GUIDE[errorType] || ERROR_GUIDE.unknown;
+
+  return (
+    <div className={`p-4 rounded-2xl border ${diag.bgClass}`}>
+      <div className="flex items-start gap-3">
+        <AlertCircle
+          size={18}
+          className={`${diag.iconClass} mt-0.5 shrink-0`}
+        />
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-extrabold ${diag.titleClass}`}>
+            {diag.title}
+          </p>
+          <p className={`text-[11px] ${diag.bodyClass} mt-1`}>
+            <strong>Chi tiết:</strong>{" "}
+            <code className={`font-mono ${diag.codeClass} px-1 py-0.5 rounded`}>
+              {message}
+            </code>
+          </p>
+          <p className={`text-[11px] ${diag.bodyClass} mt-2 leading-relaxed`}>
+            {guide}
+          </p>
+          <p className={`text-[11px] ${diag.bodyClass} mt-2`}>
+            <strong>API base URL đang dùng:</strong>{" "}
+            <code className={`font-mono ${diag.codeClass} px-1.5 py-0.5 rounded`}>
+              {apiBaseUrl}
+            </code>{" "}
+            (có thể ghi đè bằng biến môi trường{" "}
+            <code className="font-mono">NEXT_PUBLIC_API_URL</code>).
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCw size={12} />
+              Thử lại
+            </button>
+            {errorType === "network" && (
+              <a
+                href={`${apiBaseUrl.replace("/api/v1", "")}/swagger-ui.html`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-[11px] inline-flex items-center gap-1.5"
+              >
+                <Globe size={12} />
+                Mở Swagger UI
+              </a>
+            )}
+            {errorType === "auth" && (
+              <a
+                href="/auth/login"
+                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white border border-rose-700 font-bold text-[11px] inline-flex items-center gap-1.5"
+              >
+                <KeyRound size={12} />
+                Đăng nhập lại
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
