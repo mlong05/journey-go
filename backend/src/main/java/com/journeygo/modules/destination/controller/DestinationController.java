@@ -113,3 +113,13 @@ public class DestinationController {
                 destinationService.update(id, request, userPrincipal.getId(), callerRole)));
     }
 }
+  @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Tạo điểm đến mới", description = "Tạo điểm đến mới, mặc định chưa được phê duyệt (ADMIN / MODERATOR / PROVIDER)")
+    public ResponseEntity<ApiResponse<DestinationResponse>> create(
+            @Valid @RequestBody DestinationRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Tạo điểm đến thành công", destinationService.create(request, userPrincipal.getId())));
+    }

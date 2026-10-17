@@ -17,7 +17,8 @@ public record UserResponse(
         AuthProvider authProvider,
         String avatarUrl,
         boolean active,
-        Instant createdAt
+        Instant createdAt,
+        Instant updatedAt
 ) {
     public static UserResponse fromEntity(User user) {
         return UserResponse.builder()
@@ -30,6 +31,7 @@ public record UserResponse(
                 .avatarUrl(user.getAvatarUrl())
                 .active(user.isActive())
                 .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
                 .build();
     }
 }
