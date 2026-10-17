@@ -180,8 +180,7 @@ export default function AuthPage() {
   };
 
   const handleSelectRole = (roleId) => {
-    // Chỉ đổi pill vai trò — KHÔNG tự động điền tài khoản/mật khẩu mẫu.
-    // Người dùng phải tự nhập email và mật khẩu.
+  
     setSelectedRoleId(roleId);
   };
 
