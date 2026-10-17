@@ -198,6 +198,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Bắt IllegalArgumentException phát sinh từ việc truyền sort không hợp lệ trên truy vấn JPA hoặc đối số sai.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        String msg = ex.getMessage() != null ? ex.getMessage() : "Tham số yêu cầu không hợp lệ";
+        ApiResponse<Object> response = ApiResponse.builder()
+                .code(HttpStatus.BAD_REQUEST.value())
+                .message("Tham số không hợp lệ: " + msg)
+                .build();
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
      * Lỗi khi query param sai kiểu (VD Swagger gửi sort=["id"] mảng JSON thay vì chuỗi "id,asc").
      */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
