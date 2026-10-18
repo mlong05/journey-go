@@ -16,6 +16,7 @@ import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 import ForgotPasswordFlow from "./ForgotPasswordFlow";
 import SocialLoginButtons from "./SocialLoginButtons";
+import { translateAuthError } from "@/services/errorMessage";
 
 export default function AuthScreen({ initialTab = "login" }) {
   const router = useRouter();
@@ -107,6 +108,21 @@ export default function AuthScreen({ initialTab = "login" }) {
 
       if (!user) {
         throw new Error(result?.message || "Không nhận được dữ liệu người dùng từ máy chủ.");
+      }
+
+      // ==========================================================================
+      // KIỂM TRA TRẠNG THÁI HOẠT ĐỘNG CỦA TÀI KHOẢN
+      // Tài khoản bị vô hiệu hóa (active = false) phải bị chặn ngay từ bước
+      // đăng nhập, không cho phép vào hệ thống. Thông báo rõ ràng hướng dẫn
+      // người dùng liên hệ quản trị viên để được khôi phục.
+      // ==========================================================================
+      if (user.active === false) {
+        setLoading(false);
+        showToast(
+          "error",
+          "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được hướng dẫn khôi phục."
+        );
+        return;
       }
 
       const roleStr = String(user.role || "").toUpperCase();
@@ -201,7 +217,10 @@ export default function AuthScreen({ initialTab = "login" }) {
       }, 1250);
     } catch (err) {
       console.error("[Login Error]", err);
-      const errMsg = err?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại Email và Mật khẩu.";
+      const errMsg = translateAuthError(
+        err,
+        "Đăng nhập thất bại. Vui lòng kiểm tra lại Email và Mật khẩu."
+      );
       showToast("error", errMsg);
       setLoading(false);
     }
@@ -351,6 +370,19 @@ export default function AuthScreen({ initialTab = "login" }) {
         const user = res.user;
 
         // ==========================================================================
+        // KIỂM TRA TRẠNG THÁI HOẠT ĐỘNG CỦA TÀI KHOẢN (Google OAuth)
+        // Tài khoản bị vô hiệu hóa phải bị chặn ngay từ bước đăng nhập.
+        // ==========================================================================
+        if (user?.active === false) {
+          setLoading(false);
+          showToast(
+            "error",
+            "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được hướng dẫn khôi phục."
+          );
+          return;
+        }
+
+        // ==========================================================================
         // KIỂM TRA KHỚP VAI TRÒ cho luồng Google OAuth.
         // Thông báo lỗi chung chung, không lộ role thật của tài khoản.
         // ==========================================================================
@@ -389,7 +421,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       }
     } catch (err) {
       console.error("[Google Login Error]", err);
-      showToast("error", err?.message || "Đăng nhập Google thất bại.");
+      showToast("error", translateAuthError(err, "Đăng nhập Google thất bại."));
     } finally {
       setLoading(false);
     }

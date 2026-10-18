@@ -26,7 +26,6 @@ import {
   Calendar,
   RotateCcw,
   Sparkles,
-  UserCog,
   Save,
   Pencil,
   ShieldAlert,
@@ -389,15 +388,6 @@ export default function AdminUsersClient() {
     setPageNumber(0);
   };
 
-  const handleKpiClick = (role) => {
-    console.log("[KPI Click] role =", role);
-    setRoleFilter(role);
-    setActiveFilter("all");
-    setPageNumber(0);
-    setKeywordInput("");
-    setKeywordApplied("");
-  };
-
   const handlePageChange = (nextPage) => {
     if (nextPage < 0 || nextPage >= pageData.totalPages) return;
     setPageNumber(nextPage);
@@ -525,7 +515,8 @@ export default function AdminUsersClient() {
 
   /* ----------------------------------------------------------------
      MUTATION: cập nhật trạng thái active của 1 user
-     PATCH /api/v1/users/{id}/status  body: { active }
+     POST /api/v1/users/{id}/activate     (kích hoạt)
+     POST /api/v1/users/{id}/deactivate   (khóa)
      ---------------------------------------------------------------- */
   const handleToggleActive = useCallback(
     async (user, nextActive) => {
@@ -534,25 +525,36 @@ export default function AdminUsersClient() {
       setMutatingId(user.id);
       setMutatingAction((prev) => ({ ...prev, [user.id]: "status" }));
       try {
-        const json = await apiClient.patch(
-          `/users/${user.id}/status`,
-          { active: nextActive }
-        );
+        const endpoint = nextActive
+          ? `/users/${user.id}/activate`
+          : `/users/${user.id}/deactivate`;
+        const json = await apiClient.post(endpoint, {});
         const updated = json?.data || json;
         setPageData((prev) => {
           const list = Array.isArray(prev.content) ? prev.content : [];
+          // Hợp nhất: nếu response trả về thiếu `active` thì tự set theo nextActive
           return {
             ...prev,
             content: list.map((u) =>
-              u.id === user.id ? { ...u, ...updated } : u
+              u.id === user.id
+                ? { ...u, ...updated, active: nextActive }
+                : u
             ),
           };
         });
         if (detailUser?.id === user.id) {
-          setDetailUser((prev) => ({ ...prev, ...updated }));
+          setDetailUser((prev) => ({
+            ...prev,
+            ...updated,
+            active: nextActive,
+          }));
         }
         if (editUser?.id === user.id) {
-          setEditUser((prev) => ({ ...prev, ...updated }));
+          setEditUser((prev) => ({
+            ...prev,
+            ...updated,
+            active: nextActive,
+          }));
         }
         showToast(
           nextActive
@@ -581,8 +583,10 @@ export default function AdminUsersClient() {
   );
 
   /* ----------------------------------------------------------------
-     MUTATION: cập nhật thông tin user (fullName, phone, role, active)
-     PUT /api/v1/users/{id}
+     MUTATION: cập nhật thông tin user (fullName, phone, role)
+     PUT /api/v1/users/{id}                 (chỉ thông tin cá nhân + role)
+     POST /api/v1/users/{id}/activate       (nếu active: true)
+     POST /api/v1/users/{id}/deactivate     (nếu active: false)
      ---------------------------------------------------------------- */
   const handleSaveUser = useCallback(
     async (user, payload) => {
@@ -590,8 +594,37 @@ export default function AdminUsersClient() {
       setMutatingId(user.id);
       setMutatingAction((prev) => ({ ...prev, [user.id]: "save" }));
       try {
-        const json = await apiClient.put(`/users/${user.id}`, payload);
-        const updated = json?.data || json;
+        // 1) Tách field `active` — không gửi cùng PUT thông tin
+        const { active: nextActive, ...profilePayload } = payload;
+        const activeChanged =
+          typeof nextActive === "boolean" &&
+          Boolean(nextActive) !== Boolean(user.active);
+
+        // 2) PUT thông tin (nếu có gì đó để update)
+        const hasProfileChange =
+          profilePayload.fullName !== undefined ||
+          profilePayload.phone !== undefined ||
+          profilePayload.role !== undefined;
+        let updated = user;
+        if (hasProfileChange) {
+          const json = await apiClient.put(
+            `/users/${user.id}`,
+            profilePayload
+          );
+          updated = json?.data || json || updated;
+        }
+
+        // 3) Nếu trạng thái đổi, gọi đúng endpoint activate / deactivate
+        if (activeChanged) {
+          const endpoint = nextActive
+            ? `/users/${user.id}/activate`
+            : `/users/${user.id}/deactivate`;
+          const json = await apiClient.post(endpoint, {});
+          const statusRes = json?.data || json;
+          updated = { ...updated, ...statusRes, active: Boolean(nextActive) };
+        }
+
+        // 4) Đồng bộ state UI
         setPageData((prev) => {
           const list = Array.isArray(prev.content) ? prev.content : [];
           return {
@@ -725,13 +758,7 @@ export default function AdminUsersClient() {
           unit="tài khoản"
           icon={Users}
           iconClass="text-slate-700 bg-slate-100"
-          borderClass="border-l-4 border-slate-800"
-          active={roleFilter === "all" && activeFilter === "all"}
-          onClick={() => {
-            setRoleFilter("all");
-            setActiveFilter("all");
-            setPageNumber(0);
-          }}
+          interactive={false}
         />
         <KpiCard
           title="Đối tác Điểm đến"
@@ -739,9 +766,7 @@ export default function AdminUsersClient() {
           unit="đối tác"
           icon={Building2}
           iconClass="text-emerald-600 bg-emerald-50"
-          borderClass="border-l-4 border-emerald-500"
-          active={roleFilter === ROLES.PROVIDER}
-          onClick={() => handleKpiClick(ROLES.PROVIDER)}
+          interactive={false}
         />
         <KpiCard
           title="Kiểm duyệt viên"
@@ -749,9 +774,7 @@ export default function AdminUsersClient() {
           unit="kiểm duyệt viên"
           icon={ShieldCheck}
           iconClass="text-indigo-600 bg-indigo-50"
-          borderClass="border-l-4 border-indigo-500"
-          active={roleFilter === ROLES.MODERATOR}
-          onClick={() => handleKpiClick(ROLES.MODERATOR)}
+          interactive={false}
         />
         <KpiCard
           title="Du khách"
@@ -759,9 +782,7 @@ export default function AdminUsersClient() {
           unit="khách du lịch"
           icon={Compass}
           iconClass="text-sky-600 bg-sky-50"
-          borderClass="border-l-4 border-sky-500"
-          active={roleFilter === ROLES.USER}
-          onClick={() => handleKpiClick(ROLES.USER)}
+          interactive={false}
         />
       </section>
 
@@ -797,7 +818,7 @@ export default function AdminUsersClient() {
               }`}
             >
               <Compass size={13} />
-              <span>Du khách (USER)</span>
+              <span>Du khách</span>
             </button>
             <button
               type="button"
@@ -809,7 +830,7 @@ export default function AdminUsersClient() {
               }`}
             >
               <Building2 size={13} />
-              <span>Đối tác (PROVIDER)</span>
+              <span>Đối tác</span>
             </button>
             <button
               type="button"
@@ -821,7 +842,7 @@ export default function AdminUsersClient() {
               }`}
             >
               <ShieldCheck size={13} />
-              <span>Kiểm duyệt (MODERATOR)</span>
+              <span>Kiểm duyệt</span>
             </button>
             <button
               type="button"
@@ -833,7 +854,7 @@ export default function AdminUsersClient() {
               }`}
             >
               <Users size={13} />
-              <span>Quản trị (ADMIN)</span>
+              <span>Quản trị</span>
             </button>
           </div>
 
@@ -871,8 +892,8 @@ export default function AdminUsersClient() {
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
               >
                 <option value="all">Tất cả trạng thái</option>
-                <option value="true">● Đang hoạt động (true)</option>
-                <option value="false">● Đã khóa / Ngưng (false)</option>
+                <option value="true">● Đang hoạt động</option>
+                <option value="false">● Đã khóa / Ngưng</option>
               </select>
             </div>
 
@@ -917,7 +938,7 @@ export default function AdminUsersClient() {
                 <th className="py-3.5 px-3 whitespace-nowrap">Vai trò</th>
                 <th className="py-3.5 px-3 whitespace-nowrap">Trạng thái</th>
                 <th className="py-3.5 px-3 whitespace-nowrap">Ngày tạo / Cập nhật</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Thao tác</th>
+                <th className="py-3.5 px-4 text-left whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1014,13 +1035,29 @@ function KpiCard({
   borderClass,
   active,
   onClick,
+  interactive = true,
 }) {
+  const interactiveClass = interactive
+    ? "text-left cursor-pointer hover:shadow-sm transition-all"
+    : "text-left cursor-default";
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`text-left bg-white rounded-xl p-3 border border-slate-200/90 ${borderClass} shadow-xs hover:shadow-sm transition-all cursor-pointer ${
-        active ? "ring-2 ring-slate-300/80" : ""
+    <div
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={interactive ? onClick : undefined}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      className={`bg-white rounded-xl p-3 border border-slate-200 shadow-xs ${interactiveClass} ${
+        interactive && active ? "ring-2 ring-slate-300/80" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -1046,7 +1083,7 @@ function KpiCard({
           <Icon size={14} strokeWidth={2.2} />
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -1070,7 +1107,6 @@ function UserRow({
     !avatarError;
 
   const rowDisabled = isMutating;
-  const roleBusy = isMutating && mutatingAction === "role";
 
   return (
     <tr
@@ -1129,40 +1165,19 @@ function UserRow({
         )}
       </td>
 
-      {/* Cột 3 - Vai trò (Dropdown đổi nhanh) */}
+      {/* Cột 3 - Vai trò (chỉ hiển thị, chỉnh sửa qua nút Sửa) */}
       <td className="py-3.5 px-3 whitespace-nowrap">
-        <div className="relative inline-flex items-center">
-          <select
-            value={user.role}
-            disabled={rowDisabled}
-            onChange={(e) => onChangeRole?.(e.target.value)}
-            className={`appearance-none pr-7 pl-2.5 py-1 rounded-full text-[10.5px] font-bold border cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500/30 disabled:cursor-not-allowed ${
-              ROLE_BADGE_CLASS[user.role] ||
-              "bg-slate-100 text-slate-700 border-slate-200"
-            }`}
-            title="Bấm để đổi vai trò nhanh"
-          >
-            {Object.values(ROLES).map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABELS[r] || r}
-              </option>
-            ))}
-          </select>
-          {roleBusy ? (
-            <Loader2
-              size={11}
-              className="absolute right-1.5 animate-spin text-current pointer-events-none"
-            />
-          ) : (
-            <UserCog
-              size={10}
-              className="absolute right-2 pointer-events-none opacity-70"
-            />
-          )}
-        </div>
+        <span
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border ${
+            ROLE_BADGE_CLASS[user.role] ||
+            "bg-slate-100 text-slate-700 border-slate-200"
+          }`}
+        >
+          {ROLE_LABELS[user.role] || user.role}
+        </span>
       </td>
 
-      {/* Cột 5 - Trạng thái (chỉ hiển thị, chỉnh sửa qua nút Sửa) */}
+      {/* Cột 4 - Trạng thái (chỉ hiển thị, chỉnh sửa qua nút Sửa) */}
       <td className="py-3.5 px-3 whitespace-nowrap">
         {user.active ? (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -1177,7 +1192,7 @@ function UserRow({
         )}
       </td>
 
-      {/* Cột 6 - Ngày tạo / Cập nhật */}
+      {/* Cột 5 - Ngày tạo / Cập nhật */}
       <td className="py-3.5 px-3 whitespace-nowrap">
         <div className="flex flex-col gap-0.5 text-[11px]">
           <span className="text-slate-700 font-mono inline-flex items-center gap-1">
@@ -1190,8 +1205,8 @@ function UserRow({
         </div>
       </td>
 
-      {/* Cột 7 - Thao tác */}
-      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+      {/* Cột 6 - Thao tác */}
+      <td className="py-3.5 px-4 text-left whitespace-nowrap">
         <div className="inline-flex items-center gap-1">
           <button
             type="button"

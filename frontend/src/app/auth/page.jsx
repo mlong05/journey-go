@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { translateAuthError } from "@/services/errorMessage";
 import {
   Compass,
   Sparkles,
@@ -286,7 +287,10 @@ export default function AuthPage() {
       }, 1000);
     } catch (err) {
       console.error("[Login Error]", err);
-      showToast("error", err?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại.");
+      showToast(
+        "error",
+        translateAuthError(err, "Đăng nhập thất bại. Vui lòng kiểm tra lại.")
+      );
     } finally {
       setLoading(false);
     }

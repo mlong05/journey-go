@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { authService } from "../services/authService";
 import { ROUTES } from "@/constants/routes";
 import { STORAGE_KEYS } from "@/constants";
+import { translateAuthError } from "@/services/errorMessage";
 
 export function useAuth() {
   const router = useRouter();
@@ -153,7 +154,7 @@ export function useAuth() {
       }
       return { success: true, user, payload, targetPath, roleTitle };
     } catch (err) {
-      const msg = err.message || "Đăng nhập Google thất bại";
+      const msg = translateAuthError(err, "Đăng nhập Google thất bại");
       setError(msg);
       return { success: false, error: msg };
     } finally {
