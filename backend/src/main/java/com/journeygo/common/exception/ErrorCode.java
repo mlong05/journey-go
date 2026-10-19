@@ -16,7 +16,13 @@ public enum ErrorCode {
     VALIDATION_ERROR("Dữ liệu đầu vào không hợp lệ", HttpStatus.BAD_REQUEST),
     DESTINATION_NOT_FOUND("Điểm đến không tồn tại", HttpStatus.NOT_FOUND),
     DESTINATION_EXISTED("Điểm đến với tên và địa chỉ này đã tồn tại", HttpStatus.CONFLICT),
-    DESTINATION_COORDINATE_EXISTED("Đã tồn tại điểm đến với tọa độ này", HttpStatus.CONFLICT);
+    DESTINATION_COORDINATE_EXISTED("Đã tồn tại điểm đến với tọa độ này", HttpStatus.CONFLICT),
+    REGION_NOT_FOUND("Khu vực không tồn tại", HttpStatus.NOT_FOUND),
+    REGION_EXISTED("Khu vực đã tồn tại", HttpStatus.CONFLICT),
+    THEME_NOT_FOUND("Chủ đề không tồn tại", HttpStatus.NOT_FOUND),
+    THEME_EXISTED("Chủ đề đã tồn tại", HttpStatus.CONFLICT),
+    CONTENT_NOT_FOUND("Nội dung văn hóa không tồn tại", HttpStatus.NOT_FOUND),
+    INVALID_DESTINATION_STATUS("Trạng thái điểm đến không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST);
 
     private final String message;
     private final HttpStatus httpStatus;

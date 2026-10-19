@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 @Schema(description = "Yêu cầu tạo hoặc cập nhật điểm đến")
 public record DestinationRequest(
@@ -31,5 +32,11 @@ public record DestinationRequest(
         @Schema(description = "Sức chứa (số người)", example = "500")
         @NotNull(message = "Sức chứa không được để trống")
         @Min(value = 1, message = "Sức chứa phải >= 1")
-        Integer capacity
+        Integer capacity,
+
+        @Schema(description = "ID khu vực", example = "1")
+        Long regionId,
+
+        @Schema(description = "Danh sách ID chủ đề", example = "[1, 2]")
+        Set<Long> themeIds
 ) {}
