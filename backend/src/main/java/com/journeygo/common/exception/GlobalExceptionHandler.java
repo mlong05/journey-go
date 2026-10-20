@@ -258,6 +258,24 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(response);
     }
 
+    @ExceptionHandler(org.springframework.data.mapping.PropertyReferenceException.class)
+    public ResponseEntity<ApiResponse<Object>> handlePropertyReferenceException(org.springframework.data.mapping.PropertyReferenceException ex) {
+        ApiResponse<Object> response = ApiResponse.builder()
+                .code(HttpStatus.BAD_REQUEST.value())
+                .message("Trường sắp xếp không hợp lệ: '" + ex.getPropertyName() + "'")
+                .build();
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        ApiResponse<Object> response = ApiResponse.builder()
+                .code(HttpStatus.BAD_REQUEST.value())
+                .message("Tham số yêu cầu không hợp lệ: " + ex.getMessage())
+                .build();
+        return ResponseEntity.badRequest().body(response);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGeneralException(Exception ex) {
         ApiResponse<Object> response = ApiResponse.builder()
