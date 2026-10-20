@@ -15,17 +15,16 @@ import {
   Eye,
   X,
   AlertCircle,
-  Compass,
   Inbox,
   RefreshCw,
   Users,
   Loader2,
-  Layers,
   Info,
   AlertTriangle,
 } from "lucide-react";
 import {
   destinationService,
+  provinceService,
   CreateDestinationModal,
   EditDestinationModal,
 } from "@/features/destination";
@@ -81,6 +80,10 @@ export default function ProviderDestinationsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
+  const [provinceList, setProvinceList] = useState([]);
+  const [provinceLoading, setProvinceLoading] = useState(false);
+  const [provinceError, setProvinceError] = useState("");
+
   const [detailTarget, setDetailTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -120,6 +123,38 @@ export default function ProviderDestinationsPage() {
   useEffect(() => {
     fetchAllList();
   }, [fetchAllList]);
+
+  // ── Tải danh sách 34 tỉnh/thành mới (mô hình 2 cấp từ 1/7/2025) ───
+  useEffect(() => {
+    const controller = new AbortController();
+    setProvinceLoading(true);
+    setProvinceError("");
+    provinceService
+      .getNewProvinces({ signal: controller.signal })
+      .then((list) => {
+        const arr = Array.isArray(list) ? list : [];
+        setProvinceList(arr);
+        // Nếu selectedRegion đang trỏ vào 1 code không tồn tại trong danh sách
+        // mới → reset về 'all' để tránh lọc "không ra gì".
+        setSelectedRegion((prev) => {
+          if (prev === "all") return "all";
+          const stillExists = arr.some((p) => p.code === prev);
+          return stillExists ? prev : "all";
+        });
+      })
+      .catch((err) => {
+        if (err?.name === "AbortError") return;
+        console.error("[Provider Destinations] Province load error:", err);
+        setProvinceError(
+          err?.message || "Không thể tải danh sách tỉnh/thành mới nhất."
+        );
+        setProvinceList([]);
+      })
+      .finally(() => {
+        setProvinceLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
 
   const handleViewDetail = useCallback(async (id) => {
     try {
@@ -251,24 +286,67 @@ export default function ProviderDestinationsPage() {
 
   const filteredDestinations = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const norm = provinceService.normalizeForSearch;
+
+    // Tỉnh được chọn → dựng tập từ khoá (tên hiện tại + các tỉnh cũ
+    // đã được sát nhập) để khớp cả địa chỉ gõ theo mô hình cũ lẫn mới.
+    const selectedProvince =
+      selectedRegion === "all"
+        ? null
+        : provinceList.find((p) => p.code === selectedRegion);
+
+    // Các tên tỉnh cũ (nếu trùng code với merged_from) ánh xạ qua danh sách
+    // cùng dataset — thực tế hiếm gặp vì merged_from chứa code cũ, nhưng
+    // giữ lại để tăng độ phủ khi tên tỉnh được lưu cả 2 dạng trong địa chỉ.
+    const legacyNamesByCode = new Map();
+    if (selectedProvince && Array.isArray(selectedProvince.merged_from)) {
+      for (const p of provinceList) {
+        if (selectedProvince.merged_from.includes(String(p.code))) {
+          legacyNamesByCode.set(p.code, p.name);
+        }
+      }
+    }
+
+    const regionTermsNorm = selectedProvince
+      ? [
+          selectedProvince.name,
+          ...Array.from(legacyNamesByCode.values()),
+        ]
+          .map(norm)
+          .filter(Boolean)
+      : [];
+
     return destinations.filter((dest) => {
+      const addressLower = (dest.address || "").toLowerCase();
+      const nameLower = (dest.name || "").toLowerCase();
+      const idLower = String(dest.id).toLowerCase();
+
       const matchSearch =
         !q ||
-        (dest.name || "").toLowerCase().includes(q) ||
-        (dest.address || "").toLowerCase().includes(q) ||
-        String(dest.id).toLowerCase().includes(q);
+        addressLower.includes(q) ||
+        nameLower.includes(q) ||
+        idLower.includes(q);
 
-      const matchRegion =
-        selectedRegion === "all" ||
-        (dest.address || "").toLowerCase().includes(
-          selectedRegion.toLowerCase()
-        );
+      let matchRegion = true;
+      if (selectedProvince) {
+        if (regionTermsNorm.length > 0) {
+          const addressNorm = norm(dest.address || "");
+          matchRegion = regionTermsNorm.some((term) =>
+            addressNorm.includes(term)
+          );
+        } else {
+          // Fallback khi thiếu dữ liệu merged_from: khớp chuỗi con không dấu
+          matchRegion = norm(dest.address || "").includes(
+            norm(selectedProvince.name)
+          );
+        }
+      }
 
       const matchStatus = statusTab === "all" || dest.status === statusTab;
 
       return matchSearch && matchRegion && matchStatus;
     });
-  }, [destinations, searchQuery, selectedRegion, statusTab]);
+  }, [destinations, searchQuery, selectedRegion, statusTab, provinceList]);
 
   const toastPalette = {
     success: "bg-emerald-900 border-emerald-600 text-white",
@@ -350,15 +428,25 @@ export default function ProviderDestinationsPage() {
             <select
               value={selectedRegion}
               onChange={(e) => setSelectedRegion(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              disabled={provinceLoading && provinceList.length === 0}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60"
             >
-              <option value="all">Tất cả Tỉnh / Thành phố</option>
-              <option value="Hà Nội">Hà Nội</option>
-              <option value="Ninh Bình">Ninh Bình</option>
-              <option value="Huế">Thừa Thiên Huế</option>
-              <option value="Quảng Nam">Quảng Nam</option>
-              <option value="Đà Nẵng">Đà Nẵng</option>
+              <option value="all">
+                {provinceLoading && provinceList.length === 0
+                  ? "Đang tải tỉnh/thành..."
+                  : "Tất cả Tỉnh / Thành phố"}
+              </option>
+              {provinceList.map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.name}
+                </option>
+              ))}
             </select>
+            {provinceError && (
+              <p className="mt-1 text-[10px] text-rose-600 font-semibold">
+                ⚠ {provinceError}
+              </p>
+            )}
           </div>
 
           <div className="sm:col-span-3">
@@ -493,13 +581,7 @@ export default function ProviderDestinationsPage() {
               <div>
                 <div className="relative h-32 overflow-hidden bg-gradient-to-br from-emerald-100 via-sky-100 to-slate-100">
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
-                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/90 backdrop-blur-md text-slate-800 shadow-2xs">
-                      <Compass size={11} className="inline mr-1 -mt-0.5" />
-                      {dest.latitude !== null
-                        ? `${Number(dest.latitude).toFixed(3)}° N`
-                        : "—"}
-                    </span>
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-end gap-2">
                     {dest.status === STATUS.APPROVED && (
                       <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-emerald-600/90 text-white shadow-2xs">
                         <span className="w-1.5 h-1.5 rounded-full bg-white" />
@@ -540,11 +622,12 @@ export default function ProviderDestinationsPage() {
                     <span>{dest.address || "Chưa cập nhật địa chỉ"}</span>
                   </p>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center gap-1 font-mono text-[11px] text-sky-700 font-bold bg-sky-50 px-2 py-0.5 rounded w-fit">
-                    <Navigation size={11} />
-                    <span>
-                      {dest.latitude?.toFixed(4) ?? "—"},{" "}
-                      {dest.longitude?.toFixed(4) ?? "—"}
+                  <div className="pt-2 border-t border-slate-100">
+                    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-mono font-medium bg-sky-50 text-sky-700 border border-sky-200/70 w-fit max-w-full">
+                      <Navigation size={12} className="shrink-0" />
+                      <span className="truncate">
+                        {dest.latitude ?? "—"}, {dest.longitude ?? "—"}
+                      </span>
                     </span>
                   </div>
                 </div>

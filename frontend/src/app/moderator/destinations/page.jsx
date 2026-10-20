@@ -17,12 +17,28 @@ import {
   RefreshCw,
   Layers,
   Clock,
+  Ban,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { destinationService } from "@/features/destination/services/destinationService";
 
 /* =========================================================================
  *  TRANG: Thẩm định điểm đến di sản (Moderator)
- *  Layout: Compact Header → 3 KPI Cards → Unified Workspace (Toolbar + List)
+ *
+ *  BỐ CỤC (theo chuẩn trang Quản lý Người dùng của Admin):
+ *   - Root: h-full / flex-col / overflow-hidden  → trang không đổi chiều cao
+ *   - Tầng 1 (tiêu đề)            : shrink-0, không cuộn
+ *   - Tầng 2 (3 ô KPI)           : shrink-0, không cuộn
+ *   - Tầng 3 (thanh lọc + tìm)   : shrink-0, không cuộn
+ *   - Tầng 4 (tiêu đề cột)       : shrink-0, không cuộn
+ *   - Tầng 5 (DANH SÁCH)         : flex-1 min-h-0 overflow-auto  → CHỈ vùng này cuộn
+ *   - Tầng 6 (thanh phân trang)  : shrink-0, không cuộn
+ *
+ *  Cột hiển thị: Tên địa điểm · Sức chứa · Trạng thái · Thao tác
+ *  (Địa chỉ & tọa độ GPS đã chuyển vào modal Chi tiết)
  * ========================================================================= */
 
 const STATUS = {
@@ -31,7 +47,20 @@ const STATUS = {
   REVOKED: "revoked",
 };
 
-const CUBIC = "transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]";
+/* Các lựa chọn số dòng mỗi trang */
+const SIZE_OPTIONS = [10, 20, 50];
+
+/* Lưới 12 cột dùng chung cho tiêu đề cột và từng dòng để thẳng hàng tuyệt đối */
+const ROW_GRID = "grid grid-cols-12 gap-3 sm:gap-4 items-center";
+
+/* Vùng cuộn của danh sách: khe scrollbar ổn định + chặn cuộn chồng (chain)
+   sang vùng cha, để chỉ vùng danh sách là vùng duy nhất được cuộn. */
+const LIST_SCROLL =
+  "[scrollbar-gutter:stable] overflow-y-auto overscroll-contain";
+
+/* Chiều rộng bù của thanh cuộn dọc trên desktop (~15px). Áp vào TIÊU ĐỀ CỘT
+   (nằm ngoài vùng cuộn) để các cột thẳng hàng tuyệt đối với từng dòng dữ liệu. */
+const HEADER_PAD = "sm:pr-[15px]";
 
 /* Chuẩn hoá dữ liệu thô từ API về dạng dùng chung */
 function normalizeDestination(raw) {
@@ -74,7 +103,7 @@ function Toast({ msg, tone }) {
   const Icon = tone === "error" ? AlertCircle : CheckCircle2;
   return (
     <div
-      className={`fixed top-5 right-5 z-50 ${palette} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2 ${CUBIC} max-w-md animate-in slide-in-from-top-3`}
+      className={`fixed top-5 right-5 z-50 ${palette} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3`}
     >
       <Icon size={16} className="shrink-0" />
       <span>{msg}</span>
@@ -82,39 +111,98 @@ function Toast({ msg, tone }) {
   );
 }
 
-/* Thẻ KPI tương tác — click để lọc */
-function KpiCard({ active, onClick, icon: Icon, label, value, accent, valueColor, dot = false }) {
+/* -------------------------------------------------------------------------
+ * Bảng màu KPI — khung thẻ luôn trắng, chỉ tone nội bộ thay đổi theo sắc thái
+ /* -------------------------------------------------------------------------
+ * Bảng màu KPI — chuẩn hoá 100% theo trang Admin:
+ *  • Toàn bộ chữ nhãn dùng chung xám mờ (text-slate-400), KHÔNG tô màu vàng/xanh
+ *  • Toàn bộ số liệu dùng chung slate-900 (đen tuyền), KHÔNG số vàng/số xanh
+ *  • Màu nhấn chỉ nằm ở khung icon góc phải
+ * ---------------------------------------------------------------------- */
+/* Bộ tông màu KPI.
+   Mỗi tone cung cấp 3 nhóm class ĐỘC LẬP — dùng THỐNG NHẤT giữa 3 ô để
+   dù bấm vào ô nào, layout cũng giống nhau 100%:
+     • icon       — chỉ dùng khi KHÔNG active
+     • activeIcon — chỉ dùng khi CÓ active (icon đậm hơn, đồng tone với nền)
+     • activeBg   — nền ô khi active (thay cho nền trắng cố định)
+     • activeBorder — viền tone khi active (thay cho viền slate-200 cố định)
+
+   LƯU Ý: KHÔNG dùng ring-NUMBER hoặc tăng độ dày shadow/border làm active — chỉ đổi màu —
+   để kích thước ô bất biến 1 pixel khi nhấn. */
+const KPI_TONES = {
+  slate: {
+    icon: "bg-slate-100 text-slate-600 border-slate-200/80",
+    activeIcon: "bg-slate-900/10 text-slate-900 border-slate-300",
+    activeBg: "bg-slate-50",
+    activeBorder: "border-slate-300",
+  },
+  amber: {
+    icon: "bg-amber-50 text-amber-600 border-amber-200/70",
+    activeIcon: "bg-amber-100 text-amber-700 border-amber-300",
+    activeBg: "bg-amber-50",
+    activeBorder: "border-amber-300",
+  },
+  emerald: {
+    icon: "bg-emerald-50 text-emerald-600 border-emerald-200/70",
+    activeIcon: "bg-emerald-100 text-emerald-700 border-emerald-300",
+    activeBg: "bg-emerald-50",
+    activeBorder: "border-emerald-300",
+  },
+};
+
+/* Ô thống kê — bấm để lọc nhanh danh sách bên dưới (đồng bộ trang Admin) */
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  unit,
+  tone = "slate",
+  dot = false,
+  active = false,
+  onClick,
+}) {
+  const t = KPI_TONES[tone] || KPI_TONES.slate;
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`text-left bg-white rounded-2xl border border-slate-200/80 p-5 ${CUBIC} hover:shadow-md hover:-translate-y-[1px] cursor-pointer ${
-        active ? `border-l-4 ${accent} shadow-md` : "border-l-4 border-l-transparent"
+      aria-pressed={active}
+      title={`Lọc theo: ${label}`}
+      /* Ô KPI hoàn toàn TĨNH: KHÔNG dùng ring/border đổi độ dày (gây lệch khi
+         bấm), cũng không animate nội dung. Mọi thay đổi khi active chỉ đổi
+         MÀU nền/màu chữ/icon đã được khai báo cố định trong t.activeBg —
+         kích thước khung không đổi 1 pixel. */
+      className={`bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-colors hover:border-slate-300 cursor-pointer text-left w-full ${
+        active
+          ? `${t.activeBg} ${t.activeBorder}`
+          : "bg-white border-slate-200/90"
       }`}
     >
-      <div className="flex items-center gap-4">
-        <div
-          className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-            active ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"
-          } ${CUBIC}`}
-        >
-          <Icon size={20} />
-        </div>
-        <div>
-          <p className="text-[10.5px] font-black uppercase tracking-[0.16em] text-slate-500 flex items-center gap-1.5">
-            {label}
-            {dot && (
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  active ? "bg-current" : "bg-slate-300"
-                }`}
-              />
-            )}
-          </p>
-          <p className={`text-2xl font-black leading-none mt-1.5 ${valueColor}`}>
+      {/* Cột chữ bên trái */}
+      <div className="flex flex-col text-left min-w-0">
+        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
+          {label}
+        </p>
+        <div className="mt-1 flex items-baseline gap-1.5">
+          <span className="text-xl sm:text-2xl font-black text-slate-900 tabular-nums leading-none">
             {value}
-          </p>
+          </span>
+          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+            {unit}
+          </span>
+          {dot && (
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse inline-block ml-1 shrink-0" />
+          )}
         </div>
+      </div>
+
+      {/* Icon góc phải — đổi sang activeIcon khi active (cùng 10x10 cố định) */}
+      <div
+        className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+          active ? t.activeIcon : t.icon
+        }`}
+      >
+        <Icon size={18} strokeWidth={2.2} />
       </div>
     </button>
   );
@@ -123,25 +211,16 @@ function KpiCard({ active, onClick, icon: Icon, label, value, accent, valueColor
 /* Segmented Tab filter */
 function StatusTab({ active, onClick, children, accent = "slate" }) {
   const palette = {
-    slate: {
-      active: "bg-slate-900 text-white border-slate-900",
-      dot: "bg-emerald-500",
-    },
-    amber: {
-      active: "bg-amber-500 text-white border-amber-500",
-      dot: "bg-white animate-pulse",
-    },
-    emerald: {
-      active: "bg-emerald-600 text-white border-emerald-600",
-      dot: "bg-white",
-    },
+    slate: { active: "bg-slate-900 text-white border-slate-900" },
+    amber: { active: "bg-amber-500 text-white border-amber-500" },
+    emerald: { active: "bg-emerald-600 text-white border-emerald-600" },
   };
   const t = palette[accent] || palette.slate;
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border ${CUBIC} cursor-pointer flex items-center gap-1.5 ${
+      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
         active
           ? t.active
           : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
@@ -156,17 +235,170 @@ function StatusTab({ active, onClick, children, accent = "slate" }) {
 function StatusBadge({ status }) {
   if (status === STATUS.APPROVED) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
         Đã duyệt
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
       Chờ duyệt
     </span>
+  );
+}
+
+/* =========================================================================
+ *  THANH PHÂN TRANG — cố định ở đáy vùng danh sách (shrink-0)
+ * ========================================================================= */
+function PaginationBar({
+  totalElements,
+  pageNumber,
+  pageSize,
+  totalPages,
+  onPageChange,
+  onSizeChange,
+}) {
+  const currentPage = pageNumber + 1;
+  const safeTotalPages = Math.max(totalPages, 1);
+
+  /* Danh sách số trang hiển thị (tối đa 5 nút quanh trang hiện tại) */
+  const visiblePageNumbers = useMemo(() => {
+    const total = safeTotalPages;
+    const curr = currentPage;
+    if (total <= 5) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const start = Math.max(1, curr - 2);
+    const end = Math.min(total, curr + 2);
+    const pages = [];
+    for (let p = start; p <= end; p += 1) pages.push(p);
+    if (start > 1) {
+      pages.unshift(1);
+      if (start > 2) pages.splice(1, 0, "...");
+    }
+    if (end < total) {
+      if (end < total - 1) pages.push("...");
+      pages.push(total);
+    }
+    return pages;
+  }, [safeTotalPages, currentPage]);
+
+  const isFirst = pageNumber <= 0;
+  const isLast = pageNumber >= safeTotalPages - 1;
+
+  const navBtn =
+    "p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
+
+  return (
+    <div
+      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-4 sm:pl-5 ${HEADER_PAD} py-3 bg-slate-50/60 border-t border-slate-100`}
+    >
+      {/* Bên trái: Thông tin phân trang + chọn số dòng */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+        <span className="text-xs text-slate-600 font-semibold">
+          Đang xem trang{" "}
+          <strong className="text-slate-900">{currentPage}</strong> /{" "}
+          <strong className="text-slate-900">{safeTotalPages}</strong>{" "}
+          <span className="text-slate-400">
+            (Tổng{" "}
+            <strong className="text-slate-700">
+              {totalElements.toLocaleString("vi-VN")}
+            </strong>{" "}
+            hồ sơ)
+          </span>
+        </span>
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-slate-500 font-semibold">
+            Số dòng/trang:
+          </span>
+          <select
+            value={pageSize}
+            onChange={(e) => onSizeChange(Number(e.target.value))}
+            aria-label="Số dòng mỗi trang"
+            className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/20 cursor-pointer"
+          >
+            {SIZE_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Bên phải: Nút điều hướng trang */}
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onPageChange(0)}
+          disabled={isFirst}
+          className={navBtn}
+          title="Trang đầu"
+          aria-label="Trang đầu"
+        >
+          <ChevronsLeft size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(pageNumber - 1)}
+          disabled={isFirst}
+          className={navBtn}
+          title="Trang trước"
+          aria-label="Trang trước"
+        >
+          <ChevronLeft size={14} />
+        </button>
+
+        {visiblePageNumbers.map((p, idx) =>
+          p === "..." ? (
+            <span
+              key={`dots-${idx}`}
+              className="px-2 text-xs text-slate-400 font-bold select-none"
+            >
+              …
+            </span>
+          ) : (
+            <button
+              key={`page-${p}`}
+              type="button"
+              onClick={() => onPageChange(Number(p) - 1)}
+              aria-current={p === currentPage ? "page" : undefined}
+              className={`min-w-[32px] h-7 px-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                p === currentPage
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              {p}
+            </button>
+          )
+        )}
+
+        <button
+          type="button"
+          onClick={() => onPageChange(pageNumber + 1)}
+          disabled={isLast}
+          className={navBtn}
+          title="Trang sau"
+          aria-label="Trang sau"
+        >
+          <ChevronRight size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(safeTotalPages - 1)}
+          disabled={isLast}
+          className={navBtn}
+          title="Trang cuối"
+          aria-label="Trang cuối"
+        >
+          <ChevronsRight size={14} />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -184,6 +416,10 @@ export default function ModeratorDestinationsPage() {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [toastMsg, setToastMsg] = useState("");
   const [toastTone, setToastTone] = useState("success");
+
+  /* ── Phân trang ───────────────────────────────────────────── */
+  const [pageNumber, setPageNumber] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   /* ── Helpers ──────────────────────────────────────────────── */
   const showToast = useCallback((msg, tone = "success") => {
@@ -214,6 +450,11 @@ export default function ModeratorDestinationsPage() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  /* Ghi chú: khung chiều cao cố định (h-full + overflow-hidden) do
+     src/app/moderator/layout.jsx thiết lập NGAY TỪ RENDER ĐẦU TIÊN cho đúng
+     route danh sách. Nhờ vậy không còn hiện tượng nhảy layout giữa lúc đang tải
+     và lúc dữ liệu hiển thị, cũng không cần hack class runtime trong effect. */
 
   const openDetail = useCallback(async (id) => {
     setDetailTarget({ id });
@@ -266,6 +507,26 @@ export default function ModeratorDestinationsPage() {
     [detailTarget, showToast]
   );
 
+  /* ── Điều hướng phân trang + lọc ───────────────────────────── */
+  const handleTabChange = useCallback((tab) => {
+    setStatusTab(tab);
+    setPageNumber(0);
+  }, []);
+
+  const handleSearchChange = useCallback((value) => {
+    setSearchQuery(value);
+    setPageNumber(0);
+  }, []);
+
+  const handlePageSizeChange = useCallback((size) => {
+    setPageSize(size);
+    setPageNumber(0);
+  }, []);
+
+  const handlePageChange = useCallback((nextPage) => {
+    setPageNumber(nextPage < 0 ? 0 : nextPage);
+  }, []);
+
   /* ── Counts (luôn đếm trên FULL list, loại trừ deleted) ──── */
   const counts = useMemo(
     () => ({
@@ -294,14 +555,32 @@ export default function ModeratorDestinationsPage() {
       });
   }, [destinations, searchQuery, statusTab]);
 
+  /* ── Tổng số trang + dữ liệu của trang hiện tại ───────────── */
+  const totalPages = Math.max(
+    Math.ceil(filtered.length / pageSize),
+    1
+  );
+
+  const safePageNumber = Math.min(pageNumber, totalPages - 1);
+
+  const pagedItems = useMemo(() => {
+    const start = safePageNumber * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePageNumber, pageSize]);
+
+  /* Root của trang: h-full + flex column + overflow-hidden.
+     Layout (moderator/layout.jsx) đã cấp sẵn khung h-full cho route này ngay từ
+     render đầu tiên, nên KHÔNG có chuyển động nhảy khi chuyển từ loading →
+     có dữ liệu. Padding do chính trang này nắm giữ (layout không thêm padding
+     cho route danh sách). */
   return (
-    <div className="space-y-5 animate-in fade-in-50 duration-300">
+    <div className="h-full w-full flex flex-col overflow-hidden p-4 lg:p-6">
       <Toast msg={toastMsg} tone={toastTone} />
 
       {/* ══════════════════════════════════════════════════════════
-          TẦNG 1 — COMPACT HEADER BAR
+          TẦNG 1 — TIÊU ĐỀ (shrink-0, không cuộn)
          ══════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
           Thẩm định điểm đến di sản
         </h1>
@@ -309,107 +588,107 @@ export default function ModeratorDestinationsPage() {
           type="button"
           onClick={loadAll}
           disabled={isLoading}
-          className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+          className="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <RefreshCw
-            size={14}
-            className={isLoading ? "animate-spin" : ""}
-          />
+          <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
           <span>Làm mới dữ liệu</span>
         </button>
       </div>
 
       {/* ══════════════════════════════════════════════════════════
-          TẦNG 2 — 3 INTERACTIVE KPI CARDS
+          TẦNG 2 — 3 KPI (shrink-0, không cuộn) — bấm để lọc nhanh
          ══════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <section className="shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 mt-4">
         <KpiCard
-          active={statusTab === "all"}
-          onClick={() => setStatusTab("all")}
           icon={Layers}
-          label="TỔNG HỒ SƠ"
+          label="TỔNG HỒ SƠ HỆ THỐNG"
           value={counts.all}
-          accent="border-l-slate-900"
-          valueColor="text-slate-900"
+          unit="hồ sơ"
+          tone="slate"
+          active={statusTab === "all"}
+          onClick={() => handleTabChange("all")}
         />
         <KpiCard
-          active={statusTab === "pending"}
-          onClick={() => setStatusTab("pending")}
           icon={Clock}
-          label="CHỜ PHÊ DUYỆT"
+          label="HỒ SƠ CHỜ PHÊ DUYỆT"
           value={counts.pending}
-          accent="border-l-amber-500"
-          valueColor="text-amber-600"
+          unit="chờ duyệt"
+          tone="amber"
           dot
+          active={statusTab === "pending"}
+          onClick={() => handleTabChange("pending")}
         />
         <KpiCard
-          active={statusTab === "approved"}
-          onClick={() => setStatusTab("approved")}
           icon={CheckCircle2}
-          label="ĐANG LƯU HÀNH"
+          label="ĐIỂM ĐẾN ĐANG LƯU HÀNH"
           value={counts.approved}
-          accent="border-l-emerald-500"
-          valueColor="text-emerald-600"
-          dot
+          unit="đã duyệt"
+          tone="emerald"
+          active={statusTab === "approved"}
+          onClick={() => handleTabChange("approved")}
         />
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════
+          TẦNG 3 — THANH LỌC & TÌM KIẾM (shrink-0, không cuộn)
+         ══════════════════════════════════════════════════════════ */}
+      <div className="shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusTab
+            active={statusTab === "all"}
+            onClick={() => handleTabChange("all")}
+          >
+            <span>Tất cả ({counts.all})</span>
+          </StatusTab>
+          <StatusTab
+            active={statusTab === "pending"}
+            onClick={() => handleTabChange("pending")}
+            accent="amber"
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                statusTab === "pending" ? "bg-white animate-pulse" : "bg-amber-500"
+              }`}
+            />
+            <span>Chờ duyệt ({counts.pending})</span>
+          </StatusTab>
+          <StatusTab
+            active={statusTab === "approved"}
+            onClick={() => handleTabChange("approved")}
+            accent="emerald"
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                statusTab === "approved" ? "bg-white" : "bg-emerald-500"
+              }`}
+            />
+            <span>Đang lưu hành ({counts.approved})</span>
+          </StatusTab>
+        </div>
+
+        <div className="relative w-full sm:w-80 shrink-0">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <Search size={14} />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="Tìm tên điểm đến, địa chỉ, đơn vị..."
+            className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+          />
+        </div>
       </div>
 
       {/* ══════════════════════════════════════════════════════════
-          TẦNG 3 — UNIFIED WORKSPACE (Toolbar + List)
+          TẦNG 4 + 5 — BẢNG DANH SÁCH
+          • Tiêu đề cột: shrink-0 (luôn nhìn thấy)
+          • Thân danh sách: flex-1 min-h-0 overflow-auto (CHỈ VÙNG NÀY CUỘN)
          ══════════════════════════════════════════════════════════ */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-        {/* Toolbar */}
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusTab
-              active={statusTab === "all"}
-              onClick={() => setStatusTab("all")}
-            >
-              <span>Tất cả ({counts.all})</span>
-            </StatusTab>
-            <StatusTab
-              active={statusTab === "pending"}
-              onClick={() => setStatusTab("pending")}
-              accent="amber"
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  statusTab === "pending" ? "bg-white animate-pulse" : "bg-amber-500"
-                }`}
-              />
-              <span>Chờ duyệt ({counts.pending})</span>
-            </StatusTab>
-            <StatusTab
-              active={statusTab === "approved"}
-              onClick={() => setStatusTab("approved")}
-              accent="emerald"
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  statusTab === "approved" ? "bg-white" : "bg-emerald-500"
-                }`}
-              />
-              <span>Đang lưu hành ({counts.approved})</span>
-            </StatusTab>
-          </div>
-
-          <div className="relative w-full sm:w-80">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <Search size={14} />
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm tên điểm đến, địa chỉ, đơn vị..."
-              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-            />
-          </div>
-        </div>
-
-        {/* Error banner */}
+      <section className="flex-1 min-h-0 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
+        {/* Thông báo lỗi — nằm trong vùng cuộn */}
         {fetchError && (
-          <div className="m-4 flex items-start gap-2.5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
+          <div className="shrink-0 m-4 mb-0 flex items-start gap-2.5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
             <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
             <div className="flex-1">
               <p className="text-xs font-bold text-rose-800">
@@ -427,154 +706,173 @@ export default function ModeratorDestinationsPage() {
           </div>
         )}
 
-        {/* List / Empty / Loading */}
-        {isLoading && destinations.length === 0 ? (
-          <div className="p-16 text-center">
-            <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
-            <p className="text-xs text-slate-400 mt-3 font-semibold">
-              Đang tải bảng kiểm duyệt…
-            </p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-16 text-center space-y-3">
-            <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
-              <Inbox size={28} />
+        {/* ── TIÊU ĐỀ CỘT — shrink-0, cố định ── */}
+        <div
+          className={`${ROW_GRID} shrink-0 pl-4 sm:pl-5 ${HEADER_PAD} py-3 bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold uppercase text-slate-500 tracking-wider`}
+        >
+          <div className="col-span-12 md:col-span-4">Tên địa điểm</div>
+          <div className="col-span-6 md:col-span-2">Sức chứa</div>
+          <div className="col-span-6 md:col-span-3">Trạng thái</div>
+          <div className="col-span-12 md:col-span-3">Thao tác</div>
+        </div>
+
+        {/* ── THÂN DANH SÁCH — CHỈ VÙNG NÀY CUỘN ── */}
+        <div className={`flex-1 min-h-0 ${LIST_SCROLL}`}>
+          {isLoading && destinations.length === 0 ? (
+            <div className="p-16 text-center">
+              <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
+              <p className="text-xs text-slate-400 mt-3 font-semibold">
+                Đang tải bảng kiểm duyệt…
+              </p>
             </div>
-            <h3 className="text-base font-bold text-slate-800">
-              {searchQuery
-                ? "Không tìm thấy điểm đến nào phù hợp với bộ lọc"
-                : statusTab === "pending"
-                ? "Không có hồ sơ nào đang chờ thẩm định"
-                : statusTab === "approved"
-                ? "Chưa có điểm đến nào đang lưu hành"
-                : "Chưa có điểm đến nào trong hệ thống"}
-            </h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Danh sách điểm đến do Đối tác hoặc Quản trị viên khởi tạo sẽ hiển
-              thị tại đây.
-            </p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {filtered.map((item) => {
-              const isApproved = item.approved === true;
-              const isLoadingAction = actionLoadingId === item.id;
-              return (
-                <li
-                  key={item.id}
-                  className={`p-4 sm:p-5 hover:bg-slate-50/60 ${CUBIC}`}
-                >
-                  <div className="grid grid-cols-12 gap-3 sm:gap-4 items-center">
-                    {/* Cột 1 — Thông tin điểm đến */}
-                    <div className="col-span-12 md:col-span-4 flex items-start gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
-                        <Compass size={18} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-bold text-slate-900 truncate">
-                          {item.name}
-                        </h3>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
-                          <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
-                            #{item.id}
-                          </span>
-                          <span className="flex items-center gap-1 font-semibold text-slate-600 truncate">
-                            <Building2 size={11} className="text-slate-400 shrink-0" />
-                            <span className="truncate">
-                              {item.createdBy || "Đơn vị không xác định"}
+          ) : pagedItems.length === 0 ? (
+            <div className="p-16 text-center space-y-3">
+              <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
+                <Inbox size={28} />
+              </div>
+              <h3 className="text-base font-bold text-slate-800">
+                {searchQuery
+                  ? "Không tìm thấy điểm đến nào phù hợp với bộ lọc"
+                  : statusTab === "pending"
+                    ? "Không có hồ sơ nào đang chờ thẩm định"
+                    : statusTab === "approved"
+                      ? "Chưa có điểm đến nào đang lưu hành"
+                      : "Chưa có điểm đến nào trong hệ thống"}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Danh sách điểm đến do Đối tác hoặc Quản trị viên khởi tạo sẽ hiển
+                thị tại đây.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {pagedItems.map((item) => {
+                const isApproved = item.approved === true;
+                const isLoadingAction = actionLoadingId === item.id;
+                return (
+                  <li
+                    key={item.id}
+                    className="pl-4 sm:pl-5 py-3.5 hover:bg-slate-50/60 transition-colors"
+                  >
+                    <div className={ROW_GRID}>
+                      {/* Cột 1 — Tên địa điểm */}
+                      <div className="col-span-12 md:col-span-4 flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
+                          <Compass size={18} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-bold text-slate-900 truncate">
+                            {item.name}
+                          </h3>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
+                            <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                              #{item.id}
                             </span>
-                          </span>
+                            <span className="flex items-center gap-1 font-semibold text-slate-600 truncate">
+                              <Building2
+                                size={11}
+                                className="text-slate-400 shrink-0"
+                              />
+                              <span className="truncate">
+                                {item.createdBy || "Đơn vị không xác định"}
+                              </span>
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Cột 2 — Địa chỉ & tọa độ GPS */}
-                    <div className="col-span-12 md:col-span-3 space-y-1">
-                      <p className="text-xs font-medium text-slate-700 flex items-center gap-1 truncate">
-                        <MapPin size={12} className="text-slate-400 shrink-0" />
-                        <span className="truncate">
-                          {item.address || "—"}
-                        </span>
-                      </p>
-                      {item.latitude !== null && item.longitude !== null && (
-                        <span className="font-mono text-[11px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-md border border-sky-200/60 inline-flex items-center gap-1">
-                          <Navigation size={10} />
-                          {item.latitude.toFixed(4)} / {item.longitude.toFixed(4)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Cột 3 — Sức chứa */}
-                    <div className="col-span-6 md:col-span-2">
-                      <p className="text-xs text-slate-500 font-semibold flex items-center gap-1.5">
-                        <Users size={12} className="text-slate-400" />
-                        Sức chứa
-                      </p>
-                      <p className="text-sm font-black text-slate-900 mt-0.5">
-                        {item.capacity ?? "—"}{" "}
-                        <span className="text-[10.5px] font-medium text-slate-400">
+                      {/* Cột 2 — Sức chứa */}
+                      <div className="col-span-6 md:col-span-2 flex items-center gap-1.5 text-sm font-black text-slate-900">
+                        <Users size={13} className="text-slate-400 shrink-0" />
+                        <span>{item.capacity ?? "—"}</span>
+                        <span className="text-[10.5px] font-medium text-slate-400 whitespace-nowrap">
                           du khách/lượt
                         </span>
-                      </p>
-                    </div>
+                      </div>
 
-                    {/* Cột 4 — Trạng thái */}
-                    <div className="col-span-6 md:col-span-1 flex md:justify-start">
-                      <StatusBadge status={item.status} />
-                    </div>
+                      {/* Cột 3 — Trạng thái (rộng hơn cột 2 để badge không bị sát sức chứa) */}
+                      <div className="col-span-6 md:col-span-3 flex items-center">
+                        <StatusBadge status={item.status} />
+                      </div>
 
-                    {/* Cột 5 — Thao tác thẩm định */}
-                    <div className="col-span-12 md:col-span-2 flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openDetail(item.id)}
-                        className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Eye size={13} />
-                        <span>Chi tiết</span>
-                      </button>
-                      {isApproved ? (
+                      {/* Cột 4 — Thao tác
+                          Chuẩn hoá: h-8, rounded-full, text-xs font-semibold,
+                          gap-1.5, shadow-xs, active:scale-95 — đồng nhất với
+                          cụm nút [Sửa] / [Chi tiết] của trang Admin Người dùng.
+                          Căn lề TRÁI (justify-start) để cụm nút thẳng với
+                          tiêu đề cột "Thao tác", thay vì dồn sát mép phải. */}
+                      <div className="col-span-12 md:col-span-3 flex items-center justify-start gap-2 shrink-0">
                         <button
                           type="button"
-                          onClick={() =>
-                            handleApprove(item.id, false, item.name)
-                          }
-                          disabled={isLoadingAction}
-                          className="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          onClick={() => openDetail(item.id)}
+                          title="Xem chi tiết hồ sơ"
+                          className="h-8 px-3 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shadow-xs transition-all active:scale-95 cursor-pointer"
                         >
-                          {isLoadingAction ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <X size={12} />
-                          )}
-                          <span>Hủy duyệt</span>
+                          <Eye size={14} className="text-slate-500 shrink-0" />
+                          <span>Chi tiết</span>
                         </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleApprove(item.id, true, item.name)}
-                          disabled={isLoadingAction}
-                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
-                        >
-                          {isLoadingAction ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <CheckCircle2 size={12} />
-                          )}
-                          <span>Phê duyệt</span>
-                        </button>
-                      )}
+                        {isApproved ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleApprove(item.id, false, item.name)
+                            }
+                            disabled={isLoadingAction}
+                            title="Thu hồi phê duyệt, đưa hồ sơ về chờ duyệt"
+                            className="h-8 px-3 rounded-full border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed"
+                          >
+                            {isLoadingAction ? (
+                              <Loader2 size={14} className="animate-spin shrink-0" />
+                            ) : (
+                              <Ban size={14} className="text-rose-500 shrink-0" />
+                            )}
+                            <span>Hủy duyệt</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleApprove(item.id, true, item.name)
+                            }
+                            disabled={isLoadingAction}
+                            title="Phê duyệt và phát hành hồ sơ"
+                            className="h-8 px-3.5 rounded-full border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed"
+                          >
+                            {isLoadingAction ? (
+                              <Loader2 size={14} className="animate-spin shrink-0" />
+                            ) : (
+                              <CheckCircle2
+                                size={14}
+                                className="text-emerald-600 shrink-0"
+                              />
+                            )}
+                            <span>Phê duyệt</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* ── THANH PHÂN TRANG — shrink-0, cố định ở đáy ── */}
+        <div className="shrink-0">
+          <PaginationBar
+            totalElements={filtered.length}
+            pageNumber={safePageNumber}
+            pageSize={pageSize}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            onSizeChange={handlePageSizeChange}
+          />
+        </div>
+      </section>
 
       {/* ══════════════════════════════════════════════════════════
-          MODAL — Xem chi tiết điểm đến
+          MODAL — Xem chi tiết điểm đến (nơi chứa ĐỊA CHỈ & TỌA ĐỘ)
          ══════════════════════════════════════════════════════════ */}
       {(detailTarget || detailLoading || detailError) && (
         <div
@@ -582,19 +880,17 @@ export default function ModeratorDestinationsPage() {
           onClick={closeDetail}
         >
           <div
-            className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-200"
+            className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal header */}
-            <div className="px-5 sm:px-7 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
+            <div className="shrink-0 px-5 sm:px-7 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="font-mono text-[10.5px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
                     #{detailTarget?.id ?? "—"}
                   </span>
-                  {detailTarget && (
-                    <StatusBadge status={detailTarget.status} />
-                  )}
+                  {detailTarget && <StatusBadge status={detailTarget.status} />}
                 </div>
                 <h3 className="text-base sm:text-lg font-black text-slate-900 truncate">
                   {detailTarget?.name || "Đang tải..."}
@@ -609,15 +905,15 @@ export default function ModeratorDestinationsPage() {
               <button
                 type="button"
                 onClick={closeDetail}
-                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer shrink-0"
+                className="w-9 h-9 rounded-full bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center cursor-pointer border border-slate-200 shrink-0"
                 aria-label="Đóng"
               >
-                <X size={15} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Modal body */}
-            <div className="px-5 sm:px-7 py-5 max-h-[calc(92vh-150px)] overflow-y-auto">
+            {/* Modal body — có cuộn riêng */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-7 py-5">
               {detailLoading ? (
                 <div className="py-12 flex flex-col items-center gap-3 text-slate-500">
                   <Loader2 size={28} className="animate-spin text-slate-400" />
@@ -640,6 +936,16 @@ export default function ModeratorDestinationsPage() {
                 </div>
               ) : detailTarget ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Địa chỉ — đã chuyển từ danh sách vào đây */}
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 sm:col-span-2">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <MapPin size={10} /> Địa chỉ thực tế
+                    </p>
+                    <p className="text-[13px] font-bold text-slate-800 leading-relaxed">
+                      {detailTarget.address || "—"}
+                    </p>
+                  </div>
+
                   <div className="rounded-2xl bg-sky-50/70 border border-sky-200 p-4">
                     <p className="text-[10px] font-black text-sky-700 uppercase tracking-wider mb-2 flex items-center gap-1">
                       <Navigation size={10} /> Tọa độ GPS
@@ -654,11 +960,12 @@ export default function ModeratorDestinationsPage() {
                       <div className="flex justify-between">
                         <span className="text-slate-500">Kinh độ</span>
                         <span className="font-black text-slate-800">
-                          {detailTarget.latitude?.toFixed(6) ?? "—"}
+                          {detailTarget.longitude?.toFixed(6) ?? "—"}
                         </span>
                       </div>
                     </div>
                   </div>
+
                   <div className="rounded-2xl bg-emerald-50/70 border border-emerald-200 p-4">
                     <p className="text-[10px] font-black text-emerald-700 uppercase tracking-wider mb-2 flex items-center gap-1">
                       <Users size={10} /> Sức chứa tối đa
@@ -670,6 +977,7 @@ export default function ModeratorDestinationsPage() {
                       </span>
                     </p>
                   </div>
+
                   <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 sm:col-span-2">
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
                       Đơn vị khởi tạo
@@ -684,7 +992,7 @@ export default function ModeratorDestinationsPage() {
             </div>
 
             {/* Modal footer */}
-            <div className="px-5 sm:px-7 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50/40">
+            <div className="shrink-0 px-5 sm:px-7 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50/40">
               {detailTarget && !detailTarget.approved && (
                 <button
                   type="button"
@@ -692,12 +1000,12 @@ export default function ModeratorDestinationsPage() {
                     handleApprove(detailTarget.id, true, detailTarget.name)
                   }
                   disabled={actionLoadingId === detailTarget.id}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                  className="h-8 px-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-60 disabled:active:scale-100 disabled:cursor-not-allowed"
                 >
                   {actionLoadingId === detailTarget.id ? (
-                    <Loader2 size={12} className="animate-spin" />
+                    <Loader2 size={14} className="animate-spin shrink-0" />
                   ) : (
-                    <CheckCircle2 size={12} />
+                    <CheckCircle2 size={14} className="shrink-0" />
                   )}
                   <span>Phê duyệt</span>
                 </button>
@@ -709,12 +1017,12 @@ export default function ModeratorDestinationsPage() {
                     handleApprove(detailTarget.id, false, detailTarget.name)
                   }
                   disabled={actionLoadingId === detailTarget.id}
-                  className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="h-8 px-3 rounded-full border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 text-xs font-semibold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed"
                 >
                   {actionLoadingId === detailTarget.id ? (
-                    <Loader2 size={12} className="animate-spin" />
+                    <Loader2 size={14} className="animate-spin shrink-0" />
                   ) : (
-                    <X size={12} />
+                    <Ban size={14} className="text-rose-500 shrink-0" />
                   )}
                   <span>Hủy duyệt</span>
                 </button>
@@ -722,7 +1030,7 @@ export default function ModeratorDestinationsPage() {
               <button
                 type="button"
                 onClick={closeDetail}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                className="h-8 px-3.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center transition-all active:scale-95 cursor-pointer"
               >
                 Đóng
               </button>
