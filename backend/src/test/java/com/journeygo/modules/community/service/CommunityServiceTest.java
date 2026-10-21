@@ -1,0 +1,377 @@
+package com.journeygo.modules.community.service;
+
+import com.journeygo.modules.community.dto.*;
+import com.journeygo.modules.community.entity.*;
+import com.journeygo.modules.community.entity.enums.*;
+import com.journeygo.modules.community.repository.*;
+import com.journeygo.modules.experience.exception.BusinessException;
+import com.journeygo.modules.experience.exception.ResourceNotFoundException;
+import com.journeygo.modules.user.entity.User;
+import com.journeygo.modules.user.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class CommunityServiceTest {
+
+    @Mock
+    private CommunityPostRepository postRepository;
+
+    @Mock
+    private PostMediaRepository mediaRepository;
+
+    @Mock
+    private PostCommentRepository commentRepository;
+
+    @Mock
+    private PostReactionRepository reactionRepository;
+
+    @Mock
+    private PostReportRepository reportRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @InjectMocks
+    private CommunityService communityService;
+
+    private User sampleUser;
+    private CommunityPost samplePublishedPost;
+
+    @BeforeEach
+    void setUp() {
+        sampleUser = User.builder()
+                .id(1L)
+                .fullName("Nguyen Van A")
+                .avatarUrl("https://example.com/avatar.jpg")
+                .email("user1@example.com")
+                .build();
+
+        samplePublishedPost = CommunityPost.builder()
+                .id(100L)
+                .authorId(1L)
+                .authorName("Nguyen Van A")
+                .authorAvatarUrl("https://example.com/avatar.jpg")
+                .title("Trải nghiệm tuyệt vời tại Huế")
+                .content("Chùa Thiên Mụ thật cổ kính và bình yên...")
+                .status(PostStatus.PUBLISHED)
+                .likesCount(5)
+                .commentsCount(2)
+                .hidden(false)
+                .mediaList(new ArrayList<>())
+                .build();
+    }
+
+    @Test
+    @DisplayName("Tạo bài viết mới ở chế độ Nháp (DRAFT)")
+    void testCreatePost_Draft() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(sampleUser));
+        when(postRepository.save(any(CommunityPost.class))).thenAnswer(invocation -> {
+            CommunityPost p = invocation.getArgument(0);
+            p.setId(201L);
+            return p;
+        });
+
+        CreatePostRequest req = new CreatePostRequest(
+                "Tiêu đề nháp",
+                "Nội dung nháp",
+                10L,
+                20L,
+                null,
+                List.of("https://example.com/pic1.jpg"),
+                true
+        );
+
+        PostResponse res = communityService.createPost(1L, req);
+
+        assertNotNull(res);
+        assertEquals(201L, res.id());
+        assertEquals(PostStatus.DRAFT, res.status());
+        verify(postRepository).save(argThat(p -> p.getStatus() == PostStatus.DRAFT && p.getMediaList().size() == 1));
+    }
+
+    @Test
+    @DisplayName("Tạo bài viết mới gửi duyệt (PENDING_REVIEW)")
+    void testCreatePost_PendingReview() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(sampleUser));
+        when(postRepository.save(any(CommunityPost.class))).thenAnswer(invocation -> {
+            CommunityPost p = invocation.getArgument(0);
+            p.setId(202L);
+            return p;
+        });
+
+        CreatePostRequest req = new CreatePostRequest(
+                "Hành trình Đà Nẵng",
+                "Cầu Rồng phun lửa rất đẹp",
+                null,
+                null,
+                null,
+                null,
+                false
+        );
+
+        PostResponse res = communityService.createPost(1L, req);
+
+        assertNotNull(res);
+        assertEquals(PostStatus.PENDING_REVIEW, res.status());
+        verify(postRepository).save(argThat(p -> p.getStatus() == PostStatus.PENDING_REVIEW));
+    }
+
+    @Test
+    @DisplayName("Sửa bài viết của người khác bị chặn FORBIDDEN-POST")
+    void testUpdatePost_Forbidden() {
+        when(postRepository.findByIdWithMedia(100L)).thenReturn(Optional.of(samplePublishedPost));
+
+        UpdatePostRequest req = new UpdatePostRequest("Hacked Title", "Hacked Content", null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                communityService.updatePost(100L, 999L, req)
+        );
+
+        assertEquals("FORBIDDEN-POST", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("Sửa bài viết đã PUBLISHED tự động quay về PENDING_REVIEW để kiểm duyệt lại")
+    void testUpdatePost_PublishedResetsToPendingReview() {
+        when(postRepository.findByIdWithMedia(100L)).thenReturn(Optional.of(samplePublishedPost));
+        when(postRepository.save(any(CommunityPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePostRequest req = new UpdatePostRequest("Tiêu đề đã sửa", "Nội dung cập nhật mới", List.of("https://example.com/new.jpg"));
+
+        PostResponse res = communityService.updatePost(100L, 1L, req);
+
+        assertNotNull(res);
+        assertEquals(PostStatus.PENDING_REVIEW, res.status());
+        assertEquals("Tiêu đề đã sửa", res.title());
+        verify(postRepository).save(argThat(p -> p.getStatus() == PostStatus.PENDING_REVIEW && p.getModerationNote() != null));
+    }
+
+    @Test
+    @DisplayName("Xem chi tiết bài viết bị ẩn ném ngoại lệ POST-HIDDEN")
+    void testGetPostDetail_HiddenPost() {
+        samplePublishedPost.setHidden(true);
+        when(postRepository.findByIdWithMedia(100L)).thenReturn(Optional.of(samplePublishedPost));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                communityService.getPostDetail(100L, 1L)
+        );
+
+        assertEquals("POST-HIDDEN", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("Xem chi tiết bài viết chưa publish bởi người lạ ném ngoại lệ POST-NOT-PUBLISHED")
+    void testGetPostDetail_NotPublished_Stranger() {
+        samplePublishedPost.setStatus(PostStatus.PENDING_REVIEW);
+        when(postRepository.findByIdWithMedia(100L)).thenReturn(Optional.of(samplePublishedPost));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                communityService.getPostDetail(100L, 999L)
+        );
+
+        assertEquals("POST-NOT-PUBLISHED", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("Bình luận vào bài viết chưa PUBLISHED bị từ chối")
+    void testAddComment_NotPublished_Fails() {
+        samplePublishedPost.setStatus(PostStatus.PENDING_REVIEW);
+        when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
+
+        PostCommentRequest req = new PostCommentRequest("Bình luận test");
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                communityService.addComment(100L, 1L, req)
+        );
+
+        assertEquals("COMMENT-NOT-ALLOWED", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("Bình luận thành công tăng commentsCount")
+    void testAddComment_Success() {
+        when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(sampleUser));
+        when(commentRepository.save(any(PostComment.class))).thenAnswer(invocation -> {
+            PostComment c = invocation.getArgument(0);
+            c.setId(501L);
+            return c;
+        });
+
+        PostCommentRequest req = new PostCommentRequest("Bài viết hay quá!");
+        CommentResponse res = communityService.addComment(100L, 1L, req);
+
+        assertNotNull(res);
+        assertEquals(501L, res.id());
+        assertEquals("Bài viết hay quá!", res.content());
+        assertEquals(3, samplePublishedPost.getCommentsCount());
+        verify(postRepository).save(samplePublishedPost);
+    }
+
+    @Test
+    @DisplayName("Thả tim mới lần đầu tăng likesCount")
+    void testToggleReaction_NewReaction() {
+        when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
+        when(reactionRepository.findByPostIdAndUserId(100L, 2L)).thenReturn(Optional.empty());
+
+        int likes = communityService.toggleReaction(100L, 2L, ReactionType.LIKE);
+
+        assertEquals(6, likes);
+        verify(reactionRepository).save(argThat(r -> r.getReactionType() == ReactionType.LIKE && r.getUserId().equals(2L)));
+        verify(postRepository).save(samplePublishedPost);
+    }
+
+    @Test
+    @DisplayName("Bấm lại cùng loại reaction thì hủy (toggle off) giảm likesCount")
+    void testToggleReaction_SameReaction_TogglesOff() {
+        when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
+        PostReaction existing = PostReaction.builder()
+                .id(10L)
+                .postId(100L)
+                .userId(2L)
+                .reactionType(ReactionType.LIKE)
+                .build();
+        when(reactionRepository.findByPostIdAndUserId(100L, 2L)).thenReturn(Optional.of(existing));
+
+        int likes = communityService.toggleReaction(100L, 2L, ReactionType.LIKE);
+
+        assertEquals(4, likes);
+        verify(reactionRepository).delete(existing);
+        verify(postRepository).save(samplePublishedPost);
+    }
+
+    @Test
+    @DisplayName("Bấm khác loại reaction thì cập nhật loại mới, không đổi likesCount")
+    void testToggleReaction_ChangeReactionType() {
+        when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
+        PostReaction existing = PostReaction.builder()
+                .id(10L)
+                .postId(100L)
+                .userId(2L)
+                .reactionType(ReactionType.LIKE)
+                .build();
+        when(reactionRepository.findByPostIdAndUserId(100L, 2L)).thenReturn(Optional.of(existing));
+
+        int likes = communityService.toggleReaction(100L, 2L, ReactionType.LOVE);
+
+        assertEquals(5, likes);
+        assertEquals(ReactionType.LOVE, existing.getReactionType());
+        verify(reactionRepository).save(existing);
+        verify(postRepository).save(samplePublishedPost);
+    }
+
+    @Test
+    @DisplayName("Báo cáo vi phạm thành công")
+    void testReportPost_Success() {
+        when(postRepository.existsById(100L)).thenReturn(true);
+        when(reportRepository.existsByPostIdAndReporterId(100L, 2L)).thenReturn(false);
+        when(reportRepository.save(any(PostReport.class))).thenAnswer(invocation -> {
+            PostReport r = invocation.getArgument(0);
+            r.setId(701L);
+            return r;
+        });
+
+        CreateReportRequest req = new CreateReportRequest(ReportReason.SPAM, "Spam link quảng cáo");
+        ReportResponse res = communityService.reportPost(100L, 2L, req);
+
+        assertNotNull(res);
+        assertEquals(701L, res.id());
+        assertEquals(ReportReason.SPAM, res.reason());
+        assertEquals(ReportStatus.PENDING, res.status());
+    }
+
+    @Test
+    @DisplayName("Báo cáo trùng bài viết bị từ chối ALREADY-REPORTED")
+    void testReportPost_AlreadyReported() {
+        when(postRepository.existsById(100L)).thenReturn(true);
+        when(reportRepository.existsByPostIdAndReporterId(100L, 2L)).thenReturn(true);
+
+        CreateReportRequest req = new CreateReportRequest(ReportReason.INAPPROPRIATE_CONTENT, null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                communityService.reportPost(100L, 2L, req)
+        );
+
+        assertEquals("ALREADY-REPORTED", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("Kiểm duyệt duyệt bài viết APPROVE -> PUBLISHED")
+    void testModeratePost_Approve() {
+        samplePublishedPost.setStatus(PostStatus.PENDING_REVIEW);
+        when(postRepository.findByIdWithMedia(100L)).thenReturn(Optional.of(samplePublishedPost));
+        when(postRepository.save(any(CommunityPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ModeratePostRequest req = new ModeratePostRequest("APPROVE", "Nội dung chuẩn chỉ");
+        PostResponse res = communityService.moderatePost(100L, 888L, req);
+
+        assertNotNull(res);
+        assertEquals(PostStatus.PUBLISHED, res.status());
+        assertEquals(888L, samplePublishedPost.getModeratedBy());
+    }
+
+    @Test
+    @DisplayName("Kiểm duyệt từ chối REJECT -> REJECTED")
+    void testModeratePost_Reject() {
+        samplePublishedPost.setStatus(PostStatus.PENDING_REVIEW);
+        when(postRepository.findByIdWithMedia(100L)).thenReturn(Optional.of(samplePublishedPost));
+        when(postRepository.save(any(CommunityPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ModeratePostRequest req = new ModeratePostRequest("REJECT", "Hình ảnh không phù hợp");
+        PostResponse res = communityService.moderatePost(100L, 888L, req);
+
+        assertNotNull(res);
+        assertEquals(PostStatus.REJECTED, res.status());
+    }
+
+    @Test
+    @DisplayName("Hành động kiểm duyệt không hợp lệ bị từ chối")
+    void testModeratePost_InvalidAction() {
+        when(postRepository.findByIdWithMedia(100L)).thenReturn(Optional.of(samplePublishedPost));
+
+        ModeratePostRequest req = new ModeratePostRequest("UNKNOWN_ACTION", null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                communityService.moderatePost(100L, 888L, req)
+        );
+
+        assertEquals("INVALID-MODERATION-ACTION", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("Xử lý báo cáo vi phạm với tuỳ chọn ẩn bài viết hidePost=true")
+    void testResolveReport_HidePost() {
+        PostReport report = PostReport.builder()
+                .id(801L)
+                .postId(100L)
+                .reporterId(2L)
+                .reason(ReportReason.INAPPROPRIATE_CONTENT)
+                .status(ReportStatus.PENDING)
+                .build();
+
+        when(reportRepository.findById(801L)).thenReturn(Optional.of(report));
+        when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
+        when(reportRepository.save(any(PostReport.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ReportResponse res = communityService.resolveReport(801L, 999L, true, "Đã xác minh vi phạm, ẩn bài viết");
+
+        assertNotNull(res);
+        assertEquals(ReportStatus.RESOLVED, res.status());
+        assertTrue(samplePublishedPost.isHidden());
+        verify(postRepository).save(samplePublishedPost);
+    }
+}
