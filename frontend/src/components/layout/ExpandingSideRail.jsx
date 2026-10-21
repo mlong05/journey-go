@@ -32,6 +32,7 @@ export default function ExpandingSideRail({
   const pathname = usePathname();
   const [highlightY, setHighlightY] = useState(0);
   const itemRefs = useRef([]);
+  const [mounted, setMounted] = useState(false);
 
   // Xác định index mục đang active dựa trên pathname
   const activeIndex = React.useMemo(() => {
@@ -46,6 +47,11 @@ export default function ExpandingSideRail({
 
     return foundIdx !== -1 ? foundIdx : 0;
   }, [pathname, navItems]);
+
+  // Client-only: Đánh dấu mounted để tránh hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Cập nhật vị trí translateY (--y) của viên highlight khi activeIndex hoặc isWide đổi
   useEffect(() => {
@@ -161,7 +167,6 @@ export default function ExpandingSideRail({
                     <Link
                       href={item.href}
                       onClick={() => {
-                        setActiveIndex(index);
                         onCloseMobile();
                       }}
                       onKeyDown={(e) => handleKeyDown(e, index)}

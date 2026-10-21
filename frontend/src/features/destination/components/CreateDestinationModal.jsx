@@ -235,16 +235,24 @@ export default function CreateDestinationModal({
         className="w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
       >
         {/* ── HEADER ─────────────────────────────────────────── */}
-        <div className="relative px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-white via-white to-slate-50/60">
+        <div className="relative px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-white via-white to-emerald-50/40">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
               <div
-                className={`w-10 h-10 rounded-2xl ${palette.badge} border flex items-center justify-center shrink-0`}
+                className={`p-2.5 rounded-2xl border flex items-center justify-center shrink-0 ${
+                  success
+                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                    : `${palette.badge} border`
+                }`}
               >
-                <Landmark size={20} className={palette.icon} />
+                {success ? (
+                  <CheckCircle2 size={20} className="text-emerald-600" />
+                ) : (
+                  <Landmark size={20} className={palette.icon} />
+                )}
               </div>
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                   {success ? "Đã khởi tạo điểm đến thành công!" : title}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-md">
@@ -269,44 +277,29 @@ export default function CreateDestinationModal({
         {/* ── BODY (scrollable) ──────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {success ? (
-            // Trạng thái thành công
             <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
-                <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                  <CheckCircle2 size={20} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-black text-emerald-900">
-                    Đã khởi tạo điểm đến thành công!
-                  </p>
-                  <p className="text-xs text-emerald-800/80 mt-0.5">
-                    Hồ sơ đang ở trạng thái <strong>chờ phê duyệt</strong>.
-                  </p>
-                </div>
-              </div>
-
               {createdItem && (
-                <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60 space-y-2 text-xs">
+                <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60 space-y-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                         Tên điểm đến
                       </p>
-                      <p className="text-sm font-black text-slate-900">
+                      <p className="text-sm font-black text-slate-900 truncate">
                         {createdItem.name || form.name}
                       </p>
                     </div>
-                    <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                       Chờ phê duyệt
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/70">
+                  <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200/70">
                     <div>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                         Địa chỉ
                       </p>
-                      <p className="text-slate-800 font-semibold">
+                      <p className="text-slate-800 font-semibold truncate">
                         {createdItem.address || form.address}
                       </p>
                     </div>
@@ -502,7 +495,7 @@ export default function CreateDestinationModal({
             <button
               type="button"
               onClick={handleClose}
-              className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs transition-colors cursor-pointer ${palette.primary} ${palette.primaryShadow} shadow-sm`}
+              className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm transition-all cursor-pointer text-xs"
             >
               Đóng & tiếp tục
             </button>

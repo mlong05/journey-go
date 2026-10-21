@@ -17,7 +17,6 @@ import {
   Navigation,
   AlertCircle,
   Info,
-  ListChecks,
   RotateCcw,
   Trash2,
 } from "lucide-react";
@@ -27,18 +26,22 @@ import {
   EditDestinationModal,
 } from "@/features/destination";
 
+const APPROVAL_FILTER = {
+  ALL: "all",
+  PENDING: "pending",
+  APPROVED: "approved",
+};
+
+const DELETION_FILTER = {
+  ACTIVE: "active",
+  DELETED: "deleted",
+  ALL: "all",
+};
+
 const STATUS = {
   PENDING: "pending",
   APPROVED: "approved",
-  REVOKED: "revoked",
   DELETED: "deleted",
-};
-
-const STATUS_LABEL = {
-  [STATUS.APPROVED]: "Đang hoạt động",
-  [STATUS.PENDING]: "Chờ duyệt",
-  [STATUS.REVOKED]: "Chờ duyệt lại",
-  [STATUS.DELETED]: "Đã xóa mềm",
 };
 
 function normalizeDestination(raw, fallbackStatus = STATUS.PENDING) {
@@ -48,7 +51,7 @@ function normalizeDestination(raw, fallbackStatus = STATUS.PENDING) {
   let status;
   if (deletedFlag) status = STATUS.DELETED;
   else if (approvedFlag) status = STATUS.APPROVED;
-  else status = fallbackStatus;
+  else status = STATUS.PENDING;
 
   return {
     id: raw.id,
@@ -74,8 +77,8 @@ function normalizeDestination(raw, fallbackStatus = STATUS.PENDING) {
 
 export default function DestinationsClient() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [dataSource, setDataSource] = useState("approved");
-  const [statusTab, setStatusTab] = useState("all");
+  const [approvalFilter, setApprovalFilter] = useState(APPROVAL_FILTER.ALL);
+  const [deletionFilter, setDeletionFilter] = useState(DELETION_FILTER.ACTIVE);
   const [destinations, setDestinations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
@@ -96,23 +99,14 @@ export default function DestinationsClient() {
     setTimeout(() => setToastMessage(""), 4000);
   }, []);
 
-  const loadList = useCallback(async (source = dataSource) => {
+  const loadList = useCallback(async () => {
     setIsLoading(true);
     setFetchError("");
     try {
-      let data;
-      if (source === "deleted") {
-        data = await destinationService.getDeleted();
-      } else if (source === "all") {
-        data = await destinationService.getAll();
-      } else {
-        data = await destinationService.getApproved();
-      }
+      const data = await destinationService.getAll();
       const list = Array.isArray(data) ? data : [];
-      const fallback =
-        source === "all" ? STATUS.PENDING : STATUS.APPROVED;
       const normalized = list
-        .map((item) => normalizeDestination(item, fallback))
+        .map((item) => normalizeDestination(item))
         .filter(Boolean);
       setDestinations(normalized);
     } catch (err) {
@@ -125,12 +119,37 @@ export default function DestinationsClient() {
     } finally {
       setIsLoading(false);
     }
-  }, [dataSource]);
+  }, []);
 
   useEffect(() => {
-    loadList(dataSource);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataSource]);
+    let active = true;
+    const fetchDestinations = async () => {
+      setIsLoading(true);
+      setFetchError("");
+      try {
+        const data = await destinationService.getAll();
+        const normalized = (Array.isArray(data) ? data : [])
+          .map((item) => normalizeDestination(item))
+          .filter(Boolean);
+        if (active) setDestinations(normalized);
+      } catch (err) {
+        if (active) {
+          console.error("[Admin Destinations] Fetch error:", err);
+          setFetchError(
+            err?.message ||
+              "Không thể tải danh sách điểm đến. Vui lòng kiểm tra kết nối."
+          );
+          setDestinations([]);
+        }
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+    fetchDestinations();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleViewDetail = useCallback(
     async (id) => {
@@ -152,7 +171,7 @@ export default function DestinationsClient() {
       const normalized = normalizeDestination(newDest, STATUS.PENDING);
       if (!normalized) return;
       setDestinations((prev) => [normalized, ...prev]);
-      setStatusTab(STATUS.PENDING);
+      setApprovalFilter(APPROVAL_FILTER.PENDING);
       showToast("Tạo điểm đến mới thành công! Đang ở trạng thái chờ phê duyệt.");
     },
     [showToast]
@@ -161,10 +180,8 @@ export default function DestinationsClient() {
   const handleUpdated = useCallback(
     (updatedDest) => {
       if (!updatedDest || typeof updatedDest !== "object") return;
-      const normalized = normalizeDestination(updatedDest, STATUS.REVOKED);
+      const normalized = normalizeDestination(updatedDest);
       if (!normalized) return;
-      normalized.status = STATUS.REVOKED;
-      normalized.approved = false;
       setDestinations((prev) => {
         const exists = prev.some((d) => d.id === normalized.id);
         if (!exists) return [normalized, ...prev];
@@ -172,10 +189,9 @@ export default function DestinationsClient() {
           d.id === normalized.id ? { ...d, ...normalized } : d
         );
       });
-      setStatusTab(STATUS.REVOKED);
-      showToast(
-        "Cập nhật thành công! Hồ sơ đã tự động chuyển về trạng thái Chờ thẩm định lại."
-      );
+      setApprovalFilter(APPROVAL_FILTER.PENDING);
+      setDeletionFilter(DELETION_FILTER.ACTIVE);
+      showToast("Cập nhật thành công! Điểm đến chuyển về trạng thái chờ duyệt.");
     },
     [showToast]
   );
@@ -185,37 +201,22 @@ export default function DestinationsClient() {
     const wantApprove = approveTarget.action === "approve";
     setActionLoadingId(approveTarget.id);
     try {
-      const updated = await destinationService.setApproval(
-        approveTarget.id,
-        wantApprove
-      );
-      const updatedNorm = normalizeDestination(
-        updated,
-        wantApprove ? STATUS.APPROVED : STATUS.PENDING
-      );
-      setDestinations((prev) => {
-        if (!updatedNorm) return prev;
-        const exists = prev.some((d) => d.id === approveTarget.id);
-        if (!exists) return [updatedNorm, ...prev];
-        return prev.map((d) =>
-          d.id === approveTarget.id ? { ...d, ...updatedNorm } : d
-        );
-      });
-      showToast(
-        wantApprove
-          ? `Đã phê duyệt điểm đến "${approveTarget.name}".`
-          : `Đã hủy phê duyệt điểm đến "${approveTarget.name}".`
-      );
-      if (detailTarget?.id === approveTarget.id && updatedNorm) {
-        setDetailTarget(updatedNorm);
+      const updated = await destinationService.setApproval(approveTarget.id, wantApprove);
+      const updatedNorm = normalizeDestination(updated);
+      if (updatedNorm) {
+        setDestinations((prev) => prev.map((destination) =>
+          destination.id === approveTarget.id ? { ...destination, ...updatedNorm } : destination
+        ));
       }
+      showToast(wantApprove
+        ? `Đã phê duyệt điểm đến "${approveTarget.name}".`
+        : `Đã hủy phê duyệt điểm đến "${approveTarget.name}".`
+      );
+      if (detailTarget?.id === approveTarget.id && updatedNorm) setDetailTarget(updatedNorm);
       setApproveTarget(null);
     } catch (err) {
       console.error("[Admin Approve] error:", err);
-      showToast(
-        err?.message || "Không thể cập nhật trạng thái phê duyệt.",
-        "error"
-      );
+      showToast(err?.message || "Không thể cập nhật trạng thái phê duyệt.", "error");
     } finally {
       setActionLoadingId(null);
     }
@@ -226,10 +227,12 @@ export default function DestinationsClient() {
     setActionLoadingId(deleteTarget.id);
     try {
       await destinationService.delete(deleteTarget.id);
-      setDestinations((prev) =>
-        prev.filter((d) => d.id !== deleteTarget.id)
-      );
-      showToast(`Đã xóa mềm điểm đến "${deleteTarget.name}".`);
+      setDestinations((prev) => prev.map((destination) =>
+        destination.id === deleteTarget.id
+          ? { ...destination, deleted: true, status: STATUS.DELETED }
+          : destination
+      ));
+      showToast(`Đã xóa điểm đến "${deleteTarget.name}".`);
       setDeleteTarget(null);
     } catch (err) {
       console.error("[Admin Delete] error:", err);
@@ -245,13 +248,14 @@ export default function DestinationsClient() {
     try {
       const restored = await destinationService.restore(restoreTarget.id);
       const normalized = normalizeDestination(restored, STATUS.PENDING);
-      setDestinations((prev) => prev.filter((d) => d.id !== restoreTarget.id));
+      if (normalized) {
+        setDestinations((prev) => prev.map((destination) =>
+          destination.id === restoreTarget.id ? normalized : destination
+        ));
+      }
       showToast(
         `Đã khôi phục điểm đến "${restoreTarget.name}". Hồ sơ trở về Chờ duyệt.`
       );
-      if (normalized && normalized.id !== restoreTarget.id) {
-        setDestinations((prev) => [normalized, ...prev]);
-      }
       setRestoreTarget(null);
     } catch (err) {
       console.error("[Admin Restore] error:", err);
@@ -261,32 +265,33 @@ export default function DestinationsClient() {
     }
   }, [restoreTarget, showToast]);
 
-  const counts = useMemo(
-    () => ({
-      all: destinations.filter((d) => d.status !== STATUS.DELETED).length,
-      approved: destinations.filter((d) => d.status === STATUS.APPROVED).length,
-      pending: destinations.filter((d) => d.status === STATUS.PENDING).length,
-      revoked: destinations.filter((d) => d.status === STATUS.REVOKED).length,
-      deleted: destinations.filter((d) => d.status === STATUS.DELETED).length,
-    }),
-    [destinations]
-  );
+  const counts = useMemo(() => ({
+    all: destinations.length,
+    pending: destinations.filter((destination) => !destination.approved).length,
+    approved: destinations.filter((destination) => destination.approved).length,
+    active: destinations.filter((destination) => !destination.deleted).length,
+    deleted: destinations.filter((destination) => destination.deleted).length,
+  }), [destinations]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return destinations.filter((dest) => {
+    return destinations.filter((destination) => {
       const matchSearch =
         !q ||
-        (dest.name || "").toLowerCase().includes(q) ||
-        (dest.address || "").toLowerCase().includes(q) ||
-        String(dest.id).toLowerCase().includes(q);
-      const matchStatus =
-        statusTab === "all"
-          ? dest.status !== STATUS.DELETED
-          : dest.status === statusTab;
-      return matchSearch && matchStatus;
+        destination.name.toLowerCase().includes(q) ||
+        destination.address.toLowerCase().includes(q) ||
+        String(destination.id).toLowerCase().includes(q);
+      const matchApproval =
+        approvalFilter === APPROVAL_FILTER.ALL ||
+        (approvalFilter === APPROVAL_FILTER.APPROVED && destination.approved) ||
+        (approvalFilter === APPROVAL_FILTER.PENDING && !destination.approved);
+      const matchDeletion =
+        deletionFilter === DELETION_FILTER.ALL ||
+        (deletionFilter === DELETION_FILTER.DELETED && destination.deleted) ||
+        (deletionFilter === DELETION_FILTER.ACTIVE && !destination.deleted);
+      return matchSearch && matchApproval && matchDeletion;
     });
-  }, [destinations, searchQuery, statusTab]);
+  }, [approvalFilter, deletionFilter, destinations, searchQuery]);
 
   const toastPalette = {
     success: "bg-emerald-900 border-emerald-600 text-white",
@@ -320,14 +325,14 @@ export default function DestinationsClient() {
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Toàn quyền: phê duyệt, xóa mềm, khôi phục và giám sát điểm đến di sản trên hệ thống.
+          
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
           <button
             type="button"
-            onClick={() => loadList(dataSource)}
+            onClick={() => loadList()}
             disabled={isLoading}
             className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
           >
@@ -361,93 +366,34 @@ export default function DestinationsClient() {
           </div>
           <div className="sm:col-span-3">
             <select
-              value={statusTab}
-              onChange={(e) => setStatusTab(e.target.value)}
+              value={approvalFilter}
+              onChange={(event) => setApprovalFilter(event.target.value)}
+              aria-label="Lọc theo trạng thái phê duyệt"
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
             >
-              <option value="all">Tất cả trạng thái</option>
-              <option value={STATUS.PENDING}>Chờ phê duyệt</option>
-              <option value={STATUS.APPROVED}>Đã phê duyệt</option>
-              <option value={STATUS.REVOKED}>Chờ duyệt lại</option>
-              <option value={STATUS.DELETED}>Đã xóa mềm</option>
+              <option value={APPROVAL_FILTER.ALL}>Trạng thái duyệt: Tất cả</option>
+              <option value={APPROVAL_FILTER.PENDING}>Chờ phê duyệt</option>
+              <option value={APPROVAL_FILTER.APPROVED}>Đã phê duyệt</option>
             </select>
           </div>
           <div className="sm:col-span-2">
             <select
-              value={dataSource}
-              onChange={(e) => {
-                setDataSource(e.target.value);
-                setStatusTab("all");
-              }}
+              value={deletionFilter}
+              onChange={(event) => setDeletionFilter(event.target.value)}
+              aria-label="Lọc theo trạng thái xóa"
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
             >
-              <option value="approved">Nguồn: Đã duyệt</option>
-              <option value="all">Nguồn: Tất cả</option>
-              <option value="deleted">Nguồn: Đã xóa mềm</option>
+              <option value={DELETION_FILTER.ALL}>Tình trạng: Tất cả</option>
+              <option value={DELETION_FILTER.ACTIVE}>Đang hoạt động</option>
+              <option value={DELETION_FILTER.DELETED}>Đã xóa</option>
             </select>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={() => setStatusTab("all")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              statusTab === "all"
-                ? "bg-slate-900 text-white shadow-xs"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
-            }`}
-          >
-            Hoạt động ({counts.all})
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab(STATUS.PENDING)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === STATUS.PENDING
-                ? "bg-amber-600 text-white shadow-xs"
-                : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <span>Chờ phê duyệt ({counts.pending})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab(STATUS.APPROVED)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === STATUS.APPROVED
-                ? "bg-emerald-600 text-white shadow-xs"
-                : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Đang hoạt động ({counts.approved})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab(STATUS.REVOKED)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === STATUS.REVOKED
-                ? "bg-orange-600 text-white shadow-xs"
-                : "bg-orange-50 text-orange-800 hover:bg-orange-100 border border-orange-200"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-            <span>Chờ duyệt lại ({counts.revoked})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab(STATUS.DELETED)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === STATUS.DELETED
-                ? "bg-slate-700 text-white shadow-xs"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
-            }`}
-          >
-            <Trash2 size={11} />
-            <span>Đã xóa mềm ({counts.deleted})</span>
-          </button>
+          <span className="text-[11px] font-semibold text-slate-500">
+            Đang hiển thị {filtered.length} / {destinations.length} điểm đến
+          </span>
         </div>
       </div>
 
@@ -461,7 +407,7 @@ export default function DestinationsClient() {
             <p className="text-[11px] text-rose-700 mt-0.5">{fetchError}</p>
             <button
               type="button"
-              onClick={() => loadList(dataSource)}
+              onClick={() => loadList()}
               className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900"
             >
               Thử lại
@@ -483,7 +429,7 @@ export default function DestinationsClient() {
             <Inbox size={28} />
           </div>
           <h3 className="text-base font-bold text-slate-800">
-            {searchQuery || statusTab !== "all"
+            {searchQuery || approvalFilter !== APPROVAL_FILTER.ALL || deletionFilter !== DELETION_FILTER.ACTIVE
               ? "Không tìm thấy điểm đến nào phù hợp với bộ lọc"
               : "Chưa có điểm đến nào trong hệ thống"}
           </h3>
@@ -513,7 +459,7 @@ export default function DestinationsClient() {
                   <th className="text-center px-4 py-3 font-black text-slate-700 uppercase tracking-wider text-[10.5px]">
                     Trạng thái
                   </th>
-                  <th className="text-right px-4 py-3 font-black text-slate-700 uppercase tracking-wider text-[10.5px]">
+                  <th className="text-left px-4 py-3 font-black text-slate-700 uppercase tracking-wider text-[10.5px]">
                     Thao tác
                   </th>
                 </tr>
@@ -575,21 +521,15 @@ export default function DestinationsClient() {
                           Chờ phê duyệt
                         </span>
                       )}
-                      {dest.status === STATUS.REVOKED && (
-                        <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
-                          Chờ duyệt lại
-                        </span>
-                      )}
                       {dest.status === STATUS.DELETED && (
                         <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
                           <Trash2 size={10} />
-                          Đã xóa mềm
+                          Đã xóa
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-start gap-1.5">
                         {dest.status !== STATUS.DELETED && (
                           <>
                             <button
@@ -638,7 +578,7 @@ export default function DestinationsClient() {
                               type="button"
                               onClick={() => setDeleteTarget(dest)}
                               className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors cursor-pointer"
-                              title="Xóa mềm"
+                              title="Xóa"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -859,12 +799,11 @@ export default function DestinationsClient() {
             </div>
             <div>
               <h3 className="text-base font-black text-slate-900">
-                Xóa mềm điểm đến?
+                Xóa điểm đến?
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Điểm đến <strong>&quot;{deleteTarget.name}&quot;</strong> sẽ
-                bị ẩn khỏi hệ thống và có thể khôi phục lại từ tab &quot;Đã xóa
-                mềm&quot;.
+                bị ẩn khỏi hệ thống và có thể khôi phục lại từ tab &quot;Đã xóa&quot;.
               </p>
             </div>
             <div className="flex items-center gap-2 pt-2">
@@ -956,25 +895,6 @@ export default function DestinationsClient() {
         theme="slate"
       />
 
-      <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-4 text-[11px] text-slate-500 leading-relaxed">
-        <div className="flex items-start gap-2">
-          <ListChecks size={14} className="text-slate-400 mt-0.5 shrink-0" />
-          <div>
-            <p className="font-bold text-slate-700">Ma trận API — ADMIN</p>
-            <ul className="mt-1 space-y-0.5 list-disc list-inside">
-              <li>GET /api/v1/destinations (tất cả)</li>
-              <li>GET /api/v1/destinations/approved</li>
-              <li>GET /api/v1/destinations/deleted</li>
-              <li>GET /api/v1/destinations/{`{id}`}</li>
-              <li>POST /api/v1/destinations</li>
-              <li>PUT /api/v1/destinations/{`{id}`}</li>
-              <li>PATCH /api/v1/destinations/{`{id}`}/approve</li>
-              <li>DELETE /api/v1/destinations/{`{id}`}</li>
-              <li>PATCH /api/v1/destinations/{`{id}`}/restore</li>
-            </ul>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
