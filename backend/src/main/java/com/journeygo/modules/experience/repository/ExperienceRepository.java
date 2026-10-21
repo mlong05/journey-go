@@ -16,9 +16,15 @@ import java.util.Optional;
 @Repository
 public interface ExperienceRepository extends JpaRepository<Experience, Long> {
 
-    Optional<Experience> findByDestinationId(Long destinationId);
+    // ── By destination (one-to-many) ──────────────────────────────────────────
 
-    boolean existsByDestinationId(Long destinationId);
+    List<Experience> findByDestination_Id(Long destinationId);
+
+    Page<Experience> findByDestination_Id(Long destinationId, Pageable pageable);
+
+    long countByDestination_Id(Long destinationId);
+
+    // ── Global status filters ─────────────────────────────────────────────────
 
     Page<Experience> findByStatus(ExperienceStatus status, Pageable pageable);
 
@@ -26,27 +32,15 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
 
     Page<Experience> findByStatusNot(ExperienceStatus status, Pageable pageable);
 
-    List<Experience> findByStatusAndCreatedById(ExperienceStatus status, Long createdById);
+    List<Experience> findByStatusAndCreatedBy_Id(ExperienceStatus status, Long createdById);
 
-    @EntityGraph(attributePaths = {"createdBy"})
-    @Query(value = "SELECT e FROM Experience e WHERE e.createdBy.id = :createdById",
-           countQuery = "SELECT count(e) FROM Experience e WHERE e.createdBy.id = :createdById")
-    Page<Experience> findByCreatedById(@Param("createdById") Long createdById, Pageable pageable);
-
-    @EntityGraph(attributePaths = {"createdBy"})
-    @Query(value = "SELECT e FROM Experience e WHERE e.createdBy.id = :createdById AND e.status <> :excludedStatus",
-           countQuery = "SELECT count(e) FROM Experience e WHERE e.createdBy.id = :createdById AND e.status <> :excludedStatus")
-    Page<Experience> findByCreatedByIdAndStatusNot(
-            @Param("createdById") Long createdById,
-            @Param("excludedStatus") ExperienceStatus excludedStatus,
-            Pageable pageable);
+    // ── With owner eager-loaded (avoid N+1) ───────────────────────────────────
 
     @Query("SELECT e FROM Experience e JOIN FETCH e.createdBy WHERE e.id = :id")
     Optional<Experience> findByIdWithOwner(@Param("id") Long id);
 
-    @Query("SELECT e FROM Experience e JOIN FETCH e.createdBy WHERE e.destinationId = :destinationId")
-    Optional<Experience> findByDestinationIdWithOwner(@Param("destinationId") Long destinationId);
-
+    @Query("SELECT e FROM Experience e JOIN FETCH e.createdBy WHERE e.destination.id = :destinationId")
+    List<Experience> findByDestinationIdWithOwner(@Param("destinationId") Long destinationId);
 
     @EntityGraph(attributePaths = {"createdBy"})
     @Query(value = "SELECT e FROM Experience e",
@@ -63,43 +57,56 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
            countQuery = "SELECT count(e) FROM Experience e WHERE e.status <> :status")
     Page<Experience> findByStatusNotWithCreatedBy(ExperienceStatus status, Pageable pageable);
 
-    // ── Lọc theo Destination ───────────────────────────────────────────────────
+    // ── Filter by destination ─────────────────────────────────────────────────
 
     @EntityGraph(attributePaths = {"createdBy"})
-    @Query(value = "SELECT e FROM Experience e WHERE e.destinationId = :destinationId",
-           countQuery = "SELECT count(e) FROM Experience e WHERE e.destinationId = :destinationId")
+    @Query(value = "SELECT e FROM Experience e WHERE e.destination.id = :destinationId",
+           countQuery = "SELECT count(e) FROM Experience e WHERE e.destination.id = :destinationId")
     Page<Experience> findByDestinationIdWithCreatedBy(
             @Param("destinationId") Long destinationId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"createdBy"})
-    @Query(value = "SELECT e FROM Experience e WHERE e.destinationId = :destinationId AND e.status = :status",
-           countQuery = "SELECT count(e) FROM Experience e WHERE e.destinationId = :destinationId AND e.status = :status")
+    @Query(value = "SELECT e FROM Experience e WHERE e.destination.id = :destinationId AND e.status = :status",
+           countQuery = "SELECT count(e) FROM Experience e WHERE e.destination.id = :destinationId AND e.status = :status")
     Page<Experience> findByDestinationIdAndStatusWithCreatedBy(
             @Param("destinationId") Long destinationId,
             @Param("status") ExperienceStatus status,
             Pageable pageable);
 
     @EntityGraph(attributePaths = {"createdBy"})
-    @Query(value = "SELECT e FROM Experience e WHERE e.destinationId = :destinationId AND e.status <> :excludedStatus",
-           countQuery = "SELECT count(e) FROM Experience e WHERE e.destinationId = :destinationId AND e.status <> :excludedStatus")
+    @Query(value = "SELECT e FROM Experience e WHERE e.destination.id = :destinationId AND e.status <> :excludedStatus",
+           countQuery = "SELECT count(e) FROM Experience e WHERE e.destination.id = :destinationId AND e.status <> :excludedStatus")
     Page<Experience> findByDestinationIdAndStatusNotWithCreatedBy(
             @Param("destinationId") Long destinationId,
             @Param("excludedStatus") ExperienceStatus excludedStatus,
             Pageable pageable);
 
-    // ── Lọc theo Destination + owner (cho endpoint /experiences/mine) ───────────
+    // ── Filter by destination + owner (for /experiences/mine) ─────────────────
 
     @EntityGraph(attributePaths = {"createdBy"})
-    @Query(value = "SELECT e FROM Experience e WHERE e.createdBy.id = :createdById AND e.destinationId = :destinationId",
-           countQuery = "SELECT count(e) FROM Experience e WHERE e.createdBy.id = :createdById AND e.destinationId = :destinationId")
+    @Query(value = "SELECT e FROM Experience e WHERE e.createdBy.id = :createdById",
+           countQuery = "SELECT count(e) FROM Experience e WHERE e.createdBy.id = :createdById")
+    Page<Experience> findByCreatedById(@Param("createdById") Long createdById, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"createdBy"})
+    @Query(value = "SELECT e FROM Experience e WHERE e.createdBy.id = :createdById AND e.status <> :excludedStatus",
+           countQuery = "SELECT count(e) FROM Experience e WHERE e.createdBy.id = :createdById AND e.status <> :excludedStatus")
+    Page<Experience> findByCreatedByIdAndStatusNot(
+            @Param("createdById") Long createdById,
+            @Param("excludedStatus") ExperienceStatus excludedStatus,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {"createdBy"})
+    @Query(value = "SELECT e FROM Experience e WHERE e.createdBy.id = :createdById AND e.destination.id = :destinationId",
+           countQuery = "SELECT count(e) FROM Experience e WHERE e.createdBy.id = :createdById AND e.destination.id = :destinationId")
     Page<Experience> findByCreatedByIdAndDestinationId(
             @Param("createdById") Long createdById,
             @Param("destinationId") Long destinationId,
             Pageable pageable);
 
     @EntityGraph(attributePaths = {"createdBy"})
-    @Query(value = "SELECT e FROM Experience e WHERE e.createdBy.id = :createdById AND e.destinationId = :destinationId AND e.status = :status",
-           countQuery = "SELECT count(e) FROM Experience e WHERE e.createdBy.id = :createdById AND e.destinationId = :destinationId AND e.status = :status")
+    @Query(value = "SELECT e FROM Experience e WHERE e.createdBy.id = :createdById AND e.destination.id = :destinationId AND e.status = :status",
+           countQuery = "SELECT count(e) FROM Experience e WHERE e.createdBy.id = :createdById AND e.destination.id = :destinationId AND e.status = :status")
     Page<Experience> findByCreatedByIdAndDestinationIdAndStatus(
             @Param("createdById") Long createdById,
             @Param("destinationId") Long destinationId,
@@ -107,8 +114,8 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
             Pageable pageable);
 
     @EntityGraph(attributePaths = {"createdBy"})
-    @Query(value = "SELECT e FROM Experience e WHERE e.createdBy.id = :createdById AND e.destinationId = :destinationId AND e.status <> :excludedStatus",
-           countQuery = "SELECT count(e) FROM Experience e WHERE e.createdBy.id = :createdById AND e.destinationId = :destinationId AND e.status <> :excludedStatus")
+    @Query(value = "SELECT e FROM Experience e WHERE e.createdBy.id = :createdById AND e.destination.id = :destinationId AND e.status <> :excludedStatus",
+           countQuery = "SELECT count(e) FROM Experience e WHERE e.createdBy.id = :createdById AND e.destination.id = :destinationId AND e.status <> :excludedStatus")
     Page<Experience> findByCreatedByIdAndDestinationIdAndStatusNot(
             @Param("createdById") Long createdById,
             @Param("destinationId") Long destinationId,

@@ -23,6 +23,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
@@ -42,13 +44,12 @@ public class ExperienceController {
                 experienceService.getById(id)));
     }
 
-    @GetMapping("/destinations/{destinationId}/experience")
-    @Operation(summary = "Lấy Experience theo Destination")
+    @GetMapping("/destinations/{destinationId}/experiences")
+    @Operation(summary = "Lấy danh sách Experience theo Destination")
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Experience không tồn tại cho destination này")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Danh sách Experience, có thể rỗng")
     })
-    public ResponseEntity<ApiResponse<ExperienceResponse>> getByDestinationId(
+    public ResponseEntity<ApiResponse<List<ExperienceResponse>>> getByDestinationId(
             @PathVariable Long destinationId) {
         return ResponseEntity.ok(ApiResponse.success(
                 experienceService.getByDestinationId(destinationId)));
@@ -63,7 +64,7 @@ public class ExperienceController {
             @RequestParam(required = false) ExperienceStatus status,
             @Parameter(description = "Admin: bao gồm cả INACTIVE")
             @RequestParam(defaultValue = "false") boolean includeInactive,
-            @Parameter(description = "Lọc theo điểm đến — mỗi Destination có tối đa 1 Experience (BR-EXP-1)")
+            @Parameter(description = "Lọc theo điểm đến")
             @RequestParam(required = false) Long destinationId,
             @Parameter(description = "Phân trang — để trống sort nếu không cần")
             @PageableDefault(size = 20) Pageable pageable) {
@@ -90,7 +91,7 @@ public class ExperienceController {
             @RequestParam(required = false) ExperienceStatus status,
             @Parameter(description = "Bao gồm cả INACTIVE")
             @RequestParam(defaultValue = "false") boolean includeInactive,
-            @Parameter(description = "Lọc theo điểm đến — BR-EXP-1 giới hạn 1 Experience mỗi Destination")
+            @Parameter(description = "Lọc theo điểm đến")
             @RequestParam(required = false) Long destinationId,
             @PageableDefault(size = 20) Pageable pageable) {
         Long currentUserId = AuthorizationGuard.currentUserId();
@@ -104,7 +105,6 @@ public class ExperienceController {
     @Operation(summary = "Tạo Experience mới (PROVIDER/ADMIN) — status = DRAFT")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "BR-EXP-1: Destination đã có Experience"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Chỉ PROVIDER/ADMIN")
     })

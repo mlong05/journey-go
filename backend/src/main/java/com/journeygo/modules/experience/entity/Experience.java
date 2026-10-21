@@ -1,5 +1,6 @@
 package com.journeygo.modules.experience.entity;
 
+import com.journeygo.modules.destination.entity.Destination;
 import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
 import com.journeygo.modules.user.entity.User;
 import jakarta.persistence.*;
@@ -11,9 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "experience", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_experience_destination", columnNames = "destination_id")
-})
+@Table(name = "experience")
 @Getter
 @Setter
 @Builder
@@ -25,8 +24,10 @@ public class Experience {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "destination_id", nullable = false)
-    private Long destinationId;
+    /** Many experiences can belong to the same destination. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "destination_id", nullable = false)
+    private Destination destination;
 
     @Column(nullable = false, length = 255)
     private String title;
@@ -49,7 +50,6 @@ public class Experience {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private ExperienceStatus status = ExperienceStatus.DRAFT;
-
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
@@ -84,5 +84,10 @@ public class Experience {
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = Instant.now();
+    }
+
+    /** Convenience getter — avoids forcing a join when only the FK is needed. */
+    public Long getDestinationId() {
+        return destination != null ? destination.getId() : null;
     }
 }

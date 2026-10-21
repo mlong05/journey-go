@@ -13,7 +13,7 @@ import java.time.Instant;
 public record ExperienceResponse(
 
         @Schema(description = "ID Experience") Long id,
-        @Schema(description = "ID Destination (UNIQUE — BR-EXP-1)") Long destinationId,
+        @Schema(description = "ID Destination liên kết") Long destinationId,
         @Schema(description = "Tiêu đề") String title,
         @Schema(description = "Mô tả") String description,
         @Schema(description = "Giá") BigDecimal price,
