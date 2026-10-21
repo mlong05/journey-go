@@ -26,6 +26,15 @@ public record TourInfo(
             String taskType,
             Integer orderIndex,
             Integer points,
-            String correctAnswer
-    ) {}
+            String correctAnswer,
+            String clue,
+            BigDecimal targetLatitude,
+            BigDecimal targetLongitude,
+            Integer targetRadiusMeters,
+            String hint
+    ) {
+        public TourTaskInfo(Long taskId, String taskName, String taskType, Integer orderIndex, Integer points, String correctAnswer) {
+            this(taskId, taskName, taskType, orderIndex, points, correctAnswer, null, null, null, 50, null);
+        }
+    }
 }
