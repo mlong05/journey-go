@@ -6,6 +6,7 @@ import com.journeygo.modules.experience.dto.request.UpdateTaskTypeRequest;
 import com.journeygo.modules.experience.dto.response.TaskTypeResponse;
 import com.journeygo.modules.experience.service.TaskTypeService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,18 +29,27 @@ public class TaskTypeController {
 
     @GetMapping("/task-types")
     @Operation(summary = "Danh sách TaskType (PUBLIC — không cần auth)")
+    @ApiResponses(@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"))
     public ResponseEntity<ApiResponse<List<TaskTypeResponse>>> list() {
         return ResponseEntity.ok(ApiResponse.success(taskTypeService.list()));
     }
 
     @GetMapping("/task-types/{id}")
     @Operation(summary = "Lấy TaskType theo ID")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<TaskTypeResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(taskTypeService.getById(id)));
     }
 
     @GetMapping("/task-types/code/{code}")
     @Operation(summary = "Lấy TaskType theo code (vd: QUIZ, FIELD_CLUE)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<TaskTypeResponse>> getByCode(@PathVariable String code) {
         return ResponseEntity.ok(ApiResponse.success(taskTypeService.getByCode(code)));
     }
@@ -48,6 +58,11 @@ public class TaskTypeController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Tạo TaskType mới (ADMIN only)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403")
+    })
     public ResponseEntity<ApiResponse<TaskTypeResponse>> create(
             @Valid @RequestBody CreateTaskTypeRequest request) {
         TaskTypeResponse t = taskTypeService.create(request);
@@ -59,6 +74,11 @@ public class TaskTypeController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Cập nhật TaskType (ADMIN only)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<TaskTypeResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateTaskTypeRequest request) {

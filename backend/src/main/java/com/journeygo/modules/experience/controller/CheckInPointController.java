@@ -6,6 +6,7 @@ import com.journeygo.modules.experience.dto.request.UpdateCheckInPointRequest;
 import com.journeygo.modules.experience.dto.response.CheckInPointResponse;
 import com.journeygo.modules.experience.service.CheckInPointService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -27,12 +28,17 @@ public class CheckInPointController {
 
     @GetMapping("/check-in-points/{id}")
     @Operation(summary = "Lấy CheckInPoint theo ID")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<CheckInPointResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(checkInPointService.getById(id)));
     }
 
     @GetMapping("/experiences/{experienceId}/check-in-points")
     @Operation(summary = "Danh sách CheckInPoint theo Experience")
+    @ApiResponses(@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"))
     public ResponseEntity<ApiResponse<List<CheckInPointResponse>>> listByExperience(
             @PathVariable Long experienceId) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -43,6 +49,12 @@ public class CheckInPointController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
     @Operation(summary = "Tạo CheckInPoint (chỉ khi Experience DRAFT, chỉ owner) — BR-CIP-1: qr_token UNIQUE")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+                    description = "BR-CIP-1: qr_token đã tồn tại hoặc Experience không DRAFT"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403")
+    })
     public ResponseEntity<ApiResponse<CheckInPointResponse>> create(
             @PathVariable Long experienceId,
             @Valid @RequestBody CreateCheckInPointRequest request) {
@@ -55,6 +67,12 @@ public class CheckInPointController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfCheckInPoint(#id)")
     @Operation(summary = "Cập nhật CheckInPoint (chỉ khi Experience DRAFT, chỉ owner)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+                    description = "Experience không DRAFT hoặc qr_token trùng"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403")
+    })
     public ResponseEntity<ApiResponse<CheckInPointResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateCheckInPointRequest request) {
@@ -65,6 +83,11 @@ public class CheckInPointController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfCheckInPoint(#id)")
     @Operation(summary = "Xóa CheckInPoint (chỉ khi Experience DRAFT, chỉ owner)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         checkInPointService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Xóa CheckInPoint thành công"));

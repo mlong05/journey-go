@@ -30,7 +30,7 @@ public class DestinationController {
     // ── Public endpoints ──────────────────────────────────────────────────────
 
     @GetMapping
-    @Operation(summary = "Lấy tất cả điểm đến", description = "Trả về danh sách tất cả điểm đến chưa bị xóa")
+    @Operation(summary = "Lấy tất cả điểm đến chưa xóa", description = "Trả về danh sách điểm đến chưa bị xóa, bao gồm cả chưa duyệt và đã duyệt (ADMIN / MODERATOR / PROVIDER)")
     public ResponseEntity<ApiResponse<List<DestinationResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách điểm đến thành công", destinationService.getAll()));
     }

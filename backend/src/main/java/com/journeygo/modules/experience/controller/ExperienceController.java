@@ -2,6 +2,7 @@ package com.journeygo.modules.experience.controller;
 
 import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.security.AuthorizationGuard;
+import com.journeygo.modules.experience.dto.request.ChangeExperienceStatusRequest;
 import com.journeygo.modules.experience.dto.request.CreateExperienceRequest;
 import com.journeygo.modules.experience.dto.request.UpdateExperienceRequest;
 import com.journeygo.modules.experience.dto.response.ExperienceResponse;
@@ -55,17 +56,46 @@ public class ExperienceController {
 
     @GetMapping("/experiences")
     @Operation(summary = "Danh sách Experience (có phân trang)",
-            description = "filter theo ?status=PUBLISHED/DRAFT/INACTIVE&page=0&size=20&sort=id,asc. " +
+            description = "filter theo ?status=PUBLISHED/DRAFT/INACTIVE&destinationId=<id>&page=0&size=20&sort=id,asc. " +
                     "Mặc định ẩn INACTIVE (soft-deleted). Admin truyền ?includeInactive=true để thấy tất cả.")
     public ResponseEntity<ApiResponse<Page<ExperienceResponse>>> list(
             @Parameter(description = "Filter theo status (mặc định ẩn INACTIVE)")
             @RequestParam(required = false) ExperienceStatus status,
             @Parameter(description = "Admin: bao gồm cả INACTIVE")
             @RequestParam(defaultValue = "false") boolean includeInactive,
+            @Parameter(description = "Lọc theo điểm đến — mỗi Destination có tối đa 1 Experience (BR-EXP-1)")
+            @RequestParam(required = false) Long destinationId,
             @Parameter(description = "Phân trang — để trống sort nếu không cần")
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success(
-                experienceService.list(status, includeInactive, pageable)));
+                experienceService.list(status, includeInactive, destinationId, pageable)));
+    }
+
+    /**
+     * Danh sách Experience của user hiện tại (PROVIDER xem của mình).
+     * Không nhìn thấy experience của provider khác.
+     */
+    @GetMapping("/experiences/mine")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN')")
+    @Operation(summary = "Danh sách Experience của tôi (PROVIDER/ADMIN) — không thấy của người khác",
+            description = "Lọc theo createdBy = current user. Hỗ trợ ?status=&?destinationId=&?includeInactive=true.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Chỉ PROVIDER/ADMIN")
+    })
+    public ResponseEntity<ApiResponse<Page<ExperienceResponse>>> listMine(
+            @Parameter(description = "Filter theo status (mặc định ẩn INACTIVE)")
+            @RequestParam(required = false) ExperienceStatus status,
+            @Parameter(description = "Bao gồm cả INACTIVE")
+            @RequestParam(defaultValue = "false") boolean includeInactive,
+            @Parameter(description = "Lọc theo điểm đến — BR-EXP-1 giới hạn 1 Experience mỗi Destination")
+            @RequestParam(required = false) Long destinationId,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Long currentUserId = AuthorizationGuard.currentUserId();
+        return ResponseEntity.ok(ApiResponse.success(
+                experienceService.listByOwner(currentUserId, status, includeInactive, destinationId, pageable)));
     }
 
     @PostMapping("/experiences")
@@ -115,5 +145,25 @@ public class ExperienceController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         experienceService.softDelete(id);
         return ResponseEntity.ok(ApiResponse.success("Xóa Experience thành công"));
+    }
+
+    @PatchMapping("/experiences/{id}/status")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#id)")
+    @Operation(summary = "Đổi trạng thái Experience (DRAFT ↔ PUBLISHED, chỉ owner)",
+            description = "Không thể đổi INACTIVE; dùng DELETE để xoá mềm. Idempotent: trùng status hiện tại thì trả về object hiện tại.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+                    description = "BR-EXP-3: status mới không hợp lệ hoặc Experience đã INACTIVE"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải owner"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
+    public ResponseEntity<ApiResponse<ExperienceResponse>> changeStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody ChangeExperienceStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đổi trạng thái thành công",
+                experienceService.changeStatus(id, request)));
     }
 }
