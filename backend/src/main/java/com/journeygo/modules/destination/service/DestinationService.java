@@ -10,7 +10,6 @@ import com.journeygo.modules.destination.entity.DestinationStatus;
 import com.journeygo.modules.destination.entity.Region;
 import com.journeygo.modules.destination.entity.Theme;
 import com.journeygo.modules.destination.repository.DestinationRepository;
-import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.destination.repository.RegionRepository;
 import com.journeygo.modules.destination.repository.ThemeRepository;
 import com.journeygo.modules.user.entity.Role;
@@ -43,7 +42,7 @@ public class DestinationService {
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
             "id", "name", "address", "latitude", "longitude",
-            "capacity", "status", "approved", "deleted", "regionId", "createdAt", "updatedAt"
+            "capacity", "booked", "status", "approved", "deleted", "regionId", "createdAt", "updatedAt"
     );
 
     /** Retrieve all non-deleted destinations with pagination and sorting. */
@@ -193,6 +192,7 @@ public class DestinationService {
                 .latitude(request.latitude())
                 .longitude(request.longitude())
                 .capacity(request.capacity())
+                .booked(0)
                 .approved(false)
                 .status(DestinationStatus.DRAFT)
                 .region(region)

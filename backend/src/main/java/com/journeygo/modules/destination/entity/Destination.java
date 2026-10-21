@@ -2,6 +2,7 @@ package com.journeygo.modules.destination.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.journeygo.modules.content.entity.CulturalContent;
+import com.journeygo.modules.experience.entity.Experience;
 import com.journeygo.modules.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -43,6 +44,10 @@ public class Destination {
 
     @Column(nullable = false)
     @Builder.Default
+    private Integer booked = 0;
+
+    @Column(nullable = false)
+    @Builder.Default
     private boolean approved = false;
 
     @Enumerated(EnumType.STRING)
@@ -75,6 +80,11 @@ public class Destination {
     @OrderBy("sequenceOrder ASC")
     @Builder.Default
     private List<CulturalContent> contents = new ArrayList<>();
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "destination", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Experience> experiences = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

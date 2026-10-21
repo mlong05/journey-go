@@ -24,8 +24,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/v1/destinations")
 @RequiredArgsConstructor
@@ -92,14 +90,11 @@ public class DestinationController {
 
     // ── ADMIN / MODERATOR only ────────────────────────────────────────────────
 
+    @Operation(summary = "Lấy điểm đến đã xóa (phân trang & sắp xếp)",
+            description = "Trả về danh sách điểm đến đã bị xóa mềm (ADMIN / MODERATOR)")
     @GetMapping("/deleted")
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Lấy điểm đến đã xóa", description = "Trả về danh sách điểm đến đã bị xóa mềm (ADMIN / MODERATOR)")
-    public ResponseEntity<ApiResponse<List<DestinationResponse>>> getDeleted() {
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách điểm đến đã xóa thành công", destinationService.getDeleted()));
-    @Operation(summary = "Lấy điểm đến đã xóa (phân trang & sắp xếp)",
-            description = "Trả về danh sách điểm đến đã bị xóa mềm (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<PageResponse<DestinationResponse>>> getDeleted(
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách điểm đến đã xóa thành công",
@@ -125,7 +120,6 @@ public class DestinationController {
     @PatchMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Phê duyệt điểm đến", description = "Phê duyệt hoặc hủy phê duyệt điểm đến (ADMIN / MODERATOR)")
     @Operation(summary = "Phê duyệt điểm đến (legacy)", description = "Phê duyệt hoặc hủy phê duyệt điểm đến (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<DestinationResponse>> setApproval(
             @PathVariable Long id,
@@ -149,34 +143,6 @@ public class DestinationController {
     @Operation(summary = "Khôi phục điểm đến", description = "Khôi phục điểm đến đã bị xóa mềm (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<DestinationResponse>> restore(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Khôi phục điểm đến thành công", destinationService.restore(id)));
-    }
-
-    // ── ADMIN / MODERATOR / PROVIDER ─────────────────────────────────────────
-
-    @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
-    @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Tạo điểm đến mới", description = "Tạo điểm đến mới, mặc định chưa được phê duyệt (ADMIN / MODERATOR / PROVIDER)")
-    public ResponseEntity<ApiResponse<DestinationResponse>> create(
-            @Valid @RequestBody DestinationRequest request,
-            @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Tạo điểm đến thành công", destinationService.create(request, userPrincipal.getId())));
-    }
-
-    @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
-    @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Cập nhật điểm đến", description = "Cập nhật điểm đến; PROVIDER chỉ được sửa điểm đến của chính mình")
-    public ResponseEntity<ApiResponse<DestinationResponse>> update(
-            @PathVariable Long id,
-            @Valid @RequestBody DestinationRequest request,
-            @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        Role callerRole = Role.valueOf(
-                userPrincipal.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "")
-        );
-        return ResponseEntity.ok(ApiResponse.success("Cập nhật điểm đến thành công",
-                destinationService.update(id, request, userPrincipal.getId(), callerRole)));
     }
 
     // ── ADMIN / MODERATOR / PROVIDER ─────────────────────────────────────────

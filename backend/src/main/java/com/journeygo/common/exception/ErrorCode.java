@@ -23,14 +23,17 @@ public enum ErrorCode {
     SAME_OLD_PASSWORD("Mật khẩu mới không được trùng với mật khẩu hiện tại", HttpStatus.BAD_REQUEST),
     MAIL_SEND_FAILED("Gửi email thất bại, vui lòng kiểm tra lại cấu hình hoặc thử lại sau", HttpStatus.INTERNAL_SERVER_ERROR),
     CANNOT_MODIFY_OWN_ROLE("Không thể tự thay đổi vai trò của chính mình", HttpStatus.BAD_REQUEST),
-    CANNOT_DEACTIVATE_SELF("Không thể tự khóa tài khoản của chính mình", HttpStatus.BAD_REQUEST);
-    DESTINATION_COORDINATE_EXISTED("Đã tồn tại điểm đến với tọa độ này", HttpStatus.CONFLICT),
+    CANNOT_DEACTIVATE_SELF("Không thể tự khóa tài khoản của chính mình", HttpStatus.BAD_REQUEST),
     REGION_NOT_FOUND("Khu vực không tồn tại", HttpStatus.NOT_FOUND),
     REGION_EXISTED("Khu vực đã tồn tại", HttpStatus.CONFLICT),
     THEME_NOT_FOUND("Chủ đề không tồn tại", HttpStatus.NOT_FOUND),
     THEME_EXISTED("Chủ đề đã tồn tại", HttpStatus.CONFLICT),
     CONTENT_NOT_FOUND("Nội dung văn hóa không tồn tại", HttpStatus.NOT_FOUND),
-    INVALID_DESTINATION_STATUS("Trạng thái điểm đến không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST);
+    INVALID_DESTINATION_STATUS("Trạng thái điểm đến không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
+    TOUR_NOT_FOUND("Tour không tồn tại", HttpStatus.NOT_FOUND),
+    TOUR_EXISTED("Tour với tên này đã tồn tại", HttpStatus.CONFLICT),
+    TOUR_REJECTION_REASON_REQUIRED("Lý do từ chối không được để trống", HttpStatus.BAD_REQUEST),
+    INVALID_TOUR_STATUS("Trạng thái tour không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST);
 
     private final String message;
     private final HttpStatus httpStatus;

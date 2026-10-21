@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 @Schema(description = "Yêu cầu tạo Experience mới (không có experienceType — dùng Task)")
 public record CreateExperienceRequest(
 
-        @Schema(description = "ID Destination (1-1 với Experience — BR-EXP-1)", example = "1")
+        @Schema(description = "ID Destination liên kết", example = "1")
         @NotNull(message = "Destination ID không được để trống")
         Long destinationId,
 
