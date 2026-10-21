@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
+  MapPin,
   CreditCard,
   BarChart3,
   ShieldAlert,
@@ -13,10 +14,71 @@ import {
   Search,
   Bell,
   Menu,
+  Sparkles,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
 import { ExpandingSideRail, UserProfilePill } from "@/components/layout";
+
+// Navigation items được định nghĩa ngoài component để tránh re-create mỗi render
+const ADMIN_NAV_ITEMS = [
+  {
+    id: "overview",
+    label: "Tổng quan vận hành",
+    href: "/admin",
+    icon: LayoutDashboard,
+    badge: null,
+  },
+  {
+    id: "users",
+    label: "Quản lý người dùng",
+    href: "/admin/users",
+    icon: Users,
+    badge: null,
+  },
+  {
+    id: "destinations",
+    label: "Quản lý điểm đến",
+    href: "/admin/destinations",
+    icon: MapPin,
+    badge: null,
+  },
+  {
+    id: "experiences",
+    label: "Quản lý trải nghiệm",
+    href: "/admin/experiences",
+    icon: Sparkles,
+    badge: null,
+  },
+  {
+    id: "finance",
+    label: "Tài chính & Thanh toán",
+    href: "/admin/finance",
+    icon: CreditCard,
+    badge: null,
+  },
+  {
+    id: "analytics",
+    label: "Báo cáo tăng trưởng",
+    href: "/admin/analytics",
+    icon: BarChart3,
+    badge: null,
+  },
+  {
+    id: "audit-logs",
+    label: "Nhật ký kiểm toán",
+    href: "/admin/audit-logs",
+    icon: ShieldAlert,
+    badge: null,
+  },
+  {
+    id: "system-config",
+    label: "Cấu hình hệ thống",
+    href: "/admin/system-config",
+    icon: Settings,
+    badge: null,
+  },
+];
 
 /**
  * Layout Quản Trị Hệ Thống Toàn Sàn - JourneyGo
@@ -37,52 +99,6 @@ export default function AdminLayout({ children }) {
   const [isSidebarWide, setIsSidebarWide] = useState(true);
   const [topSearch, setTopSearch] = useState("");
   const [notificationsCount, setNotificationsCount] = useState(0);
-
-  // 6 Mục menu điều hướng quản trị trung tâm
-  const adminNavItems = [
-    {
-      id: "overview",
-      label: "Tổng quan vận hành",
-      href: "/admin",
-      icon: LayoutDashboard,
-      badge: null,
-    },
-    {
-      id: "users",
-      label: "Quản lý người dùng",
-      href: "/admin/users",
-      icon: Users,
-      badge: null,
-    },
-    {
-      id: "finance",
-      label: "Tài chính & Thanh toán",
-      href: "/admin/finance",
-      icon: CreditCard,
-      badge: null,
-    },
-    {
-      id: "analytics",
-      label: "Báo cáo tăng trưởng",
-      href: "/admin/analytics",
-      icon: BarChart3,
-      badge: null,
-    },
-    {
-      id: "audit-logs",
-      label: "Nhật ký kiểm toán",
-      href: "/admin/audit-logs",
-      icon: ShieldAlert,
-      badge: null,
-    },
-    {
-      id: "system-config",
-      label: "Cấu hình hệ thống",
-      href: "/admin/system-config",
-      icon: Settings,
-      badge: null,
-    },
-  ];
 
   // Xử lý tìm kiếm nhanh từ Topbar
   const handleTopSearchSubmit = (e) => {
@@ -116,7 +132,7 @@ export default function AdminLayout({ children }) {
       <ExpandingSideRail
         role="admin"
         roleLabel="Quản trị viên"
-        navItems={adminNavItems}
+        navItems={ADMIN_NAV_ITEMS}
         user={{
           name: adminName,
           email: adminEmail,

@@ -59,6 +59,12 @@ export default function ProviderLayout({ children }) {
       icon: MapPin,
     },
     {
+      id: "experiences",
+      label: "Quản lý Trải nghiệm",
+      href: "/provider/experiences",
+      icon: Sparkles,
+    },
+    {
       id: "routes",
       label: "Lộ trình Văn hóa",
       href: "/provider/routes/builder",

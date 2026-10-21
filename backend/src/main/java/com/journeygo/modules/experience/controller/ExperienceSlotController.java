@@ -6,6 +6,7 @@ import com.journeygo.modules.experience.dto.request.UpdateExperienceSlotRequest;
 import com.journeygo.modules.experience.dto.response.ExperienceSlotResponse;
 import com.journeygo.modules.experience.service.ExperienceSlotService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,9 +29,13 @@ public class ExperienceSlotController {
 
     private final ExperienceSlotService slotService;
 
-    @GetMapping("/experiences/{experienceId}/slots")
+@GetMapping("/experiences/{experienceId}/slots")
     @Operation(summary = "Danh sách slot theo Experience",
-            description = "?date=2026-10-15 (YYYY-MM-DD) để filter theo ngày cụ thể")
+            description = "?date=2026-10-15 (YYYY-MM-DD) để filter theo ngày cụ thể. Cần auth.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401")
+    })
     public ResponseEntity<ApiResponse<List<ExperienceSlotResponse>>> list(
             @PathVariable Long experienceId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -39,6 +44,10 @@ public class ExperienceSlotController {
 
     @GetMapping("/slots/{id}")
     @Operation(summary = "Lấy Slot theo ID")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<ExperienceSlotResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(slotService.getById(id)));
     }
@@ -46,8 +55,14 @@ public class ExperienceSlotController {
     @PostMapping("/experiences/{experienceId}/slots")
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
-    @Operation(summary = "Tạo / cập nhật quota platform cho Experience theo ngày (chỉ owner)",
-            description = "Upsert theo (experienceId, slotDate).")
+    @Operation(summary = "Tạo / cập nhật quota theo ngày (Upsert, chỉ owner — KHÔNG yêu cầu Experience DRAFT)",
+    description = "Upsert theo (experienceId, slotDate). Owner được tạo quota ngay cả khi Experience đã PUBLISHED.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải owner")
+    })
     public ResponseEntity<ApiResponse<ExperienceSlotResponse>> create(
             @PathVariable Long experienceId,
             @Valid @RequestBody CreateExperienceSlotRequest request) {
@@ -59,7 +74,13 @@ public class ExperienceSlotController {
     @PatchMapping("/slots/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfSlot(#id)")
-    @Operation(summary = "Cập nhật quota platform / status (chỉ owner)")
+    @Operation(summary = "Cập nhật quota / status slot (chỉ owner — KHÔNG yêu cầu Experience DRAFT)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải owner"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<ExperienceSlotResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateExperienceSlotRequest request) {
@@ -70,6 +91,12 @@ public class ExperienceSlotController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfSlot(#id)")
     @Operation(summary = "Xóa Slot (chỉ owner)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải owner"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         slotService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Xóa Slot thành công"));
