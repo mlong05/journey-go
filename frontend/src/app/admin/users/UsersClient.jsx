@@ -396,7 +396,7 @@ export default function AdminUsersClient() {
   const handleExportCSV = () => {
     const rows = Array.isArray(pageData.content) ? pageData.content : [];
     if (rows.length === 0) {
-      showToast("Không có dữ liệu để xuất CSV.", "error");
+      showToast("Không có dữ liệu để xuất Excel.", "error");
       return;
     }
 
@@ -452,7 +452,7 @@ export default function AdminUsersClient() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`Đã xuất ${rows.length} tài khoản ra file CSV.`, "success");
+    showToast(`Đã xuất ${rows.length} tài khoản ra Excel.`, "success");
   };
 
   /* ----------------------------------------------------------------
@@ -729,7 +729,7 @@ export default function AdminUsersClient() {
             className="bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm shadow-slate-900/20 text-xs sm:text-sm transition-all cursor-pointer"
           >
             <Download size={16} strokeWidth={2.4} />
-            <span>Xuất danh sách CSV</span>
+            <span>Xuất file Excel</span>
           </button>
         </div>
       </div>

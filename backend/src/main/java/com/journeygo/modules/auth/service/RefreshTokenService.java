@@ -6,7 +6,6 @@ import com.journeygo.modules.auth.entity.RefreshToken;
 import com.journeygo.modules.auth.repository.RefreshTokenRepository;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.security.JwtTokenProvider;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,11 +13,16 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider tokenProvider;
+
+    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository,
+                               JwtTokenProvider tokenProvider) {
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.tokenProvider = tokenProvider;
+    }
 
     @Transactional
     public RefreshToken createRefreshToken(User user) {

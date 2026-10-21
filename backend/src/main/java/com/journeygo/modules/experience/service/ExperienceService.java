@@ -1,6 +1,7 @@
 package com.journeygo.modules.experience.service;
 
 import com.journeygo.common.security.AuthorizationGuard;
+import com.journeygo.modules.experience.dto.request.ChangeExperienceStatusRequest;
 import com.journeygo.modules.experience.dto.request.CreateExperienceRequest;
 import com.journeygo.modules.experience.dto.request.UpdateExperienceRequest;
 import com.journeygo.modules.experience.dto.response.ExperienceResponse;
@@ -55,10 +56,18 @@ public class ExperienceService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ExperienceResponse> list(ExperienceStatus status, boolean includeInactive, Pageable pageable) {
-
+    public Page<ExperienceResponse> list(ExperienceStatus status, boolean includeInactive, Long destinationId, Pageable pageable) {
         Page<Experience> page;
-        if (status != null) {
+        if (destinationId != null) {
+            if (status != null) {
+                page = experienceRepository.findByDestinationIdAndStatusWithCreatedBy(destinationId, status, pageable);
+            } else if (includeInactive) {
+                page = experienceRepository.findByDestinationIdWithCreatedBy(destinationId, pageable);
+            } else {
+                page = experienceRepository.findByDestinationIdAndStatusNotWithCreatedBy(
+                        destinationId, ExperienceStatus.INACTIVE, pageable);
+            }
+        } else if (status != null) {
             page = experienceRepository.findByStatusWithCreatedBy(status, pageable);
         } else if (includeInactive) {
             page = experienceRepository.findAllWithCreatedBy(pageable);
@@ -75,6 +84,34 @@ public class ExperienceService {
                         org.springframework.data.domain.PageRequest.of(0, 500))
                 .map(this::toResponseWithCounts)
                 .getContent();
+    }
+
+    /**
+     * Danh sách Experience của một user (PROVIDER xem của mình).
+     * Mặc định ẩn INACTIVE (soft-deleted).
+     */
+    @Transactional(readOnly = true)
+    public Page<ExperienceResponse> listByOwner(Long ownerId, ExperienceStatus status, boolean includeInactive, Long destinationId, Pageable pageable) {
+        Page<Experience> page;
+        if (destinationId != null) {
+            if (status != null) {
+                page = experienceRepository.findByCreatedByIdAndDestinationIdAndStatus(
+                        ownerId, destinationId, status, pageable);
+            } else if (includeInactive) {
+                page = experienceRepository.findByCreatedByIdAndDestinationId(
+                        ownerId, destinationId, pageable);
+            } else {
+                page = experienceRepository.findByCreatedByIdAndDestinationIdAndStatusNot(
+                        ownerId, destinationId, ExperienceStatus.INACTIVE, pageable);
+            }
+        } else if (status != null) {
+            page = experienceRepository.findByStatusWithCreatedBy(status, pageable);
+        } else if (includeInactive) {
+            page = experienceRepository.findByCreatedById(ownerId, pageable);
+        } else {
+            page = experienceRepository.findByCreatedByIdAndStatusNot(ownerId, ExperienceStatus.INACTIVE, pageable);
+        }
+        return page.map(this::toResponseWithCounts);
     }
 
 
@@ -140,9 +177,53 @@ public class ExperienceService {
     public void softDelete(Long id) {
         Experience e = findOrThrow(id);
 
+        // Idempotent: nếu đã INACTIVE thì không ghi đè log nữa, tránh tốn transaction thừa.
+        if (e.getStatus() == ExperienceStatus.INACTIVE) {
+            log.info("Experience id={} đã ở trạng thái INACTIVE, bỏ qua softDelete", id);
+            return;
+        }
+
         e.setStatus(ExperienceStatus.INACTIVE);
         experienceRepository.save(e);
         log.info("Experience id={} soft-deleted → INACTIVE", id);
+    }
+
+    /**
+     * Đổi trạng thái Experience (chỉ DRAFT ↔ PUBLISHED — INACTIVE chỉ set bằng xoá mềm).
+     * Chỉ owner (PROVIDER/ADMIN) được thực hiện; controller đã chặn ở @PreAuthorize.
+     *
+     * @throws BusinessException "BR-EXP-3" khi đổi INACTIVE → ? ; "BR-EXP-2" khi status mới không hợp lệ.
+     */
+    @Transactional
+    public ExperienceResponse changeStatus(Long id, ChangeExperienceStatusRequest req) {
+        Experience e = findOrThrow(id);
+        ExperienceStatus newStatus = req.status();
+
+        // Không cho đổi status của Experience đã ngừng hoạt động
+        if (e.getStatus() == ExperienceStatus.INACTIVE) {
+            throw new BusinessException("BR-EXP-3",
+                    "Experience đã ở trạng thái INACTIVE. Cần tạo mới thay vì đổi trạng thái.");
+        }
+
+        // Chỉ chấp nhận DRAFT hoặc PUBLISHED làm status mới
+        if (newStatus != ExperienceStatus.DRAFT && newStatus != ExperienceStatus.PUBLISHED) {
+            throw new BusinessException("BR-EXP-3-CHG",
+                    "Chỉ có thể chuyển sang DRAFT hoặc PUBLISHED. INACTIVE là xoá mềm.");
+        }
+
+        // Idempotent: nếu trùng status hiện tại thì trả về luôn
+        if (e.getStatus() == newStatus) {
+            log.info("Experience id={} đã ở trạng thái {}, bỏ qua changeStatus", id, newStatus);
+        } else {
+            ExperienceStatus old = e.getStatus();
+            e.setStatus(newStatus);
+            experienceRepository.save(e);
+            log.info("Experience id={} status: {} → {}", id, old, newStatus);
+        }
+
+        int taskCount = (int) taskRepository.countByExperienceId(e.getId());
+        int cipCount = (int) checkInPointRepository.countByExperienceId(e.getId());
+        return ExperienceResponse.fromEntity(e, taskCount, cipCount);
     }
 
     private Experience findOrThrow(Long id) {

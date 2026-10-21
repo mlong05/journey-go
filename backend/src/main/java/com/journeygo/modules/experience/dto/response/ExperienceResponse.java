@@ -20,6 +20,7 @@ public record ExperienceResponse(
         @Schema(description = "Currency") String currency,
         @Schema(description = "Thời lượng (phút)") Integer durationMinutes,
         @Schema(description = "Trạng thái") ExperienceStatus status,
+        @Schema(description = "ID người tạo") Long createdById,
         @Schema(description = "Người tạo") String createdBy,
         @Schema(description = "Số Task con") Integer taskCount,
         @Schema(description = "Số CheckInPoint") Integer checkInPointCount,
@@ -37,6 +38,7 @@ public record ExperienceResponse(
                 .currency(e.getCurrency())
                 .durationMinutes(e.getDurationMinutes())
                 .status(e.getStatus())
+                .createdById(e.getCreatedBy() != null ? e.getCreatedBy().getId() : null)
                 .createdBy(e.getCreatedBy() != null ? e.getCreatedBy().getFullName() : null)
                 .taskCount(taskCount)
                 .checkInPointCount(checkInPointCount)
@@ -56,6 +58,7 @@ public record ExperienceResponse(
                 .currency(e.getCurrency())
                 .durationMinutes(e.getDurationMinutes())
                 .status(e.getStatus())
+                .createdById(e.getCreatedBy() != null ? e.getCreatedBy().getId() : null)
                 .createdBy(e.getCreatedBy() != null ? e.getCreatedBy().getFullName() : null)
                 .taskCount(e.getTasks() != null ? e.getTasks().size() : 0)
                 .checkInPointCount(e.getCheckInPoints() != null ? e.getCheckInPoints().size() : 0)

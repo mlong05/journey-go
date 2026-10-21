@@ -6,6 +6,7 @@ import com.journeygo.modules.experience.dto.request.SetExpectedTextRequest;
 import com.journeygo.modules.experience.dto.response.QuestionResponse;
 import com.journeygo.modules.experience.service.QuestionService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +29,10 @@ public class QuestionController {
     @GetMapping("/questions/{id}")
     @Operation(summary = "Lấy Question theo ID",
             description = "?forTourist=true ẩn expectedText & answers.isCorrect (BR-TASK-5)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<QuestionResponse>> getById(
             @PathVariable Long id,
             @RequestParam(defaultValue = "false") boolean forTourist) {
@@ -37,6 +42,7 @@ public class QuestionController {
     @GetMapping("/tasks/{taskId}/questions")
     @Operation(summary = "Danh sách Question theo Task",
             description = "?forTourist=true ẩn đáp án (BR-TASK-5)")
+    @ApiResponses(@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"))
     public ResponseEntity<ApiResponse<List<QuestionResponse>>> listByTask(
             @PathVariable Long taskId,
             @RequestParam(defaultValue = "false") boolean forTourist) {
@@ -48,6 +54,12 @@ public class QuestionController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfTask(#taskId)")
     @Operation(summary = "Tạo Question cho Task (chỉ khi Task DRAFT, chỉ owner)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+                    description = "Task không DRAFT hoặc không thuộc TaskType có Question"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403")
+    })
     public ResponseEntity<ApiResponse<QuestionResponse>> create(
             @PathVariable Long taskId,
             @Valid @RequestBody CreateQuestionRequest request) {
@@ -60,6 +72,11 @@ public class QuestionController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfQuestion(#id)")
     @Operation(summary = "Set/Cập nhật expectedText (chỉ khi Task DRAFT, chỉ owner)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<QuestionResponse>> setExpectedText(
             @PathVariable Long id,
             @Valid @RequestBody SetExpectedTextRequest request) {
@@ -70,6 +87,11 @@ public class QuestionController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfQuestion(#id)")
     @Operation(summary = "Xóa Question (chỉ khi Task DRAFT, chỉ owner)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
+    })
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         questionService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Xóa Question thành công"));

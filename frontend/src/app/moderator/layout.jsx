@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Compass,
+  Sparkles,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -39,6 +40,11 @@ export default function ModeratorLayout({ children }) {
   const [topSearch, setTopSearch] = useState("");
   const [urgentAlertsCount, setUrgentAlertsCount] = useState(0);
 
+  /* Chỉ trang DANH SÁCH điểm đến mới dùng khung cố định h-full/overflow-hidden
+     để vùng bảng tự cuộn. Các trang khác (kể cả hồ sơ chi tiết /destinations/[id])
+     vẫn cuộn toàn trang như cũ. So khớp chính xác để không áp nhầm. */
+  const isDestinationList = /^\/moderator\/destinations\/?$/.test(pathname);
+
   // 5 mục menu điều hướng chuyên biệt của kiểm duyệt viên
   const moderatorNavItems = [
     {
@@ -53,6 +59,13 @@ export default function ModeratorLayout({ children }) {
       label: "Duyệt Điểm đến & Lộ trình",
       href: "/moderator/destinations",
       icon: MapPin,
+      badge: null,
+    },
+    {
+      id: "experiences",
+      label: "Trải nghiệm",
+      href: "/moderator/experiences",
+      icon: Sparkles,
       badge: null,
     },
     {
@@ -192,9 +205,25 @@ export default function ModeratorLayout({ children }) {
           </div>
         </header>
 
-        {/* Nội dung trang làm việc: flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50 */}
-        <main className="flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50">
-          <div className="w-full max-w-[1600px] mx-auto space-y-6">
+        {/* Nội dung trang làm việc.
+            • TRANG DANH SÁCH (/moderator/destinations): dùng khung cố định
+              h-full + overflow-hidden NGAY TỪ RENDER ĐẦU TIÊN để trang con tự
+              cuộn riêng vùng danh sách, không bị nhảy layout khi dữ liệu về.
+            • CÁC TRANG KHÁC: giữ nguyên cuộn toàn trang + padding như cũ. */}
+        <main
+          className={
+            isDestinationList
+              ? "flex-1 w-full h-full overflow-hidden bg-slate-50"
+              : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
+          }
+        >
+          <div
+            className={
+              isDestinationList
+                ? "w-full max-w-[1600px] mx-auto h-full flex flex-col"
+                : "w-full max-w-[1600px] mx-auto space-y-6"
+            }
+          >
             {children}
           </div>
         </main>
