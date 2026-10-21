@@ -240,4 +240,108 @@ class JourneyServiceTest {
 
         assertEquals("DEST-NOT-CHECKED-IN", ex.getCode());
     }
+
+    @Test
+    void getPuzzleClue_WhenCheckedIn_ShouldReturnClueDetails() {
+        sampleDestProgress.setCheckedIn(true);
+
+        when(journeyRepository.findByIdWithDestinations(50L)).thenReturn(Optional.of(sampleJourney));
+        when(taskProgressRepository.findByJourneyId(50L)).thenReturn(List.of(sampleTaskProgress));
+        when(tourInfoProvider.getTourInfo(1L)).thenReturn(sampleTourInfo);
+
+        PuzzleClueResponse response = journeyService.getPuzzleClue(50L, 1001L, 10L);
+
+        assertNotNull(response);
+        assertEquals(1001L, response.taskId());
+        assertFalse(response.completed());
+    }
+
+    @Test
+    void submitTask_WhenGPSPuzzleOutOfRange_ShouldThrowException() {
+        TourInfo.TourTaskInfo puzzleTaskInfo = new TourInfo.TourTaskInfo(
+                1002L, "Mật mã chuông đồng", "REAL_WORLD_INTERACTIVE", 2, 20, "PHUOC DUYEN",
+                "Giải mật mã", new BigDecimal("16.4526000"), new BigDecimal("107.5458000"), 50, "Gợi ý"
+        );
+
+        TourInfo.TourDestinationInfo destInfoWithPuzzle = new TourInfo.TourDestinationInfo(
+                101L, "Chùa Thiên Mụ", 1, 201L,
+                new BigDecimal("16.4526000"), new BigDecimal("107.5458000"), 100, "QR",
+                List.of(puzzleTaskInfo)
+        );
+
+        TourInfo puzzleTourInfo = new TourInfo(1L, "Huế", List.of(destInfoWithPuzzle));
+
+        JourneyTaskProgress puzzleProgress = JourneyTaskProgress.builder()
+                .id(301L)
+                .journey(sampleJourney)
+                .destinationProgress(sampleDestProgress)
+                .taskId(1002L)
+                .taskName("Mật mã chuông đồng")
+                .taskType("REAL_WORLD_INTERACTIVE")
+                .orderIndex(2)
+                .status(TaskProgressStatus.NOT_STARTED)
+                .attempts(0)
+                .build();
+
+        sampleDestProgress.setCheckedIn(true);
+
+        // Khách ở Hà Nội thay vì ở Huế
+        SubmitTaskRequest req = new SubmitTaskRequest("PHUOC DUYEN", new BigDecimal("21.0277000"), new BigDecimal("105.8351000"));
+
+        when(journeyRepository.findByIdWithDestinations(50L)).thenReturn(Optional.of(sampleJourney));
+        when(taskProgressRepository.findByJourneyId(50L)).thenReturn(List.of(puzzleProgress));
+        when(tourInfoProvider.getTourInfo(1L)).thenReturn(puzzleTourInfo);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                journeyService.submitTask(50L, 1002L, req, 10L)
+        );
+
+        assertEquals("GPS-OUT-OF-PUZZLE-ZONE", ex.getCode());
+    }
+
+    @Test
+    void submitTask_WhenGPSPuzzleWithinRangeAndCorrect_ShouldComplete() {
+        TourInfo.TourTaskInfo puzzleTaskInfo = new TourInfo.TourTaskInfo(
+                1002L, "Mật mã chuông đồng", "REAL_WORLD_INTERACTIVE", 2, 20, "PHUOC DUYEN",
+                "Giải mật mã", new BigDecimal("16.4526000"), new BigDecimal("107.5458000"), 50, "Gợi ý"
+        );
+
+        TourInfo.TourDestinationInfo destInfoWithPuzzle = new TourInfo.TourDestinationInfo(
+                101L, "Chùa Thiên Mụ", 1, 201L,
+                new BigDecimal("16.4526000"), new BigDecimal("107.5458000"), 100, "QR",
+                List.of(puzzleTaskInfo)
+        );
+
+        TourInfo puzzleTourInfo = new TourInfo(1L, "Huế", List.of(destInfoWithPuzzle));
+
+        JourneyTaskProgress puzzleProgress = JourneyTaskProgress.builder()
+                .id(301L)
+                .journey(sampleJourney)
+                .destinationProgress(sampleDestProgress)
+                .taskId(1002L)
+                .taskName("Mật mã chuông đồng")
+                .taskType("REAL_WORLD_INTERACTIVE")
+                .orderIndex(2)
+                .status(TaskProgressStatus.NOT_STARTED)
+                .attempts(0)
+                .build();
+
+        sampleDestProgress.setCheckedIn(true);
+
+        // Khách đứng đúng tọa độ Chùa Thiên Mụ
+        SubmitTaskRequest req = new SubmitTaskRequest("PHUOC DUYEN", new BigDecimal("16.4526000"), new BigDecimal("107.5458000"));
+
+        when(journeyRepository.findByIdWithDestinations(50L)).thenReturn(Optional.of(sampleJourney));
+        when(taskProgressRepository.findByJourneyId(50L)).thenReturn(List.of(puzzleProgress));
+        when(tourInfoProvider.getTourInfo(1L)).thenReturn(puzzleTourInfo);
+
+        JourneyTaskProgressResponse response = journeyService.submitTask(50L, 1002L, req, 10L);
+
+        assertNotNull(response);
+        assertEquals(TaskProgressStatus.COMPLETED, response.status());
+        assertTrue(response.isCorrect());
+        assertEquals(20, response.pointsEarned());
+        verify(gamificationService).awardPoints(eq(10L), eq(20), any(), anyString(), anyString());
+    }
 }
+

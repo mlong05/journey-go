@@ -11,6 +11,8 @@ import java.time.Instant;
         @Index(name = "idx_point_tx_user_id", columnList = "user_id"),
         @Index(name = "idx_point_tx_type", columnList = "transaction_type"),
         @Index(name = "idx_point_tx_reference", columnList = "reference_id")
+}, uniqueConstraints = {
+        @UniqueConstraint(name = "uk_user_point_ref", columnNames = {"user_id", "reference_id"})
 })
 @Getter
 @Setter

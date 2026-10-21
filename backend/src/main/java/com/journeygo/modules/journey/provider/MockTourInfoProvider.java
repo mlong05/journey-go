@@ -47,7 +47,12 @@ public class MockTourInfoProvider implements TourInfoProvider {
                             "REAL_WORLD_INTERACTIVE",
                             2,
                             20,
-                            "DI SAN VIET NAM"
+                            "DI SAN VIET NAM",
+                            "Hãy tìm bảng chữ in nổi xung quanh nơi bạn đang đứng tại " + d.getName() + ", sau đó giải mã theo dãy số để tìm ra thông điệp ẩn giấu.",
+                            d.getLatitude(),
+                            d.getLongitude(),
+                            60,
+                            "Gợi ý: Cụm từ gồm 4 chữ, tôn vinh giá trị văn hóa nước nhà."
                     )
             );
 
@@ -81,7 +86,19 @@ public class MockTourInfoProvider implements TourInfoProvider {
                         "QR_THIEN_MU",
                         List.of(
                                 new TourInfo.TourTaskInfo(1001L, "Lịch sử tháp Phước Duyên", "QUIZ", 1, 10, "B"),
-                                new TourInfo.TourTaskInfo(1002L, "Mật mã chuông đồng Chùa Thiên Mụ", "REAL_WORLD_INTERACTIVE", 2, 20, "PHUOC DUYEN")
+                                new TourInfo.TourTaskInfo(
+                                        1002L,
+                                        "Mật mã chuông đồng Chùa Thiên Mụ",
+                                        "REAL_WORLD_INTERACTIVE",
+                                        2,
+                                        20,
+                                        "PHUOC DUYEN",
+                                        "Hãy quan sát văn bia bên cạnh tháp chính và tìm tên ngọn tháp 7 tầng nổi tiếng của chùa.",
+                                        new BigDecimal("16.4526000"),
+                                        new BigDecimal("107.5458000"),
+                                        50,
+                                        "Gợi ý: Tên tháp có chữ Phước..."
+                                )
                         )
                 ),
                 new TourInfo.TourDestinationInfo(
@@ -95,7 +112,19 @@ public class MockTourInfoProvider implements TourInfoProvider {
                         "QR_LANG_TU_DUC",
                         List.of(
                                 new TourInfo.TourTaskInfo(1003L, "Kiến trúc Khiêm Cung", "QUIZ", 1, 10, "C"),
-                                new TourInfo.TourTaskInfo(1004L, "Thông điệp bia Khiêm Ký", "REAL_WORLD_INTERACTIVE", 2, 20, "KHIEM KHI")
+                                new TourInfo.TourTaskInfo(
+                                        1004L,
+                                        "Thông điệp bia Khiêm Ký",
+                                        "REAL_WORLD_INTERACTIVE",
+                                        2,
+                                        20,
+                                        "KHIEM KHI",
+                                        "Tìm tấm bia đá lớn nhất Việt Nam tại Bi Đình và nhập tên bài tự ký của vua Tự Đức.",
+                                        new BigDecimal("16.4332000"),
+                                        new BigDecimal("107.5658000"),
+                                        50,
+                                        "Gợi ý: Bài văn bia có chữ Khiêm..."
+                                )
                         )
                 ),
                 new TourInfo.TourDestinationInfo(
@@ -109,7 +138,19 @@ public class MockTourInfoProvider implements TourInfoProvider {
                         "QR_KINH_THANH",
                         List.of(
                                 new TourInfo.TourTaskInfo(1005L, "Biểu tượng Ngọ Môn", "QUIZ", 1, 10, "A"),
-                                new TourInfo.TourTaskInfo(1006L, "Báu vật Cửu Đỉnh triều Nguyễn", "REAL_WORLD_INTERACTIVE", 2, 20, "CUU DINH")
+                                new TourInfo.TourTaskInfo(
+                                        1006L,
+                                        "Báu vật Cửu Đỉnh triều Nguyễn",
+                                        "REAL_WORLD_INTERACTIVE",
+                                        2,
+                                        20,
+                                        "CUU DINH",
+                                        "Đến trước Thế Miếu, đếm số đỉnh đồng lớn tượng trưng cho quyền lực triều Nguyễn.",
+                                        new BigDecimal("16.4699000"),
+                                        new BigDecimal("107.5786000"),
+                                        60,
+                                        "Gợi ý: 9 chiếc đỉnh bằng đồng được gọi là gì?"
+                                )
                         )
                 )
         );

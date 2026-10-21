@@ -211,6 +211,51 @@ public class JourneyService {
 
     // ── TASK SUBMISSION (QUIZ & GPS PUZZLE) ──────────────────────────────────────
 
+    @Transactional(readOnly = true)
+    public PuzzleClueResponse getPuzzleClue(Long journeyId, Long taskId, Long userId) {
+        Journey journey = findJourneyAndVerifyOwner(journeyId, userId);
+
+        JourneyTaskProgress taskProgress = taskProgressRepository.findByJourneyId(journeyId)
+                .stream()
+                .filter(t -> t.getTaskId().equals(taskId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Task in Journey", taskId));
+
+        JourneyDestinationProgress destProgress = taskProgress.getDestinationProgress();
+        if (!destProgress.isCheckedIn()) {
+            throw new BusinessException("DEST-NOT-CHECKED-IN", "Bạn cần check-in tại điểm đến trước khi nhận gợi ý giải đố");
+        }
+
+        TourInfo tourInfo = tourInfoProvider.getTourInfo(journey.getTourId());
+        TourInfo.TourTaskInfo matchedTaskInfo = tourInfo.destinations().stream()
+                .flatMap(d -> d.tasks().stream())
+                .filter(t -> t.taskId().equals(taskId))
+                .findFirst()
+                .orElse(null);
+
+        String clue = matchedTaskInfo != null && matchedTaskInfo.clue() != null
+                ? matchedTaskInfo.clue()
+                : "Hãy quan sát kỹ hiện trường xung quanh địa điểm để tìm câu trả lời";
+        String hint = matchedTaskInfo != null ? matchedTaskInfo.hint() : null;
+        BigDecimal targetLat = matchedTaskInfo != null ? matchedTaskInfo.targetLatitude() : null;
+        BigDecimal targetLng = matchedTaskInfo != null ? matchedTaskInfo.targetLongitude() : null;
+        Integer targetRadius = matchedTaskInfo != null && matchedTaskInfo.targetRadiusMeters() != null
+                ? matchedTaskInfo.targetRadiusMeters() : 50;
+
+        return PuzzleClueResponse.builder()
+                .taskId(taskId)
+                .taskName(taskProgress.getTaskName())
+                .taskType(taskProgress.getTaskType())
+                .clue(clue)
+                .targetLatitude(targetLat)
+                .targetLongitude(targetLng)
+                .targetRadiusMeters(targetRadius)
+                .hint(hint)
+                .attempts(taskProgress.getAttempts())
+                .completed(taskProgress.getStatus() == TaskProgressStatus.COMPLETED)
+                .build();
+    }
+
     @Transactional
     public JourneyTaskProgressResponse submitTask(Long journeyId, Long taskId, SubmitTaskRequest request, Long userId) {
         Journey journey = findJourneyAndVerifyOwner(journeyId, userId);
@@ -241,6 +286,27 @@ public class JourneyService {
                 .findFirst()
                 .orElse(null);
 
+        // ── GPS PUZZLE LOCATION VERIFICATION ─────────────────────────────────────────
+        if (matchedTaskInfo != null && "REAL_WORLD_INTERACTIVE".equalsIgnoreCase(matchedTaskInfo.taskType())) {
+            if (matchedTaskInfo.targetLatitude() != null && matchedTaskInfo.targetLongitude() != null) {
+                if (request.latitude() == null || request.longitude() == null) {
+                    throw new BusinessException("GPS-REQUIRED", "Nhiệm vụ tương tác thực tế yêu cầu bật định vị GPS tại hiện trường");
+                }
+
+                BigDecimal dist = GeoUtils.haversineMeters(
+                        request.latitude(), request.longitude(),
+                        matchedTaskInfo.targetLatitude(), matchedTaskInfo.targetLongitude()
+                );
+                int allowedRadius = matchedTaskInfo.targetRadiusMeters() != null ? matchedTaskInfo.targetRadiusMeters() : 60;
+
+                if (dist.intValue() > allowedRadius) {
+                    throw new BusinessException("GPS-OUT-OF-PUZZLE-ZONE",
+                            String.format("Bạn đang cách điểm giải đố %d mét (yêu cầu trong phạm vi %d mét). Hãy đến gần vị trí hơn để giải mật mã!",
+                                    dist.intValue(), allowedRadius));
+                }
+            }
+        }
+
         boolean isCorrect = false;
         int pointsToAward = 10;
 
@@ -248,7 +314,10 @@ public class JourneyService {
             pointsToAward = matchedTaskInfo.points() != null ? matchedTaskInfo.points() : 10;
             String expected = matchedTaskInfo.correctAnswer();
             if (expected != null && request.answer() != null) {
-                isCorrect = expected.trim().equalsIgnoreCase(request.answer().trim());
+                // Chuẩn hóa chuỗi so sánh: bỏ khoảng trắng thừa, không phân biệt hoa thường
+                String normalizedActual = request.answer().trim().replaceAll("\\s+", " ");
+                String normalizedExpected = expected.trim().replaceAll("\\s+", " ");
+                isCorrect = normalizedExpected.equalsIgnoreCase(normalizedActual);
             } else {
                 isCorrect = true;
             }

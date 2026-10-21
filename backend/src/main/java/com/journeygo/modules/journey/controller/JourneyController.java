@@ -71,6 +71,17 @@ public class JourneyController {
         return ResponseEntity.ok(ApiResponse.success(result.message(), result));
     }
 
+    @GetMapping("/{id}/tasks/{taskId}/puzzle-clue")
+    @Operation(summary = "Xem manh mối giải đố GPS Puzzle", description = "Lấy gợi ý và tọa độ vị trí thực địa để du khách đến giải mật mã tại di tích")
+    public ResponseEntity<ApiResponse<PuzzleClueResponse>> getPuzzleClue(
+            @PathVariable Long id,
+            @PathVariable Long taskId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        PuzzleClueResponse response = journeyService.getPuzzleClue(id, taskId, userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.success("Lấy manh mối câu đố thành công", response));
+    }
+
     @PostMapping("/{id}/tasks/{taskId}/submit")
     @Operation(summary = "Nộp bài nhiệm vụ (Quiz hoặc GPS Puzzle)", description = "Chấm điểm câu trả lời trắc nghiệm hoặc đáp án giải đố thực địa và cộng điểm tích lũy")
     public ResponseEntity<ApiResponse<JourneyTaskProgressResponse>> submitTask(
