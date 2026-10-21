@@ -359,7 +359,7 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 **Base path:** `/api/v1/experiences`
 
-> Mỗi **Destination** có **1 Experience** (1-1). Status: `DRAFT | PUBLISHED | INACTIVE`.
+> Một **Destination** có thể có nhiều **Experience**. Status: `DRAFT | PUBLISHED | INACTIVE`.
 
 ---
 
@@ -368,7 +368,7 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 | Method | Path | Mô tả |
 |---|---|---|
 | GET | `/experiences/{id}` | Chi tiết experience |
-| GET | `/destinations/{destinationId}/experience` | Experience theo destination |
+| GET | `/destinations/{destinationId}/experiences` | Danh sách Experience theo destination |
 | GET | `/experiences` | Danh sách (phân trang) |
 
 **Query params cho `GET /experiences`:**
@@ -385,7 +385,7 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 | Method | Path | Mô tả |
 |---|---|---|
-| POST | `/experiences` | Tạo mới (status = DRAFT). **BR-EXP-1: 1 destination chỉ 1 experience** |
+| POST | `/experiences` | Tạo mới (status = DRAFT), gắn với một destination hiện có |
 | PATCH | `/experiences/{id}` | Sửa — **BR-EXP-2: chỉ sửa khi DRAFT**, chỉ owner |
 | DELETE | `/experiences/{id}` | Xóa mềm → INACTIVE, chỉ owner |
 
@@ -770,7 +770,6 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 | Mã | Nội dung |
 |---|---|
-| **BR-EXP-1** | 1 Destination chỉ gắn với **1 Experience** (quan hệ 1-1) |
 | **BR-EXP-2** | Experience chỉ được **sửa** khi status = `DRAFT`. Khi đã `PUBLISHED` → không sửa nội dung, chỉ có thể soft-delete |
 | **BR-CIP-1** | `qrToken` của CheckInPoint phải **UNIQUE** trong toàn DB |
 | **BR-TASK-1** | Task chỉ được sửa khi status = `DRAFT` |

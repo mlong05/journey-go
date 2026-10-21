@@ -78,14 +78,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Xử lý race condition vi phạm UNIQUE constraint ở DB.
-     *
-     * <p>Khi 2 request cùng tạo Experience cho 1 destination, có thể cả 2 đều qua
-     * pre-check {@code existsByDestinationId()}. DB-level UNIQUE constraint sẽ reject
-     * request thứ 2 → ném {@link DataIntegrityViolationException}.</p>
-     *
-     * <p>Handler này bắt exception và trả 400 Bad Request với mã BR-EXP-1,
-     * thay vì để nhảy vào handler {@code Exception.class} → 500.</p>
+     * Maps database integrity violations to concise client-facing errors.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
@@ -97,12 +90,7 @@ public class GlobalExceptionHandler {
         String code;
         String message;
 
-        // Map UNIQUE constraint name → Business Rule code.
-        // Tên constraint phải khớp với file Flyway migration V*.sql.
-        if (rootMessage != null && rootMessage.contains("uk_experience_destination")) {
-            code = "BR-EXP-1";
-            message = "Destination này đã có Experience. Mỗi Destination chỉ có 1 Experience (BR-EXP-1).";
-        } else if (rootMessage != null && rootMessage.contains("uk_task_experience_sequence")) {
+        if (rootMessage != null && rootMessage.contains("uk_task_experience_sequence")) {
             code = "BR-TASK-2";
             message = "Sequence order đã tồn tại trong Experience (BR-TASK-2).";
         } else if (rootMessage != null && rootMessage.contains("uk_check_in_point_qr_token")) {
@@ -263,15 +251,6 @@ public class GlobalExceptionHandler {
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.BAD_REQUEST.value())
                 .message("Trường sắp xếp không hợp lệ: '" + ex.getPropertyName() + "'")
-                .build();
-        return ResponseEntity.badRequest().body(response);
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        ApiResponse<Object> response = ApiResponse.builder()
-                .code(HttpStatus.BAD_REQUEST.value())
-                .message("Tham số yêu cầu không hợp lệ: " + ex.getMessage())
                 .build();
         return ResponseEntity.badRequest().body(response);
     }
