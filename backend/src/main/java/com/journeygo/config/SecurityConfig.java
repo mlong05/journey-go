@@ -55,7 +55,10 @@ public class SecurityConfig {
             "/api/v1/task-types/code/*",
             "/api/v1/task-types/*/point-rule",
             // Metadata public
-            "/api/v1/tasks/*/unlock-condition"
+            "/api/v1/tasks/*/unlock-condition",
+            // Gamification catalog public read
+            "/api/v1/gamification/badges",
+            "/api/v1/gamification/vouchers"
     };
 
 

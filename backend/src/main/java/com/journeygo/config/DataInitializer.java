@@ -17,6 +17,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.journeygo.modules.gamification.entity.Badge;
+import com.journeygo.modules.gamification.entity.UserPoint;
+import com.journeygo.modules.gamification.entity.Voucher;
+import com.journeygo.modules.gamification.entity.enums.BadgeType;
+import com.journeygo.modules.gamification.entity.enums.DiscountType;
+import com.journeygo.modules.gamification.repository.BadgeRepository;
+import com.journeygo.modules.gamification.repository.UserPointRepository;
+import com.journeygo.modules.gamification.repository.VoucherRepository;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +40,9 @@ public class DataInitializer {
     private final TaskTypeRepository taskTypeRepository;
     private final PointRuleRepository pointRuleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final BadgeRepository badgeRepository;
+    private final VoucherRepository voucherRepository;
+    private final UserPointRepository userPointRepository;
 
     @Bean
     public CommandLineRunner initDefaultUsers() {
@@ -264,6 +276,92 @@ public class DataInitializer {
             });
 
             log.info("Đồng bộ TaskType + PointRule hoàn tất. Tổng TaskType: {}", taskTypeRepository.count());
+
+            // ── Seed Badges mẫu ────────────────────────────────────────────────────────
+            if (badgeRepository.count() == 0) {
+                badgeRepository.save(Badge.builder()
+                        .code("BADGE_VAN_MIEU")
+                        .name("Dấu ấn Văn Miếu Quốc Tử Giám")
+                        .description("Đã đặt chân và khám phá trường đại học đầu tiên của Việt Nam")
+                        .iconUrl("https://assets.journeygo.com/badges/van_mieu.png")
+                        .badgeType(BadgeType.DESTINATION_CHECKIN)
+                        .bonusPoints(10)
+                        .active(true)
+                        .build());
+                badgeRepository.save(Badge.builder()
+                        .code("BADGE_HOANG_THANH")
+                        .name("Chiến tích Hoàng Thành Thăng Long")
+                        .description("Khám phá trung tâm quyền lực lịch sử của kinh thành xưa")
+                        .iconUrl("https://assets.journeygo.com/badges/hoang_thanh.png")
+                        .badgeType(BadgeType.DESTINATION_CHECKIN)
+                        .bonusPoints(10)
+                        .active(true)
+                        .build());
+                badgeRepository.save(Badge.builder()
+                        .code("BADGE_BAT_TRANG")
+                        .name("Nghệ nhân Gốm Sứ Bát Tràng")
+                        .description("Tự tay trải nghiệm nét đẹp làng nghề gốm sứ truyền thống")
+                        .iconUrl("https://assets.journeygo.com/badges/bat_trang.png")
+                        .badgeType(BadgeType.DESTINATION_CHECKIN)
+                        .bonusPoints(10)
+                        .active(true)
+                        .build());
+                badgeRepository.save(Badge.builder()
+                        .code("BADGE_TRANG_AN")
+                        .name("Tuyệt tác Di sản Tràng An")
+                        .description("Khám phá quần thể di sản thiên nhiên và văn hóa thế giới")
+                        .iconUrl("https://assets.journeygo.com/badges/trang_an.png")
+                        .badgeType(BadgeType.DESTINATION_CHECKIN)
+                        .bonusPoints(10)
+                        .active(true)
+                        .build());
+                log.info("Khởi tạo danh mục Huy hiệu di sản mẫu thành công!");
+            }
+
+            // ── Seed Vouchers mẫu ──────────────────────────────────────────────────────
+            if (voucherRepository.count() == 0) {
+                voucherRepository.save(Voucher.builder()
+                        .code("JG-VOUCHER-50K")
+                        .title("Giảm 50.000đ khi đặt Tour di sản")
+                        .description("Áp dụng cho mọi tour trải nghiệm trên hệ thống JourneyGo")
+                        .discountType(DiscountType.FIXED_AMOUNT)
+                        .discountValue(new BigDecimal("50000.00"))
+                        .minOrderAmount(new BigDecimal("150000.00"))
+                        .pointsRequired(50)
+                        .totalQuantity(100)
+                        .remainingQuantity(100)
+                        .validDays(30)
+                        .active(true)
+                        .build());
+                voucherRepository.save(Voucher.builder()
+                        .code("JG-VOUCHER-10PCT")
+                        .title("Giảm 10% Tour văn hóa lịch sử")
+                        .description("Giảm tối đa 100.000đ cho đơn đặt tour bất kỳ")
+                        .discountType(DiscountType.PERCENTAGE)
+                        .discountValue(new BigDecimal("10.00"))
+                        .minOrderAmount(new BigDecimal("200000.00"))
+                        .maxDiscountAmount(new BigDecimal("100000.00"))
+                        .pointsRequired(80)
+                        .totalQuantity(50)
+                        .remainingQuantity(50)
+                        .validDays(45)
+                        .active(true)
+                        .build());
+                log.info("Khởi tạo danh mục Voucher giảm giá mẫu thành công!");
+            }
+
+            // ── Khởi tạo 100 điểm thưởng ban đầu cho tourist@journeygo.com để test ────
+            userRepository.findByEmail("tourist@journeygo.com").ifPresent(tourist -> {
+                if (userPointRepository.findByUserId(tourist.getId()).isEmpty()) {
+                    userPointRepository.save(UserPoint.builder()
+                            .userId(tourist.getId())
+                            .currentBalance(100)
+                            .lifetimeEarned(100)
+                            .lifetimeSpent(0)
+                            .build());
+                    log.info("Khởi tạo 100 điểm ban đầu cho tài khoản tourist@journeygo.com");
+                }
+            });
 
             log.info("Khởi tạo và đồng bộ tài khoản mẫu (ADMIN, MODERATOR, PROVIDER, TOURIST) thành công với mật khẩu Password123@");
         };
