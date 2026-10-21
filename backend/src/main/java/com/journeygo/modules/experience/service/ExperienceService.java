@@ -10,6 +10,8 @@ import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
 import com.journeygo.modules.experience.repository.ExperienceRepository;
+import com.journeygo.modules.destination.entity.Destination;
+import com.journeygo.modules.destination.repository.DestinationRepository;
 import com.journeygo.modules.experience.repository.TaskRepository;
 import com.journeygo.modules.experience.repository.CheckInPointRepository;
 import com.journeygo.modules.user.entity.User;
@@ -30,6 +32,7 @@ import java.util.List;
 public class ExperienceService {
 
     private final ExperienceRepository experienceRepository;
+    private final DestinationRepository destinationRepository;
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
     private final CheckInPointRepository checkInPointRepository;
@@ -46,13 +49,11 @@ public class ExperienceService {
     }
 
     @Transactional(readOnly = true)
-    public ExperienceResponse getByDestinationId(Long destinationId) {
-        Experience e = experienceRepository.findByDestinationIdWithOwner(destinationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Experience", "destinationId", destinationId));
-        hideDraftFromNonOwner(e);
-        int taskCount = (int) taskRepository.countByExperienceId(e.getId());
-        int cipCount = (int) checkInPointRepository.countByExperienceId(e.getId());
-        return ExperienceResponse.fromEntity(e, taskCount, cipCount);
+    public List<ExperienceResponse> getByDestinationId(Long destinationId) {
+        return experienceRepository.findByDestinationIdWithOwner(destinationId).stream()
+                .peek(this::hideDraftFromNonOwner)
+                .map(this::toResponseWithCounts)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -125,16 +126,14 @@ public class ExperienceService {
     @Transactional
     public ExperienceResponse create(CreateExperienceRequest req, Long creatorId) {
 
-        if (experienceRepository.existsByDestinationId(req.destinationId())) {
-            throw new BusinessException("BR-EXP-1",
-                    "Destination " + req.destinationId() + " đã có Experience. Mỗi Destination chỉ có 1 Experience.");
-        }
+        Destination destination = destinationRepository.findByIdAndDeletedFalse(req.destinationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Destination", req.destinationId()));
 
         User creator = userRepository.findById(creatorId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", creatorId));
 
         Experience e = Experience.builder()
-                .destinationId(req.destinationId())
+                .destination(destination)
                 .title(req.title())
                 .description(req.description())
                 .price(req.price() != null ? req.price() : BigDecimal.ZERO)
