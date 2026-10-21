@@ -79,7 +79,10 @@ public class TourService {
     /** Soft-deleted tours (admin / moderator). */
     @Transactional(readOnly = true)
     public PageResponse<TourResponse> getDeleted(Pageable pageable) {
-        Page<Tour> page = tourRepository.findDeleted(sanitizePageable(pageable));
+        Pageable pagination = pageable == null
+                ? PageRequest.of(0, 10)
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        Page<Tour> page = tourRepository.findDeleted(pagination);
         return PageResponse.from(page, TourResponse::fromEntity);
     }
 

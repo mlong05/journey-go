@@ -37,12 +37,16 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
 
     // ── Admin-only: bypass @SQLRestriction to read deleted rows ──────────────
 
-    @Query("SELECT t FROM Tour t WHERE t.deleted = true")
+    @Query(value = "SELECT * FROM tours WHERE deleted = true ORDER BY created_at DESC",
+            countQuery = "SELECT COUNT(*) FROM tours WHERE deleted = true",
+            nativeQuery = true)
     Page<Tour> findDeleted(Pageable pageable);
 
-    @Query("SELECT t FROM Tour t WHERE t.deleted = true")
+    @Query(value = "SELECT * FROM tours WHERE deleted = true ORDER BY created_at DESC",
+            nativeQuery = true)
     List<Tour> findDeleted();
 
-    @Query("SELECT t FROM Tour t WHERE t.tourId = :tourId AND t.deleted = true")
+    @Query(value = "SELECT * FROM tours WHERE tour_id = :tourId AND deleted = true",
+            nativeQuery = true)
     Optional<Tour> findDeletedByTourId(@Param("tourId") Long tourId);
 }

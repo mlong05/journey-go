@@ -83,8 +83,3 @@ app:
   mail:
     from-name: ${MAIL_FROM_NAME:JourneyGo Platform}
     otp-expiration-minutes: ${MAIL_OTP_EXPIRATION_MINUTES:10}
-
-    spring:
-      jpa:
-        hibernate:
-          ddl-auto: update
