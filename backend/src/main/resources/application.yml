@@ -6,6 +6,10 @@ server:
 spring:
   application:
     name: journey-go-backend
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 10MB
   threads:
     virtual:
       enabled: true
@@ -75,6 +79,10 @@ springdoc:
 
 # CORS, OAuth2 & Mail Configuration
 app:
+  cloudinary:
+    cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+    api-key: ${CLOUDINARY_API_KEY:}
+    api-secret: ${CLOUDINARY_API_SECRET:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
   oauth2:

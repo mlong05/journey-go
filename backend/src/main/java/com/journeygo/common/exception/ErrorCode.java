@@ -33,7 +33,11 @@ public enum ErrorCode {
     TOUR_NOT_FOUND("Tour không tồn tại", HttpStatus.NOT_FOUND),
     TOUR_EXISTED("Tour với tên này đã tồn tại", HttpStatus.CONFLICT),
     TOUR_REJECTION_REASON_REQUIRED("Lý do từ chối không được để trống", HttpStatus.BAD_REQUEST),
-    INVALID_TOUR_STATUS("Trạng thái tour không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST);
+    INVALID_TOUR_STATUS("Trạng thái tour không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
+    CONTENT_REVIEW_REASON_REQUIRED("Lý do từ chối nội dung không được để trống", HttpStatus.BAD_REQUEST),
+    INVALID_CONTENT_REVIEW_STATUS("Trạng thái kiểm duyệt nội dung không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
+    CLOUDINARY_NOT_CONFIGURED("Cloudinary chưa được cấu hình trên máy chủ", HttpStatus.SERVICE_UNAVAILABLE),
+    INVALID_CLOUDINARY_ASSET("Ảnh Cloudinary không hợp lệ hoặc không thuộc tài khoản hiện tại", HttpStatus.BAD_REQUEST);
 
     private final String message;
     private final HttpStatus httpStatus;
