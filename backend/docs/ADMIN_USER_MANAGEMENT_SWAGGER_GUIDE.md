@@ -52,7 +52,7 @@ Base URL: `/api/v1/users`
 - **Mục đích**: Xem danh sách phân trang người dùng, hỗ trợ tìm kiếm và lọc.
 - **Các tham số kiểm thử (Query Parameters)**:
   - `keyword`: Tìm theo từ khóa (họ tên, email hoặc số điện thoại). Ví dụ: `john` hoặc `098`.
-  - `role`: Lọc theo vai trò (`USER`, `MODERATOR`, `PROVIDER`, `ADMIN`).
+  - `role`: Lọc theo vai trò (`TOURIST`, `MODERATOR`, `PROVIDER`, `ADMIN`).
   - `active`: Lọc theo trạng thái tài khoản (`true` = đang hoạt động, `false` = đã bị khóa).
   - `page`: Chỉ số trang (bắt đầu từ `0`).
   - `size`: Số bản ghi trên 1 trang (mặc định: `20`).
@@ -74,7 +74,7 @@ Base URL: `/api/v1/users`
           "email": "user@journeygo.com",
           "fullName": "Nguyễn Văn A",
           "phone": "0987654321",
-          "role": "USER",
+          "role": "TOURIST",
           "authProvider": "LOCAL",
           "avatarUrl": null,
           "active": true,
@@ -105,7 +105,7 @@ Base URL: `/api/v1/users`
       "email": "user@journeygo.com",
       "fullName": "Nguyễn Văn A",
       "phone": "0987654321",
-      "role": "USER",
+      "role": "TOURIST",
       "authProvider": "LOCAL",
       "avatarUrl": null,
       "active": true,
@@ -157,7 +157,7 @@ Base URL: `/api/v1/users`
 ---
 
 ### 3.4. Cập nhật vai trò người dùng (`PATCH /api/v1/users/{id}/role`)
-- **Mục đích**: Nâng cấp hoặc thay đổi phân quyền cho tài khoản (ví dụ: chuyển từ `USER` thành `MODERATOR` hoặc `PROVIDER`).
+- **Mục đích**: Nâng cấp hoặc thay đổi phân quyền cho tài khoản (ví dụ: chuyển từ `TOURIST` thành `MODERATOR` hoặc `PROVIDER`).
 - **Path Param**: `id` của người dùng cần đổi role (ví dụ: `2`).
 - **Request Body**:
   ```json
@@ -190,7 +190,7 @@ Base URL: `/api/v1/users`
   {
     "fullName": "Nguyễn Văn A (Updated)",
     "phone": "0988889999",
-    "role": "USER",
+    "role": "TOURIST",
     "active": true
   }
   ```

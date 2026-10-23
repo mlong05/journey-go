@@ -79,7 +79,7 @@ public class AuthService {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
-        Role assignedRole = request.role() != null ? request.role() : Role.USER;
+        Role assignedRole = request.role() != null ? request.role() : Role.TOURIST;
 
         User user = User.builder()
                 .email(request.email())
@@ -113,7 +113,7 @@ public class AuthService {
         User user = userRepository.findByEmail(email).orElse(null);
 
         if (user == null) {
-            Role assignedRole = request.role() != null ? request.role() : Role.USER;
+            Role assignedRole = request.role() != null ? request.role() : Role.TOURIST;
             String fullName = (googleUser.name() != null && !googleUser.name().isBlank())
                     ? googleUser.name()
                     : email.split("@")[0];

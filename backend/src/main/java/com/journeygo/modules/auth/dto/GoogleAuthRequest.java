@@ -9,7 +9,7 @@ public record GoogleAuthRequest(
         @Schema(description = "Google ID Token (credential) nhận từ Google Identity Services trên Client", example = "eyJhbGciOiJSUzI1NiIsImtpZCI...")
         String idToken,
 
-        @Schema(description = "Vai trò mong muốn nếu tài khoản được đăng ký mới (mặc định USER)", example = "USER")
+        @Schema(description = "Vai trò mong muốn nếu tài khoản được đăng ký mới (mặc định TOURIST)", example = "TOURIST")
         Role role
 ) {
 }

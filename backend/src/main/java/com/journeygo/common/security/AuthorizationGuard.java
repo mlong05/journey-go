@@ -16,7 +16,7 @@ import java.util.Set;
  *   - ADMIN: full quyền, bypass ownership check.
  *   - PROVIDER: được CRUD Experience/Task/CheckInPoint/Question/Answer/Slot
  *     mà mình là owner (createdBy = currentUserId).
- *   - USER (tourist): chỉ đọc + check-in.
+ *   - TOURIST: chỉ đọc + check-in.
  *   - Chưa authenticated: Authentication null → trả 401.
  *
  * Ném {@link BusinessException} với mã "FORBIDDEN-..." để FE biết phân biệt

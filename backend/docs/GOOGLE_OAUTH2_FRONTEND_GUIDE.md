@@ -16,10 +16,10 @@ Tài liệu này hướng dẫn chi tiết cho Developer Frontend cách kết n�
 ```json
 {
   "idToken": "<chuỗi_google_id_token_credential_từ_Google_SDK>",
-  "role": "USER"
+  "role": "TOURIST"
 }
 ```
-*(Trường `role` là tùy chọn, mặc định là `"USER"`)*
+*(Trường `role` là tùy chọn, mặc định là `"TOURIST"`)*
 
 ### Response Thành Công (HTTP 200):
 ```json
@@ -36,7 +36,7 @@ Tài liệu này hướng dẫn chi tiết cho Developer Frontend cách kết n�
       "email": "nguyenvana@gmail.com",
       "fullName": "Nguyễn Văn A",
       "phone": null,
-      "role": "USER",
+      "role": "TOURIST",
       "authProvider": "GOOGLE",
       "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8oc...",
       "active": true,

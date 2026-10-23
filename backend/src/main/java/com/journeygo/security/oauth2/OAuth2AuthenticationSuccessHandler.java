@@ -89,7 +89,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                     .email(email)
                     .fullName(name != null && !name.isBlank() ? name : email.split("@")[0])
                     .password(passwordEncoder.encode(UUID.randomUUID().toString()))
-                    .role(Role.USER)
+                    .role(Role.TOURIST)
                     .authProvider(AuthProvider.GOOGLE)
                     .providerId(sub)
                     .avatarUrl(picture)
