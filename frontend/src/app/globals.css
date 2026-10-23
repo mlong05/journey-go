@@ -19,8 +19,110 @@
   }
 }
 
+/*
+ * Font chuẩn của toàn hệ thống.
+ *
+ * LỖI ĐÃ SỬA: trước đây body khai báo `font-family: Arial, Helvetica, sans-serif`.
+ * Điều đó vô hiệu hoá hoàn toàn font Geist đã nạp qua next/font ở mọi trang
+ * không khai báo class `font-sans` (trang công khai, trang xác thực, trang lỗi),
+ * khiến phông chữ hiển thị không đồng nhất giữa các khu vực.
+ * Giờ body kế thừa đúng biến font Geist từ <html>.
+ */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * Số liệu trong bảng quản trị (giá, số ngày, mã định danh) luôn dùng font-mono
+ * để các cột số thẳng hàng. tabular-nums giữ độ rộng chữ số cố định.
+ */
+.font-mono,
+code,
+kbd,
+samp,
+pre {
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================================
+   LỚP TIỆN ÍCH CHUYỂN ĐỘNG (ENTER ANIMATION)
+   =========================================================================
+   LỖI ĐÃ SỬA: toàn dự án dùng khoảng 101 class `animate-in`, `fade-in`,
+   `fade-in-50`, `zoom-in-95`, `slide-in-from-top-2/3` nhưng KHÔNG cài
+   `tailwindcss-animate` / `tw-animate-css`, và globals.css không có
+   `@plugin`. Kết quả: các class này không tồn tại trong CSS được biên dịch,
+   mọi modal, toast và dropdown hiện đều "bật" đột ngột, không có chuyển động.
+
+   Bộ quy tắc dưới đây được viết lại thuần CSS (không thêm dependency)
+   theo đúng cơ chế biến CSS mà tailwindcss-animate sử dụng, nên toàn bộ
+   101 chỗ sử dụng sẵn có trong codebase hoạt động trở lại.
+
+   Nguyên lý: `.animate-in` gắn keyframe `jg-enter`. Mỗi class biến thể chỉ
+   khai báo giá trị mặc định cho các biến CSS, còn keyframe đọc chúng ở
+   frame `from` và trả về trạng thái chuẩn ở frame `to`.
+   ========================================================================= */
+
+@keyframes jg-enter {
+  from {
+    opacity: var(--tw-enter-opacity, 0);
+    transform: translate3d(
+        var(--tw-enter-translate-x, 0),
+        var(--tw-enter-translate-y, 0),
+        0
+      )
+      scale3d(
+        var(--tw-enter-scale, 1),
+        var(--tw-enter-scale, 1),
+        var(--tw-enter-scale, 1)
+      );
+  }
+  to {
+    opacity: var(--tw-enter-opacity-final, 1);
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+  }
+}
+
+@layer utilities {
+  .animate-in {
+    animation-name: jg-enter;
+    animation-duration: var(--tw-duration, 150ms);
+    animation-timing-function: var(
+      --tw-ease,
+      cubic-bezier(0.16, 1, 0.3, 1)
+    );
+    animation-fill-mode: backwards;
+  }
+
+  .fade-in {
+    --tw-enter-opacity: 0;
+    --tw-enter-opacity-final: 1;
+  }
+
+  .fade-in-50 {
+    --tw-enter-opacity: 0.5;
+    --tw-enter-opacity-final: 1;
+  }
+
+  .zoom-in {
+    --tw-enter-scale: 0;
+    --tw-enter-opacity: 0;
+  }
+
+  .zoom-in-95 {
+    --tw-enter-scale: 0.95;
+    --tw-enter-opacity: 0;
+  }
+
+  .slide-in-from-top-2 {
+    --tw-enter-translate-y: -0.5rem;
+  }
+
+  .slide-in-from-top-3 {
+    --tw-enter-translate-y: -0.75rem;
+  }
 }

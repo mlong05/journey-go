@@ -89,7 +89,36 @@ const SLIDE_ITEMS = [
   },
 ];
 
-
+/**
+ * DANH SÁCH VAI TRÒ MẪU (pill chọn nhanh ở form đăng nhập)
+ * roleEnum phải khớp với enum Role của backend: TOURIST | PROVIDER | MODERATOR | ADMIN
+ */
+const SAMPLE_ROLES = [
+  {
+    id: "admin",
+    roleEnum: "ADMIN",
+    title: "Quản trị viên",
+    redirectPath: "/admin",
+  },
+  {
+    id: "moderator",
+    roleEnum: "MODERATOR",
+    title: "Kiểm duyệt viên",
+    redirectPath: "/moderator",
+  },
+  {
+    id: "provider",
+    roleEnum: "PROVIDER",
+    title: "Đối tác điểm đến",
+    redirectPath: "/provider",
+  },
+  {
+    id: "tourist",
+    roleEnum: "TOURIST",
+    title: "Khách du lịch",
+    redirectPath: "/",
+  },
+];
 
 export default function AuthPage() {
   const router = useRouter();
@@ -244,7 +273,7 @@ export default function AuthPage() {
       const accessToken = payload?.accessToken || payload?.token;
       const refreshToken = payload?.refreshToken;
 
-      const roleStr = String(user?.role || "USER").toUpperCase();
+      const roleStr = String(user?.role || "TOURIST").toUpperCase();
       let targetPath = "/";
       let roleTitle = "Du khách khám phá";
 
@@ -341,7 +370,9 @@ export default function AuthPage() {
           phone: registerForm.phone.trim(),
           email: registerForm.email.trim(),
           password: registerForm.password,
-          role: selectedRoleId === "provider" ? "PROVIDER" : "USER",
+          role:
+            SAMPLE_ROLES.find((r) => r.id === selectedRoleId)?.roleEnum ||
+            "TOURIST",
         }),
       });
 

@@ -9,6 +9,7 @@ import com.journeygo.modules.tour.dto.*;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourDestination;
 import com.journeygo.modules.tour.entity.TourStatus;
+import com.journeygo.modules.tour.repository.TourPriceProjection;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
@@ -22,8 +23,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -36,7 +41,7 @@ public class TourService {
     private final DestinationRepository destinationRepository;
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
-            "tourId", "title", "tourType", "price", "durationDays",
+            "tourId", "title", "tourType", "durationDays",
             "approved", "status", "deleted", "createdAt", "updatedAt"
     );
 
@@ -46,34 +51,36 @@ public class TourService {
     @Transactional(readOnly = true)
     public PageResponse<TourResponse> getAll(Pageable pageable) {
         Page<Tour> page = tourRepository.findAll(sanitizePageable(pageable));
-        return PageResponse.from(page, TourResponse::fromEntity);
+        return toPageResponse(page);
     }
 
     /** All published / approved tours (public API, paginated). */
     @Transactional(readOnly = true)
     public PageResponse<TourResponse> getPublished(Pageable pageable) {
         Page<Tour> page = tourRepository.findByApprovedTrue(sanitizePageable(pageable));
-        return PageResponse.from(page, TourResponse::fromEntity);
+        return toPageResponse(page);
     }
 
     /** Tours by workflow status (paginated). */
     @Transactional(readOnly = true)
     public PageResponse<TourResponse> getByStatus(TourStatus status, Pageable pageable) {
         Page<Tour> page = tourRepository.findByStatus(status, sanitizePageable(pageable));
-        return PageResponse.from(page, TourResponse::fromEntity);
+        return toPageResponse(page);
     }
 
     /** Tours created by a specific user (paginated). */
     @Transactional(readOnly = true)
     public PageResponse<TourResponse> getByCreator(Long creatorId, Pageable pageable) {
         Page<Tour> page = tourRepository.findByCreatedBy_Id(creatorId, sanitizePageable(pageable));
-        return PageResponse.from(page, TourResponse::fromEntity);
+        return toPageResponse(page);
     }
 
     /** Single tour by ID. */
     @Transactional(readOnly = true)
     public TourResponse getById(Long tourId) {
-        return TourResponse.fromEntity(findOrThrow(tourId));
+        Tour tour = findOrThrow(tourId);
+        BigDecimal price = tourRepository.calculateTotalPriceByTourId(tourId);
+        return TourResponse.fromEntity(tour, price);
     }
 
     /** Soft-deleted tours (admin / moderator). */
@@ -83,7 +90,7 @@ public class TourService {
                 ? PageRequest.of(0, 10)
                 : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
         Page<Tour> page = tourRepository.findDeleted(pagination);
-        return PageResponse.from(page, TourResponse::fromEntity);
+        return toPageResponse(page);
     }
 
     // ── Create / Update ───────────────────────────────────────────────────────
@@ -101,7 +108,6 @@ public class TourService {
         Tour tour = Tour.builder()
                 .title(request.title().trim())
                 .tourType(request.tourType())
-                .price(request.price())
                 .durationDays(request.durationDays())
                 .approved(false)
                 .status(TourStatus.DRAFT)
@@ -113,7 +119,7 @@ public class TourService {
 
         Tour saved = tourRepository.save(tour);
         log.info("Created tour id={} title={}", saved.getTourId(), saved.getTitle());
-        return TourResponse.fromEntity(saved);
+        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
     }
 
     /** Update an existing tour and reset it to DRAFT for re-review.
@@ -129,7 +135,6 @@ public class TourService {
 
         existing.setTitle(request.title().trim());
         existing.setTourType(request.tourType());
-        existing.setPrice(request.price());
         existing.setDurationDays(request.durationDays());
         existing.setStatus(TourStatus.DRAFT);
         existing.setApproved(false);
@@ -141,7 +146,7 @@ public class TourService {
 
         Tour saved = tourRepository.save(existing);
         log.info("Updated tour id={} by userId={}", saved.getTourId(), callerId);
-        return TourResponse.fromEntity(saved);
+        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
     }
 
     // ── Workflow ──────────────────────────────────────────────────────────────
@@ -154,7 +159,7 @@ public class TourService {
         tour.submit();
         Tour saved = tourRepository.save(tour);
         log.info("Submitted tour id={} for review", saved.getTourId());
-        return TourResponse.fromEntity(saved);
+        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
     }
 
     /** Publish tour (ADMIN / MODERATOR). */
@@ -164,7 +169,7 @@ public class TourService {
         tour.publish();
         Tour saved = tourRepository.save(tour);
         log.info("Published tour id={}", saved.getTourId());
-        return TourResponse.fromEntity(saved);
+        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
     }
 
     /** Reject tour with a mandatory reason (ADMIN / MODERATOR). */
@@ -174,7 +179,7 @@ public class TourService {
         tour.reject(reason);
         Tour saved = tourRepository.save(tour);
         log.info("Rejected tour id={} reason={}", saved.getTourId(), reason);
-        return TourResponse.fromEntity(saved);
+        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
     }
 
     // ── Soft-delete / Restore ─────────────────────────────────────────────────
@@ -199,10 +204,47 @@ public class TourService {
         tour.setRejectionReason(null);
         Tour saved = tourRepository.save(tour);
         log.info("Restored tour id={}", saved.getTourId());
-        return TourResponse.fromEntity(saved);
+        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Chuyển trang Tour sang PageResponse, đồng thời gắn giá tính động cho
+     * từng tour (tổng giá Experience của các điểm đến trong hành trình).
+     *
+     * Giá được tính bằng MỘT truy vấn cho cả trang để tránh N+1.
+     */
+    private PageResponse<TourResponse> toPageResponse(Page<Tour> page) {
+        Map<Long, BigDecimal> priceMap = calculatePriceMap(page.getContent());
+        return PageResponse.from(page, tour -> TourResponse.fromEntity(tour, priceMap.get(tour.getTourId())));
+    }
+
+    /**
+     * Tính giá cho nhiều tour cùng lúc.
+     *
+     * @return Map tourId → tổng giá. Tour không có Experience sẽ không có trong map.
+     */
+    private Map<Long, BigDecimal> calculatePriceMap(List<Tour> tours) {
+        if (tours == null || tours.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<Long> tourIds = tours.stream()
+                .map(Tour::getTourId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        if (tourIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<Long, BigDecimal> priceMap = new HashMap<>();
+        for (TourPriceProjection projection : tourRepository.calculateTotalPricesByTourIds(tourIds)) {
+            priceMap.put(projection.tourId(), projection.totalPrice());
+        }
+        return priceMap;
+    }
 
     private Tour findOrThrow(Long tourId) {
         return tourRepository.findByTourId(tourId)
