@@ -40,7 +40,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<Page<UserResponse>>> getAllUsers(
             @Parameter(description = "Từ khóa tìm kiếm (email, họ tên hoặc số điện thoại)")
             @RequestParam(required = false) String keyword,
-            @Parameter(description = "Lọc theo vai trò (USER, MODERATOR, PROVIDER, ADMIN)")
+            @Parameter(description = "Lọc theo vai trò (TOURIST, MODERATOR, PROVIDER, ADMIN)")
             @RequestParam(required = false) Role role,
             @Parameter(description = "Lọc theo trạng thái kích hoạt (true/false)")
             @RequestParam(required = false) Boolean active,

@@ -25,6 +25,6 @@ public record RegisterRequest(
         @Schema(description = "Số điện thoại", example = "0912345678")
         String phone,
 
-        @Schema(description = "Vai trò người dùng (USER, PROVIDER)", example = "USER")
+        @Schema(description = "Vai trò người dùng (TOURIST, PROVIDER)", example = "TOURIST")
         Role role
 ) {}

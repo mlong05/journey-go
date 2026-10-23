@@ -111,10 +111,10 @@ public class DataInitializer {
                         .build());
             });
 
-            // Tài khoản Khách du lịch (USER/TOURIST) dành riêng cho ứng dụng Mobile
+            // Tài khoản Khách du lịch (TOURIST) dành riêng cho ứng dụng Mobile
             userRepository.findByEmail("tourist@journeygo.com").ifPresentOrElse(tourist -> {
                 tourist.setPassword(passwordEncoder.encode("Password123@"));
-                tourist.setRole(Role.USER);
+                tourist.setRole(Role.TOURIST);
                 tourist.setFullName("Nguyễn An");
                 userRepository.save(tourist);
             }, () -> {
@@ -123,7 +123,7 @@ public class DataInitializer {
                         .password(passwordEncoder.encode("Password123@"))
                         .fullName("Nguyễn An")
                         .phone("0988123456")
-                        .role(Role.USER)
+                        .role(Role.TOURIST)
                         .active(true)
                         .build());
             });
