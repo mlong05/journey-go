@@ -204,7 +204,7 @@ export default function ExperiencesManager({
   const canEditItem = (exp) => canManageItem(exp) && exp.status === "DRAFT";
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in-50 duration-200">
+    <div className="h-full max-h-full min-h-0 w-full overflow-hidden flex flex-col animate-in fade-in-50 duration-200">
       {toast && (
         <div
           role="status"
@@ -215,7 +215,7 @@ export default function ExperiencesManager({
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="shrink-0 mb-5 pb-4 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className={`w-1.5 h-5 rounded-full ${palette.bar}`} />
@@ -249,7 +249,7 @@ export default function ExperiencesManager({
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs space-y-4">
+      <div className="shrink-0 mb-5 bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <Search size={15} />
@@ -316,7 +316,7 @@ export default function ExperiencesManager({
       </div>
 
       {error && (
-        <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
+        <div className="shrink-0 mb-5 flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
           <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-bold text-rose-800">Có lỗi khi tải dữ liệu</p>
@@ -332,6 +332,8 @@ export default function ExperiencesManager({
         </div>
       )}
 
+      {/* Vùng danh sách: chỉ khu vực này cuộn, các phần còn lại cố định */}
+      <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pr-1.5 pb-6 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
       {loading && experiences.length === 0 ? (
         <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-2xs">
           <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
@@ -378,7 +380,7 @@ export default function ExperiencesManager({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
           {filtered.map((exp) => {
             const meta = EXPERIENCE_STATUS_META[exp.status] || EXPERIENCE_STATUS_META.DRAFT;
             const dest = destinationById.get(Number(exp.destinationId));
@@ -410,11 +412,6 @@ export default function ExperiencesManager({
                   </span>
                 </p>
 
-                {exp.description && (
-                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                    {exp.description}
-                  </p>
-                )}
 
                 <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-semibold text-slate-600">
                   <span>{formatPrice(exp.price, exp.currency)}</span>
@@ -525,6 +522,7 @@ export default function ExperiencesManager({
           })}
         </div>
       )}
+      </div>
 
       {canCreate && (
         <CreateExperienceModal
