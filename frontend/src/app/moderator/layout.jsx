@@ -16,6 +16,7 @@ import {
   X,
   Compass,
   Sparkles,
+  Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -66,6 +67,13 @@ export default function ModeratorLayout({ children }) {
       label: "Trải nghiệm",
       href: "/moderator/experiences",
       icon: Sparkles,
+      badge: null,
+    },
+    {
+      id: "tours",
+      label: "Thẩm định tour",
+      href: "/moderator/tours",
+      icon: Route,
       badge: null,
     },
     {

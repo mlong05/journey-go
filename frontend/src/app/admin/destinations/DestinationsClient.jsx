@@ -44,14 +44,22 @@ const STATUS = {
   DELETED: "deleted",
 };
 
+/**
+ * Backend trả `status` theo quy trình: DRAFT | PENDING | PUBLISHED | REJECTED
+ * kèm cờ `approved` (legacy) và `deleted`.
+ * UI quản trị chỉ cần 3 nhóm: chờ duyệt / đã duyệt / đã xóa.
+ */
+function resolveStatus(raw) {
+  if (raw.deleted === true) return STATUS.DELETED;
+  if (raw.approved === true || raw.status === "PUBLISHED") return STATUS.APPROVED;
+  return STATUS.PENDING;
+}
+
 function normalizeDestination(raw, fallbackStatus = STATUS.PENDING) {
   if (!raw || typeof raw !== "object") return null;
   const approvedFlag = raw.approved === true;
   const deletedFlag = raw.deleted === true;
-  let status;
-  if (deletedFlag) status = STATUS.DELETED;
-  else if (approvedFlag) status = STATUS.APPROVED;
-  else status = STATUS.PENDING;
+  const status = resolveStatus(raw) || fallbackStatus;
 
   return {
     id: raw.id,
@@ -103,9 +111,27 @@ export default function DestinationsClient() {
     setIsLoading(true);
     setFetchError("");
     try {
-      const data = await destinationService.getAll();
-      const list = Array.isArray(data) ? data : [];
-      const normalized = list
+      // Backend tách riêng: /destinations (chưa xóa) và /destinations/deleted (đã xóa).
+      // Ta gộp cả hai để các tab lọc "Đã xóa" / "Tất cả" hoạt động đúng.
+      const [activeRes, deletedRes] = await Promise.allSettled([
+        destinationService.getAll(),
+        destinationService.getDeleted(),
+      ]);
+
+      if (activeRes.status === "rejected") throw activeRes.reason;
+      if (deletedRes.status === "rejected") {
+        console.warn(
+          "[Admin Destinations] Không tải được danh sách đã xóa:",
+          deletedRes.reason
+        );
+      }
+
+      const merged = [
+        ...(Array.isArray(activeRes.value) ? activeRes.value : []),
+        ...(Array.isArray(deletedRes.value) ? deletedRes.value : []),
+      ];
+
+      const normalized = merged
         .map((item) => normalizeDestination(item))
         .filter(Boolean);
       setDestinations(normalized);
@@ -127,8 +153,25 @@ export default function DestinationsClient() {
       setIsLoading(true);
       setFetchError("");
       try {
-        const data = await destinationService.getAll();
-        const normalized = (Array.isArray(data) ? data : [])
+        const [activeRes, deletedRes] = await Promise.allSettled([
+          destinationService.getAll(),
+          destinationService.getDeleted(),
+        ]);
+
+        if (activeRes.status === "rejected") throw activeRes.reason;
+        if (deletedRes.status === "rejected") {
+          console.warn(
+            "[Admin Destinations] Không tải được danh sách đã xóa:",
+            deletedRes.reason
+          );
+        }
+
+        const merged = [
+          ...(Array.isArray(activeRes.value) ? activeRes.value : []),
+          ...(Array.isArray(deletedRes.value) ? deletedRes.value : []),
+        ];
+
+        const normalized = merged
           .map((item) => normalizeDestination(item))
           .filter(Boolean);
         if (active) setDestinations(normalized);

@@ -78,4 +78,14 @@ export const ROLES = [
     samplePassword: "Password123@",
     desc: "Cập nhật thông tin điểm di sản, phát hành tour & vé",
   },
+  {
+    id: "tourist",
+    roleEnum: "TOURIST",
+    title: "Khách du lịch",
+    scope: "Khám phá di sản",
+    redirectPath: "/",
+    sampleEmail: "tourist@journeygo.com",
+    samplePassword: "Password123@",
+    desc: "Khám phá điểm đến, hoàn thành nhiệm vụ và tích lũy điểm thưởng",
+  },
 ];

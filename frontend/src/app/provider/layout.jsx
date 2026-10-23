@@ -22,6 +22,7 @@ import {
   X,
   Sparkles,
   HelpCircle,
+  Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -63,6 +64,12 @@ export default function ProviderLayout({ children }) {
       label: "Quản lý Trải nghiệm",
       href: "/provider/experiences",
       icon: Sparkles,
+    },
+    {
+      id: "tours",
+      label: "Quản lý Tour Du Lịch",
+      href: "/provider/tours",
+      icon: Route,
     },
     {
       id: "routes",

@@ -15,6 +15,7 @@ import {
   Bell,
   Menu,
   Sparkles,
+  Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -48,6 +49,13 @@ const ADMIN_NAV_ITEMS = [
     label: "Quản lý trải nghiệm",
     href: "/admin/experiences",
     icon: Sparkles,
+    badge: null,
+  },
+  {
+    id: "tours",
+    label: "Quản lý tour du lịch",
+    href: "/admin/tours",
+    icon: Route,
     badge: null,
   },
   {

@@ -80,7 +80,7 @@ export function useAuth() {
     }
   };
 
-  const loginWithGoogle = async (idToken, desiredRole = "USER", options = { redirect: true }) => {
+  const loginWithGoogle = async (idToken, desiredRole = "TOURIST", options = { redirect: true }) => {
     setLoading(true);
     setError(null);
     try {
@@ -90,7 +90,7 @@ export function useAuth() {
       const accessToken = payload?.accessToken || payload?.token;
       const refreshToken = payload?.refreshToken;
 
-      const roleStr = String(user?.role || desiredRole || "USER").toUpperCase();
+      const roleStr = String(user?.role || desiredRole || "TOURIST").toUpperCase();
       let targetPath = ROUTES.HOME || "/";
       let roleTitle = "Người dùng";
       let roleScope = "Khám phá di sản";

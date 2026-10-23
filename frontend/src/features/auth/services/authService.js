@@ -5,7 +5,7 @@ export const authService = {
     return apiClient.post("/auth/login", credentials);
   },
 
-  loginWithGoogle: async (idToken, role = "USER") => {
+  loginWithGoogle: async (idToken, role = "TOURIST") => {
     return apiClient.post("/auth/google", { idToken, role });
   },
 

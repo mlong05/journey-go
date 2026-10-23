@@ -91,7 +91,7 @@ function getRoleLabel(role, fallbackRole = "admin") {
   if (r.includes("ADMIN")) return "Quản trị viên hệ thống";
   if (r.includes("MODERATOR")) return "Kiểm duyệt viên";
   if (r.includes("DESTINATION") || r.includes("PROVIDER")) return "Đối tác Điểm đến";
-  if (r.includes("USER") || r.includes("TOURIST")) return "Khách du lịch";
+  if (r.includes("TOURIST")) return "Khách du lịch";
   return role;
 }
 

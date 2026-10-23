@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLRestriction;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,9 +30,6 @@ public class Tour {
     @Column(nullable = false, length = 30)
     @Builder.Default
     private TourType tourType = TourType.OTHER;
-
-    @Column(nullable = false, precision = 15, scale = 2)
-    private BigDecimal price;
 
     @Column(nullable = false)
     private int durationDays;

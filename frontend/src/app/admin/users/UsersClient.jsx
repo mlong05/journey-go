@@ -45,14 +45,14 @@ const ROLES = {
   ADMIN: "ADMIN",
   MODERATOR: "MODERATOR",
   PROVIDER: "PROVIDER",
-  USER: "USER",
+  TOURIST: "TOURIST",
 };
 
 const ROLE_LABELS = {
   [ROLES.ADMIN]: "Quản trị viên",
   [ROLES.MODERATOR]: "Kiểm duyệt viên",
   [ROLES.PROVIDER]: "Đối tác Điểm đến",
-  [ROLES.USER]: "Khách du lịch",
+  [ROLES.TOURIST]: "Khách du lịch",
 };
 
 const ROLE_BADGE_CLASS = {
@@ -62,14 +62,14 @@ const ROLE_BADGE_CLASS = {
     "bg-indigo-50 text-indigo-700 border-indigo-200",
   [ROLES.PROVIDER]:
     "bg-emerald-50 text-emerald-700 border-emerald-200",
-  [ROLES.USER]: "bg-sky-50 text-sky-700 border-sky-200",
+  [ROLES.TOURIST]: "bg-sky-50 text-sky-700 border-sky-200",
 };
 
 const ROLE_AVATAR_BG = {
   [ROLES.ADMIN]: "bg-rose-100 text-rose-700",
   [ROLES.MODERATOR]: "bg-indigo-100 text-indigo-700",
   [ROLES.PROVIDER]: "bg-emerald-100 text-emerald-700",
-  [ROLES.USER]: "bg-sky-100 text-sky-700",
+  [ROLES.TOURIST]: "bg-sky-100 text-sky-700",
 };
 
 const SORT_OPTIONS = [
@@ -183,7 +183,7 @@ export default function AdminUsersClient() {
       total: pageData.totalElements || 0,
       providers: content.filter((u) => u.role === ROLES.PROVIDER).length,
       moderators: content.filter((u) => u.role === ROLES.MODERATOR).length,
-      users: content.filter((u) => u.role === ROLES.USER).length,
+      users: content.filter((u) => u.role === ROLES.TOURIST).length,
     };
   }, [pageData]);
 
@@ -810,9 +810,9 @@ export default function AdminUsersClient() {
             </button>
             <button
               type="button"
-              onClick={() => handleRoleFilterChange(ROLES.USER)}
+              onClick={() => handleRoleFilterChange(ROLES.TOURIST)}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                roleFilter === ROLES.USER
+                roleFilter === ROLES.TOURIST
                   ? "bg-sky-600 text-white shadow-xs"
                   : "bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200"
               }`}
@@ -1646,7 +1646,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
   // Form state — khởi tạo từ user được truyền vào
   const [fullName, setFullName] = useState(user?.fullName || "");
   const [phone, setPhone] = useState(user?.phone || "");
-  const [role, setRole] = useState(user?.role || ROLES.USER);
+  const [role, setRole] = useState(user?.role || ROLES.TOURIST);
   const [active, setActive] = useState(Boolean(user?.active));
   const [touched, setTouched] = useState(false);
 
@@ -1657,7 +1657,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
     lastUserIdRef.current = user?.id;
     setFullName(user?.fullName || "");
     setPhone(user?.phone || "");
-    setRole(user?.role || ROLES.USER);
+    setRole(user?.role || ROLES.TOURIST);
     setActive(Boolean(user?.active));
     setTouched(false);
   }
@@ -1984,7 +1984,7 @@ const ERROR_GUIDE = {
         /api/v1/users
       </code>{" "}
       yêu cầu quyền <code>ADMIN</code>. Tài khoản hiện tại có thể là{" "}
-      <code>USER</code>/<code>MODERATOR</code>/<code>PROVIDER</code>.
+      <code>TOURIST</code>/<code>MODERATOR</code>/<code>PROVIDER</code>.
     </>
   ),
   notfound: (

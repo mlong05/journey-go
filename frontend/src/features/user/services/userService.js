@@ -94,7 +94,7 @@ function normalizePage(pageData, fallbackItems = []) {
  *
  * @param {object} params
  * @param {string} [params.keyword] - Tìm theo email, họ tên, SĐT
- * @param {string} [params.role] - USER | MODERATOR | PROVIDER | ADMIN
+ * @param {string} [params.role] - TOURIST | MODERATOR | PROVIDER | ADMIN
  * @param {boolean} [params.active] - Lọc theo trạng thái kích hoạt
  * @param {number} [params.page=0]
  * @param {number} [params.size=20]
@@ -156,7 +156,7 @@ export async function createUser(payload) {
     password: String(payload.password || ""),
     fullName: String(payload.fullName || "").trim(),
     phone: payload.phone ? String(payload.phone).trim() : null,
-    role: payload.role || "USER",
+    role: payload.role || "TOURIST",
     active: payload.active === undefined ? true : Boolean(payload.active),
   };
   const res = await apiClient.post(ENDPOINTS.ROOT, body);

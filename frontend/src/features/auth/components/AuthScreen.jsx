@@ -260,7 +260,7 @@ export default function AuthScreen({ initialTab = "login" }) {
     setLoading(true);
 
     try {
-      const targetRoleEnum = selectedRole.roleEnum || (selectedRoleId === "provider" ? "PROVIDER" : "USER");
+      const targetRoleEnum = selectedRole.roleEnum || (selectedRoleId === "provider" ? "PROVIDER" : "TOURIST");
 
       const result = await authService.register({
         fullName: registerForm.fullName.trim(),
@@ -360,7 +360,7 @@ export default function AuthScreen({ initialTab = "login" }) {
     try {
       const targetRoleEnum =
         selectedRole?.roleEnum ||
-        (selectedRoleId === "provider" ? "PROVIDER" : "USER");
+        (selectedRoleId === "provider" ? "PROVIDER" : "TOURIST");
 
       const res = await loginWithGoogle(response.credential, targetRoleEnum, {
         redirect: false,
@@ -518,7 +518,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       const ssoRoleMap = {
         "Doanh nghiệp": "PROVIDER",
       };
-      const ssoAccountRole = ssoRoleMap[providerName] || "USER";
+      const ssoAccountRole = ssoRoleMap[providerName] || "TOURIST";
       const expectedRole = String(selectedRole?.roleEnum || "").toUpperCase();
       if (expectedRole && ssoAccountRole !== expectedRole) {
         setLoading(false);
