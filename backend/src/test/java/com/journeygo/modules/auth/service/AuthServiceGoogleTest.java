@@ -68,7 +68,7 @@ class AuthServiceGoogleTest {
     @Test
     void processGoogleAuth_WhenUserDoesNotExist_ShouldRegisterNewUser() {
         // Arrange
-        GoogleAuthRequest request = new GoogleAuthRequest("valid-id-token", Role.USER);
+        GoogleAuthRequest request = new GoogleAuthRequest("valid-id-token", Role.TOURIST);
 
         when(googleTokenVerifierService.verify("valid-id-token")).thenReturn(sampleGoogleUser);
         when(userRepository.findByEmail(sampleGoogleUser.email())).thenReturn(Optional.empty());
@@ -79,7 +79,7 @@ class AuthServiceGoogleTest {
                 .email(sampleGoogleUser.email())
                 .fullName(sampleGoogleUser.name())
                 .password("hashed-uuid")
-                .role(Role.USER)
+                .role(Role.TOURIST)
                 .authProvider(AuthProvider.GOOGLE)
                 .providerId(sampleGoogleUser.sub())
                 .avatarUrl(sampleGoogleUser.picture())
@@ -126,7 +126,7 @@ class AuthServiceGoogleTest {
                 .id(50L)
                 .email(sampleGoogleUser.email())
                 .fullName("Old Name")
-                .role(Role.USER)
+                .role(Role.TOURIST)
                 .authProvider(AuthProvider.LOCAL)
                 .active(true)
                 .createdAt(Instant.now())

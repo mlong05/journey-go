@@ -85,7 +85,7 @@ public class UserService {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
-        Role userRole = request.role() != null ? request.role() : Role.USER;
+        Role userRole = request.role() != null ? request.role() : Role.TOURIST;
         boolean isActive = request.active() != null ? request.active() : true;
 
         User user = User.builder()
