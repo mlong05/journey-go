@@ -60,7 +60,7 @@ class DestinationServiceWorkflowTest {
                 .id(1L)
                 .email("provider@example.com")
                 .fullName("Test Provider")
-                .role(Role.PROVIDER)
+                .role(Role.valueOf(Role.PROVIDER))
                 .build();
 
         region = Region.builder()
@@ -127,7 +127,7 @@ class DestinationServiceWorkflowTest {
         when(destinationRepository.findByIdAndDeletedFalse(100L)).thenReturn(Optional.of(destination));
         when(destinationRepository.save(any(Destination.class))).thenAnswer(i -> i.getArgument(0));
 
-        DestinationResponse response = destinationService.submit(100L, 1L, Role.PROVIDER);
+        DestinationResponse response = destinationService.submit(100L, 1L, Role.valueOf(Role.PROVIDER));
 
         assertEquals(DestinationStatus.PENDING, response.status());
         assertFalse(response.approved());
@@ -139,7 +139,7 @@ class DestinationServiceWorkflowTest {
         when(destinationRepository.findByIdAndDeletedFalse(100L)).thenReturn(Optional.of(destination));
 
         AppException ex = assertThrows(AppException.class, () ->
-                destinationService.submit(100L, 999L, Role.PROVIDER));
+                destinationService.submit(100L, 999L, Role.valueOf(Role.PROVIDER)));
         assertEquals(ErrorCode.UNAUTHORIZED, ex.getErrorCode());
     }
 

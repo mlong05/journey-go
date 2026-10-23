@@ -17,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import com.journeygo.modules.user.repository.RoleRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ public class UserService {
     );
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
 
@@ -85,7 +87,11 @@ public class UserService {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
-        Role userRole = request.role() != null ? request.role() : Role.TOURIST;
+        String targetRoleName = (request.role() != null && request.role().getName() != null)
+                ? request.role().getName()
+                : Role.TOURIST;
+        Role userRole = roleRepository.findByName(targetRoleName)
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
         boolean isActive = request.active() != null ? request.active() : true;
 
         User user = User.builder()
@@ -114,8 +120,15 @@ public class UserService {
         }
 
         User user = findUserOrThrow(id);
-        if (user.getRole() != request.role()) {
-            user.setRole(request.role());
+        String targetRoleName = request.role() != null ? request.role().getName() : null;
+        if (targetRoleName == null) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "Vai trò không được để trống");
+        }
+        Role targetRole = roleRepository.findByName(targetRoleName)
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+
+        if (!java.util.Objects.equals(user.getRole(), targetRole)) {
+            user.setRole(targetRole);
             // Thu hồi các refresh token cũ để buộc người dùng làm mới phiên đăng nhập với quyền mới
             refreshTokenService.revokeAllUserTokens(user);
         }
@@ -132,17 +145,24 @@ public class UserService {
     public UserResponse updateUser(Long id, AdminUpdateUserRequest request, Long currentAdminId) {
         User user = findUserOrThrow(id);
 
-        if (request.role() != null && request.role() != user.getRole()) {
-            if (id.equals(currentAdminId)) {
-                throw new AppException(ErrorCode.CANNOT_MODIFY_OWN_ROLE);
+        if (request.role() != null && request.role().getName() != null) {
+            Role targetRole = roleRepository.findByName(request.role().getName())
+                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+            if (!java.util.Objects.equals(user.getRole(), targetRole)) {
+                if (id.equals(currentAdminId)) {
+                    throw new AppException(ErrorCode.CANNOT_MODIFY_OWN_ROLE);
+                }
+                user.setRole(targetRole);
+                refreshTokenService.revokeAllUserTokens(user);
             }
-            user.setRole(request.role());
-            refreshTokenService.revokeAllUserTokens(user);
         }
 
         if (request.active() != null && request.active() != user.isActive()) {
             if (id.equals(currentAdminId) && !request.active()) {
                 throw new AppException(ErrorCode.CANNOT_DEACTIVATE_SELF);
+            }
+            if (!request.active() && user.getRole() != null && user.getRole().isAdmin()) {
+                throw new AppException(ErrorCode.CANNOT_DEACTIVATE_ADMIN);
             }
             user.setActive(request.active());
             if (!user.isActive()) {
@@ -162,7 +182,7 @@ public class UserService {
 
     /**
      * Kích hoạt hoặc vô hiệu hóa tài khoản người dùng.
-     * Admin không được tự khóa tài khoản của chính mình.
+     * Admin không được tự khóa tài khoản của chính mình và không được khóa tài khoản Admin khác.
      */
     @Transactional
     public UserResponse setUserActiveStatus(Long id, boolean active, Long currentAdminId) {
@@ -171,6 +191,10 @@ public class UserService {
         }
 
         User user = findUserOrThrow(id);
+        if (!active && user.getRole() != null && user.getRole().isAdmin()) {
+            throw new AppException(ErrorCode.CANNOT_DEACTIVATE_ADMIN);
+        }
+
         if (user.isActive() != active) {
             user.setActive(active);
             if (!active) {

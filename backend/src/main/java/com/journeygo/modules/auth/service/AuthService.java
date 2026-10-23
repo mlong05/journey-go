@@ -31,6 +31,7 @@ import java.util.UUID;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final com.journeygo.modules.user.repository.RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
@@ -79,7 +80,11 @@ public class AuthService {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
-        Role assignedRole = request.role() != null ? request.role() : Role.TOURIST;
+        String targetRoleName = (request.role() != null && request.role().getName() != null)
+                ? request.role().getName()
+                : Role.TOURIST;
+        Role assignedRole = roleRepository.findByName(targetRoleName)
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
 
         User user = User.builder()
                 .email(request.email())
@@ -113,7 +118,12 @@ public class AuthService {
         User user = userRepository.findByEmail(email).orElse(null);
 
         if (user == null) {
-            Role assignedRole = request.role() != null ? request.role() : Role.TOURIST;
+            String targetRoleName = (request.role() != null && request.role().getName() != null)
+                    ? request.role().getName()
+                    : Role.TOURIST;
+            Role assignedRole = roleRepository.findByName(targetRoleName)
+                    .orElseGet(() -> roleRepository.findByName(Role.TOURIST)
+                            .orElseGet(() -> roleRepository.save(new Role(Role.TOURIST, "Khách du lịch"))));
             String fullName = (googleUser.name() != null && !googleUser.name().isBlank())
                     ? googleUser.name()
                     : email.split("@")[0];
@@ -130,7 +140,7 @@ public class AuthService {
                     .build();
 
             user = userRepository.save(user);
-            log.info("Tạo mới tài khoản thành công qua Google OAuth2: email={}, role={}", email, assignedRole);
+            log.info("Tạo mới tài khoản thành công qua Google OAuth2: email={}, role={}", email, assignedRole.getName());
         } else {
             if (!user.isActive()) {
                 throw new AppException(ErrorCode.UNAUTHORIZED, "Tài khoản của bạn đã bị vô hiệu hóa");
