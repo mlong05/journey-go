@@ -33,7 +33,8 @@ public enum ErrorCode {
     TOUR_NOT_FOUND("Tour không tồn tại", HttpStatus.NOT_FOUND),
     TOUR_EXISTED("Tour với tên này đã tồn tại", HttpStatus.CONFLICT),
     TOUR_REJECTION_REASON_REQUIRED("Lý do từ chối không được để trống", HttpStatus.BAD_REQUEST),
-    INVALID_TOUR_STATUS("Trạng thái tour không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST);
+    INVALID_TOUR_STATUS("Trạng thái tour không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
+    ROLE_NOT_FOUND("Vai trò không tồn tại trong hệ thống", HttpStatus.NOT_FOUND);
 
     private final String message;
     private final HttpStatus httpStatus;
