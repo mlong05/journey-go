@@ -108,6 +108,9 @@ export default function AdminLayout({ children }) {
   const [topSearch, setTopSearch] = useState("");
   const [notificationsCount, setNotificationsCount] = useState(0);
 
+  // Trang Trải nghiệm: khóa khung 100vh, chỉ vùng danh sách thẻ tự cuộn
+  const isExperiencesPage = /^\/admin\/experiences\/?$/.test(pathname || "");
+
   // Xử lý tìm kiếm nhanh từ Topbar
   const handleTopSearchSubmit = (e) => {
     e.preventDefault();
@@ -222,8 +225,20 @@ export default function AdminLayout({ children }) {
         </header>
 
         {/* Main Content bên dưới: flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50 */}
-        <main className="flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50">
-          <div className="w-full max-w-[1600px] mx-auto space-y-6">
+        <main
+          className={
+            isExperiencesPage
+              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8 bg-slate-50"
+              : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
+          }
+        >
+          <div
+            className={
+              isExperiencesPage
+                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
+                : "w-full max-w-[1600px] mx-auto space-y-6"
+            }
+          >
             {children}
           </div>
         </main>

@@ -45,6 +45,9 @@ export default function ProviderLayout({ children }) {
   // Dynamic danh sách thông báo duyệt bài (sẵn sàng gắn API)
   const [notifications, setNotifications] = useState([]);
 
+  // Trang Trải nghiệm: khóa khung 100vh, chỉ vùng danh sách thẻ tự cuộn
+  const isExperiencesPage = /^\/provider\/experiences\/?$/.test(pathname || "");
+
   // 6 Danh mục điều hướng Sidebar của Đối tác
   const navMenuItems = [
     {
@@ -217,8 +220,20 @@ export default function ProviderLayout({ children }) {
         </header>
 
         {/* ── NỘI DUNG TRANG CHÍNH: flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 ── */}
-        <main className="flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8">
-          <div className="w-full max-w-[1600px] mx-auto space-y-6">
+        <main
+          className={
+            isExperiencesPage
+              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8"
+              : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8"
+          }
+        >
+          <div
+            className={
+              isExperiencesPage
+                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
+                : "w-full max-w-[1600px] mx-auto space-y-6"
+            }
+          >
             {children}
           </div>
         </main>

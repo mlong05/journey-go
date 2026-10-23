@@ -44,7 +44,8 @@ export default function ModeratorLayout({ children }) {
   /* Chỉ trang DANH SÁCH điểm đến mới dùng khung cố định h-full/overflow-hidden
      để vùng bảng tự cuộn. Các trang khác (kể cả hồ sơ chi tiết /destinations/[id])
      vẫn cuộn toàn trang như cũ. So khớp chính xác để không áp nhầm. */
-  const isDestinationList = /^\/moderator\/destinations\/?$/.test(pathname);
+  const isDestinationList = /^\/moderator\/destinations\/?$/.test(pathname || "");
+  const isExperiencesPage = /^\/moderator\/experiences\/?$/.test(pathname || "");
 
   // 5 mục menu điều hướng chuyên biệt của kiểm duyệt viên
   const moderatorNavItems = [
@@ -222,6 +223,8 @@ export default function ModeratorLayout({ children }) {
           className={
             isDestinationList
               ? "flex-1 w-full h-full overflow-hidden bg-slate-50"
+              : isExperiencesPage
+              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8 bg-slate-50"
               : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
           }
         >
@@ -229,6 +232,8 @@ export default function ModeratorLayout({ children }) {
             className={
               isDestinationList
                 ? "w-full max-w-[1600px] mx-auto h-full flex flex-col"
+                : isExperiencesPage
+                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
                 : "w-full max-w-[1600px] mx-auto space-y-6"
             }
           >
