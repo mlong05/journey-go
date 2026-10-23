@@ -20,9 +20,11 @@ public class UserPrincipal implements UserDetails {
     private final String fullName;
     private final boolean active;
     private final Collection<? extends GrantedAuthority> authorities;
-
     public static UserPrincipal create(User user) {
-        GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().name());
+        String roleName = (user.getRole() != null && user.getRole().getName() != null)
+                ? user.getRole().getName()
+                : com.journeygo.modules.user.entity.Role.TOURIST;
+        GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + roleName);
 
         return new UserPrincipal(
                 user.getId(),
