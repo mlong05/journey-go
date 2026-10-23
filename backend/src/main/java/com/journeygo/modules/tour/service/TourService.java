@@ -252,7 +252,7 @@ public class TourService {
     }
 
     private void checkOwnership(Tour tour, Long callerId, Role callerRole) {
-        if (callerRole == Role.PROVIDER) {
+        if (callerRole != null && callerRole.isProvider()) {
             Long ownerId = tour.getCreatedBy() != null ? tour.getCreatedBy().getId() : null;
             if (ownerId == null || !ownerId.equals(callerId)) {
                 throw new AppException(ErrorCode.UNAUTHORIZED);

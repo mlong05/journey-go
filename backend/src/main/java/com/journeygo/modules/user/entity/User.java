@@ -32,10 +32,9 @@ public class User {
     @Column(length = 20)
     private String phone;
 
-    @Convert(converter = RoleConverter.class)
-    @Column(nullable = false, length = 30)
-    @Builder.Default
-    private Role role = Role.TOURIST;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id")
+    private Role role;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "auth_provider", length = 30)
