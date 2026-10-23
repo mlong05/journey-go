@@ -58,7 +58,7 @@ class UserServiceTest {
                 .password("encoded_password")
                 .fullName("Nguyen Van B")
                 .phone("0987654321")
-                .role(Role.USER)
+                .role(Role.TOURIST)
                 .authProvider(AuthProvider.LOCAL)
                 .active(true)
                 .createdAt(Instant.now())
@@ -133,14 +133,14 @@ class UserServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         Page<User> page = new PageImpl<>(List.of(sampleUser, adminUser), pageable, 2);
 
-        when(userRepository.searchUsers("journey", Role.USER, true, pageable)).thenReturn(page);
+        when(userRepository.searchUsers("journey", Role.TOURIST, true, pageable)).thenReturn(page);
 
-        Page<UserResponse> result = userService.getAllUsers("  journey  ", Role.USER, true, pageable);
+        Page<UserResponse> result = userService.getAllUsers("  journey  ", Role.TOURIST, true, pageable);
 
         assertNotNull(result);
         assertEquals(2, result.getTotalElements());
         assertEquals("user@journeygo.com", result.getContent().get(0).email());
-        verify(userRepository).searchUsers("journey", Role.USER, true, pageable);
+        verify(userRepository).searchUsers("journey", Role.TOURIST, true, pageable);
     }
 
     @Test
@@ -198,7 +198,7 @@ class UserServiceTest {
     @Test
     @DisplayName("Admin không thể tự cập nhật vai trò của chính mình")
     void updateUserRole_SelfModification_ThrowsException() {
-        UpdateRoleRequest request = new UpdateRoleRequest(Role.USER);
+        UpdateRoleRequest request = new UpdateRoleRequest(Role.TOURIST);
 
         AppException ex = assertThrows(AppException.class, () -> userService.updateUserRole(1L, request, 1L));
         assertEquals(ErrorCode.CANNOT_MODIFY_OWN_ROLE, ex.getErrorCode());
