@@ -137,15 +137,30 @@ erDiagram
 
 ---
 
+### 3.5. API Quản lý Vai trò (Role Management APIs)
+- **[`RoleController.java`](file:///d:/S9/journey-go/backend/src/main/java/com/journeygo/modules/user/controller/RoleController.java)** & **[`RoleService.java`](file:///d:/S9/journey-go/backend/src/main/java/com/journeygo/modules/user/service/RoleService.java)**:
+  - `@PreAuthorize("hasRole('ADMIN')")`: Dành riêng cho quản trị viên.
+  - `GET /api/v1/roles`: Lấy toàn bộ danh sách vai trò hiện có trong hệ thống (sắp xếp theo ID tăng dần).
+  - `POST /api/v1/roles`: Tạo mới một vai trò tùy chỉnh (`is_system = false`). Tên vai trò tự động được chuẩn hóa chữ hoa (`toUpperCase()`). Kiểm tra không được trùng lặp tên (`ROLE_EXISTED`).
+  - DTOs: [`CreateRoleRequest.java`](file:///d:/S9/journey-go/backend/src/main/java/com/journeygo/modules/user/dto/CreateRoleRequest.java), [`RoleResponse.java`](file:///d:/S9/journey-go/backend/src/main/java/com/journeygo/modules/user/dto/RoleResponse.java).
+
+### 3.6. Ràng buộc bảo vệ tài khoản Quản trị viên (Admin Protection Rules)
+- Trong [`UserService.java`](file:///d:/S9/journey-go/backend/src/main/java/com/journeygo/modules/user/service/UserService.java):
+  - **Admin không thể tự khóa tài khoản của mình**: Ném lỗi `CANNOT_DEACTIVATE_SELF`.
+  - **Admin không thể khóa tài khoản của một Admin khác**: Khi thao tác vô hiệu hóa (qua `setUserActiveStatus` hoặc `updateUser` với `active: false`), nếu đối tượng mục tiêu có vai trò là `ADMIN`, hệ thống lập tức từ chối và ném lỗi `CANNOT_DEACTIVATE_ADMIN` (HTTP 403 Forbidden).
+
+---
+
 ## 4. Kiểm thử & Đảm bảo chất lượng (Verification)
 
-Tất cả unit tests đã được cập nhật tương thích với `Role` entity và `RoleRepository` mock:
-- **`UserServiceTest.java`**: 12/12 tests passed.
+Tất cả unit tests đã được cập nhật tương thích với `Role` entity, `RoleRepository` mock và các ràng buộc bảo vệ Admin:
+- **`RoleServiceTest.java`**: 3/3 tests passed (Lấy danh sách, tạo thành công, chặn trùng tên).
+- **`UserServiceTest.java`**: 14/14 tests passed (Thêm test case chặn khóa self-admin và other-admin).
 - **`AuthServiceGoogleTest.java`**: 3/3 tests passed.
 - **`AuthServicePasswordTest.java`**: 8/8 tests passed.
 - **`DestinationServiceWorkflowTest.java`**: 8/8 tests passed.
 - **`CulturalContentServiceTest.java`**: 6/6 tests passed.
-- **Toàn bộ Test Suite Backend**: **74/74 tests passed (0 failures, 0 errors)**.
+- **Toàn bộ Test Suite Backend**: **79/79 tests passed (0 failures, 0 errors)**.
 
 ---
 
@@ -153,11 +168,12 @@ Tất cả unit tests đã được cập nhật tương thích với `Role` ent
 
 Khi hệ thống phát triển đến giai đoạn cần quản lý phân quyền chuyên sâu hơn:
 
-### 5.1. Thêm API CRUD Vai trò động (Dynamic Role Management)
-- Tạo `RoleController` với các API dành riêng cho `ADMIN`:
+### 5.1. Mở rộng CRUD Vai trò động (Dynamic Role Management)
+- Hệ thống đã có sẵn:
   - `GET /api/v1/roles`: Lấy danh sách tất cả các vai trò.
-  - `POST /api/v1/roles`: Tạo một vai trò tùy chỉnh mới (`is_system = false`).
-  - `PUT /api/v1/roles/{id}`: Sửa tên/mô tả vai trò (chỉ cho phép sửa nếu `is_system == false`).
+  - `POST /api/v1/roles`: Tạo vai trò tùy chỉnh mới (`is_system = false`).
+- Các tính năng có thể mở rộng tiếp theo:
+  - `PUT /api/v1/roles/{id}`: Sửa mô tả vai trò (chỉ cho phép sửa nếu `is_system == false`).
   - `DELETE /api/v1/roles/{id}`: Xóa vai trò tùy chỉnh khi không còn user nào gán vai trò này.
 
 ### 5.2. Nâng cấp lên RBAC (Role-Based Access Control) với Permissions

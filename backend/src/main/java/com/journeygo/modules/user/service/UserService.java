@@ -161,6 +161,9 @@ public class UserService {
             if (id.equals(currentAdminId) && !request.active()) {
                 throw new AppException(ErrorCode.CANNOT_DEACTIVATE_SELF);
             }
+            if (!request.active() && user.getRole() != null && user.getRole().isAdmin()) {
+                throw new AppException(ErrorCode.CANNOT_DEACTIVATE_ADMIN);
+            }
             user.setActive(request.active());
             if (!user.isActive()) {
                 refreshTokenService.revokeAllUserTokens(user);
@@ -179,7 +182,7 @@ public class UserService {
 
     /**
      * Kích hoạt hoặc vô hiệu hóa tài khoản người dùng.
-     * Admin không được tự khóa tài khoản của chính mình.
+     * Admin không được tự khóa tài khoản của chính mình và không được khóa tài khoản Admin khác.
      */
     @Transactional
     public UserResponse setUserActiveStatus(Long id, boolean active, Long currentAdminId) {
@@ -188,6 +191,10 @@ public class UserService {
         }
 
         User user = findUserOrThrow(id);
+        if (!active && user.getRole() != null && user.getRole().isAdmin()) {
+            throw new AppException(ErrorCode.CANNOT_DEACTIVATE_ADMIN);
+        }
+
         if (user.isActive() != active) {
             user.setActive(active);
             if (!active) {

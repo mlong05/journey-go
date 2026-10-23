@@ -282,4 +282,48 @@ class UserServiceTest {
         verify(userRepository, never()).save(any());
         verify(refreshTokenService, never()).revokeAllUserTokens(any());
     }
+
+    @Test
+    @DisplayName("Admin không thể vô hiệu hóa (khóa) tài khoản của Admin khác")
+    void setUserActiveStatus_DeactivateOtherAdmin_ThrowsException() {
+        User otherAdmin = User.builder()
+                .id(99L)
+                .email("other.admin@journeygo.com")
+                .fullName("Other Admin")
+                .role(adminRole)
+                .active(true)
+                .build();
+
+        when(userRepository.findById(99L)).thenReturn(Optional.of(otherAdmin));
+
+        AppException ex = assertThrows(AppException.class, () -> userService.setUserActiveStatus(99L, false, 1L));
+        assertEquals(ErrorCode.CANNOT_DEACTIVATE_ADMIN, ex.getErrorCode());
+        verify(userRepository, never()).save(any());
+        verify(refreshTokenService, never()).revokeAllUserTokens(any());
+    }
+
+    @Test
+    @DisplayName("Admin cập nhật người dùng thất bại khi cố gắng vô hiệu hóa Admin khác")
+    void updateUser_DeactivateOtherAdmin_ThrowsException() {
+        User otherAdmin = User.builder()
+                .id(99L)
+                .email("other.admin@journeygo.com")
+                .fullName("Other Admin")
+                .role(adminRole)
+                .active(true)
+                .build();
+
+        AdminUpdateUserRequest request = new AdminUpdateUserRequest(
+                "Other Admin Updated",
+                null,
+                null,
+                false
+        );
+
+        when(userRepository.findById(99L)).thenReturn(Optional.of(otherAdmin));
+
+        AppException ex = assertThrows(AppException.class, () -> userService.updateUser(99L, request, 1L));
+        assertEquals(ErrorCode.CANNOT_DEACTIVATE_ADMIN, ex.getErrorCode());
+        verify(userRepository, never()).save(any());
+    }
 }
