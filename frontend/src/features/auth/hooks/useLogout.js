@@ -42,14 +42,16 @@ export function useLogout() {
       setLogoutModal({
         isOpen: true,
         status: "success",
-        message: "Đã đăng xuất khỏi hệ thống.",
+        message:
+          "Dữ liệu phiên làm việc của bạn đã được bảo vệ an toàn. Hẹn gặp lại bạn trên các hành trình di sản tiếp theo!",
       });
     } catch (err) {
       console.error("[Logout Error]", err);
       setLogoutModal({
         isOpen: true,
         status: "success",
-        message: "Đã đăng xuất khỏi hệ thống.",
+        message:
+          "Dữ liệu phiên làm việc của bạn đã được bảo vệ an toàn. Hẹn gặp lại bạn trên các hành trình di sản tiếp theo!",
       });
     } finally {
       // 4. Xóa sạch mọi session và token trong localStorage

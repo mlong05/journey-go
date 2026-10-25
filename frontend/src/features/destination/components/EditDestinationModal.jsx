@@ -13,8 +13,11 @@ import {
   CheckCircle2,
   Save,
   RotateCcw,
+  Globe2,
+  ChevronDown,
 } from "lucide-react";
 import { destinationService } from "../services/destinationService";
+import { regionService } from "../services/regionService";
 import AdministrativeAddressFields from "./AdministrativeAddressFields";
 
 /**
@@ -63,12 +66,15 @@ export default function EditDestinationModal({
   // ── Form state ───────────────────────────────────────────────
   const initialForm = {
     name: "",
+    regionId: "",
     address: "",
     latitude: "",
     longitude: "",
     capacity: "",
   };
   const [form, setForm] = useState(initialForm);
+  const [regions, setRegions] = useState([]);
+  const [regionsLoading, setRegionsLoading] = useState(false);
   const [addr, setAddr] = useState({
     address: "",
     provinceCode: "",
@@ -88,47 +94,82 @@ export default function EditDestinationModal({
   // ── Load destination data khi mở modal ──────────────────────
   useEffect(() => {
     if (!isOpen || !destinationId) return;
+    let cancelled = false;
 
-    setApiError("");
-    setSuccess(false);
-    setErrors({});
-    setFetchingDest(true);
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setApiError("");
+      setSuccess(false);
+      setErrors({});
+      setFetchingDest(true);
 
-    destinationService
-      .getById(destinationId)
-      .then((dest) => {
-        setForm({
-          name: dest.name ?? "",
-          address: dest.address ?? "",
-          latitude:
-            dest.latitude != null ? String(dest.latitude) : "",
-          longitude:
-            dest.longitude != null ? String(dest.longitude) : "",
-          capacity:
-            dest.capacity != null ? String(dest.capacity) : "",
+      // Nạp danh mục vùng miền
+      setRegionsLoading(true);
+      regionService
+        .getAll()
+        .then((data) => {
+          if (!cancelled) setRegions(Array.isArray(data) ? data : []);
+        })
+        .catch((err) => console.error("[Edit Destination] Load regions error:", err))
+        .finally(() => {
+          if (!cancelled) setRegionsLoading(false);
         });
-      })
-      .catch((err) => {
-        console.error("[Edit Destination] Fetch error:", err);
-        setApiError(
-          err?.message ||
-            "Không thể tải thông tin điểm đến. Vui lòng thử lại."
-        );
-      })
-      .finally(() => {
-        setFetchingDest(false);
-      });
+
+      destinationService
+        .getById(destinationId)
+        .then((dest) => {
+          if (cancelled) return;
+          setForm({
+            name: dest.name ?? "",
+            regionId:
+              dest.regionId != null
+                ? String(dest.regionId)
+                : dest.region?.id != null
+                ? String(dest.region.id)
+                : "",
+            address: dest.address ?? "",
+            latitude:
+              dest.latitude != null ? String(dest.latitude) : "",
+            longitude:
+              dest.longitude != null ? String(dest.longitude) : "",
+            capacity:
+              dest.capacity != null ? String(dest.capacity) : "",
+          });
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          console.error("[Edit Destination] Fetch error:", err);
+          setApiError(
+            err?.message ||
+              "Không thể tải thông tin điểm đến. Vui lòng thử lại."
+          );
+        })
+        .finally(() => {
+          if (!cancelled) setFetchingDest(false);
+        });
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, destinationId]);
 
   // Reset state khi đóng modal
   useEffect(() => {
-    if (!isOpen) {
-      setForm(initialForm);
-      setErrors({});
-      setApiError("");
-      setSuccess(false);
-      setUpdatedItem(null);
-    }
+    if (isOpen) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setForm(initialForm);
+        setErrors({});
+        setApiError("");
+        setSuccess(false);
+        setUpdatedItem(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -203,6 +244,9 @@ export default function EditDestinationModal({
     if (!form.name.trim()) {
       e.name = "Vui lòng nhập tên điểm đến di sản.";
     }
+    if (!form.regionId) {
+      e.regionId = "Vui lòng chọn khu vực / vùng miền du lịch.";
+    }
     if (!addr.provinceCode) {
       e.address = "Vui lòng chọn Tỉnh/Thành phố.";
     } else if (!addr.wardCode) {
@@ -244,6 +288,7 @@ export default function EditDestinationModal({
     try {
       const payload = {
         name: form.name.trim(),
+        regionId: Number(form.regionId),
         address: addr.address,
         latitude: Number(form.latitude),
         longitude: Number(form.longitude),
@@ -447,6 +492,42 @@ export default function EditDestinationModal({
                   <p className="text-[11px] text-rose-600 font-bold">
                     {errors.name}
                   </p>
+                )}
+              </div>
+
+              {/* ── Trường mới: Khu vực / Vùng miền du lịch (Region Master Data) ── */}
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <Globe2 size={13} className={palette.icon} />
+                  <span>Thuộc Khu vực / Vùng miền du lịch</span>
+                  <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={form.regionId}
+                    onChange={(e) => handleChange("regionId", e.target.value)}
+                    disabled={loading || regionsLoading}
+                    className={`w-full appearance-none pl-3.5 pr-9 py-2.5 bg-slate-50 border rounded-xl text-sm font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} disabled:opacity-60 transition-colors cursor-pointer ${
+                      errors.regionId ? "border-rose-300" : "border-slate-200"
+                    }`}
+                  >
+                    <option value="">
+                      {regionsLoading
+                        ? "Đang tải danh mục vùng miền..."
+                        : "-- Chọn vùng miền du lịch --"}
+                    </option>
+                    {regions.map((reg) => (
+                      <option key={reg.id} value={reg.id}>
+                        {reg.name} ({reg.slug})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
+                    <ChevronDown size={14} />
+                  </div>
+                </div>
+                {errors.regionId && (
+                  <p className="text-[11px] text-rose-600 font-bold">{errors.regionId}</p>
                 )}
               </div>
 

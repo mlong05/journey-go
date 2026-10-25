@@ -22,12 +22,14 @@ import {
   AlertTriangle,
   ChevronDown,
   Landmark,
+  Headphones,
 } from "lucide-react";
 import {
   destinationService,
   provinceService,
   CreateDestinationModal,
   EditDestinationModal,
+  CulturalContentManagerModal,
 } from "@/features/destination";
 
 const STATUS = {
@@ -69,6 +71,13 @@ function normalizeDestination(raw, fallbackStatus = STATUS.PENDING) {
     updatedAt: raw.updatedAt || null,
     status: approvedFlag ? STATUS.APPROVED : fallbackStatus,
     _wasUpdated: wasUpdated,
+    contentCount:
+      raw.contentCount ??
+      (Array.isArray(raw.contents)
+        ? raw.contents.length
+        : Array.isArray(raw.culturalContents)
+        ? raw.culturalContents.length
+        : 0),
   };
 }
 
@@ -87,6 +96,7 @@ export default function ProviderDestinationsPage() {
 
   const [detailTarget, setDetailTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+  const [contentManagerTarget, setContentManagerTarget] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
@@ -121,39 +131,57 @@ export default function ProviderDestinationsPage() {
   }, []);
 
   useEffect(() => {
-    fetchAllList();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        fetchAllList();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [fetchAllList]);
 
   // ── Tải danh sách 34 tỉnh/thành mới (mô hình 2 cấp từ 1/7/2025) ───
   useEffect(() => {
+    let cancelled = false;
     const controller = new AbortController();
-    setProvinceLoading(true);
-    setProvinceError("");
-    provinceService
-      .getNewProvinces({ signal: controller.signal })
-      .then((list) => {
-        const arr = Array.isArray(list) ? list : [];
-        setProvinceList(arr);
-        // Nếu selectedRegion đang trỏ vào 1 code không tồn tại trong danh sách
-        // mới → reset về 'all' để tránh lọc "không ra gì".
-        setSelectedRegion((prev) => {
-          if (prev === "all") return "all";
-          const stillExists = arr.some((p) => p.code === prev);
-          return stillExists ? prev : "all";
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setProvinceLoading(true);
+      setProvinceError("");
+      provinceService
+        .getNewProvinces({ signal: controller.signal })
+        .then((list) => {
+          if (cancelled) return;
+          const arr = Array.isArray(list) ? list : [];
+          setProvinceList(arr);
+          // Nếu selectedRegion đang trỏ vào 1 code không tồn tại trong danh sách
+          // mới → reset về 'all' để tránh lọc "không ra gì".
+          setSelectedRegion((prev) => {
+            if (prev === "all") return "all";
+            const stillExists = arr.some((p) => p.code === prev);
+            return stillExists ? prev : "all";
+          });
+        })
+        .catch((err) => {
+          if (cancelled || err?.name === "AbortError") return;
+          console.error("[Provider Destinations] Province load error:", err);
+          setProvinceError(
+            err?.message || "Không thể tải danh sách tỉnh/thành mới nhất."
+          );
+          setProvinceList([]);
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setProvinceLoading(false);
+          }
         });
-      })
-      .catch((err) => {
-        if (err?.name === "AbortError") return;
-        console.error("[Provider Destinations] Province load error:", err);
-        setProvinceError(
-          err?.message || "Không thể tải danh sách tỉnh/thành mới nhất."
-        );
-        setProvinceList([]);
-      })
-      .finally(() => {
-        setProvinceLoading(false);
-      });
-    return () => controller.abort();
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, []);
 
   const handleViewDetail = useCallback(async (id) => {
@@ -626,32 +654,60 @@ export default function ProviderDestinationsPage() {
                       <span className="break-words">{dest.address || "Chưa cập nhật địa chỉ hành chính"}</span>
                     </p>
 
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-medium px-2.5 py-1 rounded-xl bg-slate-50 text-slate-600 border border-slate-200/80 group-hover:bg-emerald-50/50 group-hover:text-emerald-700 group-hover:border-emerald-200/60 transition-colors max-w-full truncate">
                         <Navigation size={12} className="shrink-0 text-emerald-600" />
                         <span className="truncate">
                           {dest.latitude ?? "—"}, {dest.longitude ?? "—"}
                         </span>
                       </span>
+
+                      <button
+                        type="button"
+                        onClick={() => setContentManagerTarget(dest)}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-xl bg-amber-50/90 text-amber-850 border border-amber-200/90 hover:bg-amber-100 text-amber-900 transition-colors cursor-pointer shrink-0 group/pill"
+                        title="Nhấp để mở kho thuyết minh đa phương tiện"
+                      >
+                        <Headphones size={12} className="text-amber-600 group-hover/pill:scale-110 transition-transform" />
+                        <span>{dest.contentCount ?? 0} thuyết minh</span>
+                      </button>
                     </div>
                   </div>
                 </div>
 
                 {/* Footer Actions: Dock tương tác */}
-                <div className="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleViewDetail(dest.id)}
-                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 shadow-2xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Eye size={13} />
-                    <span>Xem chi tiết</span>
-                  </button>
+                <div className="px-4 sm:px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => handleViewDetail(dest.id)}
+                      className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 shadow-2xs transition-all active:scale-95 flex items-center gap-1 cursor-pointer shrink-0"
+                      title="Xem thông tin chi tiết điểm đến"
+                    >
+                      <Eye size={13} />
+                      <span className="hidden xs:inline">Chi tiết</span>
+                    </button>
+
+                    {/* Nút Nội dung & Thuyết minh với huy hiệu đếm */}
+                    <button
+                      type="button"
+                      onClick={() => setContentManagerTarget(dest)}
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 text-amber-900 border border-amber-300/80 font-bold text-xs shadow-2xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0 group/btn"
+                      title="Quản lý thuyết minh audio, video, câu chuyện văn hóa"
+                    >
+                      <Headphones size={13} className="text-amber-600 group-hover/btn:scale-110 transition-transform" />
+                      <span>Thuyết minh</span>
+                      <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[10px] font-black shadow-2xs">
+                        {dest.contentCount ?? 0}
+                      </span>
+                    </button>
+                  </div>
 
                   <button
                     type="button"
                     onClick={() => setEditTarget(dest)}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs shadow-emerald-600/20 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs shadow-emerald-600/20 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shrink-0"
+                    title="Chỉnh sửa thông tin điểm đến"
                   >
                     <Edit3 size={13} />
                     <span>Chỉnh sửa</span>
@@ -761,25 +817,44 @@ export default function ProviderDestinationsPage() {
               </div>
             </div>
 
-            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2.5 flex-wrap">
               <button
                 type="button"
                 onClick={() => {
-                  setEditTarget(detailTarget);
+                  setContentManagerTarget(detailTarget);
                   setDetailTarget(null);
                 }}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                <Edit3 size={13} />
-                <span>Chỉnh sửa điểm đến</span>
+                <Headphones size={13} className="text-amber-600" />
+                <span>Nội dung &amp; Thuyết minh</span>
+                {detailTarget.contentCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-amber-600 text-white text-[10px] font-black">
+                    {detailTarget.contentCount}
+                  </span>
+                )}
               </button>
-              <button
-                type="button"
-                onClick={() => setDetailTarget(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-              >
-                Đóng
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditTarget(detailTarget);
+                    setDetailTarget(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Edit3 size={13} />
+                  <span>Chỉnh sửa điểm đến</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailTarget(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -800,6 +875,13 @@ export default function ProviderDestinationsPage() {
         onClose={() => setEditTarget(null)}
         onUpdated={handleUpdated}
         theme="emerald"
+      />
+
+      <CulturalContentManagerModal
+        isOpen={Boolean(contentManagerTarget)}
+        destination={contentManagerTarget}
+        onClose={() => setContentManagerTarget(null)}
+        onUpdated={fetchAllList}
       />
 
       </div>

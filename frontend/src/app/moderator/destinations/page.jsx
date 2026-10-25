@@ -22,8 +22,13 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Globe2,
 } from "lucide-react";
-import { destinationService } from "@/features/destination/services/destinationService";
+import {
+  destinationService,
+  RegionManagerModal,
+  DestinationAssessmentModal,
+} from "@/features/destination";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /* =========================================================================
@@ -410,6 +415,7 @@ export default function ModeratorDestinationsPage() {
   const [statusTab, setStatusTab] = useState("all");
   const [destinations, setDestinations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegionManagerOpen, setIsRegionManagerOpen] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
   const [detailTarget, setDetailTarget] = useState(null);
@@ -450,7 +456,13 @@ export default function ModeratorDestinationsPage() {
   }, []);
 
   useEffect(() => {
-    loadAll();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) loadAll();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadAll]);
 
   /* Ghi chú: khung chiều cao cố định (h-full + overflow-hidden) do
@@ -608,15 +620,26 @@ export default function ModeratorDestinationsPage() {
         <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
           Thẩm định điểm đến di sản
         </h1>
-        <button
-          type="button"
-          onClick={loadAll}
-          disabled={isLoading}
-          className="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
-          <span>Làm mới dữ liệu</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={loadAll}
+            disabled={isLoading}
+            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+            <span>Làm mới dữ liệu</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsRegionManagerOpen(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 active:scale-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-teal-900/20 text-xs transition-all cursor-pointer"
+            title="Xem và quản lý danh mục vùng miền du lịch"
+          >
+            <Globe2 size={15} strokeWidth={2.4} />
+            <span>Quản lý Vùng miền</span>
+          </button>
+        </div>
       </div>
 
       {/* ══════════════════════════════════════════════════════════
@@ -896,174 +919,28 @@ export default function ModeratorDestinationsPage() {
       </section>
 
       {/* ══════════════════════════════════════════════════════════
-          MODAL — Xem chi tiết điểm đến (nơi chứa ĐỊA CHỈ & TỌA ĐỘ)
+      {/* ══════════════════════════════════════════════════════════
+          MODAL THẨM ĐỊNH ĐIỂM ĐẾN & HỒ SƠ THUYẾT MINH VĂN HÓA
          ══════════════════════════════════════════════════════════ */}
-      {(detailTarget || detailLoading || detailError) && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
-          onClick={closeDetail}
-        >
-          <div
-            className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div className="shrink-0 px-5 sm:px-7 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="font-mono text-[10.5px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                    #{detailTarget?.id ?? "—"}
-                  </span>
-                  {detailTarget && <StatusBadge status={detailTarget.status} />}
-                </div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 truncate">
-                  {detailTarget?.name || "Đang tải..."}
-                </h3>
-                {detailTarget?.address && (
-                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 truncate">
-                    <MapPin size={12} className="text-slate-400 shrink-0" />
-                    <span className="truncate">{detailTarget.address}</span>
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={closeDetail}
-                className="w-9 h-9 rounded-full bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center cursor-pointer border border-slate-200 shrink-0"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Modal body — có cuộn riêng */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-7 py-5">
-              {detailLoading ? (
-                <div className="py-12 flex flex-col items-center gap-3 text-slate-500">
-                  <Loader2 size={28} className="animate-spin text-slate-400" />
-                  <p className="text-xs font-bold">Đang tải dữ liệu điểm đến…</p>
-                </div>
-              ) : detailError ? (
-                <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
-                  <AlertCircle
-                    size={16}
-                    className="text-rose-600 mt-0.5 shrink-0"
-                  />
-                  <div>
-                    <p className="text-xs font-bold text-rose-800">
-                      Không thể tải chi tiết
-                    </p>
-                    <p className="text-[11px] text-rose-700 mt-0.5">
-                      {detailError}
-                    </p>
-                  </div>
-                </div>
-              ) : detailTarget ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* Địa chỉ — đã chuyển từ danh sách vào đây */}
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 sm:col-span-2">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <MapPin size={10} /> Địa chỉ thực tế
-                    </p>
-                    <p className="text-[13px] font-bold text-slate-800 leading-relaxed">
-                      {detailTarget.address || "—"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-sky-50/70 border border-sky-200 p-4">
-                    <p className="text-[10px] font-black text-sky-700 uppercase tracking-wider mb-2 flex items-center gap-1">
-                      <Navigation size={10} /> Tọa độ GPS
-                    </p>
-                    <div className="space-y-1 text-[11.5px] font-mono">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Vĩ độ</span>
-                        <span className="font-black text-slate-800">
-                          {detailTarget.latitude?.toFixed(6) ?? "—"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Kinh độ</span>
-                        <span className="font-black text-slate-800">
-                          {detailTarget.longitude?.toFixed(6) ?? "—"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-emerald-50/70 border border-emerald-200 p-4">
-                    <p className="text-[10px] font-black text-emerald-700 uppercase tracking-wider mb-2 flex items-center gap-1">
-                      <Users size={10} /> Sức chứa tối đa
-                    </p>
-                    <p className="text-[18px] font-black text-slate-900 leading-none">
-                      {detailTarget.capacity ?? "—"}
-                      <span className="text-[10.5px] font-bold text-slate-500 ml-1.5">
-                        du khách / lượt
-                      </span>
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 sm:col-span-2">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                      Đơn vị khởi tạo
-                    </p>
-                    <p className="text-[13px] font-bold text-slate-800 flex items-center gap-1.5">
-                      <Building2 size={12} className="text-slate-400" />
-                      {detailTarget.createdBy || "—"}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Modal footer */}
-            <div className="shrink-0 px-5 sm:px-7 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50/40">
-              {detailTarget && !detailTarget.approved && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleApprove(detailTarget.id, true, detailTarget.name)
-                  }
-                  disabled={actionLoadingId === detailTarget.id}
-                  className="h-8 px-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-60 disabled:active:scale-100 disabled:cursor-not-allowed"
-                >
-                  {actionLoadingId === detailTarget.id ? (
-                    <Loader2 size={14} className="animate-spin shrink-0" />
-                  ) : (
-                    <CheckCircle2 size={14} className="shrink-0" />
-                  )}
-                  <span>Phê duyệt</span>
-                </button>
-              )}
-              {detailTarget && detailTarget.approved && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleApprove(detailTarget.id, false, detailTarget.name)
-                  }
-                  disabled={actionLoadingId === detailTarget.id}
-                  className="h-8 px-3 rounded-full border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 text-xs font-semibold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed"
-                >
-                  {actionLoadingId === detailTarget.id ? (
-                    <Loader2 size={14} className="animate-spin shrink-0" />
-                  ) : (
-                    <Ban size={14} className="text-rose-500 shrink-0" />
-                  )}
-                  <span>Hủy duyệt</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={closeDetail}
-                className="h-8 px-3.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center transition-all active:scale-95 cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DestinationAssessmentModal
+        isOpen={Boolean(detailTarget || detailLoading || detailError)}
+        destination={detailTarget}
+        isLoading={detailLoading}
+        error={detailError}
+        onClose={closeDetail}
+        onApprove={(id, approve, name) => handleApprove(id, approve, name)}
+        isActionLoading={actionLoadingId === detailTarget?.id}
+        theme="emerald"
+      />
 
       {confirmDialog}
+
+      {/* Modal Quản lý Vùng miền */}
+      <RegionManagerModal
+        isOpen={isRegionManagerOpen}
+        onClose={() => setIsRegionManagerOpen(false)}
+        onUpdated={loadAll}
+      />
     </div>
   );
 }

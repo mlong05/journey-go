@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   X,
   ListChecks,
@@ -15,9 +15,16 @@ import {
   Inbox,
   ArrowUp,
   ArrowDown,
+  MapPin,
+  Lock,
+  Eye,
+  Compass,
+  FileQuestion,
 } from "lucide-react";
 import { taskService } from "../services/taskService";
 import { getExperienceTheme } from "../theme";
+import CheckInPointManagerModal from "./CheckInPointManagerModal";
+import QuestionManagerModal from "./QuestionManagerModal";
 
 const INITIAL_FORM = {
   taskTypeId: "",
@@ -30,15 +37,16 @@ const INITIAL_FORM = {
 };
 
 /**
- * Modal liệt kê và thao tác với Task của một Experience.
- * - GET /experiences/{id}/tasks
- * - POST /experiences/{id}/tasks         (BR-TASK-1: chỉ khi Experience DRAFT)
- * - PATCH /tasks/{id}                    (BR-TASK-1)
- * - DELETE /tasks/{id}                   (xoá mềm)
- *
- * `canEdit`: truyền vào ngoài; nên false với Moderator.
- *
- * Props: isOpen, onClose, experience, theme, canEdit.
+ * Modal quản lý Task của một Experience.
+ * Kết nối các API:
+ *  - GET    /api/v1/experiences/{experienceId}/tasks          (danh sách task)
+ *  - POST   /api/v1/experiences/{experienceId}/tasks          (tạo task)
+ *  - GET    /api/v1/tasks/{id}                                (lấy chi tiết task)
+ *  - PATCH  /api/v1/tasks/{id}                                (cập nhật task)
+ *  - DELETE /api/v1/tasks/{id}                                (xóa mềm task)
+ *  - POST   /api/v1/experiences/{experienceId}/tasks/reorder  (sắp xếp thứ tự)
+ *  - PATCH  /api/v1/tasks/{id}/location                       (gán điểm Check-in)
+ *  - PATCH  /api/v1/tasks/{id}/unlock-condition               (cấu hình điều kiện mở khóa)
  */
 export default function TaskManager({
   isOpen,
@@ -70,46 +78,76 @@ function TaskManagerDialog({
 
   const [tasks, setTasks] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
-  // Lưu mỗi phiên tải dữ liệu vào ref để tránh setState ở effect body
-  const loadingRef = React.useRef(false);
+  const [checkInPoints, setCheckInPoints] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
 
+  const [detailTask, setDetailTask] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  const [unlockTarget, setUnlockTarget] = useState(null);
+  const [locationTarget, setLocationTarget] = useState(null);
+  const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
+  const [questionTarget, setQuestionTarget] = useState(null);
+
   const isDraft = experience?.status === "DRAFT";
   const editable = canEdit && isDraft;
-
-  // Tải dữ liệu khi mở modal. experience.id được destructured ra để
-  // deps list phẳng, tránh re-trigger khi các field khác của experience đổi.
   const experienceId = experience?.id;
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 4000);
+  }, []);
+
+  const loadData = useCallback(async () => {
+    if (!experienceId) return;
+    setLoading(true);
+    try {
+      const [list, types, cips] = await Promise.all([
+        taskService.listByExperience(experienceId),
+        taskService.listTypes().catch(() => []),
+        taskService.listCheckInPoints(experienceId).catch(() => []),
+      ]);
+      setError("");
+      setTasks(list || []);
+      setTaskTypes(types || []);
+      setCheckInPoints(cips || []);
+    } catch (err) {
+      console.error("[TaskManager] load error", err);
+      setError(err?.message || "Không thể tải danh sách nhiệm vụ. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  }, [experienceId]);
+
   useEffect(() => {
     if (!isOpen || !experienceId) return;
-    if (loadingRef.current) return;
-    loadingRef.current = true;
-    queueMicrotask(() => setLoading(true));
     let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setLoading(true);
+    });
     (async () => {
       try {
-        const [list, types] = await Promise.all([
+        const [list, types, cips] = await Promise.all([
           taskService.listByExperience(experienceId),
           taskService.listTypes().catch(() => []),
+          taskService.listCheckInPoints(experienceId).catch(() => []),
         ]);
         if (cancelled) return;
+        setError("");
         setTasks(list || []);
         setTaskTypes(types || []);
+        setCheckInPoints(cips || []);
       } catch (err) {
         if (cancelled) return;
         console.error("[TaskManager] load error", err);
-        setError(
-          err?.message || "Không thể tải danh sách nhiệm vụ. Vui lòng thử lại."
-        );
+        setError(err?.message || "Không thể tải danh sách nhiệm vụ. Vui lòng thử lại.");
       } finally {
-        loadingRef.current = false;
         if (!cancelled) setLoading(false);
       }
     })();
@@ -138,21 +176,26 @@ function TaskManagerDialog({
 
   if (!isOpen || !experience) return null;
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 4000);
+  // Lấy chi tiết Task qua GET /api/v1/tasks/{id}
+  const handleViewDetail = async (task) => {
+    setDetailLoading(true);
+    try {
+      const full = await taskService.get(task.id);
+      setDetailTask(full || task);
+    } catch {
+      setDetailTask(task);
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
-  // ---- CRUD handlers ----
-  const reload = async () => {
+  const handleOpenEdit = async (task) => {
+    setEditing(task);
     try {
-      setLoading(true);
-      const list = await taskService.listByExperience(experience.id);
-      setTasks(list || []);
-    } catch (err) {
-      setError(err?.message || "Không thể tải lại danh sách.");
-    } finally {
-      setLoading(false);
+      const full = await taskService.get(task.id);
+      if (full) setEditing(full);
+    } catch {
+      // fallback to cached
     }
   };
 
@@ -161,7 +204,7 @@ function TaskManagerDialog({
       [...prev, created].sort((a, b) => (a.sequenceOrder ?? 0) - (b.sequenceOrder ?? 0))
     );
     setCreating(false);
-    showToast("Đã tạo nhiệm vụ mới.");
+    showToast("Đã tạo nhiệm vụ mới thành công.");
   };
 
   const handleUpdated = (updated) => {
@@ -171,11 +214,8 @@ function TaskManagerDialog({
         .sort((a, b) => (a.sequenceOrder ?? 0) - (b.sequenceOrder ?? 0))
     );
     setEditing(null);
-    showToast("Đã cập nhật nhiệm vụ.");
+    showToast("Đã cập nhật nhiệm vụ thành công.");
   };
-
-  const askDelete = (t) => setDeleting(t);
-  const cancelDelete = () => setDeleting(null);
 
   const confirmDelete = async () => {
     if (!deleting) return;
@@ -183,9 +223,7 @@ function TaskManagerDialog({
     try {
       await taskService.delete(deleting.id);
       setTasks((prev) =>
-        prev.map((t) =>
-          t.id === deleting.id ? { ...t, status: "INACTIVE" } : t
-        )
+        prev.map((t) => (t.id === deleting.id ? { ...t, status: "INACTIVE" } : t))
       );
       showToast(`Đã xoá nhiệm vụ "${deleting.title}".`);
       setDeleting(null);
@@ -197,26 +235,22 @@ function TaskManagerDialog({
     }
   };
 
-  // ---- Sắp xếp lại ----
   const move = async (idx, dir) => {
     if (!editable) return;
     const next = [...tasks];
     const target = idx + dir;
     if (target < 0 || target >= next.length) return;
     [next[idx], next[target]] = [next[target], next[idx]];
-    const reordered = next;
-    setTasks(reordered);
+    setTasks(next);
     try {
       await taskService.reorder(
         experience.id,
-        reordered.map((t) => t.id)
+        next.map((t) => t.id)
       );
     } catch (err) {
       console.error("[TaskManager] reorder error", err);
-      showToast(
-        err?.message || "Không thể sắp xếp lại. Đã khôi phục thứ tự cũ."
-      );
-      await reload();
+      showToast(err?.message || "Không thể sắp xếp lại. Đã khôi phục thứ tự cũ.");
+      loadData();
     }
   };
 
@@ -236,9 +270,7 @@ function TaskManagerDialog({
         <div className="px-6 py-5 border-b border-slate-100">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 min-w-0">
-              <div
-                className={`p-2.5 rounded-2xl border ${palette.badge} shrink-0`}
-              >
+              <div className={`p-2.5 rounded-2xl border ${palette.badge} shrink-0`}>
                 <ListChecks size={20} className={palette.icon} />
               </div>
               <div className="min-w-0">
@@ -247,10 +279,7 @@ function TaskManagerDialog({
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                   Trải nghiệm:{" "}
-                  <span className="font-semibold text-slate-700">
-                    {experience.title}
-                  </span>{" "}
-                  ·{" "}
+                  <span className="font-semibold text-slate-700">{experience.title}</span> ·{" "}
                   <span
                     className={
                       isDraft ? "text-emerald-600 font-semibold" : "text-slate-500"
@@ -281,14 +310,10 @@ function TaskManagerDialog({
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {!isDraft && (
             <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
-              <AlertCircle
-                size={16}
-                className="text-amber-700 mt-0.5 shrink-0"
-              />
+              <AlertCircle size={16} className="text-amber-700 mt-0.5 shrink-0" />
               <p className="text-xs text-amber-800 font-semibold leading-relaxed">
-                Trải nghiệm đang ở trạng thái{" "}
-                <strong>{experience.status}</strong>. Theo BR-TASK-1, chỉ thêm /
-                sửa / xoá Task khi Experience = Bản nháp.
+                Trải nghiệm đang ở trạng thái <strong>{experience.status}</strong>. Theo quy tắc
+                BR-TASK-1, chỉ thao tác thêm / sửa / xoá Task khi Experience ở trạng thái Bản nháp.
               </p>
             </div>
           )}
@@ -300,13 +325,28 @@ function TaskManagerDialog({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={reload}
+                onClick={loadData}
                 disabled={loading}
                 className="h-8 px-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
                 <span>Tải lại</span>
               </button>
+              {editable && (
+                <button
+                  type="button"
+                  onClick={() => setIsCheckInModalOpen(true)}
+                  className="h-8 px-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/image/compass-real.jpg"
+                    alt=""
+                    className="w-3.5 h-3.5 rounded-full object-cover shrink-0 ring-1 ring-amber-400/40"
+                  />
+                  <span>Trạm Check-in ({checkInPoints.length})</span>
+                </button>
+              )}
               {editable && (
                 <button
                   type="button"
@@ -322,10 +362,7 @@ function TaskManagerDialog({
 
           {error && (
             <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-rose-50 border border-rose-200">
-              <AlertCircle
-                size={14}
-                className="text-rose-600 mt-0.5 shrink-0"
-              />
+              <AlertCircle size={14} className="text-rose-600 mt-0.5 shrink-0" />
               <p className="text-xs text-rose-800 font-semibold">{error}</p>
             </div>
           )}
@@ -333,7 +370,7 @@ function TaskManagerDialog({
           {loading && tasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-slate-500">
               <Loader2 size={24} className="animate-spin mb-2" />
-              <span className="text-xs font-semibold">Đang tải...</span>
+              <span className="text-xs font-semibold">Đang tải nhiệm vụ...</span>
             </div>
           ) : tasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-slate-400">
@@ -354,7 +391,7 @@ function TaskManagerDialog({
               {tasks.map((t, idx) => (
                 <li
                   key={t.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-3 flex items-center gap-3"
+                  className="rounded-2xl border border-slate-200 bg-white p-3 flex items-center gap-3 hover:border-slate-300 transition-colors"
                 >
                   <div className="flex flex-col items-center shrink-0 text-slate-400">
                     <button
@@ -367,7 +404,7 @@ function TaskManagerDialog({
                       <ArrowUp size={12} />
                     </button>
                     <span className="text-[10px] font-mono font-bold text-slate-500 my-0.5">
-                      #{t.sequenceOrder}
+                      {t.sequenceOrder}
                     </span>
                     <button
                       type="button"
@@ -382,11 +419,8 @@ function TaskManagerDialog({
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-[11px] font-bold text-slate-500">
-                        #{t.id}
-                      </span>
                       <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                        {t.taskTypeCode || `type #${t.taskTypeId}`}
+                        {t.taskTypeName || t.taskTypeCode || `Loại #${t.taskTypeId}`}
                       </span>
                       {t.status === "INACTIVE" && (
                         <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
@@ -394,7 +428,7 @@ function TaskManagerDialog({
                         </span>
                       )}
                     </div>
-                    <h4 className="text-sm font-bold text-slate-900 mt-0.5 truncate">
+                    <h4 className="text-sm font-bold text-slate-900 mt-1 truncate">
                       {t.title}
                     </h4>
                     {t.description && (
@@ -402,35 +436,84 @@ function TaskManagerDialog({
                         {t.description}
                       </p>
                     )}
-                    <div className="flex items-center gap-3 mt-1 text-[11px] font-semibold text-slate-600">
+                    <div className="flex items-center gap-3 mt-1.5 text-[11px] font-semibold text-slate-600 flex-wrap">
                       <span>{t.pointsReward ?? 0} điểm</span>
                       {t.maxAttempts != null && <span>{t.maxAttempts} lần thử</span>}
                       {t.checkInPointId != null && (
-                        <span>CheckIn #{t.checkInPointId}</span>
+                        <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          <MapPin size={10} /> Check-in: #{t.checkInPointId}
+                        </span>
                       )}
                     </div>
                   </div>
 
-                  {editable && (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setEditing(t)}
-                        title="Sửa"
-                        className="h-7 px-2.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <Pencil size={11} /> Sửa
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => askDelete(t)}
-                        title="Xoá"
-                        className="h-7 px-2.5 rounded-full border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <Trash2 size={11} /> Xoá
-                      </button>
-                    </div>
-                  )}
+                  {/* CÁC THAO TÁC */}
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                    {/* Xem chi tiết qua GET /tasks/{id} */}
+                    <button
+                      type="button"
+                      onClick={() => handleViewDetail(t)}
+                      title="Xem chi tiết"
+                      className="h-7 px-2 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eye size={11} />
+                    </button>
+
+                    {/* Bộ câu hỏi thử thách qua /api/v1/tasks/{id}/questions */}
+                    <button
+                      type="button"
+                      onClick={() => setQuestionTarget(t)}
+                      title="Xem & Quản lý bộ câu hỏi trong nhiệm vụ"
+                      className="h-7 px-2.5 rounded-full border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                    >
+                      <FileQuestion size={11} className="text-indigo-600" />
+                      <span>Câu hỏi</span>
+                    </button>
+
+                    {editable && (
+                      <>
+                        {/* Gán vị trí check-in qua PATCH /tasks/{id}/location */}
+                        <button
+                          type="button"
+                          onClick={() => setLocationTarget(t)}
+                          title="Gán điểm Check-in"
+                          className="h-7 px-2.5 rounded-full border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <MapPin size={11} /> Vị trí
+                        </button>
+
+                        {/* Điều kiện mở khóa qua PATCH /tasks/{id}/unlock-condition */}
+                        <button
+                          type="button"
+                          onClick={() => setUnlockTarget(t)}
+                          title="Điều kiện mở khóa"
+                          className="h-7 px-2.5 rounded-full border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Lock size={11} /> Điều kiện
+                        </button>
+
+                        {/* Sửa qua PATCH /tasks/{id} */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(t)}
+                          title="Sửa"
+                          className="h-7 px-2.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Pencil size={11} /> Sửa
+                        </button>
+
+                        {/* Xoá mềm qua DELETE /tasks/{id} */}
+                        <button
+                          type="button"
+                          onClick={() => setDeleting(t)}
+                          title="Xoá"
+                          className="h-7 px-2.5 rounded-full border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Trash2 size={11} /> Xoá
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -449,7 +532,16 @@ function TaskManagerDialog({
         </div>
       </div>
 
-      {/* Form tạo / sửa */}
+      {/* MODAL CHI TIẾT TASK (GET /api/v1/tasks/{id}) */}
+      {detailTask && (
+        <TaskDetailDialog
+          task={detailTask}
+          loading={detailLoading}
+          onClose={() => setDetailTask(null)}
+        />
+      )}
+
+      {/* FORM TẠO / SỬA (POST /experiences/{id}/tasks hoặc PATCH /tasks/{id}) */}
       {(creating || editing) && (
         <TaskFormDialog
           key={editing?.id ?? (creating ? `new-${experience.id}` : "closed")}
@@ -461,17 +553,60 @@ function TaskManagerDialog({
           experience={experience}
           task={editing}
           taskTypes={taskTypes}
+          checkInPoints={checkInPoints}
           onCreated={handleCreated}
           onUpdated={handleUpdated}
           theme={theme}
         />
       )}
 
-      {/* Modal xác nhận xoá */}
+      {/* MODAL GÁN VỊ TRÍ CHECK-IN (PATCH /api/v1/tasks/{id}/location) */}
+      {locationTarget && (
+        <LocationDialog
+          task={locationTarget}
+          checkInPoints={checkInPoints}
+          onClose={() => setLocationTarget(null)}
+          onSaved={(updated) => {
+            handleUpdated(updated);
+            setLocationTarget(null);
+          }}
+        />
+      )}
+
+      {/* MODAL ĐIỀU KIỆN MỞ KHÓA (PATCH /api/v1/tasks/{id}/unlock-condition) */}
+      {unlockTarget && (
+        <UnlockConditionDialog
+          task={unlockTarget}
+          allTasks={tasks}
+          checkInPoints={checkInPoints}
+          onClose={() => setUnlockTarget(null)}
+          onSaved={() => {
+            showToast("Đã cấu hình điều kiện mở khóa thành công.");
+            setUnlockTarget(null);
+          }}
+        />
+      )}
+
+      {/* MODAL QUẢN LÝ BỘ CÂU HỎI & THỬ THÁCH (/api/v1/tasks/{id}/questions) */}
+      {questionTarget && (
+        <QuestionManagerModal
+          isOpen={Boolean(questionTarget)}
+          onClose={() => setQuestionTarget(null)}
+          task={questionTarget}
+          experience={experience}
+          canEdit={editable}
+          isModerator={!canEdit}
+          onQuestionsUpdated={() => {
+            loadData();
+          }}
+        />
+      )}
+
+      {/* MODAL XÁC NHẬN XOÁ (DELETE /api/v1/tasks/{id}) */}
       {deleting && (
         <div
           className="fixed inset-0 z-[80] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={cancelDelete}
+          onClick={() => setDeleting(null)}
         >
           <div
             role="alertdialog"
@@ -486,8 +621,7 @@ function TaskManagerDialog({
               <div>
                 <h3 className="text-base font-bold text-slate-900">Xoá nhiệm vụ?</h3>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  Hành động này sẽ xoá mềm nhiệm vụ. Không thể hoàn tác từ giao
-                  diện.
+                  Hành động này sẽ xoá mềm nhiệm vụ trong hệ thống.
                 </p>
               </div>
             </div>
@@ -497,7 +631,7 @@ function TaskManagerDialog({
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
               <button
                 type="button"
-                onClick={cancelDelete}
+                onClick={() => setDeleting(null)}
                 disabled={deleteLoading}
                 className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
               >
@@ -525,15 +659,467 @@ function TaskManagerDialog({
           </div>
         </div>
       )}
+      {/* MODAL QUẢN LÝ CHECK-IN POINT */}
+      <CheckInPointManagerModal
+        isOpen={isCheckInModalOpen}
+        onClose={() => {
+          setIsCheckInModalOpen(false);
+          loadData();
+        }}
+        experience={experience}
+        onPointsUpdated={() => {
+          loadData();
+        }}
+      />
     </div>
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// DIALOG CHI TIẾT TASK (GET /api/v1/tasks/{id})
+// ─────────────────────────────────────────────────────────────
+function TaskDetailDialog({ task, loading, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-[80] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
+      >
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-900">Chi tiết nhiệm vụ</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+          >
+            <X size={15} />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-8 text-slate-500 gap-2">
+              <Loader2 size={20} className="animate-spin" />
+              <span className="text-xs font-semibold">Đang tải dữ liệu...</span>
+            </div>
+          ) : (
+            <>
+              <div>
+                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                  {task.taskTypeName || task.taskTypeCode}
+                </span>
+                <h4 className="text-base font-bold text-slate-900 mt-1">{task.title}</h4>
+              </div>
+              {task.description && (
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                  {task.description}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 font-semibold block">Thứ tự</span>
+                  <span className="font-bold text-slate-800">{task.sequenceOrder ?? 0}</span>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 font-semibold block">Điểm thưởng</span>
+                  <span className="font-bold text-amber-700">{task.pointsReward ?? 0} điểm</span>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 font-semibold block">Số lần thử</span>
+                  <span className="font-bold text-slate-800">{task.maxAttempts ?? 1} lần</span>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 font-semibold block">Điểm Check-in</span>
+                  <span className="font-bold text-slate-800">
+                    {task.checkInPointId ? `#${task.checkInPointId}` : "Chưa gán"}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DIALOG GÁN VỊ TRÍ CHECK-IN (PATCH /api/v1/tasks/{id}/location)
+// ─────────────────────────────────────────────────────────────
+function LocationDialog({ task, checkInPoints, onClose, onSaved }) {
+  const [selectedCip, setSelectedCip] = useState(
+    task.checkInPointId ? String(task.checkInPointId) : ""
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSave = async () => {
+    if (!selectedCip) {
+      setError("Vui lòng chọn điểm Check-in.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const updated = await taskService.setLocation(task.id, Number(selectedCip));
+      onSaved?.(updated);
+    } catch (err) {
+      console.error("[LocationDialog] setLocation error", err);
+      setError(err?.message || "Không thể gán điểm check-in.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
+      >
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <MapPin size={16} />
+            </div>
+            <h3 className="text-base font-bold text-slate-900">Gán điểm Check-in</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <p className="text-xs text-slate-600">
+            Nhiệm vụ: <strong className="text-slate-900">{task.title}</strong>
+          </p>
+
+          {error && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-semibold">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Chọn điểm Check-in
+            </label>
+            <select
+              value={selectedCip}
+              onChange={(e) => setSelectedCip(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              <option value="">— Chọn điểm Check-in trong trải nghiệm —</option>
+              {checkInPoints.map((cip) => (
+                <option key={cip.id} value={cip.id}>
+                  {cip.name} {cip.qrToken ? `(${cip.qrToken})` : ""}
+                </option>
+              ))}
+            </select>
+            {!checkInPoints.length && (
+              <p className="text-[11px] text-amber-700 font-semibold">
+                Trải nghiệm này chưa có điểm check-in nào. Bạn có thể nhập mã ID thủ công khi sửa nhiệm vụ.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+          >
+            Huỷ bỏ
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={loading || !selectedCip}
+            className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            {loading ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            <span>Lưu vị trí</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DIALOG ĐIỀU KIỆN MỞ KHÓA (PATCH /api/v1/tasks/{id}/unlock-condition)
+// ─────────────────────────────────────────────────────────────
+function UnlockConditionDialog({ task, allTasks, checkInPoints, onClose, onSaved }) {
+  const [conditionType, setConditionType] = useState("NONE");
+  const [prerequisiteTaskId, setPrerequisiteTaskId] = useState("");
+  const [minimumScorePercent, setMinimumScorePercent] = useState(80);
+  const [timeWindowMinutes, setTimeWindowMinutes] = useState(15);
+  const [checkInPointId, setCheckInPointId] = useState("");
+  const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const otherTasks = useMemo(
+    () => allTasks.filter((t) => t.id !== task.id),
+    [allTasks, task.id]
+  );
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError("");
+    const payload = {
+      conditionType,
+      description: description ? description.trim() : null,
+      prerequisiteTaskId:
+        conditionType === "SEQUENTIAL" && prerequisiteTaskId
+          ? Number(prerequisiteTaskId)
+          : null,
+      minimumScorePercent:
+        conditionType === "SCORE_BASED"
+          ? Number(minimumScorePercent)
+          : null,
+      timeWindowMinutes:
+        conditionType === "TIME_BASED"
+          ? Number(timeWindowMinutes)
+          : null,
+      checkInPointId:
+        conditionType === "LOCATION_VERIFICATION" && checkInPointId
+          ? Number(checkInPointId)
+          : null,
+    };
+
+    if (conditionType === "SEQUENTIAL" && !payload.prerequisiteTaskId) {
+      setError("Vui lòng chọn nhiệm vụ tiên quyết.");
+      setLoading(false);
+      return;
+    }
+    if (conditionType === "SCORE_BASED" && payload.minimumScorePercent == null) {
+      setError("Vui lòng nhập điểm phần trăm tối thiểu.");
+      setLoading(false);
+      return;
+    }
+    if (conditionType === "TIME_BASED" && payload.timeWindowMinutes == null) {
+      setError("Vui lòng nhập khoảng thời gian (phút).");
+      setLoading(false);
+      return;
+    }
+    if (conditionType === "LOCATION_VERIFICATION" && !payload.checkInPointId) {
+      setError("Vui lòng chọn điểm Check-in yêu cầu.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await taskService.setUnlockCondition(task.id, payload);
+      onSaved?.();
+    } catch (err) {
+      console.error("[UnlockConditionDialog] set error", err);
+      setError(err?.message || "Không thể cấu hình điều kiện mở khóa.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
+      >
+        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-violet-50 text-violet-700 border border-violet-200">
+              <Lock size={16} />
+            </div>
+            <h3 className="text-base font-bold text-slate-900">Điều kiện mở khóa</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <p className="text-xs text-slate-600">
+            Nhiệm vụ: <strong className="text-slate-900">{task.title}</strong>
+          </p>
+
+          {error && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-semibold">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Loại điều kiện mở khóa
+            </label>
+            <select
+              value={conditionType}
+              onChange={(e) => setConditionType(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+            >
+              <option value="NONE">Không có điều kiện (mở tự do)</option>
+              <option value="SEQUENTIAL">Hoàn thành nhiệm vụ trước (SEQUENTIAL)</option>
+              <option value="SCORE_BASED">Đạt điểm tối thiểu (SCORE_BASED)</option>
+              <option value="TIME_BASED">Sau khoảng thời gian (TIME_BASED)</option>
+              <option value="LOCATION_VERIFICATION">Xác thực vị trí check-in (LOCATION_VERIFICATION)</option>
+            </select>
+          </div>
+
+          {conditionType === "SEQUENTIAL" && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Nhiệm vụ tiên quyết <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={prerequisiteTaskId}
+                onChange={(e) => setPrerequisiteTaskId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none"
+              >
+                <option value="">— Chọn nhiệm vụ cần hoàn thành trước —</option>
+                {otherTasks.map((ot) => (
+                  <option key={ot.id} value={ot.id}>
+                    Thứ tự {ot.sequenceOrder}: {ot.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {conditionType === "SCORE_BASED" && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Điểm phần trăm tối thiểu (0 - 100%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={minimumScorePercent}
+                onChange={(e) => setMinimumScorePercent(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none"
+              />
+            </div>
+          )}
+
+          {conditionType === "TIME_BASED" && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Khoảng thời gian chờ (phút)
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={timeWindowMinutes}
+                onChange={(e) => setTimeWindowMinutes(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none"
+              />
+            </div>
+          )}
+
+          {conditionType === "LOCATION_VERIFICATION" && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Điểm Check-in yêu cầu
+              </label>
+              <select
+                value={checkInPointId}
+                onChange={(e) => setCheckInPointId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none"
+              >
+                <option value="">— Chọn điểm Check-in —</option>
+                {checkInPoints.map((cip) => (
+                  <option key={cip.id} value={cip.id}>
+                    {cip.name} {cip.qrToken ? `(${cip.qrToken})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Mô tả điều kiện (tùy chọn)
+            </label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Vd: Cần giải đúng câu đố ở trạm 1"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+          >
+            Huỷ bỏ
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={loading}
+            className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            {loading ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            <span>Lưu điều kiện</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// FORM DIALOG TẠO / SỬA TASK
+// ─────────────────────────────────────────────────────────────
 function TaskFormDialog({
   onClose,
   experience,
   task,
   taskTypes,
+  checkInPoints,
   onCreated,
   onUpdated,
   theme = "emerald",
@@ -550,7 +1136,7 @@ function TaskFormDialog({
         sequenceOrder: task.sequenceOrder ?? 0,
         pointsReward: task.pointsReward ?? 0,
         maxAttempts: task.maxAttempts ?? 1,
-        checkInPointId: task.checkInPointId ?? "",
+        checkInPointId: task.checkInPointId ? String(task.checkInPointId) : "",
       };
     }
     return {
@@ -563,9 +1149,6 @@ function TaskFormDialog({
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // key={task?.id ?? `new-${experience.id}`} trên component cha
-  // nên component này remount mỗi lần đổi task → không cần effect sync.
 
   useEffect(() => {
     const onKey = (e) => {
@@ -585,6 +1168,11 @@ function TaskFormDialog({
     });
     setApiError("");
   };
+
+  const selectedType = useMemo(
+    () => taskTypes.find((tt) => String(tt.id) === String(form.taskTypeId)) || null,
+    [taskTypes, form.taskTypeId]
+  );
 
   const validate = () => {
     const e = {};
@@ -615,6 +1203,9 @@ function TaskFormDialog({
     ) {
       e.maxAttempts = "Số lần thử phải >= 1.";
     }
+    if (selectedType?.requiresLocation && !form.checkInPointId) {
+      e.checkInPointId = "Loại nhiệm vụ này yêu cầu điểm check-in (BR-TASK-4).";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -631,21 +1222,14 @@ function TaskFormDialog({
       } else {
         const created = await taskService.create(experience.id, {
           ...form,
-          // mặc định gán sequenceOrder = (tasks.length + 1) nếu 0
-          sequenceOrder:
-            Number(form.sequenceOrder) > 0
-              ? Number(form.sequenceOrder)
-              : Date.now() % 1000,
+          sequenceOrder: Number(form.sequenceOrder) || 0,
         });
         onCreated?.(created);
       }
     } catch (err) {
       console.error("[TaskForm] submit error", err);
       setApiError(
-        err?.message ||
-          (isEdit
-            ? "Không thể cập nhật nhiệm vụ."
-            : "Không thể tạo nhiệm vụ.")
+        err?.message || (isEdit ? "Không thể cập nhật nhiệm vụ." : "Không thể tạo nhiệm vụ.")
       );
     } finally {
       setLoading(false);
@@ -653,8 +1237,7 @@ function TaskFormDialog({
   };
 
   const inputBase = `w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} font-semibold disabled:opacity-60 transition-colors`;
-  const borderOf = (field) =>
-    errors[field] ? "border-rose-300" : "border-slate-200";
+  const borderOf = (field) => (errors[field] ? "border-rose-300" : "border-slate-200");
 
   return (
     <div
@@ -675,7 +1258,7 @@ function TaskFormDialog({
                 {isEdit ? "Sửa nhiệm vụ" : "Tạo nhiệm vụ mới"}
               </h3>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                BR-TASK-1: chỉ thao tác khi Experience = Bản nháp.
+                BR-TASK-1: Chỉ thao tác khi Experience ở trạng thái Bản nháp.
               </p>
             </div>
             <button
@@ -705,9 +1288,7 @@ function TaskFormDialog({
               </label>
               <select
                 value={form.taskTypeId}
-                onChange={(e) =>
-                  handleChange("taskTypeId", e.target.value)
-                }
+                onChange={(e) => handleChange("taskTypeId", e.target.value)}
                 disabled={loading}
                 className={`${inputBase} ${borderOf("taskTypeId")}`}
               >
@@ -719,9 +1300,7 @@ function TaskFormDialog({
                 ))}
               </select>
               {errors.taskTypeId && (
-                <p className="text-[11px] text-rose-600 font-bold">
-                  {errors.taskTypeId}
-                </p>
+                <p className="text-[11px] text-rose-600 font-bold">{errors.taskTypeId}</p>
               )}
             </div>
 
@@ -734,16 +1313,12 @@ function TaskFormDialog({
                 min="0"
                 step="1"
                 value={form.sequenceOrder}
-                onChange={(e) =>
-                  handleChange("sequenceOrder", e.target.value)
-                }
+                onChange={(e) => handleChange("sequenceOrder", e.target.value)}
                 disabled={loading}
                 className={`${inputBase} ${borderOf("sequenceOrder")}`}
               />
               {errors.sequenceOrder && (
-                <p className="text-[11px] text-rose-600 font-bold">
-                  {errors.sequenceOrder}
-                </p>
+                <p className="text-[11px] text-rose-600 font-bold">{errors.sequenceOrder}</p>
               )}
             </div>
           </div>
@@ -758,13 +1333,11 @@ function TaskFormDialog({
               value={form.title}
               onChange={(e) => handleChange("title", e.target.value)}
               disabled={loading}
-              placeholder="Vd: Tìm đáp án câu đố..."
+              placeholder="Vd: Tìm manh mối tại khu vực..."
               className={`${inputBase} ${borderOf("title")}`}
             />
             {errors.title && (
-              <p className="text-[11px] text-rose-600 font-bold">
-                {errors.title}
-              </p>
+              <p className="text-[11px] text-rose-600 font-bold">{errors.title}</p>
             )}
           </div>
 
@@ -791,16 +1364,12 @@ function TaskFormDialog({
                 min="0"
                 step="1"
                 value={form.pointsReward}
-                onChange={(e) =>
-                  handleChange("pointsReward", e.target.value)
-                }
+                onChange={(e) => handleChange("pointsReward", e.target.value)}
                 disabled={loading}
                 className={`${inputBase} ${borderOf("pointsReward")}`}
               />
               {errors.pointsReward && (
-                <p className="text-[11px] text-rose-600 font-bold">
-                  {errors.pointsReward}
-                </p>
+                <p className="text-[11px] text-rose-600 font-bold">{errors.pointsReward}</p>
               )}
             </div>
 
@@ -818,28 +1387,43 @@ function TaskFormDialog({
                 className={`${inputBase} ${borderOf("maxAttempts")}`}
               />
               {errors.maxAttempts && (
-                <p className="text-[11px] text-rose-600 font-bold">
-                  {errors.maxAttempts}
-                </p>
+                <p className="text-[11px] text-rose-600 font-bold">{errors.maxAttempts}</p>
               )}
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                CheckIn ID
+                Điểm Check-in {selectedType?.requiresLocation && <span className="text-rose-500">*</span>}
               </label>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={form.checkInPointId}
-                onChange={(e) =>
-                  handleChange("checkInPointId", e.target.value)
-                }
-                disabled={loading}
-                placeholder="(tùy chọn)"
-                className={`${inputBase} ${borderOf("checkInPointId")}`}
-              />
+              {checkInPoints.length > 0 ? (
+                <select
+                  value={form.checkInPointId}
+                  onChange={(e) => handleChange("checkInPointId", e.target.value)}
+                  disabled={loading}
+                  className={`${inputBase} ${borderOf("checkInPointId")}`}
+                >
+                  <option value="">— Không gắn —</option>
+                  {checkInPoints.map((cip) => (
+                    <option key={cip.id} value={cip.id}>
+                      {cip.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={form.checkInPointId}
+                  onChange={(e) => handleChange("checkInPointId", e.target.value)}
+                  disabled={loading}
+                  placeholder="ID Check-in"
+                  className={`${inputBase} ${borderOf("checkInPointId")}`}
+                />
+              )}
+              {errors.checkInPointId && (
+                <p className="text-[11px] text-rose-600 font-bold">{errors.checkInPointId}</p>
+              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import {
@@ -60,9 +60,6 @@ export default function TourDetailModal({
         <div className="shrink-0 px-5 sm:px-7 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="font-mono text-[10.5px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                #{tour?.tourId ?? "Chưa có"}
-              </span>
               {tour && (
                 <span
                   className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full border ${meta.cls}`}

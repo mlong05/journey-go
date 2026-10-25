@@ -57,13 +57,20 @@ function buildListQuery(params = {}) {
 }
 
 function buildPayload(payload) {
-  return {
+  const out = {
     name: String(payload.name || "").trim(),
     address: String(payload.address || "").trim(),
     latitude: Number(payload.latitude),
     longitude: Number(payload.longitude),
     capacity: parseInt(payload.capacity, 10),
   };
+  if (payload.regionId !== undefined && payload.regionId !== null && payload.regionId !== "") {
+    out.regionId = Number(payload.regionId);
+  }
+  if (payload.themeIds && Array.isArray(payload.themeIds) && payload.themeIds.length > 0) {
+    out.themeIds = payload.themeIds;
+  }
+  return out;
 }
 
 export async function createDestination(payload) {

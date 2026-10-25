@@ -19,11 +19,14 @@ import {
   Info,
   RotateCcw,
   Trash2,
+  Globe2,
 } from "lucide-react";
 import {
   destinationService,
   CreateDestinationModal,
   EditDestinationModal,
+  RegionManagerModal,
+  DestinationAssessmentModal,
 } from "@/features/destination";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
@@ -103,6 +106,7 @@ export default function DestinationsClient() {
   const [approveTarget, setApproveTarget] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isRegionManagerOpen, setIsRegionManagerOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastTone, setToastTone] = useState("success");
 
@@ -343,7 +347,13 @@ export default function DestinationsClient() {
 
   // Reset trang về 1 khi bộ lọc thay đổi
   useEffect(() => {
-    setCurrentPage(1);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setCurrentPage(1);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [searchQuery, approvalFilter, deletionFilter]);
 
   // Phân trang dữ liệu
@@ -397,6 +407,15 @@ export default function DestinationsClient() {
           >
             <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
             <span className="hidden sm:inline">Làm mới</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsRegionManagerOpen(true)}
+            className="h-10 px-3.5 sm:px-4 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 active:scale-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-teal-900/20 text-xs sm:text-sm transition-all cursor-pointer"
+            title="Xem và quản lý danh mục vùng miền du lịch"
+          >
+            <Globe2 size={16} strokeWidth={2.4} />
+            <span>Quản lý Vùng miền</span>
           </button>
           <button
             type="button"
@@ -542,7 +561,6 @@ export default function DestinationsClient() {
                             {dest.name}
                           </p>
                           <p className="text-[10.5px] text-slate-500 mt-0.5">
-                            ID: {dest.id} •{" "}
                             {dest.createdBy || "Không rõ"}
                           </p>
                         </div>
@@ -761,120 +779,27 @@ export default function DestinationsClient() {
         </div>
       )}
 
-      {detailTarget && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150"
-          onClick={() => setDetailTarget(null)}
-        >
-          <div
-            className="w-full max-w-2xl bg-white rounded-3xl p-5 sm:p-7 shadow-2xl border border-slate-100 relative animate-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-mono text-xs font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                    #{detailTarget.id}
-                  </span>
-                </div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900">
-                  {detailTarget.name}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                  <MapPin size={12} className="text-slate-400" />
-                  <span>{detailTarget.address}</span>
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setDetailTarget(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-              <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200">
-                <p className="text-[10px] font-bold text-sky-700 uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <Navigation size={11} /> Tọa độ GPS
-                </p>
-                <div className="space-y-1.5 text-xs font-mono">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Vĩ độ (LAT):</span>
-                    <span className="font-black text-slate-800">
-                      {detailTarget.latitude?.toFixed(6) ?? "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Kinh độ (LNG):</span>
-                    <span className="font-black text-slate-800">
-                      {detailTarget.longitude?.toFixed(6) ?? "—"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200">
-                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <Users size={11} /> Sức chứa tối đa
-                </p>
-                <p className="text-base font-black text-slate-900">
-                  {detailTarget.capacity ?? "—"} du khách / lượt
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Đơn vị khởi tạo
-                </p>
-                <p className="text-sm font-bold text-slate-800">
-                  {detailTarget.createdBy || "—"}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Trạng thái phê duyệt
-                </p>
-                {detailTarget.approved ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    Đã phê duyệt
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                    Chờ phê duyệt
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditTarget(detailTarget);
-                  setDetailTarget(null);
-                }}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Edit3 size={13} />
-                <span>Chỉnh sửa điểm đến</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailTarget(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ══════════════════════════════════════════════════════════
+          MODAL THẨM ĐỊNH ĐIỂM ĐẾN & HỒ SƠ THUYẾT MINH VĂN HÓA
+         ══════════════════════════════════════════════════════════ */}
+      <DestinationAssessmentModal
+        isOpen={Boolean(detailTarget)}
+        destination={detailTarget}
+        onClose={() => setDetailTarget(null)}
+        onApprove={(id, approve, name) => {
+          setApproveTarget({
+            id,
+            name,
+            action: approve ? "approve" : "revoke",
+          });
+        }}
+        onEdit={(dest) => {
+          setEditTarget(dest);
+          setDetailTarget(null);
+        }}
+        isActionLoading={actionLoadingId === detailTarget?.id}
+        theme="slate"
+      />
 
       <ConfirmDialog
         open={Boolean(approveTarget)}
@@ -942,6 +867,11 @@ export default function DestinationsClient() {
         theme="slate"
       />
 
+      <RegionManagerModal
+        isOpen={isRegionManagerOpen}
+        onClose={() => setIsRegionManagerOpen(false)}
+        onUpdated={loadList}
+      />
     </div>
   );
 }
