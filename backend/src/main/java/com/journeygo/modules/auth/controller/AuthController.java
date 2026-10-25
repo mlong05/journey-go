@@ -28,6 +28,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserRepository userRepository;
+    private final com.journeygo.common.service.CloudinaryService cloudinaryService;
 
     @PostMapping("/login")
     @Operation(summary = "Đăng nhập", description = "Đăng nhập bằng email và mật khẩu, trả về Access Token và Refresh Token")
@@ -111,12 +112,35 @@ public class AuthController {
         if (request.phone() != null) {
             user.setPhone(request.phone().trim());
         }
-        if (request.avatarUrl() != null) {
-            user.setAvatarUrl(request.avatarUrl().trim());
+        String newAvatar = request.avatarUrl() != null ? request.avatarUrl().trim()
+                : (request.avatar() != null ? request.avatar().trim() : null);
+        if (newAvatar != null) {
+            user.setAvatarUrl(newAvatar.isEmpty() ? null : newAvatar);
         }
 
         user = userRepository.save(user);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin thành công", UserResponse.fromEntity(user)));
+    }
+
+    @PostMapping(value = "/profile/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Tải ảnh đại diện lên Cloudinary cho tài khoản hiện tại")
+    public ResponseEntity<ApiResponse<UserResponse>> uploadProfileAvatar(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error(401, "Người dùng chưa đăng nhập"));
+        }
+
+        User user = userRepository.findById(userPrincipal.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        String avatarUrl = cloudinaryService.uploadImage(file, "journeygo/avatars");
+        user.setAvatarUrl(avatarUrl);
+        user = userRepository.save(user);
+
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh đại diện thành công", UserResponse.fromEntity(user)));
     }
 
     @PostMapping("/forgot-password")

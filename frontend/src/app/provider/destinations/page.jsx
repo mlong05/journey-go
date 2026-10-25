@@ -8,7 +8,6 @@ import {
   Search,
   Filter,
   Edit3,
-  Trash2,
   CheckCircle2,
   Clock,
   Navigation,
@@ -21,6 +20,8 @@ import {
   Loader2,
   Info,
   AlertTriangle,
+  ChevronDown,
+  Landmark,
 } from "lucide-react";
 import {
   destinationService,
@@ -86,7 +87,6 @@ export default function ProviderDestinationsPage() {
 
   const [detailTarget, setDetailTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
@@ -251,28 +251,6 @@ export default function ProviderDestinationsPage() {
     [showToast]
   );
 
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteTarget) return;
-    setActionLoadingId(deleteTarget.id);
-    try {
-      await destinationService.delete(deleteTarget.id);
-      setDestinations((prev) =>
-        prev.filter((d) => d.id !== deleteTarget.id)
-      );
-      showToast(`Đã xóa mềm điểm đến "${deleteTarget.name}" khỏi hệ thống.`);
-      setDeleteTarget(null);
-    } catch (err) {
-      console.error("[Provider Destinations] Delete error:", err);
-      showToast(
-        err?.message ||
-          "Không thể xóa điểm đến. Vui lòng thử lại sau.",
-        "error"
-      );
-    } finally {
-      setActionLoadingId(null);
-    }
-  }, [deleteTarget, showToast]);
-
   const counts = useMemo(
     () => ({
       all: destinations.length,
@@ -355,7 +333,7 @@ export default function ProviderDestinationsPage() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in-50 duration-200">
+    <div className="h-full min-h-0 w-full overflow-hidden flex flex-col animate-in fade-in-50 duration-200">
       {toastMessage && (
         <div
           className={`fixed top-5 right-5 z-50 ${toastPalette[toastTone]} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-3 max-w-md`}
@@ -371,7 +349,8 @@ export default function ProviderDestinationsPage() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      {/* ── 1. TIÊU ĐỀ TRANG VÀ THAO TÁC (SHRINK-0: CỐ ĐỊNH TRÊN CÙNG) ── */}
+      <div className="shrink-0 mb-4 pb-4 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-5 bg-emerald-600 rounded-full" />
@@ -409,7 +388,8 @@ export default function ProviderDestinationsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs space-y-4">
+      {/* ── 2. BỘ LỌC TÌM KIẾM VÀ TABS TRẠNG THÁI (SHRINK-0: CỐ ĐỊNH TRÊN CÙNG) ── */}
+      <div className="shrink-0 mb-4 bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-3.5">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
           <div className="sm:col-span-6 relative">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -419,17 +399,17 @@ export default function ProviderDestinationsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo tên điểm đến, địa chỉ..."
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+              placeholder="Tìm theo tên điểm đến, địa chỉ hoặc mã số..."
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all"
             />
           </div>
 
-          <div className="sm:col-span-3">
+          <div className="sm:col-span-3 relative">
             <select
               value={selectedRegion}
               onChange={(e) => setSelectedRegion(e.target.value)}
               disabled={provinceLoading && provinceList.length === 0}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60"
+              className="w-full pl-3.5 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none disabled:opacity-60 cursor-pointer"
             >
               <option value="all">
                 {provinceLoading && provinceList.length === 0
@@ -442,6 +422,10 @@ export default function ProviderDestinationsPage() {
                 </option>
               ))}
             </select>
+            <ChevronDown
+              size={14}
+              className="absolute inset-y-0 right-2.5 my-auto pointer-events-none text-slate-400"
+            />
             {provinceError && (
               <p className="mt-1 text-[10px] text-rose-600 font-semibold">
                 ⚠ {provinceError}
@@ -449,11 +433,11 @@ export default function ProviderDestinationsPage() {
             )}
           </div>
 
-          <div className="sm:col-span-3">
+          <div className="sm:col-span-3 relative">
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full pl-3.5 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none cursor-pointer"
             >
               <option value="all">Tất cả Thể loại</option>
               <option value="Di tích">Di tích lịch sử</option>
@@ -461,10 +445,14 @@ export default function ProviderDestinationsPage() {
               <option value="Bảo tàng">Bảo tàng</option>
               <option value="Danh thắng">Danh thắng</option>
             </select>
+            <ChevronDown
+              size={14}
+              className="absolute inset-y-0 right-2.5 my-auto pointer-events-none text-slate-400"
+            />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+        <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100">
           <button
             type="button"
             onClick={() => setStatusTab("all")}
@@ -482,7 +470,7 @@ export default function ProviderDestinationsPage() {
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               statusTab === STATUS.APPROVED
                 ? "bg-emerald-600 text-white shadow-xs"
-                : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
+                : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/80"
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -496,7 +484,7 @@ export default function ProviderDestinationsPage() {
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               statusTab === STATUS.PENDING
                 ? "bg-amber-600 text-white shadow-xs"
-                : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
+                : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/80"
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
@@ -508,7 +496,7 @@ export default function ProviderDestinationsPage() {
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               statusTab === STATUS.REVOKED
                 ? "bg-orange-600 text-white shadow-xs"
-                : "bg-orange-50 text-orange-800 hover:bg-orange-100 border border-orange-200"
+                : "bg-orange-50 text-orange-800 hover:bg-orange-100 border border-orange-200/80"
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
@@ -518,7 +506,7 @@ export default function ProviderDestinationsPage() {
       </div>
 
       {fetchError && (
-        <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
+        <div className="shrink-0 mb-4 flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
           <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-bold text-rose-800">
@@ -528,7 +516,7 @@ export default function ProviderDestinationsPage() {
             <button
               type="button"
               onClick={fetchAllList}
-              className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900"
+              className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900 cursor-pointer"
             >
               Thử lại
             </button>
@@ -536,135 +524,144 @@ export default function ProviderDestinationsPage() {
         </div>
       )}
 
-      {isLoading && destinations.length === 0 ? (
-        <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-2xs">
-          <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
-          <p className="text-xs text-slate-400 mt-3">
-            Đang tải danh sách điểm đến từ máy chủ…
-          </p>
-        </div>
-      ) : filteredDestinations.length === 0 ? (
-        <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-2xs space-y-3">
-          <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
-            <Inbox size={28} />
+      {/* ── 3. KHU VỰC DANH SÁCH THẺ (CHỈ DUY NHẤT VÙNG NÀY CUỘN DỌC) ── */}
+      <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pr-1.5 pb-6 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+        {isLoading && destinations.length === 0 ? (
+          <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-2xs">
+            <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
+            <p className="text-xs text-slate-400 mt-3">
+              Đang tải danh sách điểm đến từ máy chủ…
+            </p>
           </div>
-          <h3 className="text-base font-bold text-slate-800">
-            {searchQuery || statusTab !== "all" || selectedRegion !== "all"
-              ? "Không tìm thấy điểm đến nào phù hợp với bộ lọc"
-              : "Chưa có điểm đến nào trong danh sách"}
-          </h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            {searchQuery || statusTab !== "all"
-              ? "Thử xóa từ khóa tìm kiếm hoặc đặt lại các bộ lọc về mặc định."
-              : "Bấm nút Thêm Điểm Đến Mới để khai báo thông tin, tọa độ thực địa và gửi phê duyệt."}
-          </p>
-          {!searchQuery && statusTab === "all" && (
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors"
-              >
-                <Plus size={16} />
-                <span>Thêm Điểm Đến Ngay</span>
-              </button>
+        ) : filteredDestinations.length === 0 ? (
+          <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-2xs space-y-3">
+            <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
+              <Inbox size={28} />
             </div>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredDestinations.map((dest) => (
-            <div
-              key={dest.id}
-              className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all overflow-hidden flex flex-col justify-between group"
-            >
-              <div>
-                <div className="relative h-32 overflow-hidden bg-gradient-to-br from-emerald-100 via-sky-100 to-slate-100">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
-                  <div className="absolute top-3 left-3 right-3 flex items-center justify-end gap-2">
-                    {dest.status === STATUS.APPROVED && (
-                      <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-emerald-600/90 text-white shadow-2xs">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                        Đang hoạt động
-                      </span>
-                    )}
-                    {dest.status === STATUS.PENDING && (
-                      <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-amber-500/90 text-white shadow-2xs">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                        Chờ duyệt
-                      </span>
-                    )}
-                    {dest.status === STATUS.REVOKED && (
-                      <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-orange-500/90 text-white shadow-2xs">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                        Chờ duyệt lại
-                      </span>
-                    )}
-                  </div>
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs">
-                    <span className="font-mono font-bold bg-black/40 backdrop-blur-xs px-2 py-0.5 rounded text-[11px]">
-                      #{dest.id}
-                    </span>
-                    <span className="flex items-center gap-1 font-semibold text-[11px] bg-black/40 backdrop-blur-xs px-2 py-0.5 rounded">
-                      <Users size={11} className="text-emerald-400" />
-                      <span>{dest.capacity ?? "—"} người</span>
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-4 space-y-2.5">
-                  <h3 className="text-base font-black text-slate-900 group-hover:text-emerald-700 transition-colors line-clamp-1">
-                    {dest.name}
-                  </h3>
-
-                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed flex items-start gap-1">
-                    <MapPin size={12} className="text-slate-400 mt-0.5 shrink-0" />
-                    <span>{dest.address || "Chưa cập nhật địa chỉ"}</span>
-                  </p>
-
-                  <div className="pt-2 border-t border-slate-100">
-                    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-mono font-medium bg-sky-50 text-sky-700 border border-sky-200/70 w-fit max-w-full">
-                      <Navigation size={12} className="shrink-0" />
-                      <span className="truncate">
-                        {dest.latitude ?? "—"}, {dest.longitude ?? "—"}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-1.5">
+            <h3 className="text-base font-bold text-slate-800">
+              {searchQuery || statusTab !== "all" || selectedRegion !== "all"
+                ? "Không tìm thấy điểm đến nào phù hợp với bộ lọc"
+                : "Chưa có điểm đến nào trong danh sách"}
+            </h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              {searchQuery || statusTab !== "all"
+                ? "Thử xóa từ khóa tìm kiếm hoặc đặt lại các bộ lọc về mặc định."
+                : "Bấm nút Thêm Điểm Đến Mới để khai báo thông tin, tọa độ thực địa và gửi phê duyệt."}
+            </p>
+            {!searchQuery && statusTab === "all" && (
+              <div className="pt-2">
                 <button
                   type="button"
-                  onClick={() => handleViewDetail(dest.id)}
-                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                  onClick={() => setIsCreateOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
                 >
-                  <Eye size={13} />
-                  <span>Xem chi tiết</span>
+                  <Plus size={16} />
+                  <span>Thêm Điểm Đến Ngay</span>
                 </button>
-                <div className="flex items-center gap-1">
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {filteredDestinations.map((dest) => (
+              <div
+                key={dest.id}
+                className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs hover:shadow-xl hover:border-emerald-300 hover:-translate-y-1 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col justify-between overflow-hidden group"
+              >
+                <div>
+                  {/* Hero Cover Card: Gradient di sản nghệ thuật + Badge nổi bật */}
+                  <div className="relative h-36 overflow-hidden bg-gradient-to-br from-emerald-800 via-teal-900 to-slate-900 p-4 flex flex-col justify-between">
+                    {/* Họa tiết trang trí mờ tinh tế */}
+                    <div className="absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
+                    <div className="absolute -left-6 -top-6 w-28 h-28 rounded-full bg-teal-400/10 blur-xl pointer-events-none" />
+                    <div className="absolute right-3 bottom-2 text-white/5 pointer-events-none">
+                      <Landmark size={80} strokeWidth={1} />
+                    </div>
+
+                    {/* Hàng trên: Mã ID + Badge trạng thái */}
+                    <div className="relative z-10 flex items-center justify-between gap-2">
+                      <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md text-emerald-200 border border-emerald-400/20 shadow-xs">
+                        #{dest.id}
+                      </span>
+
+                      {dest.status === STATUS.APPROVED && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-500/90 text-white backdrop-blur-md shadow-xs ring-1 ring-emerald-400/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]" />
+                          Đang hoạt động
+                        </span>
+                      )}
+                      {dest.status === STATUS.PENDING && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-amber-500/90 text-white backdrop-blur-md shadow-xs ring-1 ring-amber-300/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                          Chờ phê duyệt
+                        </span>
+                      )}
+                      {dest.status === STATUS.REVOKED && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-orange-500/90 text-white backdrop-blur-md shadow-xs ring-1 ring-orange-300/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                          Chờ duyệt lại
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Hàng dưới: Sức chứa du khách */}
+                    <div className="relative z-10 flex items-center justify-end">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-slate-900/60 backdrop-blur-md px-3 py-1 rounded-full text-slate-100 border border-white/10 shadow-xs">
+                        <Users size={12} className="text-emerald-400" />
+                        <span>
+                          {dest.capacity ? `${Number(dest.capacity).toLocaleString("vi-VN")} du khách/lượt` : "Chưa đặt sức chứa"}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Body: Tên điểm đến, Địa chỉ, Tọa độ GPS */}
+                  <div className="p-5 space-y-3">
+                    <h3 className="text-base font-extrabold text-slate-900 group-hover:text-emerald-700 transition-colors line-clamp-1 tracking-tight" title={dest.name}>
+                      {dest.name}
+                    </h3>
+
+                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed min-h-[36px] flex items-start gap-1.5">
+                      <MapPin size={13} className="text-emerald-600 mt-0.5 shrink-0" />
+                      <span className="break-words">{dest.address || "Chưa cập nhật địa chỉ hành chính"}</span>
+                    </p>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-medium px-2.5 py-1 rounded-xl bg-slate-50 text-slate-600 border border-slate-200/80 group-hover:bg-emerald-50/50 group-hover:text-emerald-700 group-hover:border-emerald-200/60 transition-colors max-w-full truncate">
+                        <Navigation size={12} className="shrink-0 text-emerald-600" />
+                        <span className="truncate">
+                          {dest.latitude ?? "—"}, {dest.longitude ?? "—"}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Actions: Dock tương tác */}
+                <div className="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleViewDetail(dest.id)}
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 shadow-2xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Eye size={13} />
+                    <span>Xem chi tiết</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setEditTarget(dest)}
-                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs shadow-emerald-600/20 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
                   >
                     <Edit3 size={13} />
                     <span>Chỉnh sửa</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTarget(dest)}
-                    className="p-2 rounded-xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 text-xs font-bold transition-colors cursor-pointer"
-                    title="Yêu cầu xóa điểm đến"
-                  >
-                    <Trash2 size={14} />
-                  </button>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
 
       {detailTarget && (
         <div
@@ -782,53 +779,6 @@ export default function ProviderDestinationsPage() {
                 className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
               >
                 Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {deleteTarget && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
-          onClick={() => setDeleteTarget(null)}
-        >
-          <div
-            className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-              <AlertCircle size={26} />
-            </div>
-            <div>
-              <h3 className="text-base font-black text-slate-900">
-                Yêu cầu gỡ bỏ điểm đến?
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Thao tác này sẽ gửi yêu cầu xóa mềm{" "}
-                <strong>&quot;{deleteTarget.name}&quot;</strong>. Điểm đến sẽ
-                bị ẩn khỏi hệ thống và có thể khôi phục lại sau.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                disabled={actionLoadingId === deleteTarget.id}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {actionLoadingId === deleteTarget.id ? (
-                  <Loader2 size={14} className="animate-spin mx-auto" />
-                ) : (
-                  "Xác nhận xóa"
-                )}
               </button>
             </div>
           </div>

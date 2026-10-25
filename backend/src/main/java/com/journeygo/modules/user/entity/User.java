@@ -44,7 +44,7 @@ public class User {
     @Column(name = "provider_id", length = 100)
     private String providerId;
 
-    @Column(name = "avatar_url", length = 500)
+    @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl;
 
     @Column(nullable = false)

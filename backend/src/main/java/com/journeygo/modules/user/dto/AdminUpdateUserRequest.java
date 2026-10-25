@@ -17,5 +17,11 @@ public record AdminUpdateUserRequest(
         Role role,
 
         @Schema(description = "Trạng thái hoạt động", example = "true")
-        Boolean active
+        Boolean active,
+
+        @Schema(description = "URL ảnh đại diện hoặc avatar (URL hoặc Base64)", example = "https://example.com/avatar.png")
+        String avatarUrl,
+
+        @Schema(description = "Bí danh cho avatarUrl")
+        String avatar
 ) {}

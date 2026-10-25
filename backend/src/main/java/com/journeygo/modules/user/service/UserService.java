@@ -94,6 +94,10 @@ public class UserService {
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
         boolean isActive = request.active() != null ? request.active() : true;
 
+        String rawAvatar = (request.avatarUrl() != null && !request.avatarUrl().isBlank())
+                ? request.avatarUrl().trim()
+                : ((request.avatar() != null && !request.avatar().isBlank()) ? request.avatar().trim() : null);
+
         User user = User.builder()
                 .email(request.email())
                 .password(passwordEncoder.encode(request.password()))
@@ -101,6 +105,7 @@ public class UserService {
                 .phone(request.phone())
                 .role(userRole)
                 .authProvider(AuthProvider.LOCAL)
+                .avatarUrl(rawAvatar)
                 .active(isActive)
                 .build();
 
@@ -175,6 +180,13 @@ public class UserService {
             user.setPhone(request.phone());
         }
 
+        String newAvatar = request.avatarUrl() != null
+                ? request.avatarUrl().trim()
+                : (request.avatar() != null ? request.avatar().trim() : null);
+        if (newAvatar != null) {
+            user.setAvatarUrl(newAvatar.isBlank() ? null : newAvatar);
+        }
+
         User updatedUser = userRepository.save(user);
         log.info("Admin id={} updated user details for user id={}", currentAdminId, updatedUser.getId());
         return UserResponse.fromEntity(updatedUser);
@@ -205,6 +217,18 @@ public class UserService {
 
         User updatedUser = userRepository.save(user);
         log.info("Admin id={} set active status for user id={} to {}", currentAdminId, updatedUser.getId(), active);
+        return UserResponse.fromEntity(updatedUser);
+    }
+
+    /**
+     * Cập nhật ảnh đại diện (avatar) của người dùng bởi Admin.
+     */
+    @Transactional
+    public UserResponse updateUserAvatar(Long id, String avatarUrl) {
+        User user = findUserOrThrow(id);
+        user.setAvatarUrl(avatarUrl != null && !avatarUrl.isBlank() ? avatarUrl.trim() : null);
+        User updatedUser = userRepository.save(user);
+        log.info("Admin updated avatar for user id={}", updatedUser.getId());
         return UserResponse.fromEntity(updatedUser);
     }
 

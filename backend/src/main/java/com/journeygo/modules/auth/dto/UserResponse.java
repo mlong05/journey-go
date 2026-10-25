@@ -16,11 +16,13 @@ public record UserResponse(
         Role role,
         AuthProvider authProvider,
         String avatarUrl,
+        String avatar,
         boolean active,
         Instant createdAt,
         Instant updatedAt
 ) {
     public static UserResponse fromEntity(User user) {
+        String avatar = user.getAvatarUrl();
         return UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -28,7 +30,8 @@ public record UserResponse(
                 .phone(user.getPhone())
                 .role(user.getRole())
                 .authProvider(user.getAuthProvider())
-                .avatarUrl(user.getAvatarUrl())
+                .avatarUrl(avatar)
+                .avatar(avatar)
                 .active(user.isActive())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())

@@ -17,6 +17,10 @@ export const authService = {
     return apiClient.get("/auth/me");
   },
 
+  updateProfile: async (data) => {
+    return apiClient.put("/auth/profile", data);
+  },
+
   refreshToken: async (refreshToken) => {
     let token = refreshToken;
     if (!token && typeof window !== "undefined") {
