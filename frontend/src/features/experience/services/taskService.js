@@ -94,6 +94,31 @@ export async function reorderTasks(experienceId, taskIds) {
   return unwrap(res);
 }
 
+export async function setTaskLocation(id, checkInPointId) {
+  const res = await apiClient.patch(`/tasks/${id}/location`, null, {
+    params: { checkInPointId },
+  });
+  return unwrap(res);
+}
+
+export async function setTaskUnlockCondition(id, payload) {
+  const res = await apiClient.patch(`/tasks/${id}/unlock-condition`, payload);
+  return unwrap(res);
+}
+
+export async function setTaskPoints(id, pointsReward) {
+  const res = await apiClient.patch(`/tasks/${id}/points`, {
+    pointsReward: Number(pointsReward),
+  });
+  return unwrap(res);
+}
+
+export async function listCheckInPoints(experienceId) {
+  const res = await apiClient.get(`/experiences/${experienceId}/check-in-points`);
+  const data = await unwrap(res);
+  return Array.isArray(data) ? data : [];
+}
+
 export async function listTaskTypes() {
   const res = await apiClient.get(ENDPOINTS.TASK_TYPES());
   const data = await unwrap(res);
@@ -108,6 +133,11 @@ export const taskService = {
   delete: deleteTask,
   reorder: reorderTasks,
   listTypes: listTaskTypes,
+  setLocation: setTaskLocation,
+  setUnlockCondition: setTaskUnlockCondition,
+  setPoints: setTaskPoints,
+  listCheckInPoints,
 };
 
 export default taskService;
+

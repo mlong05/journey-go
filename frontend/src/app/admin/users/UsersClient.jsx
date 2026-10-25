@@ -36,6 +36,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { apiClient } from "@/services/apiClient";
+import RoleManagerModal from "./RoleManagerModal";
 
 // URL chỉ dùng để hiển thị trong banner cảnh báo khi fallback.
 // Việc gọi API thực sự dùng apiClient (đã cấu hình base URL đúng ở services/apiClient.js).
@@ -158,6 +159,9 @@ export default function AdminUsersClient() {
   // Create modal (thêm người dùng mới)
   const [createOpen, setCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Role Manager modal (quản lý & định nghĩa vai trò hệ thống)
+  const [roleManagerOpen, setRoleManagerOpen] = useState(false);
 
   // Row đang được mutate (id của user) — disable nút để tránh double-click
   const [mutatingId, setMutatingId] = useState(null);
@@ -311,7 +315,15 @@ export default function AdminUsersClient() {
 
   /* --------------------------- EFFECTS ----------------------------- */
   useEffect(() => {
-    fetchUsers();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        fetchUsers();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [fetchUsers]);
 
   // Debounce keyword input -> áp dụng sau 400ms
@@ -766,7 +778,16 @@ export default function AdminUsersClient() {
             className="h-9 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
           >
             <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
-            <span className="hidden sm:inline">Làm mới dữ liệu</span>
+            <span className="hidden sm:inline">Làm mới</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setRoleManagerOpen(true)}
+            className="h-9 px-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 active:scale-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-indigo-900/20 text-xs transition-all cursor-pointer"
+            title="Xem danh mục vai trò hệ thống và tạo vai trò mới (Dành cho ADMIN)"
+          >
+            <ShieldCheck size={14} strokeWidth={2.4} />
+            <span>Quản lý Vai trò</span>
           </button>
           <button
             type="button"
@@ -1078,6 +1099,15 @@ export default function AdminUsersClient() {
           onCreate={handleCreateUser}
         />
       )}
+
+      {/* Role Management Modal (Dành riêng cho ADMIN) */}
+      <RoleManagerModal
+        isOpen={roleManagerOpen}
+        onClose={() => setRoleManagerOpen(false)}
+        onRoleCreated={(newRole) => {
+          showToast(`Đã tạo thành công vai trò "${newRole.name}"!`, "success");
+        }}
+      />
     </div>
   );
 }

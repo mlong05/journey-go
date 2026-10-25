@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -1085,10 +1085,7 @@ export default function ToursManager({
                             {meta.label}
                           </span>
                         </div>
-                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs">
-                          <span className="font-mono font-bold bg-black/40 px-2 py-0.5 rounded text-[11px]">
-                            #{tour.tourId}
-                          </span>
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-end text-white text-xs">
                           <span className="flex items-center gap-1 font-semibold text-[11px] bg-black/40 px-2 py-0.5 rounded">
                             <MapPin size={11} />
                             <span>
@@ -1428,9 +1425,6 @@ export default function ToursManager({
                           {tour.title}
                         </h3>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
-                          <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
-                            #{tour.tourId}
-                          </span>
                           <span className="font-semibold text-slate-600 truncate">
                             {tour.createdBy || "Đơn vị không xác định"}
                           </span>
