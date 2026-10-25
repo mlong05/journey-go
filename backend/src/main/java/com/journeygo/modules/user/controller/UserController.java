@@ -4,6 +4,7 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.auth.dto.UserResponse;
 import com.journeygo.modules.user.dto.AdminCreateUserRequest;
 import com.journeygo.modules.user.dto.AdminUpdateUserRequest;
+import com.journeygo.modules.user.dto.UpdateAvatarRequest;
 import com.journeygo.modules.user.dto.UpdateRoleRequest;
 import com.journeygo.modules.user.dto.UpdateUserStatusRequest;
 import com.journeygo.modules.user.entity.Role;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final com.journeygo.common.service.CloudinaryService cloudinaryService;
 
     @GetMapping
     @Operation(summary = "Xem danh sách người dùng", description = "Hỗ trợ tìm kiếm theo từ khóa (email, tên, sđt), lọc theo vai trò (role), trạng thái kích hoạt (active) và phân trang. Để sort, truyền 'id,asc' hoặc 'createdAt,desc'.")
@@ -123,5 +125,29 @@ public class UserController {
     ) {
         UserResponse updated = userService.setUserActiveStatus(id, true, currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success("Kích hoạt người dùng thành công", updated));
+    }
+
+    @PatchMapping("/{id}/avatar")
+    @Operation(summary = "Cập nhật ảnh đại diện (Avatar) của người dùng")
+    public ResponseEntity<ApiResponse<UserResponse>> updateUserAvatar(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateAvatarRequest request
+    ) {
+        String avatar = (request.avatarUrl() != null && !request.avatarUrl().isBlank())
+                ? request.avatarUrl().trim()
+                : ((request.avatar() != null && !request.avatar().isBlank()) ? request.avatar().trim() : null);
+        UserResponse updated = userService.updateUserAvatar(id, avatar);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh đại diện thành công", updated));
+    }
+
+    @PostMapping(value = "/{id}/avatar/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Tải ảnh đại diện lên Cloudinary cho người dùng bởi Admin")
+    public ResponseEntity<ApiResponse<UserResponse>> uploadUserAvatar(
+            @PathVariable Long id,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file
+    ) {
+        String avatarUrl = cloudinaryService.uploadImage(file, "journeygo/avatars");
+        UserResponse updated = userService.updateUserAvatar(id, avatarUrl);
+        return ResponseEntity.ok(ApiResponse.success("Tải ảnh đại diện lên Cloudinary thành công", updated));
     }
 }

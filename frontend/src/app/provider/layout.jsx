@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -35,6 +35,18 @@ export default function ProviderLayout({ children }) {
   const authData = useAuthSession();
   const { performLogout, logoutModal } = useLogout();
 
+  // Khóa triệt để thanh cuộn của window/body để loại bỏ hoàn toàn thanh cuộn ngoài cùng của cả trang
+  useEffect(() => {
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
+
   // State điều khiển drawer trên mobile/tablet & trạng thái co giãn của side rail
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarWide, setIsSidebarWide] = useState(true);
@@ -45,8 +57,10 @@ export default function ProviderLayout({ children }) {
   // Dynamic danh sách thông báo duyệt bài (sẵn sàng gắn API)
   const [notifications, setNotifications] = useState([]);
 
-  // Trang Trải nghiệm: khóa khung 100vh, chỉ vùng danh sách thẻ tự cuộn
-  const isExperiencesPage = /^\/provider\/experiences\/?$/.test(pathname || "");
+  // Trang Quản lý Điểm đến & Trải nghiệm: khóa khung 100vh, cố định header & filter, chỉ danh sách thẻ tự cuộn
+  const isScrollLockedPage =
+    pathname?.startsWith("/provider/destinations") ||
+    pathname?.startsWith("/provider/experiences");
 
   // 6 Danh mục điều hướng Sidebar của Đối tác
   const navMenuItems = [
@@ -55,6 +69,12 @@ export default function ProviderLayout({ children }) {
       label: "Tổng quan",
       href: "/provider",
       icon: LayoutDashboard,
+    },
+    {
+      id: "tours",
+      label: "Quản lý Tour Du Lịch",
+      href: "/provider/tours",
+      icon: Route,
     },
     {
       id: "destinations",
@@ -68,12 +88,7 @@ export default function ProviderLayout({ children }) {
       href: "/provider/experiences",
       icon: Sparkles,
     },
-    {
-      id: "tours",
-      label: "Quản lý Tour Du Lịch",
-      href: "/provider/tours",
-      icon: Route,
-    },
+
     {
       id: "routes",
       label: "Lộ trình Văn hóa",
@@ -109,7 +124,7 @@ export default function ProviderLayout({ children }) {
   const partnerCode = authData?.user?.id ? `DT-${String(authData.user.id).slice(-4).toUpperCase()}` : "DT-JG-01";
 
   return (
-    <div className="h-screen w-full overflow-hidden flex bg-slate-50 m-0 p-0 font-sans antialiased text-slate-800">
+    <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 font-sans antialiased text-slate-800">
       {/* ══════════════════════════════════════════════════════════
           1. EXPANDING SIDE RAIL (PROMPT #040 - MENUS & TABS)
       ══════════════════════════════════════════════════════════ */}
@@ -133,7 +148,7 @@ export default function ProviderLayout({ children }) {
       {/* ══════════════════════════════════════════════════════════
           2. KHU VỰC NỘI DUNG CHÍNH & HEADER TRÊN CÙNG (ĐẨY THEO RAIL)
       ══════════════════════════════════════════════════════════ */}
-      <div className="flex-1 min-w-0 w-full h-screen flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
         {/* HEADER TRÊN CÙNG (SHRINK-0): CỐ ĐỊNH VĨNH VIỄN */}
         <header className="h-16 shrink-0 w-full bg-white border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 z-30 shadow-2xs">
           {/* Cụm trái: Nút mở mobile menu & Thanh tìm kiếm nhanh */}
@@ -219,19 +234,19 @@ export default function ProviderLayout({ children }) {
           </div>
         </header>
 
-        {/* ── NỘI DUNG TRANG CHÍNH: flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 ── */}
+        {/* ── NỘI DUNG TRANG CHÍNH: Cố định toàn khung với các trang danh sách, cho phép con tự cuộn ── */}
         <main
           className={
-            isExperiencesPage
-              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8"
-              : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8"
+            isScrollLockedPage
+              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8"
+              : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
           }
         >
           <div
             className={
-              isExperiencesPage
-                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
-                : "w-full max-w-[1600px] mx-auto space-y-6"
+              isScrollLockedPage
+                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
+                : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
             }
           >
             {children}

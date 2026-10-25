@@ -15,6 +15,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { destinationService } from "../services/destinationService";
+import AdministrativeAddressFields from "./AdministrativeAddressFields";
 
 /**
  * Modal "Tạo Điểm Đến Di Sản Mới" — dùng chung cho Provider & Admin.
@@ -67,6 +68,12 @@ export default function CreateDestinationModal({
     capacity: "",
   };
   const [form, setForm] = useState(initialForm);
+  const [addr, setAddr] = useState({
+    address: "",
+    provinceCode: "",
+    wardCode: "",
+    street: "",
+  });
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -159,8 +166,12 @@ export default function CreateDestinationModal({
     if (!form.name.trim()) {
       e.name = "Vui lòng nhập tên điểm đến di sản.";
     }
-    if (!form.address.trim()) {
-      e.address = "Vui lòng nhập địa chỉ hành chính.";
+    if (!addr.provinceCode) {
+      e.address = "Vui lòng chọn Tỉnh/Thành phố.";
+    } else if (!addr.wardCode) {
+      e.address = "Vui lòng chọn Xã/Phường.";
+    } else if (!addr.street) {
+      e.address = "Vui lòng nhập địa chỉ cụ thể (số nhà, đường...).";
     }
 
     const lat = Number(form.latitude);
@@ -196,7 +207,7 @@ export default function CreateDestinationModal({
     try {
       const payload = {
         name: form.name.trim(),
-        address: form.address.trim(),
+        address: addr.address,
         latitude: Number(form.latitude),
         longitude: Number(form.longitude),
         capacity: parseInt(form.capacity, 10),
@@ -300,7 +311,7 @@ export default function CreateDestinationModal({
                         Địa chỉ
                       </p>
                       <p className="text-slate-800 font-semibold truncate">
-                        {createdItem.address || form.address}
+                        {createdItem.address || addr.address}
                       </p>
                     </div>
                     <div>
@@ -365,27 +376,21 @@ export default function CreateDestinationModal({
                 )}
               </div>
 
-              {/* ── Trường 2: Địa chỉ ──────────────────────── */}
-              <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  <MapPin size={13} className={palette.icon} />
-                  <span>Địa chỉ hành chính</span>
-                  <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.address}
-                  onChange={(e) => handleChange("address", e.target.value)}
-                  placeholder="Ví dụ: Quảng Ninh, Việt Nam"
-                  disabled={loading}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} font-semibold disabled:opacity-60 transition-colors ${
-                    errors.address ? "border-rose-300" : "border-slate-200"
-                  }`}
-                />
-                {errors.address && (
-                  <p className="text-[11px] text-rose-600 font-bold">{errors.address}</p>
-                )}
-              </div>
+              {/* ── Trường 2: Địa chỉ hành chính (Tỉnh → Xã → Cụ thể) ── */}
+              <AdministrativeAddressFields
+                disabled={loading}
+                error={errors.address}
+                palette={palette}
+                onChange={(v) => {
+                  setAddr(v);
+                  setErrors((prev) => {
+                    if (!prev.address) return prev;
+                    const next = { ...prev };
+                    delete next.address;
+                    return next;
+                  });
+                }}
+              />
 
               {/* ── Trường 3+4: Tọa độ GPS ────────────────── */}
               <div className="space-y-2">

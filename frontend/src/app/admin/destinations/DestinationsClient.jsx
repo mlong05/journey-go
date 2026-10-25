@@ -25,6 +25,7 @@ import {
   CreateDestinationModal,
   EditDestinationModal,
 } from "@/features/destination";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const APPROVAL_FILTER = {
   ALL: "all",
@@ -90,6 +91,10 @@ export default function DestinationsClient() {
   const [destinations, setDestinations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
+
+  // Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [detailTarget, setDetailTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
@@ -336,6 +341,19 @@ export default function DestinationsClient() {
     });
   }, [approvalFilter, deletionFilter, destinations, searchQuery]);
 
+  // Reset trang về 1 khi bộ lọc thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, approvalFilter, deletionFilter]);
+
+  // Phân trang dữ liệu
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const paginatedDestinations = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
+
   const toastPalette = {
     success: "bg-emerald-900 border-emerald-600 text-white",
     error: "bg-rose-900 border-rose-600 text-white",
@@ -343,7 +361,7 @@ export default function DestinationsClient() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in-50 duration-200">
+    <div className="h-full min-h-0 w-full overflow-hidden flex flex-col animate-in fade-in-50 duration-200">
       {toastMessage && (
         <div
           className={`fixed top-5 right-5 z-50 ${toastPalette[toastTone]} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-3 max-w-md`}
@@ -359,7 +377,8 @@ export default function DestinationsClient() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      {/* ── 1. TIÊU ĐỀ TRANG VÀ THAO TÁC (SHRINK-0: CỐ ĐỊNH TRÊN CÙNG) ── */}
+      <div className="shrink-0 mb-4 pb-3 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-5 bg-slate-900 rounded-full" />
@@ -367,9 +386,6 @@ export default function DestinationsClient() {
               Quản Lý Điểm Đến Toàn Sàn
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          
-          </p>
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
@@ -393,7 +409,8 @@ export default function DestinationsClient() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-4">
+      {/* ── 2. BỘ LỌC TÌM KIẾM (SHRINK-0: CỐ ĐỊNH TRÊN CÙNG) ── */}
+      <div className="shrink-0 mb-4 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
           <div className="sm:col-span-7 relative">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -412,7 +429,7 @@ export default function DestinationsClient() {
               value={approvalFilter}
               onChange={(event) => setApprovalFilter(event.target.value)}
               aria-label="Lọc theo trạng thái phê duyệt"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20 cursor-pointer"
             >
               <option value={APPROVAL_FILTER.ALL}>Trạng thái duyệt: Tất cả</option>
               <option value={APPROVAL_FILTER.PENDING}>Chờ phê duyệt</option>
@@ -424,7 +441,7 @@ export default function DestinationsClient() {
               value={deletionFilter}
               onChange={(event) => setDeletionFilter(event.target.value)}
               aria-label="Lọc theo trạng thái xóa"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20 cursor-pointer"
             >
               <option value={DELETION_FILTER.ALL}>Tình trạng: Tất cả</option>
               <option value={DELETION_FILTER.ACTIVE}>Đang hoạt động</option>
@@ -435,13 +452,13 @@ export default function DestinationsClient() {
 
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
           <span className="text-[11px] font-semibold text-slate-500">
-            Đang hiển thị {filtered.length} / {destinations.length} điểm đến
+            Tìm thấy {filtered.length} / {destinations.length} điểm đến
           </span>
         </div>
       </div>
 
       {fetchError && (
-        <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
+        <div className="shrink-0 mb-4 flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
           <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-bold text-rose-800">
@@ -451,7 +468,7 @@ export default function DestinationsClient() {
             <button
               type="button"
               onClick={() => loadList()}
-              className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900"
+              className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900 cursor-pointer"
             >
               Thử lại
             </button>
@@ -459,15 +476,16 @@ export default function DestinationsClient() {
         </div>
       )}
 
+      {/* ── 3. KHU VỰC BẢNG DỮ LIỆU & PHÂN TRANG (CHỈ VÙNG BẢNG CUỘN) ── */}
       {isLoading && destinations.length === 0 ? (
-        <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-xs">
+        <div className="flex-1 bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-xs flex flex-col items-center justify-center">
           <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
           <p className="text-xs text-slate-400 mt-3">
             Đang tải danh sách điểm đến…
           </p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-xs space-y-3">
+        <div className="flex-1 bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-xs space-y-3 flex flex-col items-center justify-center">
           <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
             <Inbox size={28} />
           </div>
@@ -482,10 +500,11 @@ export default function DestinationsClient() {
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200">
+        <div className="flex-1 min-h-0 w-full bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
+          {/* Scrollable table container */}
+          <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+            <table className="w-full text-xs border-collapse">
+              <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 shadow-2xs">
                 <tr>
                   <th className="text-left px-4 py-3 font-black text-slate-700 uppercase tracking-wider text-[10.5px]">
                     Điểm đến
@@ -507,11 +526,11 @@ export default function DestinationsClient() {
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                {filtered.map((dest) => (
+              <tbody className="divide-y divide-slate-100">
+                {paginatedDestinations.map((dest) => (
                   <tr
                     key={dest.id}
-                    className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
+                    className="hover:bg-slate-50/70 transition-colors"
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
@@ -649,6 +668,96 @@ export default function DestinationsClient() {
               </tbody>
             </table>
           </div>
+
+          {/* ── 4. THANH PHÂN TRANG CỐ ĐỊNH Ở ĐÁY BẢNG ── */}
+          <div className="shrink-0 px-4 py-3 bg-slate-50/90 border-t border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 font-bold text-slate-600">
+                <span>Số dòng/trang:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+              <span className="text-slate-300">•</span>
+              <span className="font-semibold text-slate-600">
+                Đang xem trang <span className="font-bold text-slate-900">{currentPage}</span> / <span className="font-bold text-slate-900">{totalPages}</span> (Tổng <span className="font-bold text-slate-900">{totalItems}</span> điểm đến)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage <= 1}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                title="Trang đầu"
+              >
+                Đầu
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                title="Trang trước"
+              >
+                Trước
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .map((p, idx, arr) => {
+                  const prev = arr[idx - 1];
+                  return (
+                    <React.Fragment key={p}>
+                      {prev && p - prev > 1 && (
+                        <span className="px-1 text-slate-400 font-bold">…</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage(p)}
+                        className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          currentPage === p
+                            ? "bg-slate-900 text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    </React.Fragment>
+                  );
+                })}
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                title="Trang sau"
+              >
+                Sau
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage >= totalPages}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                title="Trang cuối"
+              >
+                Cuối
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -767,159 +876,54 @@ export default function DestinationsClient() {
         </div>
       )}
 
-      {approveTarget && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
-          onClick={() => setApproveTarget(null)}
-        >
-          <div
-            className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className={`w-12 h-12 rounded-2xl mx-auto flex items-center justify-center ${
-                approveTarget.action === "approve"
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-rose-100 text-rose-700"
-              }`}
-            >
-              <CheckCircle2 size={26} />
-            </div>
-            <div>
-              <h3 className="text-base font-black text-slate-900">
-                {approveTarget.action === "approve"
-                  ? "Phê duyệt điểm đến này?"
-                  : "Hủy phê duyệt điểm đến này?"}
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                {approveTarget.action === "approve"
-                  ? `Điểm đến "${approveTarget.name}" sẽ được phê duyệt và hiển thị trên hệ thống.`
-                  : `Điểm đến "${approveTarget.name}" sẽ bị hủy duyệt và chuyển về trạng thái Chờ thẩm định.`}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setApproveTarget(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleApproveConfirm}
-                disabled={actionLoadingId === approveTarget.id}
-                className={`flex-1 py-2.5 rounded-xl text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50 ${
-                  approveTarget.action === "approve"
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-rose-600 hover:bg-rose-700"
-                }`}
-              >
-                {actionLoadingId === approveTarget.id ? (
-                  <Loader2 size={14} className="animate-spin mx-auto" />
-                ) : approveTarget.action === "approve" ? (
-                  "Xác nhận duyệt"
-                ) : (
-                  "Xác nhận hủy"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={Boolean(approveTarget)}
+        loading={actionLoadingId === approveTarget?.id}
+        tone={approveTarget?.action === "approve" ? "success" : "danger"}
+        icon={approveTarget?.action === "approve" ? "check" : "reject"}
+        title={
+          approveTarget?.action === "approve"
+            ? "Phê duyệt điểm đến này?"
+            : "Hủy phê duyệt điểm đến này?"
+        }
+        subject={approveTarget?.name}
+        description={
+          approveTarget?.action === "approve"
+            ? "Điểm đến sẽ được phê duyệt và hiển thị trên hệ thống."
+            : "Điểm đến sẽ bị hủy duyệt và chuyển về trạng thái Chờ thẩm định."
+        }
+        confirmLabel={
+          approveTarget?.action === "approve" ? "Xác nhận duyệt" : "Xác nhận hủy"
+        }
+        onConfirm={handleApproveConfirm}
+        onCancel={() => setApproveTarget(null)}
+      />
 
-      {deleteTarget && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
-          onClick={() => setDeleteTarget(null)}
-        >
-          <div
-            className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-              <AlertCircle size={26} />
-            </div>
-            <div>
-              <h3 className="text-base font-black text-slate-900">
-                Xóa điểm đến?
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Điểm đến <strong>&quot;{deleteTarget.name}&quot;</strong> sẽ
-                bị ẩn khỏi hệ thống và có thể khôi phục lại từ tab &quot;Đã xóa&quot;.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                disabled={actionLoadingId === deleteTarget.id}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {actionLoadingId === deleteTarget.id ? (
-                  <Loader2 size={14} className="animate-spin mx-auto" />
-                ) : (
-                  "Xác nhận xóa"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        loading={actionLoadingId === deleteTarget?.id}
+        tone="danger"
+        icon="trash"
+        title="Xóa điểm đến?"
+        subject={deleteTarget?.name}
+        description='Điểm đến sẽ bị ẩn khỏi hệ thống và có thể khôi phục lại từ tab "Đã xóa".'
+        confirmLabel="Xác nhận xóa"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
-      {restoreTarget && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
-          onClick={() => setRestoreTarget(null)}
-        >
-          <div
-            className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
-              <RotateCcw size={26} />
-            </div>
-            <div>
-              <h3 className="text-base font-black text-slate-900">
-                Khôi phục điểm đến đã xóa?
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Điểm đến <strong>&quot;{restoreTarget.name}&quot;</strong> sẽ
-                được khôi phục và chuyển về trạng thái Chờ phê duyệt để thẩm
-                định lại.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setRestoreTarget(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleRestoreConfirm}
-                disabled={actionLoadingId === restoreTarget.id}
-                className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {actionLoadingId === restoreTarget.id ? (
-                  <Loader2 size={14} className="animate-spin mx-auto" />
-                ) : (
-                  "Khôi phục ngay"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={Boolean(restoreTarget)}
+        loading={actionLoadingId === restoreTarget?.id}
+        tone="warning"
+        icon="restore"
+        title="Khôi phục điểm đến đã xóa?"
+        subject={restoreTarget?.name}
+        description="Điểm đến sẽ được khôi phục và chuyển về trạng thái Chờ phê duyệt để thẩm định lại."
+        confirmLabel="Khôi phục ngay"
+        onConfirm={handleRestoreConfirm}
+        onCancel={() => setRestoreTarget(null)}
+      />
 
       <CreateDestinationModal
         isOpen={isCreateOpen}

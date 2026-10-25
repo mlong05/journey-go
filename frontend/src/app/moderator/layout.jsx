@@ -57,6 +57,13 @@ export default function ModeratorLayout({ children }) {
       badge: null,
     },
     {
+      id: "tours",
+      label: "Thẩm định tour",
+      href: "/moderator/tours",
+      icon: Route,
+      badge: null,
+    },
+    {
       id: "destinations-routes",
       label: "Duyệt Điểm đến & Lộ trình",
       href: "/moderator/destinations",
@@ -70,13 +77,7 @@ export default function ModeratorLayout({ children }) {
       icon: Sparkles,
       badge: null,
     },
-    {
-      id: "tours",
-      label: "Thẩm định tour",
-      href: "/moderator/tours",
-      icon: Route,
-      badge: null,
-    },
+
     {
       id: "ai-knowledge",
       label: "Kiểm tra Kiến thức AI",
@@ -224,8 +225,8 @@ export default function ModeratorLayout({ children }) {
             isDestinationList
               ? "flex-1 w-full h-full overflow-hidden bg-slate-50"
               : isExperiencesPage
-              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8 bg-slate-50"
-              : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
+                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8 bg-slate-50"
+                : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
           }
         >
           <div
@@ -233,8 +234,8 @@ export default function ModeratorLayout({ children }) {
               isDestinationList
                 ? "w-full max-w-[1600px] mx-auto h-full flex flex-col"
                 : isExperiencesPage
-                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
-                : "w-full max-w-[1600px] mx-auto space-y-6"
+                  ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
+                  : "w-full max-w-[1600px] mx-auto space-y-6"
             }
           >
             {children}

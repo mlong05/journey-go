@@ -24,6 +24,7 @@ import {
   ChevronsRight,
 } from "lucide-react";
 import { destinationService } from "@/features/destination/services/destinationService";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /* =========================================================================
  *  TRANG: Thẩm định điểm đến di sản (Moderator)
@@ -404,6 +405,7 @@ function PaginationBar({
 
 export default function ModeratorDestinationsPage() {
   /* ── State ────────────────────────────────────────────────── */
+  const { confirm, confirmDialog } = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusTab, setStatusTab] = useState("all");
   const [destinations, setDestinations] = useState([]);
@@ -479,6 +481,28 @@ export default function ModeratorDestinationsPage() {
 
   const handleApprove = useCallback(
     async (id, approved, displayName) => {
+      const ok = await confirm(
+        approved
+          ? {
+              tone: "success",
+              icon: "check",
+              title: "Phê duyệt điểm đến này?",
+              subject: displayName,
+              description:
+                "Điểm đến sẽ được công khai và hiển thị tới du khách trên ứng dụng.",
+              confirmLabel: "Phê duyệt",
+            }
+          : {
+              tone: "danger",
+              icon: "reject",
+              title: "Hủy phê duyệt điểm đến này?",
+              subject: displayName,
+              description:
+                "Điểm đến sẽ bị gỡ khỏi danh sách công khai và quay về trạng thái chờ thẩm định.",
+              confirmLabel: "Hủy phê duyệt",
+            }
+      );
+      if (!ok) return;
       setActionLoadingId(id);
       try {
         const updated = await destinationService.setApproval(id, approved);
@@ -504,7 +528,7 @@ export default function ModeratorDestinationsPage() {
         setActionLoadingId(null);
       }
     },
-    [detailTarget, showToast]
+    [detailTarget, showToast, confirm]
   );
 
   /* ── Điều hướng phân trang + lọc ───────────────────────────── */
@@ -1038,6 +1062,8 @@ export default function ModeratorDestinationsPage() {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }
