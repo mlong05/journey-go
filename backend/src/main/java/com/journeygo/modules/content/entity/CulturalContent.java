@@ -38,8 +38,12 @@ public class CulturalContent {
     @Column(columnDefinition = "TEXT")
     private String contentText;
 
+    @JsonIgnore
     @Column(name = "media_url", length = 1000)
     private String mediaUrl;
+
+    @Column(name = "media_public_id", length = 255)
+    private String mediaPublicId;
 
     @Column(name = "duration")
     private Integer duration; // Duration in seconds for audio/video

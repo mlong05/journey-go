@@ -6,6 +6,9 @@ import com.journeygo.modules.content.dto.CulturalContentRequest;
 import com.journeygo.modules.content.dto.CulturalContentResponse;
 import com.journeygo.modules.content.entity.CulturalContent;
 import com.journeygo.modules.content.repository.CulturalContentRepository;
+import com.journeygo.modules.moderation.service.ContentModerationService;
+import com.journeygo.modules.media.service.CloudinaryImageService;
+import com.journeygo.modules.media.dto.CloudinaryUploadedImage;
 import com.journeygo.modules.destination.entity.Destination;
 import com.journeygo.modules.destination.repository.DestinationRepository;
 import com.journeygo.modules.user.entity.Role;
@@ -13,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -23,12 +27,18 @@ public class CulturalContentService {
 
     private final CulturalContentRepository culturalContentRepository;
     private final DestinationRepository destinationRepository;
+    private final ContentModerationService contentModerationService;
+    private final CloudinaryImageService cloudinaryImageService;
 
     @Transactional(readOnly = true)
     public List<CulturalContentResponse> getByDestinationId(Long destinationId) {
         findDestinationOrThrow(destinationId);
-        return culturalContentRepository.findByDestinationIdAndDeletedFalseAndDestinationDeletedFalseOrderBySequenceOrderAsc(destinationId)
-                .stream().map(CulturalContentResponse::fromEntity).toList();
+        return contentModerationService.getApprovedByDestination(destinationId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CulturalContentResponse> getAllApproved() {
+        return contentModerationService.getAllApproved();
     }
 
     @Transactional(readOnly = true)
@@ -41,6 +51,7 @@ public class CulturalContentService {
 
     @Transactional(readOnly = true)
     public CulturalContentResponse getById(Long id) {
+        contentModerationService.requireApproved(id);
         return CulturalContentResponse.fromEntity(findContentOrThrow(id));
     }
 
@@ -50,6 +61,7 @@ public class CulturalContentService {
         Destination destination = findDestinationOrThrow(destinationId);
 
         checkOwnership(destination, callerId, callerRole);
+        cloudinaryImageService.validateAsset(request.mediaUrl(), request.mediaPublicId(), destinationId, callerId, null);
 
         CulturalContent content = CulturalContent.builder()
                 .destination(destination)
@@ -59,14 +71,32 @@ public class CulturalContentService {
                 .description(request.description())
                 .contentText(request.contentText())
                 .mediaUrl(request.mediaUrl())
+                .mediaPublicId(request.mediaPublicId())
                 .duration(request.duration())
                 .playCount(0L)
                 .deleted(false)
                 .build();
 
         CulturalContent saved = culturalContentRepository.save(content);
+        contentModerationService.submit(saved.getId(), callerId, callerRole);
         log.info("Created cultural content id={} for destinationId={}", saved.getId(), destinationId);
         return CulturalContentResponse.fromEntity(saved);
+    }
+
+    /** Create content and upload its image in one multipart request. */
+    @Transactional
+    public CulturalContentResponse createWithImage(Long destinationId, CulturalContentRequest request,
+                                                   MultipartFile image, Long callerId, Role callerRole) {
+        CloudinaryUploadedImage uploaded = cloudinaryImageService.uploadImage(image, destinationId, callerId, callerRole);
+        CulturalContentRequest requestWithImage = new CulturalContentRequest(request.title(), request.contentType(),
+                request.sequenceOrder(), request.description(), request.contentText(), uploaded.secureUrl(),
+                uploaded.publicId(), request.duration());
+        try {
+            return create(destinationId, requestWithImage, callerId, callerRole);
+        } catch (RuntimeException exception) {
+            cloudinaryImageService.deleteImmediately(uploaded.publicId());
+            throw exception;
+        }
     }
 
     /** Update cultural content */
@@ -81,12 +111,39 @@ public class CulturalContentService {
         content.setSequenceOrder(request.sequenceOrder());
         content.setDescription(request.description());
         content.setContentText(request.contentText());
+        String previousPublicId = content.getMediaPublicId();
+        cloudinaryImageService.validateAsset(request.mediaUrl(), request.mediaPublicId(),
+                content.getDestination().getId(), callerId, previousPublicId);
         content.setMediaUrl(request.mediaUrl());
+        content.setMediaPublicId(request.mediaPublicId());
         content.setDuration(request.duration());
 
         CulturalContent saved = culturalContentRepository.save(content);
+        contentModerationService.submit(saved.getId(), callerId, callerRole);
+        if (previousPublicId != null && !previousPublicId.equals(saved.getMediaPublicId())) {
+            cloudinaryImageService.deleteAfterCommit(previousPublicId);
+        }
         log.info("Updated cultural content id={}", saved.getId());
         return CulturalContentResponse.fromEntity(saved);
+    }
+
+    /** Replace the image and update content fields in one multipart request. */
+    @Transactional
+    public CulturalContentResponse updateWithImage(Long id, CulturalContentRequest request,
+                                                   MultipartFile image, Long callerId, Role callerRole) {
+        CulturalContent current = findContentOrThrow(id);
+        checkOwnership(current.getDestination(), callerId, callerRole);
+        CloudinaryUploadedImage uploaded = cloudinaryImageService.uploadImage(
+                image, current.getDestination().getId(), callerId, callerRole);
+        CulturalContentRequest requestWithImage = new CulturalContentRequest(request.title(), request.contentType(),
+                request.sequenceOrder(), request.description(), request.contentText(), uploaded.secureUrl(),
+                uploaded.publicId(), request.duration());
+        try {
+            return update(id, requestWithImage, callerId, callerRole);
+        } catch (RuntimeException exception) {
+            cloudinaryImageService.deleteImmediately(uploaded.publicId());
+            throw exception;
+        }
     }
 
     /** Soft-delete cultural content */
@@ -99,6 +156,20 @@ public class CulturalContentService {
         content.setDeleted(true);
         culturalContentRepository.save(content);
         log.info("Soft-deleted cultural content id={}", id);
+    }
+
+    /** Detach the image while retaining the cultural content. */
+    @Transactional
+    public CulturalContentResponse removeImage(Long id, Long callerId, Role callerRole) {
+        CulturalContent content = findContentOrThrow(id);
+        checkOwnership(content.getDestination(), callerId, callerRole);
+        String previousPublicId = content.getMediaPublicId();
+        content.setMediaUrl(null);
+        content.setMediaPublicId(null);
+        CulturalContent saved = culturalContentRepository.save(content);
+        contentModerationService.submit(saved.getId(), callerId, callerRole);
+        if (previousPublicId != null) cloudinaryImageService.deleteAfterCommit(previousPublicId);
+        return CulturalContentResponse.fromEntity(saved);
     }
 
     /** Restore a soft-deleted cultural content */
@@ -118,6 +189,7 @@ public class CulturalContentService {
     /** Play content: increments play counter and returns media playback details */
     @Transactional
     public CulturalContentResponse play(Long id) {
+        contentModerationService.requireApproved(id);
         CulturalContent content = findContentOrThrow(id);
         content.incrementPlayCount();
         CulturalContent saved = culturalContentRepository.save(content);
