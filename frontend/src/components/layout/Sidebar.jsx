@@ -12,53 +12,39 @@ import {
 } from "lucide-react";
 
 /**
- * CẤU HÌNH BẢNG MÀU PHÂN BIỆT RÕ RÀNG THEO 3 ROLE DOANH NGHIỆP:
- * - Admin (Quản trị viên): Đen than chì Dark Slate Carbon (#0b1120), viền active đỏ rose-500, avatar đỏ cam
- * - Provider (Đối tác): Ngọc lục bảo di sản Deep Forest Jade (#03231a), viền active lục bảo emerald-400, avatar xanh ngọc sang vàng kim
- * - Moderator (Kiểm duyệt viên): Tím than sâu Midnight Violet (#151528), viền active chàm indigo-400, avatar xanh dương sang tím
+ * BẢNG MÀU DÙNG CHUNG CHO CẢ 3 ROLE (CHUẨN ADMIN - Dark Slate + Rose):
+ * Chỉ khác nhau nhãn badge, tiêu đề nhóm menu và chữ viết tắt mặc định.
  */
+const SHARED_THEME = {
+  sidebarBg: "bg-[#0b1120] border-r border-slate-800 text-slate-300",
+  badge: "bg-rose-500/20 text-rose-400 border border-rose-500/30",
+  itemActive: "bg-slate-800/90 text-white font-bold border-l-4 border-rose-500 shadow-sm",
+  itemHover: "text-slate-400 hover:bg-slate-800/60 hover:text-white transition-all duration-200",
+  itemIconActive: "text-rose-400",
+  itemIconDefault: "text-slate-400",
+  avatar: "bg-gradient-to-br from-rose-500 to-orange-500 text-white font-black",
+  avatarRoleTag: "text-rose-400",
+  toggleBtn: "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80",
+};
+
 const ROLE_THEMES = {
   admin: {
-    sidebarBg: "bg-[#0b1120] border-r border-slate-800 text-slate-300",
-    badge: "bg-rose-500/20 text-rose-400 border border-rose-500/30",
+    ...SHARED_THEME,
     badgeText: "QUẢN TRỊ VIÊN",
     groupLabel: "MENU QUẢN TRỊ",
-    itemActive: "bg-slate-800 text-white font-bold border-l-4 border-rose-500 shadow-sm",
-    itemHover: "hover:bg-white/10 hover:text-white transition-all duration-200 text-slate-300",
-    itemIconActive: "text-rose-400",
-    itemIconDefault: "text-slate-400",
-    avatar: "bg-gradient-to-br from-rose-500 to-orange-500 text-white font-black",
-    avatarRoleTag: "text-rose-400",
     defaultInitials: "QT",
-    toggleBtn: "bg-white/10 hover:bg-white/20 text-white",
   },
   provider: {
-    sidebarBg: "bg-[#03231a] border-r border-emerald-900/40 text-emerald-100",
-    badge: "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30",
+    ...SHARED_THEME,
     badgeText: "ĐỐI TÁC ĐIỂM ĐẾN",
     groupLabel: "MENU ĐỐI TÁC",
-    itemActive: "bg-emerald-700/30 text-white font-bold border-l-4 border-emerald-400 shadow-sm shadow-emerald-950",
-    itemHover: "hover:bg-white/10 hover:text-white transition-all duration-200 text-emerald-100",
-    itemIconActive: "text-emerald-300",
-    itemIconDefault: "text-emerald-400/70",
-    avatar: "bg-gradient-to-br from-emerald-500 to-amber-500 text-white font-black",
-    avatarRoleTag: "text-emerald-300",
     defaultInitials: "ĐT",
-    toggleBtn: "bg-white/10 hover:bg-white/20 text-white",
   },
   moderator: {
-    sidebarBg: "bg-[#151528] border-r border-indigo-900/40 text-indigo-200",
-    badge: "bg-indigo-500/20 text-indigo-300 border border-indigo-400/30",
+    ...SHARED_THEME,
     badgeText: "KIỂM DUYỆT VIÊN",
     groupLabel: "MENU THẨM ĐỊNH",
-    itemActive: "bg-indigo-600/30 text-white font-bold border-l-4 border-indigo-400 shadow-sm shadow-indigo-950",
-    itemHover: "hover:bg-white/10 hover:text-white transition-all duration-200 text-indigo-200",
-    itemIconActive: "text-indigo-300",
-    itemIconDefault: "text-indigo-400/70",
-    avatar: "bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-black",
-    avatarRoleTag: "text-indigo-300",
     defaultInitials: "TĐ",
-    toggleBtn: "bg-white/10 hover:bg-white/20 text-white",
   },
 };
 
@@ -134,7 +120,7 @@ export default function Sidebar({
         ══════════════════════════════════════════════════════════ */}
         <div className="flex flex-col">
           <div
-            className={`h-16 flex items-center border-b border-white/10 ${
+            className={`h-16 flex items-center border-b border-slate-800 ${
               isWide ? "px-4 justify-between" : "px-2 justify-between"
             }`}
           >
@@ -196,7 +182,7 @@ export default function Sidebar({
                 <button
                   type="button"
                   onClick={onToggleWide}
-                  className={`hidden md:flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer shadow-2xs shrink-0 ${
+                  className={`hidden md:flex items-center justify-center rounded-lg ${theme.toggleBtn} transition-colors cursor-pointer shadow-2xs shrink-0 ${
                     isWide ? "w-8 h-8" : "w-7 h-7"
                   }`}
                   aria-label={isWide ? "Thu gọn menu" : "Mở rộng menu"}
@@ -219,7 +205,7 @@ export default function Sidebar({
           >
             {/* Thẻ phân nhóm "MENU QUẢN TRỊ" / "MENU THẨM ĐỊNH" / "MENU ĐỐI TÁC" */}
             {isWide && (
-              <p className="text-[11px] font-bold uppercase tracking-wider opacity-60 px-3 mb-2">
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">
                 {theme.groupLabel}
               </p>
             )}
@@ -291,15 +277,15 @@ export default function Sidebar({
         {/* ══════════════════════════════════════════════════════════
             PHẦN ĐÁY: NÚT ĐĂNG XUẤT DUY NHẤT (ĐÃ XÓA KHUNG TÀI KHOẢN)
         ══════════════════════════════════════════════════════════ */}
-        <div className={`border-t border-white/10 ${isWide ? "p-3" : "p-2"}`}>
+        <div className={`border-t border-slate-800 ${isWide ? "p-3" : "p-2"}`}>
           {onLogout && (
             <button
               type="button"
               onClick={onLogout}
               className={
                 isWide
-                  ? "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 font-semibold text-xs transition-all cursor-pointer"
-                  : "w-full flex items-center justify-center p-3 rounded-xl text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 transition-all cursor-pointer"
+                  ? "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-500 hover:bg-rose-500/10 hover:text-rose-400 font-semibold text-xs transition-all cursor-pointer"
+                  : "w-full flex items-center justify-center p-3 rounded-xl text-rose-500 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer"
               }
               title="Đăng xuất khỏi hệ thống"
               aria-label="Đăng xuất"

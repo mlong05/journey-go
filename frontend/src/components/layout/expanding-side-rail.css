@@ -85,18 +85,12 @@
   --ux-rail-text: #F4F0E8;
 }
 
-/* Biến thể phối màu theo từng vai trò quản trị JourneyGo */
-.u040-wrap[data-role="admin"] {
+/* Đồng bộ phối màu Sidebar cho cả 3 vai trò theo chuẩn Admin (Dark Slate + Rose) */
+.u040-wrap[data-role] {
   --ux-grad: linear-gradient(120deg, #F43F5E, #059669 55%, #0284C7);
   --ux-accent: #F43F5E;
-}
-.u040-wrap[data-role="moderator"] {
-  --ux-grad: linear-gradient(120deg, #0284C7, #0D9488 55%, #6366F1);
-  --ux-accent: #0284C7;
-}
-.u040-wrap[data-role="provider"] {
-  --ux-grad: linear-gradient(120deg, #059669, #D97706 55%, #10B981);
-  --ux-accent: #059669;
+  --ux-rail-bg: #0b1120;
+  --ux-rail-text: #cbd5e1;
 }
 
 /* Cấu trúc Side Rail Expandable */
@@ -120,7 +114,7 @@
   overflow: hidden;
   transition: width .6s var(--ux-spring);
   box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid #1e293b;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -187,13 +181,15 @@
   border: 0;
   padding: 0;
   border-radius: 10px 0 0 10px;
-  background: color-mix(in srgb, var(--ux-page) 14%, transparent);
-  color: inherit;
+  background: #1e293b;
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  color: #cbd5e1;
   display: grid;
   place-items: center;
   opacity: 0;
   cursor: pointer;
   transition: opacity .2s, background .2s;
+
   z-index: 10;
 }
 .u040-rail:hover .u040-tog,
@@ -250,7 +246,7 @@
   top: 0;
   height: 48px;
   border-radius: 15px;
-  background: color-mix(in srgb, var(--ux-page) 15%, transparent);
+  background: rgba(244, 63, 94, 0.15);
   transform: translateY(var(--y, 0));
   transition: transform .5s var(--ux-spring);
   pointer-events: none;
@@ -264,7 +260,7 @@
   bottom: 12px;
   width: 4px;
   border-radius: 0 4px 4px 0;
-  background: var(--ux-grad);
+  background: #F43F5E;
 }
 
 /* Item Điều hướng */
@@ -290,6 +286,16 @@
 .u040-it:hover,
 .u040-it[aria-current="page"] {
   opacity: 1;
+}
+.u040-it:hover {
+  color: #fff;
+}
+.u040-it[aria-current="page"] {
+  color: #fff;
+  font-weight: 700;
+}
+.u040-it[aria-current="page"] svg {
+  color: #fb7185;
 }
 .u040-it:focus-visible {
   outline: 2px solid var(--ux-accent);

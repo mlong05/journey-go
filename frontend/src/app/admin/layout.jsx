@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -15,6 +15,7 @@ import {
   Bell,
   Menu,
   Sparkles,
+  Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -37,6 +38,13 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
+    id: "tours",
+    label: "Quản lý tour du lịch",
+    href: "/admin/tours",
+    icon: Route,
+    badge: null,
+  },
+  {
     id: "destinations",
     label: "Quản lý điểm đến",
     href: "/admin/destinations",
@@ -50,6 +58,7 @@ const ADMIN_NAV_ITEMS = [
     icon: Sparkles,
     badge: null,
   },
+
   {
     id: "finance",
     label: "Tài chính & Thanh toán",
@@ -83,10 +92,9 @@ const ADMIN_NAV_ITEMS = [
 /**
  * Layout Quản Trị Hệ Thống Toàn Sàn - JourneyGo
  * - Mô hình Flexbox 2 cột chuẩn Dashboard:
- *   + Cột 1 (Sidebar): sticky top-0 h-screen (w-64 <-> w-20)
- *   + Cột 2 (Vùng nội dung bên phải): flex-1 min-w-0 min-h-screen flex flex-col overflow-y-auto
- * - Topbar trên cùng h-16 ăn khớp 100% với Header Sidebar h-16
- * - Main content bên dưới flex-1 p-6 space-y-6 bg-slate-50
+ *   + Cột 1 (Sidebar): ExpandingSideRail
+ *   + Cột 2 (Vùng nội dung bên phải): flex-1 min-w-0 h-full flex flex-col overflow-hidden
+ * - Khóa triệt để thanh cuộn của window/body để loại bỏ hoàn toàn thanh cuộn ngoài cùng
  */
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
@@ -94,11 +102,28 @@ export default function AdminLayout({ children }) {
   const authData = useAuthSession();
   const { performLogout, logoutModal } = useLogout();
 
+  // Khóa triệt để thanh cuộn của window/body để loại bỏ hoàn toàn thanh cuộn ngoài cùng của cả trang
+  useEffect(() => {
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
+
   // State drawer trên mobile & trạng thái co giãn của side rail
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarWide, setIsSidebarWide] = useState(true);
   const [topSearch, setTopSearch] = useState("");
   const [notificationsCount, setNotificationsCount] = useState(0);
+
+  // Trang Điểm đến & Trải nghiệm: khóa khung 100vh, cố định header & filter, chỉ danh sách tự cuộn
+  const isScrollLockedPage =
+    pathname?.startsWith("/admin/destinations") ||
+    pathname?.startsWith("/admin/experiences");
 
   // Xử lý tìm kiếm nhanh từ Topbar
   const handleTopSearchSubmit = (e) => {
@@ -116,16 +141,16 @@ export default function AdminLayout({ children }) {
   const adminEmail = authData?.user?.email || "admin@journeygo.com";
   const avatarInitials = authData?.user
     ? adminName
-        .split(" ")
-        .filter(Boolean)
-        .slice(-2)
-        .map((w) => w[0])
-        .join("")
-        .toUpperCase()
+      .split(" ")
+      .filter(Boolean)
+      .slice(-2)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
     : "QT";
 
   return (
-    <div className="h-screen w-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
+    <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
       {/* ────────────────────────────────────────────────────────
           1. CỘT 1 (SIDEBAR): MÔ HÌNH FLEXBOX CHUẨN DASHBOARD
       ──────────────────────────────────────────────────────── */}
@@ -149,7 +174,7 @@ export default function AdminLayout({ children }) {
       {/* ────────────────────────────────────────────────────────
           2. CỘT 2 (VÙNG NỘI DUNG BÊN PHẢI): CỐ ĐỊNH 100VH, KHÔNG BỊ TRÔI TOPBAR
       ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 w-full h-screen flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
         {/* Topbar trên cùng: h-16 shrink-0, cố định vĩnh viễn trên cùng */}
         <header className="h-16 shrink-0 w-full bg-white border-b border-slate-200 px-6 flex items-center justify-between z-30 shadow-2xs">
           {/* Cụm trái: Menu mobile + Tiêu đề */}
@@ -213,9 +238,21 @@ export default function AdminLayout({ children }) {
           </div>
         </header>
 
-        {/* Main Content bên dưới: flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50 */}
-        <main className="flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50">
-          <div className="w-full max-w-[1600px] mx-auto space-y-6">
+        {/* Main Content bên dưới */}
+        <main
+          className={
+            isScrollLockedPage
+              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 bg-slate-50"
+              : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-slate-50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
+          }
+        >
+          <div
+            className={
+              isScrollLockedPage
+                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
+                : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
+            }
+          >
             {children}
           </div>
         </main>

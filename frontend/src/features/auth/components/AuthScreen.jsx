@@ -16,7 +16,13 @@ import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 import ForgotPasswordFlow from "./ForgotPasswordFlow";
 import SocialLoginButtons from "./SocialLoginButtons";
+import HeritageLandmarksArt from "./HeritageLandmarksArt";
 import { translateAuthError } from "@/services/errorMessage";
+
+// Loại bỏ vai trò Khách du lịch khỏi danh sách đăng nhập theo yêu cầu
+const LOGIN_ROLES = ROLES.filter(
+  (r) => r.id !== "tourist" && r.roleEnum !== "TOURIST"
+);
 
 export default function AuthScreen({ initialTab = "login" }) {
   const router = useRouter();
@@ -27,7 +33,8 @@ export default function AuthScreen({ initialTab = "login" }) {
 
   // Vai trò truy cập được chọn (Mặc định: Quản trị viên)
   const [selectedRoleId, setSelectedRoleId] = useState("admin");
-  const selectedRole = ROLES.find((r) => r.id === selectedRoleId) || ROLES[0];
+  const selectedRole =
+    LOGIN_ROLES.find((r) => r.id === selectedRoleId) || LOGIN_ROLES[0];
 
   // Trạng thái ẩn/hiện mật khẩu
   const [showPassword, setShowPassword] = useState(false);
@@ -204,10 +211,10 @@ export default function AuthScreen({ initialTab = "login" }) {
       setFeedbackModal({
         isOpen: true,
         type: "login",
-        title: "Đăng nhập thành công!",
-        subtitle: `Chào mừng bạn quay trở lại. Đang kết nối phiên làm việc cho ${roleTitle}...`,
+        title: "Xác thực hành trình thành công!",
+        subtitle: `Chào mừng bạn quay trở lại. Đang mở ${roleTitle} trên nền tảng JourneyGo...`,
         roleBadge: roleTitle,
-        targetLabel: targetPath === "/" ? "Trang chủ (Tourist)" : targetPath,
+        targetLabel: targetPath === "/" ? "Cổng Khám Phá" : targetPath,
         redirectPath: targetPath,
       });
 
@@ -260,7 +267,7 @@ export default function AuthScreen({ initialTab = "login" }) {
     setLoading(true);
 
     try {
-      const targetRoleEnum = selectedRole.roleEnum || (selectedRoleId === "provider" ? "PROVIDER" : "USER");
+      const targetRoleEnum = selectedRole.roleEnum || (selectedRoleId === "provider" ? "PROVIDER" : "TOURIST");
 
       const result = await authService.register({
         fullName: registerForm.fullName.trim(),
@@ -360,7 +367,7 @@ export default function AuthScreen({ initialTab = "login" }) {
     try {
       const targetRoleEnum =
         selectedRole?.roleEnum ||
-        (selectedRoleId === "provider" ? "PROVIDER" : "USER");
+        (selectedRoleId === "provider" ? "PROVIDER" : "TOURIST");
 
       const res = await loginWithGoogle(response.credential, targetRoleEnum, {
         redirect: false,
@@ -518,7 +525,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       const ssoRoleMap = {
         "Doanh nghiệp": "PROVIDER",
       };
-      const ssoAccountRole = ssoRoleMap[providerName] || "USER";
+      const ssoAccountRole = ssoRoleMap[providerName] || "TOURIST";
       const expectedRole = String(selectedRole?.roleEnum || "").toUpperCase();
       if (expectedRole && ssoAccountRole !== expectedRole) {
         setLoading(false);
@@ -571,25 +578,59 @@ export default function AuthScreen({ initialTab = "login" }) {
   return (
     <div
       suppressHydrationWarning
-      className="relative h-screen w-screen max-h-screen overflow-hidden bg-slate-100 flex items-center justify-center p-4 xl:p-8"
+      className="relative h-screen w-screen max-h-screen overflow-hidden bg-[#eef6fc] flex items-center justify-center p-3 sm:p-4 xl:p-8"
     >
+      {/* Vòng sáng nền mờ tạo độ sâu */}
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-sky-200/40 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
+
       {/* Modal phản hồi xác thực & chuyển hướng */}
       <AuthFeedbackModal feedbackModal={feedbackModal} />
 
-      {/* Card chính Split-screen 5/12 và 7/12 */}
+      {/* Card chính Split-screen 5/12 và 7/12 bo góc mềm mại như Hình 2 */}
       <div
         suppressHydrationWarning
-        className="relative w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1380px] h-[98vh] max-h-[950px] min-h-[580px] bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden grid grid-cols-1 lg:grid-cols-12"
+        className="relative w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1360px] h-[96vh] max-h-[920px] min-h-[580px] bg-white rounded-3xl xl:rounded-[36px] shadow-[0_20px_60px_-15px_rgba(0,159,227,0.18),0_10px_25px_-5px_rgba(0,0,0,0.04)] border border-sky-100/70 overflow-hidden grid grid-cols-1 lg:grid-cols-12 z-10"
       >
         {/* Toast thông báo */}
         <AuthToast toast={toast} onClose={() => setToast(null)} />
 
-        {/* Cột trái Hero Banner Di sản (5/12) */}
+        {/* Cột trái Hero Banner Di sản & Du lịch văn hóa (5/12) */}
         <AuthHeroCarousel />
 
-        {/* Cột phải Form Xác thực (7/12) */}
-        <div className="relative lg:col-span-7 col-span-12 flex flex-col justify-between overflow-hidden h-full bg-white p-8 xl:p-12">
-          <div className="w-full flex flex-col justify-between h-full space-y-4">
+        {/* Cột phải Form Xác thực phỏng theo Hình 2 (7/12) */}
+        <div className="relative lg:col-span-7 col-span-12 flex flex-col justify-between overflow-hidden h-full bg-white p-6 sm:p-8 xl:p-12">
+          {/* Họa tiết máy bay lượn trên góc phải chuẩn xác theo Hình 2 */}
+          <div
+            aria-hidden="true"
+            className="absolute top-4 right-6 pointer-events-none select-none z-10 hidden sm:block"
+          >
+            <svg
+              className="w-32 h-20 text-[#009fe3]"
+              viewBox="0 0 120 70"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              {/* Đường bay cong chấm gạch mềm mại */}
+              <path
+                d="M 5 62 C 45 50, 78 22, 102 18"
+                stroke="#009fe3"
+                strokeWidth="1.6"
+                strokeDasharray="3.5 3.5"
+                strokeLinecap="round"
+              />
+              {/* Biểu tượng máy bay phản lực bay hướng góc phải */}
+              <g transform="translate(104, 18) rotate(48)">
+                <path
+                  d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"
+                  fill="#009fe3"
+                  transform="scale(0.85) translate(-11, -11)"
+                />
+              </g>
+            </svg>
+          </div>
+
+          <div className="w-full flex flex-col justify-between h-full space-y-3 z-10">
             {/* Chế độ Quên mật khẩu & Khôi phục bằng OTP */}
             {activeTab === "forgot_password" ? (
               <ForgotPasswordFlow
@@ -610,40 +651,18 @@ export default function AuthScreen({ initialTab = "login" }) {
               />
             ) : (
               <>
-                {/* Header & Chuyển đổi Tab Đăng nhập / Đăng ký */}
-                <div className="space-y-3">
-                  <div className="inline-flex p-1 bg-slate-100 rounded-xl gap-1 w-fit border border-slate-200/60">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("login")}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        activeTab === "login"
-                          ? "bg-white text-slate-900 shadow-xs"
-                          : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      Đăng nhập
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("register")}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        activeTab === "register"
-                          ? "bg-white text-slate-900 shadow-xs"
-                          : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      Đăng ký tài khoản
-                    </button>
-                  </div>
-
-                  <div>
-                    <h1 className="text-2xl xl:text-3xl font-black text-slate-900 tracking-tight">
-                      {activeTab === "login"
-                        ? "Đăng Nhập Hệ Thống"
-                        : "Đăng Ký Thành Viên"}
-                    </h1>
-                  </div>
+                {/* Tiêu đề Chào mừng bạn quay trở lại */}
+                <div className="space-y-1 pt-1 sm:pt-2">
+                  <h1 className="font-jakarta text-2xl sm:text-[26px] xl:text-[28px] font-bold text-[#009fe3] tracking-tight leading-snug">
+                    {activeTab === "login"
+                      ? "Chào mừng bạn quay trở lại"
+                      : "Đăng Ký Tài Khoản"}
+                  </h1>
+                  <p className="text-xs sm:text-sm font-medium text-slate-400 mt-0.5">
+                    {activeTab === "login"
+                      ? "Đăng nhập bằng Email & Mật khẩu"
+                      : "Khởi tạo tài khoản quản trị & đối tác"}
+                  </p>
                 </div>
 
                 {/* Form Đăng nhập hoặc Form Đăng ký */}
@@ -651,7 +670,7 @@ export default function AuthScreen({ initialTab = "login" }) {
                   <LoginForm
                     loginForm={loginForm}
                     setLoginForm={setLoginForm}
-                    roles={ROLES}
+                    roles={LOGIN_ROLES}
                     selectedRoleId={selectedRoleId}
                     onSelectRole={handleSelectRole}
                     showPassword={showPassword}
@@ -674,22 +693,52 @@ export default function AuthScreen({ initialTab = "login" }) {
                   />
                 )}
 
-                {/* Các nút Đăng nhập nhanh SSO / Doanh nghiệp */}
+                {/* Các nút Đăng nhập nhanh Google / SSO / Apple chuẩn Hình 2 */}
                 <SocialLoginButtons
                   onSocialLogin={handleSocialLogin}
                   onGoogleLogin={handleGoogleClick}
                   loading={loading}
                 />
+
+                {/* Dòng liên kết chuyển đổi Đăng ký / Đăng nhập */}
+                <div className="text-center pt-1 w-full">
+                  {activeTab === "login" ? (
+                    <p className="text-xs text-slate-600">
+                      Chưa có tài khoản?{" "}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("register")}
+                        className="font-bold text-slate-900 hover:text-[#009fe3] transition-colors cursor-pointer"
+                      >
+                        Đăng ký ngay
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-600">
+                      Đã có tài khoản?{" "}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("login")}
+                        className="font-bold text-slate-900 hover:text-[#009fe3] transition-colors cursor-pointer"
+                      >
+                        Đăng nhập ngay
+                      </button>
+                    </p>
+                  )}
+                </div>
               </>
             )}
 
             {/* Footer bản quyền */}
-            <div className="text-center pt-1 w-full">
-              <p className="text-[11px] text-slate-400">
+            <div className="text-center pt-0.5 w-full">
+              <p className="text-[10px] text-slate-400">
                 Bảo hộ bởi JourneyGo Identity Service • Phiên bản 2.5
               </p>
             </div>
           </div>
+
+          {/* Đồ họa danh thắng chân trang vector xanh ngọc chuẩn Hình 2 */}
+          <HeritageLandmarksArt />
         </div>
       </div>
 

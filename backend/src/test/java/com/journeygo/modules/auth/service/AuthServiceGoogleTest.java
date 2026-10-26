@@ -12,6 +12,7 @@ import com.journeygo.modules.user.repository.UserRepository;
 import com.journeygo.security.JwtTokenProvider;
 import com.journeygo.security.oauth2.GoogleTokenVerifierService;
 import com.journeygo.security.oauth2.GoogleUserInfo;
+import com.journeygo.modules.user.repository.RoleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +36,9 @@ class AuthServiceGoogleTest {
     private UserRepository userRepository;
 
     @Mock
+    private RoleRepository roleRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -53,9 +57,12 @@ class AuthServiceGoogleTest {
     private AuthService authService;
 
     private GoogleUserInfo sampleGoogleUser;
+    private Role touristRole;
 
     @BeforeEach
     void setUp() {
+        touristRole = new Role(1L, Role.TOURIST);
+
         sampleGoogleUser = GoogleUserInfo.builder()
                 .sub("google-sub-123")
                 .email("test.google@journeygo.com")
@@ -68,10 +75,11 @@ class AuthServiceGoogleTest {
     @Test
     void processGoogleAuth_WhenUserDoesNotExist_ShouldRegisterNewUser() {
         // Arrange
-        GoogleAuthRequest request = new GoogleAuthRequest("valid-id-token", Role.TOURIST);
+        GoogleAuthRequest request = new GoogleAuthRequest("valid-id-token", Role.valueOf(Role.TOURIST));
 
         when(googleTokenVerifierService.verify("valid-id-token")).thenReturn(sampleGoogleUser);
         when(userRepository.findByEmail(sampleGoogleUser.email())).thenReturn(Optional.empty());
+        when(roleRepository.findByName(Role.TOURIST)).thenReturn(Optional.of(touristRole));
         when(passwordEncoder.encode(any())).thenReturn("hashed-uuid");
 
         User savedUser = User.builder()
@@ -79,7 +87,7 @@ class AuthServiceGoogleTest {
                 .email(sampleGoogleUser.email())
                 .fullName(sampleGoogleUser.name())
                 .password("hashed-uuid")
-                .role(Role.TOURIST)
+                .role(touristRole)
                 .authProvider(AuthProvider.GOOGLE)
                 .providerId(sampleGoogleUser.sub())
                 .avatarUrl(sampleGoogleUser.picture())
@@ -126,7 +134,7 @@ class AuthServiceGoogleTest {
                 .id(50L)
                 .email(sampleGoogleUser.email())
                 .fullName("Old Name")
-                .role(Role.TOURIST)
+                .role(touristRole)
                 .authProvider(AuthProvider.LOCAL)
                 .active(true)
                 .createdAt(Instant.now())

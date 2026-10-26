@@ -29,6 +29,7 @@ import {
   Eye,
   Award,
 } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /**
  * Trang Thẩm Định Chi Tiết Hồ Sơ Điểm Đến Di Tích - JourneyGo
@@ -42,6 +43,7 @@ export default function DestinationAuditDetailPage({ params }) {
   const router = useRouter();
   const resolvedParams = params ? use(params) : { id: "" };
   const recordId = resolvedParams?.id || "";
+  const { confirm, confirmDialog } = useConfirm();
 
   // Dynamic state cho hồ sơ kiểm duyệt - gắn API sau
   const [destinationData, setDestinationData] = useState(null);
@@ -110,7 +112,17 @@ export default function DestinationAuditDetailPage({ params }) {
   };
 
   // Xử lý phê duyệt hồ sơ
-  const handleApprove = () => {
+  const handleApprove = async () => {
+    const ok = await confirm({
+      tone: "success",
+      icon: "check",
+      title: "Phê duyệt & xuất bản hồ sơ?",
+      subject: destinationData?.name || `#${recordId}`,
+      description:
+        "Hồ sơ sẽ được phát hành tới toàn bộ du khách trên ứng dụng. Vui lòng kiểm tra kỹ trước khi xác nhận.",
+      confirmLabel: "Phê duyệt",
+    });
+    if (!ok) return;
     // [API INTEGRATION] Gọi API phê duyệt
     // api.post(`/moderator/destinations/${recordId}/publish`, { feedback: feedbackNote })
     setSubmissionStatus("PUBLISHED");
@@ -123,7 +135,17 @@ export default function DestinationAuditDetailPage({ params }) {
   };
 
   // Xử lý yêu cầu hiệu đính
-  const handleRequestRevision = () => {
+  const handleRequestRevision = async () => {
+    const ok = await confirm({
+      tone: "warning",
+      icon: "warning",
+      title: "Gửi yêu cầu chỉnh sửa bổ sung?",
+      subject: destinationData?.name || `#${recordId}`,
+      description:
+        "Hồ sơ sẽ được chuyển về đơn vị đệ trình kèm ý kiến thẩm định của bạn.",
+      confirmLabel: "Gửi yêu cầu",
+    });
+    if (!ok) return;
     // [API INTEGRATION] Gọi API yêu cầu sửa
     // api.post(`/moderator/destinations/${recordId}/request-revision`, { feedback: feedbackNote })
     setSubmissionStatus("REVISION");
@@ -136,7 +158,17 @@ export default function DestinationAuditDetailPage({ params }) {
   };
 
   // Xử lý từ chối hồ sơ
-  const handleReject = () => {
+  const handleReject = async () => {
+    const ok = await confirm({
+      tone: "danger",
+      icon: "reject",
+      title: "Từ chối tiếp nhận hồ sơ?",
+      subject: destinationData?.name || `#${recordId}`,
+      description:
+        "Hồ sơ sẽ bị từ chối và không được hiển thị tới du khách. Hành động này khó hoàn tác.",
+      confirmLabel: "Từ chối hồ sơ",
+    });
+    if (!ok) return;
     // [API INTEGRATION] Gọi API từ chối
     // api.post(`/moderator/destinations/${recordId}/reject`, { feedback: feedbackNote })
     setSubmissionStatus("REJECTED");
@@ -648,6 +680,8 @@ export default function DestinationAuditDetailPage({ params }) {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

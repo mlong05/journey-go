@@ -128,10 +128,12 @@ public class TourController {
     // ── ADMIN / MODERATOR / PROVIDER ─────────────────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo tour mới (ADMIN / MODERATOR / PROVIDER)",
-            description = "Tour mới mặc định ở trạng thái DRAFT, chưa được phê duyệt")
+            description = "Tour mới mặc định ở trạng thái DRAFT, chưa được phê duyệt. "
+                    + "Giá tour KHÔNG nhập tay mà được tính tự động = tổng giá các Experience "
+                    + "của các điểm đến trong hành trình.")
     public ResponseEntity<ApiResponse<TourResponse>> create(
             @Valid @RequestBody TourRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -144,7 +146,8 @@ public class TourController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Cập nhật tour (ADMIN / MODERATOR / PROVIDER)",
-            description = "PROVIDER chỉ được cập nhật tour của chính mình. Chỉnh sửa sẽ reset trạng thái về DRAFT.")
+            description = "PROVIDER chỉ được cập nhật tour của chính mình. Chỉnh sửa sẽ reset trạng thái về DRAFT. "
+                    + "Giá tour được tính lại tự động từ các Experience của các điểm đến.")
     public ResponseEntity<ApiResponse<TourResponse>> update(
             @PathVariable Long tourId,
             @Valid @RequestBody TourRequest request,

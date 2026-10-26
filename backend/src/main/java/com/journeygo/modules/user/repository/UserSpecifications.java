@@ -46,8 +46,8 @@ public final class UserSpecifications {
                 predicates.add(cb.or(emailLike, nameLike, phoneLike));
             }
 
-            if (role != null) {
-                predicates.add(cb.equal(root.get("role"), role));
+            if (role != null && role.getName() != null) {
+                predicates.add(cb.equal(root.get("role").get("name"), role.getName()));
             }
 
             if (active != null) {

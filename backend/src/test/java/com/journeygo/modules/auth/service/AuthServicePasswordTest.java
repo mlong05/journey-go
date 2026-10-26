@@ -60,7 +60,7 @@ class AuthServicePasswordTest {
                 .email("test@journeygo.com")
                 .password("encoded-old-password")
                 .fullName("Nguyễn Văn A")
-                .role(Role.TOURIST)
+                .role(Role.valueOf(Role.TOURIST))
                 .active(true)
                 .build();
     }

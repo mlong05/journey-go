@@ -14,8 +14,10 @@ public record UpdateProfileRequest(
         @Size(max = 20, message = "Số điện thoại tối đa 20 ký tự")
         String phone,
 
-        @Schema(description = "Đường dẫn ảnh đại diện", example = "https://example.com/avatar.png")
-        @Size(max = 500, message = "URL ảnh đại diện tối đa 500 ký tự")
-        String avatarUrl
+        @Schema(description = "Đường dẫn ảnh đại diện hoặc Base64", example = "https://example.com/avatar.png")
+        String avatarUrl,
+
+        @Schema(description = "Bí danh cho avatarUrl")
+        String avatar
 ) {
 }

@@ -29,8 +29,14 @@ import {
   Save,
   Pencil,
   ShieldAlert,
+  UserPlus,
+  EyeOff,
+  Upload,
+  Camera,
+  Image as ImageIcon,
 } from "lucide-react";
 import { apiClient } from "@/services/apiClient";
+import RoleManagerModal from "./RoleManagerModal";
 
 // URL chỉ dùng để hiển thị trong banner cảnh báo khi fallback.
 // Việc gọi API thực sự dùng apiClient (đã cấu hình base URL đúng ở services/apiClient.js).
@@ -45,14 +51,14 @@ const ROLES = {
   ADMIN: "ADMIN",
   MODERATOR: "MODERATOR",
   PROVIDER: "PROVIDER",
-  USER: "USER",
+  TOURIST: "TOURIST",
 };
 
 const ROLE_LABELS = {
   [ROLES.ADMIN]: "Quản trị viên",
   [ROLES.MODERATOR]: "Kiểm duyệt viên",
   [ROLES.PROVIDER]: "Đối tác Điểm đến",
-  [ROLES.USER]: "Khách du lịch",
+  [ROLES.TOURIST]: "Khách du lịch",
 };
 
 const ROLE_BADGE_CLASS = {
@@ -62,14 +68,14 @@ const ROLE_BADGE_CLASS = {
     "bg-indigo-50 text-indigo-700 border-indigo-200",
   [ROLES.PROVIDER]:
     "bg-emerald-50 text-emerald-700 border-emerald-200",
-  [ROLES.USER]: "bg-sky-50 text-sky-700 border-sky-200",
+  [ROLES.TOURIST]: "bg-sky-50 text-sky-700 border-sky-200",
 };
 
 const ROLE_AVATAR_BG = {
   [ROLES.ADMIN]: "bg-rose-100 text-rose-700",
   [ROLES.MODERATOR]: "bg-indigo-100 text-indigo-700",
   [ROLES.PROVIDER]: "bg-emerald-100 text-emerald-700",
-  [ROLES.USER]: "bg-sky-100 text-sky-700",
+  [ROLES.TOURIST]: "bg-sky-100 text-sky-700",
 };
 
 const SORT_OPTIONS = [
@@ -150,6 +156,13 @@ export default function AdminUsersClient() {
   // Edit modal (chỉnh sửa thông tin + role + active)
   const [editUser, setEditUser] = useState(null);
 
+  // Create modal (thêm người dùng mới)
+  const [createOpen, setCreateOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Role Manager modal (quản lý & định nghĩa vai trò hệ thống)
+  const [roleManagerOpen, setRoleManagerOpen] = useState(false);
+
   // Row đang được mutate (id của user) — disable nút để tránh double-click
   const [mutatingId, setMutatingId] = useState(null);
   // Map id → action đang chạy: "role" | "status" | "save"
@@ -183,7 +196,7 @@ export default function AdminUsersClient() {
       total: pageData.totalElements || 0,
       providers: content.filter((u) => u.role === ROLES.PROVIDER).length,
       moderators: content.filter((u) => u.role === ROLES.MODERATOR).length,
-      users: content.filter((u) => u.role === ROLES.USER).length,
+      users: content.filter((u) => u.role === ROLES.TOURIST).length,
     };
   }, [pageData]);
 
@@ -302,7 +315,15 @@ export default function AdminUsersClient() {
 
   /* --------------------------- EFFECTS ----------------------------- */
   useEffect(() => {
-    fetchUsers();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        fetchUsers();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [fetchUsers]);
 
   // Debounce keyword input -> áp dụng sau 400ms
@@ -604,7 +625,9 @@ export default function AdminUsersClient() {
         const hasProfileChange =
           profilePayload.fullName !== undefined ||
           profilePayload.phone !== undefined ||
-          profilePayload.role !== undefined;
+          profilePayload.role !== undefined ||
+          profilePayload.avatarUrl !== undefined ||
+          profilePayload.avatar !== undefined;
         let updated = user;
         if (hasProfileChange) {
           const json = await apiClient.put(
@@ -664,6 +687,40 @@ export default function AdminUsersClient() {
     [detailUser, showToast]
   );
 
+  /* ----------------------------------------------------------------
+     MUTATION: tạo người dùng mới
+     POST /api/v1/users  body: { email, password, fullName, phone, role, active }
+     ---------------------------------------------------------------- */
+  const handleCreateUser = useCallback(
+    async (payload) => {
+      setIsCreating(true);
+      try {
+        const json = await apiClient.post("/users", payload);
+        const created = json?.data || json;
+        showToast(
+          `Đã tạo thành công người dùng ${
+            created?.fullName || payload.fullName
+          } (${payload.email}).`,
+          "success"
+        );
+        setCreateOpen(false);
+        setPageNumber(0);
+        fetchUsers({ page: 0 });
+        return true;
+      } catch (err) {
+        console.error("[Admin Users] Lỗi tạo user:", err);
+        showToast(
+          `Không thể tạo người dùng: ${err?.message || "Lỗi không xác định"}`,
+          "error"
+        );
+        return false;
+      } finally {
+        setIsCreating(false);
+      }
+    },
+    [fetchUsers, showToast]
+  );
+
   /* =========================================================================
      RENDER
      ========================================================================= */
@@ -718,17 +775,34 @@ export default function AdminUsersClient() {
             type="button"
             onClick={handleRefresh}
             disabled={isLoading}
-            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+            className="h-9 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
           >
             <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
-            <span className="hidden sm:inline">Làm mới dữ liệu</span>
+            <span className="hidden sm:inline">Làm mới</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setRoleManagerOpen(true)}
+            className="h-9 px-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 active:scale-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-indigo-900/20 text-xs transition-all cursor-pointer"
+            title="Xem danh mục vai trò hệ thống và tạo vai trò mới (Dành cho ADMIN)"
+          >
+            <ShieldCheck size={14} strokeWidth={2.4} />
+            <span>Quản lý Vai trò</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-emerald-900/20 text-xs transition-all cursor-pointer"
+          >
+            <UserPlus size={14} strokeWidth={2.4} />
+            <span>Thêm người dùng mới</span>
           </button>
           <button
             type="button"
             onClick={handleExportCSV}
-            className="bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm shadow-slate-900/20 text-xs sm:text-sm transition-all cursor-pointer"
+            className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-slate-900/20 text-xs transition-all cursor-pointer"
           >
-            <Download size={16} strokeWidth={2.4} />
+            <Download size={14} strokeWidth={2.4} />
             <span>Xuất file Excel</span>
           </button>
         </div>
@@ -810,9 +884,9 @@ export default function AdminUsersClient() {
             </button>
             <button
               type="button"
-              onClick={() => handleRoleFilterChange(ROLES.USER)}
+              onClick={() => handleRoleFilterChange(ROLES.TOURIST)}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                roleFilter === ROLES.USER
+                roleFilter === ROLES.TOURIST
                   ? "bg-sky-600 text-white shadow-xs"
                   : "bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200"
               }`}
@@ -1017,6 +1091,23 @@ export default function AdminUsersClient() {
           }}
         />
       )}
+
+      {createOpen && (
+        <CreateModal
+          isSubmitting={isCreating}
+          onClose={() => !isCreating && setCreateOpen(false)}
+          onCreate={handleCreateUser}
+        />
+      )}
+
+      {/* Role Management Modal (Dành riêng cho ADMIN) */}
+      <RoleManagerModal
+        isOpen={roleManagerOpen}
+        onClose={() => setRoleManagerOpen(false)}
+        onRoleCreated={(newRole) => {
+          showToast(`Đã tạo thành công vai trò "${newRole.name}"!`, "success");
+        }}
+      />
     </div>
   );
 }
@@ -1101,9 +1192,12 @@ function UserRow({
   mutatingAction = null,
 }) {
   const [avatarError, setAvatarError] = useState(false);
+  const avatarSrc = user.avatarUrl || user.avatar;
   const showAvatar =
-    user.avatarUrl &&
-    /^https?:\/\//i.test(user.avatarUrl) &&
+    Boolean(avatarSrc) &&
+    (avatarSrc.startsWith("data:") ||
+      avatarSrc.startsWith("/") ||
+      /^https?:\/\//i.test(avatarSrc)) &&
     !avatarError;
 
   const rowDisabled = isMutating;
@@ -1121,7 +1215,7 @@ function UserRow({
             {showAvatar ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={user.avatarUrl}
+                src={avatarSrc}
                 alt={user.fullName}
                 onError={() => setAvatarError(true)}
                 className="w-full h-full object-cover"
@@ -1138,9 +1232,6 @@ function UserRow({
             )}
           </div>
           <div className="min-w-0">
-            <p className="font-mono text-[10.5px] text-slate-400">
-              #{user.id}
-            </p>
             <p className="font-bold text-sm text-slate-900 truncate max-w-[220px]">
               {user.fullName}
             </p>
@@ -1247,7 +1338,6 @@ function SkeletonRows() {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-100 animate-pulse" />
               <div className="space-y-1.5">
-                <div className="h-2.5 w-12 bg-slate-100 rounded animate-pulse" />
                 <div className="h-3 w-32 bg-slate-100 rounded animate-pulse" />
                 <div className="h-2.5 w-40 bg-slate-100 rounded animate-pulse" />
               </div>
@@ -1480,6 +1570,12 @@ function DetailModal({
   mutatingAction = null,
 }) {
   const roleBusy = isMutating && mutatingAction === "role";
+  const detailAvatarSrc = user.avatarUrl || user.avatar;
+  const showDetailAvatar =
+    Boolean(detailAvatarSrc) &&
+    (detailAvatarSrc.startsWith("data:") ||
+      detailAvatarSrc.startsWith("/") ||
+      /^https?:\/\//i.test(detailAvatarSrc));
 
   return (
     <div
@@ -1494,10 +1590,10 @@ function DetailModal({
         <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/60 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3.5 min-w-0">
             <div className="relative w-14 h-14 rounded-2xl overflow-hidden shrink-0">
-              {user.avatarUrl && /^https?:\/\//i.test(user.avatarUrl) ? (
+              {showDetailAvatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={user.avatarUrl}
+                  src={detailAvatarSrc}
                   alt={user.fullName}
                   className="w-full h-full object-cover"
                 />
@@ -1646,9 +1742,42 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
   // Form state — khởi tạo từ user được truyền vào
   const [fullName, setFullName] = useState(user?.fullName || "");
   const [phone, setPhone] = useState(user?.phone || "");
-  const [role, setRole] = useState(user?.role || ROLES.USER);
+  const [role, setRole] = useState(user?.role || ROLES.TOURIST);
   const [active, setActive] = useState(Boolean(user?.active));
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || user?.avatar || "");
   const [touched, setTouched] = useState(false);
+  const editFileInputRef = useRef(null);
+
+  const handleAvatarFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Vui lòng chọn tệp hình ảnh hợp lệ.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      if (typeof evt.target?.result === "string") {
+        setAvatarUrl(evt.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "journeygo/avatars");
+      const res = await apiClient.upload("/upload/image", formData);
+      const cloudUrl = res?.data?.url || res?.data?.avatarUrl || res?.url;
+      if (cloudUrl) {
+        setAvatarUrl(cloudUrl);
+      }
+    } catch (err) {
+      console.warn("[Cloudinary Upload] Chưa upload được qua API, tiếp tục dùng preview:", err?.message);
+    } finally {
+      e.target.value = "";
+    }
+  };
 
   // Reset khi user thay đổi (mở modal khác) — dùng derived state pattern.
   // Lưu id của user đang edit vào ref để so sánh; chỉ reset khi id thực sự đổi.
@@ -1657,8 +1786,9 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
     lastUserIdRef.current = user?.id;
     setFullName(user?.fullName || "");
     setPhone(user?.phone || "");
-    setRole(user?.role || ROLES.USER);
+    setRole(user?.role || ROLES.TOURIST);
     setActive(Boolean(user?.active));
+    setAvatarUrl(user?.avatarUrl || user?.avatar || "");
     setTouched(false);
   }
 
@@ -1675,7 +1805,8 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
     String(fullName).trim() !== String(user?.fullName || "") ||
     String(phone || "") !== String(user?.phone || "") ||
     role !== user?.role ||
-    Boolean(active) !== Boolean(user?.active);
+    Boolean(active) !== Boolean(user?.active) ||
+    String(avatarUrl || "") !== String(user?.avatarUrl || user?.avatar || "");
 
   const canSubmit =
     !isMutating &&
@@ -1693,6 +1824,8 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
       phone: String(phone || "").trim() || null,
       role,
       active: Boolean(active),
+      avatarUrl: String(avatarUrl || "").trim() || null,
+      avatar: String(avatarUrl || "").trim() || null,
     };
     await onSave?.(payload);
   };
@@ -1784,6 +1917,53 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
             )}
           </div>
 
+          {/* Ảnh đại diện (Avatar) */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+              Ảnh đại diện (Avatar)
+            </label>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-xs font-bold text-slate-400">Trống</span>
+                )}
+              </div>
+              <div className="flex-1 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => editFileInputRef.current?.click()}
+                  className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                >
+                  <Upload size={13} />
+                  <span>Tải ảnh file</span>
+                </button>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl("")}
+                    className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Xóa ảnh
+                  </button>
+                )}
+              </div>
+              <input
+                ref={editFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFile}
+                className="hidden"
+              />
+            </div>
+          </div>
+
           {/* Vai trò + Trạng thái */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -1856,6 +2036,342 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
               <Save size={12} />
             )}
             {isMutating ? "Đang lưu…" : "Lưu thay đổi"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/* =========================================================================
+   SUB-COMPONENT: CreateModal (Thêm người dùng mới)
+   ========================================================================= */
+
+function CreateModal({ onClose, onCreate, isSubmitting = false }) {
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    fullName: "",
+    phone: "",
+    role: ROLES.TOURIST,
+    active: true,
+    avatarUrl: "",
+  });
+  const [touched, setTouched] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const createFileInputRef = useRef(null);
+
+  const handleCreateAvatarFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Vui lòng chọn tệp hình ảnh hợp lệ.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      if (typeof evt.target?.result === "string") {
+        setField("avatarUrl", evt.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "journeygo/avatars");
+      const res = await apiClient.upload("/upload/image", formData);
+      const cloudUrl = res?.data?.url || res?.data?.avatarUrl || res?.url;
+      if (cloudUrl) {
+        setField("avatarUrl", cloudUrl);
+      }
+    } catch (err) {
+      console.warn("[Cloudinary Upload] Chưa upload được qua API, tiếp tục dùng preview:", err?.message);
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const setField = (key, value) => setForm((p) => ({ ...p, [key]: value }));
+  const touch = (key) => setTouched((p) => ({ ...p, [key]: true }));
+
+  const errors = {
+    email: !form.email.trim()
+      ? "Email không được để trống"
+      : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+      ? "Email không hợp lệ"
+      : "",
+    password: !form.password
+      ? "Mật khẩu không được để trống"
+      : form.password.length < 8
+      ? "Mật khẩu tối thiểu 8 ký tự"
+      : "",
+    fullName: !form.fullName.trim() ? "Họ tên không được để trống" : "",
+    phone:
+      form.phone && !/^[0-9+\-\s()]{6,20}$/.test(form.phone)
+        ? "Số điện thoại không hợp lệ"
+        : "",
+  };
+  const hasError = Object.values(errors).some(Boolean);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setTouched({ email: true, password: true, fullName: true, phone: true });
+    if (hasError || isSubmitting) return;
+    await onCreate?.({
+      email: form.email.trim(),
+      password: form.password,
+      fullName: form.fullName.trim(),
+      phone: form.phone.trim() || null,
+      role: form.role,
+      active: Boolean(form.active),
+      avatarUrl: String(form.avatarUrl || "").trim() || null,
+      avatar: String(form.avatarUrl || "").trim() || null,
+    });
+  };
+
+  const labelCls =
+    "text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block";
+  const inputCls = (err) =>
+    `w-full px-3 py-2 bg-white border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+      err
+        ? "border-rose-300 focus:ring-rose-500/20 focus:border-rose-500"
+        : "border-slate-200 focus:ring-slate-500/20 focus:border-slate-700"
+    }`;
+  const errP = (key) =>
+    touched[key] && errors[key] ? (
+      <p className="text-[11px] text-rose-600 font-semibold mt-1">
+        {errors[key]}
+      </p>
+    ) : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="w-full max-w-xl max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="shrink-0 px-6 py-5 border-b border-slate-100 bg-slate-50/60 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+              <UserPlus size={18} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">
+                Thêm người dùng mới
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Quản trị viên tạo tài khoản trực tiếp cho hệ thống
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors cursor-pointer border border-slate-200 shrink-0 disabled:opacity-50"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4 overflow-y-auto">
+          <div>
+            <label className={labelCls}>
+              Email <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setField("email", e.target.value)}
+                onBlur={() => touch("email")}
+                disabled={isSubmitting}
+                placeholder="john.doe@journeygo.com"
+                autoComplete="off"
+                className={`${inputCls(touched.email && errors.email)} pl-9`}
+              />
+            </div>
+            {errP("email")}
+          </div>
+
+          <div>
+            <label className={labelCls}>
+              Mật khẩu <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <KeyRound size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={(e) => setField("password", e.target.value)}
+                onBlur={() => touch("password")}
+                disabled={isSubmitting}
+                placeholder="Tối thiểu 8 ký tự"
+                autoComplete="new-password"
+                className={`${inputCls(touched.password && errors.password)} pl-9 pr-10 font-mono`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+              >
+                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+            {errP("password")}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>
+                Họ và tên <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.fullName}
+                onChange={(e) => setField("fullName", e.target.value)}
+                onBlur={() => touch("fullName")}
+                disabled={isSubmitting}
+                placeholder="John Doe"
+                className={inputCls(touched.fullName && errors.fullName)}
+              />
+              {errP("fullName")}
+            </div>
+            <div>
+              <label className={labelCls}>Số điện thoại</label>
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setField("phone", e.target.value)}
+                onBlur={() => touch("phone")}
+                disabled={isSubmitting}
+                placeholder="0987654321"
+                className={inputCls(touched.phone && errors.phone)}
+              />
+              {errP("phone")}
+            </div>
+          </div>
+
+          {/* Ảnh đại diện (Avatar) */}
+          <div>
+            <label className={labelCls}>Ảnh đại diện (Avatar)</label>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
+                {form.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={form.avatarUrl}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-xs font-bold text-slate-400">Trống</span>
+                )}
+              </div>
+              <div className="flex-1 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => createFileInputRef.current?.click()}
+                  className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                >
+                  <Upload size={13} />
+                  <span>Tải ảnh file</span>
+                </button>
+                {form.avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setField("avatarUrl", "")}
+                    className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Xóa ảnh
+                  </button>
+                )}
+              </div>
+              <input
+                ref={createFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleCreateAvatarFile}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Vai trò</label>
+              <select
+                value={form.role}
+                onChange={(e) => setField("role", e.target.value)}
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-700"
+              >
+                {Object.values(ROLES).map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABELS[r] || r}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Trạng thái</label>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => setField("active", !form.active)}
+                className={`w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors cursor-pointer disabled:cursor-not-allowed ${
+                  form.active
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                    : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    form.active ? "bg-emerald-500" : "bg-rose-500"
+                  }`}
+                />
+                {form.active ? "Đang hoạt động" : "Đã khóa"}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 leading-relaxed">
+            <strong className="text-slate-700">Lưu ý:</strong> Email không thể thay
+            đổi sau khi tạo. Mọi thao tác sẽ được ghi nhật ký phía máy chủ.
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm shadow-emerald-900/20 transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <UserPlus size={12} />
+            )}
+            {isSubmitting ? "Đang tạo…" : "Tạo người dùng"}
           </button>
         </div>
       </form>
@@ -1984,7 +2500,7 @@ const ERROR_GUIDE = {
         /api/v1/users
       </code>{" "}
       yêu cầu quyền <code>ADMIN</code>. Tài khoản hiện tại có thể là{" "}
-      <code>USER</code>/<code>MODERATOR</code>/<code>PROVIDER</code>.
+      <code>TOURIST</code>/<code>MODERATOR</code>/<code>PROVIDER</code>.
     </>
   ),
   notfound: (

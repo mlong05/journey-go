@@ -80,6 +80,33 @@ export async function getNewProvinces(opts = {}) {
   return list;
 }
 
+/** @type {Map<string, {data: any[], ts: number}>} */
+const wardCache = new Map();
+
+/**
+ * Lấy toàn bộ xã/phường/đặc khu thuộc 1 tỉnh/thành mới.
+ * (Tỉnh lớn nhất có 168 xã/phường → limit=500 là đủ trong 1 request.)
+ * @param {string} provinceCode
+ * @param {{ force?: boolean, signal?: AbortSignal }} [opts]
+ * @returns {Promise<Array<{code: string, name: string, type: string, province_code: string}>>}
+ */
+export async function getWardsByProvince(provinceCode, opts = {}) {
+  const { force = false, signal } = opts;
+  if (!provinceCode) return [];
+  const key = String(provinceCode);
+  const hit = wardCache.get(key);
+  if (!force && hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.data;
+  const json = await fetchJson(
+    `${TTP_BASE}/new-provinces/${encodeURIComponent(key)}/wards?limit=500`,
+    { signal }
+  );
+  const list = (Array.isArray(json?.data) ? json.data : []).sort((a, b) =>
+    String(a.name).localeCompare(String(b.name), "vi")
+  );
+  wardCache.set(key, { data: list, ts: Date.now() });
+  return list;
+}
+
 /**
  * Chuẩn hoá chuỗi để so khớp không phân biệt hoa/thường và dấu.
  * Ví dụ "Bà Rịa - Vũng Tàu" ↔ "ba ria - vung tau" ↔ "Ba Ria - Vung Tau"
@@ -97,6 +124,7 @@ export function normalizeForSearch(input) {
 
 const provinceService = {
   getNewProvinces,
+  getWardsByProvince,
   normalizeForSearch,
 };
 

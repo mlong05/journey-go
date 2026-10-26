@@ -10,3 +10,4 @@ public class JourneyGoApplication {
         SpringApplication.run(JourneyGoApplication.class, args);
     }
 }
+    

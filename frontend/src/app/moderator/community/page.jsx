@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Inbox,
 } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /**
  * Trang Kiểm Duyệt Ảnh Thực Địa & Bài Viết Cộng Đồng - JourneyGo
@@ -34,6 +35,7 @@ import {
 export default function ModeratorCommunityPage() {
   const [activeTab, setActiveTab] = useState("photos"); // 'photos' | 'posts'
   const [toastMsg, setToastMsg] = useState("");
+  const { confirm, confirmDialog } = useConfirm();
   const [isLoading, setIsLoading] = useState(false);
 
   // Dynamic state cho ảnh nhiệm vụ & bài viết cộng đồng - gắn API sau
@@ -66,7 +68,16 @@ export default function ModeratorCommunityPage() {
   };
 
   // Thao tác duyệt ảnh nhiệm vụ
-  const handleApprovePhoto = (id, points, name) => {
+  const handleApprovePhoto = async (id, points, name) => {
+    const ok = await confirm({
+      tone: "success",
+      icon: "check",
+      title: "Duyệt ảnh & tặng điểm thưởng?",
+      subject: `Ảnh của ${name}`,
+      description: `Du khách sẽ được cộng ${points} điểm thưởng ngay lập tức.`,
+      confirmLabel: "Duyệt & tặng",
+    });
+    if (!ok) return;
     // [API INTEGRATION] Gọi API duyệt ảnh và cộng điểm
     // api.post(`/moderator/community-photos/${id}/approve`, { rewardPoints: points })
     setPhotos((prev) => prev.filter((item) => item.id !== id));
@@ -74,7 +85,17 @@ export default function ModeratorCommunityPage() {
   };
 
   // Thao tác từ chối ảnh
-  const handleRejectPhoto = (id, name) => {
+  const handleRejectPhoto = async (id, name) => {
+    const ok = await confirm({
+      tone: "danger",
+      icon: "reject",
+      title: "Từ chối ảnh thử thách?",
+      subject: `Ảnh của ${name}`,
+      description:
+        "Ảnh sẽ bị loại và du khách không nhận được điểm thưởng cho nhiệm vụ này.",
+      confirmLabel: "Từ chối ảnh",
+    });
+    if (!ok) return;
     // [API INTEGRATION] Gọi API từ chối ảnh
     // api.post(`/moderator/community-photos/${id}/reject`)
     setPhotos((prev) => prev.filter((item) => item.id !== id));
@@ -82,7 +103,16 @@ export default function ModeratorCommunityPage() {
   };
 
   // Thao tác xử lý bài viết vi phạm: Gỡ bài
-  const handleRemovePost = (id) => {
+  const handleRemovePost = async (id) => {
+    const ok = await confirm({
+      tone: "danger",
+      icon: "trash",
+      title: "Gỡ bỏ bài viết vi phạm?",
+      description:
+        "Bài viết sẽ bị gỡ khỏi cộng đồng và tài khoản du khách sẽ nhận cảnh cáo.",
+      confirmLabel: "Gỡ bỏ bài viết",
+    });
+    if (!ok) return;
     // [API INTEGRATION] Gọi API gỡ bài viết
     // api.post(`/moderator/flagged-posts/${id}/remove`)
     setPosts((prev) => prev.filter((item) => item.id !== id));
@@ -90,7 +120,16 @@ export default function ModeratorCommunityPage() {
   };
 
   // Thao tác bỏ qua báo cáo bài viết
-  const handleDismissPost = (id) => {
+  const handleDismissPost = async (id) => {
+    const ok = await confirm({
+      tone: "warning",
+      icon: "warning",
+      title: "Bỏ qua báo cáo này?",
+      description:
+        "Bài viết sẽ được xem là hợp lệ và báo cáo sẽ được đóng lại.",
+      confirmLabel: "Bỏ qua báo cáo",
+    });
+    if (!ok) return;
     // [API INTEGRATION] Gọi API bỏ qua báo cáo
     // api.post(`/moderator/flagged-posts/${id}/dismiss`)
     setPosts((prev) => prev.filter((item) => item.id !== id));
@@ -337,6 +376,8 @@ export default function ModeratorCommunityPage() {
           )}
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }
