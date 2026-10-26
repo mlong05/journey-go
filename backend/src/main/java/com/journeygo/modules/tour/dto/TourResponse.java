@@ -19,7 +19,8 @@ public record TourResponse(
         @Schema(description = "ID tour") Long tourId,
         @Schema(description = "Tên tour") String title,
         @Schema(description = "Loại hình tour") TourType tourType,
-        @Schema(description = "Giá tour") BigDecimal price,
+        @Schema(description = "Tổng giá tour = tổng giá các Experience của các điểm đến trong hành trình (VND)")
+        BigDecimal price,
         @Schema(description = "Số ngày") int durationDays,
         @Schema(description = "Đã được phê duyệt") boolean approved,
         @Schema(description = "Trạng thái quy trình (DRAFT, PENDING, PUBLISHED, REJECTED)") TourStatus status,
@@ -32,7 +33,7 @@ public record TourResponse(
         @Schema(description = "Thời gian tạo") Instant createdAt,
         @Schema(description = "Thời gian cập nhật") Instant updatedAt
 ) {
-    public static TourResponse fromEntity(Tour t) {
+    public static TourResponse fromEntity(Tour t, BigDecimal price) {
         if (t == null) return null;
 
         List<TourDestinationResponse> destResponses = (t.getTourDestinations() == null)
@@ -45,7 +46,7 @@ public record TourResponse(
                 .tourId(t.getTourId())
                 .title(t.getTitle())
                 .tourType(t.getTourType())
-                .price(t.getPrice())
+                .price(price)
                 .durationDays(t.getDurationDays())
                 .approved(t.isApproved())
                 .status(t.getStatus())

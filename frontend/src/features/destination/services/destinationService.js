@@ -24,18 +24,53 @@ const ENDPOINTS = {
   RESTORE: (id) => `/destinations/${id}/restore`,
 };
 
+/**
+ * Số trang lấy tối đa cho các endpoint trả về toàn bộ danh sách.
+ * Backend mặc định size=10 nên phải ghi đè để UI quản trị hiển thị toàn sàn.
+ */
+const LARGE_PAGE_SIZE = 500;
+
 async function unwrap(res) {
   return res?.data || res;
 }
 
+/**
+ * Bóc mảng dữ liệu từ response của Spring Data.
+ *
+ * Backend trả về: { code, message, data: { page, size, totalElements, content: [...] } }
+ * Nên cần đọc `data.content` thay vì coi `data` là mảng thuần.
+ */
+async function extractList(res) {
+  const payload = await unwrap(res);
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.content)) return payload.content;
+  return [];
+}
+
+function buildListQuery(params = {}) {
+  const { page = 0, size = LARGE_PAGE_SIZE, sort } = params;
+  const query = new URLSearchParams();
+  query.append("page", String(page));
+  query.append("size", String(size));
+  if (sort) query.append("sort", sort);
+  return query.toString();
+}
+
 function buildPayload(payload) {
-  return {
+  const out = {
     name: String(payload.name || "").trim(),
     address: String(payload.address || "").trim(),
     latitude: Number(payload.latitude),
     longitude: Number(payload.longitude),
     capacity: parseInt(payload.capacity, 10),
   };
+  if (payload.regionId !== undefined && payload.regionId !== null && payload.regionId !== "") {
+    out.regionId = Number(payload.regionId);
+  }
+  if (payload.themeIds && Array.isArray(payload.themeIds) && payload.themeIds.length > 0) {
+    out.themeIds = payload.themeIds;
+  }
+  return out;
 }
 
 export async function createDestination(payload) {
@@ -48,19 +83,19 @@ export async function updateDestination(id, payload) {
   return unwrap(res);
 }
 
-export async function getAllDestinations() {
-  const res = await apiClient.get(ENDPOINTS.ROOT);
-  return unwrap(res) || [];
+export async function getAllDestinations(params = {}) {
+  const res = await apiClient.get(`${ENDPOINTS.ROOT}?${buildListQuery(params)}`);
+  return extractList(res);
 }
 
-export async function getApprovedDestinations() {
-  const res = await apiClient.get(ENDPOINTS.APPROVED);
-  return unwrap(res) || [];
+export async function getApprovedDestinations(params = {}) {
+  const res = await apiClient.get(`${ENDPOINTS.APPROVED}?${buildListQuery(params)}`);
+  return extractList(res);
 }
 
-export async function getDeletedDestinations() {
-  const res = await apiClient.get(ENDPOINTS.DELETED);
-  return unwrap(res) || [];
+export async function getDeletedDestinations(params = {}) {
+  const res = await apiClient.get(`${ENDPOINTS.DELETED}?${buildListQuery(params)}`);
+  return extractList(res);
 }
 
 export async function getDestinationById(id) {

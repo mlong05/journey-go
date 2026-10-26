@@ -71,8 +71,9 @@ class ApiClient {
       }
     }
 
+    const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
     const headers = {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     };
@@ -155,6 +156,14 @@ class ApiClient {
       ...options,
       method: "PATCH",
       body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  upload(endpoint, formData, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: "POST",
+      body: formData,
     });
   }
 }

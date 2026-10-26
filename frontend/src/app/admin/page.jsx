@@ -17,6 +17,7 @@ import {
   X,
   ArrowUpRight,
 } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SURFACE, HERO, KPI, TABLE, BADGE, BUTTON, MODAL } from "./dashboard.tokens";
 
 /**
@@ -28,6 +29,7 @@ export default function AdminDashboardPage() {
   // State phản hồi Toast & Modal xử lý tác vụ
   const [toastMsg, setToastMsg] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
+  const { confirm, confirmDialog } = useConfirm();
   const [isLoading, setIsLoading] = useState(false);
 
   // 1. Dữ liệu 4 thẻ KPI chỉ số vĩ mô (sẵn sàng gắn API)
@@ -141,6 +143,19 @@ export default function AdminDashboardPage() {
   // Xác nhận xử lý tác vụ (Duyệt hoặc Từ chối)
   const handleConfirmTaskAction = async (action) => {
     if (!selectedTask) return;
+
+    const isApprove = action === "approve";
+    const ok = await confirm({
+      tone: isApprove ? "success" : "warning",
+      icon: isApprove ? "check" : "warning",
+      title: isApprove ? "Phê duyệt chính thức yêu cầu này?" : "Yêu cầu bổ sung hồ sơ?",
+      subject: selectedTask.title,
+      description: isApprove
+        ? "Quyết định sẽ được cập nhật vào hệ thống và thông báo tới người gửi yêu cầu."
+        : "Yêu cầu sẽ được trả về để người gửi bổ sung hồ sơ.",
+      confirmLabel: isApprove ? "Phê duyệt" : "Yêu cầu bổ sung",
+    });
+    if (!ok) return;
 
     // TODO: Gắn API xử lý duyệt:
     // await apiClient.patch(`/api/v1/admin/approvals/${selectedTask.id}`, { action });
@@ -484,6 +499,8 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

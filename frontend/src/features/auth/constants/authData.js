@@ -3,6 +3,19 @@
 // ============================================================================
 export const SLIDE_ITEMS = [
   {
+    id: "travelista",
+    shortName: "Khám Phá",
+    name: "Hành Trình Di Sản - Chạm vào Kỳ quan",
+    tag: "Khám Phá Di Sản & Thiên Nhiên",
+    slogan: "Hành Trình Di Sản",
+    subSlogan: "Du lịch là trải nghiệm duy nhất làm giàu tâm hồn vượt trên mọi giá trị vật chất",
+    quote:
+      "Du lịch là hành trình duy nhất bạn chi trả để nhận lại sự giàu có vô hạn về trải nghiệm, tâm hồn và tri thức di sản văn hóa.",
+    statNumber: "3,143m",
+    statLabel: "Đỉnh cao tuyệt cảnh thiên nhiên",
+    image: "/image/travel_mountain_hero.jpg",
+  },
+  {
     id: "trangan",
     shortName: "Tràng An",
     name: "Tràng An - Ninh Bình",
@@ -77,5 +90,15 @@ export const ROLES = [
     sampleEmail: "provider@journeygo.com",
     samplePassword: "Password123@",
     desc: "Cập nhật thông tin điểm di sản, phát hành tour & vé",
+  },
+  {
+    id: "tourist",
+    roleEnum: "TOURIST",
+    title: "Khách du lịch",
+    scope: "Khám phá di sản",
+    redirectPath: "/",
+    sampleEmail: "tourist@journeygo.com",
+    samplePassword: "Password123@",
+    desc: "Khám phá điểm đến, hoàn thành nhiệm vụ và tích lũy điểm thưởng",
   },
 ];

@@ -36,6 +36,7 @@ import java.util.Map;
 public class DataInitializer {
 
     private final UserRepository userRepository;
+    private final com.journeygo.modules.user.repository.RoleRepository roleRepository;
     private final DestinationRepository destinationRepository;
     private final TaskTypeRepository taskTypeRepository;
     private final PointRuleRepository pointRuleRepository;
@@ -47,10 +48,20 @@ public class DataInitializer {
     @Bean
     public CommandLineRunner initDefaultUsers() {
         return args -> {
+            // Khởi tạo các Role hệ thống cốt lõi nếu chưa có
+            Role touristRole = roleRepository.findByName(Role.TOURIST)
+                    .orElseGet(() -> roleRepository.save(new Role(Role.TOURIST, "Khách du lịch")));
+            Role adminRole = roleRepository.findByName(Role.ADMIN)
+                    .orElseGet(() -> roleRepository.save(new Role(Role.ADMIN, "Quản trị viên")));
+            Role modRole = roleRepository.findByName(Role.MODERATOR)
+                    .orElseGet(() -> roleRepository.save(new Role(Role.MODERATOR, "Kiểm duyệt viên")));
+            Role providerRole = roleRepository.findByName(Role.PROVIDER)
+                    .orElseGet(() -> roleRepository.save(new Role(Role.PROVIDER, "Đối tác cung cấp dịch vụ")));
+
             // Tài khoản admin mặc định
             userRepository.findByEmail("admin@journeygo.com").ifPresentOrElse(admin -> {
                 admin.setPassword(passwordEncoder.encode("Password123@"));
-                admin.setRole(Role.ADMIN);
+                admin.setRole(adminRole);
                 userRepository.save(admin);
             }, () -> {
                 userRepository.save(User.builder()
@@ -58,7 +69,7 @@ public class DataInitializer {
                         .password(passwordEncoder.encode("Password123@"))
                         .fullName("Hệ Thống Quản Trị")
                         .phone("0900000001")
-                        .role(Role.ADMIN)
+                        .role(adminRole)
                         .active(true)
                         .build());
             });
@@ -66,7 +77,7 @@ public class DataInitializer {
             // Tài khoản user@journeygo.com đóng vai trò ADMIN theo yêu cầu
             userRepository.findByEmail("user@journeygo.com").ifPresentOrElse(user -> {
                 user.setPassword(passwordEncoder.encode("Password123@"));
-                user.setRole(Role.ADMIN);
+                user.setRole(adminRole);
                 userRepository.save(user);
             }, () -> {
                 userRepository.save(User.builder()
@@ -74,7 +85,7 @@ public class DataInitializer {
                         .password(passwordEncoder.encode("Password123@"))
                         .fullName("Quản Trị Viên (User)")
                         .phone("0900000002")
-                        .role(Role.ADMIN)
+                        .role(adminRole)
                         .active(true)
                         .build());
             });
@@ -82,7 +93,7 @@ public class DataInitializer {
             // Tài khoản Kiểm duyệt viên (MODERATOR)
             userRepository.findByEmail("moderator@journeygo.com").ifPresentOrElse(mod -> {
                 mod.setPassword(passwordEncoder.encode("Password123@"));
-                mod.setRole(Role.MODERATOR);
+                mod.setRole(modRole);
                 userRepository.save(mod);
             }, () -> {
                 userRepository.save(User.builder()
@@ -90,7 +101,7 @@ public class DataInitializer {
                         .password(passwordEncoder.encode("Password123@"))
                         .fullName("Chuyên Viên Thẩm Định")
                         .phone("0900000003")
-                        .role(Role.MODERATOR)
+                        .role(modRole)
                         .active(true)
                         .build());
             });
@@ -98,7 +109,7 @@ public class DataInitializer {
             // Tài khoản Đối tác điểm đến (PROVIDER)
             userRepository.findByEmail("provider@journeygo.com").ifPresentOrElse(provider -> {
                 provider.setPassword(passwordEncoder.encode("Password123@"));
-                provider.setRole(Role.PROVIDER);
+                provider.setRole(providerRole);
                 userRepository.save(provider);
             }, () -> {
                 userRepository.save(User.builder()
@@ -106,7 +117,7 @@ public class DataInitializer {
                         .password(passwordEncoder.encode("Password123@"))
                         .fullName("Ban Quản Lý Tràng An")
                         .phone("0900000004")
-                        .role(Role.PROVIDER)
+                        .role(providerRole)
                         .active(true)
                         .build());
             });
@@ -114,7 +125,7 @@ public class DataInitializer {
             // Tài khoản Khách du lịch (TOURIST) dành riêng cho ứng dụng Mobile
             userRepository.findByEmail("tourist@journeygo.com").ifPresentOrElse(tourist -> {
                 tourist.setPassword(passwordEncoder.encode("Password123@"));
-                tourist.setRole(Role.TOURIST);
+                tourist.setRole(touristRole);
                 tourist.setFullName("Nguyễn An");
                 userRepository.save(tourist);
             }, () -> {
@@ -123,9 +134,17 @@ public class DataInitializer {
                         .password(passwordEncoder.encode("Password123@"))
                         .fullName("Nguyễn An")
                         .phone("0988123456")
-                        .role(Role.TOURIST)
+                        .role(touristRole)
                         .active(true)
                         .build());
+            });
+
+            // Tự động gán touristRole cho các user cũ nếu role bị null sau khi tạo cột role_id
+            userRepository.findAll().forEach(u -> {
+                if (u.getRole() == null) {
+                    u.setRole(touristRole);
+                    userRepository.save(u);
+                }
             });
 
             // Khởi tạo các điểm di tích văn hóa lịch sử mẫu nếu chưa có

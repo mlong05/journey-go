@@ -16,6 +16,7 @@ import {
   X,
   Compass,
   Sparkles,
+  Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -43,7 +44,8 @@ export default function ModeratorLayout({ children }) {
   /* Chỉ trang DANH SÁCH điểm đến mới dùng khung cố định h-full/overflow-hidden
      để vùng bảng tự cuộn. Các trang khác (kể cả hồ sơ chi tiết /destinations/[id])
      vẫn cuộn toàn trang như cũ. So khớp chính xác để không áp nhầm. */
-  const isDestinationList = /^\/moderator\/destinations\/?$/.test(pathname);
+  const isDestinationList = /^\/moderator\/destinations\/?$/.test(pathname || "");
+  const isExperiencesPage = /^\/moderator\/experiences\/?$/.test(pathname || "");
 
   // 5 mục menu điều hướng chuyên biệt của kiểm duyệt viên
   const moderatorNavItems = [
@@ -52,6 +54,13 @@ export default function ModeratorLayout({ children }) {
       label: "Bàn làm việc tổng quan",
       href: "/moderator",
       icon: LayoutDashboard,
+      badge: null,
+    },
+    {
+      id: "tours",
+      label: "Thẩm định tour",
+      href: "/moderator/tours",
+      icon: Route,
       badge: null,
     },
     {
@@ -68,6 +77,7 @@ export default function ModeratorLayout({ children }) {
       icon: Sparkles,
       badge: null,
     },
+
     {
       id: "ai-knowledge",
       label: "Kiểm tra Kiến thức AI",
@@ -214,14 +224,18 @@ export default function ModeratorLayout({ children }) {
           className={
             isDestinationList
               ? "flex-1 w-full h-full overflow-hidden bg-slate-50"
-              : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
+              : isExperiencesPage
+                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8 bg-slate-50"
+                : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
           }
         >
           <div
             className={
               isDestinationList
                 ? "w-full max-w-[1600px] mx-auto h-full flex flex-col"
-                : "w-full max-w-[1600px] mx-auto space-y-6"
+                : isExperiencesPage
+                  ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
+                  : "w-full max-w-[1600px] mx-auto space-y-6"
             }
           >
             {children}

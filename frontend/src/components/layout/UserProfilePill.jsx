@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronDown,
   Phone,
@@ -14,6 +15,8 @@ import {
   Mail,
   User,
   Image as ImageIcon,
+  Camera,
+  Upload,
   Shield,
   Lock,
   Sparkles,
@@ -23,6 +26,7 @@ import {
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { authService } from "@/features/auth";
+import { apiClient } from "@/services/apiClient";
 
 /**
  * CẤU HÌNH GIAO DIỆN & VAI TRÒ THEO 3 ROLE:
@@ -91,7 +95,7 @@ function getRoleLabel(role, fallbackRole = "admin") {
   if (r.includes("ADMIN")) return "Quản trị viên hệ thống";
   if (r.includes("MODERATOR")) return "Kiểm duyệt viên";
   if (r.includes("DESTINATION") || r.includes("PROVIDER")) return "Đối tác Điểm đến";
-  if (r.includes("USER") || r.includes("TOURIST")) return "Khách du lịch";
+  if (r.includes("TOURIST")) return "Khách du lịch";
   return role;
 }
 
@@ -133,14 +137,128 @@ export default function UserProfilePill({
   const [profileData, setProfileData] = useState(null);
   const [imgError, setImgError] = useState(false);
   const [modalImgError, setModalImgError] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Form state cho Modal Chỉnh sửa hồ sơ chi tiết lớn
   const [editFullName, setEditFullName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editAvatarUrl, setEditAvatarUrl] = useState("");
   const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const containerRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // Xử lý tải ảnh đại diện từ tệp máy tính (Upload lên Cloudinary qua Backend API, tự động lưu và load lại trang)
+  const handleAvatarFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, JPEG, WEBP, GIF).");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Dung lượng ảnh tối đa là 10MB. Vui lòng chọn ảnh nhỏ hơn.");
+      return;
+    }
+
+    setIsSavingProfile(true);
+
+    // 1) Đọc file ảnh dưới dạng DataURL (base64) để preview và lưu
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const result = event.target?.result;
+      if (typeof result === "string") {
+        setEditAvatarUrl(result);
+        setModalImgError(false);
+
+        // 2) Tải lên dịch vụ Cloudinary qua Backend API /api/v1/upload/image nếu khả dụng
+        let finalAvatarUrl = result;
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("folder", "journeygo/avatars");
+          const res = await apiClient.upload("/upload/image", formData);
+          const cloudUrl = res?.data?.url || res?.data?.avatarUrl || res?.url;
+          if (cloudUrl) {
+            finalAvatarUrl = cloudUrl;
+            setEditAvatarUrl(cloudUrl);
+          }
+        } catch (err) {
+          console.warn("[Cloudinary Upload] Chưa upload được qua API, tiếp tục dùng data url:", err?.message);
+        }
+
+        // 3) Tự động lưu ảnh vào Database backend và tự động load lại trang
+        try {
+          const currentFullName = editFullName.trim() || displayName;
+          const currentPhone = editPhone.trim();
+
+          const updateRes = await authService.updateProfile({
+            fullName: currentFullName,
+            phone: currentPhone,
+            avatarUrl: finalAvatarUrl,
+            avatar: finalAvatarUrl,
+          });
+
+          const updatedUser = updateRes?.data || updateRes || {
+            ...(currentUser || {}),
+            fullName: currentFullName,
+            phone: currentPhone,
+            avatarUrl: finalAvatarUrl,
+            avatar: finalAvatarUrl,
+          };
+
+          setProfileData(updatedUser);
+
+          if (typeof window !== "undefined") {
+            try {
+              const currentAuth = JSON.parse(localStorage.getItem("journey_go_auth") || "{}");
+              if (currentAuth && typeof currentAuth === "object") {
+                currentAuth.user = { ...(currentAuth.user || {}), ...updatedUser };
+                localStorage.setItem("journey_go_auth", JSON.stringify(currentAuth));
+                window.dispatchEvent(new Event("storage"));
+              }
+            } catch {
+              // bỏ qua
+            }
+          }
+
+          setSaveSuccessMsg("Đã cập nhật ảnh đại diện thành công! Đang tự động tải lại trang...");
+          setTimeout(() => {
+            if (typeof window !== "undefined") {
+              window.location.reload();
+            }
+          }, 800);
+        } catch (err) {
+          console.error("[Profile Auto-Save Avatar Error]", err);
+          if (typeof window !== "undefined") {
+            try {
+              const currentAuth = JSON.parse(localStorage.getItem("journey_go_auth") || "{}");
+              if (currentAuth && typeof currentAuth === "object") {
+                currentAuth.user = { ...(currentAuth.user || {}), avatarUrl: finalAvatarUrl, avatar: finalAvatarUrl };
+                localStorage.setItem("journey_go_auth", JSON.stringify(currentAuth));
+                window.dispatchEvent(new Event("storage"));
+              }
+            } catch {
+              // bỏ qua
+            }
+            setSaveSuccessMsg("Đã đổi ảnh đại diện! Đang tải lại trang...");
+            setTimeout(() => {
+              window.location.reload();
+            }, 800);
+          }
+        } finally {
+          setIsSavingProfile(false);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   // 1. Tự động gọi API GET /api/v1/auth/me từ JWT Bearer Token
   const fetchProfile = useCallback(async (isManualRefresh = false) => {
@@ -226,36 +344,89 @@ export default function UserProfilePill({
     setIsDetailModalOpen(true);
   };
 
-  // Xử lý lưu thay đổi thông tin từ modal lớn
-  const handleSaveProfileChanges = (e) => {
+  // Xử lý lưu thay đổi thông tin từ modal lớn (Gửi API PUT /auth/profile lên backend DB)
+  const handleSaveProfileChanges = async (e) => {
     e.preventDefault();
-    const updated = {
-      ...(currentUser || {}),
-      fullName: editFullName.trim() || displayName,
-      phone: editPhone.trim(),
-      avatarUrl: editAvatarUrl.trim(),
-    };
-    setProfileData(updated);
-    setImgError(false);
-    setModalImgError(false);
+    setIsSavingProfile(true);
+    const newFullName = editFullName.trim() || displayName;
+    const newPhone = editPhone.trim();
+    const newAvatarUrl = editAvatarUrl.trim();
 
-    if (typeof window !== "undefined") {
-      try {
-        const currentAuth = JSON.parse(localStorage.getItem("journey_go_auth") || "{}");
-        if (currentAuth && typeof currentAuth === "object") {
-          currentAuth.user = { ...(currentAuth.user || {}), ...updated };
-          localStorage.setItem("journey_go_auth", JSON.stringify(currentAuth));
+    try {
+      // 1. Gọi API PUT /api/v1/auth/profile để lưu vĩnh viễn vào Database
+      const res = await authService.updateProfile({
+        fullName: newFullName,
+        phone: newPhone,
+        avatarUrl: newAvatarUrl,
+        avatar: newAvatarUrl,
+      });
+
+      const updatedUser = res?.data || res || {
+        ...(currentUser || {}),
+        fullName: newFullName,
+        phone: newPhone,
+        avatarUrl: newAvatarUrl,
+        avatar: newAvatarUrl,
+      };
+
+      setProfileData(updatedUser);
+      setImgError(false);
+      setModalImgError(false);
+
+      if (typeof window !== "undefined") {
+        try {
+          const currentAuth = JSON.parse(localStorage.getItem("journey_go_auth") || "{}");
+          if (currentAuth && typeof currentAuth === "object") {
+            currentAuth.user = { ...(currentAuth.user || {}), ...updatedUser };
+            localStorage.setItem("journey_go_auth", JSON.stringify(currentAuth));
+            window.dispatchEvent(new Event("storage"));
+          }
+        } catch {
+          // bỏ qua
         }
-      } catch {
-        // bỏ qua
       }
-    }
 
-    setSaveSuccessMsg("Đã lưu cập nhật thông tin hồ sơ thành công!");
-    setTimeout(() => {
-      setSaveSuccessMsg("");
-      setIsDetailModalOpen(false);
-    }, 1200);
+      setSaveSuccessMsg("Đã lưu cập nhật thông tin hồ sơ thành công! Đang tải lại trang...");
+      setTimeout(() => {
+        setSaveSuccessMsg("");
+        setIsDetailModalOpen(false);
+        if (typeof window !== "undefined") {
+          window.location.reload();
+        }
+      }, 700);
+    } catch (err) {
+      console.error("[Profile Save Error]", err);
+      const fallbackUpdated = {
+        ...(currentUser || {}),
+        fullName: newFullName,
+        phone: newPhone,
+        avatarUrl: newAvatarUrl,
+        avatar: newAvatarUrl,
+      };
+      setProfileData(fallbackUpdated);
+      if (typeof window !== "undefined") {
+        try {
+          const currentAuth = JSON.parse(localStorage.getItem("journey_go_auth") || "{}");
+          if (currentAuth && typeof currentAuth === "object") {
+            currentAuth.user = { ...(currentAuth.user || {}), ...fallbackUpdated };
+            localStorage.setItem("journey_go_auth", JSON.stringify(currentAuth));
+            window.dispatchEvent(new Event("storage"));
+          }
+        } catch {
+          // bỏ qua
+        }
+      }
+      setSaveSuccessMsg("Đã lưu cập nhật thông tin hồ sơ! Đang tải lại trang...");
+      setTimeout(() => {
+        setSaveSuccessMsg("");
+        setIsDetailModalOpen(false);
+        if (typeof window !== "undefined") {
+          window.location.reload();
+        }
+      }, 700);
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   return (
@@ -471,9 +642,9 @@ export default function UserProfilePill({
       {/* ────────────────────────────────────────────────────────
           MODAL "HỒ SƠ CÁ NHÂN CHI TIẾT" CỠ LỚN (LARGE PROFILE MODAL)
       ──────────────────────────────────────────────────────── */}
-      {isDetailModalOpen && (
+      {isDetailModalOpen && mounted && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200 overflow-y-auto"
+          className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200 overflow-y-auto"
           onClick={() => setIsDetailModalOpen(false)}
         >
           <div
@@ -487,8 +658,6 @@ export default function UserProfilePill({
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-white/20 backdrop-blur-xs border border-white/30 text-white">
                     HỒ SƠ TÀI KHOẢN HỆ THỐNG
                   </span>
-                  <span className="text-white/60">•</span>
-                  <span className="text-xs font-medium text-white/90">JourneyGo Identity</span>
                 </div>
                 <h2 className="text-lg sm:text-2xl font-black tracking-tight text-white mt-1.5">
                   Hồ Sơ Cá Nhân & Phân Quyền Hệ Thống
@@ -518,22 +687,45 @@ export default function UserProfilePill({
             {/* ── 2. KHỐI TÓM TẮT ĐỊNH DANH (NẰM TRỌN VẸN DƯỚI BANNER, BỎ HOÀN TOÀN -MT) ── */}
             <div className="px-6 pt-5 pb-4 bg-white border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10 shrink-0">
               <div className="flex items-center gap-4 min-w-0">
-                {/* Avatar vuông bo góc w-14 h-14 rounded-2xl */}
-                <div className="relative shrink-0">
+                {/* Avatar bấm vào để tải ảnh đại diện lên từ máy tính */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className="relative shrink-0 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-2xl"
+                  title="Bấm vào để tải ảnh đại diện từ thiết bị"
+                >
                   {editAvatarUrl && !modalImgError ? (
                     <img
                       src={editAvatarUrl}
                       alt={displayName}
                       onError={() => setModalImgError(true)}
-                      className="w-14 h-14 rounded-2xl object-cover ring-2 ring-slate-100 shadow-sm bg-white"
+                      className="w-16 h-16 rounded-2xl object-cover ring-2 ring-slate-100 shadow-sm bg-white group-hover:brightness-90 transition-all"
                     />
                   ) : (
                     <div
-                      className={`w-14 h-14 rounded-2xl font-black text-lg text-white flex items-center justify-center shadow-sm ${config.avatarBg}`}
+                      className={`w-16 h-16 rounded-2xl font-black text-xl text-white flex items-center justify-center shadow-sm group-hover:brightness-90 transition-all ${config.avatarBg}`}
                     >
                       {initials}
                     </div>
                   )}
+
+                  {/* Lớp phủ hover với icon Camera */}
+                  <div className="absolute inset-0 bg-black/45 rounded-2xl flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera size={18} className="drop-shadow-sm" />
+                    <span className="text-[10px] font-bold mt-0.5 tracking-tight">Đổi ảnh</span>
+                  </div>
+
+                  {/* Huy hiệu Camera ở góc dưới */}
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white shadow-md border border-slate-200 flex items-center justify-center text-slate-700 group-hover:text-emerald-600 transition-colors">
+                    <Camera size={12} />
+                  </div>
                 </div>
 
                 {/* Tên & Tag phân quyền */}
@@ -563,7 +755,7 @@ export default function UserProfilePill({
                 </div>
               </div>
 
-              {/* Badge vai trò và mô tả bên phải */}
+              {/* Badge vai trò bên phải */}
               <div className="sm:text-right shrink-0">
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${config.badgeBg}`}
@@ -571,9 +763,6 @@ export default function UserProfilePill({
                   <ShieldCheck size={14} />
                   {currentRoleLabel}
                 </span>
-                <p className="text-[11px] text-slate-400 mt-1 max-w-xs sm:ml-auto">
-                  {config.roleDesc}
-                </p>
               </div>
             </div>
 
@@ -641,28 +830,38 @@ export default function UserProfilePill({
                       </div>
                     </div>
 
-                    {/* Đường dẫn Avatar URL */}
+                    {/* Ảnh đại diện: Tải ảnh từ máy tính hoặc dán URL */}
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Đường dẫn ảnh đại diện (Avatar URL)
+                        Ảnh đại diện (Avatar)
                       </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <ImageIcon size={15} />
-                        </div>
-                        <input
-                          type="url"
-                          value={editAvatarUrl}
-                          onChange={(e) => {
-                            setEditAvatarUrl(e.target.value);
-                            setModalImgError(false);
-                          }}
-                          placeholder="https://example.com/avatar.jpg"
-                          className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
+
+                      {/* Nút bấm tải tệp từ máy tính */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                        >
+                          <Upload size={14} />
+                          <span>Tải ảnh từ thiết bị</span>
+                        </button>
+                        {editAvatarUrl && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditAvatarUrl("");
+                              setModalImgError(false);
+                            }}
+                            className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 text-xs font-bold transition-all cursor-pointer"
+                            title="Xóa ảnh đại diện"
+                          >
+                            Xóa ảnh
+                          </button>
+                        )}
                       </div>
                       <p className="text-[11px] text-slate-400 mt-1">
-                        Dán liên kết ảnh trực tiếp để đổi ảnh đại diện cá nhân trên hệ thống.
+                        Bấm trực tiếp vào ảnh đại diện phía trên hoặc nhấn &quot;Tải ảnh từ thiết bị&quot; để chọn file ảnh.
                       </p>
                     </div>
                   </div>
@@ -773,8 +972,19 @@ export default function UserProfilePill({
                 </button>
               </div>
             </div>
+
+            {/* Input file ẩn dùng để mở cửa sổ chọn tệp khi bấm vào Avatar */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarFileUpload}
+              className="hidden"
+              aria-hidden="true"
+            />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

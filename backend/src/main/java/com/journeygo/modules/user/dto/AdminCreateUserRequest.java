@@ -29,5 +29,11 @@ public record AdminCreateUserRequest(
         Role role,
 
         @Schema(description = "Trạng thái kích hoạt tài khoản", example = "true")
-        Boolean active
+        Boolean active,
+
+        @Schema(description = "URL ảnh đại diện hoặc avatar (URL hoặc Base64)", example = "https://example.com/avatar.png")
+        String avatarUrl,
+
+        @Schema(description = "Bí danh cho avatarUrl")
+        String avatar
 ) {}

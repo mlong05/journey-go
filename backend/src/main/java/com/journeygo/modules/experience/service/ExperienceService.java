@@ -1,7 +1,7 @@
 package com.journeygo.modules.experience.service;
 
 import com.journeygo.common.security.AuthorizationGuard;
-import com.journeygo.modules.experience.dto.request.ChangeExperienceStatusRequest;
+import com.journeygo.modules.experience.dto.request   .ChangeExperienceStatusRequest;
 import com.journeygo.modules.experience.dto.request.CreateExperienceRequest;
 import com.journeygo.modules.experience.dto.request.UpdateExperienceRequest;
 import com.journeygo.modules.experience.dto.response.ExperienceResponse;

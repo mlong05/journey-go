@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   SlidersHorizontal,
   FolderTree,
@@ -21,7 +21,14 @@ import {
   Landmark,
   Compass,
   Utensils,
+  Layers,
+  Loader2,
+  Globe2,
+  RotateCcw,
+  Trash2,
 } from "lucide-react";
+import { taskTypeService, TaskTypeManagerModal } from "@/features/experience";
+import { regionService } from "@/features/destination";
 
 /**
  * Trang Cấu Hình Danh Mục & Luật Hệ Thống (System Config & Rules) - JourneyGo
@@ -46,13 +53,13 @@ export default function AdminSystemConfigPage() {
   // 1. DỮ LIỆU TAB 1: DANH MỤC DI SẢN & ĐIỂM ĐẾN
   // ══════════════════════════════════════════════════════════
 
-  // Danh mục Vùng miền (sẵn sàng gắn API)
-  const [regions, setRegions] = useState([
-    { id: "reg-01", name: "Bắc Bộ", code: "NORTH", count: 0, isVisible: true },
-    { id: "reg-02", name: "Trung Bộ", code: "CENTRAL", count: 0, isVisible: true },
-    { id: "reg-03", name: "Nam Bộ", code: "SOUTH", count: 0, isVisible: true },
-  ]);
+  // Danh mục Vùng miền (kết nối live API regionService)
+  const [regions, setRegions] = useState([]);
+  const [deletedRegions, setDeletedRegions] = useState([]);
+  const [regionsLoading, setRegionsLoading] = useState(false);
+  const [regionTab, setRegionTab] = useState("active"); // 'active' | 'deleted'
   const [newRegionName, setNewRegionName] = useState("");
+  const [regionActionLoading, setRegionActionLoading] = useState(false);
 
   // Danh mục Chủ đề di sản (sẵn sàng gắn API)
   const [themes, setThemes] = useState([
@@ -94,45 +101,51 @@ export default function AdminSystemConfigPage() {
     },
   ]);
 
-  // Loại nhiệm vụ tương tác thực địa
-  const [taskTypes, setTaskTypes] = useState([
-    {
-      id: "task-01",
-      title: "Kích hoạt GPS Geofencing",
-      description: "Du khách di chuyển vào bán kính 30m - 60m quanh hiện vật để mở khóa bài học",
-      icon: MapPin,
-      iconColor: "text-emerald-600 bg-emerald-50",
-      badge: "Định vị vệ tinh",
-      isEnabled: true,
-    },
-    {
-      id: "task-02",
-      title: "Quét mã QR Hiện vật",
-      description: "Quét mã QR gắn tại hiện vật, cổng di tích để xác thực sự có mặt",
-      icon: QrCode,
-      iconColor: "text-sky-600 bg-sky-50",
-      badge: "Quét trực tiếp",
-      isEnabled: true,
-    },
-    {
-      id: "task-03",
-      title: "Trắc nghiệm Quiz Kiến Thức",
-      description: "Trả lời bộ 3 - 5 câu hỏi lịch sử đối soát từ kho tri thức kiểm duyệt",
-      icon: HelpCircle,
-      iconColor: "text-purple-600 bg-purple-50",
-      badge: "Hỏi đáp lịch sử",
-      isEnabled: true,
-    },
-    {
-      id: "task-04",
-      title: "Săn ảnh Photo Challenge",
-      description: "Chụp ảnh đúng góc mẫu hiện vật và gửi kiểm duyệt viên thẩm định",
-      icon: Camera,
-      iconColor: "text-amber-600 bg-amber-50",
-      badge: "Đối chiếu thị giác",
-      isEnabled: true,
-    },
-  ]);
+  // Danh mục loại nhiệm vụ thực địa (kết nối live API TaskType)
+  const [taskTypes, setTaskTypes] = useState([]);
+  const [taskTypesLoading, setTaskTypesLoading] = useState(false);
+  const [isTaskTypeModalOpen, setIsTaskTypeModalOpen] = useState(false);
+
+  const loadTaskTypes = useCallback(async () => {
+    setTaskTypesLoading(true);
+    try {
+      const data = await taskTypeService.list();
+      setTaskTypes(data || []);
+    } catch (err) {
+      console.error("[SystemConfig] loadTaskTypes error", err);
+    } finally {
+      setTaskTypesLoading(false);
+    }
+  }, []);
+
+  const loadRegions = useCallback(async () => {
+    setRegionsLoading(true);
+    try {
+      const [actives, deleteds] = await Promise.all([
+        regionService.getAll().catch(() => []),
+        regionService.getDeleted().catch(() => []),
+      ]);
+      setRegions(actives || []);
+      setDeletedRegions(deleteds || []);
+    } catch (err) {
+      console.error("[SystemConfig] loadRegions error", err);
+    } finally {
+      setRegionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        loadTaskTypes();
+        loadRegions();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadTaskTypes, loadRegions]);
 
   // ══════════════════════════════════════════════════════════
   // 2. DỮ LIỆU TAB 2: CƠ CHẾ GAME HÓA & ĐIỂM THƯỞNG
@@ -181,26 +194,62 @@ export default function AdminSystemConfigPage() {
   const [exemptSpecialMonuments, setExemptSpecialMonuments] = useState(true);
   const [defaultGateway, setDefaultGateway] = useState("VNPay"); // 'VNPay' | 'MoMo'
 
-  // Xử lý thêm Vùng miền
-  const handleAddRegion = () => {
-    if (!newRegionName.trim()) return;
-    const newReg = {
-      id: `reg-${Date.now()}`,
-      name: newRegionName.trim(),
-      code: newRegionName.trim().toUpperCase().slice(0, 4),
-      count: 0,
-      isVisible: true,
-    };
-    setRegions([...regions, newReg]);
-    setNewRegionName("");
-    showToast(`Đã thêm vùng miền mới: "${newRegionName.trim()}"`);
+  // Xử lý thêm Vùng miền qua POST /api/v1/regions
+  const handleAddRegion = async () => {
+    const clean = newRegionName.trim();
+    if (!clean) return;
+    setRegionActionLoading(true);
+    try {
+      await regionService.create({ name: clean });
+      setNewRegionName("");
+      showToast(`Đã thêm thành công vùng miền mới: "${clean}"`);
+      await loadRegions();
+    } catch (err) {
+      console.error("[SystemConfig] handleAddRegion error", err);
+      showToast(
+        err?.response?.data?.message || err?.message || "Không thể tạo vùng miền mới.",
+        "error"
+      );
+    } finally {
+      setRegionActionLoading(false);
+    }
   };
 
-  // Toggle ẩn/hiện Vùng miền
-  const handleToggleRegionVisibility = (id) => {
-    setRegions((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, isVisible: !r.isVisible } : r))
-    );
+  // Xử lý xóa mềm Vùng miền qua DELETE /api/v1/regions/{id}
+  const handleDeleteRegion = async (id, name) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn chuyển vùng "${name}" vào thùng rác?`)) return;
+    setRegionActionLoading(true);
+    try {
+      await regionService.delete(id);
+      showToast(`Đã chuyển vùng "${name}" vào thùng rác.`);
+      await loadRegions();
+    } catch (err) {
+      console.error("[SystemConfig] handleDeleteRegion error", err);
+      showToast(
+        err?.response?.data?.message || err?.message || "Không thể xóa vùng miền.",
+        "error"
+      );
+    } finally {
+      setRegionActionLoading(false);
+    }
+  };
+
+  // Xử lý khôi phục Vùng miền qua PATCH /api/v1/regions/{id}/restore
+  const handleRestoreRegion = async (id, name) => {
+    setRegionActionLoading(true);
+    try {
+      await regionService.restore(id);
+      showToast(`Đã khôi phục thành công vùng "${name}".`);
+      await loadRegions();
+    } catch (err) {
+      console.error("[SystemConfig] handleRestoreRegion error", err);
+      showToast(
+        err?.response?.data?.message || err?.message || "Không thể khôi phục vùng miền.",
+        "error"
+      );
+    } finally {
+      setRegionActionLoading(false);
+    }
   };
 
   // Toggle ẩn/hiện Chủ đề
@@ -318,13 +367,16 @@ export default function AdminSystemConfigPage() {
         <div className="space-y-6">
           {/* 1.1 Quản lý danh mục Vùng miền */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                  Phân Vùng Địa Lý & Lãnh Thổ
-                </h3>
+                <div className="flex items-center gap-2">
+                  <Globe2 size={16} className="text-teal-600" />
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                    Phân Vùng Địa Lý &amp; Lãnh Thổ (Regions)
+                  </h3>
+                </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Dùng để nhóm lộ trình tour và hiển thị trên bộ lọc di sản cho du khách
+                  Quản lý danh mục vùng miền du lịch dùng cho bộ lọc điểm đến và tour di sản
                 </p>
               </div>
 
@@ -332,58 +384,123 @@ export default function AdminSystemConfigPage() {
               <div className="flex items-center gap-2">
                 <input
                   type="text"
+                  maxLength={150}
                   value={newRegionName}
                   onChange={(e) => setNewRegionName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddRegion()}
                   placeholder="Thêm vùng (VD: Tây Bắc, Tây Nguyên...)"
                   className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                 />
                 <button
                   type="button"
+                  disabled={regionActionLoading || !newRegionName.trim()}
                   onClick={handleAddRegion}
-                  className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
                 >
-                  <Plus size={14} />
+                  {regionActionLoading ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Plus size={14} />
+                  )}
                   <span>Thêm vùng</span>
                 </button>
               </div>
             </div>
 
-            {/* Danh sách các vùng miền */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              {regions.map((reg) => (
-                <div
-                  key={reg.id}
-                  className={`p-4 rounded-xl border transition-all flex items-center justify-between ${
-                    reg.isVisible
-                      ? "bg-slate-50/80 border-slate-200"
-                      : "bg-slate-100/60 border-slate-200 opacity-60"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-sm">{reg.name}</span>
-                      <span className="font-mono text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                        {reg.code}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-1 font-medium">
-                      {reg.count} điểm di tích đã gán
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleRegionVisibility(reg.id)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-teal-700 hover:bg-teal-50 transition-colors cursor-pointer"
-                      title={reg.isVisible ? "Ẩn vùng miền này" : "Hiện vùng miền này"}
-                    >
-                      {reg.isVisible ? <Eye size={15} /> : <EyeOff size={15} />}
-                    </button>
-                  </div>
-                </div>
-              ))}
+            {/* Tab chuyển đổi: Đang hoạt động vs Thùng rác */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setRegionTab("active")}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  regionTab === "active"
+                    ? "bg-teal-700 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                <span>Đang hoạt động</span>
+                <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px]">
+                  {regions.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRegionTab("deleted")}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  regionTab === "deleted"
+                    ? "bg-rose-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                <Trash2 size={12} />
+                <span>Thùng rác</span>
+                <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px]">
+                  {deletedRegions.length}
+                </span>
+              </button>
             </div>
+
+            {/* Danh sách các vùng miền */}
+            {regionsLoading ? (
+              <div className="py-8 flex items-center justify-center gap-2 text-slate-400 text-xs font-bold">
+                <Loader2 size={16} className="animate-spin text-teal-600" />
+                <span>Đang tải danh mục vùng miền...</span>
+              </div>
+            ) : (regionTab === "active" ? regions : deletedRegions).length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs font-medium">
+                {regionTab === "active"
+                  ? "Chưa có khu vực nào. Hãy nhập tên ở trên để thêm vùng mới."
+                  : "Thùng rác hiện đang trống."}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                {(regionTab === "active" ? regions : deletedRegions).map((reg) => (
+                  <div
+                    key={reg.id}
+                    className={`p-3.5 rounded-xl border transition-all flex items-center justify-between ${
+                      reg.deleted
+                        ? "bg-rose-50/40 border-rose-200"
+                        : "bg-slate-50/80 border-slate-200 hover:border-teal-300 hover:bg-white"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">{reg.name}</span>
+                        <span className="font-mono text-[10px] text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200/60 font-semibold">
+                          #{reg.id}
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-mono text-slate-400 mt-0.5 font-medium">
+                        slug: <span className="text-slate-600">{reg.slug}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {reg.deleted ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreRegion(reg.id, reg.name)}
+                          className="px-2.5 py-1 rounded-lg text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Khôi phục vùng miền này"
+                        >
+                          <RotateCcw size={12} />
+                          <span>Khôi phục</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRegion(reg.id, reg.name)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Chuyển vùng miền này vào thùng rác"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 1.2 Quản lý danh mục Chủ đề di sản */}
@@ -434,60 +551,89 @@ export default function AdminSystemConfigPage() {
             </div>
           </div>
 
-          {/* 1.3 Quản lý Loại nhiệm vụ tương tác thực địa */}
+          {/* 1.3 Quản lý Loại nhiệm vụ tương tác thực địa (TaskType Master Data) */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
-            <div className="pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                Cơ Chế Nhiệm Vụ Trải Nghiệm Thực Địa
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Các phương thức tương tác được phép tạo bởi Content Provider và kiểm duyệt bởi Moderator
-              </p>
+            <div className="pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <span>Cơ Chế Loại Nhiệm Vụ Trải Nghiệm Thực Địa (TaskType)</span>
+                  <span className="text-[10.5px] font-mono font-bold bg-violet-100 text-violet-800 px-2 py-0.5 rounded-full">
+                    {taskTypes.length} loại
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Danh mục chuẩn hóa loại nhiệm vụ toàn sàn (Quiz, Check-in, Săn ảnh...). Quản lý qua API TaskType.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsTaskTypeModalOpen(true)}
+                className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer self-start sm:self-auto transition-colors"
+              >
+                <Layers size={14} />
+                <span>Quản lý / Thêm mới</span>
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {taskTypes.map((task) => {
-                const Icon = task.icon;
-                return (
+            {taskTypesLoading && taskTypes.length === 0 ? (
+              <div className="flex items-center justify-center py-8 text-slate-500 gap-2">
+                <Loader2 size={18} className="animate-spin text-violet-600" />
+                <span className="text-xs font-semibold">Đang tải danh mục TaskType...</span>
+              </div>
+            ) : taskTypes.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <p className="text-xs font-semibold">Chưa có loại nhiệm vụ nào.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {taskTypes.map((task) => (
                   <div
                     key={task.id}
-                    className={`p-4 rounded-xl border transition-all flex items-start gap-3.5 ${
-                      task.isEnabled
-                        ? "bg-white border-slate-200 shadow-2xs"
-                        : "bg-slate-50 border-slate-200 opacity-60"
-                    }`}
+                    className="p-4 rounded-xl border border-slate-200 bg-white hover:border-violet-300 hover:shadow-2xs transition-all flex items-start gap-3.5"
                   >
-                    <div className={`p-3 rounded-xl ${task.iconColor} shrink-0`}>
-                      <Icon size={20} />
+                    <div className="p-3 rounded-xl bg-violet-50 text-violet-700 shrink-0">
+                      <Layers size={20} />
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-slate-900 text-xs">{task.title}</h4>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[11px] font-black uppercase text-violet-700 bg-violet-50 px-2 py-0.5 rounded border border-violet-200">
+                          {task.code}
+                        </span>
                         <button
                           type="button"
-                          onClick={() => handleToggleTaskType(task.id)}
-                          className="cursor-pointer"
-                          title={task.isEnabled ? "Đang bật" : "Đang tắt"}
+                          onClick={() => setIsTaskTypeModalOpen(true)}
+                          className="text-[11px] font-bold text-violet-700 hover:underline cursor-pointer"
                         >
-                          {task.isEnabled ? (
-                            <ToggleRight size={26} className="text-teal-600" />
-                          ) : (
-                            <ToggleLeft size={26} className="text-slate-400" />
-                          )}
+                          Chỉnh sửa
                         </button>
                       </div>
-                      <p className="text-[11.5px] text-slate-500 mt-1 leading-relaxed">
-                        {task.description}
-                      </p>
-                      <span className="inline-block mt-2 text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200 font-mono">
-                        {task.badge}
-                      </span>
+
+                      <h4 className="font-bold text-slate-900 text-xs mt-1.5 truncate">
+                        {task.name}
+                      </h4>
+
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                          {task.verificationMethod}
+                        </span>
+                        {task.hasQuestions && (
+                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                            Có câu hỏi
+                          </span>
+                        )}
+                        {task.requiresLocation && (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Cần vị trí
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -803,6 +949,15 @@ export default function AdminSystemConfigPage() {
           <span>{isSaving ? "Đang lưu cấu hình..." : "Lưu Cấu Hình Hệ Thống"}</span>
         </button>
       </div>
+
+      {/* Modal Quản lý TaskType Master Data */}
+      <TaskTypeManagerModal
+        isOpen={isTaskTypeModalOpen}
+        onClose={() => {
+          setIsTaskTypeModalOpen(false);
+          loadTaskTypes();
+        }}
+      />
     </div>
   );
 }

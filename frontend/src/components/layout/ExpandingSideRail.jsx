@@ -117,7 +117,7 @@ export default function ExpandingSideRail({
                   <span className="text-white font-black tracking-tight">
                     Journey<span className="text-amber-400">Go</span>
                   </span>
-                  <span className="u040-role-tag text-emerald-400">{roleLabel}</span>
+                  <span className="u040-role-tag text-rose-400">{roleLabel}</span>
                 </div>
               </Link>
 
@@ -194,15 +194,15 @@ export default function ExpandingSideRail({
             </ul>
 
             {/* Phần Đáy: Nút Đăng xuất duy nhất */}
-            <div className="u040-bottom border-t border-white/10 pt-2">
+            <div className="u040-bottom border-t border-slate-800 pt-2">
               {onLogout && (
                 <button
                   type="button"
                   onClick={onLogout}
                   className={
                     isWide
-                      ? "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 font-semibold text-xs transition-all cursor-pointer"
-                      : "w-full flex items-center justify-center p-3 rounded-xl text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 transition-all cursor-pointer"
+                      ? "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-500 hover:bg-rose-500/10 hover:text-rose-400 font-semibold text-xs transition-all cursor-pointer"
+                      : "w-full flex items-center justify-center p-3 rounded-xl text-rose-500 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer"
                   }
                   title="Đăng xuất khỏi phiên làm việc"
                   aria-label="Đăng xuất"

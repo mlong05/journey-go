@@ -46,7 +46,7 @@ class CulturalContentServiceTest {
         owner = User.builder()
                 .id(1L)
                 .fullName("Owner Provider")
-                .role(Role.PROVIDER)
+                .role(Role.valueOf(Role.PROVIDER))
                 .build();
 
         destination = Destination.builder()
@@ -101,7 +101,7 @@ class CulturalContentServiceTest {
             return c;
         });
 
-        CulturalContentResponse response = culturalContentService.create(50L, request, 1L, Role.PROVIDER);
+        CulturalContentResponse response = culturalContentService.create(50L, request, 1L, Role.valueOf(Role.PROVIDER));
 
         assertNotNull(response);
         assertEquals("Kiến trúc Chùa Một Cột", response.title());
@@ -118,7 +118,7 @@ class CulturalContentServiceTest {
         when(destinationRepository.findByIdAndDeletedFalse(50L)).thenReturn(Optional.of(destination));
 
         AppException ex = assertThrows(AppException.class, () ->
-                culturalContentService.create(50L, request, 999L, Role.PROVIDER));
+                culturalContentService.create(50L, request, 999L, Role.valueOf(Role.PROVIDER)));
         assertEquals(ErrorCode.UNAUTHORIZED, ex.getErrorCode());
     }
 
@@ -140,7 +140,7 @@ class CulturalContentServiceTest {
         when(culturalContentRepository.findByIdAndDeletedFalseAndDestinationDeletedFalse(1L)).thenReturn(Optional.of(content));
         when(culturalContentRepository.save(any(CulturalContent.class))).thenAnswer(i -> i.getArgument(0));
 
-        culturalContentService.delete(1L, 1L, Role.PROVIDER);
+        culturalContentService.delete(1L, 1L, Role.valueOf(Role.PROVIDER));
 
         assertTrue(content.isDeleted());
         verify(culturalContentRepository).save(content);
@@ -154,7 +154,7 @@ class CulturalContentServiceTest {
         when(culturalContentRepository.findByIdAndDeletedTrue(1L)).thenReturn(Optional.of(content));
         when(culturalContentRepository.save(any(CulturalContent.class))).thenAnswer(i -> i.getArgument(0));
 
-        CulturalContentResponse response = culturalContentService.restore(1L, 1L, Role.PROVIDER);
+        CulturalContentResponse response = culturalContentService.restore(1L, 1L, Role.valueOf(Role.PROVIDER));
 
         assertNotNull(response);
         assertFalse(response.deleted());

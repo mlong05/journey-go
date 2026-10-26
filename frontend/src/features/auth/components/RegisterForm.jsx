@@ -1,31 +1,32 @@
 "use client";
 
 import React from "react";
-import { User, Phone, Mail, Loader2, ArrowRight } from "lucide-react";
+import { User, Phone, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 /**
  * Form Đăng ký tài khoản thành viên / đối tác di sản
+ * Đồng bộ phong cách viền bo tròn xanh da trời và nhãn nổi
  */
 export default function RegisterForm({
   registerForm,
   setRegisterForm,
   showPassword,
   showConfirmPassword,
+  setShowPassword,
+  setShowConfirmPassword,
   loading,
   onSubmit,
 }) {
   return (
-    <form onSubmit={onSubmit} className="space-y-2.5 w-full">
+    <form onSubmit={onSubmit} className="space-y-3.5 w-full">
       <div className="grid grid-cols-2 gap-3 w-full">
         {/* Họ và tên */}
-        <div className="space-y-1">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all pt-0.5">
+          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-[#009fe3] tracking-wide select-none z-10">
             Họ và tên
           </label>
-          <div className="relative w-full">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-              <User className="w-3.5 h-3.5" />
-            </div>
+          <div className="flex items-center px-3 h-11">
+            <User className="w-4 h-4 text-slate-700 mr-2 shrink-0 stroke-[1.8]" />
             <input
               type="text"
               required
@@ -34,20 +35,18 @@ export default function RegisterForm({
                 setRegisterForm((prev) => ({ ...prev, fullName: e.target.value }))
               }
               placeholder="Nguyễn Văn A"
-              className="w-full h-9.5 pl-8.5 pr-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:bg-white focus:border-emerald-600"
+              className="w-full text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none bg-transparent"
             />
           </div>
         </div>
 
         {/* Số điện thoại */}
-        <div className="space-y-1">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all pt-0.5">
+          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-[#009fe3] tracking-wide select-none z-10">
             Số điện thoại
           </label>
-          <div className="relative w-full">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-              <Phone className="w-3.5 h-3.5" />
-            </div>
+          <div className="flex items-center px-3 h-11">
+            <Phone className="w-4 h-4 text-slate-700 mr-2 shrink-0 stroke-[1.8]" />
             <input
               type="tel"
               required
@@ -56,21 +55,19 @@ export default function RegisterForm({
                 setRegisterForm((prev) => ({ ...prev, phone: e.target.value }))
               }
               placeholder="0912 345 678"
-              className="w-full h-9.5 pl-8.5 pr-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:bg-white focus:border-emerald-600"
+              className="w-full text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none bg-transparent"
             />
           </div>
         </div>
       </div>
 
       {/* Email */}
-      <div className="space-y-1 w-full">
-        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+      <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all pt-0.5">
+        <label className="absolute -top-2.5 left-4 bg-white px-2 text-[10px] font-bold text-[#009fe3] tracking-wide select-none z-10">
           Email đăng ký
         </label>
-        <div className="relative w-full">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-            <Mail className="w-3.5 h-3.5" />
-          </div>
+        <div className="flex items-center px-3.5 h-11">
+          <Mail className="w-4 h-4 text-slate-700 mr-2.5 shrink-0 stroke-[1.8]" />
           <input
             type="email"
             required
@@ -79,46 +76,70 @@ export default function RegisterForm({
               setRegisterForm((prev) => ({ ...prev, email: e.target.value }))
             }
             placeholder="email@journeygo.com"
-            className="w-full h-9.5 pl-8.5 pr-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:bg-white focus:border-emerald-600"
+            className="w-full text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none bg-transparent"
           />
         </div>
       </div>
 
       {/* Mật khẩu & Xác nhận */}
       <div className="grid grid-cols-2 gap-3 w-full">
-        <div className="space-y-1">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all pt-0.5">
+          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-[#009fe3] tracking-wide select-none z-10">
             Mật khẩu
           </label>
-          <input
-            type={showPassword ? "text" : "password"}
-            required
-            value={registerForm.password}
-            onChange={(e) =>
-              setRegisterForm((prev) => ({ ...prev, password: e.target.value }))
-            }
-            placeholder="Tối thiểu 6 ký tự"
-            className="w-full h-9.5 px-3 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:bg-white focus:border-emerald-600"
-          />
+          <div className="flex items-center px-3 h-11">
+            <Lock className="w-4 h-4 text-slate-700 mr-2 shrink-0 stroke-[1.8]" />
+            <input
+              type={showPassword ? "text" : "password"}
+              required
+              value={registerForm.password}
+              onChange={(e) =>
+                setRegisterForm((prev) => ({ ...prev, password: e.target.value }))
+              }
+              placeholder="Tối thiểu 6 ký tự"
+              className="w-full text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none bg-transparent"
+            />
+            {setShowPassword && (
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+              >
+                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-            Xác nhận mật khẩu
+        <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all pt-0.5">
+          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-[#009fe3] tracking-wide select-none z-10">
+            Xác nhận
           </label>
-          <input
-            type={showConfirmPassword ? "text" : "password"}
-            required
-            value={registerForm.confirmPassword}
-            onChange={(e) =>
-              setRegisterForm((prev) => ({
-                ...prev,
-                confirmPassword: e.target.value,
-              }))
-            }
-            placeholder="Nhập lại mật khẩu"
-            className="w-full h-9.5 px-3 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:bg-white focus:border-emerald-600"
-          />
+          <div className="flex items-center px-3 h-11">
+            <Lock className="w-4 h-4 text-slate-700 mr-2 shrink-0 stroke-[1.8]" />
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              required
+              value={registerForm.confirmPassword}
+              onChange={(e) =>
+                setRegisterForm((prev) => ({
+                  ...prev,
+                  confirmPassword: e.target.value,
+                }))
+              }
+              placeholder="Nhập lại mật khẩu"
+              className="w-full text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none bg-transparent"
+            />
+            {setShowConfirmPassword && (
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+              >
+                {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -134,11 +155,11 @@ export default function RegisterForm({
                 agreeTerms: e.target.checked,
               }))
             }
-            className="w-3.5 h-3.5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+            className="w-4 h-4 text-[#009fe3] rounded border-slate-300 focus:ring-[#009fe3] cursor-pointer accent-[#009fe3]"
           />
-          <span>
+          <span className="text-[11px] text-slate-600">
             Tôi đồng ý với{" "}
-            <span className="text-emerald-700 font-semibold underline">
+            <span className="text-[#009fe3] font-semibold underline">
               Điều khoản dịch vụ &amp; Quy chế di sản
             </span>
           </span>
@@ -149,18 +170,15 @@ export default function RegisterForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-2.5 rounded-xl font-bold text-xs shadow-md bg-emerald-700 hover:bg-emerald-800 text-white active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+        className="w-full py-3 rounded-xl font-bold text-xs sm:text-sm tracking-wider uppercase text-white bg-[#009fe3] hover:bg-[#008bd0] shadow-md shadow-[#009fe3]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
       >
         {loading ? (
           <>
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
             <span>Đang khởi tạo tài khoản...</span>
           </>
         ) : (
-          <>
-            <span>Hoàn tất đăng ký</span>
-            <ArrowRight className="w-3.5 h-3.5 text-white" />
-          </>
+          <span>HOÀN TẤT ĐĂNG KÝ</span>
         )}
       </button>
     </form>

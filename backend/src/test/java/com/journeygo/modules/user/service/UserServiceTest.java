@@ -10,6 +10,7 @@ import com.journeygo.modules.user.dto.UpdateRoleRequest;
 import com.journeygo.modules.user.entity.AuthProvider;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
+import com.journeygo.modules.user.repository.RoleRepository;
 import com.journeygo.modules.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +40,9 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private RoleRepository roleRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -49,16 +53,25 @@ class UserServiceTest {
 
     private User sampleUser;
     private User adminUser;
+    private Role touristRole;
+    private Role adminRole;
+    private Role moderatorRole;
+    private Role providerRole;
 
     @BeforeEach
     void setUp() {
+        touristRole = new Role(1L, Role.TOURIST);
+        adminRole = new Role(2L, Role.ADMIN);
+        moderatorRole = new Role(3L, Role.MODERATOR);
+        providerRole = new Role(4L, Role.PROVIDER);
+
         sampleUser = User.builder()
                 .id(2L)
                 .email("user@journeygo.com")
                 .password("encoded_password")
                 .fullName("Nguyen Van B")
                 .phone("0987654321")
-                .role(Role.TOURIST)
+                .role(touristRole)
                 .authProvider(AuthProvider.LOCAL)
                 .active(true)
                 .createdAt(Instant.now())
@@ -70,7 +83,7 @@ class UserServiceTest {
                 .email("admin@journeygo.com")
                 .password("encoded_admin_pass")
                 .fullName("Admin User")
-                .role(Role.ADMIN)
+                .role(adminRole)
                 .authProvider(AuthProvider.LOCAL)
                 .active(true)
                 .createdAt(Instant.now())
@@ -86,11 +99,12 @@ class UserServiceTest {
                 "Password123@",
                 "Tran Van C",
                 "0911223344",
-                Role.MODERATOR,
+                moderatorRole,
                 true
         );
 
         when(userRepository.existsByEmail("newuser@journeygo.com")).thenReturn(false);
+        when(roleRepository.findByName(Role.MODERATOR)).thenReturn(Optional.of(moderatorRole));
         when(passwordEncoder.encode("Password123@")).thenReturn("encoded_pass");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User u = invocation.getArgument(0);
@@ -103,7 +117,7 @@ class UserServiceTest {
         assertNotNull(response);
         assertEquals(3L, response.id());
         assertEquals("newuser@journeygo.com", response.email());
-        assertEquals(Role.MODERATOR, response.role());
+        assertEquals(moderatorRole, response.role());
         assertTrue(response.active());
         verify(userRepository).save(any(User.class));
     }
@@ -133,14 +147,14 @@ class UserServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         Page<User> page = new PageImpl<>(List.of(sampleUser, adminUser), pageable, 2);
 
-        when(userRepository.searchUsers("journey", Role.TOURIST, true, pageable)).thenReturn(page);
+        when(userRepository.searchUsers("journey", touristRole, true, pageable)).thenReturn(page);
 
-        Page<UserResponse> result = userService.getAllUsers("  journey  ", Role.TOURIST, true, pageable);
+        Page<UserResponse> result = userService.getAllUsers("  journey  ", touristRole, true, pageable);
 
         assertNotNull(result);
         assertEquals(2, result.getTotalElements());
         assertEquals("user@journeygo.com", result.getContent().get(0).email());
-        verify(userRepository).searchUsers("journey", Role.TOURIST, true, pageable);
+        verify(userRepository).searchUsers("journey", touristRole, true, pageable);
     }
 
     @Test
@@ -183,14 +197,15 @@ class UserServiceTest {
     @Test
     @DisplayName("Cập nhật vai trò người dùng thành công và thu hồi refresh tokens")
     void updateUserRole_Success() {
-        UpdateRoleRequest request = new UpdateRoleRequest(Role.MODERATOR);
+        UpdateRoleRequest request = new UpdateRoleRequest(moderatorRole);
         when(userRepository.findById(2L)).thenReturn(Optional.of(sampleUser));
+        when(roleRepository.findByName(Role.MODERATOR)).thenReturn(Optional.of(moderatorRole));
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
         UserResponse response = userService.updateUserRole(2L, request, 1L);
 
         assertNotNull(response);
-        assertEquals(Role.MODERATOR, response.role());
+        assertEquals(moderatorRole, response.role());
         verify(refreshTokenService).revokeAllUserTokens(sampleUser);
         verify(userRepository).save(sampleUser);
     }
@@ -198,7 +213,7 @@ class UserServiceTest {
     @Test
     @DisplayName("Admin không thể tự cập nhật vai trò của chính mình")
     void updateUserRole_SelfModification_ThrowsException() {
-        UpdateRoleRequest request = new UpdateRoleRequest(Role.TOURIST);
+        UpdateRoleRequest request = new UpdateRoleRequest(touristRole);
 
         AppException ex = assertThrows(AppException.class, () -> userService.updateUserRole(1L, request, 1L));
         assertEquals(ErrorCode.CANNOT_MODIFY_OWN_ROLE, ex.getErrorCode());
@@ -212,11 +227,12 @@ class UserServiceTest {
         AdminUpdateUserRequest request = new AdminUpdateUserRequest(
                 "Nguyen Van Updated",
                 "0999888777",
-                Role.PROVIDER,
+                providerRole,
                 true
         );
 
         when(userRepository.findById(2L)).thenReturn(Optional.of(sampleUser));
+        when(roleRepository.findByName(Role.PROVIDER)).thenReturn(Optional.of(providerRole));
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
         UserResponse response = userService.updateUser(2L, request, 1L);
@@ -224,7 +240,7 @@ class UserServiceTest {
         assertNotNull(response);
         assertEquals("Nguyen Van Updated", response.fullName());
         assertEquals("0999888777", response.phone());
-        assertEquals(Role.PROVIDER, response.role());
+        assertEquals(providerRole, response.role());
         verify(refreshTokenService).revokeAllUserTokens(sampleUser);
         verify(userRepository).save(sampleUser);
     }
@@ -265,5 +281,49 @@ class UserServiceTest {
         assertEquals(ErrorCode.CANNOT_DEACTIVATE_SELF, ex.getErrorCode());
         verify(userRepository, never()).save(any());
         verify(refreshTokenService, never()).revokeAllUserTokens(any());
+    }
+
+    @Test
+    @DisplayName("Admin không thể vô hiệu hóa (khóa) tài khoản của Admin khác")
+    void setUserActiveStatus_DeactivateOtherAdmin_ThrowsException() {
+        User otherAdmin = User.builder()
+                .id(99L)
+                .email("other.admin@journeygo.com")
+                .fullName("Other Admin")
+                .role(adminRole)
+                .active(true)
+                .build();
+
+        when(userRepository.findById(99L)).thenReturn(Optional.of(otherAdmin));
+
+        AppException ex = assertThrows(AppException.class, () -> userService.setUserActiveStatus(99L, false, 1L));
+        assertEquals(ErrorCode.CANNOT_DEACTIVATE_ADMIN, ex.getErrorCode());
+        verify(userRepository, never()).save(any());
+        verify(refreshTokenService, never()).revokeAllUserTokens(any());
+    }
+
+    @Test
+    @DisplayName("Admin cập nhật người dùng thất bại khi cố gắng vô hiệu hóa Admin khác")
+    void updateUser_DeactivateOtherAdmin_ThrowsException() {
+        User otherAdmin = User.builder()
+                .id(99L)
+                .email("other.admin@journeygo.com")
+                .fullName("Other Admin")
+                .role(adminRole)
+                .active(true)
+                .build();
+
+        AdminUpdateUserRequest request = new AdminUpdateUserRequest(
+                "Other Admin Updated",
+                null,
+                null,
+                false
+        );
+
+        when(userRepository.findById(99L)).thenReturn(Optional.of(otherAdmin));
+
+        AppException ex = assertThrows(AppException.class, () -> userService.updateUser(99L, request, 1L));
+        assertEquals(ErrorCode.CANNOT_DEACTIVATE_ADMIN, ex.getErrorCode());
+        verify(userRepository, never()).save(any());
     }
 }

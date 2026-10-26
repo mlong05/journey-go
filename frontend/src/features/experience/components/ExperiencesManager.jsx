@@ -19,6 +19,8 @@ import {
   Send,
   Undo2,
   ChevronDown,
+  Layers,
+  Compass,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import useExperienceData from "../hooks/useExperienceData";
@@ -27,6 +29,8 @@ import EditExperienceModal from "./EditExperienceModal";
 import TaskManager from "./TaskManager";
 import SlotManager from "./SlotManager";
 import ChangeStatusDialog from "./ChangeStatusDialog";
+import TaskTypeManagerModal from "./TaskTypeManagerModal";
+import CheckInPointManagerModal from "./CheckInPointManagerModal";
 import {
   getExperienceTheme,
   EXPERIENCE_STATUS_META,
@@ -94,6 +98,8 @@ export default function ExperiencesManager({
   const [tasksFor, setTasksFor] = useState(null);
   const [slotsFor, setSlotsFor] = useState(null);
   const [statusFor, setStatusFor] = useState(null); // { exp, newStatus }
+  const [checkInFor, setCheckInFor] = useState(null);
+  const [isTaskTypesOpen, setIsTaskTypesOpen] = useState(false);
   const [toast, setToast] = useState("");
 
   const showToast = (msg) => {
@@ -154,7 +160,7 @@ export default function ExperiencesManager({
         String(e.id).includes(q)
       );
     });
-  }, [experiences, query, statusTab, destFilter, destinationById]);
+  }, [experiences, query, statusTab, destinationById]);
 
   const handleCreated = (created) => {
     addExperience(created);
@@ -204,7 +210,7 @@ export default function ExperiencesManager({
   const canEditItem = (exp) => canManageItem(exp) && exp.status === "DRAFT";
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in-50 duration-200">
+    <div className="h-full max-h-full min-h-0 w-full overflow-hidden flex flex-col animate-in fade-in-50 duration-200">
       {toast && (
         <div
           role="status"
@@ -215,7 +221,7 @@ export default function ExperiencesManager({
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="shrink-0 mb-5 pb-4 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className={`w-1.5 h-5 rounded-full ${palette.bar}`} />
@@ -227,6 +233,16 @@ export default function ExperiencesManager({
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsTaskTypesOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Layers size={14} />
+              <span>Loại nhiệm vụ</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={reload}
@@ -249,7 +265,7 @@ export default function ExperiencesManager({
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs space-y-4">
+      <div className="shrink-0 mb-5 bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <Search size={15} />
@@ -316,7 +332,7 @@ export default function ExperiencesManager({
       </div>
 
       {error && (
-        <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
+        <div className="shrink-0 mb-5 flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
           <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-bold text-rose-800">Có lỗi khi tải dữ liệu</p>
@@ -332,6 +348,8 @@ export default function ExperiencesManager({
         </div>
       )}
 
+      {/* Vùng danh sách: chỉ khu vực này cuộn, các phần còn lại cố định */}
+      <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pr-1.5 pb-6 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
       {loading && experiences.length === 0 ? (
         <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-2xs">
           <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
@@ -378,7 +396,7 @@ export default function ExperiencesManager({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
           {filtered.map((exp) => {
             const meta = EXPERIENCE_STATUS_META[exp.status] || EXPERIENCE_STATUS_META.DRAFT;
             const dest = destinationById.get(Number(exp.destinationId));
@@ -387,10 +405,7 @@ export default function ExperiencesManager({
                 key={exp.id}
                 className={`group bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md ${palette.hoverCard} transition-all p-4 space-y-3`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-mono text-[11px] font-bold text-slate-500">
-                    #{exp.id}
-                  </span>
+                <div className="flex items-start justify-end gap-2">
                   <span
                     className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full border ${meta.cls}`}
                   >
@@ -410,11 +425,6 @@ export default function ExperiencesManager({
                   </span>
                 </p>
 
-                {exp.description && (
-                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                    {exp.description}
-                  </p>
-                )}
 
                 <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-semibold text-slate-600">
                   <span>{formatPrice(exp.price, exp.currency)}</span>
@@ -444,6 +454,23 @@ export default function ExperiencesManager({
                     >
                       <ListChecks size={12} className="shrink-0" />
                       <span>Nhiệm vụ ({exp.taskCount ?? 0})</span>
+                    </button>
+                  )}
+                  {/* Nút Quản lý Trạm Check-in */}
+                  {canManageItem(exp) && (
+                    <button
+                      type="button"
+                      onClick={() => setCheckInFor(exp)}
+                      title="Quản lý trạm dừng chân & check-in GPS/QR"
+                      className={`h-7 px-3 rounded-full border text-[11px] font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border-slate-200 bg-white ${palette.hoverCard} hover:bg-slate-50 text-slate-700`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src="/image/compass-real.jpg"
+                        alt=""
+                        className="w-3.5 h-3.5 rounded-full object-cover shrink-0 ring-1 ring-amber-400/40"
+                      />
+                      <span>Trạm Check-in</span>
                     </button>
                   )}
                   {/* Nút Quản lý khung giờ — luôn hiển thị cho owner */}
@@ -525,6 +552,7 @@ export default function ExperiencesManager({
           })}
         </div>
       )}
+      </div>
 
       {canCreate && (
         <CreateExperienceModal
@@ -553,7 +581,7 @@ export default function ExperiencesManager({
         isOpen={Boolean(tasksFor)}
         experience={tasksFor}
         theme={theme}
-        canManage={canManage}
+        canEdit={canManage}
         onClose={() => setTasksFor(null)}
       />
 
@@ -581,6 +609,22 @@ export default function ExperiencesManager({
           );
         }}
         onClose={() => setStatusFor(null)}
+      />
+
+      {/* Modal quản lý TaskType (Master Data) dành cho Admin */}
+      {isAdmin && (
+        <TaskTypeManagerModal
+          isOpen={isTaskTypesOpen}
+          onClose={() => setIsTaskTypesOpen(false)}
+        />
+      )}
+
+      {/* Modal quản lý CheckInPoint vi mô */}
+      <CheckInPointManagerModal
+        isOpen={Boolean(checkInFor)}
+        onClose={() => setCheckInFor(null)}
+        experience={checkInFor}
+        onPointsUpdated={() => reload()}
       />
 
       {/* Modal xác nhận xoá — chỉ render khi có item đang chờ xoá */}
@@ -614,9 +658,6 @@ export default function ExperiencesManager({
             <div className="px-6 py-5 bg-slate-50/40">
               <div className="rounded-2xl border border-slate-200 p-3 bg-white space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] font-bold text-slate-500">
-                    #{deleting.id}
-                  </span>
                   {(() => {
                     const meta =
                       EXPERIENCE_STATUS_META[deleting.status] ||

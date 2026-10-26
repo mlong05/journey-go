@@ -35,6 +35,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     private final JwtTokenProvider tokenProvider;
     private final RefreshTokenService refreshTokenService;
     private final UserRepository userRepository;
+    private final com.journeygo.modules.user.repository.RoleRepository roleRepository;
     @org.springframework.context.annotation.Lazy
     private final PasswordEncoder passwordEncoder;
     private final HttpCookieOAuth2AuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;
@@ -85,11 +86,13 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
             // Đăng ký mới người dùng qua Google OAuth2
+            Role touristRole = roleRepository.findByName(Role.TOURIST)
+                    .orElseGet(() -> roleRepository.save(new Role(Role.TOURIST, "Khách du lịch")));
             user = User.builder()
                     .email(email)
                     .fullName(name != null && !name.isBlank() ? name : email.split("@")[0])
                     .password(passwordEncoder.encode(UUID.randomUUID().toString()))
-                    .role(Role.TOURIST)
+                    .role(touristRole)
                     .authProvider(AuthProvider.GOOGLE)
                     .providerId(sub)
                     .avatarUrl(picture)

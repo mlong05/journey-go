@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Schema(description = "Yêu cầu tạo hoặc cập nhật tour du lịch")
@@ -18,11 +17,6 @@ public record TourRequest(
         @Schema(description = "Loại hình tour", example = "CULTURAL")
         @NotNull(message = "Loại hình tour không được để trống")
         TourType tourType,
-
-        @Schema(description = "Giá tour (VND)", example = "2500000")
-        @NotNull(message = "Giá không được để trống")
-        @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
-        BigDecimal price,
 
         @Schema(description = "Số ngày của tour", example = "3")
         @NotNull(message = "Số ngày không được để trống")
