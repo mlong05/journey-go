@@ -1,5 +1,6 @@
 package com.journeygo.modules.content.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.journeygo.modules.content.entity.CulturalContent;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -19,6 +20,8 @@ public record CulturalContentResponse(
         @Schema(description = "Mô tả ngắn gọn") String description,
         @Schema(description = "Nội dung bài viết") String contentText,
         @Schema(description = "Đường dẫn file media") String mediaUrl,
+        @JsonIgnore
+        @Schema(hidden = true, description = "Cloudinary public ID nội bộ") String mediaPublicId,
         @Schema(description = "Thời lượng phát (giây)") Integer duration,
         @Schema(description = "Số lượt phát / xem") long playCount,
         @Schema(description = "Đã xóa") boolean deleted,
@@ -37,6 +40,7 @@ public record CulturalContentResponse(
                 .description(content.getDescription())
                 .contentText(content.getContentText())
                 .mediaUrl(content.getMediaUrl())
+                .mediaPublicId(content.getMediaPublicId())
                 .duration(content.getDuration())
                 .playCount(content.getPlayCount())
                 .deleted(content.isDeleted())
