@@ -27,10 +27,21 @@ public record CulturalContentRequest(
         @Schema(description = "Nội dung bài viết hoặc kịch bản chi tiết")
         String contentText,
 
-        @Schema(description = "Đường dẫn file media (âm thanh, video, ảnh)", example = "https://cdn.journeygo.com/audio/hoan-kiem-legend.mp3")
+        @Schema(hidden = true, description = "Đường dẫn media; ảnh được tải lên qua trường image")
         String mediaUrl,
+
+        @Schema(hidden = true, description = "Cloudinary public ID nội bộ của ảnh")
+        @Size(max = 255, message = "Cloudinary public ID không được quá 255 ký tự")
+        String mediaPublicId,
 
         @Schema(description = "Thời lượng phát (giây) nếu là audio/video", example = "180")
         @Min(value = 0, message = "Thời lượng phải >= 0")
         Integer duration
-) {}
+) {
+    /** Preserve compatibility with clients that predate the Cloudinary public ID field. */
+    public CulturalContentRequest(String title, String contentType, int sequenceOrder,
+                                  String description, String contentText, String mediaUrl,
+                                  Integer duration) {
+        this(title, contentType, sequenceOrder, description, contentText, mediaUrl, null, duration);
+    }
+}
