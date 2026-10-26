@@ -257,7 +257,11 @@ function TaskManagerDialog({
   return (
     <div
       className="fixed inset-0 z-[60] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
         role="dialog"
@@ -279,14 +283,7 @@ function TaskManagerDialog({
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                   Trải nghiệm:{" "}
-                  <span className="font-semibold text-slate-700">{experience.title}</span> ·{" "}
-                  <span
-                    className={
-                      isDraft ? "text-emerald-600 font-semibold" : "text-slate-500"
-                    }
-                  >
-                    {experience.status}
-                  </span>
+                  <span className="font-semibold text-slate-700">{experience.title}</span>
                 </p>
               </div>
             </div>
@@ -312,8 +309,7 @@ function TaskManagerDialog({
             <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
               <AlertCircle size={16} className="text-amber-700 mt-0.5 shrink-0" />
               <p className="text-xs text-amber-800 font-semibold leading-relaxed">
-                Trải nghiệm đang ở trạng thái <strong>{experience.status}</strong>. Theo quy tắc
-                BR-TASK-1, chỉ thao tác thêm / sửa / xoá Task khi Experience ở trạng thái Bản nháp.
+                Điểm đến và gói trải nghiệm này đã được phê duyệt và đang phát hành. Để thêm, sửa hoặc xoá nhiệm vụ, vui lòng hiệu chỉnh điểm đến để chuyển về trạng thái chờ duyệt lại.
               </p>
             </div>
           )}
@@ -594,8 +590,8 @@ function TaskManagerDialog({
           onClose={() => setQuestionTarget(null)}
           task={questionTarget}
           experience={experience}
-          canEdit={editable}
-          isModerator={!canEdit}
+          canEdit={canEdit}
+          isModerator={false}
           onQuestionsUpdated={() => {
             loadData();
           }}

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/auth_models.dart';
 import '../../core/models/destination_model.dart';
+import '../../core/models/experience_model.dart';
 import '../../core/models/journey_model.dart';
 import '../../core/services/destination_service.dart';
+import '../../core/services/experience_service.dart';
 import '../../core/services/user_data_service.dart';
 import '../modals/checkin_modal.dart';
 import '../modals/mission_modal.dart';
@@ -26,9 +28,11 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   final DestinationService _destinationService = DestinationService();
+  final ExperienceService _experienceService = ExperienceService();
   final UserDataService _userDataService = UserDataService();
 
   List<DestinationModel> _destinations = [];
+  List<ExperienceModel> _experiences = [];
   List<ActiveMission> _missions = [];
   int _userPoints = 350;
   int _badgeCount = 4;
@@ -46,6 +50,7 @@ class _HomeTabState extends State<HomeTab> {
 
     final results = await Future.wait([
       _destinationService.getApprovedDestinations(),
+      _experienceService.getPublishedExperiences(),
       _userDataService.getUserPoints(),
       _userDataService.getBadges(),
       _userDataService.getMissions(),
@@ -54,9 +59,10 @@ class _HomeTabState extends State<HomeTab> {
     if (mounted) {
       setState(() {
         _destinations = results[0] as List<DestinationModel>;
-        _userPoints = results[1] as int;
-        _badgeCount = (results[2] as List<BadgeItem>).where((b) => b.isUnlocked).length;
-        _missions = results[3] as List<ActiveMission>;
+        _experiences = (results[1] as List<ExperienceModel>).where((e) => e.isPublished).toList();
+        _userPoints = results[2] as int;
+        _badgeCount = (results[3] as List<BadgeItem>).where((b) => b.isUnlocked).length;
+        _missions = results[4] as List<ActiveMission>;
         _isLoading = false;
       });
     }
@@ -94,6 +100,18 @@ class _HomeTabState extends State<HomeTab> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => PaymentModal(
         route: route,
+        onPaymentSuccess: _loadAllData,
+      ),
+    );
+  }
+
+  void _openExperiencePaymentModal(ExperienceModel exp) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => PaymentModal(
+        experience: exp,
         onPaymentSuccess: _loadAllData,
       ),
     );
@@ -149,7 +167,12 @@ class _HomeTabState extends State<HomeTab> {
 
             const SizedBox(height: 24),
 
-            // AI Recommended routes section
+            // Gói Tour Trải Nghiệm Thực Địa (Dữ liệu thật từ Experience API)
+            _buildFeaturedExperiencesSection(),
+
+            const SizedBox(height: 24),
+
+            // AI Recommended routes section (Điểm đến di sản)
             _buildRecommendedRoutesSection(),
 
             const SizedBox(height: 24),
@@ -568,6 +591,303 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeaturedExperiencesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: AppCultureColors.heritageJade,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'GÓI TOUR & TRẢI NGHIỆM THỰC ĐỊA',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: AppCultureColors.textDark,
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: () => widget.onNavigateToTab(1), // Chuyển sang ExploreTab
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppCultureColors.heritageJade.withOpacity(0.2)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Text(
+                        'Xem tất cả',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppCultureColors.heritageJade,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(Icons.chevron_right_rounded, size: 14, color: AppCultureColors.heritageJade),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        SizedBox(
+          height: 255,
+          child: _experiences.isEmpty
+              ? Center(
+                  child: Text(
+                    'Đang cập nhật các gói tour di sản mới...',
+                    style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                  ),
+                )
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _experiences.length,
+                  itemBuilder: (context, idx) {
+                    final exp = _experiences[idx];
+                    return _buildExperienceHorizontalCard(exp);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExperienceHorizontalCard(ExperienceModel exp) {
+    return Container(
+      width: 260,
+      margin: const EdgeInsets.only(right: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppCultureColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image top
+          SizedBox(
+            height: 125,
+            width: double.infinity,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
+                  child: Image.asset(exp.coverImage, fit: BoxFit.cover),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withOpacity(0.3),
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.65),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+                // Top Left Price
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: exp.price > 0 ? Colors.white : AppCultureColors.heritageJade,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      exp.formattedPrice,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: exp.price > 0 ? AppCultureColors.textDark : Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                // Top Right Rating
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.65),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.star_rounded, color: Color(0xFFFFB300), size: 12),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${exp.rating}',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Bottom Duration
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.schedule_rounded, color: Colors.white, size: 11),
+                        const SizedBox(width: 3),
+                        Text(
+                          exp.formattedDuration,
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Details
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exp.title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppCultureColors.textDark,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${exp.taskCount} Thử thách',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6366F1),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${exp.checkInPointCount} Trạm GPS',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppCultureColors.heritageJade,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.verified_rounded, size: 12, color: AppCultureColors.heritageJade),
+                        SizedBox(width: 3),
+                        Text(
+                          'Đã duyệt',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppCultureColors.heritageJade,
+                          ),
+                        ),
+                      ],
+                    ),
+                    InkWell(
+                      onTap: () => _openExperiencePaymentModal(exp),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppCultureColors.heritageJade,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'Đặt vé',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   X,
-  Sparkles,
+  Compass,
   Type,
   AlignLeft,
   Banknote,
@@ -14,7 +14,12 @@ import {
   Save,
 } from "lucide-react";
 import { experienceService } from "../services/experienceService";
-import { getExperienceTheme, formatPrice } from "../theme";
+import {
+  getExperienceTheme,
+  formatPrice,
+  formatNumberWithDots,
+  parseRawNumber,
+} from "../theme";
 
 const CURRENCIES = ["VND", "USD"];
 
@@ -135,17 +140,55 @@ function EditExperienceDialog({
     setApiError("");
   };
 
+  const handlePriceChange = (e) => {
+    const input = e.target;
+    const cursorPosition = input.selectionStart || 0;
+    const previousVal = input.value;
+    const digitsBeforeCursor = previousVal
+      .slice(0, cursorPosition)
+      .replace(/\D/g, "").length;
+
+    const raw = parseRawNumber(previousVal);
+    handleChange("price", raw);
+
+    const formatted = formatNumberWithDots(raw);
+    let newCursorPos = 0;
+    let digitsCount = 0;
+    for (let i = 0; i < formatted.length; i++) {
+      if (digitsCount === digitsBeforeCursor) {
+        newCursorPos = i;
+        break;
+      }
+      if (/\d/.test(formatted[i])) {
+        digitsCount++;
+      }
+      if (digitsCount === digitsBeforeCursor) {
+        newCursorPos = i + 1;
+        break;
+      }
+    }
+    if (digitsCount < digitsBeforeCursor) {
+      newCursorPos = formatted.length;
+    }
+
+    requestAnimationFrame(() => {
+      if (input) {
+        input.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    });
+  };
+
   const validate = () => {
     const e = {};
     const t = form.title.trim();
     if (!t) e.title = "Vui lòng nhập tiêu đề trải nghiệm.";
     else if (t.length > 255) e.title = "Tiêu đề tối đa 255 ký tự.";
 
-    const priceStr = String(form.price ?? "").trim();
-    if (priceStr === "") {
+    const rawPrice = parseRawNumber(form.price);
+    if (rawPrice === "") {
       e.price = "Vui lòng nhập giá hợp lệ.";
     } else {
-      const price = Number(priceStr);
+      const price = Number(rawPrice);
       if (Number.isNaN(price)) e.price = "Giá phải là số hợp lệ.";
       else if (price < 0) e.price = "Giá phải lớn hơn hoặc bằng 0.";
     }
@@ -168,13 +211,14 @@ function EditExperienceDialog({
   // Chuẩn hoá payload PATCH: chỉ gửi field có giá trị (null khi để trống).
   const buildUpdatePayload = () => {
     const description = String(form.description ?? "").trim();
-    const priceNum = Number(form.price);
+    const rawPrice = parseRawNumber(form.price);
+    const priceNum = rawPrice === "" ? null : Number(rawPrice);
     const durationStr = String(form.durationMinutes ?? "").trim();
 
     const payload = {
       title: form.title.trim(),
       description: description || null,
-      price: Number.isNaN(priceNum) ? null : priceNum,
+      price: priceNum,
       currency: String(form.currency || "VND"),
       durationMinutes:
         durationStr === "" || Number.isNaN(Number(durationStr))
@@ -251,7 +295,7 @@ function EditExperienceDialog({
                 {updatedItem ? (
                   <CheckCircle2 size={20} className="text-emerald-600" />
                 ) : (
-                  <Sparkles size={20} className={palette.icon} />
+                  <Compass size={20} className={palette.icon} />
                 )}
               </div>
               <div>
@@ -284,12 +328,10 @@ function EditExperienceDialog({
               <AlertCircle size={16} className="text-amber-700 mt-0.5 shrink-0" />
               <div>
                 <p className="text-xs text-amber-800 font-bold leading-relaxed">
-                  Không thể chỉnh sửa ở trạng thái hiện tại (BR-EXP-2)
+                  Điểm đến và trải nghiệm đang hoạt động
                 </p>
                 <p className="text-[11px] text-amber-700 mt-1 leading-relaxed">
-                  Trải nghiệm chỉ cập nhật được khi status = Bản nháp. Hiện tại
-                  trạng thái là <strong>{experience.status}</strong>. Vui lòng
-                  liên hệ quản trị nếu cần thay đổi.
+                  Gói trải nghiệm đã được phát hành cùng điểm đến. Để thay đổi giá vé hoặc thông tin cơ bản, vui lòng chỉnh sửa thông tin điểm đến để đưa về trạng thái chờ duyệt lại.
                 </p>
               </div>
             </div>
@@ -436,12 +478,11 @@ function EditExperienceDialog({
                   </label>
                   <input
                     id="edit-exp-price"
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={form.price}
-                    onChange={(e) => handleChange("price", e.target.value)}
-                    placeholder="50000"
+                    type="text"
+                    inputMode="numeric"
+                    value={formatNumberWithDots(form.price)}
+                    onChange={handlePriceChange}
+                    placeholder="50.000"
                     disabled={loading}
                     className={`${inputBase} ${borderOf("price")}`}
                   />

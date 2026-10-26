@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/destination_model.dart';
+import '../../core/models/experience_model.dart';
 import '../../core/models/ticket_model.dart';
 import '../../core/services/user_data_service.dart';
 
 class PaymentModal extends StatefulWidget {
-  final DestinationModel route;
+  final DestinationModel? route;
+  final ExperienceModel? experience;
   final VoidCallback? onPaymentSuccess;
 
   const PaymentModal({
     super.key,
-    required this.route,
+    this.route,
+    this.experience,
     this.onPaymentSuccess,
   });
 
@@ -22,6 +25,21 @@ class _PaymentModalState extends State<PaymentModal> {
   final UserDataService _userDataService = UserDataService();
   String _selectedMethod = 'vnpay'; // 'vnpay', 'momo', 'card'
   bool _isProcessing = false;
+
+  String get _title =>
+      widget.experience?.title ?? widget.route?.name ?? 'Trải nghiệm Di sản';
+  String get _subtitle =>
+      widget.route?.address ??
+      (widget.experience != null && widget.experience!.description.isNotEmpty
+          ? widget.experience!.description
+          : 'Hành trình trải nghiệm di sản văn hóa');
+  String get _priceFormatted =>
+      widget.experience?.formattedPrice ??
+      widget.route?.ticketPrice ??
+      'Miễn phí';
+  int get _priceNumeric => widget.experience != null
+      ? widget.experience!.price.toInt()
+      : (widget.route?.numericPrice ?? 0);
 
   void _handlePayment() async {
     setState(() => _isProcessing = true);
@@ -39,16 +57,18 @@ class _PaymentModalState extends State<PaymentModal> {
 
     final newTicket = TicketModel(
       ticketCode: randomCode,
-      tourName: widget.route.name,
-      destination: widget.route.address,
-      price: widget.route.ticketPrice,
-      numericPrice: widget.route.numericPrice,
+      tourName: _title,
+      destination: _subtitle,
+      price: _priceFormatted,
+      numericPrice: _priceNumeric,
       status: 'ACTIVE',
       statusLabel: 'Còn hiệu lực',
-      purchaseDate: '$dateStr - ${now.hour}:${now.minute.toString().padLeft(2, '0')}',
+      purchaseDate:
+          '$dateStr - ${now.hour}:${now.minute.toString().padLeft(2, '0')}',
       validDate: '$dateStr - 30 ngày',
       paymentGateway: gatewayName,
-      transactionId: '${gatewayName.toUpperCase()}-${now.millisecondsSinceEpoch}',
+      transactionId:
+          '${gatewayName.toUpperCase()}-${now.millisecondsSinceEpoch}',
       qrCodeUrl:
           'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=VIETCULTURE_${randomCode}_ACTIVE',
       holderName: 'Nguyễn An',
@@ -126,7 +146,11 @@ class _PaymentModalState extends State<PaymentModal> {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.stars_rounded, color: AppCultureColors.gold, size: 20),
+                  Icon(
+                    Icons.stars_rounded,
+                    color: AppCultureColors.gold,
+                    size: 20,
+                  ),
                   SizedBox(width: 6),
                   Text(
                     '+150 Điểm Thưởng Di Sản',
@@ -204,7 +228,10 @@ class _PaymentModalState extends State<PaymentModal> {
               ),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded, color: AppCultureColors.textMuted),
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: AppCultureColors.textMuted,
+                ),
                 style: IconButton.styleFrom(
                   backgroundColor: AppCultureColors.surfaceSubtle,
                 ),
@@ -226,7 +253,7 @@ class _PaymentModalState extends State<PaymentModal> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.route.name,
+                  _title,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -236,11 +263,22 @@ class _PaymentModalState extends State<PaymentModal> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, size: 16, color: AppCultureColors.textMuted),
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color: AppCultureColors.textMuted,
+                    ),
                     const SizedBox(width: 4),
-                    Text(
-                      widget.route.address,
-                      style: const TextStyle(fontSize: 13, color: AppCultureColors.textMuted),
+                    Expanded(
+                      child: Text(
+                        _subtitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppCultureColors.textMuted,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -252,10 +290,14 @@ class _PaymentModalState extends State<PaymentModal> {
                   children: [
                     const Text(
                       'Tổng chi phí:',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppCultureColors.textDark,
+                      ),
                     ),
                     Text(
-                      widget.route.ticketPrice,
+                      _priceFormatted,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -317,7 +359,9 @@ class _PaymentModalState extends State<PaymentModal> {
                 backgroundColor: AppCultureColors.heritageJade,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               child: _isProcessing
                   ? const Row(
@@ -326,20 +370,29 @@ class _PaymentModalState extends State<PaymentModal> {
                         SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
                         ),
                         SizedBox(width: 12),
                         Text(
                           'Đang xử lý giao dịch an toàn...',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
                         ),
                       ],
                     )
                   : Text(
-                      widget.route.numericPrice > 0
-                          ? 'Thanh toán ${widget.route.ticketPrice} để mở khóa'
+                      _priceNumeric > 0
+                          ? 'Thanh toán $_priceFormatted để mở khóa'
                           : 'Nhận vé miễn phí ngay',
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
                     ),
             ),
           ),
@@ -364,10 +417,14 @@ class _PaymentModalState extends State<PaymentModal> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppCultureColors.jadeLight.withOpacity(0.4) : Colors.white,
+          color: isSelected
+              ? AppCultureColors.jadeLight.withOpacity(0.4)
+              : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? AppCultureColors.heritageJade : AppCultureColors.border,
+            color: isSelected
+                ? AppCultureColors.heritageJade
+                : AppCultureColors.border,
             width: isSelected ? 1.8 : 1,
           ),
         ),
@@ -396,7 +453,10 @@ class _PaymentModalState extends State<PaymentModal> {
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppCultureColors.textMuted,
+                    ),
                   ),
                 ],
               ),

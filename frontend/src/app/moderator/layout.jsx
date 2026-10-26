@@ -70,13 +70,6 @@ export default function ModeratorLayout({ children }) {
       icon: MapPin,
       badge: null,
     },
-    {
-      id: "experiences",
-      label: "Trải nghiệm",
-      href: "/moderator/experiences",
-      icon: Sparkles,
-      badge: null,
-    },
 
     {
       id: "ai-knowledge",
