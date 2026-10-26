@@ -57,12 +57,10 @@ export default function ProviderLayout({ children }) {
   // Dynamic danh sách thông báo duyệt bài (sẵn sàng gắn API)
   const [notifications, setNotifications] = useState([]);
 
-  // Trang Quản lý Điểm đến & Trải nghiệm: khóa khung 100vh, cố định header & filter, chỉ danh sách thẻ tự cuộn
-  const isScrollLockedPage =
-    pathname?.startsWith("/provider/destinations") ||
-    pathname?.startsWith("/provider/experiences");
+  // Trang Quản lý Điểm đến: khóa khung 100vh, cố định header & filter, chỉ danh sách thẻ tự cuộn
+  const isScrollLockedPage = pathname?.startsWith("/provider/destinations");
 
-  // 6 Danh mục điều hướng Sidebar của Đối tác
+  // Danh mục điều hướng Sidebar của Đối tác
   const navMenuItems = [
     {
       id: "overview",
@@ -82,13 +80,6 @@ export default function ProviderLayout({ children }) {
       href: "/provider/destinations",
       icon: MapPin,
     },
-    {
-      id: "experiences",
-      label: "Quản lý Trải nghiệm",
-      href: "/provider/experiences",
-      icon: Sparkles,
-    },
-
     {
       id: "routes",
       label: "Lộ trình Văn hóa",

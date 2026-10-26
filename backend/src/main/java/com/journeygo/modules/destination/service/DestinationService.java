@@ -27,6 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 
 import java.util.HashSet;
+import com.journeygo.modules.experience.entity.Experience;
+import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
+import com.journeygo.modules.experience.repository.ExperienceRepository;
 import java.util.List;
 import java.util.Set;
 
@@ -39,6 +42,7 @@ public class DestinationService {
     private final UserRepository userRepository;
     private final RegionRepository regionRepository;
     private final ThemeRepository themeRepository;
+    private final ExperienceRepository experienceRepository;
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
             "id", "name", "address", "latitude", "longitude",
@@ -251,8 +255,15 @@ public class DestinationService {
         existing.setStatus(DestinationStatus.DRAFT);
         existing.setApproved(false);
 
+        List<Experience> exps = experienceRepository.findByDestination_Id(existing.getId());
+        for (Experience exp : exps) {
+            if (exp.getStatus() != ExperienceStatus.INACTIVE) {
+                exp.setStatus(ExperienceStatus.DRAFT);
+                experienceRepository.save(exp);
+            }
+        }
+
         Destination saved = destinationRepository.save(existing);
-        log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
         log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
         return DestinationResponse.fromEntity(saved);
     }
@@ -274,6 +285,13 @@ public class DestinationService {
     public DestinationResponse publish(Long id) {
         Destination destination = findOrThrow(id);
         destination.publish();
+        List<Experience> exps = experienceRepository.findByDestination_Id(id);
+        for (Experience exp : exps) {
+            if (exp.getStatus() != ExperienceStatus.INACTIVE) {
+                exp.setStatus(ExperienceStatus.PUBLISHED);
+                experienceRepository.save(exp);
+            }
+        }
         Destination saved = destinationRepository.save(destination);
         log.info("Published destination id={}", saved.getId());
         return DestinationResponse.fromEntity(saved);
@@ -284,6 +302,13 @@ public class DestinationService {
     public DestinationResponse reject(Long id) {
         Destination destination = findOrThrow(id);
         destination.reject();
+        List<Experience> exps = experienceRepository.findByDestination_Id(id);
+        for (Experience exp : exps) {
+            if (exp.getStatus() != ExperienceStatus.INACTIVE) {
+                exp.setStatus(ExperienceStatus.DRAFT);
+                experienceRepository.save(exp);
+            }
+        }
         Destination saved = destinationRepository.save(destination);
         log.info("Rejected destination id={}", saved.getId());
         return DestinationResponse.fromEntity(saved);
@@ -295,8 +320,22 @@ public class DestinationService {
         Destination destination = findOrThrow(id);
         if (approved) {
             destination.publish();
+            List<Experience> exps = experienceRepository.findByDestination_Id(id);
+            for (Experience exp : exps) {
+                if (exp.getStatus() != ExperienceStatus.INACTIVE) {
+                    exp.setStatus(ExperienceStatus.PUBLISHED);
+                    experienceRepository.save(exp);
+                }
+            }
         } else {
             destination.reject();
+            List<Experience> exps = experienceRepository.findByDestination_Id(id);
+            for (Experience exp : exps) {
+                if (exp.getStatus() != ExperienceStatus.INACTIVE) {
+                    exp.setStatus(ExperienceStatus.DRAFT);
+                    experienceRepository.save(exp);
+                }
+            }
         }
         Destination saved = destinationRepository.save(destination);
         log.info("Destination id={} approved={} status={}", saved.getId(), saved.isApproved(), saved.getStatus());

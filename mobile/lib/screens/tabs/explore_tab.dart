@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/destination_model.dart';
+import '../../core/models/experience_model.dart';
 import '../../core/services/destination_service.dart';
+import '../../core/services/experience_service.dart';
 import '../modals/payment_modal.dart';
 
 class ExploreTab extends StatefulWidget {
@@ -13,14 +15,19 @@ class ExploreTab extends StatefulWidget {
 
 class _ExploreTabState extends State<ExploreTab> {
   final DestinationService _destinationService = DestinationService();
+  final ExperienceService _experienceService = ExperienceService();
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _aiChatController = TextEditingController();
 
   List<DestinationModel> _allRoutes = [];
+  List<ExperienceModel> _allExperiences = [];
   bool _isLoading = true;
 
   // Mode: 'direct' or 'ai'
   String _activeMode = 'direct';
+
+  // Sub-tab: 'experiences' (Gói Tour trải nghiệm) or 'destinations' (Điểm đến di sản)
+  String _activeContentType = 'experiences';
 
   // Filters for Direct mode
   String _selectedCategory = 'all';
@@ -57,13 +64,35 @@ class _ExploreTabState extends State<ExploreTab> {
 
   Future<void> _loadRoutes() async {
     setState(() => _isLoading = true);
-    final list = await _destinationService.getApprovedDestinations();
+    final results = await Future.wait([
+      _destinationService.getApprovedDestinations(),
+      _experienceService.getPublishedExperiences(),
+    ]);
+
     if (mounted) {
       setState(() {
-        _allRoutes = list;
+        _allRoutes = results[0] as List<DestinationModel>;
+        _allExperiences = results[1] as List<ExperienceModel>;
         _isLoading = false;
       });
     }
+  }
+
+  List<ExperienceModel> get _filteredExperiences {
+    return _allExperiences.where((e) {
+      // TUÂN THỦ NGHIỆP VỤ: Tourist chỉ xem Tour đã được duyệt / xuất bản
+      if (!e.isPublished) return false;
+
+      final matchesSearch = _searchQuery.isEmpty ||
+          e.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          e.description.toLowerCase().contains(_searchQuery.toLowerCase());
+
+      final matchesCategory = _selectedCategory == 'all' ||
+          (_selectedCategory == 'free' && e.price == 0) ||
+          (_selectedCategory != 'free');
+
+      return matchesSearch && matchesCategory;
+    }).toList();
   }
 
   List<DestinationModel> get _filteredRoutes {
@@ -120,6 +149,18 @@ class _ExploreTabState extends State<ExploreTab> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => PaymentModal(route: route),
+    );
+  }
+
+  void _openExperiencePaymentModal(ExperienceModel exp) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => PaymentModal(
+        experience: exp,
+        onPaymentSuccess: _loadRoutes,
+      ),
     );
   }
 
@@ -313,8 +354,107 @@ class _ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildDirectModeView() {
+    final activeCount = _activeContentType == 'experiences'
+        ? _filteredExperiences.length
+        : _filteredRoutes.length;
+
+    final activeNoun = _activeContentType == 'experiences'
+        ? 'gói tour trải nghiệm'
+        : 'điểm đến di sản';
+
     return Column(
       children: [
+        // Phân loại Nội dung: Gói Tour vs Điểm Đến Di Sản
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppCultureColors.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _activeContentType = 'experiences'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _activeContentType == 'experiences'
+                            ? AppCultureColors.heritageJade
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.explore_rounded,
+                            size: 16,
+                            color: _activeContentType == 'experiences'
+                                ? Colors.white
+                                : AppCultureColors.textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Gói Tour (${_filteredExperiences.length})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _activeContentType == 'experiences'
+                                  ? Colors.white
+                                  : AppCultureColors.textDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _activeContentType = 'destinations'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _activeContentType == 'destinations'
+                            ? AppCultureColors.oceanBlue
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.account_balance_rounded,
+                            size: 16,
+                            color: _activeContentType == 'destinations'
+                                ? Colors.white
+                                : AppCultureColors.textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Điểm Đến (${_filteredRoutes.length})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _activeContentType == 'destinations'
+                                  ? Colors.white
+                                  : AppCultureColors.textDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
         // Search bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -322,7 +462,9 @@ class _ExploreTabState extends State<ExploreTab> {
             controller: _searchController,
             onChanged: (val) => setState(() => _searchQuery = val),
             decoration: InputDecoration(
-              hintText: 'Tìm Văn Miếu, Bát Tràng, Tràng An...',
+              hintText: _activeContentType == 'experiences'
+                  ? 'Tìm tour Khám phá Khuê Văn Các, Thăng Long...'
+                  : 'Tìm Văn Miếu, Bát Tràng, Tràng An...',
               hintStyle: const TextStyle(fontSize: 13, color: AppCultureColors.textLight),
               prefixIcon: const Icon(Icons.search_rounded, color: AppCultureColors.textMuted, size: 20),
               filled: true,
@@ -370,7 +512,7 @@ class _ExploreTabState extends State<ExploreTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Tìm thấy ${_filteredRoutes.length} lộ trình di sản',
+                'Tìm thấy $activeCount $activeNoun',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -379,14 +521,14 @@ class _ExploreTabState extends State<ExploreTab> {
               ),
               const Row(
                 children: [
-                  Icon(Icons.near_me_outlined, size: 14, color: AppCultureColors.oceanBlue),
+                  Icon(Icons.verified_outlined, size: 14, color: AppCultureColors.heritageJade),
                   SizedBox(width: 4),
                   Text(
-                    'Sắp xếp theo gợi ý',
+                    'Đã kiểm duyệt',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: AppCultureColors.oceanBlue,
+                      color: AppCultureColors.heritageJade,
                     ),
                   ),
                 ],
@@ -395,20 +537,60 @@ class _ExploreTabState extends State<ExploreTab> {
           ),
         ),
 
-        // Routes list
+        // Content list
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: AppCultureColors.heritageJade))
-              : ListView.builder(
-                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 90),
-                  itemCount: _filteredRoutes.length,
-                  itemBuilder: (context, idx) {
-                    final route = _filteredRoutes[idx];
-                    return _buildFullRouteCard(route);
-                  },
-                ),
+              : _activeContentType == 'experiences'
+                  ? _filteredExperiences.isEmpty
+                      ? _buildEmptyState('Không tìm thấy gói tour nào phù hợp.')
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 90),
+                          itemCount: _filteredExperiences.length,
+                          itemBuilder: (context, idx) {
+                            final exp = _filteredExperiences[idx];
+                            return _buildExperienceCard(exp);
+                          },
+                        )
+                  : _filteredRoutes.isEmpty
+                      ? _buildEmptyState('Không tìm thấy điểm đến nào phù hợp.')
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 90),
+                          itemCount: _filteredRoutes.length,
+                          itemBuilder: (context, idx) {
+                            final route = _filteredRoutes[idx];
+                            return _buildFullRouteCard(route);
+                          },
+                        ),
         ),
       ],
+    );
+  }
+
+  Widget _buildEmptyState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppCultureColors.surfaceSubtle,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.travel_explore_rounded, size: 40, color: AppCultureColors.textMuted),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              message,
+              style: const TextStyle(fontSize: 13, color: AppCultureColors.textMuted, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -674,6 +856,291 @@ class _ExploreTabState extends State<ExploreTab> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExperienceCard(ExperienceModel exp) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppCultureColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cover photo with badges & pills
+          SizedBox(
+            height: 170,
+            width: double.infinity,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(21)),
+                  child: Image.asset(exp.coverImage, fit: BoxFit.cover),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(21)),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withOpacity(0.35),
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.75),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+                // Top Left: Price & Duration
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: exp.price > 0 ? Colors.white : AppCultureColors.heritageJade,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          exp.formattedPrice,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: exp.price > 0 ? AppCultureColors.textDark : Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.65),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.schedule_rounded, color: Colors.white, size: 12),
+                            const SizedBox(width: 4),
+                            Text(
+                              exp.formattedDuration,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Top Right: Rating
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.92),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.star_rounded, color: AppCultureColors.gold, size: 14),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${exp.rating}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Bottom-left on image: Tour tương tác đã duyệt
+                Positioned(
+                  bottom: 10,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppCultureColors.heritageJade.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified_rounded, color: Colors.white, size: 12),
+                        SizedBox(width: 4),
+                        Text(
+                          'TOUR ĐÃ ĐƯỢC DUYỆT',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Content body
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exp.title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppCultureColors.textDark,
+                    height: 1.3,
+                  ),
+                ),
+                if (exp.description.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    exp.description,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppCultureColors.textMuted,
+                      height: 1.4,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 12),
+
+                // Meta pills (Task, check-in, points)
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildMetaTag(
+                      Icons.quiz_outlined,
+                      '${exp.taskCount} Thử thách & Đố vui',
+                      const Color(0xFF6366F1),
+                      const Color(0xFFEEF2FF),
+                    ),
+                    _buildMetaTag(
+                      Icons.place_outlined,
+                      '${exp.checkInPointCount} Trạm Check-in GPS',
+                      AppCultureColors.heritageJade,
+                      const Color(0xFFECFDF5),
+                    ),
+                    _buildMetaTag(
+                      Icons.stars_rounded,
+                      '+150 Điểm thưởng',
+                      const Color(0xFFD97706),
+                      const Color(0xFFFFFBEB),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+
+                // Footer CTA Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Giá trọn gói tour',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppCultureColors.textLight,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          exp.formattedPrice,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: AppCultureColors.heritageJade,
+                          ),
+                        ),
+                      ],
+                    ),
+                    ElevatedButton(
+                      onPressed: () => _openExperiencePaymentModal(exp),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppCultureColors.heritageJade,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.confirmation_number_outlined, size: 16),
+                          SizedBox(width: 6),
+                          Text(
+                            'Đặt Vé Tour',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetaTag(IconData icon, String text, Color fgColor, Color bgColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: fgColor),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: fgColor,
             ),
           ),
         ],

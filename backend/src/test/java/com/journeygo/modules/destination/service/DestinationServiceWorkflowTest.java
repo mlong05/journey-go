@@ -46,6 +46,9 @@ class DestinationServiceWorkflowTest {
     @Mock
     private ThemeRepository themeRepository;
 
+    @Mock
+    private com.journeygo.modules.experience.repository.ExperienceRepository experienceRepository;
+
     @InjectMocks
     private DestinationService destinationService;
 

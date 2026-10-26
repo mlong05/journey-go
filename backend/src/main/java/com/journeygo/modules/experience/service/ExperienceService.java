@@ -51,7 +51,7 @@ public class ExperienceService {
     @Transactional(readOnly = true)
     public List<ExperienceResponse> getByDestinationId(Long destinationId) {
         return experienceRepository.findByDestinationIdWithOwner(destinationId).stream()
-                .peek(this::hideDraftFromNonOwner)
+                .filter(this::isAccessibleToCurrentUser)
                 .map(this::toResponseWithCounts)
                 .toList();
     }
@@ -231,15 +231,29 @@ public class ExperienceService {
     }
 
 
-    private void hideDraftFromNonOwner(Experience e) {
+    private boolean isAccessibleToCurrentUser(Experience e) {
+        if (e.getStatus() == ExperienceStatus.INACTIVE) {
+            return false;
+        }
+        if (e.getStatus() == ExperienceStatus.PUBLISHED) {
+            return true;
+        }
         if (e.getStatus() == ExperienceStatus.DRAFT) {
-
-            if (com.journeygo.common.security.AuthorizationGuard.isAdmin()) return;
-
-            Long ownerId = e.getCreatedBy() != null ? e.getCreatedBy().getId() : null;
-            if (ownerId != null && ownerId.equals(com.journeygo.common.security.AuthorizationGuard.currentUserId())) {
-                return;
+            try {
+                if (AuthorizationGuard.isAdmin() || AuthorizationGuard.hasRole("MODERATOR")) {
+                    return true;
+                }
+                Long ownerId = e.getCreatedBy() != null ? e.getCreatedBy().getId() : null;
+                return ownerId != null && ownerId.equals(AuthorizationGuard.currentUserId());
+            } catch (Exception ignored) {
+                return false;
             }
+        }
+        return false;
+    }
+
+    private void hideDraftFromNonOwner(Experience e) {
+        if (!isAccessibleToCurrentUser(e)) {
             throw new ResourceNotFoundException("Experience", e.getId());
         }
     }

@@ -21,8 +21,14 @@ import {
   Info,
   AlertTriangle,
   ChevronDown,
-  Landmark,
+  ChevronUp,
   Headphones,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Compass,
+  Trophy,
 } from "lucide-react";
 import {
   destinationService,
@@ -31,6 +37,14 @@ import {
   EditDestinationModal,
   CulturalContentManagerModal,
 } from "@/features/destination";
+import {
+  experienceService,
+  CreateExperienceModal as CreateExpModal,
+  EditExperienceModal as EditExpModal,
+  TaskManager as TaskManagerModal,
+  SlotManager as SlotManagerModal,
+  CheckInPointManagerModal as CheckInModal,
+} from "@/features/experience";
 
 const STATUS = {
   PENDING: "pending",
@@ -99,14 +113,56 @@ export default function ProviderDestinationsPage() {
   const [contentManagerTarget, setContentManagerTarget] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [toastMessage, setToastMessage] = useState("");
   const [toastTone, setToastTone] = useState("success");
+
+  // ── State quản lý Trải nghiệm gắn với Điểm đến ──
+  const [detailExp, setDetailExp] = useState(null);
+  const [loadingExp, setLoadingExp] = useState(false);
+  const [expCreateOpen, setExpCreateOpen] = useState(false);
+  const [expEditTarget, setExpEditTarget] = useState(null);
+  const [expTaskTarget, setExpTaskTarget] = useState(null);
+  const [expSlotTarget, setExpSlotTarget] = useState(null);
+  const [expCheckInTarget, setExpCheckInTarget] = useState(null);
+  const [expDescExpanded, setExpDescExpanded] = useState(false);
 
   const showToast = useCallback((msg, tone = "success") => {
     setToastMessage(msg);
     setToastTone(tone);
     setTimeout(() => setToastMessage(""), 4000);
   }, []);
+
+  const loadExperienceForDestination = useCallback(async (destinationId) => {
+    if (!destinationId) {
+      setDetailExp(null);
+      return;
+    }
+    setExpDescExpanded(false);
+    setLoadingExp(true);
+    try {
+      const exp = await experienceService.getExperienceByDestinationId(destinationId);
+      setDetailExp(exp || null);
+    } catch {
+      setDetailExp(null);
+    } finally {
+      setLoadingExp(false);
+    }
+  }, []);
+
+  const handleExpCreated = useCallback((newExp) => {
+    setExpCreateOpen(false);
+    setDetailExp(newExp);
+    showToast("Đã thiết lập gói trải nghiệm mới thành công!", "success");
+  }, [showToast]);
+
+  const handleExpUpdated = useCallback((updatedExp) => {
+    setExpEditTarget(null);
+    setDetailExp(updatedExp);
+    showToast("Đã cập nhật thông tin trải nghiệm thành công!", "success");
+  }, [showToast]);
+
 
   const fetchAllList = useCallback(async () => {
     setIsLoading(true);
@@ -188,7 +244,10 @@ export default function ProviderDestinationsPage() {
     try {
       const detail = await destinationService.getById(id);
       const normalized = normalizeDestination(detail, STATUS.PENDING);
-      if (normalized) setDetailTarget(normalized);
+      if (normalized) {
+        setDetailTarget(normalized);
+        loadExperienceForDestination(id);
+      }
     } catch (err) {
       console.error("[Provider Destinations] Detail error:", err);
       showToast(
@@ -196,7 +255,7 @@ export default function ProviderDestinationsPage() {
         "error"
       );
     }
-  }, [showToast]);
+  }, [loadExperienceForDestination, showToast]);
 
   const handleCreated = useCallback(
     async (newDest) => {
@@ -353,6 +412,39 @@ export default function ProviderDestinationsPage() {
       return matchSearch && matchRegion && matchStatus;
     });
   }, [destinations, searchQuery, selectedRegion, statusTab, provinceList]);
+
+  // Reset về trang 1 khi thay đổi điều kiện tìm kiếm/bộ lọc
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedRegion, selectedCategory, statusTab]);
+
+  const totalElements = filteredDestinations.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const visiblePages = useMemo(() => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const start = Math.max(1, safeCurrentPage - 2);
+    const end = Math.min(totalPages, safeCurrentPage + 2);
+    const pages = [];
+    for (let p = start; p <= end; p++) pages.push(p);
+    if (start > 1) {
+      pages.unshift(1);
+      if (start > 2) pages.splice(1, 0, "...");
+    }
+    if (end < totalPages) {
+      if (end < totalPages - 1) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  }, [totalPages, safeCurrentPage]);
+
+  const pagedDestinations = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredDestinations.slice(start, start + pageSize);
+  }, [filteredDestinations, safeCurrentPage, pageSize]);
 
   const toastPalette = {
     success: "bg-emerald-900 border-emerald-600 text-white",
@@ -552,8 +644,8 @@ export default function ProviderDestinationsPage() {
         </div>
       )}
 
-      {/* ── 3. KHU VỰC DANH SÁCH THẺ (CHỈ DUY NHẤT VÙNG NÀY CUỘN DỌC) ── */}
-      <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pr-1.5 pb-6 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+      {/* ── 3. KHU VỰC DANH SÁCH THẺ VÀ PHÂN TRANG (CỐ ĐỊNH PHÂN TRANG, CHỈ CUỘN BÊN TRONG CÁC THẺ) ── */}
+      <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
         {isLoading && destinations.length === 0 ? (
           <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-2xs">
             <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
@@ -590,131 +682,219 @@ export default function ProviderDestinationsPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {filteredDestinations.map((dest) => (
-              <div
-                key={dest.id}
-                className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs hover:shadow-xl hover:border-emerald-300 hover:-translate-y-1 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col justify-between overflow-hidden group"
-              >
-                <div>
-                  {/* Hero Cover Card: Gradient di sản nghệ thuật + Badge nổi bật */}
-                  <div className="relative h-36 overflow-hidden bg-gradient-to-br from-emerald-800 via-teal-900 to-slate-900 p-4 flex flex-col justify-between">
-                    {/* Họa tiết trang trí mờ tinh tế */}
-                    <div className="absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
-                    <div className="absolute -left-6 -top-6 w-28 h-28 rounded-full bg-teal-400/10 blur-xl pointer-events-none" />
-                    <div className="absolute right-3 bottom-2 text-white/5 pointer-events-none">
-                      <Landmark size={80} strokeWidth={1} />
+          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
+            {/* Thanh tiêu đề các cột (Cố định phía trên danh sách thẻ) */}
+            <div className="shrink-0 hidden lg:grid grid-cols-12 gap-4 px-5 py-3 bg-slate-100/90 border border-slate-200/90 rounded-2xl text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2.5 shadow-2xs">
+              <div className="col-span-1 text-center">STT</div>
+              <div className="col-span-3">Điểm đến di tích</div>
+              <div className="col-span-3">Địa chỉ thực địa</div>
+              <div className="col-span-2">Sức chứa</div>
+              <div className="col-span-1 text-center">Trạng thái</div>
+              <div className="col-span-2 text-left">Thao tác</div>
+            </div>
+
+            {/* Danh sách các thanh ngang điểm đến (CHỈ DUY NHẤT VÙNG NÀY CUỘN LÊN XUỐNG) */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1.5 space-y-2.5 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+              {pagedDestinations.map((dest, idx) => {
+                const stt = (safeCurrentPage - 1) * pageSize + idx + 1;
+                return (
+                  <div
+                    key={dest.id}
+                    className="group bg-white rounded-2xl border border-slate-200/90 hover:border-emerald-300 hover:shadow-sm transition-all duration-200 p-4 lg:py-3 lg:px-5 flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:gap-4 lg:items-center"
+                  >
+                    {/* Cột STT */}
+                    <div className="col-span-1 flex items-center justify-center">
+                      <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 border border-slate-200/80 flex items-center justify-center font-mono text-xs font-bold shrink-0">
+                        {stt}
+                      </span>
                     </div>
 
-                    {/* Hàng trên: Mã ID + Badge trạng thái */}
-                    <div className="relative z-10 flex items-center justify-between gap-2">
-                      <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md text-emerald-200 border border-emerald-400/20 shadow-xs">
-                        #{dest.id}
-                      </span>
+                    {/* Cột 1: Thông tin chính (Tên điểm đến) */}
+                    <div className="col-span-11 lg:col-span-3 min-w-0 flex items-center">
+                      <h3
+                        className="text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors truncate"
+                        title={dest.name}
+                      >
+                        {dest.name}
+                      </h3>
+                    </div>
 
+                    {/* Cột 2: Địa chỉ thực địa */}
+                    <div className="col-span-12 lg:col-span-3 min-w-0 flex items-start gap-1.5 text-xs text-slate-600">
+                      <MapPin size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2 leading-relaxed" title={dest.address}>
+                        {dest.address || "Chưa cập nhật địa chỉ hành chính"}
+                      </span>
+                    </div>
+
+                    {/* Cột 3: Sức chứa */}
+                    <div className="col-span-6 lg:col-span-2 flex items-center min-w-0">
+                      <div className="flex items-center gap-2 text-xs text-slate-600 font-medium truncate">
+                        <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                          <Users size={13} />
+                        </div>
+                        <span className="truncate">
+                          {dest.capacity ? (
+                            <>
+                              <strong className="font-bold text-slate-900">
+                                {Number(dest.capacity).toLocaleString("vi-VN")}
+                              </strong>
+                              <span className="text-slate-500 text-[11px] ml-1">du khách/lượt</span>
+                            </>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Chưa đặt sức chứa</span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Cột 4: Trạng thái phê duyệt */}
+                    <div className="col-span-6 lg:col-span-1 flex lg:justify-center items-center">
                       {dest.status === STATUS.APPROVED && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-500/90 text-white backdrop-blur-md shadow-xs ring-1 ring-emerald-400/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]" />
-                          Đang hoạt động
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />
+                          <span>Hoạt động</span>
                         </span>
                       )}
                       {dest.status === STATUS.PENDING && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-amber-500/90 text-white backdrop-blur-md shadow-xs ring-1 ring-amber-300/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                          Chờ phê duyệt
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          <span>Chờ duyệt</span>
                         </span>
                       )}
                       {dest.status === STATUS.REVOKED && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-orange-500/90 text-white backdrop-blur-md shadow-xs ring-1 ring-orange-300/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                          Chờ duyệt lại
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                          <span>Duyệt lại</span>
                         </span>
                       )}
                     </div>
 
-                    {/* Hàng dưới: Sức chứa du khách */}
-                    <div className="relative z-10 flex items-center justify-end">
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-slate-900/60 backdrop-blur-md px-3 py-1 rounded-full text-slate-100 border border-white/10 shadow-xs">
-                        <Users size={12} className="text-emerald-400" />
-                        <span>
-                          {dest.capacity ? `${Number(dest.capacity).toLocaleString("vi-VN")} du khách/lượt` : "Chưa đặt sức chứa"}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Body: Tên điểm đến, Địa chỉ, Tọa độ GPS */}
-                  <div className="p-5 space-y-3">
-                    <h3 className="text-base font-extrabold text-slate-900 group-hover:text-emerald-700 transition-colors line-clamp-1 tracking-tight" title={dest.name}>
-                      {dest.name}
-                    </h3>
-
-                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed min-h-[36px] flex items-start gap-1.5">
-                      <MapPin size={13} className="text-emerald-600 mt-0.5 shrink-0" />
-                      <span className="break-words">{dest.address || "Chưa cập nhật địa chỉ hành chính"}</span>
-                    </p>
-
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-medium px-2.5 py-1 rounded-xl bg-slate-50 text-slate-600 border border-slate-200/80 group-hover:bg-emerald-50/50 group-hover:text-emerald-700 group-hover:border-emerald-200/60 transition-colors max-w-full truncate">
-                        <Navigation size={12} className="shrink-0 text-emerald-600" />
-                        <span className="truncate">
-                          {dest.latitude ?? "—"}, {dest.longitude ?? "—"}
-                        </span>
-                      </span>
+                    {/* Cột 5: Cụm nút thao tác (Chi tiết, Chỉnh sửa) - Căn lề trái */}
+                    <div className="col-span-12 lg:col-span-2 flex items-center justify-start gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleViewDetail(dest.id)}
+                        className="h-8 px-3 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-700 bg-white text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                        title="Xem thông tin chi tiết điểm đến & thuyết minh"
+                      >
+                        <Eye size={13} className="text-emerald-600" />
+                        <span>Chi tiết</span>
+                      </button>
 
                       <button
                         type="button"
-                        onClick={() => setContentManagerTarget(dest)}
-                        className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-xl bg-amber-50/90 text-amber-850 border border-amber-200/90 hover:bg-amber-100 text-amber-900 transition-colors cursor-pointer shrink-0 group/pill"
-                        title="Nhấp để mở kho thuyết minh đa phương tiện"
+                        onClick={() => setEditTarget(dest)}
+                        className="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer shrink-0"
+                        title="Chỉnh sửa thông tin điểm đến"
                       >
-                        <Headphones size={12} className="text-amber-600 group-hover/pill:scale-110 transition-transform" />
-                        <span>{dest.contentCount ?? 0} thuyết minh</span>
+                        <Edit3 size={13} />
+                        <span>Sửa</span>
                       </button>
                     </div>
                   </div>
-                </div>
+                );
+              })}
+            </div>
 
-                {/* Footer Actions: Dock tương tác */}
-                <div className="px-4 sm:px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => handleViewDetail(dest.id)}
-                      className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 shadow-2xs transition-all active:scale-95 flex items-center gap-1 cursor-pointer shrink-0"
-                      title="Xem thông tin chi tiết điểm đến"
-                    >
-                      <Eye size={13} />
-                      <span className="hidden xs:inline">Chi tiết</span>
-                    </button>
+            {/* Thanh phân trang ở dưới (CỐ ĐỊNH, KHÔNG BỊ CUỘN) */}
+            <div className="shrink-0 mt-3 px-4 py-2.5 bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-slate-600 font-medium">
+                  Trang <strong className="text-slate-900 font-bold">{safeCurrentPage}</strong> /{" "}
+                  <strong className="text-slate-900 font-bold">{totalPages}</strong>{" "}
+                  <span className="text-slate-400">
+                    (Tổng{" "}
+                    <strong className="text-slate-700 font-bold">
+                      {totalElements.toLocaleString("vi-VN")}
+                    </strong>{" "}
+                    điểm đến)
+                  </span>
+                </span>
 
-                    {/* Nút Nội dung & Thuyết minh với huy hiệu đếm */}
-                    <button
-                      type="button"
-                      onClick={() => setContentManagerTarget(dest)}
-                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 text-amber-900 border border-amber-300/80 font-bold text-xs shadow-2xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0 group/btn"
-                      title="Quản lý thuyết minh audio, video, câu chuyện văn hóa"
-                    >
-                      <Headphones size={13} className="text-amber-600 group-hover/btn:scale-110 transition-transform" />
-                      <span>Thuyết minh</span>
-                      <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[10px] font-black shadow-2xs">
-                        {dest.contentCount ?? 0}
-                      </span>
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setEditTarget(dest)}
-                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs shadow-emerald-600/20 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shrink-0"
-                    title="Chỉnh sửa thông tin điểm đến"
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 font-medium text-[11px]">
+                    Số dòng/trang:
+                  </span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="px-2 py-1 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer transition-colors"
                   >
-                    <Edit3 size={13} />
-                    <span>Chỉnh sửa</span>
-                  </button>
+                    {[5, 10, 20, 50].map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            ))}
+
+              {/* Nút phân trang */}
+              <div className="flex items-center gap-1 self-center sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={safeCurrentPage <= 1}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Trang đầu"
+                >
+                  <ChevronsLeft size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safeCurrentPage <= 1}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Trang trước"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+
+                {visiblePages.map((p, idx) =>
+                  p === "..." ? (
+                    <span key={`dots-${idx}`} className="px-1 text-slate-400 font-bold">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={`page-${p}`}
+                      type="button"
+                      onClick={() => setCurrentPage(Number(p))}
+                      className={`min-w-[28px] h-7 px-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                        Number(p) === safeCurrentPage
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safeCurrentPage >= totalPages}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Trang sau"
+                >
+                  <ChevronRight size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={safeCurrentPage >= totalPages}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Trang cuối"
+                >
+                  <ChevronsRight size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -730,11 +910,6 @@ export default function ProviderDestinationsPage() {
           >
             <div className="flex items-start justify-between pb-4 border-b border-slate-100">
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-mono text-xs font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    #{detailTarget.id}
-                  </span>
-                </div>
                 <h3 className="text-base sm:text-lg font-black text-slate-900">
                   {detailTarget.name}
                 </h3>
@@ -817,44 +992,197 @@ export default function ProviderDestinationsPage() {
               </div>
             </div>
 
-            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2.5 flex-wrap">
-              <button
-                type="button"
-                onClick={() => {
-                  setContentManagerTarget(detailTarget);
-                  setDetailTarget(null);
-                }}
-                className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Headphones size={13} className="text-amber-600" />
-                <span>Nội dung &amp; Thuyết minh</span>
-                {detailTarget.contentCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-amber-600 text-white text-[10px] font-black">
-                    {detailTarget.contentCount}
-                  </span>
-                )}
-              </button>
+            {/* Khối Thuyết minh & Nội dung văn hóa nằm trong phần Chi tiết */}
+            <div className="mt-4 p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-orange-50/30 border border-amber-200/90 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shrink-0 shadow-xs shadow-amber-500/20">
+                    <Headphones size={20} />
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <h4 className="text-sm font-extrabold text-slate-900">
+                      Nội Dung &amp; Thuyết Minh Văn Hóa
+                    </h4>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-600 text-white text-[10px] font-black shadow-2xs">
+                      {detailTarget.contentCount ?? 0} nội dung
+                    </span>
+                  </div>
+                </div>
 
-              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
-                    setEditTarget(detailTarget);
+                    setContentManagerTarget(detailTarget);
                     setDetailTarget(null);
                   }}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="sm:self-center px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs inline-flex items-center justify-center gap-1.5 transition-all shadow-xs shadow-amber-600/20 active:scale-95 cursor-pointer shrink-0"
                 >
-                  <Edit3 size={13} />
-                  <span>Chỉnh sửa điểm đến</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDetailTarget(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-                >
-                  Đóng
+                  <Headphones size={14} />
+                  <span>Quản lý Thuyết minh</span>
                 </button>
               </div>
+            </div>
+
+            {/* ── Khối Gói Trải Nghiệm Tương Tác ── */}
+            <div className="mt-4 p-4.5 rounded-2xl border border-slate-200/90 bg-slate-50/70">
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/70">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                    <Compass size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">
+                      Gói Trải Nghiệm Tương Tác
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Nhiệm vụ khám phá, câu hỏi đố vui &amp; khung giờ tham quan
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {loadingExp ? (
+                <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                  <Loader2 size={16} className="animate-spin text-slate-400" />
+                  <span>Đang tải thông tin gói trải nghiệm...</span>
+                </div>
+              ) : !detailExp ? (
+                <div className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <p className="text-xs text-slate-600 leading-relaxed max-w-md">
+                    Điểm đến này chưa thiết lập gói trải nghiệm. Bạn có thể tạo gói trải nghiệm để mở bán vé tham quan, nhiệm vụ thực địa và câu hỏi đố vui cho du khách.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setExpCreateOpen(true)}
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+                  >
+                    <Plus size={14} />
+                    <span>Thiết lập Trải nghiệm</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-3 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h5 className="text-sm font-bold text-slate-900">
+                        {detailExp.title}
+                      </h5>
+                      {detailExp.description && (
+                        <div className="mt-1">
+                          <p
+                            className={`text-xs text-slate-600 leading-relaxed whitespace-pre-line ${
+                              !expDescExpanded ? "line-clamp-2" : ""
+                            }`}
+                          >
+                            {detailExp.description}
+                          </p>
+                          {(detailExp.description.length > 90 ||
+                            detailExp.description.includes("\n")) && (
+                            <button
+                              type="button"
+                              onClick={() => setExpDescExpanded((prev) => !prev)}
+                              className="mt-1 text-[11.5px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline inline-flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <span>
+                                {expDescExpanded
+                                  ? "Thu gọn văn bản"
+                                  : "Xem toàn bộ văn bản"}
+                              </span>
+                              {expDescExpanded ? (
+                                <ChevronUp size={12} />
+                              ) : (
+                                <ChevronDown size={12} />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-xs shrink-0 bg-white px-3 py-2 rounded-xl border border-slate-200">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                          Giá vé
+                        </span>
+                        <span className="font-extrabold text-slate-900">
+                          {Number(detailExp.price).toLocaleString("vi-VN")} {detailExp.currency || "VND"}
+                        </span>
+                      </div>
+                      <div className="h-6 w-px bg-slate-200" />
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                          Thời lượng
+                        </span>
+                        <span className="font-bold text-slate-700">
+                          {detailExp.durationMinutes ? `${detailExp.durationMinutes} phút` : "Chưa đặt"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60">
+                    <button
+                      type="button"
+                      onClick={() => setExpTaskTarget(detailExp)}
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Quản lý nhiệm vụ và đố vui tương tác"
+                    >
+                      <Trophy size={13} className="text-amber-600" />
+                      <span>Nhiệm vụ &amp; Đố vui</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpSlotTarget(detailExp)}
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Quản lý khung giờ và suất phục vụ"
+                    >
+                      <Clock size={13} className="text-sky-600" />
+                      <span>Khung giờ (Slots)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpCheckInTarget(detailExp)}
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Quản lý tọa độ trạm check-in thực địa"
+                    >
+                      <MapPin size={13} className="text-emerald-600" />
+                      <span>Trạm Check-in</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpEditTarget(detailExp)}
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Chỉnh sửa thông tin cơ bản gói trải nghiệm"
+                    >
+                      <Edit3 size={13} className="text-slate-600" />
+                      <span>Sửa</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-end gap-2.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditTarget(detailTarget);
+                  setDetailTarget(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shadow-emerald-600/20 active:scale-95 cursor-pointer"
+              >
+                <Edit3 size={13} />
+                <span>Chỉnh sửa điểm đến</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailTarget(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>
@@ -883,6 +1211,49 @@ export default function ProviderDestinationsPage() {
         onClose={() => setContentManagerTarget(null)}
         onUpdated={fetchAllList}
       />
+
+      {/* ── Các Modal nghiệp vụ Trải nghiệm gắn với Điểm đến ── */}
+      <CreateExpModal
+        isOpen={expCreateOpen}
+        onClose={() => setExpCreateOpen(false)}
+        onCreated={handleExpCreated}
+        destinations={detailTarget ? [detailTarget] : []}
+        defaultDestinationId={detailTarget?.id}
+        takenDestinationIds={new Set()}
+        theme="emerald"
+        title={`Thiết lập Trải nghiệm cho ${detailTarget?.name || ""}`}
+      />
+
+      <EditExpModal
+        isOpen={Boolean(expEditTarget)}
+        onClose={() => setExpEditTarget(null)}
+        onUpdated={handleExpUpdated}
+        experience={expEditTarget}
+        destinations={detailTarget ? [detailTarget] : []}
+        theme="emerald"
+      />
+
+      <TaskManagerModal
+        isOpen={Boolean(expTaskTarget)}
+        onClose={() => setExpTaskTarget(null)}
+        experience={expTaskTarget}
+        theme="emerald"
+      />
+
+      <SlotManagerModal
+        isOpen={Boolean(expSlotTarget)}
+        onClose={() => setExpSlotTarget(null)}
+        experience={expSlotTarget}
+        theme="emerald"
+      />
+
+      <CheckInModal
+        isOpen={Boolean(expCheckInTarget)}
+        onClose={() => setExpCheckInTarget(null)}
+        experience={expCheckInTarget}
+        onPointsUpdated={() => loadExperienceForDestination(detailTarget?.id)}
+      />
+
 
       </div>
   );
