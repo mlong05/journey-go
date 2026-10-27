@@ -12,18 +12,20 @@ import {
   MapPin,
   Compass,
   HelpCircle,
-  Bot,
+  BookOpen,
+  ScrollText,
   Building2,
   ChevronRight,
   Inbox,
 } from "lucide-react";
 import { SURFACE, HERO, KPI, TABLE, BADGE, BUTTON, INPUT } from "../admin/dashboard.tokens";
+import { moderationService } from "@/features/destination";
 
 /**
  * Trang Bảng Điều Khiển Ban Kiểm Định & Chuẩn Hóa Di Sản - JourneyGo
  * Đường dẫn: /moderator
- * - Redesign theo phong cách Metis: sạch, phẳng, ít gradient
- * - Giữ nguyên 100% state, props, hàm xử lý và API placeholders
+ * - Redesign theo phong cách Metis: sạch, phẳng, trang nhã cho website du lịch & di sản
+ * - Tích hợp trực tiếp dữ liệu hàng chờ từ moderationService
  */
 export default function ModeratorDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -33,36 +35,110 @@ export default function ModeratorDashboardPage() {
   // Dynamic KPI Stats
   const [kpiMetrics, setKpiMetrics] = useState({
     pendingCount: 0,
-    pendingTrend: "Chưa có hồ sơ mới sáng nay",
+    pendingTrend: "Đang tải dữ liệu hàng chờ...",
     publishedCount: 0,
-    publishedTrend: "Chuẩn hóa dữ liệu 100%",
+    publishedTrend: "Đang kiểm tra...",
     revisionCount: 0,
-    revisionTrend: "Đính chính niên đại và tọa độ",
+    revisionTrend: "Đang kiểm tra...",
     alertsCount: 0,
-    alertsTrend: "Cần thẩm định khẩn cấp",
+    alertsTrend: "Hệ thống giám sát ổn định",
   });
 
   // Dynamic Priority Queue Data
   const [queueData, setQueueData] = useState([]);
 
   useEffect(() => {
-    // [API INTEGRATION] Gắn hàm gọi API tại đây
-    // async function fetchDashboardData() {
-    //   setIsLoading(true);
-    //   try {
-    //     const [metricsRes, queueRes] = await Promise.all([
-    //       api.get("/moderator/dashboard-metrics"),
-    //       api.get("/moderator/priority-queue"),
-    //     ]);
-    //     setKpiMetrics(metricsRes.data);
-    //     setQueueData(queueRes.data);
-    //   } catch (err) {
-    //     console.error("Lỗi tải dữ liệu kiểm duyệt:", err);
-    //   } finally {
-    //     setIsLoading(false);
-    //   }
-    // }
-    // fetchDashboardData();
+    let isMounted = true;
+    async function fetchDashboardData() {
+      setIsLoading(true);
+      try {
+        const [destQueueRes, contentQueueRes, publishedDestsRes, rejectedDestsRes] =
+          await Promise.allSettled([
+            moderationService.getDestinationQueue(),
+            moderationService.getContentQueue(),
+            moderationService.getDestinationsByStatus("PUBLISHED"),
+            moderationService.getDestinationsByStatus("REJECTED"),
+          ]);
+
+        if (!isMounted) return;
+
+        const destQueue =
+          destQueueRes.status === "fulfilled" && Array.isArray(destQueueRes.value)
+            ? destQueueRes.value
+            : [];
+        const contentQueue =
+          contentQueueRes.status === "fulfilled" && Array.isArray(contentQueueRes.value)
+            ? contentQueueRes.value
+            : [];
+        const publishedDests =
+          publishedDestsRes.status === "fulfilled" && Array.isArray(publishedDestsRes.value)
+            ? publishedDestsRes.value
+            : [];
+        const rejectedDests =
+          rejectedDestsRes.status === "fulfilled" && Array.isArray(rejectedDestsRes.value)
+            ? rejectedDestsRes.value
+            : [];
+
+        const totalPending = destQueue.length + contentQueue.length;
+
+        setKpiMetrics({
+          pendingCount: totalPending,
+          pendingTrend:
+            totalPending > 0
+              ? `${destQueue.length} điểm đến, ${contentQueue.length} bài thuyết minh`
+              : "Hàng chờ hiện đang trống",
+          publishedCount: publishedDests.length,
+          publishedTrend: "Điểm đến đã chuẩn hóa & phát hành",
+          revisionCount: rejectedDests.length,
+          revisionTrend: "Hồ sơ yêu cầu đối tác hiệu đính",
+          alertsCount: 0,
+          alertsTrend: "Hệ thống giám sát ổn định",
+        });
+
+        // Xây dựng danh sách hàng chờ ưu tiên từ API thực tế
+        const mappedDestItems = destQueue.map((d) => ({
+          id: d.id,
+          code: `DEST-${d.id}`,
+          title: d.name,
+          type: "destination",
+          typeLabel: "Điểm đến & Di tích",
+          sender: d.createdBy || "Đối tác du lịch",
+          submittedTime: d.updatedAt
+            ? new Date(d.updatedAt).toLocaleDateString("vi-VN")
+            : "Mới cập nhật",
+          urgency: "urgent",
+          urgencyLabel: "Cần thẩm định",
+          actionHref: `/moderator/destinations`,
+          actionText: "Thẩm định ngay",
+        }));
+
+        const mappedContentItems = contentQueue.map((c) => ({
+          id: c.id,
+          code: `DOC-${c.id}`,
+          title: c.title || `Thuyết minh văn hóa #${c.id}`,
+          type: "cultural",
+          typeLabel: "Thuyết minh & Văn hóa",
+          sender: c.createdBy || "Biên tập viên",
+          submittedTime: c.updatedAt
+            ? new Date(c.updatedAt).toLocaleDateString("vi-VN")
+            : "Mới cập nhật",
+          urgency: "warning",
+          urgencyLabel: "Chờ phê duyệt",
+          actionHref: `/moderator/destinations`,
+          actionText: "Kiểm tra nội dung",
+        }));
+
+        setQueueData([...mappedDestItems, ...mappedContentItems]);
+      } catch (err) {
+        console.error("[Moderator Dashboard] Fetch error:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    fetchDashboardData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const kpiStats = [
@@ -137,7 +213,7 @@ export default function ModeratorDashboardPage() {
           </h1>
 
           <p className={HERO.subtitle}>
-            Đảm bảo 100% dữ liệu lịch sử, tọa độ thực địa và nội dung trí tuệ nhân tạo đạt chuẩn mực văn hóa Việt Nam trước khi tiếp cận du khách.
+            Đảm bảo 100% dữ liệu lịch sử, tọa độ thực địa và bài thuyết minh văn hóa đạt chuẩn mực di sản Việt Nam trước khi tiếp cận du khách.
           </p>
 
           <div className={`${HERO.rule} ${HERO.statusRow}`}>
@@ -176,10 +252,12 @@ export default function ModeratorDashboardPage() {
               </div>
 
               <div className={KPI.footerRow}>
-                <span className="text-xs text-slate-500 truncate">{stat.trend}</span>
+                <span className="text-xs text-slate-500 truncate mr-2" title={stat.trend}>
+                  {stat.trend}
+                </span>
                 <Link
                   href={stat.linkHref}
-                  className={KPI.link}
+                  className={`${KPI.link} shrink-0`}
                 >
                   {stat.linkText}
                 </Link>
@@ -230,9 +308,9 @@ export default function ModeratorDashboardPage() {
             >
               <option value="all">Tất cả loại hình</option>
               <option value="destination">Điểm đến và tọa độ</option>
+              <option value="cultural">Thuyết minh &amp; Di sản</option>
               <option value="route">Lộ trình và vé</option>
               <option value="quiz">Thử thách đố vui</option>
-              <option value="ai">Kiểm tra trí tuệ nhân tạo</option>
             </select>
           </div>
         </div>
@@ -290,17 +368,17 @@ export default function ModeratorDashboardPage() {
                         className={`${BADGE.base} ${
                           item.type === "destination"
                             ? BADGE.info
+                            : item.type === "cultural"
+                            ? BADGE.purple
                             : item.type === "route"
                             ? BADGE.success
-                            : item.type === "quiz"
-                            ? BADGE.warning
-                            : BADGE.purple
+                            : BADGE.warning
                         }`}
                       >
                         {item.type === "destination" && <MapPin size={11} />}
+                        {item.type === "cultural" && <BookOpen size={11} />}
                         {item.type === "route" && <Compass size={11} />}
                         {item.type === "quiz" && <HelpCircle size={11} />}
-                        {item.type === "ai" && <Bot size={11} />}
                         <span>{item.typeLabel || item.type}</span>
                       </span>
                     </td>

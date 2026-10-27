@@ -20,7 +20,7 @@ import {
   X,
   Compass,
   MapPin,
-  Bot,
+  BookOpen,
   Camera,
   ExternalLink,
   ChevronRight,

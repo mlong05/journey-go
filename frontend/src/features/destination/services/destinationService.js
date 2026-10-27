@@ -104,8 +104,15 @@ export async function getDestinationById(id) {
 }
 
 export async function setDestinationApproval(id, approved) {
-  const query = `?approved=${Boolean(approved)}`;
-  const res = await apiClient.patch(ENDPOINTS.APPROVE(id) + query);
+  const endpoint = approved
+    ? `/moderation/destinations/${id}/approve`
+    : `/moderation/destinations/${id}/reject`;
+  const res = await apiClient.patch(endpoint);
+  return unwrap(res);
+}
+
+export async function submitDestination(id) {
+  const res = await apiClient.post(`/moderation/destinations/${id}/submit`, {});
   return unwrap(res);
 }
 
@@ -122,6 +129,7 @@ export async function restoreDestination(id) {
 export const destinationService = {
   create: createDestination,
   update: updateDestination,
+  submit: submitDestination,
   getAll: getAllDestinations,
   getApproved: getApprovedDestinations,
   getDeleted: getDeletedDestinations,

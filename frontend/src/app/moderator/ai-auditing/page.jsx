@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Bot,
+  BookOpen,
+  ScrollText,
   AlertTriangle,
-  Sparkles,
   CheckCircle2,
   ShieldAlert,
   ShieldCheck,
@@ -17,21 +17,22 @@ import {
   Trash2,
   Check,
   X,
-  Cpu,
+  Library,
   RefreshCw,
   Database,
   ThumbsDown,
   Info,
   Inbox,
+  Landmark,
 } from "lucide-react";
 
 /**
- * Phân Hệ Kiểm Chuẩn & Hiệu Đính Tri Thức Trí Tuệ Nhân Tạo - JourneyGo
+ * Phân Hệ Kiểm Chuẩn & Hiệu Đính Thuyết Minh Di Sản - JourneyGo
  * Đường dẫn: /moderator/ai-auditing
- * - Giám sát và hiệu đính các câu trả lời của AI bị người dùng gắn cờ sai lệch
+ * - Giám sát và hiệu đính các bài thuyết minh, câu trả lời bị người dùng phản ánh sai lệch
  * - Quản trị cơ sở dữ liệu tri thức chuẩn mực văn hóa
- * - Dynamic state sẵn sàng kết nối API (không mock data tĩnh)
- * - Đảm bảo ngôn ngữ thuần Việt, không chứa chữ tiếng Anh trong ngoặc đơn
+ * - Dynamic state sẵn sàng kết nối API
+ * - Đảm bảo ngôn ngữ thuần Việt, giao diện trang nhã theo phong cách website du lịch & di sản
  */
 export default function AIAuditingPage() {
   const [toastMsg, setToastMsg] = useState("");
@@ -124,25 +125,25 @@ export default function AIAuditingPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 ring-4 ring-indigo-100" />
-              <span className="text-[11px] font-black uppercase tracking-wider text-indigo-700">
-                Phân Hệ Giám Sát Trí Tuệ Nhân Tạo
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-500 ring-4 ring-teal-100" />
+              <span className="text-[11px] font-black uppercase tracking-wider text-teal-700">
+                Phân Hệ Chuẩn Hóa Tri Thức &amp; Thuyết Minh
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              Kiểm Chuẩn & Hiệu Đính Tri Thức AI
+              Kiểm Chuẩn &amp; Hiệu Đính Thuyết Minh Di Sản
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl">
-              Rà soát câu trả lời của Trợ lý ảo thuyết minh bị người dùng báo cáo sai lệch lịch sử và chuẩn hóa bộ dữ liệu tri thức gốc.
+              Rà soát các bài thuyết minh, câu trả lời bị du khách phản ánh sai lệch niên đại, dữ liệu lịch sử và chuẩn hóa kho tàng tri thức di sản.
             </p>
           </div>
 
-          {/* Badge hệ điều hành AI */}
-          <div className="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3.5 py-2 rounded-2xl text-xs shrink-0 self-start md:self-auto">
-            <Bot size={16} className="text-indigo-600" />
+          {/* Badge hệ điều hành */}
+          <div className="inline-flex items-center gap-2 bg-teal-50 border border-teal-200 px-3.5 py-2 rounded-2xl text-xs shrink-0 self-start md:self-auto">
+            <BookOpen size={16} className="text-teal-600" />
             <div>
-              <p className="text-[10px] text-slate-400 font-semibold uppercase">Mô hình hoạt động</p>
-              <p className="text-xs font-black text-indigo-950">{aiMetrics.modelName}</p>
+              <p className="text-[10px] text-slate-400 font-semibold uppercase">Hệ thống dữ liệu</p>
+              <p className="text-xs font-black text-teal-950">{aiMetrics.modelName}</p>
             </div>
           </div>
         </div>
@@ -248,17 +249,17 @@ export default function AIAuditingPage() {
 
                   <div>
                     <span className="text-[10.5px] font-black uppercase text-rose-500 tracking-wider block mb-1">
-                      Câu trả lời của AI bị gắn cờ sai lệch
+                      Nội dung thuyết minh bị phản ánh sai lệch
                     </span>
                     <div className="p-3 rounded-xl bg-rose-50/60 border border-rose-200 text-xs text-rose-950 leading-relaxed flex items-start gap-2">
-                      <Bot size={14} className="text-rose-500 shrink-0 mt-0.5" />
+                      <ScrollText size={14} className="text-rose-500 shrink-0 mt-0.5" />
                       <span>{item.aiResponse}</span>
                     </div>
                   </div>
 
                   <div>
                     <span className="text-[10.5px] font-black uppercase text-amber-700 tracking-wider block mb-1">
-                      Nội dung báo cáo sai sót từ du khách
+                      Nội dung phản ánh từ du khách
                     </span>
                     <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-950 leading-relaxed flex items-start gap-2">
                       <AlertTriangle size={14} className="text-amber-600 shrink-0 mt-0.5" />
@@ -276,7 +277,7 @@ export default function AIAuditingPage() {
                           Dữ liệu tri thức chuẩn mực đã xác thực
                         </span>
                         <span className="text-[10.5px] text-teal-600 font-bold">
-                          Nạp trực tiếp vào mô hình
+                          Đồng bộ kho di sản
                         </span>
                       </div>
                       <textarea
@@ -290,7 +291,7 @@ export default function AIAuditingPage() {
 
                     {item.suggestedCorrection && (
                       <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-start gap-1.5">
-                        <Sparkles size={13} className="text-teal-600 shrink-0 mt-0.5" />
+                        <CheckCircle2 size={13} className="text-teal-600 shrink-0 mt-0.5" />
                         <span>
                           <strong>Khuyến nghị hiệu đính:</strong> {item.suggestedCorrection}
                         </span>
@@ -305,7 +306,7 @@ export default function AIAuditingPage() {
                       onClick={() => handleDismiss(item.id)}
                       className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer"
                     >
-                      Bỏ qua báo cáo
+                      Bỏ qua phản ánh
                     </button>
 
                     <button
@@ -314,7 +315,7 @@ export default function AIAuditingPage() {
                       className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <ThumbsDown size={13} />
-                      <span>Phạt giảm trọng số</span>
+                      <span>Gỡ bỏ nội dung</span>
                     </button>
 
                     <button
@@ -323,7 +324,7 @@ export default function AIAuditingPage() {
                       className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <CheckCircle2 size={14} />
-                      <span>Cập nhật vào Bộ Tri thức AI</span>
+                      <span>Lưu vào Kho Tri thức Di sản</span>
                     </button>
                   </div>
                 </div>

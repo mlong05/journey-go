@@ -12,7 +12,6 @@ import {
   User,
   ShieldAlert,
   Award,
-  Sparkles,
   MapPin,
   Eye,
   Trash2,

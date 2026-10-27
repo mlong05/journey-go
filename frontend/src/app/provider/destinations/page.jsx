@@ -29,6 +29,8 @@ import {
   ChevronsRight,
   Compass,
   Trophy,
+  Send,
+  XCircle,
 } from "lucide-react";
 import {
   destinationService,
@@ -47,20 +49,27 @@ import {
 } from "@/features/experience";
 
 const STATUS = {
-  PENDING: "pending",
-  APPROVED: "approved",
-  REVOKED: "revoked",
+  PUBLISHED: "PUBLISHED",
+  PENDING: "PENDING",
+  REJECTED: "REJECTED",
+  DRAFT: "DRAFT",
 };
 
 const STATUS_LABEL = {
-  [STATUS.PENDING]: "Chờ duyệt",
-  [STATUS.APPROVED]: "Đang hoạt động",
-  [STATUS.REVOKED]: "Chờ duyệt lại (Đã hủy duyệt)",
+  [STATUS.PUBLISHED]: "Đang hoạt động",
+  [STATUS.PENDING]: "Chờ phê duyệt",
+  [STATUS.REJECTED]: "Cần chỉnh sửa",
+  [STATUS.DRAFT]: "Bản nháp",
 };
 
-function normalizeDestination(raw, fallbackStatus = STATUS.PENDING) {
+function normalizeDestination(raw, fallbackStatus = STATUS.DRAFT) {
   if (!raw || typeof raw !== "object") return null;
   const approvedFlag = raw.approved === true;
+  let status = fallbackStatus;
+  if (raw.status === "PUBLISHED" || approvedFlag) status = STATUS.PUBLISHED;
+  else if (raw.status === "REJECTED") status = STATUS.REJECTED;
+  else if (raw.status === "PENDING") status = STATUS.PENDING;
+  else if (raw.status === "DRAFT") status = STATUS.DRAFT;
   const wasUpdated =
     raw._wasUpdated === true ||
     raw._wasRevoked === true ||
@@ -83,7 +92,7 @@ function normalizeDestination(raw, fallbackStatus = STATUS.PENDING) {
     createdBy: raw.createdBy || "",
     createdAt: raw.createdAt || null,
     updatedAt: raw.updatedAt || null,
-    status: approvedFlag ? STATUS.APPROVED : fallbackStatus,
+    status,
     _wasUpdated: wasUpdated,
     contentCount:
       raw.contentCount ??
@@ -257,12 +266,36 @@ export default function ProviderDestinationsPage() {
     }
   }, [loadExperienceForDestination, showToast]);
 
+  const handleSubmitForModeration = useCallback(
+    async (dest) => {
+      setIsLoading(true);
+      try {
+        await destinationService.submit(dest.id);
+        setDestinations((prev) =>
+          prev.map((d) =>
+            d.id === dest.id ? { ...d, status: STATUS.PENDING, approved: false } : d
+          )
+        );
+        showToast(
+          `Đã gửi hồ sơ điểm đến "${dest.name}" vào hàng chờ kiểm duyệt thành công!`,
+          "success"
+        );
+      } catch (err) {
+        console.error("[Submit Destination Moderation] error:", err);
+        showToast(err?.message || "Không thể gửi hồ sơ kiểm duyệt.", "error");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [showToast]
+  );
+
   const handleCreated = useCallback(
     async (newDest) => {
       if (!newDest || typeof newDest !== "object") return;
       try {
         const fresh = await destinationService.getById(newDest.id);
-        const normalized = normalizeDestination(fresh, STATUS.PENDING);
+        const normalized = normalizeDestination(fresh, STATUS.DRAFT);
         if (!normalized) return;
         setDestinations((prev) => {
           const exists = prev.some((d) => d.id === normalized.id);
@@ -271,22 +304,16 @@ export default function ProviderDestinationsPage() {
             d.id === normalized.id ? { ...d, ...normalized } : d
           );
         });
-        setStatusTab(STATUS.PENDING);
+        setStatusTab("all");
         showToast(
-          "Tạo điểm đến mới thành công! Điểm đến hiện ở trạng thái chờ phê duyệt."
+          "Tạo điểm đến mới thành công! Điểm đến ở trạng thái Bản nháp. Hãy bấm 'Gửi duyệt' khi sẵn sàng."
         );
       } catch (err) {
-        console.error(
-          "[Provider Destinations] handleCreated fallback error:",
-          err
-        );
-        const normalized = normalizeDestination(newDest, STATUS.PENDING);
+        const normalized = normalizeDestination(newDest, STATUS.DRAFT);
         if (!normalized) return;
         setDestinations((prev) => [normalized, ...prev]);
-        setStatusTab(STATUS.PENDING);
-        showToast(
-          "Tạo điểm đến mới thành công! Đang ở trạng thái chờ phê duyệt."
-        );
+        setStatusTab("all");
+        showToast("Tạo điểm đến mới thành công! Đang ở trạng thái Bản nháp.");
       }
     },
     [showToast]
@@ -297,9 +324,9 @@ export default function ProviderDestinationsPage() {
       if (!updatedDest || typeof updatedDest !== "object") return;
       try {
         const fresh = await destinationService.getById(updatedDest.id);
-        const normalized = normalizeDestination(fresh, STATUS.REVOKED);
+        const normalized = normalizeDestination(fresh, STATUS.DRAFT);
         if (!normalized) return;
-        normalized.status = STATUS.REVOKED;
+        normalized.status = STATUS.DRAFT;
         normalized.approved = false;
         setDestinations((prev) => {
           const exists = prev.some((d) => d.id === normalized.id);
@@ -308,31 +335,12 @@ export default function ProviderDestinationsPage() {
             d.id === normalized.id ? { ...d, ...normalized } : d
           );
         });
-        setStatusTab(STATUS.REVOKED);
+        setStatusTab("all");
         showToast(
-          "Cập nhật thành công! Hồ sơ đã tự động chuyển về trạng thái Chờ thẩm định lại."
+          "Cập nhật thành công! Điểm đến đã quay về trạng thái Bản nháp. Vui lòng bấm 'Gửi duyệt' để chuyển đến Ban Thẩm định."
         );
       } catch (err) {
-        console.error(
-          "[Provider Destinations] handleUpdated fallback error:",
-          err
-        );
-        const normalized = normalizeDestination(updatedDest, STATUS.REVOKED);
-        if (!normalized) return;
-        normalized.status = STATUS.REVOKED;
-        normalized.approved = false;
-        normalized._wasUpdated = true;
-        setDestinations((prev) => {
-          const exists = prev.some((d) => d.id === normalized.id);
-          if (!exists) return [normalized, ...prev];
-          return prev.map((d) =>
-            d.id === normalized.id ? { ...d, ...normalized } : d
-          );
-        });
-        setStatusTab(STATUS.REVOKED);
-        showToast(
-          "Cập nhật thành công! Hồ sơ đã tự động chuyển về trạng thái Chờ thẩm định lại."
-        );
+        console.error("[Provider Destinations] handleUpdated error:", err);
       }
     },
     [showToast]
@@ -341,10 +349,10 @@ export default function ProviderDestinationsPage() {
   const counts = useMemo(
     () => ({
       all: destinations.length,
-      approved: destinations.filter((d) => d.status === STATUS.APPROVED)
-        .length,
+      published: destinations.filter((d) => d.status === STATUS.PUBLISHED).length,
       pending: destinations.filter((d) => d.status === STATUS.PENDING).length,
-      revoked: destinations.filter((d) => d.status === STATUS.REVOKED).length,
+      rejected: destinations.filter((d) => d.status === STATUS.REJECTED).length,
+      draft: destinations.filter((d) => d.status === STATUS.DRAFT).length,
     }),
     [destinations]
   );
@@ -586,17 +594,15 @@ export default function ProviderDestinationsPage() {
           </button>
           <button
             type="button"
-            onClick={() => setStatusTab(STATUS.APPROVED)}
+            onClick={() => setStatusTab(STATUS.PUBLISHED)}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === STATUS.APPROVED
+              statusTab === STATUS.PUBLISHED
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/80"
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>
-              Đang hoạt động ({counts.approved})
-            </span>
+            <span>Đang hoạt động ({counts.published})</span>
           </button>
           <button
             type="button"
@@ -612,15 +618,27 @@ export default function ProviderDestinationsPage() {
           </button>
           <button
             type="button"
-            onClick={() => setStatusTab(STATUS.REVOKED)}
+            onClick={() => setStatusTab(STATUS.REJECTED)}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === STATUS.REVOKED
-                ? "bg-orange-600 text-white shadow-xs"
-                : "bg-orange-50 text-orange-800 hover:bg-orange-100 border border-orange-200/80"
+              statusTab === STATUS.REJECTED
+                ? "bg-rose-600 text-white shadow-xs"
+                : "bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200/80"
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-            <span>Chờ duyệt lại ({counts.revoked})</span>
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
+            <span>Cần chỉnh sửa ({counts.rejected})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusTab(STATUS.DRAFT)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              statusTab === STATUS.DRAFT
+                ? "bg-slate-700 text-white shadow-xs"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200/80"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-slate-400" />
+            <span>Bản nháp ({counts.draft})</span>
           </button>
         </div>
       </div>
@@ -750,7 +768,7 @@ export default function ProviderDestinationsPage() {
 
                     {/* Cột 4: Trạng thái phê duyệt */}
                     <div className="col-span-6 lg:col-span-1 flex lg:justify-center items-center">
-                      {dest.status === STATUS.APPROVED && (
+                      {dest.status === STATUS.PUBLISHED && (
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />
                           <span>Hoạt động</span>
@@ -762,33 +780,52 @@ export default function ProviderDestinationsPage() {
                           <span>Chờ duyệt</span>
                         </span>
                       )}
-                      {dest.status === STATUS.REVOKED && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200 shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
-                          <span>Duyệt lại</span>
+                      {dest.status === STATUS.REJECTED && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          <span>Cần sửa</span>
+                        </span>
+                      )}
+                      {dest.status === STATUS.DRAFT && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          <span>Bản nháp</span>
                         </span>
                       )}
                     </div>
 
-                    {/* Cột 5: Cụm nút thao tác (Chi tiết, Chỉnh sửa) - Căn lề trái */}
-                    <div className="col-span-12 lg:col-span-2 flex items-center justify-start gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                    {/* Cột 5: Cụm nút thao tác (Gửi duyệt, Chi tiết, Chỉnh sửa) */}
+                    <div className="col-span-12 lg:col-span-2 flex items-center justify-start gap-1.5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 flex-wrap">
+                      {(dest.status === STATUS.DRAFT || dest.status === STATUS.REJECTED) && (
+                        <button
+                          type="button"
+                          onClick={() => handleSubmitForModeration(dest)}
+                          disabled={isLoading}
+                          className="h-8 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-bold inline-flex items-center gap-1 shadow-xs shadow-amber-500/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                          title="Gửi hồ sơ điểm đến này tới Ban Thẩm định văn hóa"
+                        >
+                          <Send size={12} />
+                          <span>Gửi duyệt</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => handleViewDetail(dest.id)}
-                        className="h-8 px-3 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-700 bg-white text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                        className="h-8 px-2.5 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-700 bg-white text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
                         title="Xem thông tin chi tiết điểm đến & thuyết minh"
                       >
-                        <Eye size={13} className="text-emerald-600" />
+                        <Eye size={12} className="text-emerald-600" />
                         <span>Chi tiết</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setEditTarget(dest)}
-                        className="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer shrink-0"
+                        className="h-8 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold inline-flex items-center gap-1 shadow-xs shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer shrink-0"
                         title="Chỉnh sửa thông tin điểm đến"
                       >
-                        <Edit3 size={13} />
+                        <Edit3 size={12} />
                         <span>Sửa</span>
                       </button>
                     </div>
