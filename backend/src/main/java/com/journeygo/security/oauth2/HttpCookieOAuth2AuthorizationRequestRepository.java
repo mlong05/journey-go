@@ -13,6 +13,7 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
 
     public static final String OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME = "oauth2_auth_request";
     public static final String REDIRECT_URI_PARAM_COOKIE_NAME = "redirect_uri";
+    public static final String ROLE_PARAM_COOKIE_NAME = "role";
     private static final int COOKIE_EXPIRE_SECONDS = 180;
 
     @Override
@@ -29,6 +30,7 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
         if (authorizationRequest == null) {
             CookieUtils.deleteCookie(request, response, OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME);
             CookieUtils.deleteCookie(request, response, REDIRECT_URI_PARAM_COOKIE_NAME);
+            CookieUtils.deleteCookie(request, response, ROLE_PARAM_COOKIE_NAME);
             return;
         }
 
@@ -39,6 +41,12 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
         if (StringUtils.isNotBlank(redirectUriAfterLogin)) {
             CookieUtils.addCookie(response, REDIRECT_URI_PARAM_COOKIE_NAME,
                     redirectUriAfterLogin, COOKIE_EXPIRE_SECONDS);
+        }
+
+        String role = request.getParameter(ROLE_PARAM_COOKIE_NAME);
+        if (StringUtils.isNotBlank(role)) {
+            CookieUtils.addCookie(response, ROLE_PARAM_COOKIE_NAME,
+                    role, COOKIE_EXPIRE_SECONDS);
         }
     }
 
@@ -51,5 +59,6 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
     public void removeAuthorizationRequestCookies(HttpServletRequest request, HttpServletResponse response) {
         CookieUtils.deleteCookie(request, response, OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME);
         CookieUtils.deleteCookie(request, response, REDIRECT_URI_PARAM_COOKIE_NAME);
+        CookieUtils.deleteCookie(request, response, ROLE_PARAM_COOKIE_NAME);
     }
 }

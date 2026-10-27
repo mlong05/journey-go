@@ -40,7 +40,8 @@ public enum ErrorCode {
     CONTENT_REVIEW_REASON_REQUIRED("Lý do từ chối nội dung không được để trống", HttpStatus.BAD_REQUEST),
     INVALID_CONTENT_REVIEW_STATUS("Trạng thái kiểm duyệt nội dung không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
     CLOUDINARY_NOT_CONFIGURED("Cloudinary chưa được cấu hình trên máy chủ", HttpStatus.SERVICE_UNAVAILABLE),
-    INVALID_CLOUDINARY_ASSET("Ảnh Cloudinary không hợp lệ hoặc không thuộc tài khoản hiện tại", HttpStatus.BAD_REQUEST);
+    INVALID_CLOUDINARY_ASSET("Ảnh Cloudinary không hợp lệ hoặc không thuộc tài khoản hiện tại", HttpStatus.BAD_REQUEST),
+    LOGIN_RATE_LIMITED("Bạn đã nhập sai mật khẩu quá nhiều lần. Vui lòng thử lại sau 5 phút.", HttpStatus.TOO_MANY_REQUESTS);
 
     private final String message;
     private final HttpStatus httpStatus;
