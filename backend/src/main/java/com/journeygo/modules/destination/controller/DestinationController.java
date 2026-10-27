@@ -34,21 +34,12 @@ public class DestinationController {
     // ── Public endpoints ──────────────────────────────────────────────────────
 
     @GetMapping
-    @Operation(summary = "Lấy tất cả điểm đến (phân trang & sắp xếp)",
-            description = "Trả về danh sách điểm đến với hỗ trợ phân trang (page, size) và sắp xếp (sort=field,asc|desc)")
+    @Operation(summary = "Lấy điểm đến đã duyệt (phân trang & sắp xếp)",
+            description = "Chỉ trả về điểm đến đã được moderation duyệt; hỗ trợ page, size và sort")
     public ResponseEntity<ApiResponse<PageResponse<DestinationResponse>>> getAll(
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách điểm đến thành công",
                 destinationService.getAll(pageable)));
-    }
-
-    @GetMapping("/approved")
-    @Operation(summary = "Lấy điểm đến đã duyệt / xuất bản (phân trang & sắp xếp)",
-            description = "Trả về danh sách điểm đến đã được phê duyệt và xuất bản")
-    public ResponseEntity<ApiResponse<PageResponse<DestinationResponse>>> getApproved(
-            @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách điểm đến đã duyệt thành công",
-                destinationService.getApproved(pageable)));
     }
 
     @GetMapping("/region/{slug}")

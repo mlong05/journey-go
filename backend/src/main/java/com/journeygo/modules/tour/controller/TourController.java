@@ -2,10 +2,8 @@ package com.journeygo.modules.tour.controller;
 
 import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
-import com.journeygo.modules.tour.dto.TourRejectRequest;
 import com.journeygo.modules.tour.dto.TourRequest;
 import com.journeygo.modules.tour.dto.TourResponse;
-import com.journeygo.modules.tour.entity.TourStatus;
 import com.journeygo.modules.tour.service.TourService;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.security.UserPrincipal;
@@ -63,18 +61,6 @@ public class TourController {
                 tourService.getAll(pageable)));
     }
 
-    @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
-    @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Lấy tour theo trạng thái (ADMIN / MODERATOR)",
-            description = "Lọc theo DRAFT, PENDING, PUBLISHED, REJECTED")
-    public ResponseEntity<ApiResponse<PageResponse<TourResponse>>> getByStatus(
-            @PathVariable TourStatus status,
-            @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tour theo trạng thái thành công",
-                tourService.getByStatus(status, pageable)));
-    }
-
     @GetMapping("/deleted")
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
@@ -83,28 +69,6 @@ public class TourController {
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tour đã xóa thành công",
                 tourService.getDeleted(pageable)));
-    }
-
-    @PatchMapping("/{tourId}/publish")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
-    @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Xuất bản tour (ADMIN / MODERATOR)",
-            description = "Phê duyệt và chuyển trạng thái sang PUBLISHED")
-    public ResponseEntity<ApiResponse<TourResponse>> publish(@PathVariable Long tourId) {
-        return ResponseEntity.ok(ApiResponse.success("Xuất bản tour thành công",
-                tourService.publish(tourId)));
-    }
-
-    @PatchMapping("/{tourId}/reject")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
-    @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Từ chối tour (ADMIN / MODERATOR)",
-            description = "Từ chối và chuyển trạng thái sang REJECTED. Bắt buộc nhập lý do từ chối.")
-    public ResponseEntity<ApiResponse<TourResponse>> reject(
-            @PathVariable Long tourId,
-            @Valid @RequestBody TourRejectRequest rejectRequest) {
-        return ResponseEntity.ok(ApiResponse.success("Từ chối tour thành công",
-                tourService.reject(tourId, rejectRequest.reason())));
     }
 
     @DeleteMapping("/{tourId}")
@@ -131,9 +95,8 @@ public class TourController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo tour mới (ADMIN / MODERATOR / PROVIDER)",
-            description = "Tour mới mặc định ở trạng thái DRAFT, chưa được phê duyệt. "
-                    + "Giá tour KHÔNG nhập tay mà được tính tự động = tổng giá các Experience "
-                    + "của các điểm đến trong hành trình.")
+            description = "Tạo tour và tự gửi vào hàng chờ moderation. Request cần có price (VND), "
+                    + "startDate và endDate theo định dạng yyyy-MM-dd.")
     public ResponseEntity<ApiResponse<TourResponse>> create(
             @Valid @RequestBody TourRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -146,8 +109,8 @@ public class TourController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Cập nhật tour (ADMIN / MODERATOR / PROVIDER)",
-            description = "PROVIDER chỉ được cập nhật tour của chính mình. Chỉnh sửa sẽ reset trạng thái về DRAFT. "
-                    + "Giá tour được tính lại tự động từ các Experience của các điểm đến.")
+            description = "PROVIDER chỉ được cập nhật tour của chính mình. Chỉnh sửa sẽ tự gửi duyệt lại. "
+                    + "Request cần có price (VND), startDate và endDate theo định dạng yyyy-MM-dd.")
     public ResponseEntity<ApiResponse<TourResponse>> update(
             @PathVariable Long tourId,
             @Valid @RequestBody TourRequest request,
@@ -155,19 +118,6 @@ public class TourController {
         Role callerRole = extractRole(userPrincipal);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật tour thành công",
                 tourService.update(tourId, request, userPrincipal.getId(), callerRole)));
-    }
-
-    @PatchMapping("/{tourId}/submit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
-    @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Gửi duyệt tour (ADMIN / MODERATOR / PROVIDER)",
-            description = "Chuyển trạng thái sang PENDING để chờ admin phê duyệt")
-    public ResponseEntity<ApiResponse<TourResponse>> submit(
-            @PathVariable Long tourId,
-            @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        Role callerRole = extractRole(userPrincipal);
-        return ResponseEntity.ok(ApiResponse.success("Gửi duyệt tour thành công",
-                tourService.submit(tourId, userPrincipal.getId(), callerRole)));
     }
 
     @GetMapping("/my")
