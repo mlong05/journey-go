@@ -120,7 +120,7 @@ public class ContentModerationService {
     }
 
     private void checkOwner(CulturalContent content, Long callerId, Role role) {
-        if (role == Role.PROVIDER) {
+        if (role != null && role.isProvider()) {
             Long ownerId = content.getDestination().getCreatedBy() == null ? null : content.getDestination().getCreatedBy().getId();
             if (ownerId == null || !ownerId.equals(callerId)) throw new AppException(ErrorCode.UNAUTHORIZED);
         }

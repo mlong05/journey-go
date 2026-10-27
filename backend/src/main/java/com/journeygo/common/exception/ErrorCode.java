@@ -36,8 +36,7 @@ public enum ErrorCode {
     INVALID_TOUR_STATUS("Trạng thái tour không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
     ROLE_NOT_FOUND("Vai trò không tồn tại trong hệ thống", HttpStatus.NOT_FOUND),
     ROLE_EXISTED("Vai trò này đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
-    CANNOT_DEACTIVATE_ADMIN("Không thể vô hiệu hóa tài khoản của quản trị viên khác", HttpStatus.FORBIDDEN);
-    INVALID_TOUR_STATUS("Trạng thái tour không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
+    CANNOT_DEACTIVATE_ADMIN("Không thể vô hiệu hóa tài khoản của quản trị viên khác", HttpStatus.FORBIDDEN),
     CONTENT_REVIEW_REASON_REQUIRED("Lý do từ chối nội dung không được để trống", HttpStatus.BAD_REQUEST),
     INVALID_CONTENT_REVIEW_STATUS("Trạng thái kiểm duyệt nội dung không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
     CLOUDINARY_NOT_CONFIGURED("Cloudinary chưa được cấu hình trên máy chủ", HttpStatus.SERVICE_UNAVAILABLE),
