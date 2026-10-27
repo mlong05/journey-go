@@ -11,14 +11,12 @@ import {
   BarChart3,
   ShieldAlert,
   Settings,
-  Search,
   Bell,
-  Menu,
   Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
-import { ExpandingSideRail, UserProfilePill } from "@/components/layout";
+import { Sidebar, DashboardHeader } from "@/components/layout";
 
 // Navigation items được định nghĩa ngoài component để tránh re-create mỗi render
 const ADMIN_NAV_ITEMS = [
@@ -115,7 +113,8 @@ export default function AdminLayout({ children }) {
   // Trang Điểm đến & Trải nghiệm: khóa khung 100vh, cố định header & filter, chỉ danh sách tự cuộn
   const isScrollLockedPage =
     pathname?.startsWith("/admin/destinations") ||
-    pathname?.startsWith("/admin/experiences");
+    pathname?.startsWith("/admin/experiences") ||
+    pathname?.startsWith("/admin/tours");
 
   // Xử lý tìm kiếm nhanh từ Topbar
   const handleTopSearchSubmit = (e) => {
@@ -125,37 +124,19 @@ export default function AdminLayout({ children }) {
     }
   };
 
-  // Thông tin quản trị viên từ phiên đăng nhập thực
-  const adminName =
-    authData?.user?.fullName ||
-    authData?.user?.name ||
-    "Quản Trị Viên Hệ Thống";
-  const adminEmail = authData?.user?.email || "admin@journeygo.com";
-  const avatarInitials = authData?.user
-    ? adminName
-      .split(" ")
-      .filter(Boolean)
-      .slice(-2)
-      .map((w) => w[0])
-      .join("")
-      .toUpperCase()
-    : "QT";
+  const currentTitle =
+    [...ADMIN_NAV_ITEMS]
+      .sort((a, b) => b.href.length - a.href.length)
+      .find((i) => {
+        const p = i.href.split("#")[0];
+        return p === "/admin" ? pathname === "/admin" : pathname?.startsWith(p);
+      })?.label || "Tổng quan vận hành";
 
   return (
     <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
-      {/* ────────────────────────────────────────────────────────
-          1. CỘT 1 (SIDEBAR): MÔ HÌNH FLEXBOX CHUẨN DASHBOARD
-      ──────────────────────────────────────────────────────── */}
-      <ExpandingSideRail
+      <Sidebar
         role="admin"
-        roleLabel="Quản trị viên"
         navItems={ADMIN_NAV_ITEMS}
-        user={{
-          name: adminName,
-          email: adminEmail,
-          initials: avatarInitials,
-          roleDesc: "Toàn quyền quản trị",
-        }}
         onLogout={performLogout}
         isOpenMobile={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
@@ -163,72 +144,29 @@ export default function AdminLayout({ children }) {
         onToggleWide={() => setIsSidebarWide((prev) => !prev)}
       />
 
-      {/* ────────────────────────────────────────────────────────
-          2. CỘT 2 (VÙNG NỘI DUNG BÊN PHẢI): CỐ ĐỊNH 100VH, KHÔNG BỊ TRÔI TOPBAR
-      ──────────────────────────────────────────────────────── */}
       <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
-        {/* Topbar trên cùng: h-16 shrink-0, cố định vĩnh viễn trên cùng */}
-        <header className="h-16 shrink-0 w-full bg-white border-b border-slate-200 px-6 flex items-center justify-between z-30 shadow-2xs">
-          {/* Cụm trái: Menu mobile + Tiêu đề */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
-              title="Mở menu"
-            >
-              <Menu size={18} />
-            </button>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-slate-900 tracking-tight">
-                  Khu Vực Quản Trị Hệ Thống Toàn Sàn
-                </span>
-                <span className="hidden lg:inline-block text-slate-300">•</span>
-                <span className="hidden lg:inline-block text-[11px] font-semibold text-slate-500">
-                  Trung Tâm Chỉ Huy JourneyGo
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Cụm phải: Tìm kiếm nhanh + Chuông thông báo + Trạng thái quản trị */}
-          <div className="flex items-center gap-3.5">
-            <form onSubmit={handleTopSearchSubmit} className="relative hidden sm:block">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Search size={14} />
-              </div>
-              <input
-                type="text"
-                value={topSearch}
-                onChange={(e) => setTopSearch(e.target.value)}
-                placeholder="Tìm kiếm tài khoản, đơn hàng..."
-                className="pl-8.5 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 w-48 md:w-56 transition-all"
-              />
-            </form>
-
-            {/* Chuông thông báo */}
-            <div className="relative">
-              <Link
-                href="/admin"
-                className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 transition-colors relative"
-                title="Thông báo hệ thống"
-              >
-                <Bell size={16} />
-                {notificationsCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white animate-ping" />
-                )}
-                {notificationsCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
-                )}
-              </Link>
-            </div>
-
-            {/* Cụm Thẻ Định Danh Người Dùng (User Profile Pill) */}
-            <UserProfilePill role="admin" user={authData?.user} />
-          </div>
-        </header>
+        <DashboardHeader
+          role="admin"
+          user={authData?.user}
+          section="Quản trị"
+          title={currentTitle}
+          onOpenMenu={() => setIsSidebarOpen(true)}
+          searchValue={topSearch}
+          onSearchChange={setTopSearch}
+          onSearchSubmit={handleTopSearchSubmit}
+          searchPlaceholder="Tìm tài khoản, đơn hàng..."
+        >
+          <Link
+            href="/admin"
+            className="relative w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-colors"
+            title="Thông báo hệ thống"
+          >
+            <Bell size={16} />
+            {notificationsCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
+            )}
+          </Link>
+        </DashboardHeader>
 
         {/* Main Content bên dưới */}
         <main

@@ -122,7 +122,7 @@ function Toast({ msg, tone }) {
   const Icon = tone === "error" ? AlertCircle : CheckCircle2;
   return (
     <div
-      className={`fixed top-5 right-5 z-50 ${palette} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3`}
+      className={`fixed top-5 right-5 z-50 ${palette} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3`}
     >
       <Icon size={16} className="shrink-0" />
       <span>{msg}</span>
@@ -191,7 +191,7 @@ function KpiCard({
          bấm), cũng không animate nội dung. Mọi thay đổi khi active chỉ đổi
          MÀU nền/màu chữ/icon đã được khai báo cố định trong t.activeBg —
          kích thước khung không đổi 1 pixel. */
-      className={`bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-colors hover:border-slate-300 cursor-pointer text-left w-full ${
+      className={`bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex items-center justify-between transition-colors hover:border-slate-300 cursor-pointer text-left w-full ${
         active
           ? `${t.activeBg} ${t.activeBorder}`
           : "bg-white border-slate-200/90"
@@ -199,14 +199,14 @@ function KpiCard({
     >
       {/* Cột chữ bên trái */}
       <div className="flex flex-col text-left min-w-0">
-        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
+        <p className="text-[11px] font-bold text-slate-400 truncate">
           {label}
         </p>
         <div className="mt-1 flex items-baseline gap-1.5">
-          <span className="text-xl sm:text-2xl font-black text-slate-900 tabular-nums leading-none">
+          <span className="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums leading-none">
             {value}
           </span>
-          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+          <span className="text-xs font-bold text-slate-600 whitespace-nowrap">
             {unit}
           </span>
           {dot && (
@@ -217,7 +217,7 @@ function KpiCard({
 
       {/* Icon góc phải — đổi sang activeIcon khi active (cùng 10x10 cố định) */}
       <div
-        className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
           active ? t.activeIcon : t.icon
         }`}
       >
@@ -333,7 +333,7 @@ function PaginationBar({
     >
       {/* Bên trái: Thông tin phân trang + chọn số dòng */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-        <span className="text-xs text-slate-600 font-semibold">
+        <span className="text-xs text-slate-600 font-bold">
           Đang xem trang{" "}
           <strong className="text-slate-900">{currentPage}</strong> /{" "}
           <strong className="text-slate-900">{safeTotalPages}</strong>{" "}
@@ -347,7 +347,7 @@ function PaginationBar({
         </span>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-slate-500 font-semibold">
+          <span className="text-[11px] text-slate-600 font-bold">
             Số dòng/trang:
           </span>
           <select
@@ -711,7 +711,7 @@ export default function ModeratorDestinationsPage() {
           TẦNG 1 — TIÊU ĐỀ (shrink-0, không cuộn)
          ══════════════════════════════════════════════════════════ */}
       <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
-        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
           Thẩm định điểm đến di sản
         </h1>
         <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -727,7 +727,7 @@ export default function ModeratorDestinationsPage() {
           <button
             type="button"
             onClick={() => setIsRegionManagerOpen(true)}
-            className="px-3.5 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 active:scale-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-teal-900/20 text-xs transition-all cursor-pointer"
+            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-indigo-900/20 text-xs transition-all cursor-pointer"
             title="Xem và quản lý danh mục vùng miền du lịch"
           >
             <Globe2 size={15} strokeWidth={2.4} />
@@ -773,7 +773,7 @@ export default function ModeratorDestinationsPage() {
       {/* ══════════════════════════════════════════════════════════
           TẦNG 3 — THANH LỌC & TÌM KIẾM (shrink-0, không cuộn)
          ══════════════════════════════════════════════════════════ */}
-      <div className="shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="shrink-0 bg-white rounded-xl border border-slate-200/90 shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <StatusTab
             active={statusTab === "all"}
@@ -849,10 +849,10 @@ export default function ModeratorDestinationsPage() {
           • Tiêu đề cột: shrink-0 (luôn nhìn thấy)
           • Thân danh sách: flex-1 min-h-0 overflow-auto (CHỈ VÙNG NÀY CUỘN)
          ══════════════════════════════════════════════════════════ */}
-      <section className="flex-1 min-h-0 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
+      <section className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
         {/* Thông báo lỗi — nằm trong vùng cuộn */}
         {fetchError && (
-          <div className="shrink-0 m-4 mb-0 flex items-start gap-2.5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
+          <div className="shrink-0 m-4 mb-0 flex items-start gap-2.5 p-3.5 rounded-xl bg-rose-50 border border-rose-200">
             <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
             <div className="flex-1">
               <p className="text-xs font-bold text-rose-800">
@@ -872,7 +872,7 @@ export default function ModeratorDestinationsPage() {
 
         {/* ── TIÊU ĐỀ CỘT — shrink-0, cố định ── */}
         <div
-          className={`${ROW_GRID} shrink-0 pl-4 sm:pl-5 ${HEADER_PAD} py-3 bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold uppercase text-slate-500 tracking-wider`}
+          className={`${ROW_GRID} shrink-0 pl-4 sm:pl-5 ${HEADER_PAD} py-3 bg-slate-50 border-b border-slate-200 text-[11px] font-bold  text-slate-600 `}
         >
           <div className="col-span-12 md:col-span-4">Tên địa điểm</div>
           <div className="col-span-6 md:col-span-2">Sức chứa</div>
@@ -885,7 +885,7 @@ export default function ModeratorDestinationsPage() {
           {isLoading && destinations.length === 0 ? (
             <div className="p-16 text-center">
               <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
-              <p className="text-xs text-slate-400 mt-3 font-semibold">
+              <p className="text-xs text-slate-400 mt-3 font-bold">
                 Đang tải bảng kiểm duyệt…
               </p>
             </div>
@@ -929,11 +929,11 @@ export default function ModeratorDestinationsPage() {
                           <h3 className="text-sm font-bold text-slate-900 truncate">
                             {item.name}
                           </h3>
-                          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
-                            <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-600">
+                            <span className="tabular-nums font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
                               #{item.id}
                             </span>
-                            <span className="flex items-center gap-1 font-semibold text-slate-600 truncate">
+                            <span className="flex items-center gap-1 font-bold text-slate-600 truncate">
                               <Building2
                                 size={11}
                                 className="text-slate-400 shrink-0"
@@ -947,10 +947,10 @@ export default function ModeratorDestinationsPage() {
                       </div>
 
                       {/* Cột 2 — Sức chứa */}
-                      <div className="col-span-6 md:col-span-2 flex items-center gap-1.5 text-sm font-black text-slate-900">
+                      <div className="col-span-6 md:col-span-2 flex items-center gap-1.5 text-sm font-bold text-slate-900">
                         <Users size={13} className="text-slate-400 shrink-0" />
                         <span>{item.capacity ?? "—"}</span>
-                        <span className="text-[10.5px] font-medium text-slate-400 whitespace-nowrap">
+                        <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
                           du khách/lượt
                         </span>
                       </div>
@@ -961,7 +961,7 @@ export default function ModeratorDestinationsPage() {
                       </div>
 
                       {/* Cột 4 — Thao tác
-                          Chuẩn hoá: h-8, rounded-full, text-xs font-semibold,
+                          Chuẩn hoá: h-8, rounded-full, text-xs font-bold,
                           gap-1.5, shadow-xs, active:scale-95 — đồng nhất với
                           cụm nút [Sửa] / [Chi tiết] của trang Admin Người dùng.
                           Căn lề TRÁI (justify-start) để cụm nút thẳng với
@@ -971,9 +971,9 @@ export default function ModeratorDestinationsPage() {
                           type="button"
                           onClick={() => openDetail(item.id)}
                           title="Xem chi tiết hồ sơ"
-                          className="h-8 px-3 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shadow-xs transition-all active:scale-95 cursor-pointer"
+                          className="h-8 px-3 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap shadow-xs transition-all active:scale-95 cursor-pointer"
                         >
-                          <Eye size={14} className="text-slate-500 shrink-0" />
+                          <Eye size={14} className="text-slate-600 shrink-0" />
                           <span>Chi tiết</span>
                         </button>
                         {isApproved ? (
@@ -984,7 +984,7 @@ export default function ModeratorDestinationsPage() {
                             }
                             disabled={isLoadingAction}
                             title="Thu hồi phê duyệt, đưa hồ sơ về chờ duyệt"
-                            className="h-8 px-3 rounded-full border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed"
+                            className="h-8 px-3 rounded-full border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed"
                           >
                             {isLoadingAction ? (
                               <Loader2 size={14} className="animate-spin shrink-0" />
@@ -1001,7 +1001,7 @@ export default function ModeratorDestinationsPage() {
                             }
                             disabled={isLoadingAction}
                             title="Phê duyệt và phát hành hồ sơ"
-                            className="h-8 px-3.5 rounded-full border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed"
+                            className="h-8 px-3.5 rounded-full border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed"
                           >
                             {isLoadingAction ? (
                               <Loader2 size={14} className="animate-spin shrink-0" />

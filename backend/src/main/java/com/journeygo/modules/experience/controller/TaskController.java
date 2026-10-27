@@ -107,6 +107,22 @@ public class TaskController {
         return ResponseEntity.ok(ApiResponse.success("Xóa Task thành công"));
     }
 
+    @GetMapping("/experiences/{experienceId}/tasks/deleted")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
+    @Operation(summary = "Thùng rác: danh sách Task đã xoá của Experience (chỉ owner)")
+    public ResponseEntity<ApiResponse<List<TaskResponse>>> listDeleted(@PathVariable Long experienceId) {
+        return ResponseEntity.ok(ApiResponse.success(taskService.listDeletedByExperience(experienceId)));
+    }
+
+    @PatchMapping("/tasks/{id}/restore")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
+    @Operation(summary = "Khôi phục Task từ thùng rác về DRAFT (chỉ khi Experience DRAFT, chỉ owner)")
+    public ResponseEntity<ApiResponse<TaskResponse>> restore(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Khôi phục Task thành công", taskService.restore(id)));
+    }
+
     @PostMapping("/experiences/{experienceId}/tasks/reorder")
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")

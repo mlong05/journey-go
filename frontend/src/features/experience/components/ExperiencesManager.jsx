@@ -30,7 +30,6 @@ import TaskManager from "./TaskManager";
 import SlotManager from "./SlotManager";
 import ChangeStatusDialog from "./ChangeStatusDialog";
 import TaskTypeManagerModal from "./TaskTypeManagerModal";
-import CheckInPointManagerModal from "./CheckInPointManagerModal";
 import {
   getExperienceTheme,
   EXPERIENCE_STATUS_META,
@@ -98,7 +97,6 @@ export default function ExperiencesManager({
   const [tasksFor, setTasksFor] = useState(null);
   const [slotsFor, setSlotsFor] = useState(null);
   const [statusFor, setStatusFor] = useState(null); // { exp, newStatus }
-  const [checkInFor, setCheckInFor] = useState(null);
   const [isTaskTypesOpen, setIsTaskTypesOpen] = useState(false);
   const [toast, setToast] = useState("");
 
@@ -456,23 +454,6 @@ export default function ExperiencesManager({
                       <span>Nhiệm vụ ({exp.taskCount ?? 0})</span>
                     </button>
                   )}
-                  {/* Nút Quản lý Trạm Check-in */}
-                  {canManageItem(exp) && (
-                    <button
-                      type="button"
-                      onClick={() => setCheckInFor(exp)}
-                      title="Quản lý trạm dừng chân & check-in GPS/QR"
-                      className={`h-7 px-3 rounded-full border text-[11px] font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border-slate-200 bg-white ${palette.hoverCard} hover:bg-slate-50 text-slate-700`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="/image/compass-real.jpg"
-                        alt=""
-                        className="w-3.5 h-3.5 rounded-full object-cover shrink-0 ring-1 ring-amber-400/40"
-                      />
-                      <span>Trạm Check-in</span>
-                    </button>
-                  )}
                   {/* Nút Quản lý khung giờ — luôn hiển thị cho owner */}
                   {canManageItem(exp) && (
                     <button
@@ -618,14 +599,6 @@ export default function ExperiencesManager({
           onClose={() => setIsTaskTypesOpen(false)}
         />
       )}
-
-      {/* Modal quản lý CheckInPoint vi mô */}
-      <CheckInPointManagerModal
-        isOpen={Boolean(checkInFor)}
-        onClose={() => setCheckInFor(null)}
-        experience={checkInFor}
-        onPointsUpdated={() => reload()}
-      />
 
       {/* Modal xác nhận xoá — chỉ render khi có item đang chờ xoá */}
       {deleting && (

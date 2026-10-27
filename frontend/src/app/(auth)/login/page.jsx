@@ -51,7 +51,7 @@ export default function LoginPage() {
     } catch {
       // Bỏ qua lỗi parse
     }
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
   }, [router]);
 
   if (!mounted) {

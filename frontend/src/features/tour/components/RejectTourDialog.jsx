@@ -12,7 +12,7 @@ function CharCounter({ value, max, className = "" }) {
   const length = value.length;
   return (
     <span
-      className={`pointer-events-none absolute right-3 text-[10px] font-mono font-semibold ${
+      className={`pointer-events-none absolute right-3 text-[10px] tabular-nums font-bold ${
         length >= max * 0.9 ? "text-rose-500" : "text-slate-400"
       } ${className}`}
     >
@@ -60,14 +60,20 @@ export default function RejectTourDialog({
   const [error, setError] = useState("");
 
   /* Tải danh mục lý do từ chối từ backend khi mở modal */
-  useEffect(() => {
+  // Xoá dữ liệu nhập khi đóng hộp thoại (điều chỉnh state ngay khi render, không dùng effect)
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen);
     if (!isOpen) {
       setSelectedReasons([]);
       setOtherReason("");
       setNote("");
       setError("");
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
 
     let active = true;
     tourService
@@ -139,7 +145,7 @@ export default function RejectTourDialog({
         aria-modal="true"
         aria-label="Từ chối tour du lịch"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
       >
         {/* ── HEADER ─────────────────────────────────────────── */}
         <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between shrink-0">
@@ -148,10 +154,10 @@ export default function RejectTourDialog({
               <Ban size={20} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-base font-black text-slate-900 tracking-tight">
+              <h3 className="text-base font-bold text-slate-900 tracking-tight">
                 Từ chối phê duyệt tour
               </h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                 Tour{" "}
                 <strong className="text-slate-700 truncate inline-block max-w-[260px] align-bottom">
                   {tour?.title || "Chưa có"}
@@ -229,7 +235,7 @@ export default function RejectTourDialog({
                 }}
                 disabled={isSubmitting}
                 placeholder="Ví dụ: Thiếu văn bản xác nhận của hướng dẫn viên địa phương..."
-                className="w-full pl-3.5 pr-16 py-2.5 bg-rose-50/40 border border-rose-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-medium transition-colors"
+                className="w-full pl-3.5 pr-16 py-2.5 bg-rose-50/40 border border-rose-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-semibold transition-colors"
               />
               <CharCounter value={otherReason} max={OTHER_REASON_MAX} className="top-1/2 -translate-y-1/2" />
               </div>

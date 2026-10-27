@@ -17,8 +17,17 @@ import {
   Building2,
   ChevronRight,
   Inbox,
+  MessageSquare,
+  History,
 } from "lucide-react";
-import { SURFACE, HERO, KPI, TABLE, BADGE, BUTTON, INPUT } from "../admin/dashboard.tokens";
+import { SURFACE, TABLE, BADGE, BUTTON, INPUT } from "../admin/dashboard.tokens";
+import {
+  PageHeader,
+  StatusChip,
+  StatCard,
+  Panel,
+  StackedBar,
+} from "@/components/dashboard/DashboardUI";
 import { moderationService } from "@/features/destination";
 
 /**
@@ -27,6 +36,14 @@ import { moderationService } from "@/features/destination";
  * - Redesign theo phong cách Metis: sạch, phẳng, trang nhã cho website du lịch & di sản
  * - Tích hợp trực tiếp dữ liệu hàng chờ từ moderationService
  */
+const QUICK_LINKS = [
+  { href: "/moderator/tours", label: "Thẩm định tour", icon: Compass },
+  { href: "/moderator/destinations", label: "Duyệt điểm đến & lộ trình", icon: MapPin },
+  { href: "/moderator/ai-auditing", label: "Chuẩn hóa thuyết minh di sản", icon: BookOpen },
+  { href: "/moderator/community", label: "Duyệt bài cộng đồng", icon: MessageSquare },
+  { href: "/moderator/history", label: "Nhật ký & lịch sử duyệt", icon: History },
+];
+
 export default function ModeratorDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -54,9 +71,9 @@ export default function ModeratorDashboardPage() {
       try {
         const [destQueueRes, contentQueueRes, tourQueueRes, publishedDestsRes, rejectedDestsRes] =
           await Promise.allSettled([
-            moderationService.getDestinationQueue(),
-            moderationService.getContentQueue(),
-            moderationService.getTourQueue(),
+            moderationService.getDestinationQueue({ size: 500 }),
+            moderationService.getContentQueue({ size: 500 }),
+            moderationService.getTourQueue({ size: 500 }),
             moderationService.getDestinationsByStatus("PUBLISHED"),
             moderationService.getDestinationsByStatus("REJECTED"),
           ]);
@@ -130,14 +147,14 @@ export default function ModeratorDashboardPage() {
         });
 
         const mappedContentItems = contentQueue.map((c) => ({
-          id: c.id,
-          code: `DOC-${c.id}`,
-          title: c.title || `Thuyết minh văn hóa #${c.id}`,
+          id: c.contentId,
+          code: `DOC-${c.contentId}`,
+          title: c.title || `Thuyết minh văn hóa #${c.contentId}`,
           type: "cultural",
           typeLabel: "Thuyết minh & Văn hóa",
-          sender: c.createdBy || "Biên tập viên",
-          submittedTime: c.updatedAt
-            ? new Date(c.updatedAt).toLocaleDateString("vi-VN")
+          sender: c.destinationName || "Biên tập viên",
+          submittedTime: c.submittedAt
+            ? new Date(c.submittedAt).toLocaleDateString("vi-VN")
             : "Mới cập nhật",
           urgency: "warning",
           urgencyLabel: "Chờ phê duyệt",
@@ -167,6 +184,7 @@ export default function ModeratorDashboardPage() {
       unit: "mục",
       trend: kpiMetrics.pendingTrend,
       icon: Clock,
+      tone: "amber",
       linkText: "Chi tiết →",
       linkHref: "/moderator#queue",
     },
@@ -177,6 +195,7 @@ export default function ModeratorDashboardPage() {
       unit: "mục",
       trend: kpiMetrics.publishedTrend,
       icon: CheckCircle2,
+      tone: "emerald",
       linkText: "Chi tiết →",
       linkHref: "/moderator/history",
     },
@@ -187,6 +206,7 @@ export default function ModeratorDashboardPage() {
       unit: "mục",
       trend: kpiMetrics.revisionTrend,
       icon: AlertTriangle,
+      tone: "indigo",
       linkText: "Chi tiết →",
       linkHref: "/moderator#queue",
     },
@@ -197,9 +217,17 @@ export default function ModeratorDashboardPage() {
       unit: "cảnh báo",
       trend: kpiMetrics.alertsTrend,
       icon: ShieldAlert,
+      tone: "rose",
       linkText: "Chi tiết →",
       linkHref: "/moderator/ai-auditing",
     },
+  ];
+
+  // Cơ cấu hàng chờ theo loại (tính từ dữ liệu API thật)
+  const queueSegments = [
+    { label: "Điểm đến & di tích", value: queueData.filter((i) => i.type === "destination").length, tone: "sky" },
+    { label: "Tuyến hành trình", value: queueData.filter((i) => i.type === "tour").length, tone: "amber" },
+    { label: "Thuyết minh & văn hóa", value: queueData.filter((i) => i.type === "cultural").length, tone: "violet" },
   ];
 
   // Lọc dữ liệu theo từ khóa tìm kiếm và loại hình
@@ -217,72 +245,79 @@ export default function ModeratorDashboardPage() {
 
   return (
     <div className={SURFACE.page}>
-      {/* ────────────────────────────────────────────────────────
-          1. HERO BANNER BAN KIỂM ĐỊNH
-      ──────────────────────────────────────────────────────── */}
-      <section className={HERO.shell}>
-        <div className="relative z-10">
-          <div className={HERO.eyebrow}>
-            <span>Ban kiểm định &amp; chuẩn hóa di sản</span>
-          </div>
+      <PageHeader
+        eyebrow="Thẩm định"
+        title="Bàn làm việc tổng quan"
+        description="Đảm bảo dữ liệu lịch sử, tọa độ thực địa và bài thuyết minh đạt chuẩn di sản Việt Nam trước khi tiếp cận du khách."
+        meta={
+          <>
+            <StatusChip tone="emerald">Giám sát thẩm định: sẵn sàng</StatusChip>
+            <StatusChip tone="indigo">Xử lý trung bình: &lt; 2 giờ</StatusChip>
+          </>
+        }
+      >
+        <Link href="/moderator/history" className={BUTTON.secondary}>
+          Lịch sử duyệt
+        </Link>
+        <Link href="/moderator/destinations" className={BUTTON.primary}>
+          Duyệt điểm đến
+          <ArrowUpRight size={13} />
+        </Link>
+      </PageHeader>
 
-          <h1 className={`${HERO.title} mt-3`}>
-            Trung tâm thẩm định &amp; chuẩn hóa dữ liệu văn hóa
-          </h1>
-
-          <p className={HERO.subtitle}>
-            Đảm bảo 100% dữ liệu lịch sử, tọa độ thực địa và bài thuyết minh văn hóa đạt chuẩn mực di sản Việt Nam trước khi tiếp cận du khách.
-          </p>
-
-          <div className={`${HERO.rule} ${HERO.statusRow}`}>
-            <span className="inline-flex items-center gap-1.5 font-medium text-slate-200">
-              <span className={HERO.statusDot} />
-              Hệ thống giám sát thẩm định: Sẵn sàng
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-medium text-slate-300">
-              <span>⏱</span>
-              Thời gian xử lý trung bình: &lt; 2 giờ
-            </span>
-          </div>
-        </div>
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {kpiStats.map((stat) => (
+          <StatCard
+            key={stat.id}
+            title={stat.title}
+            value={stat.count}
+            unit={stat.unit}
+            hint={stat.trend}
+            icon={stat.icon}
+            tone={stat.tone}
+            href={stat.linkHref}
+          />
+        ))}
       </section>
 
-      {/* ────────────────────────────────────────────────────────
-          2. HÀNG 4 THẺ KPI KIỂM DUYỆT
-      ──────────────────────────────────────────────────────── */}
-      <section className={KPI.grid}>
-        {kpiStats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.id} className={KPI.card}>
-              <div className={KPI.headerRow}>
-                <p className={KPI.title}>{stat.title}</p>
-                <div className={KPI.iconBox}>
-                  <Icon size={18} strokeWidth={1.75} />
-                </div>
-              </div>
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <Panel
+          className="lg:col-span-8"
+          title="Cơ cấu hàng chờ"
+          description="Phân bổ hồ sơ đang chờ theo loại nội dung"
+          icon={Inbox}
+          tone="indigo"
+          bodyClassName="p-5"
+        >
+          <StackedBar
+            segments={queueSegments}
+            emptyText="Hàng chờ đang trống — chưa có hồ sơ cần thẩm định."
+          />
+        </Panel>
 
-              <div>
-                <div className="flex items-baseline">
-                  <span className={KPI.value}>{stat.count}</span>
-                  <span className={KPI.unit}>{stat.unit}</span>
-                </div>
-              </div>
-
-              <div className={KPI.footerRow}>
-                <span className="text-xs text-slate-500 truncate mr-2" title={stat.trend}>
-                  {stat.trend}
-                </span>
+        <Panel
+          className="lg:col-span-4"
+          title="Lối tắt nghiệp vụ"
+          description="Đi nhanh tới các khu vực duyệt"
+          icon={Compass}
+          tone="amber"
+          bodyClassName="p-2"
+        >
+          <ul>
+            {QUICK_LINKS.map(({ href, label, icon: LinkIcon }) => (
+              <li key={href}>
                 <Link
-                  href={stat.linkHref}
-                  className={`${KPI.link} shrink-0`}
+                  href={href}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  {stat.linkText}
+                  <LinkIcon size={16} className="text-slate-400" />
+                  <span className="flex-1">{label}</span>
+                  <ChevronRight size={14} className="text-slate-300" />
                 </Link>
-              </div>
-            </div>
-          );
-        })}
+              </li>
+            ))}
+          </ul>
+        </Panel>
       </section>
 
       {/* ────────────────────────────────────────────────────────
@@ -293,14 +328,14 @@ export default function ModeratorDashboardPage() {
         <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-slate-900">
+              <h2 className="text-base font-bold text-slate-900">
                 Danh sách hàng chờ ưu tiên
               </h2>
               <span className={`${BADGE.base} ${BADGE.warning}`}>
                 {filteredQueue.length} hồ sơ cần duyệt
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-600 mt-0.5">
               Các hồ sơ quan trọng cần thẩm định gấp để đồng bộ lên ứng dụng di tích
             </p>
           </div>
@@ -322,7 +357,7 @@ export default function ModeratorDashboardPage() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-400"
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:border-slate-400"
             >
               <option value="all">Tất cả loại hình</option>
               <option value="destination">Điểm đến và di tích</option>
@@ -357,7 +392,7 @@ export default function ModeratorDashboardPage() {
                       <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
                         <Inbox size={24} />
                       </div>
-                      <p className="text-sm font-semibold text-slate-600">
+                      <p className="text-sm font-bold text-slate-600">
                         {searchQuery
                           ? "Không tìm thấy hồ sơ phù hợp với từ khóa."
                           : "Hàng chờ ưu tiên hiện đang trống."}
@@ -379,7 +414,7 @@ export default function ModeratorDashboardPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 max-w-xs sm:max-w-sm">
-                      <p className="font-semibold text-slate-900">
+                      <p className="font-bold text-slate-900">
                         {item.title}
                       </p>
                     </td>
@@ -403,7 +438,7 @@ export default function ModeratorDashboardPage() {
                       </span>
                     </td>
                     <td className={TABLE.td}>
-                      <div className="flex items-center gap-1.5 font-medium text-slate-700">
+                      <div className="flex items-center gap-1.5 font-semibold text-slate-700">
                         <Building2 size={13} className="text-slate-400 flex-shrink-0" />
                         <span>{item.sender}</span>
                       </div>
@@ -450,7 +485,7 @@ export default function ModeratorDashboardPage() {
           <span>Đang hiển thị {filteredQueue.length} hồ sơ trong hàng chờ</span>
           <Link
             href="/moderator/destinations"
-            className="font-semibold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 transition-colors"
+            className="font-bold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 transition-colors"
           >
             <span>Đến trang duyệt điểm đến và lộ trình</span>
             <ChevronRight size={14} />

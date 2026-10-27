@@ -63,13 +63,13 @@ export default function AdministrativeAddressFields({
 
   const pendingWardLabel = useRef(null);
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
 
   // ── 1. Tải 34 tỉnh/thành ─────────────────────────────────────
   useEffect(() => {
     const controller = new AbortController();
-    setProvLoading(true);
-    setProvError("");
     provinceService
       .getNewProvinces({ signal: controller.signal })
       .then((list) => {
@@ -92,68 +92,82 @@ export default function AdministrativeAddressFields({
 
   // ── 2. Áp dụng địa chỉ ban đầu (màn sửa) ─────────────────────
   useEffect(() => {
-    const addr = String(initialAddress || "").trim();
-    pendingWardLabel.current = null;
-    setLegacyNote(false);
-    if (!addr) {
-      setProvinceCode("");
-      setWardCode("");
-      setStreet("");
-      return;
-    }
-    if (provinces.length === 0) return; // chờ danh sách tỉnh
-
-    const parts = addr.split(",").map((s) => s.trim()).filter(Boolean);
-    if (parts.length >= 3) {
-      const province = provinces.find((p) =>
-        matchesLabel(p, parts[parts.length - 1])
-      );
-      if (province) {
-        pendingWardLabel.current = parts[parts.length - 2];
-        setProvinceCode(province.code);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const addr = String(initialAddress || "").trim();
+      pendingWardLabel.current = null;
+      setLegacyNote(false);
+      if (!addr) {
+        setProvinceCode("");
         setWardCode("");
-        setStreet(parts.slice(0, -2).join(", "));
+        setStreet("");
         return;
       }
-    }
-    // Địa chỉ cũ không đúng định dạng mới → giữ nguyên ở ô địa chỉ cụ thể
-    setProvinceCode("");
-    setWardCode("");
-    setStreet(addr);
-    setLegacyNote(true);
+      if (provinces.length === 0) return; // chờ danh sách tỉnh
+
+      const parts = addr.split(",").map((s) => s.trim()).filter(Boolean);
+      if (parts.length >= 3) {
+        const province = provinces.find((p) =>
+          matchesLabel(p, parts[parts.length - 1])
+        );
+        if (province) {
+          pendingWardLabel.current = parts[parts.length - 2];
+          setProvinceCode(province.code);
+          setWardCode("");
+          setStreet(parts.slice(0, -2).join(", "));
+          return;
+        }
+      }
+      // Địa chỉ cũ không đúng định dạng mới → giữ nguyên ở ô địa chỉ cụ thể
+      setProvinceCode("");
+      setWardCode("");
+      setStreet(addr);
+      setLegacyNote(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [initialAddress, resetKey, provinces]);
 
   // ── 3. Tải xã/phường khi đổi tỉnh ────────────────────────────
   useEffect(() => {
-    if (!provinceCode) {
-      setWards([]);
-      setWardError("");
-      return;
-    }
+    let cancelled = false;
     const controller = new AbortController();
-    setWardLoading(true);
-    setWardError("");
-    setWards([]);
-    provinceService
-      .getWardsByProvince(provinceCode, { signal: controller.signal })
-      .then((list) => {
-        setWards(list);
-        const pending = pendingWardLabel.current;
-        if (pending) {
-          pendingWardLabel.current = null;
-          const found = list.find((w) => matchesLabel(w, pending));
-          if (found) setWardCode(found.code);
-          else setLegacyNote(true);
-        }
-      })
-      .catch((err) => {
-        if (err?.name === "AbortError") return;
-        setWardError("Không thể tải danh sách xã/phường. Vui lòng thử lại.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setWardLoading(false);
-      });
-    return () => controller.abort();
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (!provinceCode) {
+        setWards([]);
+        setWardError("");
+        return;
+      }
+      setWardLoading(true);
+      setWardError("");
+      setWards([]);
+      provinceService
+        .getWardsByProvince(provinceCode, { signal: controller.signal })
+        .then((list) => {
+          setWards(list);
+          const pending = pendingWardLabel.current;
+          if (pending) {
+            pendingWardLabel.current = null;
+            const found = list.find((w) => matchesLabel(w, pending));
+            if (found) setWardCode(found.code);
+            else setLegacyNote(true);
+          }
+        })
+        .catch((err) => {
+          if (err?.name === "AbortError") return;
+          setWardError("Không thể tải danh sách xã/phường. Vui lòng thử lại.");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setWardLoading(false);
+        });
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [provinceCode]);
 
   // ── 4. Báo kết quả lên form cha ──────────────────────────────

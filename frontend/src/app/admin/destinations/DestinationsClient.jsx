@@ -374,7 +374,7 @@ export default function DestinationsClient() {
     <div className="h-full min-h-0 w-full overflow-hidden flex flex-col animate-in fade-in-50 duration-200">
       {toastMessage && (
         <div
-          className={`fixed top-5 right-5 z-50 ${toastPalette[toastTone]} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-3 max-w-md`}
+          className={`fixed top-5 right-5 z-50 ${toastPalette[toastTone]} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-3 max-w-md`}
         >
           {toastTone === "success" ? (
             <CheckCircle2 size={16} className="text-emerald-300 shrink-0" />
@@ -392,7 +392,7 @@ export default function DestinationsClient() {
         <div>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-5 bg-slate-900 rounded-full" />
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Quản Lý Điểm Đến Toàn Sàn
             </h1>
           </div>
@@ -411,7 +411,7 @@ export default function DestinationsClient() {
           <button
             type="button"
             onClick={() => setIsRegionManagerOpen(true)}
-            className="h-10 px-3.5 sm:px-4 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 active:scale-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-teal-900/20 text-xs sm:text-sm transition-all cursor-pointer"
+            className="h-10 px-3.5 sm:px-4 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-teal-900/20 text-xs sm:text-sm transition-all cursor-pointer"
             title="Xem và quản lý danh mục vùng miền du lịch"
           >
             <Globe2 size={16} strokeWidth={2.4} />
@@ -420,7 +420,7 @@ export default function DestinationsClient() {
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
-            className="bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm shadow-slate-900/20 text-xs sm:text-sm transition-all cursor-pointer"
+            className="bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm shadow-rose-600/20 text-xs sm:text-sm transition-all cursor-pointer"
           >
             <Plus size={18} strokeWidth={2.4} />
             <span>Tạo Điểm Đến Mới</span>
@@ -429,7 +429,7 @@ export default function DestinationsClient() {
       </div>
 
       {/* ── 2. BỘ LỌC TÌM KIẾM (SHRINK-0: CỐ ĐỊNH TRÊN CÙNG) ── */}
-      <div className="shrink-0 mb-4 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3">
+      <div className="shrink-0 mb-4 bg-white rounded-xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
           <div className="sm:col-span-7 relative">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -470,14 +470,14 @@ export default function DestinationsClient() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-          <span className="text-[11px] font-semibold text-slate-500">
+          <span className="text-[11px] font-bold text-slate-600">
             Tìm thấy {filtered.length} / {destinations.length} điểm đến
           </span>
         </div>
       </div>
 
       {fetchError && (
-        <div className="shrink-0 mb-4 flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
+        <div className="shrink-0 mb-4 flex items-start gap-2.5 p-4 rounded-xl bg-rose-50 border border-rose-200">
           <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-bold text-rose-800">
@@ -497,14 +497,14 @@ export default function DestinationsClient() {
 
       {/* ── 3. KHU VỰC BẢNG DỮ LIỆU & PHÂN TRANG (CHỈ VÙNG BẢNG CUỘN) ── */}
       {isLoading && destinations.length === 0 ? (
-        <div className="flex-1 bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-xs flex flex-col items-center justify-center">
+        <div className="flex-1 bg-white rounded-2xl p-16 text-center border border-slate-200/90 shadow-xs flex flex-col items-center justify-center">
           <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
           <p className="text-xs text-slate-400 mt-3">
             Đang tải danh sách điểm đến…
           </p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex-1 bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-xs space-y-3 flex flex-col items-center justify-center">
+        <div className="flex-1 bg-white rounded-2xl p-16 text-center border border-slate-200/90 shadow-xs space-y-3 flex flex-col items-center justify-center">
           <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
             <Inbox size={28} />
           </div>
@@ -519,28 +519,28 @@ export default function DestinationsClient() {
           </p>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 w-full bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 w-full bg-white rounded-xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
           {/* Scrollable table container */}
           <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
             <table className="w-full text-xs border-collapse">
               <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 shadow-2xs">
                 <tr>
-                  <th className="text-left px-4 py-3 font-black text-slate-700 uppercase tracking-wider text-[10.5px]">
+                  <th className="text-left px-4 py-3 font-bold text-slate-700 text-[11px]">
                     Điểm đến
                   </th>
-                  <th className="text-left px-4 py-3 font-black text-slate-700 uppercase tracking-wider text-[10.5px]">
+                  <th className="text-left px-4 py-3 font-bold text-slate-700 text-[11px]">
                     Địa chỉ
                   </th>
-                  <th className="text-left px-4 py-3 font-black text-slate-700 uppercase tracking-wider text-[10.5px]">
+                  <th className="text-left px-4 py-3 font-bold text-slate-700 text-[11px]">
                     Tọa độ GPS
                   </th>
-                  <th className="text-center px-4 py-3 font-black text-slate-700 uppercase tracking-wider text-[10.5px]">
+                  <th className="text-center px-4 py-3 font-bold text-slate-700 text-[11px]">
                     Sức chứa
                   </th>
-                  <th className="text-center px-4 py-3 font-black text-slate-700 uppercase tracking-wider text-[10.5px]">
+                  <th className="text-center px-4 py-3 font-bold text-slate-700 text-[11px]">
                     Trạng thái
                   </th>
-                  <th className="text-left px-4 py-3 font-black text-slate-700 uppercase tracking-wider text-[10.5px]">
+                  <th className="text-left px-4 py-3 font-bold text-slate-700 text-[11px]">
                     Thao tác
                   </th>
                 </tr>
@@ -557,27 +557,27 @@ export default function DestinationsClient() {
                           <Compass size={15} />
                         </div>
                         <div>
-                          <p className="font-black text-slate-900 leading-tight">
+                          <p className="font-bold text-slate-900 leading-tight">
                             {dest.name}
                           </p>
-                          <p className="text-[10.5px] text-slate-500 mt-0.5">
+                          <p className="text-[11px] text-slate-600 mt-0.5">
                             {dest.createdBy || "Không rõ"}
                           </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 max-w-[260px]">
-                      <p className="text-slate-700 line-clamp-1 font-semibold flex items-center gap-1">
+                      <p className="text-slate-700 line-clamp-1 font-bold flex items-center gap-1">
                         <MapPin size={11} className="text-slate-400 shrink-0" />
                         <span>{dest.address}</span>
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-mono text-[11px] text-slate-700">
+                      <p className="tabular-nums text-[11px] text-slate-700">
                         <span className="text-slate-400">LAT </span>
                         {dest.latitude?.toFixed(4) ?? "—"}
                       </p>
-                      <p className="font-mono text-[11px] text-slate-700">
+                      <p className="tabular-nums text-[11px] text-slate-700">
                         <span className="text-slate-400">LNG </span>
                         {dest.longitude?.toFixed(4) ?? "—"}
                       </p>
@@ -590,19 +590,19 @@ export default function DestinationsClient() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       {dest.status === STATUS.APPROVED && (
-                        <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           Đã phê duyệt
                         </span>
                       )}
                       {dest.status === STATUS.PENDING && (
-                        <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                           Chờ phê duyệt
                         </span>
                       )}
                       {dest.status === STATUS.DELETED && (
-                        <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
                           <Trash2 size={10} />
                           Đã xóa
                         </span>
@@ -707,7 +707,7 @@ export default function DestinationsClient() {
                 </select>
               </div>
               <span className="text-slate-300">•</span>
-              <span className="font-semibold text-slate-600">
+              <span className="font-bold text-slate-600">
                 Đang xem trang <span className="font-bold text-slate-900">{currentPage}</span> / <span className="font-bold text-slate-900">{totalPages}</span> (Tổng <span className="font-bold text-slate-900">{totalItems}</span> điểm đến)
               </span>
             </div>

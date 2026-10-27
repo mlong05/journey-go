@@ -12,6 +12,7 @@ import {
   ZoomOut,
   Layers,
 } from "lucide-react";
+import { getDevicePosition, describeGeoError } from "@/lib/geolocation";
 
 /**
  * Danh sách các tầng bản đồ mã nguồn mở (100% miễn phí, không cần API Key, máy chủ CDN ổn định tại VN)
@@ -320,7 +321,7 @@ export default function LeafletMapPickerModal({
 
   // Tìm kiếm địa điểm bằng Photon OpenStreetMap (Hoàn toàn miễn phí, CORS mở, không bị chặn tại VN)
   const handleSearchLocation = async (e) => {
-    if (e) e.preventDefault();
+    if (e?.preventDefault) e.preventDefault();
     const q = searchQuery.trim();
     if (!q) return;
 
@@ -385,28 +386,19 @@ export default function LeafletMapPickerModal({
   };
 
   // Bay về vị trí GPS hiện tại của máy
-  const handleGoToMyLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Trình duyệt không hỗ trợ định vị GPS.");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setCurrentPos({ lat, lng });
+  const handleGoToMyLocation = async () => {
+    try {
+      const { latitude: lat, longitude: lng } = await getDevicePosition();
+      setCurrentPos({ lat, lng });
 
-        if (mapInstanceRef.current && markerRef.current && circleRef.current) {
-          mapInstanceRef.current.flyTo([lat, lng], 17, { duration: 1 });
-          markerRef.current.setLatLng([lat, lng]);
-          circleRef.current.setLatLng([lat, lng]);
-        }
-      },
-      (err) => {
-        alert("Không thể lấy vị trí hiện tại: " + err.message);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+      if (mapInstanceRef.current && markerRef.current && circleRef.current) {
+        mapInstanceRef.current.flyTo([lat, lng], 17, { duration: 1 });
+        markerRef.current.setLatLng([lat, lng]);
+        circleRef.current.setLatLng([lat, lng]);
+      }
+    } catch (err) {
+      alert(describeGeoError(err));
+    }
   };
 
   // Zoom In / Out
@@ -473,7 +465,8 @@ export default function LeafletMapPickerModal({
 
         {/* Thanh tìm kiếm địa danh OSM Photon */}
         <div className="shrink-0 px-6 py-3 bg-slate-50 border-b border-slate-200/80 relative z-10">
-          <form onSubmit={handleSearchLocation} className="relative flex items-center gap-2">
+          {/* Không dùng <form>: hộp thoại này nằm trong form của trang gọi, submit sẽ kích hoạt form ngoài */}
+          <div className="relative flex items-center gap-2">
             <div className="relative flex-1">
               <Search
                 size={15}
@@ -483,11 +476,22 @@ export default function LeafletMapPickerModal({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSearchLocation();
+                  }
+                }}
                 placeholder="Tìm kiếm di tích, đền chùa, phố xá (vd: Chùa Bái Đính, Hồ Hoàn Kiếm, Tràng An...)"
                 className="w-full pl-9 pr-24 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all text-slate-800"
               />
               <button
-                type="submit"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSearchLocation();
+                }}
                 disabled={searching}
                 className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-50"
               >
@@ -504,7 +508,7 @@ export default function LeafletMapPickerModal({
               <Navigation size={13} className="text-emerald-600" />
               <span className="hidden sm:inline">Vị trí của tôi</span>
             </button>
-          </form>
+          </div>
 
           {/* Danh sách kết quả gợi ý địa danh */}
           {searchResults.length > 0 && (

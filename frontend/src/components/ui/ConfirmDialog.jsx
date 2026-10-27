@@ -72,11 +72,31 @@ const ICONS = {
 
 const FONT = "font-sans [font-family:inherit]";
 
+const SNAPSHOT_FIELDS = [
+  "tone",
+  "icon",
+  "title",
+  "description",
+  "subject",
+  "confirmLabel",
+  "cancelLabel",
+];
+
+function pickContent(props) {
+  const out = {};
+  SNAPSHOT_FIELDS.forEach((k) => {
+    out[k] = props[k];
+  });
+  return out;
+}
+
 export default function ConfirmDialog(props) {
   const { open, loading = false, onConfirm, onCancel } = props;
   // Giữ lại nội dung lần mở gần nhất để hiệu ứng thoát không bị mất chữ
-  const snapshot = useRef(props);
-  if (open) snapshot.current = props;
+  const [snapshot, setSnapshot] = useState(() => pickContent(props));
+  if (open && SNAPSHOT_FIELDS.some((k) => snapshot[k] !== props[k])) {
+    setSnapshot(pickContent(props));
+  }
   const {
     tone = "danger",
     icon = "warning",
@@ -85,24 +105,29 @@ export default function ConfirmDialog(props) {
     subject,
     confirmLabel = "Xác nhận",
     cancelLabel = "Hủy bỏ",
-  } = snapshot.current;
+  } = snapshot;
 
   // mounted: còn trong DOM · visible: đang ở trạng thái "hiện"
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const cancelRef = useRef(null);
 
+  // Mở: gắn vào DOM ngay khi render (điều chỉnh state, không dùng effect)
+  if (open && !mounted) setMounted(true);
+
   useEffect(() => {
     if (open) {
-      setMounted(true);
       const id = requestAnimationFrame(() =>
         requestAnimationFrame(() => setVisible(true))
       );
       return () => cancelAnimationFrame(id);
     }
-    setVisible(false);
+    const hide = requestAnimationFrame(() => setVisible(false));
     const t = setTimeout(() => setMounted(false), 260);
-    return () => clearTimeout(t);
+    return () => {
+      cancelAnimationFrame(hide);
+      clearTimeout(t);
+    };
   }, [open]);
 
   // Esc để hủy + focus nút Hủy + khóa cuộn nền

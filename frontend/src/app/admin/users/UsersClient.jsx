@@ -741,7 +741,7 @@ export default function AdminUsersClient() {
           ============================================================ */}
       {toast.visible && (
         <div
-          className={`fixed top-5 right-5 z-50 ${toastPalette[toast.tone]} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2.5 animate-in slide-in-from-top-3 max-w-md`}
+          className={`fixed top-5 right-5 z-50 ${toastPalette[toast.tone]} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2.5 animate-in slide-in-from-top-3 max-w-md`}
         >
           {toast.tone === "success" ? (
             <CheckCircle2 size={16} className="text-emerald-300 shrink-0" />
@@ -759,7 +759,7 @@ export default function AdminUsersClient() {
           ============================================================ */}
       <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             Quản lý Người dùng &amp; Phân quyền
           </h1>
           {isFallback && (
@@ -783,7 +783,7 @@ export default function AdminUsersClient() {
           <button
             type="button"
             onClick={() => setRoleManagerOpen(true)}
-            className="h-9 px-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 active:scale-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-indigo-900/20 text-xs transition-all cursor-pointer"
+            className="h-9 px-3.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-indigo-900/20 text-xs transition-all cursor-pointer"
             title="Xem danh mục vai trò hệ thống và tạo vai trò mới (Dành cho ADMIN)"
           >
             <ShieldCheck size={14} strokeWidth={2.4} />
@@ -800,7 +800,7 @@ export default function AdminUsersClient() {
           <button
             type="button"
             onClick={handleExportCSV}
-            className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-slate-900/20 text-xs transition-all cursor-pointer"
+            className="h-9 px-3.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-rose-600/20 text-xs transition-all cursor-pointer"
           >
             <Download size={14} strokeWidth={2.4} />
             <span>Xuất file Excel</span>
@@ -866,7 +866,7 @@ export default function AdminUsersClient() {
           - flex flex-col: xếp dọc 3 vùng (filter / table / pagination)
           - overflow-hidden: không cuộn ở khung ngoài
           ============================================================ */}
-      <div className="flex-1 min-h-0 mt-4 flex flex-col bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+      <div className="flex-1 min-h-0 mt-4 flex flex-col bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
         {/* ---- THANH CÔNG CỤ LỌC (shrink-0, không cuộn) ---- */}
         <div className="shrink-0 p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
           {/* Hàng 1: Segmented Tabs lọc nhanh theo role */}
@@ -1006,7 +1006,7 @@ export default function AdminUsersClient() {
         <div className="flex-1 min-h-0 w-full overflow-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold uppercase text-slate-500 tracking-wider">
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600">
                 <th className="py-3.5 px-4 whitespace-nowrap">Định danh &amp; Thành viên</th>
                 <th className="py-3.5 px-3 whitespace-nowrap">Liên hệ</th>
                 <th className="py-3.5 px-3 whitespace-nowrap">Vai trò</th>
@@ -1153,17 +1153,17 @@ function KpiCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 truncate">
+          <p className="text-[11px] font-bold text-slate-600 mb-1 truncate">
             {title}
           </p>
           <div className="flex items-baseline gap-1">
-            <span className="text-lg font-extrabold text-slate-900 tabular-nums">
+            <span className="text-lg font-bold text-slate-900 tabular-nums">
               {(count ?? 0).toLocaleString("vi-VN")}
             </span>
-            <span className="text-[10px] font-bold text-slate-500">{unit}</span>
+            <span className="text-[11px] font-bold text-slate-600">{unit}</span>
           </div>
           {subtitle && (
-            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
               {subtitle}
             </p>
           )}
@@ -1235,7 +1235,7 @@ function UserRow({
             <p className="font-bold text-sm text-slate-900 truncate max-w-[220px]">
               {user.fullName}
             </p>
-            <p className="text-[11px] text-slate-500 font-mono mt-0.5 truncate max-w-[220px]">
+            <p className="text-[11px] text-slate-600 tabular-nums mt-0.5 truncate max-w-[220px]">
               {user.email}
             </p>
           </div>
@@ -1245,7 +1245,7 @@ function UserRow({
       {/* Cột 2 - Liên hệ */}
       <td className="py-3.5 px-3 whitespace-nowrap">
         {user.phone ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700">
             <Phone size={11} className="text-slate-400" />
             {user.phone}
           </span>
@@ -1259,7 +1259,7 @@ function UserRow({
       {/* Cột 3 - Vai trò (chỉ hiển thị, chỉnh sửa qua nút Sửa) */}
       <td className="py-3.5 px-3 whitespace-nowrap">
         <span
-          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border ${
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
             ROLE_BADGE_CLASS[user.role] ||
             "bg-slate-100 text-slate-700 border-slate-200"
           }`}
@@ -1271,12 +1271,12 @@ function UserRow({
       {/* Cột 4 - Trạng thái (chỉ hiển thị, chỉnh sửa qua nút Sửa) */}
       <td className="py-3.5 px-3 whitespace-nowrap">
         {user.active ? (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             Đang hoạt động
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
             Đã khóa
           </span>
@@ -1286,11 +1286,11 @@ function UserRow({
       {/* Cột 5 - Ngày tạo / Cập nhật */}
       <td className="py-3.5 px-3 whitespace-nowrap">
         <div className="flex flex-col gap-0.5 text-[11px]">
-          <span className="text-slate-700 font-mono inline-flex items-center gap-1">
+          <span className="text-slate-700 tabular-nums inline-flex items-center gap-1">
             <Calendar size={10} className="text-slate-400" />
             {formatDateTime(user.createdAt)}
           </span>
-          <span className="text-slate-400 font-mono text-[10.5px]">
+          <span className="text-slate-400 tabular-nums text-[11px]">
             ↻ {formatDateTime(user.updatedAt)}
           </span>
         </div>
@@ -1377,13 +1377,13 @@ function EmptyState({ hasFilter, onReset, isFallback }) {
           <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full mx-auto flex items-center justify-center">
             <AlertCircle size={32} />
           </div>
-          <h3 className="text-base font-extrabold text-slate-800 mt-3">
+          <h3 className="text-base font-bold text-slate-800 mt-3">
             Không thể tải danh sách người dùng
           </h3>
-          <p className="text-xs text-slate-500 mt-1.5 max-w-lg mx-auto">
+          <p className="text-xs text-slate-600 mt-1.5 max-w-lg mx-auto">
             Hệ thống <strong className="text-rose-700">chưa kết nối được backend</strong>.
             Vui lòng kiểm tra lại máy chủ Spring Boot, quyền truy cập và
-            đăng nhập bằng tài khoản <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">ADMIN</code>{" "}
+            đăng nhập bằng tài khoản <code className="tabular-nums bg-slate-100 px-1.5 py-0.5 rounded">ADMIN</code>{" "}
             — xem hướng dẫn chi tiết ở banner bên trên.
           </p>
         </td>
@@ -1408,7 +1408,7 @@ function EmptyState({ hasFilter, onReset, isFallback }) {
           <button
             type="button"
             onClick={onReset}
-            className="mt-4 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer"
+            className="mt-4 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer"
           >
             <RotateCcw size={13} />
             Xóa bộ lọc tìm kiếm
@@ -1460,7 +1460,7 @@ function PaginationBar({
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-3.5 bg-slate-50/60 border-t border-slate-100">
       {/* Bên trái: Thông tin + chọn size */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-        <span className="text-xs text-slate-600 font-semibold">
+        <span className="text-xs text-slate-600 font-bold">
           Đang xem trang{" "}
           <strong className="text-slate-900">{currentPage}</strong> /{" "}
           <strong className="text-slate-900">{totalPages}</strong>{" "}
@@ -1473,7 +1473,7 @@ function PaginationBar({
           </span>
         </span>
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-slate-500 font-semibold">
+          <span className="text-[11px] text-slate-600 font-bold">
             Số dòng/trang:
           </span>
           <select
@@ -1583,13 +1583,13 @@ function DetailModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/60 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="relative w-14 h-14 rounded-2xl overflow-hidden shrink-0">
+            <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0">
               {showDetailAvatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -1599,7 +1599,7 @@ function DetailModal({
                 />
               ) : (
                 <div
-                  className={`w-full h-full flex items-center justify-center font-extrabold text-base ${
+                  className={`w-full h-full flex items-center justify-center font-bold text-base ${
                     ROLE_AVATAR_BG[user.role] ||
                     "bg-slate-100 text-slate-700"
                   }`}
@@ -1610,11 +1610,11 @@ function DetailModal({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-mono text-[10.5px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                <span className="tabular-nums text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                   #{user.id}
                 </span>
                 <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border ${
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
                     ROLE_BADGE_CLASS[user.role] ||
                     "bg-slate-100 text-slate-700 border-slate-200"
                   }`}
@@ -1622,10 +1622,10 @@ function DetailModal({
                   {ROLE_LABELS[user.role] || user.role}
                 </span>
               </div>
-              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
                 {user.fullName}
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5 inline-flex items-center gap-1">
+              <p className="text-xs text-slate-600 mt-0.5 inline-flex items-center gap-1">
                 <Mail size={11} className="text-slate-400" />
                 {user.email}
               </p>
@@ -1652,11 +1652,11 @@ function DetailModal({
 
           {/* Vai trò — đổi nhanh (style đồng nhất, không tô màu) */}
           <div
-            className={`p-3 rounded-2xl border bg-white border-slate-200 ${
+            className={`p-3 rounded-xl border bg-white border-slate-200 ${
               roleBusy ? "opacity-60" : ""
             }`}
           >
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 inline-flex items-center gap-1">
+            <p className="text-[11px] font-bold text-slate-600 mb-1.5 inline-flex items-center gap-1">
               <ShieldAlert size={10} className="text-slate-400" />
               Vai trò
             </p>
@@ -1665,7 +1665,7 @@ function DetailModal({
                 value={user.role}
                 disabled={isMutating}
                 onChange={(e) => onChangeRole?.(e.target.value)}
-                className="flex-1 appearance-none px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500/30 focus:border-slate-700 disabled:cursor-not-allowed"
+                className="flex-1 appearance-none px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500/30 focus:border-slate-700 disabled:cursor-not-allowed"
               >
                 {Object.values(ROLES).map((r) => (
                   <option key={r} value={r}>
@@ -1674,7 +1674,7 @@ function DetailModal({
                 ))}
               </select>
               {roleBusy && (
-                <Loader2 size={14} className="animate-spin text-slate-500" />
+                <Loader2 size={14} className="animate-spin text-slate-600" />
               )}
             </div>
           </div>
@@ -1711,7 +1711,7 @@ function DetailModal({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between gap-2.5">
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-slate-600">
             Mọi thay đổi sẽ được ghi nhật ký phía máy chủ.
           </p>
           <div className="flex items-center gap-2">
@@ -1837,7 +1837,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
     >
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150"
+        className="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -1847,10 +1847,10 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
               <Pencil size={18} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
                 Chỉnh sửa người dùng
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-600 mt-0.5">
                 #{user?.id} · {user?.email}
               </p>
             </div>
@@ -1869,7 +1869,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
         <div className="p-6 space-y-4">
           {/* Họ tên */}
           <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+            <label className="text-[11px] font-bold text-slate-600 mb-1.5 block">
               Họ và tên <span className="text-rose-500">*</span>
             </label>
             <input
@@ -1886,7 +1886,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
               }`}
             />
             {fullNameError && (
-              <p className="text-[11px] text-rose-600 font-semibold mt-1">
+              <p className="text-[11px] text-rose-600 font-bold mt-1">
                 {fullNameError}
               </p>
             )}
@@ -1894,7 +1894,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
 
           {/* Số điện thoại */}
           <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+            <label className="text-[11px] font-bold text-slate-600 mb-1.5 block">
               Số điện thoại
             </label>
             <input
@@ -1911,7 +1911,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
               }`}
             />
             {phoneError && (
-              <p className="text-[11px] text-rose-600 font-semibold mt-1">
+              <p className="text-[11px] text-rose-600 font-bold mt-1">
                 {phoneError}
               </p>
             )}
@@ -1919,7 +1919,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
 
           {/* Ảnh đại diện (Avatar) */}
           <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+            <label className="text-[11px] font-bold text-slate-600 mb-1.5 block">
               Ảnh đại diện (Avatar)
             </label>
             <div className="flex items-center gap-3 mb-2">
@@ -1939,7 +1939,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
                 <button
                   type="button"
                   onClick={() => editFileInputRef.current?.click()}
-                  className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                  className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                 >
                   <Upload size={13} />
                   <span>Tải ảnh file</span>
@@ -1967,7 +1967,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
           {/* Vai trò + Trạng thái */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+              <label className="text-[11px] font-bold text-slate-600 mb-1.5 block">
                 Vai trò
               </label>
               <select
@@ -1985,7 +1985,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+              <label className="text-[11px] font-bold text-slate-600 mb-1.5 block">
                 Trạng thái
               </label>
               <button
@@ -2008,7 +2008,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 leading-relaxed">
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 leading-relaxed">
             <strong className="text-slate-700">Lưu ý:</strong> Email và mã
             định danh là bất biến. Mọi thay đổi sẽ được ghi nhật ký phía máy
             chủ.
@@ -2028,7 +2028,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
           <button
             type="submit"
             disabled={!canSubmit}
-            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs shadow-sm shadow-slate-900/20 transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold text-xs shadow-sm shadow-rose-600/20 transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isMutating ? (
               <Loader2 size={12} className="animate-spin" />
@@ -2131,7 +2131,7 @@ function CreateModal({ onClose, onCreate, isSubmitting = false }) {
   };
 
   const labelCls =
-    "text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block";
+    "text-[11px] font-bold text-slate-600   mb-1.5 block";
   const inputCls = (err) =>
     `w-full px-3 py-2 bg-white border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
       err
@@ -2140,7 +2140,7 @@ function CreateModal({ onClose, onCreate, isSubmitting = false }) {
     }`;
   const errP = (key) =>
     touched[key] && errors[key] ? (
-      <p className="text-[11px] text-rose-600 font-semibold mt-1">
+      <p className="text-[11px] text-rose-600 font-bold mt-1">
         {errors[key]}
       </p>
     ) : null;
@@ -2153,7 +2153,7 @@ function CreateModal({ onClose, onCreate, isSubmitting = false }) {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="w-full max-w-xl max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150"
+        className="w-full max-w-xl max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -2163,10 +2163,10 @@ function CreateModal({ onClose, onCreate, isSubmitting = false }) {
               <UserPlus size={18} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
                 Thêm người dùng mới
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-600 mt-0.5">
                 Quản trị viên tạo tài khoản trực tiếp cho hệ thống
               </p>
             </div>
@@ -2217,7 +2217,7 @@ function CreateModal({ onClose, onCreate, isSubmitting = false }) {
                 disabled={isSubmitting}
                 placeholder="Tối thiểu 8 ký tự"
                 autoComplete="new-password"
-                className={`${inputCls(touched.password && errors.password)} pl-9 pr-10 font-mono`}
+                className={`${inputCls(touched.password && errors.password)} pl-9 pr-10 tabular-nums`}
               />
               <button
                 type="button"
@@ -2282,7 +2282,7 @@ function CreateModal({ onClose, onCreate, isSubmitting = false }) {
                 <button
                   type="button"
                   onClick={() => createFileInputRef.current?.click()}
-                  className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                  className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                 >
                   <Upload size={13} />
                   <span>Tải ảnh file</span>
@@ -2345,7 +2345,7 @@ function CreateModal({ onClose, onCreate, isSubmitting = false }) {
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 leading-relaxed">
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 leading-relaxed">
             <strong className="text-slate-700">Lưu ý:</strong> Email không thể thay
             đổi sau khi tạo. Mọi thao tác sẽ được ghi nhật ký phía máy chủ.
           </div>
@@ -2382,19 +2382,19 @@ function CreateModal({ onClose, onCreate, isSubmitting = false }) {
 function DetailRow({ label, value, icon: Icon, mono, muted }) {
   return (
     <div
-      className={`p-3 rounded-2xl border ${
+      className={`p-3 rounded-xl border ${
         muted
           ? "bg-slate-50 border-slate-200"
           : "bg-white border-slate-200"
       }`}
     >
-      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 inline-flex items-center gap-1">
+      <p className="text-[11px] font-bold text-slate-600 mb-1.5 inline-flex items-center gap-1">
         {Icon && <Icon size={10} className="text-slate-400" />}
         {label}
       </p>
       <p
         className={`text-sm ${
-          mono ? "font-mono" : "font-semibold"
+          mono ? "tabular-nums" : "font-bold"
         } ${
           muted ? "italic text-slate-400 font-normal" : "text-slate-800"
         } break-all`}
@@ -2465,15 +2465,15 @@ const ERROR_GUIDE = {
     <>
       <strong>Cách khắc phục:</strong> Khởi động backend Spring Boot ở
       terminal <code>backend/</code> bằng lệnh{" "}
-      <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">
+      <code className="tabular-nums bg-amber-100 px-1 py-0.5 rounded">
         mvn spring-boot:run
       </code>{" "}
       hoặc{" "}
-      <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">
+      <code className="tabular-nums bg-amber-100 px-1 py-0.5 rounded">
         ./mvnw spring-boot:run
       </code>
       . Đảm bảo PostgreSQL đang chạy ở{" "}
-      <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">
+      <code className="tabular-nums bg-amber-100 px-1 py-0.5 rounded">
         localhost:5432
       </code>
       .
@@ -2496,7 +2496,7 @@ const ERROR_GUIDE = {
   forbidden: (
     <>
       <strong>Cách khắc phục:</strong> Endpoint{" "}
-      <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">
+      <code className="tabular-nums bg-rose-100 px-1 py-0.5 rounded">
         /api/v1/users
       </code>{" "}
       yêu cầu quyền <code>ADMIN</code>. Tài khoản hiện tại có thể là{" "}
@@ -2506,7 +2506,7 @@ const ERROR_GUIDE = {
   notfound: (
     <>
       <strong>Cách khắc phục:</strong> Kiểm tra URL gốc đã đúng{" "}
-      <code className="font-mono bg-orange-100 px-1 py-0.5 rounded">
+      <code className="tabular-nums bg-orange-100 px-1 py-0.5 rounded">
         /api/v1/users
       </code>{" "}
       chưa. Nếu backend đang chạy ở context-path khác, cập nhật biến môi
@@ -2517,19 +2517,19 @@ const ERROR_GUIDE = {
     <>
       <strong>Lỗi SQL/JDBC từ backend.</strong> Backend đã được cập nhật để
       dùng <code>JpaSpecificationExecutor</code> +{" "}
-      <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">
+      <code className="tabular-nums bg-rose-100 px-1 py-0.5 rounded">
         cb.coalesce(phone, &quot;&quot;)
       </code>{" "}
       nên không còn lỗi{" "}
-      <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">
+      <code className="tabular-nums bg-rose-100 px-1 py-0.5 rounded">
         could not determine data type of parameter
       </code>
       . Vui lòng <strong>restart Spring Boot</strong> (
-      <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">
+      <code className="tabular-nums bg-rose-100 px-1 py-0.5 rounded">
         Ctrl+C
       </code>{" "}
       rồi{" "}
-      <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">
+      <code className="tabular-nums bg-rose-100 px-1 py-0.5 rounded">
         mvn spring-boot:run
       </code>
       ) để áp dụng code mới.
@@ -2548,19 +2548,19 @@ function FallbackBanner({ errorType, message, apiBaseUrl, onRetry }) {
   const guide = ERROR_GUIDE[errorType] || ERROR_GUIDE.unknown;
 
   return (
-    <div className={`p-4 rounded-2xl border ${diag.bgClass}`}>
+    <div className={`p-4 rounded-xl border ${diag.bgClass}`}>
       <div className="flex items-start gap-3">
         <AlertCircle
           size={18}
           className={`${diag.iconClass} mt-0.5 shrink-0`}
         />
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-extrabold ${diag.titleClass}`}>
+          <p className={`text-sm font-bold ${diag.titleClass}`}>
             {diag.title}
           </p>
           <p className={`text-[11px] ${diag.bodyClass} mt-1`}>
             <strong>Chi tiết:</strong>{" "}
-            <code className={`font-mono ${diag.codeClass} px-1 py-0.5 rounded`}>
+            <code className={`tabular-nums ${diag.codeClass} px-1 py-0.5 rounded`}>
               {message}
             </code>
           </p>
@@ -2569,11 +2569,11 @@ function FallbackBanner({ errorType, message, apiBaseUrl, onRetry }) {
           </p>
           <p className={`text-[11px] ${diag.bodyClass} mt-2`}>
             <strong>API base URL đang dùng:</strong>{" "}
-            <code className={`font-mono ${diag.codeClass} px-1.5 py-0.5 rounded`}>
+            <code className={`tabular-nums ${diag.codeClass} px-1.5 py-0.5 rounded`}>
               {apiBaseUrl}
             </code>{" "}
             (có thể ghi đè bằng biến môi trường{" "}
-            <code className="font-mono">NEXT_PUBLIC_API_URL</code>).
+            <code className="tabular-nums">NEXT_PUBLIC_API_URL</code>).
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button

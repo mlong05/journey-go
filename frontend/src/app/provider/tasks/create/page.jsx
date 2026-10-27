@@ -24,7 +24,6 @@ import {
 import {
   experienceService,
   taskService,
-  CheckInPointManagerModal,
   QuestionManagerModal,
 } from "@/features/experience";
 
@@ -80,9 +79,7 @@ export default function CreateTaskPage() {
   // Modal xem chi tiết và modal thao tác
   const [detailTask, setDetailTask] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [locationModalTask, setLocationModalTask] = useState(null);
   const [unlockModalTask, setUnlockModalTask] = useState(null);
-  const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
   const [questionModalTask, setQuestionModalTask] = useState(null);
 
   const showToast = useCallback((msg, tone = "success") => {
@@ -215,9 +212,6 @@ export default function CreateTaskPage() {
     ) {
       e.maxAttempts = "Số lần thử phải >= 1.";
     }
-    if (selectedType?.requiresLocation && !form.checkInPointId) {
-      e.checkInPointId = "Loại nhiệm vụ này bắt buộc phải chọn điểm Check-in (BR-TASK-4).";
-    }
 
     if (form.enableUnlockCondition) {
       if (form.conditionType === "SEQUENTIAL" && !form.prerequisiteTaskId) {
@@ -249,7 +243,6 @@ export default function CreateTaskPage() {
         sequenceOrder: Number(form.sequenceOrder) || 0,
         pointsReward: Number(form.pointsReward) || 0,
         maxAttempts: form.maxAttempts ? Number(form.maxAttempts) : 3,
-        checkInPointId: form.checkInPointId ? Number(form.checkInPointId) : null,
       };
 
       const created = await taskService.create(experienceId, payload);
@@ -361,14 +354,6 @@ export default function CreateTaskPage() {
   };
 
   // Cập nhật vị trí sau khi gọi PATCH /api/v1/tasks/{id}/location
-  const handleLocationSaved = (updatedTask) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask } : t))
-    );
-    setLocationModalTask(null);
-    showToast("Đã gán điểm Check-in thành công.");
-  };
-
   const border = (f) => (errors[f] ? "border-rose-300" : "border-slate-200");
   const renderError = (f) =>
     errors[f] ? <p className="text-[11px] text-rose-600 font-bold">{errors[f]}</p> : null;
@@ -544,7 +529,7 @@ export default function CreateTaskPage() {
             </div>
 
             {/* Điểm thưởng, Số lần thử, Điểm CheckIn */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Điểm thưởng <span className="text-rose-500">*</span>
@@ -575,49 +560,8 @@ export default function CreateTaskPage() {
                 {renderError("maxAttempts")}
               </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Điểm Check-in {selectedType?.requiresLocation && <span className="text-rose-500">*</span>}
-                  </label>
-                  {selectedExperience && (
-                    <button
-                      type="button"
-                      onClick={() => setIsCheckInModalOpen(true)}
-                      className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1 cursor-pointer"
-                    >
-                      <Compass size={12} />
-                      <span>Quản lý trạm</span>
-                    </button>
-                  )}
-                </div>
-                <select
-                  value={form.checkInPointId}
-                  onChange={(e) => handleChange("checkInPointId", e.target.value)}
-                  className={`${inputCls} ${border("checkInPointId")}`}
-                >
-                  <option value="">— Không gắn điểm check-in —</option>
-                  {checkInPoints.map((cip) => (
-                    <option key={cip.id} value={cip.id}>
-                      {cip.name} {cip.qrToken ? `(${cip.qrToken})` : ""}
-                    </option>
-                  ))}
-                </select>
-                {checkInPoints.length === 0 && (
-                  <p className="text-[11px] text-amber-700">
-                    Chưa có trạm check-in nào trong trải nghiệm này.{" "}
-                    <button
-                      type="button"
-                      onClick={() => setIsCheckInModalOpen(true)}
-                      className="font-bold underline cursor-pointer"
-                    >
-                      Thêm trạm ngay
-                    </button>
-                  </p>
-                )}
-                {renderError("checkInPointId")}
-              </div>
             </div>
+
           </div>
 
           {/* CẤU HÌNH ĐIỀU KIỆN MỞ KHÓA KHI TẠO (PATCH /api/v1/tasks/{id}/unlock-condition) */}
@@ -848,14 +792,6 @@ export default function CreateTaskPage() {
 
                         {isDraft && (
                           <>
-                            {/* PATCH /api/v1/tasks/{id}/location */}
-                            <button
-                              type="button"
-                              onClick={() => setLocationModalTask(t)}
-                              className="h-6 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10.5px] font-bold inline-flex items-center gap-1 cursor-pointer border border-emerald-200"
-                            >
-                              <MapPin size={10} /> Vị trí
-                            </button>
 
                             {/* PATCH /api/v1/tasks/{id}/unlock-condition */}
                             <button
@@ -998,15 +934,6 @@ export default function CreateTaskPage() {
       )}
 
       {/* MODAL GÁN CHECK-IN POINT (PATCH /api/v1/tasks/{id}/location) */}
-      {locationModalTask && (
-        <LocationModal
-          task={locationModalTask}
-          checkInPoints={checkInPoints}
-          onClose={() => setLocationModalTask(null)}
-          onSaved={handleLocationSaved}
-        />
-      )}
-
       {/* MODAL CẤU HÌNH ĐIỀU KIỆN MỞ KHÓA (PATCH /api/v1/tasks/{id}/unlock-condition) */}
       {unlockModalTask && (
         <UnlockModal
@@ -1021,18 +948,6 @@ export default function CreateTaskPage() {
         />
       )}
 
-      {/* MODAL QUẢN LÝ TRẠM CHECK-IN */}
-      <CheckInPointManagerModal
-        isOpen={isCheckInModalOpen}
-        onClose={() => {
-          setIsCheckInModalOpen(false);
-          if (experienceId) loadTasksAndPoints(experienceId);
-        }}
-        experience={selectedExperience}
-        onPointsUpdated={() => {
-          if (experienceId) loadTasksAndPoints(experienceId);
-        }}
-      />
 
       {/* MODAL QUẢN LÝ BỘ CÂU HỎI & THỬ THÁCH */}
       {questionModalTask && (
@@ -1040,6 +955,9 @@ export default function CreateTaskPage() {
           isOpen={Boolean(questionModalTask)}
           onClose={() => setQuestionModalTask(null)}
           task={questionModalTask}
+          requiresLocation={Boolean(
+            taskTypes.find((t) => String(t.id) === String(questionModalTask?.taskTypeId))?.requiresLocation
+          )}
           experience={selectedExperience}
           canEdit={isDraft}
           isModerator={false}
@@ -1048,110 +966,6 @@ export default function CreateTaskPage() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// COMPONENT POPUP GÁN CHECK-IN POINT (PATCH /tasks/{id}/location)
-// ─────────────────────────────────────────────────────────────
-function LocationModal({ task, checkInPoints, onClose, onSaved }) {
-  const [selectedCip, setSelectedCip] = useState(
-    task.checkInPointId ? String(task.checkInPointId) : ""
-  );
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
-
-  const handleSaveLocation = async () => {
-    if (!selectedCip) {
-      setErr("Vui lòng chọn một điểm Check-in.");
-      return;
-    }
-    setSaving(true);
-    setErr("");
-    try {
-      const updated = await taskService.setLocation(task.id, Number(selectedCip));
-      onSaved(updated);
-    } catch (e) {
-      setErr(e?.message || "Không thể gán vị trí.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <MapPin size={16} />
-            </div>
-            <h3 className="text-base font-bold text-slate-900">Gán điểm Check-in</h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
-          >
-            <X size={14} />
-          </button>
-        </div>
-
-        <p className="text-xs text-slate-600">
-          Nhiệm vụ: <strong className="text-slate-900">{task.title}</strong>
-        </p>
-
-        {err && (
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-semibold">
-            {err}
-          </div>
-        )}
-
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Chọn điểm Check-in trong trải nghiệm
-          </label>
-          <select
-            value={selectedCip}
-            onChange={(e) => setSelectedCip(e.target.value)}
-            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none"
-          >
-            <option value="">— Chọn điểm Check-in —</option>
-            {checkInPoints.map((cip) => (
-              <option key={cip.id} value={cip.id}>
-                {cip.name} {cip.qrToken ? `(${cip.qrToken})` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="pt-2 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 cursor-pointer"
-          >
-            Huỷ
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveLocation}
-            disabled={saving || !selectedCip}
-            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
-          >
-            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-            Lưu vị trí
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

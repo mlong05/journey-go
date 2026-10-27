@@ -16,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -82,8 +83,27 @@ public class JourneyController {
         return ResponseEntity.ok(ApiResponse.success("Lấy manh mối câu đố thành công", response));
     }
 
+    @GetMapping("/{id}/tasks/{taskId}/questions")
+    @Operation(summary = "Xem câu hỏi của nhiệm vụ",
+            description = "Trả các câu hỏi (không kèm đáp án đúng). Nhiệm vụ cần vị trí chỉ mở câu hỏi khi gửi latitude/longitude trong bán kính của trạm, hoặc qrValue đúng mã QR của trạm; chưa tới nơi thì chỉ trả thông tin trạm với unlocked=false")
+    public ResponseEntity<ApiResponse<TaskQuestionsResponse>> getTaskQuestions(
+            @PathVariable Long id,
+            @PathVariable Long taskId,
+            @RequestParam(required = false) BigDecimal latitude,
+            @RequestParam(required = false) BigDecimal longitude,
+            @RequestParam(required = false) String qrValue,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        TaskQuestionsResponse response = journeyService.getTaskQuestions(id, taskId, userPrincipal.getId(), latitude, longitude, qrValue);
+        String msg = response.unlocked()
+                ? "Lấy câu hỏi nhiệm vụ thành công"
+                : "Hãy đến đúng địa điểm hoặc quét mã QR để mở câu hỏi";
+        return ResponseEntity.ok(ApiResponse.success(msg, response));
+    }
+
     @PostMapping("/{id}/tasks/{taskId}/submit")
-    @Operation(summary = "Nộp bài nhiệm vụ (Quiz hoặc GPS Puzzle)", description = "Chấm điểm câu trả lời trắc nghiệm hoặc đáp án giải đố thực địa và cộng điểm tích lũy")
+    @Operation(summary = "Nộp bài cả nhiệm vụ",
+            description = "Nộp câu trả lời của mọi câu hỏi trong một lần. Đúng hết thì nhận trọn điểm nhiệm vụ (một lần); chưa đúng hết thì không có điểm và phải làm lại cả nhiệm vụ, mỗi lần nộp tính một lượt (maxAttempts)")
     public ResponseEntity<ApiResponse<JourneyTaskProgressResponse>> submitTask(
             @PathVariable Long id,
             @PathVariable Long taskId,
@@ -91,9 +111,21 @@ public class JourneyController {
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         JourneyTaskProgressResponse response = journeyService.submitTask(id, taskId, request, userPrincipal.getId());
-        String msg = Boolean.TRUE.equals(response.isCorrect())
-                ? "Chính xác! Bạn đã hoàn thành nhiệm vụ và nhận được điểm thưởng"
-                : "Chưa chính xác, hãy thử lại nhé!";
+        String msg;
+        if (response.status() == com.journeygo.modules.journey.entity.enums.TaskProgressStatus.COMPLETED) {
+            msg = "Chính xác! Bạn đã hoàn thành nhiệm vụ và nhận được điểm thưởng";
+        } else if (Boolean.TRUE.equals(response.lastAnswerCorrect())) {
+            msg = String.format("Chính xác! Hãy đến địa điểm tiếp theo để trả lời câu hỏi kế tiếp (%d/%d câu).",
+                    response.questionIndex(), response.totalQuestions());
+        } else if (response.totalQuestions() != null) {
+            msg = String.format("Chưa đạt: đúng %d/%d câu. Cần trả lời đúng tất cả câu hỏi để nhận điểm. %s",
+                    response.correctCount(), response.totalQuestions(),
+                    response.attemptsRemaining() != null && response.attemptsRemaining() > 0
+                            ? "Còn " + response.attemptsRemaining() + " lần làm lại nhiệm vụ."
+                            : "Bạn đã hết số lần làm nhiệm vụ này.");
+        } else {
+            msg = "Chưa chính xác, hãy thử lại nhé!";
+        }
         return ResponseEntity.ok(ApiResponse.success(msg, response));
     }
 

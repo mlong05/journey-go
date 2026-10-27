@@ -7,7 +7,6 @@ import {
   MapPin,
   QrCode,
   DollarSign,
-  TrendingUp,
   CreditCard,
   CheckCircle2,
   Clock,
@@ -18,7 +17,16 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { SURFACE, HERO, KPI, TABLE, BADGE, BUTTON, MODAL } from "./dashboard.tokens";
+import { SURFACE, TABLE, BADGE, BUTTON, MODAL } from "./dashboard.tokens";
+import { PageHeader, StatusChip, StatCard } from "@/components/dashboard/DashboardUI";
+
+// Màu nhấn & liên kết của từng thẻ KPI
+const KPI_META = {
+  users: { tone: "sky", href: "/admin/users" },
+  destinations: { tone: "emerald", href: "/admin/destinations" },
+  checkins: { tone: "amber", href: "/admin/analytics" },
+  gmv: { tone: "rose", href: "/admin/finance" },
+};
 
 /**
  * Trang Tổng Quan Vận Hành & Tăng Trưởng Toàn Sàn - JourneyGo
@@ -174,73 +182,47 @@ export default function AdminDashboardPage() {
     <div className={SURFACE.page}>
       {/* Toast thông báo nhanh */}
       {toastMsg && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg border border-slate-700 text-xs font-semibold flex items-center gap-2.5 max-w-md">
+        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg border border-slate-700 text-xs font-bold flex items-center gap-2.5 max-w-md">
           <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* ────────────────────────────────────────────────────────
-          1. HERO BANNER ĐIỀU HÀNH TRUNG ƯƠNG
-      ──────────────────────────────────────────────────────── */}
-      <section className={HERO.shell}>
-        <div className="relative z-10">
-          <div className={HERO.eyebrow}>
-            <span>Trung tâm chỉ huy vận hành toàn sàn</span>
-          </div>
+      <PageHeader
+        eyebrow="Quản trị"
+        title="Tổng quan vận hành"
+        description="Theo dõi người dùng, điểm đến, lượt kích hoạt và doanh số toàn sàn JourneyGo."
+        meta={
+          <>
+            <StatusChip tone="emerald">Cổng thanh toán: ổn định</StatusChip>
+            <StatusChip tone="sky">Bản đồ &amp; GPS: 99.98% uptime</StatusChip>
+            <StatusChip tone="amber">Kiểm toán &amp; phân quyền: kích hoạt</StatusChip>
+          </>
+        }
+      >
+        <Link href="/admin/analytics" className={BUTTON.secondary}>
+          Báo cáo tăng trưởng
+        </Link>
+        <Link href="/admin/finance" className={BUTTON.primary}>
+          Tài chính &amp; thanh toán
+        </Link>
+      </PageHeader>
 
-          <h1 className={`${HERO.title} mt-2.5`}>
-            Trung Tâm Chỉ Huy JourneyGo
-          </h1>
-
-          <div className={`mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[11.5px] text-slate-300`}>
-            <span className="inline-flex items-center gap-1.5 font-medium text-slate-200">
-              <span className={HERO.statusDot} />
-              Cổng thanh toán trực tuyến: Kết nối ổn định
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-medium text-slate-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-              Dịch vụ Bản đồ &amp; GPS: 99.98% Uptime
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-medium text-slate-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-              Hệ thống kiểm toán &amp; phân quyền: Kích hoạt
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* ────────────────────────────────────────────────────────
-          2. LƯỚI 4 THẺ KPI CHỈ SỐ VĨ MÔ
-      ──────────────────────────────────────────────────────── */}
-      <section className={KPI.grid}>
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpiCards.map((card) => {
-          const Icon = card.icon;
+          const meta = KPI_META[card.id];
           return (
-            <div key={card.id} className={KPI.card}>
-              <div className={KPI.headerRow}>
-                <p className={KPI.title}>{card.title}</p>
-                <div className={KPI.iconBox}>
-                  <Icon size={18} strokeWidth={1.75} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-baseline">
-                  <span className={KPI.value}>{card.count}</span>
-                  <span className={KPI.unit}>{card.unit}</span>
-                </div>
-                <p className={`${KPI.sub} mt-1`}>{card.subBreakdown}</p>
-              </div>
-
-              <div className={KPI.footerRow}>
-                <span className={KPI.trend}>
-                  <TrendingUp size={12} />
-                  {card.trend}
-                </span>
-                <span className="text-[10.5px] text-slate-400">Thời gian thực</span>
-              </div>
-            </div>
+            <StatCard
+              key={card.id}
+              title={card.title}
+              value={card.count}
+              unit={card.unit}
+              hint={card.subBreakdown}
+              icon={card.icon}
+              tone={meta.tone}
+              badge={{ text: card.trend }}
+              href={meta.href}
+            />
           );
         })}
       </section>
@@ -258,10 +240,10 @@ export default function AdminDashboardPage() {
                 <CreditCard size={16} />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-slate-900 tracking-tight">
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">
                   Giao dịch vé trải nghiệm mới nhất
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-600 mt-0.5">
                   Các đơn hàng vé di tích vừa hoàn tất thanh toán trên toàn sàn
                 </p>
               </div>
@@ -269,7 +251,7 @@ export default function AdminDashboardPage() {
 
             <Link
               href="/admin/finance"
-              className="text-xs font-semibold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1"
+              className="text-xs font-bold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1"
             >
               <span>Xem tất cả</span>
               <ChevronRight size={13} />
@@ -293,7 +275,7 @@ export default function AdminDashboardPage() {
                   <tr>
                     <td colSpan={5} className={TABLE.emptyCell}>
                       <CreditCard size={28} className="mx-auto text-slate-300 mb-2" />
-                      <p className="text-sm font-semibold text-slate-600">
+                      <p className="text-sm font-bold text-slate-600">
                         Chưa có giao dịch phát sinh
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
@@ -305,11 +287,11 @@ export default function AdminDashboardPage() {
                   recentTransactions.map((tx) => (
                     <tr key={tx.id} className={TABLE.tr}>
                       <td className={TABLE.td}>
-                        <div className="font-semibold text-slate-900">{tx.customer}</div>
+                        <div className="font-bold text-slate-900">{tx.customer}</div>
                         <div className="text-[11px] font-mono text-slate-400 mt-0.5">{tx.id}</div>
                       </td>
                       <td className="py-3.5 px-4 max-w-[200px]">
-                        <p className="font-medium text-slate-800 truncate" title={tx.routeName}>
+                        <p className="font-semibold text-slate-800 truncate" title={tx.routeName}>
                           {tx.routeName}
                         </p>
                         <p className="text-[11px] text-slate-400 mt-0.5">{tx.time}</p>
@@ -320,7 +302,7 @@ export default function AdminDashboardPage() {
                         </span>
                       </td>
                       <td className={TABLE.td}>
-                        <span className="font-semibold text-slate-900 tabular-nums">
+                        <span className="font-bold text-slate-900 tabular-nums">
                           {tx.amount}
                         </span>
                       </td>
@@ -343,11 +325,11 @@ export default function AdminDashboardPage() {
 
           {/* Chân khối giao dịch */}
           <div className={`${SURFACE.cardFooter} flex items-center justify-between`}>
-            <span className="inline-flex items-center gap-1.5 font-medium">
+            <span className="inline-flex items-center gap-1.5 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               Đồng bộ dữ liệu thời gian thực
             </span>
-            <span className="font-medium text-slate-600">Đã kết nối máy chủ</span>
+            <span className="font-semibold text-slate-600">Đã kết nối máy chủ</span>
           </div>
         </div>
 
@@ -360,10 +342,10 @@ export default function AdminDashboardPage() {
                   <ShieldAlert size={16} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold text-slate-900 tracking-tight">
+                  <h2 className="text-sm font-bold text-slate-900 tracking-tight">
                     Yêu cầu cần phê duyệt
                   </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-600 mt-0.5">
                     {approvalTasks.length} tác vụ cấp thiết chờ bạn ra quyết định
                   </p>
                 </div>
@@ -378,7 +360,7 @@ export default function AdminDashboardPage() {
               {approvalTasks.length === 0 ? (
                 <div className={TABLE.emptyCell}>
                   <CheckCircle2 size={28} className="mx-auto text-emerald-500 mb-2" />
-                  <p className="text-sm font-semibold text-slate-700">
+                  <p className="text-sm font-bold text-slate-700">
                     Tất cả tác vụ đã được xử lý xong
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">
@@ -396,10 +378,10 @@ export default function AdminDashboardPage() {
                         <span className={`${BADGE.base} ${BADGE.warning} mb-1.5`}>
                           {task.badge}
                         </span>
-                        <h3 className="text-sm font-semibold text-slate-900 leading-snug">
+                        <h3 className="text-sm font-bold text-slate-900 leading-snug">
                           {task.title}
                         </h3>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-xs text-slate-600 mt-0.5">
                           {task.subtitle}
                         </p>
                       </div>
@@ -433,7 +415,7 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className={`${SURFACE.cardFooter} flex items-center justify-between`}>
-            <span className="font-semibold text-rose-700">
+            <span className="font-bold text-rose-700">
               Cam kết SLA duyệt đối tác: &lt; 24h
             </span>
             <span className="text-slate-400">Quyền: Quản trị viên</span>
@@ -452,10 +434,10 @@ export default function AdminDashboardPage() {
                 <span className={`${BADGE.base} ${BADGE.warning}`}>
                   {selectedTask.category}
                 </span>
-                <h3 className="text-base font-semibold text-slate-900 mt-2">
+                <h3 className="text-base font-bold text-slate-900 mt-2">
                   {selectedTask.title}
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">{selectedTask.subtitle}</p>
+                <p className="text-xs text-slate-600 mt-0.5">{selectedTask.subtitle}</p>
               </div>
 
               <button
@@ -468,7 +450,7 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 leading-relaxed">
-              <p className="font-semibold text-slate-800 mb-1">Chi tiết yêu cầu đệ trình:</p>
+              <p className="font-bold text-slate-800 mb-1">Chi tiết yêu cầu đệ trình:</p>
               <p>{selectedTask.description}</p>
             </div>
 

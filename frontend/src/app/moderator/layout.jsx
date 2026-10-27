@@ -10,16 +10,14 @@ import {
   MessageSquare,
   History,
   LogOut,
-  Search,
   Bell,
-  Menu,
   X,
   Compass,
   Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
-import { ExpandingSideRail, UserProfilePill } from "@/components/layout";
+import { Sidebar, DashboardHeader } from "@/components/layout";
 
 /**
  * Layout Làm Việc Của Kiểm Duyệt Viên - JourneyGo
@@ -44,7 +42,7 @@ export default function ModeratorLayout({ children }) {
      để vùng bảng tự cuộn. Các trang khác (kể cả hồ sơ chi tiết /destinations/[id])
      vẫn cuộn toàn trang như cũ. So khớp chính xác để không áp nhầm. */
   const isDestinationList = /^\/moderator\/destinations\/?$/.test(pathname || "");
-  const isExperiencesPage = /^\/moderator\/experiences\/?$/.test(pathname || "");
+  const isExperiencesPage = /^\/moderator\/(experiences|tours)\/?$/.test(pathname || "");
 
   // 5 mục menu điều hướng chuyên biệt của kiểm duyệt viên
   const moderatorNavItems = [
@@ -101,38 +99,19 @@ export default function ModeratorLayout({ children }) {
     }
   };
 
-  // Thông tin kiểm duyệt viên hiện tại từ phiên đăng nhập thực
-  const moderatorName =
-    authData?.user?.fullName ||
-    authData?.user?.name ||
-    "Chuyên Viên Thẩm Định";
-  const moderatorEmail = authData?.user?.email || "moderator@journeygo.com";
-  const avatarInitials =
-    authData?.user
-      ? moderatorName
-        .split(" ")
-        .filter(Boolean)
-        .slice(-2)
-        .map((w) => w[0])
-        .join("")
-        .toUpperCase()
-      : "TĐ";
+  const currentTitle =
+    [...moderatorNavItems]
+      .sort((a, b) => b.href.length - a.href.length)
+      .find((i) => {
+        const p = i.href.split("#")[0];
+        return p === "/moderator" ? pathname === "/moderator" : pathname?.startsWith(p);
+      })?.label || "Bàn làm việc tổng quan";
 
   return (
     <div className="h-screen w-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
-      {/* ────────────────────────────────────────────────────────
-          1. CỘT 1 (SIDEBAR): MÔ HÌNH FLEXBOX CHUẨN DASHBOARD
-      ──────────────────────────────────────────────────────── */}
-      <ExpandingSideRail
+      <Sidebar
         role="moderator"
-        roleLabel="Kiểm duyệt viên"
         navItems={moderatorNavItems}
-        user={{
-          name: moderatorName,
-          email: moderatorEmail,
-          initials: avatarInitials,
-          statusText: "Trực thẩm định",
-        }}
         onLogout={performLogout}
         isOpenMobile={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
@@ -140,72 +119,29 @@ export default function ModeratorLayout({ children }) {
         onToggleWide={() => setIsSidebarWide((prev) => !prev)}
       />
 
-      {/* ────────────────────────────────────────────────────────
-          2. CỘT 2 (VÙNG NỘI DUNG BÊN PHẢI): CỐ ĐỊNH 100VH, KHÔNG BỊ TRÔI TOPBAR
-      ──────────────────────────────────────────────────────── */}
       <div className="flex-1 min-w-0 w-full h-screen flex flex-col overflow-hidden">
-        {/* TOPBAR CỐ ĐỊNH TRÊN CÙNG (SHRINK-0): VĨNH VIỄN KHÔNG BỊ CUỘN MẤT */}
-        <header className="h-16 shrink-0 w-full bg-white border-b border-slate-200 px-6 flex items-center justify-between z-30 shadow-2xs">
-          {/* Cụm trái: Menu mobile + Tiêu đề */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
-              title="Mở menu"
-            >
-              <Menu size={18} />
-            </button>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-slate-900 tracking-tight">
-                  Khu Vực Thẩm Định & Kiểm Duyệt
-                </span>
-                <span className="hidden lg:inline-block text-slate-300">•</span>
-                <span className="hidden lg:inline-block text-[11px] font-semibold text-slate-500">
-                  Trung Tâm Thẩm Tra Nội Dung Di Sản
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Cụm phải: Tìm kiếm nhanh mã hồ sơ + Chuông + Thẻ định danh người dùng */}
-          <div className="flex items-center gap-2.5 sm:gap-3.5">
-            <form onSubmit={handleTopSearchSubmit} className="relative hidden sm:block">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Search size={14} />
-              </div>
-              <input
-                type="text"
-                value={topSearch}
-                onChange={(e) => setTopSearch(e.target.value)}
-                placeholder="Tìm mã hồ sơ, tên di tích..."
-                className="pl-8.5 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 w-44 md:w-56 transition-all"
-              />
-            </form>
-
-            {/* Chuông thông báo hồ sơ */}
-            <div className="relative">
-              <Link
-                href="/moderator"
-                className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 transition-colors relative"
-                title="Thông báo hồ sơ chờ duyệt"
-              >
-                <Bell size={16} />
-                {urgentAlertsCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white animate-ping" />
-                )}
-                {urgentAlertsCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
-                )}
-              </Link>
-            </div>
-
-            {/* Cụm Thẻ Định Danh Người Dùng (User Profile Pill) */}
-            <UserProfilePill role="moderator" user={authData?.user} />
-          </div>
-        </header>
+        <DashboardHeader
+          role="moderator"
+          user={authData?.user}
+          section="Thẩm định"
+          title={currentTitle}
+          onOpenMenu={() => setIsSidebarOpen(true)}
+          searchValue={topSearch}
+          onSearchChange={setTopSearch}
+          onSearchSubmit={handleTopSearchSubmit}
+          searchPlaceholder="Tìm mã hồ sơ, tên di tích..."
+        >
+          <Link
+            href="/moderator"
+            className="relative w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-colors"
+            title="Thông báo hồ sơ chờ duyệt"
+          >
+            <Bell size={16} />
+            {urgentAlertsCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
+            )}
+          </Link>
+        </DashboardHeader>
 
         {/* Nội dung trang làm việc.
             • TRANG DANH SÁCH (/moderator/destinations): dùng khung cố định

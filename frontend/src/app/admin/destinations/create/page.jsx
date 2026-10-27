@@ -65,18 +65,18 @@ export default function AdminCreateDestinationPage() {
         <div>
           <Link
             href="/admin/destinations"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors mb-2"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors mb-2"
           >
             <ArrowLeft size={14} />
             <span>Quay lại danh sách toàn sàn</span>
           </Link>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-5 bg-slate-900 rounded-full" />
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Khởi Tạo Điểm Đến Di Sản Mới
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
             Quản trị viên tạo hồ sơ điểm đến thay mặt hệ thống. Hồ sơ mới sẽ ở trạng thái
             <strong> chờ phê duyệt</strong> cho tới khi được duyệt.
           </p>
@@ -93,7 +93,7 @@ export default function AdminCreateDestinationPage() {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm shadow-slate-900/20 text-xs sm:text-sm transition-all cursor-pointer"
+            className="bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm shadow-rose-600/20 text-xs sm:text-sm transition-all cursor-pointer"
           >
             <Plus size={18} strokeWidth={2.4} />
             <span>Mở lại form tạo</span>
@@ -102,16 +102,16 @@ export default function AdminCreateDestinationPage() {
       </div>
 
       {/* ── Preview các điểm đến gần đây ────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5">
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Landmark size={15} className="text-slate-700" />
             Điểm đến gần đây trong hệ thống
           </h2>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="text-[11px] font-bold text-slate-500 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
+            className="text-[11px] font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
           >
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
             Tải lại
@@ -124,9 +124,9 @@ export default function AdminCreateDestinationPage() {
           </div>
         ) : recent.length === 0 ? (
           <div className="py-10 text-center">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-600">
               Hệ thống chưa có điểm đến nào. Bấm{" "}
-              <strong>"Mở lại form tạo"</strong> để khởi tạo điểm đến đầu tiên.
+              <strong>&ldquo;Mở lại form tạo&rdquo;</strong> để khởi tạo điểm đến đầu tiên.
             </p>
           </div>
         ) : (
@@ -141,16 +141,16 @@ export default function AdminCreateDestinationPage() {
                     <Landmark size={13} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-black text-slate-900 truncate">
+                    <p className="text-xs font-bold text-slate-900 truncate">
                       {d.name}
                     </p>
-                    <p className="text-[10.5px] text-slate-500 truncate">
+                    <p className="text-[11px] text-slate-600 truncate">
                       {d.address}
                     </p>
                   </div>
                 </div>
                 <span
-                  className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full ${
                     d.approved === true
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                       : "bg-amber-50 text-amber-700 border border-amber-200"

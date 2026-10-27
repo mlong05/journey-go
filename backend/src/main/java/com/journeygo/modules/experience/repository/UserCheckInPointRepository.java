@@ -11,6 +11,7 @@ import java.util.Optional;
 public interface UserCheckInPointRepository extends JpaRepository<UserCheckInPoint, Long> {
 
     Optional<UserCheckInPoint> findByUserIdAndCheckInPointId(Long userId, Long checkInPointId);
+    boolean existsByCheckInPointId(Long checkInPointId);
 
     List<UserCheckInPoint> findByUserIdOrderByCheckedInAtDesc(Long userId);
 

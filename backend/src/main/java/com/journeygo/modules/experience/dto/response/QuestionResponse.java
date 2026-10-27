@@ -18,7 +18,7 @@ public record QuestionResponse(
         @Schema(description = "Đáp án cho câu TEXT (ẨN với Tourist — BR-TASK-5)") String expectedText,
         @Schema(description = "Loại câu hỏi") QuestionType questionType,
         @Schema(description = "Thứ tự") Integer sequenceOrder,
-        @Schema(description = "Điểm") Integer points,
+        @Schema(description = "ID CheckInPoint gắn với câu hỏi (nhiệm vụ tương tác ngoài thực tế)") Long checkInPointId,
         @Schema(description = "Danh sách đáp án (đã mask isCorrect nếu forTourist)") List<AnswerResponse> answers,
         @Schema(description = "Ngày tạo") Instant createdAt
 ) {
@@ -30,7 +30,7 @@ public record QuestionResponse(
                 .expectedText(q.getExpectedText())
                 .questionType(q.getQuestionType())
                 .sequenceOrder(q.getSequenceOrder())
-                .points(q.getPoints())
+                .checkInPointId(q.getCheckInPoint() != null ? q.getCheckInPoint().getId() : null)
                 .answers(q.getAnswers() != null
                         ? q.getAnswers().stream().map(AnswerResponse::fromEntity).toList()
                         : List.of())
@@ -47,7 +47,7 @@ public record QuestionResponse(
                 .expectedText(null)   // ẨN
                 .questionType(q.getQuestionType())
                 .sequenceOrder(q.getSequenceOrder())
-                .points(q.getPoints())
+                .checkInPointId(q.getCheckInPoint() != null ? q.getCheckInPoint().getId() : null)
                 .answers(q.getAnswers() != null
                         ? q.getAnswers().stream().map(AnswerResponse::forTourist).toList()
                         : List.of())

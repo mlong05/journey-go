@@ -274,7 +274,7 @@ export default function TourFormModal({
         aria-modal="true"
         aria-label={modalTitle}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
+        className="w-full max-w-3xl max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
       >
         {/* ── HEADER ─────────────────────────────────────────── */}
         <div className="relative px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-white via-white to-slate-50/70">
@@ -301,7 +301,7 @@ export default function TourFormModal({
                       : "Đã khởi tạo tour thành công!"
                     : modalTitle}
                 </h3>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-md">
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed max-w-md">
                   {success
                     ? isEditing
                       ? "Tour đã được gửi lại vào hàng chờ kiểm duyệt. Bạn không thể chỉnh sửa cho đến khi có kết quả."
@@ -315,7 +315,7 @@ export default function TourFormModal({
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer"
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-700 flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer"
               aria-label="Đóng"
             >
               <X size={16} />
@@ -331,24 +331,24 @@ export default function TourFormModal({
                 <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
                         Tên tour
                       </p>
-                      <p className="text-sm font-black text-slate-900 truncate">
+                      <p className="text-sm font-bold text-slate-900 truncate">
                         {savedTour.title || form.title}
                       </p>
                     </div>
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                       Chờ duyệt
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200/70">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
                         Tổng giá
                       </p>
-                      <p className="text-slate-800 font-mono font-bold">
+                      <p className="text-slate-800 tabular-nums font-bold">
                         {formatVND(savedTour.price)}
                       </p>
                       <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
@@ -356,7 +356,7 @@ export default function TourFormModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
                         Thời lượng
                       </p>
                       <p className="text-slate-800 font-bold">
@@ -364,15 +364,15 @@ export default function TourFormModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
                         Loại hình
                       </p>
-                      <p className="text-slate-800 font-semibold">
+                      <p className="text-slate-800 font-bold">
                         {form.tourType}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
                         Số điểm đến
                       </p>
                       <p className="text-slate-800 font-bold">
@@ -385,7 +385,7 @@ export default function TourFormModal({
 
               {route.length > 0 && (
                 <div className="rounded-2xl border border-slate-200 p-4 bg-white">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">
+                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3">
                     Hành trình đã khai báo
                   </p>
                   <ol className="space-y-2">
@@ -394,14 +394,14 @@ export default function TourFormModal({
                         key={r.destinationId}
                         className="flex items-start gap-3 text-sm"
                       >
-                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
                           {index + 1}
                         </span>
                         <div className="min-w-0">
                           <p className="font-bold text-slate-800 truncate">
                             {r.name}
                           </p>
-                          <p className="text-[11px] text-slate-500 truncate">
+                          <p className="text-[11px] text-slate-600 truncate">
                             {r.address || "Chưa có"}
                           </p>
                         </div>
@@ -419,7 +419,7 @@ export default function TourFormModal({
                     size={16}
                     className="text-rose-600 mt-0.5 shrink-0"
                   />
-                  <p className="text-xs text-rose-800 font-semibold leading-relaxed">
+                  <p className="text-xs text-rose-800 font-bold leading-relaxed">
                     {apiError}
                   </p>
                 </div>
@@ -439,7 +439,7 @@ export default function TourFormModal({
                     onChange={(e) => handleChange("title", e.target.value)}
                     placeholder="Ví dụ: Hành trình di sản Hà Nội 3 ngày 2 đêm"
                     disabled={loading}
-                    className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} font-semibold disabled:opacity-60 transition-colors ${
+                    className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} font-bold disabled:opacity-60 transition-colors ${
                       errors.title ? "border-rose-300" : "border-slate-200"
                     }`}
                   />
@@ -461,7 +461,7 @@ export default function TourFormModal({
                       value={form.tourType}
                       onChange={(e) => handleChange("tourType", e.target.value)}
                       disabled={loading}
-                      className={`w-full px-3 py-2.5 bg-slate-50 border rounded-xl text-sm font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} disabled:opacity-60 ${
+                      className={`w-full px-3 py-2.5 bg-slate-50 border rounded-xl text-sm font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} disabled:opacity-60 ${
                         errors.tourType ? "border-rose-300" : "border-slate-200"
                       }`}
                     >
@@ -495,7 +495,7 @@ export default function TourFormModal({
                         }
                         placeholder="3"
                         disabled={loading}
-                        className={`w-full pl-3.5 pr-14 py-2.5 bg-slate-50 border rounded-xl text-sm font-mono font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} disabled:opacity-60 ${
+                        className={`w-full pl-3.5 pr-14 py-2.5 bg-slate-50 border rounded-xl text-sm tabular-nums font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder} disabled:opacity-60 ${
                           errors.durationDays
                             ? "border-rose-300"
                             : "border-slate-200"
@@ -522,7 +522,7 @@ export default function TourFormModal({
                     <span>Hành trình</span>
                     <span className="text-rose-500">*</span>
                   </label>
-                  <span className="text-[11px] font-semibold text-slate-500">
+                  <span className="text-[11px] font-bold text-slate-600">
                     {route.length} điểm đến đã chọn
                   </span>
                 </div>
@@ -533,7 +533,7 @@ export default function TourFormModal({
                     size={14}
                     className="text-slate-400 mt-0.5 shrink-0"
                   />
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
                     Giá tour được hệ thống tự động tính = tổng giá các trải
                     nghiệm của những điểm đến trong hành trình. Bạn không cần
                     khai báo giá.
@@ -548,14 +548,14 @@ export default function TourFormModal({
                         key={r.destinationId}
                         className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200"
                       >
-                        <span className="w-6 h-6 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">
+                        <span className="w-6 h-6 rounded-full bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                           {index + 1}
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-bold text-slate-900 truncate">
                             {r.name}
                           </p>
-                          <p className="text-[11px] text-slate-500 truncate">
+                          <p className="text-[11px] text-slate-600 truncate">
                             {r.address || "Chưa có"}
                           </p>
                         </div>
@@ -564,7 +564,7 @@ export default function TourFormModal({
                             type="button"
                             onClick={() => moveDestination(index, -1)}
                             disabled={index === 0 || loading}
-                            className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                             title="Đưa lên trước"
                             aria-label="Đưa điểm đến lên trước"
                           >
@@ -574,7 +574,7 @@ export default function TourFormModal({
                             type="button"
                             onClick={() => moveDestination(index, 1)}
                             disabled={index === route.length - 1 || loading}
-                            className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                             title="Đưa xuống sau"
                             aria-label="Đưa điểm đến xuống sau"
                           >
@@ -597,7 +597,7 @@ export default function TourFormModal({
                 ) : (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-6 text-center">
                     <MapPin size={20} className="text-slate-400 mx-auto" />
-                    <p className="text-xs font-semibold text-slate-500 mt-2">
+                    <p className="text-xs font-bold text-slate-600 mt-2">
                       Chưa chọn điểm đến nào
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
@@ -632,12 +632,12 @@ export default function TourFormModal({
                     {destLoading ? (
                       <div className="py-8 flex flex-col items-center gap-2 text-slate-400">
                         <Loader2 size={20} className="animate-spin" />
-                        <p className="text-[11px] font-semibold">
+                        <p className="text-[11px] font-bold">
                           Đang tải điểm đến...
                         </p>
                       </div>
                     ) : filteredDestinations.length === 0 ? (
-                      <p className="py-8 text-center text-[11px] font-semibold text-slate-400">
+                      <p className="py-8 text-center text-[11px] font-bold text-slate-400">
                         Không tìm thấy điểm đến phù hợp
                       </p>
                     ) : (
@@ -656,7 +656,7 @@ export default function TourFormModal({
                                   className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
                                     picked
                                       ? "bg-emerald-50 text-emerald-600 border-emerald-200"
-                                      : "bg-slate-100 text-slate-500 border-slate-200"
+                                      : "bg-slate-100 text-slate-600 border-slate-200"
                                   }`}
                                 >
                                   {picked ? (
@@ -669,7 +669,7 @@ export default function TourFormModal({
                                   <span className="block text-xs font-bold text-slate-800 truncate">
                                     {d.name}
                                   </span>
-                                  <span className="block text-[11px] text-slate-500 truncate">
+                                  <span className="block text-[11px] text-slate-600 truncate">
                                     {d.address || "Chưa có"}
                                   </span>
                                 </span>

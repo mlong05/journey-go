@@ -45,7 +45,6 @@ import {
   EditExperienceModal as EditExpModal,
   TaskManager as TaskManagerModal,
   SlotManager as SlotManagerModal,
-  CheckInPointManagerModal as CheckInModal,
 } from "@/features/experience";
 
 const STATUS = {
@@ -134,7 +133,6 @@ export default function ProviderDestinationsPage() {
   const [expEditTarget, setExpEditTarget] = useState(null);
   const [expTaskTarget, setExpTaskTarget] = useState(null);
   const [expSlotTarget, setExpSlotTarget] = useState(null);
-  const [expCheckInTarget, setExpCheckInTarget] = useState(null);
   const [expDescExpanded, setExpDescExpanded] = useState(false);
 
   const showToast = useCallback((msg, tone = "success") => {
@@ -421,10 +419,13 @@ export default function ProviderDestinationsPage() {
     });
   }, [destinations, searchQuery, selectedRegion, statusTab, provinceList]);
 
-  // Reset về trang 1 khi thay đổi điều kiện tìm kiếm/bộ lọc
-  useEffect(() => {
+  // Reset về trang 1 khi thay đổi điều kiện tìm kiếm/bộ lọc (điều chỉnh state ngay khi render, không dùng effect)
+  const filterKey = [searchQuery, selectedRegion, selectedCategory, statusTab].join("|");
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
     setCurrentPage(1);
-  }, [searchQuery, selectedRegion, selectedCategory, statusTab]);
+  }
 
   const totalElements = filteredDestinations.length;
   const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
@@ -464,7 +465,7 @@ export default function ProviderDestinationsPage() {
     <div className="h-full min-h-0 w-full overflow-hidden flex flex-col animate-in fade-in-50 duration-200">
       {toastMessage && (
         <div
-          className={`fixed top-5 right-5 z-50 ${toastPalette[toastTone]} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-3 max-w-md`}
+          className={`fixed top-5 right-5 z-50 ${toastPalette[toastTone]} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-3 max-w-md`}
         >
           {toastTone === "success" ? (
             <CheckCircle2 size={16} className="text-emerald-300 shrink-0" />
@@ -482,11 +483,11 @@ export default function ProviderDestinationsPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-5 bg-emerald-600 rounded-full" />
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Quản Lý Điểm Đến Di Tích
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
             Khai báo tọa độ thực địa, quản lý trạng thái phê duyệt và đồng bộ với Hội đồng Thẩm định văn hóa.
           </p>
         </div>
@@ -517,7 +518,7 @@ export default function ProviderDestinationsPage() {
       </div>
 
       {/* ── 2. BỘ LỌC TÌM KIẾM VÀ TABS TRẠNG THÁI (SHRINK-0: CỐ ĐỊNH TRÊN CÙNG) ── */}
-      <div className="shrink-0 mb-4 bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-3.5">
+      <div className="shrink-0 mb-4 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-3.5">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
           <div className="sm:col-span-6 relative">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -555,7 +556,7 @@ export default function ProviderDestinationsPage() {
               className="absolute inset-y-0 right-2.5 my-auto pointer-events-none text-slate-400"
             />
             {provinceError && (
-              <p className="mt-1 text-[10px] text-rose-600 font-semibold">
+              <p className="mt-1 text-[11px] text-rose-600 font-bold">
                 ⚠ {provinceError}
               </p>
             )}
@@ -644,7 +645,7 @@ export default function ProviderDestinationsPage() {
       </div>
 
       {fetchError && (
-        <div className="shrink-0 mb-4 flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
+        <div className="shrink-0 mb-4 flex items-start gap-2.5 p-4 rounded-xl bg-rose-50 border border-rose-200">
           <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-bold text-rose-800">
@@ -665,14 +666,14 @@ export default function ProviderDestinationsPage() {
       {/* ── 3. KHU VỰC DANH SÁCH THẺ VÀ PHÂN TRANG (CỐ ĐỊNH PHÂN TRANG, CHỈ CUỘN BÊN TRONG CÁC THẺ) ── */}
       <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
         {isLoading && destinations.length === 0 ? (
-          <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-2xs">
+          <div className="bg-white rounded-2xl p-16 text-center border border-slate-200/90 shadow-2xs">
             <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
             <p className="text-xs text-slate-400 mt-3">
               Đang tải danh sách điểm đến từ máy chủ…
             </p>
           </div>
         ) : filteredDestinations.length === 0 ? (
-          <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-2xs space-y-3">
+          <div className="bg-white rounded-2xl p-16 text-center border border-slate-200/90 shadow-2xs space-y-3">
             <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
               <Inbox size={28} />
             </div>
@@ -702,7 +703,7 @@ export default function ProviderDestinationsPage() {
         ) : (
           <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
             {/* Thanh tiêu đề các cột (Cố định phía trên danh sách thẻ) */}
-            <div className="shrink-0 hidden lg:grid grid-cols-12 gap-4 px-5 py-3 bg-slate-100/90 border border-slate-200/90 rounded-2xl text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2.5 shadow-2xs">
+            <div className="shrink-0 hidden lg:grid grid-cols-12 gap-4 px-5 py-3 bg-slate-100/90 border border-slate-200/90 rounded-xl text-[11px] font-bold text-slate-600 mb-2.5 shadow-2xs">
               <div className="col-span-1 text-center">STT</div>
               <div className="col-span-3">Điểm đến di tích</div>
               <div className="col-span-3">Địa chỉ thực địa</div>
@@ -718,11 +719,11 @@ export default function ProviderDestinationsPage() {
                 return (
                   <div
                     key={dest.id}
-                    className="group bg-white rounded-2xl border border-slate-200/90 hover:border-emerald-300 hover:shadow-sm transition-all duration-200 p-4 lg:py-3 lg:px-5 flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:gap-4 lg:items-center"
+                    className="group bg-white rounded-xl border border-slate-200/90 hover:border-emerald-300 hover:shadow-sm transition-all duration-200 p-4 lg:py-3 lg:px-5 flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:gap-4 lg:items-center"
                   >
                     {/* Cột STT */}
                     <div className="col-span-1 flex items-center justify-center">
-                      <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 border border-slate-200/80 flex items-center justify-center font-mono text-xs font-bold shrink-0">
+                      <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 border border-slate-200/80 flex items-center justify-center tabular-nums text-xs font-bold shrink-0">
                         {stt}
                       </span>
                     </div>
@@ -747,8 +748,8 @@ export default function ProviderDestinationsPage() {
 
                     {/* Cột 3: Sức chứa */}
                     <div className="col-span-6 lg:col-span-2 flex items-center min-w-0">
-                      <div className="flex items-center gap-2 text-xs text-slate-600 font-medium truncate">
-                        <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                      <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold truncate">
+                        <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
                           <Users size={13} />
                         </div>
                         <span className="truncate">
@@ -757,7 +758,7 @@ export default function ProviderDestinationsPage() {
                               <strong className="font-bold text-slate-900">
                                 {Number(dest.capacity).toLocaleString("vi-VN")}
                               </strong>
-                              <span className="text-slate-500 text-[11px] ml-1">du khách/lượt</span>
+                              <span className="text-slate-600 text-[11px] ml-1">du khách/lượt</span>
                             </>
                           ) : (
                             <span className="text-slate-400 text-xs italic">Chưa đặt sức chứa</span>
@@ -835,9 +836,9 @@ export default function ProviderDestinationsPage() {
             </div>
 
             {/* Thanh phân trang ở dưới (CỐ ĐỊNH, KHÔNG BỊ CUỘN) */}
-            <div className="shrink-0 mt-3 px-4 py-2.5 bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="shrink-0 mt-3 px-4 py-2.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-slate-600 font-medium">
+                <span className="text-slate-600 font-semibold">
                   Trang <strong className="text-slate-900 font-bold">{safeCurrentPage}</strong> /{" "}
                   <strong className="text-slate-900 font-bold">{totalPages}</strong>{" "}
                   <span className="text-slate-400">
@@ -850,7 +851,7 @@ export default function ProviderDestinationsPage() {
                 </span>
 
                 <div className="flex items-center gap-1.5">
-                  <span className="text-slate-500 font-medium text-[11px]">
+                  <span className="text-slate-600 font-semibold text-[11px]">
                     Số dòng/trang:
                   </span>
                   <select
@@ -942,15 +943,15 @@ export default function ProviderDestinationsPage() {
           onClick={() => setDetailTarget(null)}
         >
           <div
-            className="w-full max-w-2xl bg-white rounded-3xl p-5 sm:p-7 shadow-2xl border border-slate-100 relative animate-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
+            className="w-full max-w-2xl bg-white rounded-2xl p-5 sm:p-7 shadow-xl border border-slate-100 relative animate-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between pb-4 border-b border-slate-100">
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900">
                   {detailTarget.name}
                 </h3>
-                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
                   <MapPin size={12} className="text-slate-400" />
                   <span>{detailTarget.address}</span>
                 </p>
@@ -966,37 +967,37 @@ export default function ProviderDestinationsPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-              <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200">
-                <p className="text-[10px] font-bold text-sky-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <div className="p-4 rounded-xl bg-sky-50/70 border border-sky-200">
+                <p className="text-[11px] font-bold text-sky-700 mb-2 flex items-center gap-1">
                   <Navigation size={11} /> Tọa độ GPS
                 </p>
-                <div className="space-y-1.5 text-xs font-mono">
+                <div className="space-y-1.5 text-xs tabular-nums">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Vĩ độ (LAT):</span>
-                    <span className="font-black text-slate-800">
+                    <span className="text-slate-600">Vĩ độ (LAT):</span>
+                    <span className="font-bold text-slate-800">
                       {detailTarget.latitude?.toFixed(6) ?? "—"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Kinh độ (LNG):</span>
-                    <span className="font-black text-slate-800">
+                    <span className="text-slate-600">Kinh độ (LNG):</span>
+                    <span className="font-bold text-slate-800">
                       {detailTarget.longitude?.toFixed(6) ?? "—"}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200">
-                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                <p className="text-[11px] font-bold text-emerald-700 mb-2 flex items-center gap-1">
                   <Users size={11} /> Sức chứa tối đa
                 </p>
-                <p className="text-base font-black text-slate-900">
+                <p className="text-base font-bold text-slate-900">
                   {detailTarget.capacity ?? "—"} du khách / lượt
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-[11px] font-bold text-slate-600 mb-2">
                   Đơn vị khởi tạo
                 </p>
                 <p className="text-sm font-bold text-slate-800">
@@ -1004,8 +1005,8 @@ export default function ProviderDestinationsPage() {
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-[11px] font-bold text-slate-600 mb-2">
                   Trạng thái phê duyệt
                 </p>
                 {detailTarget.status === STATUS.APPROVED && (
@@ -1030,17 +1031,17 @@ export default function ProviderDestinationsPage() {
             </div>
 
             {/* Khối Thuyết minh & Nội dung văn hóa nằm trong phần Chi tiết */}
-            <div className="mt-4 p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-orange-50/30 border border-amber-200/90 shadow-2xs">
+            <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-orange-50/30 border border-amber-200/90 shadow-2xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shrink-0 shadow-xs shadow-amber-500/20">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs shadow-amber-500/20">
                     <Headphones size={20} />
                   </div>
                   <div className="flex items-center gap-2.5">
-                    <h4 className="text-sm font-extrabold text-slate-900">
+                    <h4 className="text-sm font-bold text-slate-900">
                       Nội Dung &amp; Thuyết Minh Văn Hóa
                     </h4>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-600 text-white text-[10px] font-black shadow-2xs">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-600 text-white text-[11px] font-bold shadow-2xs">
                       {detailTarget.contentCount ?? 0} nội dung
                     </span>
                   </div>
@@ -1061,7 +1062,7 @@ export default function ProviderDestinationsPage() {
             </div>
 
             {/* ── Khối Gói Trải Nghiệm Tương Tác ── */}
-            <div className="mt-4 p-4.5 rounded-2xl border border-slate-200/90 bg-slate-50/70">
+            <div className="mt-4 p-4.5 rounded-xl border border-slate-200/90 bg-slate-50/70">
               <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/70">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
@@ -1071,7 +1072,7 @@ export default function ProviderDestinationsPage() {
                     <h4 className="text-sm font-bold text-slate-900">
                       Gói Trải Nghiệm Tương Tác
                     </h4>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-slate-600">
                       Nhiệm vụ khám phá, câu hỏi đố vui &amp; khung giờ tham quan
                     </p>
                   </div>
@@ -1137,16 +1138,16 @@ export default function ProviderDestinationsPage() {
                     </div>
                     <div className="flex items-center gap-4 text-xs shrink-0 bg-white px-3 py-2 rounded-xl border border-slate-200">
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        <span className="text-[11px] font-bold text-slate-400 block">
                           Giá vé
                         </span>
-                        <span className="font-extrabold text-slate-900">
+                        <span className="font-bold text-slate-900">
                           {Number(detailExp.price).toLocaleString("vi-VN")} {detailExp.currency || "VND"}
                         </span>
                       </div>
                       <div className="h-6 w-px bg-slate-200" />
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        <span className="text-[11px] font-bold text-slate-400 block">
                           Thời lượng
                         </span>
                         <span className="font-bold text-slate-700">
@@ -1160,7 +1161,7 @@ export default function ProviderDestinationsPage() {
                     <button
                       type="button"
                       onClick={() => setExpTaskTarget(detailExp)}
-                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Quản lý nhiệm vụ và đố vui tương tác"
                     >
                       <Trophy size={13} className="text-amber-600" />
@@ -1170,7 +1171,7 @@ export default function ProviderDestinationsPage() {
                     <button
                       type="button"
                       onClick={() => setExpSlotTarget(detailExp)}
-                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Quản lý khung giờ và suất phục vụ"
                     >
                       <Clock size={13} className="text-sky-600" />
@@ -1179,18 +1180,8 @@ export default function ProviderDestinationsPage() {
 
                     <button
                       type="button"
-                      onClick={() => setExpCheckInTarget(detailExp)}
-                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Quản lý tọa độ trạm check-in thực địa"
-                    >
-                      <MapPin size={13} className="text-emerald-600" />
-                      <span>Trạm Check-in</span>
-                    </button>
-
-                    <button
-                      type="button"
                       onClick={() => setExpEditTarget(detailExp)}
-                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Chỉnh sửa thông tin cơ bản gói trải nghiệm"
                     >
                       <Edit3 size={13} className="text-slate-600" />
@@ -1284,12 +1275,6 @@ export default function ProviderDestinationsPage() {
         theme="emerald"
       />
 
-      <CheckInModal
-        isOpen={Boolean(expCheckInTarget)}
-        onClose={() => setExpCheckInTarget(null)}
-        experience={expCheckInTarget}
-        onPointsUpdated={() => loadExperienceForDestination(detailTarget?.id)}
-      />
 
 
       </div>

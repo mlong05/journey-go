@@ -60,14 +60,14 @@ export default function CreateClient() {
         <div>
           <Link
             href="/provider/destinations"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-emerald-700 transition-colors mb-2"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-emerald-700 transition-colors mb-2"
           >
             <ArrowLeft size={14} />
             <span>Quay lại danh sách điểm đến</span>
           </Link>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-5 bg-emerald-600 rounded-full" />
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Khởi Tạo Điểm Đến Di Tích Mới
             </h1>
           </div>
@@ -92,41 +92,41 @@ export default function CreateClient() {
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-5 border border-emerald-200/60 space-y-3">
+      <div className="bg-emerald-50 rounded-xl p-5 border border-emerald-200/60 space-y-3">
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
             <Compass size={16} />
           </div>
-          <h3 className="text-sm font-black text-emerald-900 uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-emerald-900">
             Hướng dẫn nhanh
           </h3>
         </div>
-        <ol className="space-y-2 text-xs text-emerald-900/80 font-medium leading-relaxed list-decimal pl-4">
-          <li>Bấm <strong>"Mở form tạo"</strong> để hiện bảng nhập liệu.</li>
+        <ol className="space-y-2 text-xs text-emerald-900/80 font-semibold leading-relaxed list-decimal pl-4">
+          <li>Bấm <strong>&ldquo;Mở form tạo&rdquo;</strong> để hiện bảng nhập liệu.</li>
           <li>Điền 5 trường bắt buộc: tên, địa chỉ, vĩ độ, kinh độ, sức chứa.</li>
           <li>Gửi yêu cầu — hệ thống sẽ phản hồi trong vòng 24-48 giờ.</li>
         </ol>
       </div>
 
       {errorMsg && (
-        <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
+        <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-rose-50 border border-rose-200">
           <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
-          <p className="text-xs text-rose-800 font-semibold leading-relaxed">
+          <p className="text-xs text-rose-800 font-bold leading-relaxed">
             {errorMsg}
           </p>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5">
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Landmark size={15} className="text-emerald-700" />
             Điểm đến gần đây của bạn
           </h2>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="text-[11px] font-bold text-slate-500 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
+            className="text-[11px] font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
           >
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
             Tải lại
@@ -139,9 +139,9 @@ export default function CreateClient() {
           </div>
         ) : recent.length === 0 ? (
           <div className="py-10 text-center">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-600">
               Bạn chưa có điểm đến nào. Bấm{" "}
-              <strong>"Mở form tạo"</strong> để khởi tạo điểm đến đầu tiên.
+              <strong>&ldquo;Mở form tạo&rdquo;</strong> để khởi tạo điểm đến đầu tiên.
             </p>
           </div>
         ) : (
@@ -156,16 +156,16 @@ export default function CreateClient() {
                     <Landmark size={13} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-black text-slate-900 truncate">
+                    <p className="text-xs font-bold text-slate-900 truncate">
                       {d.name}
                     </p>
-                    <p className="text-[10.5px] text-slate-500 truncate">
+                    <p className="text-[11px] text-slate-600 truncate">
                       {d.address}
                     </p>
                   </div>
                 </div>
                 <span
-                  className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full ${
                     d.approved === true
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                       : "bg-amber-50 text-amber-700 border border-amber-200"

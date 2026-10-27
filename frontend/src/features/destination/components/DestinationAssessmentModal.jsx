@@ -43,7 +43,6 @@ import { culturalContentService } from "../services/culturalContentService";
 import { moderationService } from "../services/moderationService";
 import { experienceService } from "@/features/experience/services/experienceService";
 import { taskService } from "@/features/experience/services/taskService";
-import { checkInPointService } from "@/features/experience/services/checkInPointService";
 import { slotService } from "@/features/experience/services/slotService";
 
 /* Cấu hình các định dạng nội dung văn hóa */
@@ -132,6 +131,8 @@ export default function DestinationAssessmentModal({
   // Trình phát nghe thử Audio trực tiếp
   const [playingId, setPlayingId] = useState(null);
   const audioRef = useRef(null);
+  // Bản sao dạng state của phần tử <audio> để hàm xử lý dùng mà không đọc ref
+  const [audioEl, setAudioEl] = useState(null);
 
   // Trình xem / phát Media chuyên dụng (YouTube iframe, Video HTML5, Audio)
   const [previewMediaTarget, setPreviewMediaTarget] = useState(null);
@@ -210,6 +211,8 @@ export default function DestinationAssessmentModal({
     } catch (err) {
       console.error("[Approve Content error]:", err);
       showContentToast(err?.message || "Không thể phê duyệt nội dung này.");
+      setApproveTarget(null);
+      loadCulturalContents();
     } finally {
       setIsApprovingContent(false);
     }
@@ -294,7 +297,6 @@ export default function DestinationAssessmentModal({
   const [expLoading, setExpLoading] = useState(false);
   const [expError, setExpError] = useState("");
   const [expTasks, setExpTasks] = useState([]);
-  const [expCheckIns, setExpCheckIns] = useState([]);
   const [expSlots, setExpSlots] = useState([]);
   const [expDescExpanded, setExpDescExpanded] = useState(false);
 
@@ -307,19 +309,13 @@ export default function DestinationAssessmentModal({
       const exp = await experienceService.getByDestinationId(destId);
       setExperience(exp);
       if (exp?.id) {
-        const [tasksRes, checkInsRes, slotsRes] = await Promise.allSettled([
+        const [tasksRes, slotsRes] = await Promise.allSettled([
           taskService.listByExperience(exp.id),
-          checkInPointService.listByExperience(exp.id),
           slotService.listByExperience(exp.id),
         ]);
         setExpTasks(
           tasksRes.status === "fulfilled" && Array.isArray(tasksRes.value)
             ? tasksRes.value
-            : []
-        );
-        setExpCheckIns(
-          checkInsRes.status === "fulfilled" && Array.isArray(checkInsRes.value)
-            ? checkInsRes.value
             : []
         );
         setExpSlots(
@@ -329,7 +325,6 @@ export default function DestinationAssessmentModal({
         );
       } else {
         setExpTasks([]);
-        setExpCheckIns([]);
         setExpSlots([]);
       }
     } catch (err) {
@@ -337,7 +332,6 @@ export default function DestinationAssessmentModal({
       setExpError(err?.message || "Không thể tải gói trải nghiệm.");
       setExperience(null);
       setExpTasks([]);
-      setExpCheckIns([]);
       setExpSlots([]);
     } finally {
       setExpLoading(false);
@@ -385,7 +379,7 @@ export default function DestinationAssessmentModal({
 
     // Nếu là video hoặc link YouTube, mở trình phát video chuyên dụng (iframe YouTube / video HTML5)
     if (isVid) {
-      if (audioRef.current) audioRef.current.pause();
+      if (audioEl) audioEl.pause();
       setPlayingId(null);
 
       try {
@@ -405,7 +399,7 @@ export default function DestinationAssessmentModal({
 
     // Nếu là audio thông thường
     if (playingId === content.id) {
-      if (audioRef.current) audioRef.current.pause();
+      if (audioEl) audioEl.pause();
       setPlayingId(null);
       return;
     }
@@ -422,9 +416,9 @@ export default function DestinationAssessmentModal({
       );
 
       const url = res?.mediaUrl || content.mediaUrl;
-      if (url && audioRef.current) {
-        audioRef.current.src = url;
-        audioRef.current.play().catch((err) => {
+      if (url && audioEl) {
+        audioEl.setAttribute("src", url);
+        audioEl.play().catch((err) => {
           console.warn("[Assessment Playback] playback error:", err);
           setPreviewMediaTarget(content);
         });
@@ -489,7 +483,10 @@ export default function DestinationAssessmentModal({
     >
       {/* Thẻ audio ẩn phát bài thuyết minh */}
       <audio
-        ref={audioRef}
+        ref={(el) => {
+          audioRef.current = el;
+          setAudioEl(el);
+        }}
         onEnded={() => setPlayingId(null)}
         onError={() => setPlayingId(null)}
         className="hidden"
@@ -889,28 +886,47 @@ export default function DestinationAssessmentModal({
                                 <span>{item.playCount || 0} lượt nghe</span>
                               </span>
 
-                              {/* Nút hành động Thẩm định từ Ban Thẩm định */}
+                              {/* Nút hành động Thẩm định: chỉ khi bài đang chờ duyệt */}
                               <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenApproveContent(item)}
-                                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 active:scale-95 shadow-2xs"
-                                  title="Phê duyệt bài thuyết minh này"
-                                >
-                                  <CheckCircle2 size={12} className="text-emerald-600" />
-                                  <span>Duyệt</span>
-                                </button>
+                                {item.reviewStatus === "PENDING" ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenApproveContent(item)}
+                                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 active:scale-95 shadow-2xs"
+                                      title="Phê duyệt bài thuyết minh này"
+                                    >
+                                      <CheckCircle2 size={12} className="text-emerald-600" />
+                                      <span>Duyệt</span>
+                                    </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenRejectContent(item)}
-                                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 active:scale-95 shadow-2xs"
-                                  title="Từ chối và yêu cầu đính chính"
-                                >
-                                  <XCircle size={12} className="text-rose-600" />
-                                  <span>Từ chối</span>
-                                </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenRejectContent(item)}
+                                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 active:scale-95 shadow-2xs"
+                                      title="Từ chối và yêu cầu đính chính"
+                                    >
+                                      <XCircle size={12} className="text-rose-600" />
+                                      <span>Từ chối</span>
+                                    </button>
+                                  </>
+                                ) : item.reviewStatus === "APPROVED" ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    <CheckCircle2 size={12} className="text-emerald-600" />
+                                    Đã duyệt
+                                  </span>
+                                ) : item.reviewStatus === "REJECTED" ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                                    <XCircle size={12} className="text-rose-600" />
+                                    Đã từ chối, chờ đối tác sửa
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                    Chưa gửi kiểm duyệt
+                                  </span>
+                                )}
 
+                                {item.reviewStatus && (
                                 <button
                                   type="button"
                                   onClick={() => handleOpenContentHistory(item)}
@@ -919,6 +935,7 @@ export default function DestinationAssessmentModal({
                                 >
                                   <History size={13} />
                                 </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1229,39 +1246,8 @@ export default function DestinationAssessmentModal({
                       )}
                     </div>
 
-                    {/* Trạm check-in và Khung giờ đón tiếp */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Trạm check-in */}
-                      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-2.5">
-                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                          <MapPin size={14} className="text-emerald-600" />
-                          <h6 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                            Trạm Check-in Thực Địa ({expCheckIns.length})
-                          </h6>
-                        </div>
-                        {expCheckIns.length === 0 ? (
-                          <p className="text-xs text-slate-400 py-3 text-center italic">
-                            Chưa có trạm check-in nào.
-                          </p>
-                        ) : (
-                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                            {expCheckIns.map((cip, i) => (
-                              <div
-                                key={cip.id || i}
-                                className="p-2 rounded-lg bg-slate-50 border border-slate-200/60 text-xs flex items-center justify-between gap-2"
-                              >
-                                <span className="font-bold text-slate-800 truncate">
-                                  {cip.name}
-                                </span>
-                                <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                                  Bán kính: {cip.radiusMeters || 50}m
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
+                    {/* Khung giờ đón tiếp */}
+                    <div className="grid grid-cols-1 gap-4">
                       {/* Khung giờ đón tiếp (Slots) */}
                       <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-2.5">
                         <div className="flex items-center gap-2 pb-2 border-b border-slate-100">

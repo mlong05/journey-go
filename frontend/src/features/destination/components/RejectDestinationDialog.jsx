@@ -41,14 +41,20 @@ export default function RejectDestinationDialog({
   const [error, setError] = useState("");
 
   /* Tải danh mục lý do từ chối từ backend khi mở modal */
-  useEffect(() => {
+  // Xoá dữ liệu nhập khi đóng hộp thoại (điều chỉnh state ngay khi render, không dùng effect)
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen);
     if (!isOpen) {
       setSelectedReasons([]);
       setOtherReason("");
       setNote("");
       setError("");
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
 
     let active = true;
     moderationService
