@@ -14,7 +14,6 @@ import {
   Search,
   Bell,
   Menu,
-  Sparkles,
   Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";

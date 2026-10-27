@@ -18,6 +18,7 @@ public interface DestinationRepository extends JpaRepository<Destination, Long> 
     Page<Destination> findByDeletedFalse(Pageable pageable);
 
     Page<Destination> findByApprovedTrueAndDeletedFalse(Pageable pageable);
+    Page<Destination> findByCreatedBy_IdAndDeletedFalse(Long creatorId, Pageable pageable);
     List<Destination> findByApprovedTrueAndDeletedFalse();
 
     Page<Destination> findByDeletedTrue(Pageable pageable);

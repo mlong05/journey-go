@@ -4,20 +4,32 @@ import com.journeygo.modules.community.dto.*;
 import com.journeygo.modules.community.entity.*;
 import com.journeygo.modules.community.entity.enums.*;
 import com.journeygo.modules.community.repository.*;
+import com.journeygo.modules.destination.entity.Destination;
+import com.journeygo.modules.destination.repository.DestinationRepository;
+import com.journeygo.modules.tour.entity.Tour;
+import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -30,6 +42,15 @@ public class CommunityService {
     private final PostReactionRepository reactionRepository;
     private final PostReportRepository reportRepository;
     private final UserRepository userRepository;
+    private final DestinationRepository destinationRepository;
+    private final TourRepository tourRepository;
+
+    private static final int MAX_MEDIA_PER_POST = 10;
+    private static final int MAX_MEDIA_URL_LENGTH = 1000;
+
+    /** Số báo cáo chờ xử lý khiến bài tự động bị ẩn để moderator xem xét. */
+    @Value("${app.community.auto-hide-report-threshold:5}")
+    private int autoHideReportThreshold = 5;
 
     // ── POST MANAGEMENT ─────────────────────────────────────────────────────────
 
@@ -57,22 +78,18 @@ public class CommunityService {
                 .hidden(false)
                 .build();
 
-        if (request.mediaUrls() != null && !request.mediaUrls().isEmpty()) {
-            int order = 0;
-            for (String url : request.mediaUrls()) {
-                if (url != null && !url.isBlank()) {
-                    post.addMedia(PostMedia.builder()
-                            .mediaUrl(url.trim())
-                            .mediaType(url.endsWith(".mp4") ? "VIDEO" : "IMAGE")
-                            .orderIndex(order++)
-                            .build());
-                }
-            }
+        int createOrder = 0;
+        for (String url : normalizeMediaUrls(request.mediaUrls())) {
+            post.addMedia(PostMedia.builder()
+                    .mediaUrl(url)
+                    .mediaType(mediaTypeOf(url))
+                    .orderIndex(createOrder++)
+                    .build());
         }
 
         CommunityPost saved = postRepository.save(post);
         log.info("Du khách {} tạo bài viết mới id={}, status={}", userId, saved.getId(), initialStatus);
-        return PostResponse.fromEntity(saved, null);
+        return withNames(PostResponse.fromEntity(saved, null));
     }
 
     @Transactional
@@ -96,16 +113,15 @@ public class CommunityService {
         }
 
         if (request.mediaUrls() != null) {
+            List<String> urls = normalizeMediaUrls(request.mediaUrls());
             post.getMediaList().clear();
             int order = 0;
-            for (String url : request.mediaUrls()) {
-                if (url != null && !url.isBlank()) {
-                    post.addMedia(PostMedia.builder()
-                            .mediaUrl(url.trim())
-                            .mediaType(url.endsWith(".mp4") ? "VIDEO" : "IMAGE")
-                            .orderIndex(order++)
-                            .build());
-                }
+            for (String url : urls) {
+                post.addMedia(PostMedia.builder()
+                        .mediaUrl(url)
+                        .mediaType(mediaTypeOf(url))
+                        .orderIndex(order++)
+                        .build());
             }
         }
 
@@ -113,28 +129,80 @@ public class CommunityService {
         return PostResponse.fromEntity(updated, null);
     }
 
+    /** Tác giả gửi duyệt bài nháp, bài bị từ chối hoặc bài được yêu cầu chỉnh sửa. */
+    @Transactional
+    public PostResponse submitPost(Long postId, Long userId) {
+        CommunityPost post = postRepository.findByIdWithMedia(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("CommunityPost", postId));
+
+        if (!post.getAuthorId().equals(userId)) {
+            throw new BusinessException("FORBIDDEN-POST", "Bạn không có quyền gửi duyệt bài viết của người khác");
+        }
+        PostStatus status = post.getStatus();
+        if (status != PostStatus.DRAFT && status != PostStatus.REJECTED && status != PostStatus.NEEDS_REVISION) {
+            throw new BusinessException("POST-INVALID-STATUS",
+                    "Chỉ có thể gửi duyệt bài nháp, bài bị từ chối hoặc bài cần chỉnh sửa");
+        }
+
+        post.setStatus(PostStatus.PENDING_REVIEW);
+        post.setModerationNote(null);
+        post.setModeratedBy(null);
+        post.setModeratedAt(null);
+        CommunityPost saved = postRepository.save(post);
+        log.info("Tác giả {} gửi duyệt bài viết id={}", userId, postId);
+        return withNames(PostResponse.fromEntity(saved, null));
+    }
+
+    /** Tác giả xóa bài của mình; không cho xóa khi còn báo cáo chờ xử lý để tránh né kiểm duyệt. */
+    @Transactional
+    public void deletePost(Long postId, Long userId) {
+        CommunityPost post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("CommunityPost", postId));
+
+        if (!post.getAuthorId().equals(userId)) {
+            throw new BusinessException("FORBIDDEN-POST", "Bạn không có quyền xóa bài viết của người khác");
+        }
+        if (reportRepository.countByPostIdAndStatus(postId, ReportStatus.PENDING) > 0) {
+            throw new BusinessException("POST-HAS-PENDING-REPORTS",
+                    "Bài viết đang có báo cáo chờ xử lý nên chưa thể xóa");
+        }
+
+        reactionRepository.deleteByPostId(postId);
+        commentRepository.deleteByPostId(postId);
+        reportRepository.deleteByPostId(postId);
+        postRepository.delete(post);
+        log.info("Tác giả {} đã xóa bài viết id={}", userId, postId);
+    }
+
     @Transactional(readOnly = true)
     public Page<PostResponse> getFeed(Pageable pageable, Long destinationId, Long tourId, Long currentUserId) {
         Page<CommunityPost> posts = postRepository.findFeedPosts(PostStatus.PUBLISHED, destinationId, tourId, pageable);
-        return posts.map(p -> {
+        return withNames(posts.map(p -> {
             ReactionType myReaction = findUserReaction(p.getId(), currentUserId);
             return PostResponse.fromEntity(p, myReaction);
-        });
+        }));
     }
 
     @Transactional(readOnly = true)
     public Page<PostResponse> getMyPosts(Long userId, Pageable pageable) {
         Page<CommunityPost> posts = postRepository.findByAuthorIdOrderByCreatedAtDesc(userId, pageable);
-        return posts.map(p -> {
+        return withNames(posts.map(p -> {
             ReactionType myReaction = findUserReaction(p.getId(), userId);
             return PostResponse.fromEntity(p, myReaction);
-        });
+        }));
     }
 
     @Transactional(readOnly = true)
-    public PostResponse getPostDetail(Long postId, Long currentUserId) {
+    public PostResponse getPostDetail(Long postId, Long currentUserId, boolean canModerate) {
         CommunityPost post = postRepository.findByIdWithMedia(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("CommunityPost", postId));
+
+        if (canModerate) {
+            // Kiểm duyệt viên xem được mọi bài, kể cả bài đã ẩn hoặc chưa duyệt.
+            return withNames(PostResponse.fromEntity(post, findUserReaction(postId, currentUserId)).toBuilder()
+                    .reportCount((int) reportRepository.countByPostIdAndStatus(postId, ReportStatus.PENDING))
+                    .build());
+        }
 
         if (post.isHidden()) {
             throw new BusinessException("POST-HIDDEN", "Bài viết này đã bị ẩn do vi phạm tiêu chuẩn cộng đồng");
@@ -145,7 +213,7 @@ public class CommunityService {
         }
 
         ReactionType myReaction = findUserReaction(postId, currentUserId);
-        return PostResponse.fromEntity(post, myReaction);
+        return withNames(PostResponse.fromEntity(post, myReaction));
     }
 
     // ── COMMENT & REACTION ──────────────────────────────────────────────────────
@@ -180,6 +248,39 @@ public class CommunityService {
         return CommentResponse.fromEntity(saved);
     }
 
+    @Transactional
+    public void deleteComment(Long commentId, Long userId) {
+        PostComment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("PostComment", commentId));
+        if (!comment.getAuthorId().equals(userId)) {
+            throw new BusinessException("FORBIDDEN-COMMENT", "Bạn không có quyền xóa bình luận của người khác");
+        }
+        if (!comment.isHidden()) {
+            adjustCommentsCount(comment.getPostId(), -1);
+        }
+        commentRepository.delete(comment);
+    }
+
+    /** Moderator ẩn hoặc hiện lại một bình luận; số bình luận của bài được cập nhật theo. */
+    @Transactional
+    public CommentResponse setCommentHidden(Long commentId, Long moderatorId, boolean hidden) {
+        PostComment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("PostComment", commentId));
+        if (comment.isHidden() != hidden) {
+            comment.setHidden(hidden);
+            adjustCommentsCount(comment.getPostId(), hidden ? -1 : 1);
+            log.info("Moderator {} {} bình luận id={}", moderatorId, hidden ? "đã ẩn" : "đã hiện lại", commentId);
+        }
+        return CommentResponse.fromEntity(commentRepository.save(comment));
+    }
+
+    private void adjustCommentsCount(Long postId, int delta) {
+        postRepository.findById(postId).ifPresent(p -> {
+            p.setCommentsCount(Math.max(0, p.getCommentsCount() + delta));
+            postRepository.save(p);
+        });
+    }
+
     @Transactional(readOnly = true)
     public Page<CommentResponse> getPostComments(Long postId, Pageable pageable) {
         return commentRepository.findByPostIdAndHiddenFalseOrderByCreatedAtAsc(postId, pageable)
@@ -187,7 +288,11 @@ public class CommunityService {
     }
 
     @Transactional
-    public int toggleReaction(Long postId, Long userId, ReactionType reactionType) {
+    public int toggleReaction(Long postId, Long userId, ReactionType requestedType) {
+        ReactionType reactionType = requestedType != null ? requestedType : ReactionType.LOVE;
+        if (reactionType != ReactionType.LOVE) {
+            throw new BusinessException("INVALID-REACTION", "Hiện chỉ hỗ trợ thả tim cho bài viết");
+        }
         CommunityPost post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("CommunityPost", postId));
 
@@ -227,8 +332,11 @@ public class CommunityService {
 
     @Transactional
     public ReportResponse reportPost(Long postId, Long userId, CreateReportRequest request) {
-        if (!postRepository.existsById(postId)) {
-            throw new ResourceNotFoundException("CommunityPost", postId);
+        CommunityPost reported = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("CommunityPost", postId));
+
+        if (reported.getAuthorId().equals(userId)) {
+            throw new BusinessException("CANNOT-REPORT-OWN-POST", "Bạn không thể báo cáo bài viết của chính mình");
         }
 
         if (reportRepository.existsByPostIdAndReporterId(postId, userId)) {
@@ -245,6 +353,13 @@ public class CommunityService {
 
         PostReport saved = reportRepository.save(report);
         log.info("User {} đã báo cáo bài viết id={} với lý do: {}", userId, postId, request.reason());
+
+        long pending = reportRepository.countByPostIdAndStatus(postId, ReportStatus.PENDING);
+        if (pending >= autoHideReportThreshold && !reported.isHidden()) {
+            reported.setHidden(true);
+            postRepository.save(reported);
+            log.warn("Bài viết id={} tự động bị ẩn vì có {} báo cáo chờ xử lý", postId, pending);
+        }
         return ReportResponse.fromEntity(saved);
     }
 
@@ -252,8 +367,11 @@ public class CommunityService {
 
     @Transactional(readOnly = true)
     public Page<PostResponse> getPendingPosts(Pageable pageable) {
-        return postRepository.findByStatusOrderByCreatedAtAsc(PostStatus.PENDING_REVIEW, pageable)
-                .map(p -> PostResponse.fromEntity(p, null));
+        Page<CommunityPost> page = postRepository.findByStatusOrderByCreatedAtAsc(PostStatus.PENDING_REVIEW, pageable);
+        Map<Long, Integer> counts = pendingReportCounts(page.getContent().stream().map(CommunityPost::getId).toList());
+        return withNames(page.map(p -> PostResponse.fromEntity(p, null).toBuilder()
+                .reportCount(counts.getOrDefault(p.getId(), 0))
+                .build()));
     }
 
     @Transactional
@@ -276,25 +394,44 @@ public class CommunityService {
 
         CommunityPost saved = postRepository.save(post);
         log.info("Moderator {} đã kiểm duyệt bài viết id={}, trạng thái mới: {}", moderatorId, postId, newStatus);
-        return PostResponse.fromEntity(saved, null);
+        return withNames(PostResponse.fromEntity(saved, null).toBuilder()
+                .reportCount((int) reportRepository.countByPostIdAndStatus(postId, ReportStatus.PENDING))
+                .build());
+    }
+
+    /** Moderator ẩn hoặc hiện lại bài viết (gỡ bài tạm thời mà không xóa dữ liệu). */
+    @Transactional
+    public PostResponse setPostHidden(Long postId, Long moderatorId, boolean hidden) {
+        CommunityPost post = postRepository.findByIdWithMedia(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("CommunityPost", postId));
+        if (post.isHidden() != hidden) {
+            post.setHidden(hidden);
+            postRepository.save(post);
+            log.info("Moderator {} {} bài viết id={}", moderatorId, hidden ? "đã ẩn" : "đã hiện lại", postId);
+        }
+        return withNames(PostResponse.fromEntity(post, null).toBuilder()
+                .reportCount((int) reportRepository.countByPostIdAndStatus(postId, ReportStatus.PENDING))
+                .build());
     }
 
     @Transactional(readOnly = true)
     public Page<ReportResponse> getReports(ReportStatus status, Pageable pageable) {
         ReportStatus filterStatus = status != null ? status : ReportStatus.PENDING;
-        return reportRepository.findByStatusOrderByCreatedAtDesc(filterStatus, pageable)
-                .map(ReportResponse::fromEntity);
+        Page<PostReport> page = reportRepository.findByStatusOrderByCreatedAtDesc(filterStatus, pageable);
+
+        List<Long> postIds = page.getContent().stream().map(PostReport::getPostId).distinct().toList();
+        Map<Long, CommunityPost> posts = postRepository.findAllById(postIds).stream()
+                .collect(Collectors.toMap(CommunityPost::getId, p -> p));
+        Map<Long, Integer> counts = pendingReportCounts(postIds);
+
+        return page.map(r -> ReportResponse.fromEntity(r, posts.get(r.getPostId()), counts.getOrDefault(r.getPostId(), 0)));
     }
 
+    /** Xác nhận báo cáo đúng; có thể ẩn bài và xử lý luôn các báo cáo chờ khác của cùng bài. */
     @Transactional
     public ReportResponse resolveReport(Long reportId, Long moderatorId, boolean hidePost, String note) {
-        PostReport report = reportRepository.findById(reportId)
-                .orElseThrow(() -> new ResourceNotFoundException("PostReport", reportId));
-
-        report.setStatus(ReportStatus.RESOLVED);
-        report.setResolvedBy(moderatorId);
-        report.setResolvedAt(Instant.now());
-        report.setResolutionNote(note);
+        PostReport report = requirePendingReport(reportId);
+        markHandled(report, ReportStatus.RESOLVED, moderatorId, note);
 
         if (hidePost) {
             postRepository.findById(report.getPostId()).ifPresent(p -> {
@@ -302,10 +439,106 @@ public class CommunityService {
                 postRepository.save(p);
                 log.info("Moderator {} đã ẩn bài viết vi phạm id={}", moderatorId, p.getId());
             });
+            for (PostReport sibling : reportRepository.findByPostIdAndStatus(report.getPostId(), ReportStatus.PENDING)) {
+                markHandled(sibling, ReportStatus.RESOLVED, moderatorId, note);
+            }
         }
+        return toReportResponse(report);
+    }
 
-        PostReport saved = reportRepository.save(report);
-        return ReportResponse.fromEntity(saved);
+    /** Bác bỏ báo cáo (báo cáo sai hoặc không vi phạm); bài viết giữ nguyên. */
+    @Transactional
+    public ReportResponse dismissReport(Long reportId, Long moderatorId, String note) {
+        PostReport report = requirePendingReport(reportId);
+        markHandled(report, ReportStatus.DISMISSED, moderatorId, note);
+        return toReportResponse(report);
+    }
+
+    /** Bổ sung tên điểm đến và tên tour (bài viết chỉ lưu id) bằng hai truy vấn cho cả danh sách. */
+    private List<PostResponse> withNames(List<PostResponse> posts) {
+        Set<Long> destinationIds = posts.stream().map(PostResponse::destinationId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> tourIds = posts.stream().map(PostResponse::tourId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+
+        Map<Long, String> destinationNames = destinationIds.isEmpty() ? Map.of()
+                : destinationRepository.findAllById(destinationIds).stream()
+                        .filter(d -> d.getName() != null)
+                        .collect(Collectors.toMap(Destination::getId, Destination::getName));
+        Map<Long, String> tourTitles = tourIds.isEmpty() ? Map.of()
+                : tourRepository.findAllById(tourIds).stream()
+                        .filter(t -> t.getTitle() != null)
+                        .collect(Collectors.toMap(Tour::getTourId, Tour::getTitle));
+
+        return posts.stream()
+                .map(p -> p.toBuilder()
+                        .destinationName(p.destinationId() == null ? null : destinationNames.get(p.destinationId()))
+                        .tourTitle(p.tourId() == null ? null : tourTitles.get(p.tourId()))
+                        .build())
+                .toList();
+    }
+
+    private PostResponse withNames(PostResponse post) {
+        return withNames(List.of(post)).get(0);
+    }
+
+    private Page<PostResponse> withNames(Page<PostResponse> page) {
+        return new PageImpl<>(withNames(page.getContent()), page.getPageable(), page.getTotalElements());
+    }
+
+    private PostReport requirePendingReport(Long reportId) {
+        PostReport report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("PostReport", reportId));
+        if (report.getStatus() != ReportStatus.PENDING) {
+            throw new BusinessException("REPORT-ALREADY-HANDLED", "Báo cáo này đã được xử lý");
+        }
+        return report;
+    }
+
+    private void markHandled(PostReport report, ReportStatus status, Long moderatorId, String note) {
+        report.setStatus(status);
+        report.setResolvedBy(moderatorId);
+        report.setResolvedAt(Instant.now());
+        report.setResolutionNote(note != null && !note.isBlank() ? note.trim() : null);
+        reportRepository.save(report);
+    }
+
+    private ReportResponse toReportResponse(PostReport report) {
+        CommunityPost post = postRepository.findById(report.getPostId()).orElse(null);
+        int pending = (int) reportRepository.countByPostIdAndStatus(report.getPostId(), ReportStatus.PENDING);
+        return ReportResponse.fromEntity(report, post, pending);
+    }
+
+    private Map<Long, Integer> pendingReportCounts(Collection<Long> postIds) {
+        if (postIds.isEmpty()) return Map.of();
+        return reportRepository.countByPostIdsAndStatus(postIds, ReportStatus.PENDING).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> ((Long) row[1]).intValue()));
+    }
+
+    /** Chuẩn hóa danh sách đường dẫn media: bỏ dòng trống, chỉ nhận http(s), giới hạn số lượng và độ dài. */
+    private List<String> normalizeMediaUrls(List<String> urls) {
+        List<String> result = new ArrayList<>();
+        if (urls == null) return result;
+        for (String raw : urls) {
+            if (raw == null || raw.isBlank()) continue;
+            String url = raw.trim();
+            String lower = url.toLowerCase();
+            if (url.length() > MAX_MEDIA_URL_LENGTH || !(lower.startsWith("https://") || lower.startsWith("http://"))) {
+                throw new BusinessException("INVALID-MEDIA-URL",
+                        "Đường dẫn ảnh hoặc video không hợp lệ: chỉ chấp nhận http(s), tối đa " + MAX_MEDIA_URL_LENGTH + " ký tự");
+            }
+            result.add(url);
+        }
+        if (result.size() > MAX_MEDIA_PER_POST) {
+            throw new BusinessException("TOO-MANY-MEDIA",
+                    "Mỗi bài viết chỉ đính kèm tối đa " + MAX_MEDIA_PER_POST + " ảnh hoặc video");
+        }
+        return result;
+    }
+
+    private String mediaTypeOf(String url) {
+        String path = url.toLowerCase().split("[?#]")[0];
+        return (path.endsWith(".mp4") || path.endsWith(".mov") || path.endsWith(".webm")) ? "VIDEO" : "IMAGE";
     }
 
     private ReactionType findUserReaction(Long postId, Long userId) {

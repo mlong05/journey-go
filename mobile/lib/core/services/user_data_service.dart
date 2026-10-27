@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/community_model.dart';
 import '../models/journey_model.dart';
 import '../models/ticket_model.dart';
 
@@ -13,7 +12,6 @@ class UserDataService {
   static const String _kTimelineKey = 'journeygo_user_timeline';
   static const String _kBadgesKey = 'journeygo_user_badges';
   static const String _kTicketsKey = 'journeygo_user_tickets';
-  static const String _kPostsKey = 'journeygo_community_posts';
   static const String _kMissionsKey = 'journeygo_active_missions';
 
   // ===========================================================================
@@ -295,113 +293,6 @@ class UserDataService {
           'Trợ lý AI thuyết minh chuyên đề Văn Miếu',
           'Tham gia giải đố nhận huy hiệu đặc biệt',
         ],
-      ),
-    ];
-  }
-
-  // ===========================================================================
-  // 5. DIỄN ĐÀN & ĐÁNH GIÁ DI SẢN (COMMUNITY POSTS)
-  // ===========================================================================
-  Future<List<CommunityPost>> getPosts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_kPostsKey);
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final List<dynamic> list = jsonDecode(raw);
-        return list.map((e) => CommunityPost.fromJson(e)).toList();
-      } catch (_) {}
-    }
-    return _getDefaultPosts();
-  }
-
-  Future<void> savePosts(List<CommunityPost> posts) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _kPostsKey,
-      jsonEncode(posts.map((e) => e.toJson()).toList()),
-    );
-  }
-
-  Future<void> addPost(CommunityPost post) async {
-    final posts = await getPosts();
-    posts.insert(0, post);
-    await savePosts(posts);
-  }
-
-  List<CommunityPost> _getDefaultPosts() {
-    return [
-      CommunityPost(
-        id: 'post_001',
-        authorName: 'Lê Thu Hà',
-        authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        authorBadge: 'Nhà Thám Hiểm Bạc',
-        createdAt: '2 giờ trước',
-        location: 'Văn Miếu - Quốc Tử Giám',
-        rating: 5.0,
-        ratingLabel: 'Tuyệt vời',
-        content: 'Hôm nay mình check-in GPS và quét mã QR tại Bia Tiến Sĩ số 3, hệ thống mở khóa bài thuyết minh chi tiết rất hay! Các bạn nhớ làm thử thách Quiz để nhận đủ +100 điểm thưởng nhé.',
-        image: 'assets/images/vanmieu.png',
-        imageCaption: 'Góc Khuê Văn Các cổ kính phản chiếu bóng nước hồ Thiên Quang',
-        category: 'checkin',
-        likesCount: 48,
-        isLiked: false,
-        commentsCount: 12,
-        sharesCount: 5,
-        comments: [
-          CommunityComment(
-            id: 'c1',
-            author: 'Trần An',
-            avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=TranAn',
-            text: 'Ảnh chụp Khuê Văn Các góc này đẹp quá bạn ơi!',
-            time: '1 giờ trước',
-          ),
-        ],
-      ),
-      CommunityPost(
-        id: 'post_002',
-        authorName: 'Trần Tuấn Kiệt',
-        authorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-        authorBadge: 'Thành viên Tích cực',
-        createdAt: '5 giờ trước',
-        location: 'Làng Gốm Bát Tràng',
-        rating: 4.8,
-        ratingLabel: 'Rất đáng thử',
-        content: 'Lộ trình AI gợi ý tour nửa ngày ở Bát Tràng rất hợp lý, tự tay nặn gốm tại Lò Bầu Cổ cực kỳ đáng thử!',
-        image: 'assets/images/gomsu.png',
-        imageCaption: 'Trải nghiệm xoay gốm thủ công mộc mạc bên lò nung truyền thống',
-        category: 'review',
-        likesCount: 65,
-        isLiked: true,
-        commentsCount: 8,
-        sharesCount: 9,
-        comments: [
-          CommunityComment(
-            id: 'c2',
-            author: 'Mai Linh',
-            avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=MaiLinh',
-            text: 'Tự tay nặn xong có được mang sản phẩm về sau khi nung không bạn?',
-            time: '3 giờ trước',
-          ),
-        ],
-      ),
-      CommunityPost(
-        id: 'post_003',
-        authorName: 'Hoàng Minh Quân',
-        authorAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-        authorBadge: 'Nhà Thám Hiểm Vàng',
-        createdAt: 'Hôm qua',
-        location: 'Hoàng Thành Thăng Long',
-        rating: 4.9,
-        ratingLabel: 'Hùng vĩ thiêng liêng',
-        content: 'Cổng Đoan Môn và di tích khảo cổ 18 Hoàng Diệu lưu giữ vẹn nguyên trầm tích lịch sử qua các triều đại Lý, Trần, Lê. Nhất định nên ghé thăm!',
-        image: 'assets/images/thanglong.png',
-        imageCaption: 'Khu di tích trung tâm Hoàng thành trong ánh chiều tà',
-        category: 'review',
-        likesCount: 112,
-        isLiked: false,
-        commentsCount: 23,
-        sharesCount: 17,
-        comments: [],
       ),
     ];
   }

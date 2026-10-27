@@ -1,10 +1,10 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Compass,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -137,31 +137,24 @@ export default function Sidebar({
               onClick={onCloseMobile}
               title="Về trang tổng quan"
             >
-              <div
-                className={`${
-                  isWide ? "w-10 h-10" : "w-8 h-8"
-                } rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center p-1.5 shadow-md shrink-0 group-hover:scale-105 transition-transform`}
-              >
-                <Compass className="w-full h-full stroke-[2.2]" />
-              </div>
-
-              {isWide && (
-                <div className="min-w-0 flex flex-col">
-                  <div className="flex items-center tracking-tight leading-none">
-                    <span className="text-base font-black tracking-tight text-emerald-400">
-                      Journey
-                    </span>
-                    <span className="text-base font-black tracking-tight text-white">
-                      Go
-                    </span>
-                  </div>
-                  {/* Badge nhận diện theo Role */}
-                  <span
-                    className={`mt-1.5 text-[9.5px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider inline-block w-fit leading-none ${theme.badge}`}
-                  >
-                    {theme.badgeText}
-                  </span>
-                </div>
+              {isWide ? (
+                <Image
+                  src="/image/logo-lockup.png"
+                  alt="JourneyGo"
+                  width={507}
+                  height={144}
+                  priority
+                  className="h-10 w-auto max-w-full group-hover:opacity-90 transition-opacity"
+                />
+              ) : (
+                <Image
+                  src="/image/logo-mark.png"
+                  alt="JourneyGo"
+                  width={96}
+                  height={96}
+                  priority
+                  className="w-8 h-8 rounded-[22%] shadow-md shrink-0 group-hover:scale-105 transition-transform"
+                />
               )}
             </Link>
 

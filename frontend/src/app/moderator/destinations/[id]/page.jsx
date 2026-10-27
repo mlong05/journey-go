@@ -23,21 +23,21 @@ import {
   Ticket,
   Maximize2,
   Layers,
-  Sparkles,
   Inbox,
   Send,
   Eye,
   Award,
+  Landmark,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { destinationService, moderationService, RejectDestinationDialog } from "@/features/destination";
 
 /**
  * Trang Thẩm Định Chi Tiết Hồ Sơ Điểm Đến Di Tích - JourneyGo
  * Đường dẫn: /moderator/destinations/[id]
  * - Giao diện thẩm định 2 cột chuyên sâu
  * - Bộ công cụ kiểm chuẩn lịch sử, tọa độ thực địa và đố vui
- * - Dynamic state sẵn sàng kết nối API (không mock data tĩnh)
- * - Đảm bảo ngôn ngữ thuần Việt, không chứa chữ tiếng Anh trong ngoặc đơn
+ * - Đảm bảo ngôn ngữ thuần Việt, giao diện du lịch di sản trang nhã
  */
 export default function DestinationAuditDetailPage({ params }) {
   const router = useRouter();
@@ -45,7 +45,7 @@ export default function DestinationAuditDetailPage({ params }) {
   const recordId = resolvedParams?.id || "";
   const { confirm, confirmDialog } = useConfirm();
 
-  // Dynamic state cho hồ sơ kiểm duyệt - gắn API sau
+  // Dữ liệu hồ sơ điểm đến
   const [destinationData, setDestinationData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -79,20 +79,32 @@ export default function DestinationAuditDetailPage({ params }) {
   });
 
   useEffect(() => {
-    // [API INTEGRATION] Gắn hàm gọi API lấy thông tin chi tiết hồ sơ
-    // async function fetchDestinationDetail() {
-    //   if (!recordId) return;
-    //   setIsLoading(true);
-    //   try {
-    //     const res = await api.get(`/moderator/destinations/${recordId}`);
-    //     setDestinationData(res.data);
-    //   } catch (err) {
-    //     console.error("Lỗi tải chi tiết hồ sơ:", err);
-    //   } finally {
-    //     setIsLoading(false);
-    //   }
-    // }
-    // fetchDestinationDetail();
+    let cancelled = false;
+    async function fetchDestinationDetail() {
+      if (!recordId) return;
+      setIsLoading(true);
+      try {
+        const data = await destinationService.getById(recordId);
+        if (!cancelled && data) {
+          setDestinationData(data);
+          if (data.status) {
+            setSubmissionStatus(data.status);
+          } else if (data.approved) {
+            setSubmissionStatus("PUBLISHED");
+          } else {
+            setSubmissionStatus("PENDING");
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi tải chi tiết hồ sơ:", err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    fetchDestinationDetail();
+    return () => {
+      cancelled = true;
+    };
   }, [recordId]);
 
   // Toggle Highlight đoạn văn
@@ -123,62 +135,51 @@ export default function DestinationAuditDetailPage({ params }) {
       confirmLabel: "Phê duyệt",
     });
     if (!ok) return;
-    // [API INTEGRATION] Gọi API phê duyệt
-    // api.post(`/moderator/destinations/${recordId}/publish`, { feedback: feedbackNote })
-    setSubmissionStatus("PUBLISHED");
-    setDecisionModal({
-      isOpen: true,
-      title: "Phê duyệt & Xuất bản thành công",
-      message: `Hồ sơ "${destinationData?.name || recordId}" đã được chuẩn hóa và phát hành thành công tới toàn bộ du khách trên ứng dụng.`,
-      type: "PUBLISHED",
-    });
+    try {
+      await moderationService.approveDestination(recordId);
+      setSubmissionStatus("PUBLISHED");
+      setDecisionModal({
+        isOpen: true,
+        title: "Phê duyệt & Xuất bản thành công",
+        message: `Hồ sơ "${destinationData?.name || recordId}" đã được chuẩn hóa và phát hành thành công tới toàn bộ du khách trên ứng dụng.`,
+        type: "PUBLISHED",
+      });
+    } catch (err) {
+      console.error("[Moderator Approve error]:", err);
+    }
   };
 
-  // Xử lý yêu cầu hiệu đính
-  const handleRequestRevision = async () => {
-    const ok = await confirm({
-      tone: "warning",
-      icon: "warning",
-      title: "Gửi yêu cầu chỉnh sửa bổ sung?",
-      subject: destinationData?.name || `#${recordId}`,
-      description:
-        "Hồ sơ sẽ được chuyển về đơn vị đệ trình kèm ý kiến thẩm định của bạn.",
-      confirmLabel: "Gửi yêu cầu",
-    });
-    if (!ok) return;
-    // [API INTEGRATION] Gọi API yêu cầu sửa
-    // api.post(`/moderator/destinations/${recordId}/request-revision`, { feedback: feedbackNote })
-    setSubmissionStatus("REVISION");
-    setDecisionModal({
-      isOpen: true,
-      title: "Đã gửi yêu cầu hiệu đính",
-      message: `Phản hồi thẩm định đã được gửi đến đơn vị đệ trình. Hồ sơ sẽ được chuyển về trạng thái chờ đối tác chỉnh sửa.`,
-      type: "REVISION",
-    });
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [isRejectSubmitting, setIsRejectSubmitting] = useState(false);
+
+  // Xử lý mở dialog từ chối / yêu cầu hiệu đính
+  const handleRequestRevision = () => {
+    setIsRejectDialogOpen(true);
   };
 
-  // Xử lý từ chối hồ sơ
-  const handleReject = async () => {
-    const ok = await confirm({
-      tone: "danger",
-      icon: "reject",
-      title: "Từ chối tiếp nhận hồ sơ?",
-      subject: destinationData?.name || `#${recordId}`,
-      description:
-        "Hồ sơ sẽ bị từ chối và không được hiển thị tới du khách. Hành động này khó hoàn tác.",
-      confirmLabel: "Từ chối hồ sơ",
-    });
-    if (!ok) return;
-    // [API INTEGRATION] Gọi API từ chối
-    // api.post(`/moderator/destinations/${recordId}/reject`, { feedback: feedbackNote })
-    setSubmissionStatus("REJECTED");
-    setDecisionModal({
-      isOpen: true,
-      title: "Đã từ chối tiếp nhận hồ sơ",
-      message: `Hồ sơ đã bị từ chối do không đáp ứng tiêu chuẩn văn hóa hoặc vi phạm an toàn thực địa.`,
-      type: "REJECTED",
-    });
+  const handleReject = () => {
+    setIsRejectDialogOpen(true);
   };
+
+  const handleConfirmReject = async (payload) => {
+    setIsRejectSubmitting(true);
+    try {
+      await moderationService.rejectDestination(recordId, payload);
+      setSubmissionStatus("REJECTED");
+      setDecisionModal({
+        isOpen: true,
+        title: "Đã từ chối & Yêu cầu hiệu đính",
+        message: `Phản hồi thẩm định đã được gửi đến đối tác. Hồ sơ "${destinationData?.name || recordId}" đã chuyển sang trạng thái bị từ chối kèm lý do để đối tác chỉnh sửa.`,
+        type: "REJECTED",
+      });
+      setIsRejectDialogOpen(false);
+    } catch (err) {
+      console.error("[Moderator Reject error]:", err);
+    } finally {
+      setIsRejectSubmitting(false);
+    }
+  };
+
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-200">
@@ -681,7 +682,16 @@ export default function DestinationAuditDetailPage({ params }) {
         </div>
       )}
 
+      <RejectDestinationDialog
+        isOpen={isRejectDialogOpen}
+        destination={destinationData}
+        isSubmitting={isRejectSubmitting}
+        onClose={() => setIsRejectDialogOpen(false)}
+        onConfirm={handleConfirmReject}
+      />
+
       {confirmDialog}
     </div>
   );
 }
+

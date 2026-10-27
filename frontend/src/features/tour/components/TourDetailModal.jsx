@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   Route,
@@ -17,8 +17,10 @@ import {
   TOUR_STATUS_META,
   TOUR_TYPE_META,
   formatVND,
+  getRejectionLabels,
   formatDuration,
 } from "../theme";
+import { tourService } from "../services/tourService";
 
 /**
  * Modal xem chi tiết tour du lịch.
@@ -41,6 +43,33 @@ export default function TourDetailModal({
   actions = null,
 }) {
   const meta = TOUR_STATUS_META[tour?.status] || TOUR_STATUS_META.DRAFT;
+  const [historyData, setHistoryData] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !tour?.tourId) {
+      setHistoryData(null);
+      return;
+    }
+    let active = true;
+    setHistoryLoading(true);
+    tourService
+      .getHistory(tour.tourId)
+      .then((data) => {
+        if (active) setHistoryData(data);
+      })
+      .catch(() => {
+        // Có thể chưa có bản ghi review history
+      })
+      .finally(() => {
+        if (active) setHistoryLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, tour?.tourId]);
+
 
   if (!isOpen) return null;
 
@@ -113,17 +142,51 @@ export default function TourDetailModal({
             </div>
           ) : tour ? (
             <div className="space-y-4">
-              {/* Lý do từ chối, ưu tiên hiển thị vì đây là thông tin cần hành động */}
-              {tour.status === "REJECTED" && tour.rejectionReason && (
-                <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4">
-                  <p className="text-[10px] font-black text-rose-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <AlertCircle size={11} /> Lý do từ chối
-                  </p>
-                  <p className="text-[13px] font-semibold text-rose-900 leading-relaxed">
-                    {tour.rejectionReason}
-                  </p>
+              {/* Lý do từ chối & Phản hồi thẩm định */}
+              {tour.status === "REJECTED" && (
+                <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 space-y-2.5">
+                  <div className="flex items-center gap-1.5 text-rose-700">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <p className="text-[11px] font-black uppercase tracking-wider">
+                      Ý kiến &amp; Lý do từ chối thẩm định
+                    </p>
+                  </div>
+
+                  {/* Nhãn lý do chuẩn hoá */}
+                  {(tour.rejectionReason || historyData?.reason) && (
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {getRejectionLabels(tour.rejectionReason || historyData?.reason)
+                        .map((label) => {
+                          return (
+                            <span
+                              key={label}
+                              className="inline-flex items-center px-2.5 py-1 rounded-xl bg-rose-100/90 text-rose-900 text-xs font-bold border border-rose-200/80 shadow-2xs"
+                            >
+                              {label}
+                            </span>
+                          );
+                        })}
+                    </div>
+                  )}
+
+                  {/* Lý do khác (nếu có) */}
+                  {historyData?.otherReason && (
+                    <div className="bg-white/80 p-3 rounded-xl border border-rose-200/70 text-xs">
+                      <span className="font-bold text-rose-950 block mb-0.5">Chi tiết lý do khác:</span>
+                      <p className="text-rose-900 leading-relaxed font-medium">{historyData.otherReason}</p>
+                    </div>
+                  )}
+
+                  {/* Ghi chú từ người duyệt */}
+                  {(historyData?.decisionNote || historyData?.note) && (
+                    <div className="bg-white/80 p-3 rounded-xl border border-rose-200/70 text-xs">
+                      <span className="font-bold text-slate-900 block mb-0.5">Ghi chú từ Hội đồng thẩm định:</span>
+                      <p className="text-slate-700 leading-relaxed">{historyData.decisionNote || historyData.note}</p>
+                    </div>
+                  )}
                 </div>
               )}
+
 
               {/* Ô thông tin chính */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -230,7 +293,83 @@ export default function TourDetailModal({
                   )}
                 </div>
               )}
+
+              {/* Lịch sử kiểm duyệt */}
+              {historyData?.history && Array.isArray(historyData.history) && historyData.history.length > 0 && (
+                <div className="pt-3 border-t border-slate-100">
+                  <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider mb-2.5">
+                    Lịch sử gửi duyệt &amp; thẩm định
+                  </p>
+                  <div className="space-y-2">
+                    {historyData.history.map((h, idx) => {
+                      const isApproved = h.action === "APPROVED";
+                      const isRejected = h.action === "REJECTED";
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs"
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                              isApproved
+                                ? "bg-emerald-500"
+                                : isRejected
+                                ? "bg-rose-500"
+                                : "bg-amber-500"
+                            }`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <span className="font-bold text-slate-900">
+                                {isApproved
+                                  ? "Đã phê duyệt"
+                                  : isRejected
+                                  ? "Từ chối phê duyệt"
+                                  : "Đã gửi thẩm định"}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-medium">
+                                {h.timestamp || h.createdAt
+                                  ? new Date(h.timestamp || h.createdAt).toLocaleString("vi-VN")
+                                  : ""}
+                              </span>
+                            </div>
+                            {h.actorName && (
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                {isApproved || isRejected ? "Người thẩm định" : "Người gửi"}:{" "}
+                                <span className="font-medium text-slate-700">{h.actorName}</span>
+                              </p>
+                            )}
+                            {isRejected && h.reason && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {getRejectionLabels(h.reason).map((label) => (
+                                  <span
+                                    key={label}
+                                    className="inline-flex items-center px-2 py-0.5 rounded-lg bg-rose-50 text-rose-800 text-[10.5px] font-bold border border-rose-200"
+                                  >
+                                    {label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {isRejected && h.otherReason && (
+                              <p className="text-[11px] text-rose-900 mt-1 bg-rose-50/60 p-2 rounded-lg border border-rose-200">
+                                {h.otherReason}
+                              </p>
+                            )}
+                            {h.note && (
+                              <p className="text-[11px] text-slate-700 mt-1 bg-white p-2 rounded-lg border border-slate-200">
+                                {h.note}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
+
           ) : null}
         </div>
 

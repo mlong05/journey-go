@@ -220,6 +220,19 @@ public class CulturalContentController {
                 culturalContentService.restore(id, userPrincipal.getId(), callerRole)));
     }
 
+    @GetMapping("/api/v1/destinations/{destinationId}/contents/manage")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Lấy toàn bộ nội dung văn hóa của điểm đến để quản lý",
+            description = "Gồm cả nội dung đang chờ duyệt hoặc bị từ chối; PROVIDER chỉ xem được điểm đến của chính mình")
+    public ResponseEntity<ApiResponse<List<CulturalContentResponse>>> getForManagement(
+            @PathVariable Long destinationId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Role callerRole = extractRole(userPrincipal);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách nội dung văn hóa thành công",
+                culturalContentService.getManageByDestinationId(destinationId, userPrincipal.getId(), callerRole)));
+    }
+
     @GetMapping("/api/v1/destinations/{destinationId}/contents/deleted")
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
