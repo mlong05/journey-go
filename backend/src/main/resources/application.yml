@@ -87,7 +87,7 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
   oauth2:
     default-redirect-uri: ${OAUTH2_DEFAULT_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
-    authorized-redirect-uris: ${OAUTH2_AUTHORIZED_REDIRECT_URIS:http://localhost:3000/oauth2/redirect,http://127.0.0.1:3000/oauth2/redirect}
+    authorized-redirect-uris: ${OAUTH2_AUTHORIZED_REDIRECT_URIS:http://localhost:3000/oauth2/redirect,http://127.0.0.1:3000/oauth2/redirect,journeygo://oauth2/redirect,journeygo://auth/callback}
   mail:
     from-name: ${MAIL_FROM_NAME:JourneyGo Platform}
     otp-expiration-minutes: ${MAIL_OTP_EXPIRATION_MINUTES:10}
