@@ -43,8 +43,8 @@ export async function createQuestion(taskId, payload) {
     content: (payload.content || "").trim(),
     questionType: payload.questionType || "MULTIPLE_CHOICE",
     sequenceOrder: Number(payload.sequenceOrder) || 0,
-    points: Number(payload.points) || 10,
     expectedText: payload.expectedText ? String(payload.expectedText).trim() : null,
+    checkInPointId: payload.checkInPointId ? Number(payload.checkInPointId) : null,
   };
   const res = await apiClient.post(ENDPOINTS.CREATE(taskId), body);
   return unwrap(res);

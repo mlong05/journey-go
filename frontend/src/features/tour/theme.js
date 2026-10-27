@@ -2,8 +2,8 @@
  * Bảng màu + nhãn dùng chung cho module Tour.
  *
  * - emerald: giao diện Provider
- * - teal:    giao diện Moderator
- * - slate:   giao diện Admin
+ * - teal:    giao diện Moderator (accent indigo)
+ * - slate:   giao diện Admin (accent rose)
  *
  * Quy tắc Color Consistency Lock (design-taste-frontend §4.2):
  * mỗi trang chỉ dùng MỘT accent chủ đạo. Các màu emerald / amber / rose chỉ
@@ -14,36 +14,36 @@
 export function getTourTheme(theme = "emerald") {
   if (theme === "slate") {
     return {
-      ring: "focus:ring-slate-500/25",
-      ringBorder: "focus:border-slate-700",
-      primary: "bg-slate-900 hover:bg-slate-800 active:bg-slate-950",
-      primaryShadow: "shadow-slate-900/20",
-      chip: "bg-slate-100 text-slate-700 border-slate-200",
-      chipActive: "bg-slate-900 text-white border-slate-900 shadow-xs",
-      icon: "text-slate-900",
-      badge: "bg-slate-900/5 text-slate-700 border-slate-200",
-      softBg: "bg-slate-50",
-      softBorder: "border-slate-200",
-      softText: "text-slate-600",
-      hoverTitle: "group-hover:text-slate-700",
-      hoverCard: "hover:border-slate-400",
+      ring: "focus:ring-rose-500/20",
+      ringBorder: "focus:border-rose-500",
+      primary: "bg-rose-600 hover:bg-rose-700 active:bg-rose-800",
+      primaryShadow: "shadow-rose-600/20",
+      chip: "bg-rose-50 text-rose-700 border-rose-200",
+      chipActive: "bg-rose-600 text-white border-rose-600 shadow-xs",
+      icon: "text-rose-600",
+      badge: "bg-rose-50 text-rose-700 border-rose-200",
+      softBg: "bg-rose-50",
+      softBorder: "border-rose-100",
+      softText: "text-rose-700",
+      hoverTitle: "group-hover:text-rose-700",
+      hoverCard: "hover:border-rose-300",
     };
   }
   if (theme === "teal") {
     return {
-      ring: "focus:ring-teal-500/25",
-      ringBorder: "focus:border-teal-600",
-      primary: "bg-teal-600 hover:bg-teal-700 active:bg-teal-800",
-      primaryShadow: "shadow-teal-600/20",
-      chip: "bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100",
-      chipActive: "bg-teal-600 text-white border-teal-600 shadow-xs",
-      icon: "text-teal-700",
-      badge: "bg-teal-50 text-teal-700 border-teal-200",
-      softBg: "bg-teal-50/50",
-      softBorder: "border-teal-200",
-      softText: "text-teal-700",
-      hoverTitle: "group-hover:text-teal-700",
-      hoverCard: "hover:border-teal-300",
+      ring: "focus:ring-indigo-500/20",
+      ringBorder: "focus:border-indigo-500",
+      primary: "bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800",
+      primaryShadow: "shadow-indigo-600/20",
+      chip: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100",
+      chipActive: "bg-indigo-600 text-white border-indigo-600 shadow-xs",
+      icon: "text-indigo-600",
+      badge: "bg-indigo-50 text-indigo-700 border-indigo-200",
+      softBg: "bg-indigo-50",
+      softBorder: "border-indigo-100",
+      softText: "text-indigo-700",
+      hoverTitle: "group-hover:text-indigo-700",
+      hoverCard: "hover:border-indigo-300",
     };
   }
   return {
@@ -55,8 +55,8 @@ export function getTourTheme(theme = "emerald") {
     chipActive: "bg-emerald-600 text-white border-emerald-600 shadow-xs",
     icon: "text-emerald-700",
     badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    softBg: "bg-emerald-50/50",
-    softBorder: "border-emerald-200",
+    softBg: "bg-emerald-50",
+    softBorder: "border-emerald-100",
     softText: "text-emerald-700",
     hoverTitle: "group-hover:text-emerald-700",
     hoverCard: "hover:border-emerald-300",

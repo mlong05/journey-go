@@ -6,7 +6,7 @@ import lombok.Builder;
 
 import java.time.Instant;
 
-@Builder
+@Builder(toBuilder = true)
 public record JourneyTaskProgressResponse(
         Long id,
         Long taskId,
@@ -18,7 +18,15 @@ public record JourneyTaskProgressResponse(
         Integer attempts,
         Boolean isCorrect,
         Instant startedAt,
-        Instant completedAt
+        Instant completedAt,
+        // Kết quả của lần nộp bài vừa rồi (null khi chỉ xem tiến độ)
+        Integer maxAttempts,
+        Integer attemptsRemaining,
+        Integer totalQuestions,
+        Integer correctCount,
+        // Nhiệm vụ đi theo từng địa điểm: số câu đã đúng trong lần làm hiện tại, và câu vừa nộp đúng hay sai
+        Integer questionIndex,
+        Boolean lastAnswerCorrect
 ) {
     public static JourneyTaskProgressResponse fromEntity(JourneyTaskProgress entity) {
         return JourneyTaskProgressResponse.builder()

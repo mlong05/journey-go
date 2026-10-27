@@ -25,6 +25,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     boolean existsByExperienceIdAndSequenceOrder(Long experienceId, Integer sequenceOrder);
 
     boolean existsByExperienceIdAndSequenceOrderAndIdNot(Long experienceId, Integer sequenceOrder, Long id);
+    boolean existsByCheckInPointIdAndIdNot(Long checkInPointId, Long id);
 
 
     @Query("""

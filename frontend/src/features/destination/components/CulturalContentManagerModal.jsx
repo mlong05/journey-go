@@ -1635,7 +1635,7 @@ export default function CulturalContentManagerModal({
 
                           {historyData.decisionNote && (
                             <p className="text-xs text-slate-700 italic">
-                              "{historyData.decisionNote}"
+                              &ldquo;{historyData.decisionNote}&rdquo;
                             </p>
                           )}
                         </div>

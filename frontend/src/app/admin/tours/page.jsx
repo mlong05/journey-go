@@ -21,9 +21,7 @@ export default function AdminToursPage() {
   return (
     <ToursManager
       theme="slate"
-      variant="table"
-      heading="Quản Lý Tour Toàn Sàn"
-      description="Toàn quyền vòng đời tour: khởi tạo, duyệt phát hành, từ chối, xoá mềm và khôi phục. Bộ lọc tình trạng giúp theo dõi các tour đã bị gỡ khỏi hệ thống."
+      heading="Quản Lý Tour Toàn Sàn"
       canCreate
       canModerate
       canDelete

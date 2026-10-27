@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface UnlockConditionRepository extends JpaRepository<UnlockCondition, Long> {
 
     Optional<UnlockCondition> findByTaskId(Long taskId);
+    boolean existsByCheckInPointId(Long checkInPointId);
 }

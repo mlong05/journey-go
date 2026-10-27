@@ -187,24 +187,24 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
       className="fixed inset-0 z-70 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
     >
       {/* Outer Shell: Double-Bezel Architecture (Doppelrand) */}
-      <div className="w-full max-w-4xl p-1.5 sm:p-2 bg-slate-900/10 dark:bg-white/10 rounded-[2.25rem] ring-1 ring-slate-900/15 shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className="w-full max-w-4xl p-1.5 sm:p-2 bg-slate-900/10 dark:bg-white/10 rounded-[2.25rem] ring-1 ring-slate-900/15 shadow-xl animate-in zoom-in-95 duration-200">
         {/* Inner Core: Main White Card */}
         <div className="bg-white rounded-[2rem] overflow-hidden flex flex-col h-[700px] max-h-[92vh] shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] border border-slate-200/80">
           {/* ========================================================
               HEADER MODAL (Double Header with Ambient Gradient)
               ======================================================== */}
-          <div className="shrink-0 px-6 sm:px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-indigo-50/30">
+          <div className="shrink-0 px-6 sm:px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
             <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-indigo-800 text-white flex items-center justify-center shadow-md shadow-indigo-500/20 ring-4 ring-indigo-50 shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-md shadow-indigo-500/20 ring-4 ring-indigo-50 shrink-0">
                 <ShieldCheck size={22} strokeWidth={2.2} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full px-2.5 py-0.5 text-[10px] uppercase tracking-[0.2em] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+                  <span className="rounded-full px-2.5 py-0.5 text-[11px] tracking-[0.2em] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
                     Phân Quyền Toàn Hệ Thống
                   </span>
                 </div>
-                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight mt-0.5">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight mt-0.5">
                   Quản Lý Vai Trò Người Dùng
                 </h2>
               </div>
@@ -213,7 +213,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
             <button
               type="button"
               onClick={onClose}
-              className="w-10 h-10 rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+              className="w-10 h-10 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
             >
               <X size={20} />
             </button>
@@ -224,7 +224,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
               ======================================================== */}
           {toast.message && (
             <div
-              className={`shrink-0 mx-6 sm:mx-8 mt-3.5 p-3.5 rounded-2xl text-xs font-bold shadow-lg flex items-center gap-2.5 animate-in slide-in-from-top-2 ${
+              className={`shrink-0 mx-6 sm:mx-8 mt-3.5 p-3.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-2.5 animate-in slide-in-from-top-2 ${
                 toast.tone === "success"
                   ? "bg-emerald-600 text-white"
                   : "bg-rose-600 text-white"
@@ -255,7 +255,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                 }`}
               >
                 <span>Tất cả</span>
-                <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px]">
+                <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[11px]">
                   {roles.length}
                 </span>
               </button>
@@ -272,7 +272,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
               >
                 <Lock size={12} />
                 <span>Hệ thống (Core)</span>
-                <span className="px-1.5 py-0.2 rounded-md bg-indigo-100 text-indigo-800 text-[10px]">
+                <span className="px-1.5 py-0.2 rounded-md bg-indigo-100 text-indigo-800 text-[11px]">
                   {systemCount}
                 </span>
               </button>
@@ -289,7 +289,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
               >
                 <Sparkles size={12} />
                 <span>Tùy chỉnh (Custom)</span>
-                <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-800 text-[10px]">
+                <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-800 text-[11px]">
                   {customCount}
                 </span>
               </button>
@@ -305,7 +305,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
               className={`h-9 px-4 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer transition-all active:scale-95 shadow-sm ${
                 isCreating
                   ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                  : "bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-indigo-600/20"
+                  : "bg-rose-600 hover:bg-rose-700 text-white shadow-indigo-600/20"
               }`}
             >
               {isCreating ? (
@@ -326,17 +326,17 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
               FORM TẠO VAI TRÒ MỚI (Khung Double-Bezel mở rộng)
               ======================================================== */}
           {isCreating && (
-            <div className="shrink-0 mx-6 sm:mx-8 mt-4 p-4 sm:p-5 bg-gradient-to-br from-indigo-50/50 via-white to-slate-50 rounded-2xl border-2 border-indigo-200/80 shadow-md animate-in fade-in slide-in-from-top-3 duration-200">
+            <div className="shrink-0 mx-6 sm:mx-8 mt-4 p-4 sm:p-5 bg-gradient-to-br from-indigo-50/50 via-white to-slate-50 rounded-xl border-2 border-indigo-200/80 shadow-md animate-in fade-in slide-in-from-top-3 duration-200">
               <div className="flex items-center justify-between pb-3 border-b border-indigo-100">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-2xs">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
                     +
                   </div>
-                  <h4 className="font-extrabold text-slate-900 text-sm">
+                  <h4 className="font-bold text-slate-900 text-sm">
                     Định Nghĩa Vai Trò Mới Cho Hệ Thống
                   </h4>
                 </div>
-                <span className="text-[11px] font-mono text-indigo-700 bg-indigo-100/60 px-2 py-0.5 rounded-md font-bold">
+                <span className="text-[11px] tabular-nums text-indigo-700 bg-indigo-100/60 px-2 py-0.5 rounded-md font-bold">
                   POST /api/v1/roles
                 </span>
               </div>
@@ -349,7 +349,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                       <span>
                         Tên vai trò (Định danh hệ thống) <span className="text-rose-500">*</span>
                       </span>
-                      <span className="text-[10.5px] text-slate-400 font-mono">
+                      <span className="text-[11px] text-slate-400 tabular-nums">
                         {name.length}/50 ký tự
                       </span>
                     </label>
@@ -359,13 +359,13 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                       value={name}
                       onChange={(e) => handleNameChange(e.target.value)}
                       placeholder="VD: TOUR_GUIDE, PARTNER, VENDOR..."
-                      className={`w-full px-3.5 py-2 text-xs font-mono font-bold bg-white border rounded-xl outline-hidden uppercase tracking-wider transition-all ${
+                      className={`w-full px-3.5 py-2 text-xs tabular-nums font-bold bg-white border rounded-xl outline-hidden   transition-all ${
                         formError
                           ? "border-rose-300 ring-2 ring-rose-100"
                           : "border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                       }`}
                     />
-                    <p className="text-[10.5px] text-slate-400">
+                    <p className="text-[11px] text-slate-400">
                       Chỉ gồm chữ cái, chữ số và dấu gạch dưới. Tự động chuẩn hóa thành chữ in hoa.
                     </p>
                   </div>
@@ -374,7 +374,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
                       <span>Mô tả quyền hạn &amp; trách nhiệm</span>
-                      <span className="text-[10.5px] text-slate-400 font-mono">
+                      <span className="text-[11px] text-slate-400 tabular-nums">
                         {description.length}/255 ký tự
                       </span>
                     </label>
@@ -384,9 +384,9 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="VD: Hướng dẫn viên phụ trách hỗ trợ du khách thực địa"
-                      className="w-full px-3.5 py-2 text-xs font-medium bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
+                      className="w-full px-3.5 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
                     />
-                    <p className="text-[10.5px] text-slate-400">
+                    <p className="text-[11px] text-slate-400">
                       Giải thích ngắn gọn để quản trị viên dễ dàng phân biệt khi gán quyền cho tài
                       khoản.
                     </p>
@@ -405,7 +405,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                   <div className="p-3 bg-white rounded-xl border border-indigo-100 flex items-center justify-between gap-3 shadow-2xs">
                     <div className="flex items-center gap-2 text-xs text-slate-600">
                       <span className="font-bold text-slate-700">Xem trước hiển thị:</span>
-                      <span className="px-2.5 py-0.5 rounded-lg text-xs font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono tracking-wider">
+                      <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 tabular-nums">
                         {name}
                       </span>
                       <span className="text-[11px] text-slate-400">
@@ -413,7 +413,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                       </span>
                     </div>
 
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
                       Vai trò tùy chỉnh
                     </span>
                   </div>
@@ -433,7 +433,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer active:scale-95"
+                    className="px-5 py-2 bg-rose-600 hover:bg-rose-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer active:scale-95"
                   >
                     <Check size={14} />
                     <span>Xác nhận giao diện tạo vai trò</span>
@@ -457,7 +457,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm kiếm vai trò theo tên mã hoặc mô tả..."
-                className="w-full pl-9 pr-8 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl outline-hidden focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
+                className="w-full pl-9 pr-8 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl outline-hidden focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
               />
               {searchQuery && (
                 <button
@@ -482,14 +482,14 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
               </div>
             ) : filteredRoles.length === 0 ? (
               <div className="py-16 text-center max-w-sm mx-auto space-y-3">
-                <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
+                <div className="w-14 h-14 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
                   <Shield size={26} />
                 </div>
                 <div>
-                  <h4 className="font-extrabold text-slate-800 text-sm">
+                  <h4 className="font-bold text-slate-800 text-sm">
                     Không tìm thấy vai trò phù hợp
                   </h4>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-slate-600 mt-1">
                     Thử tìm kiếm với từ khóa khác hoặc bấm nút Tạo vai trò mới để mở rộng hệ thống.
                   </p>
                 </div>
@@ -499,26 +499,26 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                 {filteredRoles.map((role) => (
                   <div
                     key={role.id}
-                    className="group bg-white hover:bg-gradient-to-br hover:from-white hover:to-indigo-50/20 border border-slate-200 hover:border-indigo-300 rounded-2xl p-4 sm:p-5 transition-all shadow-2xs hover:shadow-md flex flex-col gap-2.5 relative overflow-hidden"
+                    className="group bg-white hover:bg-gradient-to-br hover:from-white hover:to-indigo-50/20 border border-slate-200 hover:border-indigo-300 rounded-xl p-4 sm:p-5 transition-all shadow-2xs hover:shadow-md flex flex-col gap-2.5 relative overflow-hidden"
                   >
                     {/* Top row: Name & Badge */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-slate-100 group-hover:bg-indigo-100 text-slate-700 group-hover:text-indigo-700 font-mono font-black text-xs flex items-center justify-center shrink-0 border border-slate-200/80 transition-colors">
+                        <span className="w-7 h-7 rounded-lg bg-slate-100 group-hover:bg-indigo-100 text-slate-700 group-hover:text-indigo-700 tabular-nums font-bold text-xs flex items-center justify-center shrink-0 border border-slate-200/80 transition-colors">
                           #{role.id}
                         </span>
-                        <h4 className="text-base font-black text-slate-900 tracking-tight font-mono">
+                        <h4 className="text-base font-bold text-slate-900 tracking-tight tabular-nums">
                           {role.name}
                         </h4>
                       </div>
 
                       {role.isSystem ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full shrink-0">
-                          <Lock size={10} className="text-slate-500" />
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full shrink-0">
+                          <Lock size={10} className="text-slate-600" />
                           <span>Mặc định hệ thống</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
                           <Sparkles size={10} className="text-emerald-600" />
                           <span>Tùy chỉnh mở rộng</span>
                         </span>
@@ -526,7 +526,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                     </div>
 
                     {/* Description */}
-                    <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                    <p className="text-xs text-slate-600 leading-relaxed font-semibold">
                       {role.description || (
                         <span className="italic text-slate-400">
                           Chưa có thông tin mô tả chi tiết cho vai trò này.
@@ -542,7 +542,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
           {/* ========================================================
               FOOTER MODAL (Button Đóng)
               ======================================================== */}
-          <div className="shrink-0 px-6 sm:px-8 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <div className="shrink-0 px-6 sm:px-8 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
             <div className="flex items-center gap-2">
               <KeyRound size={14} className="text-indigo-600 shrink-0" />
               <span>
@@ -566,16 +566,16 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
           ======================================================== */}
       {confirmingRole && (
         <div className="fixed inset-0 z-80 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150 space-y-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl border border-slate-200 animate-in zoom-in-95 duration-150 space-y-4">
             <div className="flex items-start gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center shrink-0">
                 <ShieldCheck size={22} />
               </div>
               <div>
-                <h3 className="font-extrabold text-slate-900 text-base">
+                <h3 className="font-bold text-slate-900 text-base">
                   Xác nhận khởi tạo vai trò mới?
                 </h3>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                   Vai trò mới sẽ được ghi vào cơ sở dữ liệu hệ thống JourneyGo và có thể gán ngay cho
                   người dùng.
                 </p>
@@ -583,16 +583,16 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
             </div>
 
             {/* Chi tiết vai trò sắp tạo */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Tên mã vai trò:</span>
-                <span className="px-2.5 py-0.5 rounded-lg text-xs font-black bg-indigo-100 text-indigo-800 font-mono tracking-wider">
+                <span className="text-xs font-bold text-slate-600">Tên mã vai trò:</span>
+                <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-indigo-100 text-indigo-800 tabular-nums">
                   {confirmingRole.name}
                 </span>
               </div>
               <div className="text-xs text-slate-700">
-                <span className="font-bold text-slate-500 block mb-0.5">Mô tả vai trò:</span>
-                <p className="font-medium bg-white p-2.5 rounded-xl border border-slate-200 text-slate-800">
+                <span className="font-bold text-slate-600 block mb-0.5">Mô tả vai trò:</span>
+                <p className="font-semibold bg-white p-2.5 rounded-xl border border-slate-200 text-slate-800">
                   {confirmingRole.description || "(Không có mô tả)"}
                 </p>
               </div>
@@ -612,7 +612,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                 type="button"
                 disabled={actionLoading}
                 onClick={handleExecuteCreate}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-indigo-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
               >
                 {actionLoading ? (
                   <>

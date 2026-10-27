@@ -33,7 +33,8 @@ export function useExperienceData({ myOnly = false, destinationId = "all" } = {}
   const [allExperiences, setAllExperiences] = useState([]);
   const [destFiltered, setDestFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtering, setFiltering] = useState(false);
+  // Khóa (điểm đến + lần làm mới) của lần lọc server-side đã hoàn tất gần nhất
+  const [loadedFilterKey, setLoadedFilterKey] = useState(null);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -92,7 +93,7 @@ export function useExperienceData({ myOnly = false, destinationId = "all" } = {}
     if (!hasDestFilter) return undefined;
 
     let cancelled = false;
-    setFiltering(true);
+    const key = `${destId}:${refreshKey}`;
 
     (async () => {
       try {
@@ -110,7 +111,7 @@ export function useExperienceData({ myOnly = false, destinationId = "all" } = {}
           err?.message || "Không thể lọc trải nghiệm theo điểm đến. Vui lòng thử lại."
         );
       } finally {
-        if (!cancelled) setFiltering(false);
+        if (!cancelled) setLoadedFilterKey(key);
       }
     })();
 
@@ -118,6 +119,9 @@ export function useExperienceData({ myOnly = false, destinationId = "all" } = {}
       cancelled = true;
     };
   }, [refreshKey, fetchExperiences, destId, hasDestFilter]);
+
+  // Đang lọc khi có bộ lọc nhưng kết quả của lần lọc hiện tại chưa về
+  const filtering = hasDestFilter && loadedFilterKey !== `${destId}:${refreshKey}`;
 
   // Danh sách dùng để render — đã lọc server-side nếu có, ngược lại lấy full list.
   const experiences = hasDestFilter ? destFiltered : allExperiences;

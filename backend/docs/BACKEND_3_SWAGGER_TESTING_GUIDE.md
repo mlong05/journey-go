@@ -49,7 +49,8 @@ Tất cả các tài khoản dưới đây đều có mật khẩu mặc định
 | `GET` | `/api/v1/journeys/{id}` | User | Chi tiết tiến độ hành trình (danh sách điểm đến & nhiệm vụ) |
 | `POST` | `/api/v1/journeys/{id}/destinations/{destinationId}/check-in` | User | Check-in GPS tại điểm đến (nhận Huy hiệu nếu có) |
 | `GET` | `/api/v1/journeys/{id}/tasks/{taskId}/puzzle-clue` | User | Lấy manh mối câu đố GPS Puzzle thực tế |
-| `POST` | `/api/v1/journeys/{id}/tasks/{taskId}/submit` | User | Nộp bài Quiz hoặc Giải đố GPS Puzzle (tích điểm thưởng) |
+| `GET` | `/api/v1/journeys/{id}/tasks/{taskId}/questions` | User | Xem câu hỏi của nhiệm vụ (nhiệm vụ cần vị trí chỉ mở khi tới trạm hoặc quét QR) |
+| `POST` | `/api/v1/journeys/{id}/tasks/{taskId}/submit` | User | Nộp bài cả nhiệm vụ: đúng hết thì nhận trọn điểm nhiệm vụ |
 | `PATCH` | `/api/v1/journeys/{id}/destinations/{destinationId}/skip` | User | Bỏ qua điểm đến nếu bị trễ giờ |
 
 ### 2.2. Phân Hệ Gamification (Điểm Thưởng, Huy Hiệu, Voucher) - Tag: `Gamification`
@@ -132,40 +133,37 @@ Bạn có thể chạy thử một kịch bản hoàn chỉnh từ khi du khách
 
 ---
 
-### Bước 3: Nộp nhiệm vụ Quiz (`POST /api/v1/journeys/{id}/tasks/{taskId}/submit`)
-- **Mục đích:** Trả lời câu hỏi trắc nghiệm tìm hiểu lịch sử điểm đến.
-- **URL mẫu:** `/api/v1/journeys/1/tasks/11/submit`
-- **Request Body:**
-  ```json
-  {
-    "answer": "A"
-  }
-  ```
-- **Response:** Trả về kết quả `isCorrect: true`, `pointsEarned: 10`, trạng thái task đổi thành `COMPLETED`.
+### Bước 3: Làm nhiệm vụ (câu hỏi thật của Provider)
+Điểm thưởng thuộc về **nhiệm vụ** (`pointsReward`). Một nhiệm vụ có một hoặc nhiều câu hỏi; du khách nộp bài của **cả nhiệm vụ** trong một lần.
+- Đúng **hết** câu hỏi: nhận trọn điểm nhiệm vụ (cộng một lần), trạng thái `COMPLETED`.
+- Chưa đúng hết: **không có điểm**, phải làm lại cả nhiệm vụ. Mỗi lần nộp tính một lượt (`maxAttempts` của nhiệm vụ). Hết lượt thì trạng thái `FAILED`.
+- Câu bỏ trống tính là sai. Backend không bao giờ trả đáp án đúng cho du khách.
+
+1. **Xem câu hỏi:** `GET /api/v1/journeys/1/tasks/11/questions`
+   - Nhiệm vụ thường: trả `unlocked: true` cùng danh sách câu hỏi (trắc nghiệm có `options`, tự luận thì `options` rỗng).
+   - Nhiệm vụ **tương tác ngoài thực tế** (`requiresLocation: true`): **mỗi câu hỏi gắn với một địa điểm**. Du khách đi lần lượt từng địa điểm theo thứ tự câu hỏi. API chỉ trả **câu hiện tại**, và chỉ khi gửi thêm `?latitude=..&longitude=..` (trong bán kính của địa điểm câu đó) **hoặc** `?qrValue=<mã QR của địa điểm>`. Chưa tới nơi thì `unlocked: false`, `questions: null`, kèm `station` (tên, tọa độ, bán kính của địa điểm kế tiếp) để dẫn đường.
+2. **Nộp bài:** `POST /api/v1/journeys/1/tasks/11/submit`
+   ```json
+   {
+     "answers": [
+       { "questionId": 101, "answerId": 502 },
+       { "questionId": 102, "text": "Thiên Mụ" }
+     ],
+     "latitude": 16.4526,
+     "longitude": 107.5458,
+     "qrValue": null
+   }
+   ```
+   - Nhiệm vụ thường: gửi `answers` của mọi câu hỏi trong một lần.
+   - Nhiệm vụ tương tác ngoài thực tế: mỗi lần gửi **một** câu (`answers` chỉ có câu hiện tại) kèm `latitude/longitude` hoặc `qrValue` của địa điểm đó. Đúng thì sang địa điểm kế tiếp (`lastAnswerCorrect: true`, `questionIndex` tăng); đúng hết thì `COMPLETED` và nhận trọn điểm. **Sai một câu** thì lần làm đó thất bại, trừ một lượt, quay lại câu đầu (`questionIndex: 0`).
+   - Trắc nghiệm gửi `answerId`, tự luận gửi `text` (không phân biệt hoa thường, bỏ khoảng trắng thừa).
+   - **Response:** `isCorrect`, `pointsEarned`, `attempts`, `attemptsRemaining`, `totalQuestions`, `correctCount`, `status`.
+   - Nhiệm vụ tương tác ngoài thực tế: bắt buộc có `latitude/longitude` trong bán kính trạm hoặc `qrValue` đúng, nếu không báo `GPS-REQUIRED`, `GPS-OUT-OF-PUZZLE-ZONE` hoặc `QR-INVALID`.
 
 ---
 
-### Bước 4: Mở Manh mối GPS Puzzle & Giải đố thực tế
-1. **Lấy manh mối câu đố:** `GET /api/v1/journeys/1/tasks/12/puzzle-clue`
-   - **Response:**
-     ```json
-     {
-       "taskId": 12,
-       "title": "Khám phá mật mã cổ tại Văn Miếu",
-       "clueText": "Hãy tìm bảng chữ in nổi xung quanh nơi bạn đang đứng...",
-       "hints": "Gợi ý: Cụm từ gồm 4 chữ, tôn vinh giá trị văn hóa nước nhà.",
-       "radiusMeters": 60
-     }
-     ```
-2. **Nộp bài giải đố GPS Puzzle:** `POST /api/v1/journeys/1/tasks/12/submit`
-   ```json
-   {
-     "answer": "DI SAN VIET NAM",
-     "latitude": 21.0277,
-     "longitude": 105.8351
-   }
-   ```
-   - **Response:** Hệ thống kiểm tra khoảng cách GPS của người chơi so với vị trí cổ vật (sai số <= 60 mét) và đối chiếu đáp án chữ -> Trả về `isCorrect: true` và cộng **20 Điểm thưởng**!
+### Bước 4: Gợi ý nhiệm vụ tương tác ngoài thực tế
+- `GET /api/v1/journeys/1/tasks/12/puzzle-clue` trả `clue` (mô tả nhiệm vụ), tọa độ và bán kính của trạm.
 
 ---
 
@@ -230,11 +228,8 @@ public interface TourInfoProvider {
 - `destinations`: Danh sách các điểm dừng chân theo thứ tự `orderIndex`, tọa độ GPS (`latitude`, `longitude`), bán kính cho phép check-in `radiusMeters` (mặc định 80-100m), và danh sách `tasks`.
 - `tasks`: Mỗi task có `taskType` (`QUIZ` hoặc `REAL_WORLD_INTERACTIVE`), điểm thưởng `points`, đáp án đúng `correctAnswer`, tọa độ giải đố `targetLatitude`/`targetLongitude` và bán kính `targetRadiusMeters`.
 
-### 4.2. Hiện Trạng & Hướng Tích Hợp Ở Đợt 6
-- Hiện tại Backend 3 đang cung cấp `MockTourInfoProvider`: Tự động lấy các điểm đến trong bảng `destinations` có sẵn trong DB để giả lập tour 3 điểm đến kèm câu hỏi trắc nghiệm và câu đố GPS.
-- **Khi Backend 1 hoàn thiện bảng Tour và TourDestination:**
-  - Backend 1 chỉ cần tạo một service triển khai `TourInfoProvider` (hoặc đánh dấu `@Primary` trên Service thật).
-  - Logic của toàn bộ Journey, Check-in, Gamification của Backend 3 sẽ tự động chuyển sang đọc Tour thật mà không cần sửa bất kỳ dòng code nghiệp vụ nào!
+### 4.2. Nguồn Dữ Liệu Hành Trình
+Hành trình đọc dữ liệu thật qua `RealTourInfoProvider`: Tour (đã `PUBLISHED`) → các điểm đến theo thứ tự → trải nghiệm `PUBLISHED` của điểm đến → nhiệm vụ `PUBLISHED` → câu hỏi và đáp án. Điểm đến không có trải nghiệm hoặc nhiệm vụ sẽ hoàn thành ngay khi check-in. Điểm đến hiện check-in bằng GPS (chưa có mã QR riêng).
 
 ---
 

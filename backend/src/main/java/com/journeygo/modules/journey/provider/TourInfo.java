@@ -3,11 +3,16 @@ package com.journeygo.modules.journey.provider;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * Ảnh chụp nội dung một Tour dùng cho hành trình của du khách: các điểm đến theo thứ tự,
+ * nhiệm vụ đang phát hành của từng điểm, cùng câu hỏi và đáp án của từng nhiệm vụ.
+ */
 public record TourInfo(
         Long tourId,
         String tourName,
         List<TourDestinationInfo> destinations
 ) {
+
     public record TourDestinationInfo(
             Long destinationId,
             String destinationName,
@@ -20,21 +25,43 @@ public record TourInfo(
             List<TourTaskInfo> tasks
     ) {}
 
+    /**
+     * Một nhiệm vụ. Điểm thưởng nằm ở cấp nhiệm vụ: trả lời đúng toàn bộ câu hỏi thì nhận trọn
+     * {@code points}, chưa đúng hết thì không có điểm và phải làm lại cả nhiệm vụ.
+     * Nhiệm vụ cần vị trí ({@code requiresLocation}) đi theo từng câu hỏi: mỗi câu gắn với một địa điểm,
+     * du khách check-in từng địa điểm theo thứ tự rồi mới trả lời câu đó.
+     */
     public record TourTaskInfo(
             Long taskId,
             String taskName,
             String taskType,
             Integer orderIndex,
             Integer points,
-            String correctAnswer,
+            Integer maxAttempts,
             String clue,
-            BigDecimal targetLatitude,
-            BigDecimal targetLongitude,
-            Integer targetRadiusMeters,
-            String hint
-    ) {
-        public TourTaskInfo(Long taskId, String taskName, String taskType, Integer orderIndex, Integer points, String correctAnswer) {
-            this(taskId, taskName, taskType, orderIndex, points, correctAnswer, null, null, null, 50, null);
-        }
-    }
+            boolean requiresLocation,
+            List<QuestionInfo> questions
+    ) {}
+
+    /** Câu hỏi; các trường station* chỉ có với câu hỏi của nhiệm vụ cần vị trí. */
+    public record QuestionInfo(
+            Long questionId,
+            String content,
+            String questionType,
+            Integer orderIndex,
+            String expectedText,
+            String stationName,
+            BigDecimal stationLatitude,
+            BigDecimal stationLongitude,
+            Integer stationRadiusMeters,
+            String stationQrToken,
+            List<AnswerInfo> answers
+    ) {}
+
+    public record AnswerInfo(
+            Long answerId,
+            String content,
+            boolean correct,
+            Integer orderIndex
+    ) {}
 }

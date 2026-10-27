@@ -46,13 +46,18 @@ export default function TourDetailModal({
   const [historyData, setHistoryData] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Xoá lịch sử cũ khi đóng hoặc đổi tour (điều chỉnh state ngay khi render, không dùng effect)
+  const historyKey = isOpen && tour?.tourId ? String(tour.tourId) : "";
+  const [prevHistoryKey, setPrevHistoryKey] = useState(historyKey);
+  if (prevHistoryKey !== historyKey) {
+    setPrevHistoryKey(historyKey);
+    if (!historyKey) setHistoryData(null);
+    else setHistoryLoading(true);
+  }
+
   useEffect(() => {
-    if (!isOpen || !tour?.tourId) {
-      setHistoryData(null);
-      return;
-    }
+    if (!isOpen || !tour?.tourId) return;
     let active = true;
-    setHistoryLoading(true);
     tourService
       .getHistory(tour.tourId)
       .then((data) => {
@@ -83,7 +88,7 @@ export default function TourDetailModal({
         aria-modal="true"
         aria-label="Chi tiết tour du lịch"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col"
+        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-100 max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col"
       >
         {/* ── HEADER ─────────────────────────────────────────── */}
         <div className="shrink-0 px-5 sm:px-7 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
@@ -102,12 +107,12 @@ export default function TourDetailModal({
                 </span>
               )}
             </div>
-            <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
               {tour?.title ||
                 (isLoading ? "Đang tải..." : "Chưa có dữ liệu")}
             </h3>
             {tour?.createdBy && (
-              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+              <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
                 <Building2 size={12} className="text-slate-400 shrink-0" />
                 <span className="truncate">{tour.createdBy}</span>
               </p>
@@ -126,7 +131,7 @@ export default function TourDetailModal({
         {/* ── BODY ───────────────────────────────────────────── */}
         <div className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-7 py-5">
           {isLoading ? (
-            <div className="py-12 flex flex-col items-center gap-3 text-slate-500">
+            <div className="py-12 flex flex-col items-center gap-3 text-slate-600">
               <Loader2 size={28} className="animate-spin text-slate-400" />
               <p className="text-xs font-bold">Đang tải dữ liệu tour...</p>
             </div>
@@ -147,7 +152,7 @@ export default function TourDetailModal({
                 <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 space-y-2.5">
                   <div className="flex items-center gap-1.5 text-rose-700">
                     <AlertCircle size={14} className="shrink-0" />
-                    <p className="text-[11px] font-black uppercase tracking-wider">
+                    <p className="text-[11px] font-bold uppercase tracking-wider">
                       Ý kiến &amp; Lý do từ chối thẩm định
                     </p>
                   </div>
@@ -173,7 +178,7 @@ export default function TourDetailModal({
                   {historyData?.otherReason && (
                     <div className="bg-white/80 p-3 rounded-xl border border-rose-200/70 text-xs">
                       <span className="font-bold text-rose-950 block mb-0.5">Chi tiết lý do khác:</span>
-                      <p className="text-rose-900 leading-relaxed font-medium">{historyData.otherReason}</p>
+                      <p className="text-rose-900 leading-relaxed font-semibold">{historyData.otherReason}</p>
                     </div>
                   )}
 
@@ -191,10 +196,10 @@ export default function TourDetailModal({
               {/* Ô thông tin chính */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                     <CircleDollarSign size={10} /> Tổng giá tour
                   </p>
-                  <p className="text-[15px] font-black text-slate-900 font-mono leading-none">
+                  <p className="text-[15px] font-bold text-slate-900 tabular-nums leading-none">
                     {formatVND(tour.price)}
                   </p>
                   <p className="text-[10px] text-slate-400 mt-1.5 leading-tight">
@@ -203,19 +208,19 @@ export default function TourDetailModal({
                 </div>
 
                 <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                     <CalendarDays size={10} /> Thời lượng
                   </p>
-                  <p className="text-[15px] font-black text-slate-900 leading-none">
+                  <p className="text-[15px] font-bold text-slate-900 leading-none">
                     {formatDuration(tour.durationDays)}
                   </p>
                 </div>
 
                 <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                     <Compass size={10} /> Loại hình
                   </p>
-                  <p className="text-[15px] font-black text-slate-900 leading-none">
+                  <p className="text-[15px] font-bold text-slate-900 leading-none">
                     {TOUR_TYPE_META[tour.tourType] || "Khác"}
                   </p>
                 </div>
@@ -224,16 +229,16 @@ export default function TourDetailModal({
               {/* Hành trình */}
               <div className="rounded-2xl border border-slate-200 overflow-hidden">
                 <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                     <Route size={11} /> Hành trình
                   </p>
-                  <span className="text-[11px] font-bold text-slate-500">
+                  <span className="text-[11px] font-bold text-slate-600">
                     {tour.destinations.length} điểm đến
                   </span>
                 </div>
 
                 {tour.destinations.length === 0 ? (
-                  <p className="px-4 py-8 text-center text-xs font-semibold text-slate-400">
+                  <p className="px-4 py-8 text-center text-xs font-bold text-slate-400">
                     Tour chưa có điểm đến nào
                   </p>
                 ) : (
@@ -248,7 +253,7 @@ export default function TourDetailModal({
                           key={`${d.destinationId}-${index}`}
                           className="px-4 py-3 flex items-start gap-3"
                         >
-                          <span className="w-6 h-6 rounded-full bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">
+                          <span className="w-6 h-6 rounded-full bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                             {d.sequenceOrder || index + 1}
                           </span>
                           <div className="min-w-0 flex-1">
@@ -256,7 +261,7 @@ export default function TourDetailModal({
                               {d.destinationName || "Chưa có"}
                             </p>
                             {d.destinationAddress && (
-                              <p className="text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                              <p className="text-[11px] text-slate-600 truncate flex items-center gap-1 mt-0.5">
                                 <MapPin size={10} className="text-slate-400 shrink-0" />
                                 <span className="truncate">
                                   {d.destinationAddress}
@@ -272,12 +277,12 @@ export default function TourDetailModal({
 
               {/* Mốc thời gian */}
               {(tour.createdAt || tour.updatedAt) && (
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-5 text-[11px] text-slate-500">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-5 text-[11px] text-slate-600">
                   {tour.createdAt && (
                     <span className="flex items-center gap-1.5">
                       <Clock size={11} className="text-slate-400 shrink-0" />
                       Khởi tạo:{" "}
-                      <span className="font-semibold text-slate-700">
+                      <span className="font-bold text-slate-700">
                         {new Date(tour.createdAt).toLocaleString("vi-VN")}
                       </span>
                     </span>
@@ -286,7 +291,7 @@ export default function TourDetailModal({
                     <span className="flex items-center gap-1.5">
                       <Clock size={11} className="text-slate-400 shrink-0" />
                       Cập nhật:{" "}
-                      <span className="font-semibold text-slate-700">
+                      <span className="font-bold text-slate-700">
                         {new Date(tour.updatedAt).toLocaleString("vi-VN")}
                       </span>
                     </span>
@@ -297,7 +302,7 @@ export default function TourDetailModal({
               {/* Lịch sử kiểm duyệt */}
               {historyData?.history && Array.isArray(historyData.history) && historyData.history.length > 0 && (
                 <div className="pt-3 border-t border-slate-100">
-                  <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider mb-2.5">
+                  <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2.5">
                     Lịch sử gửi duyệt &amp; thẩm định
                   </p>
                   <div className="space-y-2">
@@ -327,16 +332,16 @@ export default function TourDetailModal({
                                   ? "Từ chối phê duyệt"
                                   : "Đã gửi thẩm định"}
                               </span>
-                              <span className="text-[10px] text-slate-400 font-medium">
+                              <span className="text-[10px] text-slate-400 font-semibold">
                                 {h.timestamp || h.createdAt
                                   ? new Date(h.timestamp || h.createdAt).toLocaleString("vi-VN")
                                   : ""}
                               </span>
                             </div>
                             {h.actorName && (
-                              <p className="text-[11px] text-slate-500 mt-0.5">
+                              <p className="text-[11px] text-slate-600 mt-0.5">
                                 {isApproved || isRejected ? "Người thẩm định" : "Người gửi"}:{" "}
-                                <span className="font-medium text-slate-700">{h.actorName}</span>
+                                <span className="font-semibold text-slate-700">{h.actorName}</span>
                               </p>
                             )}
                             {isRejected && h.reason && (
@@ -379,7 +384,7 @@ export default function TourDetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-8 px-3.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95 cursor-pointer"
+            className="h-8 px-3.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all active:scale-95 cursor-pointer"
           >
             Đóng
           </button>

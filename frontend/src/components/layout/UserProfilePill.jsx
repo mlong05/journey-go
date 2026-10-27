@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import {
   ChevronDown,
@@ -137,11 +137,12 @@ export default function UserProfilePill({
   const [profileData, setProfileData] = useState(null);
   const [imgError, setImgError] = useState(false);
   const [modalImgError, setModalImgError] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // false khi SSR, true trên client: tránh lệch hydration khi dùng createPortal
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // Form state cho Modal Chỉnh sửa hồ sơ chi tiết lớn
   const [editFullName, setEditFullName] = useState("");
@@ -290,7 +291,13 @@ export default function UserProfilePill({
   }, []);
 
   useEffect(() => {
-    fetchProfile(false);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) fetchProfile(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [fetchProfile]);
 
   // Click outside listener để đóng Dropdown

@@ -20,10 +20,11 @@ import {
   Eye,
   Compass,
   FileQuestion,
+  GripVertical,
+  RotateCcw,
 } from "lucide-react";
 import { taskService } from "../services/taskService";
 import { getExperienceTheme } from "../theme";
-import CheckInPointManagerModal from "./CheckInPointManagerModal";
 import QuestionManagerModal from "./QuestionManagerModal";
 
 const INITIAL_FORM = {
@@ -91,9 +92,12 @@ function TaskManagerDialog({
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [unlockTarget, setUnlockTarget] = useState(null);
-  const [locationTarget, setLocationTarget] = useState(null);
-  const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
   const [questionTarget, setQuestionTarget] = useState(null);
+  const [deletedTasks, setDeletedTasks] = useState([]);
+  const [view, setView] = useState("active"); // "active" | "trash"
+  const [restoringId, setRestoringId] = useState(null);
+  const [dragIndex, setDragIndex] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
 
   const isDraft = experience?.status === "DRAFT";
   const editable = canEdit && isDraft;
@@ -108,13 +112,15 @@ function TaskManagerDialog({
     if (!experienceId) return;
     setLoading(true);
     try {
-      const [list, types, cips] = await Promise.all([
+      const [list, types, cips, trash] = await Promise.all([
         taskService.listByExperience(experienceId),
         taskService.listTypes().catch(() => []),
         taskService.listCheckInPoints(experienceId).catch(() => []),
+        taskService.listDeleted(experienceId).catch(() => []),
       ]);
       setError("");
       setTasks(list || []);
+      setDeletedTasks(trash || []);
       setTaskTypes(types || []);
       setCheckInPoints(cips || []);
     } catch (err) {
@@ -133,14 +139,16 @@ function TaskManagerDialog({
     });
     (async () => {
       try {
-        const [list, types, cips] = await Promise.all([
+        const [list, types, cips, trash] = await Promise.all([
           taskService.listByExperience(experienceId),
           taskService.listTypes().catch(() => []),
           taskService.listCheckInPoints(experienceId).catch(() => []),
+          taskService.listDeleted(experienceId).catch(() => []),
         ]);
         if (cancelled) return;
         setError("");
         setTasks(list || []);
+        setDeletedTasks(trash || []);
         setTaskTypes(types || []);
         setCheckInPoints(cips || []);
       } catch (err) {
@@ -222,10 +230,10 @@ function TaskManagerDialog({
     setDeleteLoading(true);
     try {
       await taskService.delete(deleting.id);
-      setTasks((prev) =>
-        prev.map((t) => (t.id === deleting.id ? { ...t, status: "INACTIVE" } : t))
-      );
-      showToast(`Đã xoá nhiệm vụ "${deleting.title}".`);
+      // Nhiệm vụ đã xoá biến mất khỏi danh sách; thứ tự của các nhiệm vụ còn lại giữ nguyên
+      setTasks((prev) => prev.filter((t) => t.id !== deleting.id));
+      setDeletedTasks((prev) => [{ ...deleting, status: "INACTIVE" }, ...prev]);
+      showToast(`Đã chuyển nhiệm vụ "${deleting.title}" vào thùng rác.`);
       setDeleting(null);
     } catch (err) {
       console.error("[TaskManager] delete error", err);
@@ -235,13 +243,30 @@ function TaskManagerDialog({
     }
   };
 
-  const move = async (idx, dir) => {
-    if (!editable) return;
+  // Khôi phục nhiệm vụ từ thùng rác (về bản nháp, xếp cuối danh sách)
+  const handleRestore = async (task) => {
+    setRestoringId(task.id);
+    try {
+      await taskService.restore(task.id);
+      showToast(`Đã khôi phục nhiệm vụ "${task.title}" về bản nháp.`);
+      await loadData();
+    } catch (err) {
+      console.error("[TaskManager] restore error", err);
+      showToast(err?.message || "Không thể khôi phục nhiệm vụ.");
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  // Đổi vị trí nhiệm vụ: vị trí trên cùng là 1, tăng dần khi xuống dưới
+  const moveTo = async (from, to) => {
+    if (!editable || from === to || from == null || to == null) return;
+    if (to < 0 || to >= tasks.length) return;
     const next = [...tasks];
-    const target = idx + dir;
-    if (target < 0 || target >= next.length) return;
-    [next[idx], next[target]] = [next[target], next[idx]];
-    setTasks(next);
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    // Backend gán lại thứ tự 0..n-1 theo đúng danh sách này
+    setTasks(next.map((t, i) => ({ ...t, sequenceOrder: i })));
     try {
       await taskService.reorder(
         experience.id,
@@ -253,6 +278,8 @@ function TaskManagerDialog({
       loadData();
     }
   };
+
+  const move = (idx, dir) => moveTo(idx, idx + dir);
 
   return (
     <div
@@ -314,9 +341,82 @@ function TaskManagerDialog({
             </div>
           )}
 
+          {/* Nhiệm vụ hiện tại / Thùng rác */}
+          <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setView("active")}
+              className={`px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                view === "active" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Nhiệm vụ hiện tại ({tasks.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("trash")}
+              className={`px-3 py-1.5 rounded-lg cursor-pointer transition-colors inline-flex items-center gap-1.5 ${
+                view === "trash" ? "bg-white text-rose-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Trash2 size={12} />
+              Thùng rác ({deletedTasks.length})
+            </button>
+          </div>
+
+          {view === "trash" ? (
+            deletedTasks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <Trash2 size={30} className="mb-2" />
+                <p className="text-sm font-semibold">Thùng rác trống</p>
+                <p className="text-xs mt-1">Nhiệm vụ bạn xoá sẽ nằm ở đây và có thể khôi phục.</p>
+              </div>
+            ) : (
+              <ul className="space-y-2.5">
+                {deletedTasks.map((t) => (
+                  <li
+                    key={t.id}
+                    className="rounded-2xl border border-rose-100 bg-rose-50/30 p-3 flex items-center gap-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                          {t.taskTypeName || t.taskTypeCode || `Loại #${t.taskTypeId}`}
+                        </span>
+                        <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+                          Đã xoá
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-700 mt-1 truncate">{t.title}</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{t.pointsReward ?? 0} điểm</p>
+                    </div>
+                    {editable && (
+                      <button
+                        type="button"
+                        onClick={() => handleRestore(t)}
+                        disabled={restoringId === t.id}
+                        className="h-8 px-3 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                      >
+                        {restoringId === t.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <RotateCcw size={12} />
+                        )}
+                        <span>Khôi phục</span>
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : (
+            <>
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs text-slate-500 font-semibold">
               {tasks.length} nhiệm vụ
+              {editable && tasks.length > 1 && (
+                <span className="ml-2 font-medium text-slate-400">· Kéo thẻ lên xuống để đổi thứ tự</span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -328,21 +428,6 @@ function TaskManagerDialog({
                 <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
                 <span>Tải lại</span>
               </button>
-              {editable && (
-                <button
-                  type="button"
-                  onClick={() => setIsCheckInModalOpen(true)}
-                  className="h-8 px-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/image/compass-real.jpg"
-                    alt=""
-                    className="w-3.5 h-3.5 rounded-full object-cover shrink-0 ring-1 ring-amber-400/40"
-                  />
-                  <span>Trạm Check-in ({checkInPoints.length})</span>
-                </button>
-              )}
               {editable && (
                 <button
                   type="button"
@@ -387,8 +472,48 @@ function TaskManagerDialog({
               {tasks.map((t, idx) => (
                 <li
                   key={t.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-3 flex items-center gap-3 hover:border-slate-300 transition-colors"
+                  draggable={editable}
+                  onDragStart={(e) => {
+                    if (!editable) return;
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", String(t.id));
+                    setDragIndex(idx);
+                  }}
+                  onDragOver={(e) => {
+                    if (dragIndex == null) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (overIndex !== idx) setOverIndex(idx);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    moveTo(dragIndex, idx);
+                    setDragIndex(null);
+                    setOverIndex(null);
+                  }}
+                  onDragEnd={() => {
+                    setDragIndex(null);
+                    setOverIndex(null);
+                  }}
+                  className={`rounded-2xl border bg-white p-3 flex items-center gap-3 transition-colors ${
+                    dragIndex === idx ? "opacity-40 border-slate-300" : "border-slate-200 hover:border-slate-300"
+                  } ${
+                    overIndex === idx && dragIndex != null && dragIndex !== idx
+                      ? dragIndex < idx
+                        ? "border-b-4 border-b-emerald-500"
+                        : "border-t-4 border-t-emerald-500"
+                      : ""
+                  }`}
                 >
+                  {editable && (
+                    <span
+                      className="shrink-0 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing"
+                      title="Kéo để đổi thứ tự nhiệm vụ"
+                      aria-hidden="true"
+                    >
+                      <GripVertical size={16} />
+                    </span>
+                  )}
                   <div className="flex flex-col items-center shrink-0 text-slate-400">
                     <button
                       type="button"
@@ -399,8 +524,8 @@ function TaskManagerDialog({
                     >
                       <ArrowUp size={12} />
                     </button>
-                    <span className="text-[10px] font-mono font-bold text-slate-500 my-0.5">
-                      {t.sequenceOrder}
+                    <span className="text-[11px] font-bold text-slate-600 my-0.5 tabular-nums">
+                      {idx + 1}
                     </span>
                     <button
                       type="button"
@@ -435,11 +560,6 @@ function TaskManagerDialog({
                     <div className="flex items-center gap-3 mt-1.5 text-[11px] font-semibold text-slate-600 flex-wrap">
                       <span>{t.pointsReward ?? 0} điểm</span>
                       {t.maxAttempts != null && <span>{t.maxAttempts} lần thử</span>}
-                      {t.checkInPointId != null && (
-                        <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                          <MapPin size={10} /> Check-in: #{t.checkInPointId}
-                        </span>
-                      )}
                     </div>
                   </div>
 
@@ -468,16 +588,6 @@ function TaskManagerDialog({
 
                     {editable && (
                       <>
-                        {/* Gán vị trí check-in qua PATCH /tasks/{id}/location */}
-                        <button
-                          type="button"
-                          onClick={() => setLocationTarget(t)}
-                          title="Gán điểm Check-in"
-                          className="h-7 px-2.5 rounded-full border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
-                        >
-                          <MapPin size={11} /> Vị trí
-                        </button>
-
                         {/* Điều kiện mở khóa qua PATCH /tasks/{id}/unlock-condition */}
                         <button
                           type="button"
@@ -514,6 +624,8 @@ function TaskManagerDialog({
               ))}
             </ul>
           )}
+            </>
+          )}
         </div>
 
         {/* FOOTER */}
@@ -532,6 +644,7 @@ function TaskManagerDialog({
       {detailTask && (
         <TaskDetailDialog
           task={detailTask}
+          position={tasks.findIndex((x) => x.id === detailTask.id) + 1 || undefined}
           loading={detailLoading}
           onClose={() => setDetailTask(null)}
         />
@@ -550,22 +663,10 @@ function TaskManagerDialog({
           task={editing}
           taskTypes={taskTypes}
           checkInPoints={checkInPoints}
+          nextSequence={tasks.reduce((m, x) => Math.max(m, x.sequenceOrder ?? 0), -1) + 1}
           onCreated={handleCreated}
           onUpdated={handleUpdated}
           theme={theme}
-        />
-      )}
-
-      {/* MODAL GÁN VỊ TRÍ CHECK-IN (PATCH /api/v1/tasks/{id}/location) */}
-      {locationTarget && (
-        <LocationDialog
-          task={locationTarget}
-          checkInPoints={checkInPoints}
-          onClose={() => setLocationTarget(null)}
-          onSaved={(updated) => {
-            handleUpdated(updated);
-            setLocationTarget(null);
-          }}
         />
       )}
 
@@ -589,6 +690,9 @@ function TaskManagerDialog({
           isOpen={Boolean(questionTarget)}
           onClose={() => setQuestionTarget(null)}
           task={questionTarget}
+          requiresLocation={Boolean(
+            taskTypes.find((tt) => String(tt.id) === String(questionTarget.taskTypeId))?.requiresLocation
+          )}
           experience={experience}
           canEdit={canEdit}
           isModerator={false}
@@ -655,18 +759,6 @@ function TaskManagerDialog({
           </div>
         </div>
       )}
-      {/* MODAL QUẢN LÝ CHECK-IN POINT */}
-      <CheckInPointManagerModal
-        isOpen={isCheckInModalOpen}
-        onClose={() => {
-          setIsCheckInModalOpen(false);
-          loadData();
-        }}
-        experience={experience}
-        onPointsUpdated={() => {
-          loadData();
-        }}
-      />
     </div>
   );
 }
@@ -674,7 +766,7 @@ function TaskManagerDialog({
 // ─────────────────────────────────────────────────────────────
 // DIALOG CHI TIẾT TASK (GET /api/v1/tasks/{id})
 // ─────────────────────────────────────────────────────────────
-function TaskDetailDialog({ task, loading, onClose }) {
+function TaskDetailDialog({ task, position, loading, onClose }) {
   return (
     <div
       className="fixed inset-0 z-[80] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
@@ -719,7 +811,7 @@ function TaskDetailDialog({ task, loading, onClose }) {
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                   <span className="text-slate-500 font-semibold block">Thứ tự</span>
-                  <span className="font-bold text-slate-800">{task.sequenceOrder ?? 0}</span>
+                  <span className="font-bold text-slate-800">{position ?? (task.sequenceOrder ?? 0) + 1}</span>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                   <span className="text-slate-500 font-semibold block">Điểm thưởng</span>
@@ -746,121 +838,6 @@ function TaskDetailDialog({ task, loading, onClose }) {
             className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
           >
             Đóng
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// DIALOG GÁN VỊ TRÍ CHECK-IN (PATCH /api/v1/tasks/{id}/location)
-// ─────────────────────────────────────────────────────────────
-function LocationDialog({ task, checkInPoints, onClose, onSaved }) {
-  const [selectedCip, setSelectedCip] = useState(
-    task.checkInPointId ? String(task.checkInPointId) : ""
-  );
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSave = async () => {
-    if (!selectedCip) {
-      setError("Vui lòng chọn điểm Check-in.");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const updated = await taskService.setLocation(task.id, Number(selectedCip));
-      onSaved?.(updated);
-    } catch (err) {
-      console.error("[LocationDialog] setLocation error", err);
-      setError(err?.message || "Không thể gán điểm check-in.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
-      >
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <MapPin size={16} />
-            </div>
-            <h3 className="text-base font-bold text-slate-900">Gán điểm Check-in</h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Đóng"
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
-          >
-            <X size={15} />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          <p className="text-xs text-slate-600">
-            Nhiệm vụ: <strong className="text-slate-900">{task.title}</strong>
-          </p>
-
-          {error && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-semibold">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Chọn điểm Check-in
-            </label>
-            <select
-              value={selectedCip}
-              onChange={(e) => setSelectedCip(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            >
-              <option value="">— Chọn điểm Check-in trong trải nghiệm —</option>
-              {checkInPoints.map((cip) => (
-                <option key={cip.id} value={cip.id}>
-                  {cip.name} {cip.qrToken ? `(${cip.qrToken})` : ""}
-                </option>
-              ))}
-            </select>
-            {!checkInPoints.length && (
-              <p className="text-[11px] text-amber-700 font-semibold">
-                Trải nghiệm này chưa có điểm check-in nào. Bạn có thể nhập mã ID thủ công khi sửa nhiệm vụ.
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
-          >
-            Huỷ bỏ
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={loading || !selectedCip}
-            className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-          >
-            {loading ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-            <span>Lưu vị trí</span>
           </button>
         </div>
       </div>
@@ -1011,7 +988,7 @@ function UnlockConditionDialog({ task, allTasks, checkInPoints, onClose, onSaved
                 <option value="">— Chọn nhiệm vụ cần hoàn thành trước —</option>
                 {otherTasks.map((ot) => (
                   <option key={ot.id} value={ot.id}>
-                    Thứ tự {ot.sequenceOrder}: {ot.title}
+                    Nhiệm vụ {allTasks.findIndex((x) => x.id === ot.id) + 1}: {ot.title}
                   </option>
                 ))}
               </select>
@@ -1116,6 +1093,7 @@ function TaskFormDialog({
   task,
   taskTypes,
   checkInPoints,
+  nextSequence = 0,
   onCreated,
   onUpdated,
   theme = "emerald",
@@ -1177,14 +1155,6 @@ function TaskFormDialog({
     if (!t) e.title = "Vui lòng nhập tiêu đề.";
     else if (t.length > 255) e.title = "Tối đa 255 ký tự.";
     if (
-      form.sequenceOrder === "" ||
-      form.sequenceOrder == null ||
-      Number.isNaN(Number(form.sequenceOrder)) ||
-      Number(form.sequenceOrder) < 0
-    ) {
-      e.sequenceOrder = "Thứ tự phải là số nguyên >= 0.";
-    }
-    if (
       form.pointsReward === "" ||
       form.pointsReward == null ||
       Number.isNaN(Number(form.pointsReward)) ||
@@ -1199,9 +1169,6 @@ function TaskFormDialog({
     ) {
       e.maxAttempts = "Số lần thử phải >= 1.";
     }
-    if (selectedType?.requiresLocation && !form.checkInPointId) {
-      e.checkInPointId = "Loại nhiệm vụ này yêu cầu điểm check-in (BR-TASK-4).";
-    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -1212,13 +1179,18 @@ function TaskFormDialog({
     if (!validate()) return;
     setLoading(true);
     try {
+      // Địa điểm check-in nay gắn ở từng câu hỏi, nên form nhiệm vụ không gửi checkInPointId
+      const payload = { ...form };
+      delete payload.checkInPointId;
+      // Thứ tự do kéo thả quyết định: nhiệm vụ mới xếp cuối danh sách, sửa thì giữ nguyên vị trí
+      delete payload.sequenceOrder;
       if (isEdit) {
-        const updated = await taskService.update(task.id, form);
+        const updated = await taskService.update(task.id, payload);
         onUpdated?.(updated);
       } else {
         const created = await taskService.create(experience.id, {
-          ...form,
-          sequenceOrder: Number(form.sequenceOrder) || 0,
+          ...payload,
+          sequenceOrder: nextSequence,
         });
         onCreated?.(created);
       }
@@ -1277,7 +1249,7 @@ function TaskFormDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Loại nhiệm vụ <span className="text-rose-500">*</span>
@@ -1300,23 +1272,6 @@ function TaskFormDialog({
               )}
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Thứ tự <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={form.sequenceOrder}
-                onChange={(e) => handleChange("sequenceOrder", e.target.value)}
-                disabled={loading}
-                className={`${inputBase} ${borderOf("sequenceOrder")}`}
-              />
-              {errors.sequenceOrder && (
-                <p className="text-[11px] text-rose-600 font-bold">{errors.sequenceOrder}</p>
-              )}
-            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -1350,7 +1305,7 @@ function TaskFormDialog({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Điểm thưởng <span className="text-rose-500">*</span>
@@ -1387,41 +1342,8 @@ function TaskFormDialog({
               )}
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Điểm Check-in {selectedType?.requiresLocation && <span className="text-rose-500">*</span>}
-              </label>
-              {checkInPoints.length > 0 ? (
-                <select
-                  value={form.checkInPointId}
-                  onChange={(e) => handleChange("checkInPointId", e.target.value)}
-                  disabled={loading}
-                  className={`${inputBase} ${borderOf("checkInPointId")}`}
-                >
-                  <option value="">— Không gắn —</option>
-                  {checkInPoints.map((cip) => (
-                    <option key={cip.id} value={cip.id}>
-                      {cip.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={form.checkInPointId}
-                  onChange={(e) => handleChange("checkInPointId", e.target.value)}
-                  disabled={loading}
-                  placeholder="ID Check-in"
-                  className={`${inputBase} ${borderOf("checkInPointId")}`}
-                />
-              )}
-              {errors.checkInPointId && (
-                <p className="text-[11px] text-rose-600 font-bold">{errors.checkInPointId}</p>
-              )}
-            </div>
           </div>
+
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2.5">

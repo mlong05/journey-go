@@ -20,12 +20,10 @@ public record CreateQuestionRequest(
         @Min(0)
         Integer sequenceOrder,
 
-        @Schema(description = "Điểm thưởng cho câu này")
-        @NotNull
-        @Min(0)
-        Integer points,
-
         @Schema(description = "Đáp án cho câu TEXT (so sánh không phân biệt hoa/thường)")
         @Size(max = 500)
-        String expectedText
+        String expectedText,
+
+        @Schema(description = "ID CheckInPoint nơi du khách phải check-in để trả lời. Bắt buộc với câu hỏi của nhiệm vụ tương tác ngoài thực tế")
+        Long checkInPointId
 ) {}

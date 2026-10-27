@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Globe2,
 } from "lucide-react";
+import { getDevicePosition, describeGeoError } from "@/lib/geolocation";
 import { destinationService } from "../services/destinationService";
 import { regionService } from "../services/regionService";
 import AdministrativeAddressFields from "./AdministrativeAddressFields";
@@ -142,33 +143,26 @@ export default function CreateDestinationModal({
 
   if (!isOpen) return null;
 
-  const handleGetCurrentLocation = () => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setApiError("Trình duyệt không hỗ trợ định vị GPS.");
-      return;
-    }
+  const handleGetCurrentLocation = async () => {
     setGettingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setForm((prev) => ({
-          ...prev,
-          latitude: pos.coords.latitude.toFixed(6),
-          longitude: pos.coords.longitude.toFixed(6),
-        }));
-        setErrors((prev) => {
-          const next = { ...prev };
-          delete next.latitude;
-          delete next.longitude;
-          return next;
-        });
-        setGettingLocation(false);
-      },
-      (err) => {
-        setApiError(`Không lấy được vị trí: ${err.message}`);
-        setGettingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    try {
+      const pos = await getDevicePosition();
+      setForm((prev) => ({
+        ...prev,
+        latitude: pos.latitude.toFixed(6),
+        longitude: pos.longitude.toFixed(6),
+      }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.latitude;
+        delete next.longitude;
+        return next;
+      });
+    } catch (err) {
+      setApiError(describeGeoError(err));
+    } finally {
+      setGettingLocation(false);
+    }
   };
 
   const handleChange = (field, value) => {

@@ -60,6 +60,11 @@ public class JourneyTaskProgress {
     @Builder.Default
     private Integer attempts = 0;
 
+    /** Vị trí câu hỏi hiện tại (từ 0) khi nhiệm vụ đi theo từng địa điểm; về 0 khi làm lại. */
+    @Column(name = "current_question_index", nullable = false, columnDefinition = "integer default 0")
+    @Builder.Default
+    private Integer currentQuestionIndex = 0;
+
     @Column(name = "user_answer", columnDefinition = "TEXT")
     private String userAnswer;
 

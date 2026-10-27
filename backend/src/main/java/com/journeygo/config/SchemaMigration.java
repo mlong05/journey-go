@@ -37,6 +37,23 @@ public class SchemaMigration {
     }
 
     /**
+     * Điểm thưởng nay nằm ở cấp nhiệm vụ (task.points_reward); câu hỏi không còn có điểm riêng.
+     * Cột question.points cũ là NOT NULL không default nên phải gỡ, nếu không INSERT câu hỏi mới sẽ lỗi.
+     */
+    @Bean
+    public CommandLineRunner dropLegacyQuestionPointsColumn() {
+        return args -> {
+            if (!columnExists("question", "points")) {
+                log.info("[Migration] Cột question.points đã được gỡ bỏ trước đó — bỏ qua.");
+                return;
+            }
+
+            jdbcTemplate.execute("ALTER TABLE question DROP COLUMN IF EXISTS points");
+            log.info("[Migration] Đã gỡ cột question.points — điểm thưởng tính ở cấp nhiệm vụ.");
+        };
+    }
+
+    /**
      * Kiểm tra cột có tồn tại trong bảng hay không (PostgreSQL).
      */
     private boolean columnExists(String tableName, String columnName) {

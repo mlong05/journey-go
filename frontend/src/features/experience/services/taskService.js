@@ -113,6 +113,17 @@ export async function setTaskPoints(id, pointsReward) {
   return unwrap(res);
 }
 
+export async function listDeletedTasks(experienceId) {
+  const res = await apiClient.get(`/experiences/${experienceId}/tasks/deleted`);
+  const data = await unwrap(res);
+  return Array.isArray(data) ? data : [];
+}
+
+export async function restoreTask(id) {
+  const res = await apiClient.patch(`/tasks/${id}/restore`);
+  return unwrap(res);
+}
+
 export async function listCheckInPoints(experienceId) {
   const res = await apiClient.get(`/experiences/${experienceId}/check-in-points`);
   const data = await unwrap(res);
@@ -131,6 +142,8 @@ export const taskService = {
   create: createTask,
   update: updateTask,
   delete: deleteTask,
+  listDeleted: listDeletedTasks,
+  restore: restoreTask,
   reorder: reorderTasks,
   listTypes: listTaskTypes,
   setLocation: setTaskLocation,

@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   MapPin,
@@ -10,28 +9,17 @@ import {
   Trophy,
   BarChart3,
   FileCheck,
-  Search,
   Bell,
-  LogOut,
-  ShieldCheck,
-  Building2,
-  ExternalLink,
-  ChevronDown,
   CheckCircle2,
-  Menu,
-  X,
-  Sparkles,
-  HelpCircle,
   Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
-import { ExpandingSideRail, UserProfilePill } from "@/components/layout";
+import { Sidebar, DashboardHeader } from "@/components/layout";
 
 
 export default function ProviderLayout({ children }) {
   const pathname = usePathname();
-  const router = useRouter();
   const authData = useAuthSession();
   const { performLogout, logoutModal } = useLogout();
 
@@ -58,7 +46,9 @@ export default function ProviderLayout({ children }) {
   const [notifications, setNotifications] = useState([]);
 
   // Trang Quản lý Điểm đến: khóa khung 100vh, cố định header & filter, chỉ danh sách thẻ tự cuộn
-  const isScrollLockedPage = pathname?.startsWith("/provider/destinations");
+  const isScrollLockedPage =
+    pathname?.startsWith("/provider/destinations") ||
+    pathname?.startsWith("/provider/tours");
 
   // Danh mục điều hướng Sidebar của Đối tác
   const navMenuItems = [
@@ -107,28 +97,19 @@ export default function ProviderLayout({ children }) {
   ];
 
 
-  const partnerName =
-    authData?.user?.fullName ||
-    authData?.user?.name ||
-    "Ban Quản Lý Di Tích Đối Tác";
-  const partnerEmail = authData?.user?.email || "doitac@journeygo.vn";
-  const partnerCode = authData?.user?.id ? `DT-${String(authData.user.id).slice(-4).toUpperCase()}` : "DT-JG-01";
+  const currentTitle =
+    [...navMenuItems]
+      .sort((a, b) => b.href.length - a.href.length)
+      .find((i) => {
+        const p = i.href.split("#")[0];
+        return p === "/provider" ? pathname === "/provider" : pathname?.startsWith(p);
+      })?.label || "Tổng quan";
 
   return (
     <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 font-sans antialiased text-slate-800">
-      {/* ══════════════════════════════════════════════════════════
-          1. EXPANDING SIDE RAIL (PROMPT #040 - MENUS & TABS)
-      ══════════════════════════════════════════════════════════ */}
-      <ExpandingSideRail
+      <Sidebar
         role="provider"
-        roleLabel="Đối tác Điểm đến"
         navItems={navMenuItems}
-        user={{
-          name: partnerName,
-          email: partnerEmail,
-          initials: authData?.user ? partnerName.slice(0, 2).toUpperCase() : "ĐT",
-          statusText: "Đối tác xác thực",
-        }}
         onLogout={performLogout}
         isOpenMobile={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
@@ -136,94 +117,65 @@ export default function ProviderLayout({ children }) {
         onToggleWide={() => setIsSidebarWide((prev) => !prev)}
       />
 
-      {/* ══════════════════════════════════════════════════════════
-          2. KHU VỰC NỘI DUNG CHÍNH & HEADER TRÊN CÙNG (ĐẨY THEO RAIL)
-      ══════════════════════════════════════════════════════════ */}
       <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
-        {/* HEADER TRÊN CÙNG (SHRINK-0): CỐ ĐỊNH VĨNH VIỄN */}
-        <header className="h-16 shrink-0 w-full bg-white border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 z-30 shadow-2xs">
-          {/* Cụm trái: Nút mở mobile menu & Thanh tìm kiếm nhanh */}
-          <div className="flex items-center gap-3 flex-1 max-w-lg">
+        <DashboardHeader
+          role="provider"
+          user={authData?.user}
+          section="Đối tác"
+          title={currentTitle}
+          onOpenMenu={() => setIsSidebarOpen(true)}
+        >
+          <div className="relative">
             <button
               type="button"
-              onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 focus:outline-none cursor-pointer"
-              aria-label="Mở Menu điều hướng"
+              onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+              className="relative w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-colors cursor-pointer"
+              title="Thông báo duyệt bài"
             >
-              <Menu size={20} />
+              <Bell size={16} />
+              {notifications.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
+              )}
             </button>
 
-            {/* Thanh tìm kiếm nhanh */}
-            <div className="relative w-full">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <Search size={16} />
-              </div>
-              <input
-                type="text"
-                placeholder="Tìm nhanh điểm đến, lộ trình văn hóa, nhiệm vụ..."
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Cụm phải: Nút tạo mới + Chuông thông báo + Thẻ định danh người dùng */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors relative cursor-pointer"
-                title="Thông báo duyệt bài"
-              >
-                <Bell size={18} />
-                {notifications.length > 0 && (
-                  <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse" />
-                )}
-              </button>
-
-              {/* Menu Popover thông báo */}
-              {isNotificationOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-100 p-4 z-50 animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
-                      Thông báo duyệt nội dung
-                    </h3>
-                    <span className="text-[10.5px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                      {notifications.length} thông báo
-                    </span>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs max-h-72 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <p className="text-center py-6 text-slate-400">
-                        Chưa có thông báo kiểm duyệt mới.
-                      </p>
-                    ) : (
-                      notifications.map((n, idx) => (
-                        <div
-                          key={idx}
-                          className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-2.5"
-                        >
-                          <CheckCircle2 size={16} className="text-emerald-600 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className="font-bold text-slate-800 leading-snug">{n.title}</p>
-                            <p className="text-[11px] text-slate-500 mt-0.5">{n.message}</p>
-                            <span className="text-[10px] text-slate-400 font-semibold mt-1 inline-block">
-                              {n.time}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+            {isNotificationOpen && (
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-lg border border-slate-200 p-4 z-50">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Thông báo duyệt nội dung
+                  </h3>
+                  <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                    {notifications.length} thông báo
+                  </span>
                 </div>
-              )}
-            </div>
 
-            {/* Cụm Thẻ Định Danh Người Dùng (User Profile Pill) */}
-            <UserProfilePill role="provider" user={authData?.user} />
+                <div className="space-y-2 text-xs max-h-72 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <p className="text-center py-6 text-slate-400">
+                      Chưa có thông báo kiểm duyệt mới.
+                    </p>
+                  ) : (
+                    notifications.map((n, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-start gap-2.5"
+                      >
+                        <CheckCircle2 size={16} className="text-emerald-600 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="font-semibold text-slate-800 leading-snug">{n.title}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">{n.message}</p>
+                          <span className="text-[10px] text-slate-400 font-medium mt-1 inline-block">
+                            {n.time}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-        </header>
+        </DashboardHeader>
 
         {/* ── NỘI DUNG TRANG CHÍNH: Cố định toàn khung với các trang danh sách, cho phép con tự cuộn ── */}
         <main

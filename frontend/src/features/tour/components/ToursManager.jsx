@@ -9,12 +9,9 @@ import {
   Inbox,
   AlertCircle,
   CheckCircle2,
-  Info,
   Clock,
   Route,
   MapPin,
-  CalendarDays,
-  CircleDollarSign,
   Send,
   Pencil,
   Trash2,
@@ -28,6 +25,7 @@ import {
   ChevronsRight,
   Layers,
 } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/DashboardUI";
 import { tourService } from "../services/tourService";
 import {
   getTourTheme,
@@ -50,7 +48,7 @@ import RejectTourDialog from "./RejectTourDialog";
  *
  *  Props:
  *   - theme: "emerald" | "teal" | "slate"   (accent theo vai trò)
- *   - variant: "cards" | "table"             (Provider dùng cards, còn lại table)
+ *   - source: "mine" | "all"                (Provider: tour của chính mình; còn lại: toàn sàn)
  *   - heading / description: nhãn hiển thị
  *   - canCreate: quyền tạo tour. Backend chốt POST /tours cho
  *     ADMIN + PROVIDER, nên Moderator để false.
@@ -111,7 +109,7 @@ function Toast({ msg, tone }) {
   const Icon = tone === "error" ? AlertCircle : CheckCircle2;
   return (
     <div
-      className={`fixed top-5 right-5 z-[70] ${palette} px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3`}
+      className={`fixed top-5 right-5 z-[70] ${palette} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3`}
     >
       <Icon size={16} className="shrink-0" />
       <span>{msg}</span>
@@ -121,30 +119,10 @@ function Toast({ msg, tone }) {
 
 /* ── Ô KPI bấm để lọc nhanh ──────────────────────────────────── */
 const KPI_TONES = {
-  slate: {
-    icon: "bg-slate-100 text-slate-600 border-slate-200/80",
-    activeIcon: "bg-slate-900/10 text-slate-900 border-slate-300",
-    activeBg: "bg-slate-50",
-    activeBorder: "border-slate-300",
-  },
-  amber: {
-    icon: "bg-amber-50 text-amber-600 border-amber-200/70",
-    activeIcon: "bg-amber-100 text-amber-700 border-amber-300",
-    activeBg: "bg-amber-50",
-    activeBorder: "border-amber-300",
-  },
-  emerald: {
-    icon: "bg-emerald-50 text-emerald-600 border-emerald-200/70",
-    activeIcon: "bg-emerald-100 text-emerald-700 border-emerald-300",
-    activeBg: "bg-emerald-50",
-    activeBorder: "border-emerald-300",
-  },
-  rose: {
-    icon: "bg-rose-50 text-rose-600 border-rose-200/70",
-    activeIcon: "bg-rose-100 text-rose-700 border-rose-300",
-    activeBg: "bg-rose-50",
-    activeBorder: "border-rose-300",
-  },
+  slate: { icon: "bg-slate-100 text-slate-600", ring: "ring-slate-300" },
+  amber: { icon: "bg-amber-50 text-amber-600", ring: "ring-amber-300" },
+  emerald: { icon: "bg-emerald-50 text-emerald-600", ring: "ring-emerald-300" },
+  rose: { icon: "bg-rose-50 text-rose-600", ring: "ring-rose-300" },
 };
 
 function KpiCard({ icon: Icon, label, value, unit, tone = "slate", active, onClick }) {
@@ -155,29 +133,25 @@ function KpiCard({ icon: Icon, label, value, unit, tone = "slate", active, onCli
       onClick={onClick}
       aria-pressed={active}
       title={`Lọc theo: ${label}`}
-      className={`bg-white border rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-colors hover:border-slate-300 cursor-pointer text-left w-full ${
-        active ? `${t.activeBg} ${t.activeBorder}` : "border-slate-200/90"
+      className={`bg-white border rounded-xl p-4 shadow-xs flex items-center justify-between gap-3 transition-all hover:border-slate-300 cursor-pointer text-left w-full ${
+        active ? `border-transparent ring-2 ${t.ring}` : "border-slate-200"
       }`}
     >
       <div className="flex flex-col text-left min-w-0">
-        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
-          {label}
-        </p>
+        <p className="text-[13px] font-semibold text-slate-600 truncate">{label}</p>
         <div className="mt-1 flex items-baseline gap-1.5">
-          <span className="text-xl sm:text-2xl font-black text-slate-900 tabular-nums leading-none">
+          <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums leading-none">
             {value}
           </span>
-          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+          <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">
             {unit}
           </span>
         </div>
       </div>
       <div
-        className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
-          active ? t.activeIcon : t.icon
-        }`}
+        className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${t.icon}`}
       >
-        <Icon size={18} strokeWidth={2.2} />
+        <Icon size={18} strokeWidth={2} />
       </div>
     </button>
   );
@@ -225,18 +199,15 @@ function PaginationBar({
     >
       <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
         <span className="text-xs text-slate-600 font-semibold">
-          Trang <strong className="text-slate-900">{currentPage}</strong> /{" "}
-          <strong className="text-slate-900">{safeTotalPages}</strong>{" "}
+          Đang xem trang{" "}
+          <strong className="font-bold text-slate-900">{currentPage}</strong> /{" "}
+          <strong className="font-bold text-slate-900">{safeTotalPages}</strong>{" "}
           <span className="text-slate-400">
-            (Tổng{" "}
-            <strong className="text-slate-700">
-              {totalElements.toLocaleString("vi-VN")}
-            </strong>{" "}
-            tour)
+            ({totalElements.toLocaleString("vi-VN")} tour)
           </span>
         </span>
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-slate-500 font-semibold">
+          <span className="text-[11px] text-slate-600 font-bold">
             Số dòng/trang:
           </span>
           <select
@@ -328,7 +299,7 @@ function PaginationBar({
  * ========================================================================= */
 export default function ToursManager({
   theme = "emerald",
-  variant = "table",
+  source = "all",
   heading = "Quản Lý Tour Du Lịch",
   description = "",
   canCreate = false,
@@ -365,7 +336,7 @@ export default function ToursManager({
   const [toastTone, setToastTone] = useState("success");
 
   const [pageNumber, setPageNumber] = useState(0);
-  const [pageSize, setPageSize] = useState(variant === "cards" ? 6 : 10);
+  const [pageSize, setPageSize] = useState(10);
 
   /* ── Helpers ───────────────────────────────────────────────── */
   const showToast = useCallback((msg, tone = "success") => {
@@ -395,7 +366,7 @@ export default function ToursManager({
    */
   const fetchTours = useCallback(async () => {
     // Provider dùng endpoint "của tôi", còn Admin / Moderator dùng "toàn sàn".
-    const isProvider = variant === "cards";
+    const isProvider = source === "mine";
     const [mainRes, deletedRes] = await Promise.allSettled([
       isProvider ? tourService.getMy() : tourService.getAll(),
       showDeletedFilter ? tourService.getDeleted() : Promise.resolve([]),
@@ -415,7 +386,7 @@ export default function ToursManager({
     ];
 
     return merged.map(normalizeTour).filter(Boolean);
-  }, [variant, showDeletedFilter]);
+  }, [source, showDeletedFilter]);
 
   /**
    * Nạp dữ liệu kèm trạng thái loading.
@@ -696,7 +667,7 @@ export default function ToursManager({
       <button
         type="button"
         onClick={() => handleStatusChange("all")}
-        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
           statusTab === "all"
             ? "bg-slate-900 text-white shadow-xs"
             : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
@@ -735,7 +706,7 @@ export default function ToursManager({
             key={status}
             type="button"
             onClick={() => handleStatusChange(status)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
               isActive ? activeCls : idleCls
             }`}
           >
@@ -773,7 +744,7 @@ export default function ToursManager({
         <button
           type="button"
           onClick={() => openDetail(tour.tourId)}
-          className="p-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
           title="Xem chi tiết"
           aria-label="Xem chi tiết"
         >
@@ -784,7 +755,7 @@ export default function ToursManager({
           <button
             type="button"
             onClick={() => setEditTarget(tour)}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
             title="Chỉnh sửa tour"
             aria-label="Chỉnh sửa tour"
           >
@@ -797,7 +768,7 @@ export default function ToursManager({
             type="button"
             onClick={() => handleSubmit(tour)}
             disabled={busy}
-            className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors cursor-pointer disabled:opacity-50"
             title="Gửi duyệt"
             aria-label="Gửi duyệt"
           >
@@ -814,7 +785,7 @@ export default function ToursManager({
             type="button"
             onClick={() => handlePublish(tour)}
             disabled={busy}
-            className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer disabled:opacity-50"
             title="Duyệt và xuất bản"
             aria-label="Duyệt và xuất bản"
           >
@@ -831,7 +802,7 @@ export default function ToursManager({
             type="button"
             onClick={() => setRejectTarget(tour)}
             disabled={busy}
-            className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors cursor-pointer disabled:opacity-50"
             title="Từ chối tour"
             aria-label="Từ chối tour"
           >
@@ -844,7 +815,7 @@ export default function ToursManager({
             type="button"
             onClick={() => setDeleteTarget(tour)}
             disabled={busy}
-            className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-rose-600 border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-rose-600 border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
             title="Xoá tour"
             aria-label="Xoá tour"
           >
@@ -857,7 +828,7 @@ export default function ToursManager({
             type="button"
             onClick={() => setRestoreTarget(tour)}
             disabled={busy}
-            className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors cursor-pointer disabled:opacity-50"
             title="Khôi phục tour"
             aria-label="Khôi phục tour"
           >
@@ -872,410 +843,46 @@ export default function ToursManager({
     );
   };
 
-  /* ══════════════════════════════════════════════════════════════
-     VARIANT: CARDS (Provider)
-     ══════════════════════════════════════════════════════════════ */
-  if (variant === "cards") {
-    return (
-      <div className="space-y-6 sm:space-y-8 animate-in fade-in-50 duration-200">
-        <Toast msg={toastMsg} tone={toastTone} />
-
-        {/* ── HEADER ─────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              {heading}
-            </h1>
-            {description && (
-              <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-                {description}
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2.5 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={loadList}
-              disabled={isLoading}
-              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-              title="Làm mới danh sách"
-            >
-              <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
-              <span className="hidden sm:inline">Làm mới</span>
-            </button>
-            {canCreate && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditTarget(null);
-                  setIsFormOpen(true);
-                }}
-                className={`${palette.primary} ${palette.primaryShadow} text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm text-xs sm:text-sm transition-all cursor-pointer active:scale-[0.98]`}
-              >
-                <Plus size={18} strokeWidth={2.4} />
-                <span>Tạo Tour Mới</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ── KPI ────────────────────────────────────────────── */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <KpiCard
-            icon={Layers}
-            label="Tổng tour"
-            value={counts.all}
-            unit="tour"
-            tone="slate"
-            active={statusTab === "all"}
-            onClick={() => handleStatusChange("all")}
-          />
-          <KpiCard
-            icon={Pencil}
-            label="Bản nháp"
-            value={counts.DRAFT}
-            unit="tour"
-            tone="slate"
-            active={statusTab === "DRAFT"}
-            onClick={() => handleStatusChange("DRAFT")}
-          />
-          <KpiCard
-            icon={Clock}
-            label="Chờ duyệt"
-            value={counts.PENDING}
-            unit="tour"
-            tone="amber"
-            active={statusTab === "PENDING"}
-            onClick={() => handleStatusChange("PENDING")}
-          />
-          <KpiCard
-            icon={CheckCircle2}
-            label="Đã xuất bản"
-            value={counts.PUBLISHED}
-            unit="tour"
-            tone="emerald"
-            active={statusTab === "PUBLISHED"}
-            onClick={() => handleStatusChange("PUBLISHED")}
-          />
-        </section>
-
-        {/* ── THANH LỌC ──────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-            <div className="sm:col-span-8 relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <Search size={15} />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Tìm theo tên tour, loại hình, điểm đến..."
-                className={`w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 ${palette.ring} ${palette.ringBorder}`}
-              />
-            </div>
-            <div className="sm:col-span-4 flex items-center justify-end">
-              <span className="text-[11px] font-semibold text-slate-500">
-                Hiển thị {filtered.length} / {tours.length} tour
-              </span>
-            </div>
-          </div>
-          <div className="pt-3 border-t border-slate-100">{renderStatusTabs()}</div>
-        </div>
-
-        {/* ── LỖI ─────────────────────────────────────────────── */}
-        {fetchError && (
-          <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
-            <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs font-bold text-rose-800">
-                Không thể tải danh sách tour
-              </p>
-              <p className="text-[11px] text-rose-700 mt-0.5">{fetchError}</p>
-              <button
-                type="button"
-                onClick={loadList}
-                className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900 cursor-pointer"
-              >
-                Thử lại
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── DANH SÁCH CARD ─────────────────────────────────── */}
-        {isLoading && tours.length === 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden"
-              >
-                <div className="h-32 bg-slate-100 animate-pulse" />
-                <div className="p-4 space-y-2.5">
-                  <div className="h-4 bg-slate-100 rounded animate-pulse w-3/4" />
-                  <div className="h-3 bg-slate-100 rounded animate-pulse w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-3xl p-16 text-center border border-slate-200/90 shadow-2xs space-y-3">
-            <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
-              <Inbox size={28} />
-            </div>
-            <h3 className="text-base font-bold text-slate-800">
-              {searchQuery || statusTab !== "all"
-                ? "Không tìm thấy tour nào phù hợp với bộ lọc"
-                : "Chưa có tour nào trong danh sách"}
-            </h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-              {searchQuery || statusTab !== "all"
-                ? "Thử xoá từ khoá tìm kiếm hoặc đặt lại bộ lọc về mặc định."
-                : canCreate
-                  ? "Bấm nút Tạo Tour Mới để khai báo hành trình và gửi duyệt."
-                  : "Danh sách tour sẽ hiển thị ở đây khi có hồ sơ được tạo."}
-            </p>
-            {canCreate && !searchQuery && statusTab === "all" && (
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditTarget(null);
-                    setIsFormOpen(true);
-                  }}
-                  className={`${palette.primary} text-white font-bold text-xs px-4 py-2 rounded-xl inline-flex items-center gap-2 transition-colors cursor-pointer`}
-                >
-                  <Plus size={16} />
-                  <span>Tạo Tour Mới</span>
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {pagedItems.map((tour) => {
-                const busy = actionLoadingId === tour.tourId;
-                const canSubmit =
-                  SUBMITTABLE_STATUSES.includes(tour.status) && !tour.deleted;
-                const canEdit =
-                  EDITABLE_STATUSES.includes(tour.status) && !tour.deleted;
-                const meta = TOUR_STATUS_META[tour.status] || TOUR_STATUS_META.DRAFT;
-
-                return (
-                  <div
-                    key={tour.tourId}
-                    className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all overflow-hidden flex flex-col justify-between group"
-                  >
-                    <div>
-                      {/* Vùng ảnh: gradient thay ảnh thật, mang sắc accent theo vai trò */}
-                      <div
-                        className={`relative h-28 overflow-hidden bg-gradient-to-br ${
-                          theme === "teal"
-                            ? "from-teal-100 via-slate-100 to-slate-50"
-                            : "from-emerald-100 via-slate-100 to-slate-50"
-                        }`}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent pointer-events-none" />
-                        <div className="absolute top-3 left-3 right-3 flex items-center justify-end gap-2">
-                          <span
-                            className={`inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-white/95 shadow-2xs ${meta.cls}`}
-                          >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${meta.dot} ${
-                                meta.pulse ? "animate-pulse" : ""
-                              }`}
-                            />
-                            {meta.label}
-                          </span>
-                        </div>
-                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-end text-white text-xs">
-                          <span className="flex items-center gap-1 font-semibold text-[11px] bg-black/40 px-2 py-0.5 rounded">
-                            <MapPin size={11} />
-                            <span>
-                              {tour.destinationCount} điểm đến
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-4 space-y-2.5">
-                        <h3
-                          className={`text-base font-black text-slate-900 transition-colors line-clamp-1 ${palette.hoverTitle}`}
-                        >
-                          {tour.title}
-                        </h3>
-
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-                            {TOUR_TYPE_META[tour.tourType] || "Khác"}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-slate-700">
-                            <CircleDollarSign size={11} className="text-slate-400" />
-                            {formatVND(tour.price)}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-slate-700">
-                            <CalendarDays size={11} className="text-slate-400" />
-                            {formatDuration(tour.durationDays)}
-                          </span>
-                        </div>
-
-                        {/* Lý do từ chối: thông tin cần hành động, ưu tiên hiển thị */}
-                        {tour.status === "REJECTED" && tour.rejectionReason && (
-                          <div className="rounded-xl bg-rose-50 border border-rose-200 p-2.5">
-                            <p className="text-[10px] font-black text-rose-700 uppercase tracking-wider mb-0.5">
-                              Lý do từ chối
-                            </p>
-                            <p className="text-[11px] font-semibold text-rose-800 leading-relaxed line-clamp-3">
-                              {getRejectionLabels(tour.rejectionReason).join(" · ")}
-                            </p>
-                          </div>
-                        )}
-
-                        {tour.status === "PENDING" && (
-                          <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-2 leading-relaxed">
-                            Hồ sơ đang chờ Hội đồng Thẩm định phát hành.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Footer hành động */}
-                    <div className="p-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => openDetail(tour.tourId)}
-                        className="px-3 py-1.5 rounded-xl bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Eye size={13} />
-                        <span>Chi tiết</span>
-                      </button>
-
-                      <div className="flex items-center gap-1">
-                        {canEdit && (
-                          <button
-                            type="button"
-                            onClick={() => setEditTarget(tour)}
-                            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
-                            title="Chỉnh sửa tour"
-                          >
-                            <Pencil size={13} />
-                            <span>Sửa</span>
-                          </button>
-                        )}
-                        {canSubmit && (
-                          <button
-                            type="button"
-                            onClick={() => handleSubmit(tour)}
-                            disabled={busy}
-                            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
-                          >
-                            {busy ? (
-                              <Loader2 size={13} className="animate-spin" />
-                            ) : (
-                              <Send size={13} />
-                            )}
-                            <span>Gửi duyệt</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Phân trang dạng card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-              <PaginationBar
-                totalElements={filtered.length}
-                pageNumber={safePageNumber}
-                pageSize={pageSize}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-                onSizeChange={handlePageSizeChange}
-              />
-            </div>
-          </>
-        )}
-
-        {/* ── MODAL ───────────────────────────────────────────── */}
-        {isFormOpen && (
-          <TourFormModal
-            isOpen
-            onClose={() => {
-              setIsFormOpen(false);
-              setEditTarget(null);
-            }}
-            onSaved={handleSaved}
-            tour={editTarget}
-            theme={theme}
-          />
-        )}
-
-        {detailTarget && (
-          <TourDetailModal
-            isOpen
-            tour={detailTarget}
-            isLoading={detailLoading}
-            error={detailError}
-            onClose={closeDetail}
-          />
-        )}
-      </div>
-    );
-  }
+  /* ── Tiêu đề trang + nút thao tác (dùng chung cho mọi vai trò) ─── */
+  const renderHeader = () => (
+    <PageHeader title={heading} description={description}>
+      <button
+        type="button"
+        onClick={loadList}
+        disabled={isLoading}
+        className="h-9 px-3.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-[13px] flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+        title="Làm mới danh sách"
+      >
+        <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+        <span className="hidden sm:inline">Làm mới</span>
+      </button>
+      {canCreate && (
+        <button
+          type="button"
+          onClick={() => {
+            setEditTarget(null);
+            setIsFormOpen(true);
+          }}
+          className={`${palette.primary} text-white font-semibold h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-xs text-[13px] transition-colors cursor-pointer active:scale-[0.98]`}
+        >
+          <Plus size={16} strokeWidth={2.2} />
+          <span>Tạo tour mới</span>
+        </button>
+      )}
+    </PageHeader>
+  );
 
   /* ══════════════════════════════════════════════════════════════
-     VARIANT: TABLE (Moderator / Admin)
+     DANH SÁCH DẠNG HÀNG (Provider / Moderator / Admin)
      ══════════════════════════════════════════════════════════════ */
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in-50 duration-200">
+    <div className="h-full min-h-0 flex flex-col gap-4 overflow-hidden animate-in fade-in-50 duration-200">
       <Toast msg={toastMsg} tone={toastTone} />
 
-      {/* ── HEADER ─────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            {heading}
-          </h1>
-          {description && (
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-              {description}
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={loadList}
-            disabled={isLoading}
-            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
-            <span className="hidden sm:inline">Làm mới</span>
-          </button>
-          {canCreate && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditTarget(null);
-                setIsFormOpen(true);
-              }}
-              className={`${palette.primary} ${palette.primaryShadow} text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm text-xs sm:text-sm transition-all cursor-pointer active:scale-[0.98]`}
-            >
-              <Plus size={18} strokeWidth={2.4} />
-              <span>Tạo Tour Mới</span>
-            </button>
-          )}
-        </div>
-      </div>
+      <div className="shrink-0">{renderHeader()}</div>
 
       {/* ── KPI ───────────────────────────────────────────────── */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           icon={Layers}
           label="Tổng tour"
@@ -1285,6 +892,17 @@ export default function ToursManager({
           active={statusTab === "all"}
           onClick={() => handleStatusChange("all")}
         />
+        {source === "mine" && (
+          <KpiCard
+            icon={Pencil}
+            label="Bản nháp"
+            value={counts.DRAFT}
+            unit="tour"
+            tone="slate"
+            active={statusTab === "DRAFT"}
+            onClick={() => handleStatusChange("DRAFT")}
+          />
+        )}
         <KpiCard
           icon={Clock}
           label="Chờ duyệt"
@@ -1303,19 +921,21 @@ export default function ToursManager({
           active={statusTab === "PUBLISHED"}
           onClick={() => handleStatusChange("PUBLISHED")}
         />
-        <KpiCard
-          icon={Ban}
-          label="Bị từ chối"
-          value={counts.REJECTED}
-          unit="tour"
-          tone="rose"
-          active={statusTab === "REJECTED"}
-          onClick={() => handleStatusChange("REJECTED")}
-        />
+        {source !== "mine" && (
+          <KpiCard
+            icon={Ban}
+            label="Bị từ chối"
+            value={counts.REJECTED}
+            unit="tour"
+            tone="rose"
+            active={statusTab === "REJECTED"}
+            onClick={() => handleStatusChange("REJECTED")}
+          />
+        )}
       </section>
 
       {/* ── THANH LỌC ────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="shrink-0 bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         {renderStatusTabs()}
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
@@ -1352,7 +972,7 @@ export default function ToursManager({
 
       {/* ── LỖI ───────────────────────────────────────────────── */}
       {fetchError && (
-        <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-rose-50 border border-rose-200">
+        <div className="shrink-0 flex items-start gap-2.5 p-4 rounded-xl bg-rose-50 border border-rose-200">
           <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-bold text-rose-800">
@@ -1371,17 +991,17 @@ export default function ToursManager({
       )}
 
       {/* ── BẢNG ──────────────────────────────────────────────── */}
-      <section className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <section className="flex-1 min-h-0 flex flex-col bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         {/*
           Tiêu đề cột và thân danh sách nằm trong CÙNG một vùng cuộn.
           Nhờ vậy khi xuất hiện thanh cuộn dọc, cả hai vùng co lại đồng bộ nên
           các cột luôn thẳng hàng tuyệt đối, không cần bù thủ công bằng
           padding cứng (vốn dễ lệch khi độ rộng thanh cuộn thay đổi).
         */}
-        <div className={LIST_SCROLL}>
+        <div className={`${LIST_SCROLL} flex-1 min-h-0`}>
           {/* Tiêu đề cột */}
           <div
-            className={`${ROW_GRID} px-4 sm:px-5 py-3 bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold uppercase text-slate-500 tracking-wider sticky top-0 z-10`}
+            className={`${ROW_GRID} px-4 sm:px-5 py-3 bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 sticky top-0 z-10`}
           >
             <div className="col-span-12 md:col-span-4">Tour</div>
             <div className="col-span-6 md:col-span-2">Hành trình</div>
@@ -1394,7 +1014,7 @@ export default function ToursManager({
           {isLoading && tours.length === 0 ? (
             <div className="p-16 text-center">
               <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
-              <p className="text-xs text-slate-400 mt-3 font-semibold">
+              <p className="text-xs text-slate-400 mt-3 font-bold">
                 Đang tải bảng tour...
               </p>
             </div>
@@ -1430,31 +1050,41 @@ export default function ToursManager({
                         <h3 className="text-sm font-bold text-slate-900 truncate">
                           {tour.title}
                         </h3>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-600">
                           <span className="font-semibold text-slate-600 truncate">
-                            {tour.createdBy || "Đơn vị không xác định"}
+                            {source === "mine"
+                              ? TOUR_TYPE_META[tour.tourType] || "Khác"
+                              : tour.createdBy || "Đơn vị không xác định"}
                           </span>
                         </div>
+                        {tour.status === "REJECTED" && tour.rejectionReason && (
+                          <p
+                            className="mt-1 text-[11px] font-semibold text-rose-600 truncate"
+                            title={getRejectionLabels(tour.rejectionReason).join(" · ")}
+                          >
+                            Lý do từ chối: {getRejectionLabels(tour.rejectionReason).join(" · ")}
+                          </p>
+                        )}
                       </div>
                     </div>
 
                     {/* Cột 2: Hành trình */}
                     <div className="col-span-6 md:col-span-2 flex items-center gap-1.5 min-w-0">
                       <MapPin size={13} className="text-slate-400 shrink-0" />
-                      <span className="text-xs font-bold text-slate-700 font-mono">
+                      <span className="text-xs font-bold text-slate-700 tabular-nums">
                         {tour.destinationCount}
                       </span>
-                      <span className="text-[10.5px] text-slate-500 truncate">
+                      <span className="text-[10.5px] text-slate-600 truncate">
                         {tour.destinations[0]?.destinationName || "chưa có"}
                       </span>
                     </div>
 
                     {/* Cột 3: Tổng giá & thời lượng */}
                     <div className="col-span-6 md:col-span-2 flex flex-col gap-0.5">
-                      <span className="text-xs font-black text-slate-900 font-mono leading-none">
+                      <span className="text-xs font-bold text-slate-900 tabular-nums leading-none">
                         {formatVND(tour.price)}
                       </span>
-                      <span className="text-[10.5px] font-semibold text-slate-500 font-mono">
+                      <span className="text-[10.5px] font-bold text-slate-600 tabular-nums">
                         {formatDuration(tour.durationDays)}
                       </span>
                     </div>
@@ -1474,7 +1104,7 @@ export default function ToursManager({
         </div>
 
         {/* Phân trang */}
-        <div className="border-t border-slate-100">
+        <div className="shrink-0 border-t border-slate-100">
           <PaginationBar
             totalElements={filtered.length}
             pageNumber={safePageNumber}
@@ -1531,14 +1161,14 @@ export default function ToursManager({
             aria-modal="true"
             aria-label="Xoá tour"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in zoom-in-95 duration-200"
+            className="w-full max-w-sm bg-white rounded-xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in zoom-in-95 duration-200"
           >
-            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+            <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
               <Trash2 size={24} />
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-900">Xoá tour?</h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              <h3 className="text-base font-bold text-slate-900">Xoá tour?</h3>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                 Tour <strong>&quot;{deleteTarget.title}&quot;</strong> sẽ bị ẩn
                 khỏi hệ thống và có thể khôi phục lại từ bộ lọc Đã xoá.
               </p>
@@ -1579,16 +1209,16 @@ export default function ToursManager({
             aria-modal="true"
             aria-label="Khôi phục tour"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in zoom-in-95 duration-200"
+            className="w-full max-w-sm bg-white rounded-xl p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in zoom-in-95 duration-200"
           >
-            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
               <RotateCcw size={24} />
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-900">
+              <h3 className="text-base font-bold text-slate-900">
                 Khôi phục tour đã xoá?
               </h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                 Tour <strong>&quot;{restoreTarget.title}&quot;</strong> sẽ được
                 khôi phục và chuyển về trạng thái bản nháp để gửi duyệt lại.
               </p>

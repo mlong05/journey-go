@@ -68,11 +68,14 @@ function CreateExperienceDialog({
   const [loading, setLoading] = useState(false);
   const [createdItem, setCreatedItem] = useState(null);
 
-  useEffect(() => {
+  // Đồng bộ điểm đến mặc định khi prop đổi (điều chỉnh state ngay khi render, không dùng effect)
+  const [prevDefaultDestId, setPrevDefaultDestId] = useState(defaultDestinationId);
+  if (prevDefaultDestId !== defaultDestinationId) {
+    setPrevDefaultDestId(defaultDestinationId);
     if (defaultDestinationId) {
       setForm((prev) => ({ ...prev, destinationId: String(defaultDestinationId) }));
     }
-  }, [defaultDestinationId]);
+  }
 
   const taken = useMemo(
     () => (takenDestinationIds instanceof Set ? takenDestinationIds : new Set()),

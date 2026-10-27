@@ -9,11 +9,11 @@ import {
   CheckCircle2,
   Circle,
   Pencil,
+  MapPin,
   AlertCircle,
   Loader2,
   Sparkles,
   BookOpen,
-  Award,
   ChevronDown,
   ChevronUp,
   ShieldCheck,
@@ -23,11 +23,18 @@ import {
 } from "lucide-react";
 import { questionService } from "../services/questionService";
 import { answerService } from "../services/answerService";
+import { checkInPointService } from "../services/checkInPointService";
+import CheckInStationFields, {
+  EMPTY_STATION,
+  generateQrToken,
+  stationFromPoint,
+  validateStation,
+  persistStation,
+} from "./CheckInStationFields";
 
 const INITIAL_QUESTION_FORM = {
   content: "",
   questionType: "MULTIPLE_CHOICE",
-  points: 10,
   sequenceOrder: 0,
   expectedText: "",
   // Các phương án trắc nghiệm ban đầu
@@ -49,6 +56,7 @@ export default function QuestionManagerModal({
   onClose,
   task,
   experience,
+  requiresLocation = false,
   canEdit = true,
   isModerator = false,
   onQuestionsUpdated,
@@ -79,10 +87,19 @@ export default function QuestionManagerModal({
   // Xác nhận xóa câu hỏi
   const [deletingQuestion, setDeletingQuestion] = useState(null);
 
+  // Nhiệm vụ tương tác ngoài thực tế: mỗi câu hỏi gắn với một địa điểm check-in riêng
+  const [points, setPoints] = useState([]); // các địa điểm check-in của trải nghiệm
+  const [station, setStation] = useState({ ...EMPTY_STATION }); // địa điểm của câu hỏi đang thêm
+  const [stationErrors, setStationErrors] = useState({});
+  const [editingStationQuestionId, setEditingStationQuestionId] = useState(null);
+  const [editStation, setEditStation] = useState({ ...EMPTY_STATION });
+  const [editStationErrors, setEditStationErrors] = useState({});
+
   // Mở rộng/thu gọn câu hỏi
   const [expandedQuestions, setExpandedQuestions] = useState({});
 
   const taskId = task?.id;
+  const experienceId = experience?.id;
   // Cho phép quản lý nếu task đang DRAFT hoặc điểm đến đang ở chế độ chỉnh sửa của Provider/Admin
   const isDraft = !task?.status || task?.status === "DRAFT" || experience?.status === "DRAFT";
   const allowManage = canEdit && !isModerator && isDraft;
@@ -101,6 +118,10 @@ export default function QuestionManagerModal({
       // Đối với Provider/Admin/Moderator, truyền forTourist = false để xem đầy đủ đáp án & lời giải
       const data = await questionService.listByTask(taskId, false);
       setQuestions(data || []);
+      if (requiresLocation && experienceId) {
+        const cips = await checkInPointService.listByExperience(experienceId).catch(() => []);
+        setPoints(cips || []);
+      }
       // Mặc định mở rộng câu hỏi đầu tiên
       if (Array.isArray(data) && data.length > 0) {
         setExpandedQuestions({ [data[0].id]: true });
@@ -113,7 +134,7 @@ export default function QuestionManagerModal({
     } finally {
       setLoading(false);
     }
-  }, [taskId]);
+  }, [taskId, requiresLocation, experienceId]);
 
   useEffect(() => {
     if (!isOpen || !taskId) return;
@@ -154,13 +175,26 @@ export default function QuestionManagerModal({
     }));
   };
 
+  // Mở form thêm câu hỏi (nhiệm vụ cần vị trí: sinh sẵn mã QR cho địa điểm mới)
+  const openAddForm = () => {
+    if (requiresLocation) {
+      setStation({ ...EMPTY_STATION, qrToken: generateQrToken(experience?.title) });
+      setStationErrors({});
+    }
+    setShowAddForm(true);
+  };
+
+  const stationOf = (q) => points.find((p) => p.id === q.checkInPointId) || null;
+
   // Validate form tạo câu hỏi
   const validateQuestionForm = () => {
     const errs = {};
-    if (!form.content.trim()) errs.content = "Nội dung câu hỏi không được để trống.";
-    if (form.points === "" || Number(form.points) < 0) {
-      errs.points = "Điểm thưởng phải lớn hơn hoặc bằng 0.";
+    if (requiresLocation) {
+      const se = validateStation(station);
+      setStationErrors(se);
+      if (Object.keys(se).length > 0) errs.station = "Vui lòng nhập đầy đủ địa điểm của câu hỏi.";
     }
+    if (!form.content.trim()) errs.content = "Nội dung câu hỏi không được để trống.";
     if (form.questionType === "TEXT") {
       if (!form.expectedText.trim()) {
         errs.expectedText = "Vui lòng nhập đáp án mẫu mong đợi cho câu tự luận.";
@@ -186,16 +220,33 @@ export default function QuestionManagerModal({
     if (!validateQuestionForm()) return;
 
     setActionLoading(true);
+    let newPointId = null;
     try {
       const qData = {
         content: form.content.trim(),
         questionType: form.questionType,
-        points: Number(form.points) || 10,
         sequenceOrder: Number(form.sequenceOrder) || questions.length,
         expectedText: form.questionType === "TEXT" ? form.expectedText.trim() : null,
       };
 
-      const createdQ = await questionService.create(taskId, qData);
+      // Tạo địa điểm check-in của câu hỏi trước, rồi gắn vào câu hỏi
+      if (requiresLocation) {
+        const point = await persistStation({
+          experienceId: experience.id,
+          station,
+          sequenceOrder: qData.sequenceOrder,
+        });
+        newPointId = point?.id ?? null;
+        qData.checkInPointId = newPointId;
+      }
+
+      let createdQ;
+      try {
+        createdQ = await questionService.create(taskId, qData);
+      } catch (createErr) {
+        if (newPointId) checkInPointService.delete(newPointId).catch(() => {});
+        throw createErr;
+      }
 
       // Nếu là trắc nghiệm, tạo các phương án trả lời kèm theo
       if (form.questionType === "MULTIPLE_CHOICE" && createdQ?.id) {
@@ -212,6 +263,7 @@ export default function QuestionManagerModal({
       }
 
       showToast("Đã tạo câu hỏi thành công.");
+      setStation({ ...EMPTY_STATION });
       setShowAddForm(false);
       setForm({
         ...INITIAL_QUESTION_FORM,
@@ -222,6 +274,31 @@ export default function QuestionManagerModal({
     } catch (err) {
       console.error("[QuestionManager] create error", err);
       showToast(err?.response?.data?.message || err?.message || "Lỗi tạo câu hỏi.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Sửa địa điểm check-in của một câu hỏi
+  const handleSaveStation = async (q) => {
+    const errs = validateStation(editStation);
+    setEditStationErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    setActionLoading(true);
+    try {
+      await persistStation({
+        experienceId: experience.id,
+        existingId: q.checkInPointId,
+        station: editStation,
+        sequenceOrder: q.sequenceOrder,
+      });
+      showToast("Đã cập nhật địa điểm của câu hỏi.");
+      setEditingStationQuestionId(null);
+      await loadQuestions();
+      onQuestionsUpdated?.();
+    } catch (err) {
+      console.error("[QuestionManager] update station error", err);
+      showToast(err?.response?.data?.message || err?.message || "Lỗi cập nhật địa điểm.");
     } finally {
       setActionLoading(false);
     }
@@ -384,19 +461,6 @@ export default function QuestionManagerModal({
           </div>
 
           <div className="flex items-center gap-2">
-            {allowManage && !showAddForm && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowAddForm(true);
-                }}
-                className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-              >
-                <Plus size={14} />
-                <span>Thêm câu hỏi</span>
-              </button>
-            )}
             <button
               type="button"
               onClick={onClose}
@@ -553,29 +617,8 @@ export default function QuestionManagerModal({
                 )}
               </div>
 
-              {/* Điểm thưởng & Thứ tự */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Điểm thưởng khi trả lời đúng <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min={0}
-                      value={form.points}
-                      onChange={(e) => setForm({ ...form, points: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs font-mono bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 pr-14"
-                    />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
-                      điểm
-                    </span>
-                  </div>
-                  {formErrors.points && (
-                    <p className="text-[11px] text-rose-600 font-medium">{formErrors.points}</p>
-                  )}
-                </div>
-
+              {/* Thứ tự */}
+              <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
                     Thứ tự câu hỏi <span className="text-rose-500">*</span>
@@ -589,6 +632,22 @@ export default function QuestionManagerModal({
                   />
                 </div>
               </div>
+
+              {/* Địa điểm check-in của câu hỏi (nhiệm vụ tương tác ngoài thực tế) */}
+              {requiresLocation && (
+                <>
+                  <CheckInStationFields
+                    value={station}
+                    onChange={(next) => {
+                      setStation(next);
+                      setStationErrors({});
+                    }}
+                    errors={stationErrors}
+                    disabled={actionLoading}
+                    placeHint={form.content}
+                  />
+                </>
+              )}
 
               {/* Nhập đáp án mẫu nếu dạng TEXT */}
               {form.questionType === "TEXT" && (
@@ -776,7 +835,7 @@ export default function QuestionManagerModal({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowAddForm(true);
+                    openAddForm();
                   }}
                   className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
                 >
@@ -803,7 +862,7 @@ export default function QuestionManagerModal({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowAddForm(true);
+                      openAddForm();
                     }}
                     className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
                   >
@@ -844,10 +903,12 @@ export default function QuestionManagerModal({
                               >
                                 {isTextType ? "Tự luận (Text)" : "Trắc nghiệm"}
                               </span>
-                              <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                                <Award size={10} />
-                                <span>+{q.points || 10} điểm</span>
-                              </span>
+                              {requiresLocation && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1">
+                                  <MapPin size={10} />
+                                  {stationOf(q)?.name || (q.checkInPointId ? `Địa điểm #${q.checkInPointId}` : "Chưa gắn địa điểm")}
+                                </span>
+                              )}
                             </div>
                             <h5 className="font-bold text-slate-900 text-xs sm:text-sm mt-1 truncate max-w-xl">
                               {q.content}
@@ -878,6 +939,76 @@ export default function QuestionManagerModal({
                       {/* Chi tiết nội dung khi mở rộng */}
                       {isExpanded && (
                         <div className="p-4 pt-2 border-t border-slate-100 space-y-3 bg-white">
+                          {requiresLocation && (
+                            <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-2.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-emerald-900 inline-flex items-center gap-1.5">
+                                  <MapPin size={13} className="text-emerald-600" />
+                                  Địa điểm check-in để trả lời câu này
+                                </span>
+                                {allowManage && editingStationQuestionId !== q.id && stationOf(q) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditStation(stationFromPoint(stationOf(q)));
+                                      setEditStationErrors({});
+                                      setEditingStationQuestionId(q.id);
+                                    }}
+                                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Pencil size={11} />
+                                    <span>Sửa địa điểm</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              {editingStationQuestionId === q.id ? (
+                                <div className="space-y-2.5">
+                                  <CheckInStationFields
+                                    value={editStation}
+                                    onChange={(next) => {
+                                      setEditStation(next);
+                                      setEditStationErrors({});
+                                    }}
+                                    errors={editStationErrors}
+                                    disabled={actionLoading}
+                                  />
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingStationQuestionId(null)}
+                                      className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                                    >
+                                      Hủy
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={actionLoading}
+                                      onClick={() => handleSaveStation(q)}
+                                      className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer disabled:opacity-50"
+                                    >
+                                      Lưu địa điểm
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : stationOf(q) ? (
+                                <div className="text-xs text-slate-700 space-y-0.5">
+                                  <p className="font-bold text-slate-900">{stationOf(q).name}</p>
+                                  <p>
+                                    Tọa độ: {stationOf(q).latitude}, {stationOf(q).longitude} · Bán kính{" "}
+                                    {stationOf(q).radiusMeters} m
+                                  </p>
+                                  <p className="text-slate-500">
+                                    Du khách đến đúng tọa độ này hoặc quét mã QR tại điểm để mở câu hỏi.
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-amber-700 font-semibold">
+                                  Câu hỏi này chưa gắn địa điểm check-in.
+                                </p>
+                              )}
+                            </div>
+                          )}
                           {/* Câu hỏi TEXT: Hiển thị và sửa expectedText */}
                           {isTextType ? (
                             <div className="p-3.5 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-2">
@@ -1107,7 +1238,11 @@ export default function QuestionManagerModal({
 
         {/* Footer Modal */}
         <div className="shrink-0 px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>Quy tắc: MULTIPLE_CHOICE có duy nhất 1 đáp án đúng • TEXT so khớp không phân biệt hoa thường.</span>
+          <span>
+            {requiresLocation
+              ? "Mỗi câu hỏi có một địa điểm riêng: du khách đi lần lượt từng địa điểm theo thứ tự câu hỏi, check-in rồi mới trả lời. Trả lời hết mới nhận điểm nhiệm vụ."
+              : "Quy tắc: MULTIPLE_CHOICE có duy nhất 1 đáp án đúng • TEXT so khớp không phân biệt hoa thường."}
+          </span>
           <button
             type="button"
             onClick={onClose}

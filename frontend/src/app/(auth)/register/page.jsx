@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const AuthScreen = dynamic(
   () => import("@/features/auth").then((m) => m.AuthScreen),
@@ -26,8 +26,11 @@ function LoadingFallback({ message }) {
 }
 
 export default function RegisterPage() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   if (!mounted) {
     return <LoadingFallback message="Đang tải cổng đăng ký…" />;

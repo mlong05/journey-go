@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface QuestionRepository extends JpaRepository<Question, Long> {
 
     List<Question> findByTaskIdOrderBySequenceOrderAsc(Long taskId);
+    boolean existsByCheckInPointIdAndIdNot(Long checkInPointId, Long id);
 
 
     @Query("""

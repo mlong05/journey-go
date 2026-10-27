@@ -19,7 +19,6 @@ export default function ModeratorToursPage() {
   return (
     <ToursManager
       theme="teal"
-      variant="table"
       heading="Thẩm Định Tour Du Lịch"
       description="Kiểm tra hành trình, mức giá và nội dung của từng tour trước khi phát hành. Tour bị từ chối phải kèm lý do cụ thể để đối tác chỉnh sửa."
       canCreate={false}
