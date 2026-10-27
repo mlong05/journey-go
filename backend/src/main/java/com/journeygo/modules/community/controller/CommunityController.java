@@ -49,7 +49,9 @@ public class CommunityController {
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         Long currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
-        PostResponse post = communityService.getPostDetail(id, currentUserId);
+        boolean canModerate = userPrincipal != null && userPrincipal.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ROLE_MODERATOR".equals(a.getAuthority()));
+        PostResponse post = communityService.getPostDetail(id, currentUserId, canModerate);
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết bài viết thành công", post));
     }
 
@@ -91,6 +93,42 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật bài viết thành công", post));
     }
 
+    @PostMapping("/posts/{id}/submit")
+    @PreAuthorize("isAuthenticated()")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Gửi duyệt bài viết", description = "Tác giả gửi duyệt bài nháp, bài bị từ chối hoặc bài được yêu cầu chỉnh sửa")
+    public ResponseEntity<ApiResponse<PostResponse>> submitPost(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi bài viết để kiểm duyệt",
+                communityService.submitPost(id, userPrincipal.getId())));
+    }
+
+    @DeleteMapping("/posts/{id}")
+    @PreAuthorize("isAuthenticated()")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Xóa bài viết của tôi", description = "Tác giả xóa bài của mình; không xóa được khi bài còn báo cáo chờ xử lý")
+    public ResponseEntity<ApiResponse<Void>> deletePost(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        communityService.deletePost(id, userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa bài viết", null));
+    }
+
+    @DeleteMapping("/comments/{id}")
+    @PreAuthorize("isAuthenticated()")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Xóa bình luận của tôi")
+    public ResponseEntity<ApiResponse<Void>> deleteComment(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        communityService.deleteComment(id, userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa bình luận", null));
+    }
+
     @GetMapping("/posts/my")
     @PreAuthorize("isAuthenticated()")
     @SecurityRequirement(name = "Bearer Authentication")
@@ -120,13 +158,14 @@ public class CommunityController {
     @PostMapping("/posts/{id}/react")
     @PreAuthorize("isAuthenticated()")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Thả tim / tương tác với bài viết", description = "Thả cảm xúc hoặc hủy cảm xúc bài viết (LIKE, LOVE, CLAP, WOW)")
+    @Operation(summary = "Thả tim / tương tác với bài viết", description = "Thả tim hoặc bỏ tim bài viết (chỉ hỗ trợ reactionType = LOVE, bỏ trống thì mặc định LOVE)")
     public ResponseEntity<ApiResponse<Integer>> toggleReaction(
             @PathVariable Long id,
-            @Valid @RequestBody PostReactionRequest request,
+            @RequestBody(required = false) PostReactionRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        int likesCount = communityService.toggleReaction(id, userPrincipal.getId(), request.reactionType());
+        int likesCount = communityService.toggleReaction(id, userPrincipal.getId(),
+                request == null ? null : request.reactionType());
         return ResponseEntity.ok(ApiResponse.success("Cập nhật tương tác thành công", likesCount));
     }
 
@@ -169,6 +208,32 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.success("Kiểm duyệt bài viết thành công", post));
     }
 
+    @PatchMapping("/moderation/posts/{id}/visibility")
+    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Ẩn hoặc hiện lại bài viết (Moderator)", description = "hidden=true để gỡ bài khỏi cộng đồng, hidden=false để khôi phục")
+    public ResponseEntity<ApiResponse<PostResponse>> setPostVisibility(
+            @PathVariable Long id,
+            @RequestParam boolean hidden,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(hidden ? "Đã ẩn bài viết" : "Đã hiện lại bài viết",
+                communityService.setPostHidden(id, userPrincipal.getId(), hidden)));
+    }
+
+    @PatchMapping("/moderation/comments/{id}/visibility")
+    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Ẩn hoặc hiện lại bình luận (Moderator)")
+    public ResponseEntity<ApiResponse<CommentResponse>> setCommentVisibility(
+            @PathVariable Long id,
+            @RequestParam boolean hidden,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(hidden ? "Đã ẩn bình luận" : "Đã hiện lại bình luận",
+                communityService.setCommentHidden(id, userPrincipal.getId(), hidden)));
+    }
+
     @GetMapping("/moderation/reports")
     @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
@@ -193,5 +258,18 @@ public class CommunityController {
     ) {
         ReportResponse report = communityService.resolveReport(id, userPrincipal.getId(), hidePost, note);
         return ResponseEntity.ok(ApiResponse.success("Xử lý báo cáo vi phạm thành công", report));
+    }
+
+    @PatchMapping("/moderation/reports/{id}/dismiss")
+    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Bác bỏ báo cáo vi phạm (Moderator)", description = "Báo cáo sai hoặc không vi phạm; bài viết giữ nguyên")
+    public ResponseEntity<ApiResponse<ReportResponse>> dismissReport(
+            @PathVariable Long id,
+            @RequestParam(required = false) String note,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        ReportResponse report = communityService.dismissReport(id, userPrincipal.getId(), note);
+        return ResponseEntity.ok(ApiResponse.success("Đã bác bỏ báo cáo", report));
     }
 }

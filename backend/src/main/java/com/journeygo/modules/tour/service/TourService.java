@@ -35,9 +35,10 @@ public class TourService {
     private final UserRepository userRepository;
     private final DestinationRepository destinationRepository;
     private final TourModerationService moderationService;
+    private final TourPricingService pricingService;
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
-            "tourId", "title", "tourType", "durationDays", "price", "startDate", "endDate",
+            "tourId", "title", "tourType", "durationDays", "startDate", "endDate",
             "approved", "status", "deleted", "createdAt", "updatedAt"
     );
 
@@ -69,7 +70,7 @@ public class TourService {
     public TourResponse getById(Long tourId) {
         moderationService.requireApproved(tourId);
         Tour tour = findOrThrow(tourId);
-        return TourResponse.fromEntity(tour);
+        return pricingService.toResponse(tour);
     }
 
     /** Soft-deleted tours (admin / moderator). */
@@ -99,7 +100,6 @@ public class TourService {
                 .title(request.title().trim())
                 .tourType(request.tourType())
                 .durationDays(request.durationDays())
-                .price(request.price())
                 .startDate(request.startDate())
                 .endDate(request.endDate())
                 .approved(false)
@@ -112,7 +112,7 @@ public class TourService {
         Tour saved = tourRepository.save(tour);
         moderationService.submit(saved.getTourId(), creatorId, Role.of(Role.PROVIDER));
         log.info("Created tour id={} title={}", saved.getTourId(), saved.getTitle());
-        return TourResponse.fromEntity(saved);
+        return pricingService.toResponse(saved);
     }
 
     /** Update an existing tour and reset it to DRAFT for re-review.
@@ -131,7 +131,6 @@ public class TourService {
         existing.setTitle(request.title().trim());
         existing.setTourType(request.tourType());
         existing.setDurationDays(request.durationDays());
-        existing.setPrice(request.price());
         existing.setStartDate(request.startDate());
         existing.setEndDate(request.endDate());
 
@@ -142,7 +141,7 @@ public class TourService {
         Tour saved = tourRepository.save(existing);
         moderationService.submitAfterEdit(saved.getTourId(), callerId, callerRole);
         log.info("Updated tour id={} by userId={}", saved.getTourId(), callerId);
-        return TourResponse.fromEntity(saved);
+        return pricingService.toResponse(saved);
     }
 
     // ── Soft-delete / Restore ─────────────────────────────────────────────────
@@ -165,17 +164,18 @@ public class TourService {
         Tour saved = tourRepository.save(tour);
         moderationService.resetAfterRestore(saved.getTourId());
         log.info("Restored tour id={}", saved.getTourId());
-        return TourResponse.fromEntity(saved);
+        return pricingService.toResponse(saved);
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
     private PageResponse<TourResponse> toPageResponse(Page<Tour> page) {
-        return PageResponse.from(page, TourResponse::fromEntity);
+        return PageResponse.from(page, pricingService.mapperFor(page.getContent()));
     }
 
     private void validateDateRange(TourRequest request) {
-        if (request.endDate().isBefore(request.startDate())) {
+        if (request.startDate() != null && request.endDate() != null
+                && request.endDate().isBefore(request.startDate())) {
             throw new AppException(ErrorCode.VALIDATION_ERROR,
                     "Ngày kết thúc phải bằng hoặc sau ngày bắt đầu");
         }

@@ -26,8 +26,10 @@ import {
 } from "lucide-react";
 import {
   destinationService,
+  moderationService,
   RegionManagerModal,
   DestinationAssessmentModal,
+  RejectDestinationDialog,
 } from "@/features/destination";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
@@ -48,9 +50,10 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
  * ========================================================================= */
 
 const STATUS = {
-  PENDING: "pending",
-  APPROVED: "approved",
-  REVOKED: "revoked",
+  PENDING: "PENDING",
+  PUBLISHED: "PUBLISHED",
+  REJECTED: "REJECTED",
+  DRAFT: "DRAFT",
 };
 
 /* Các lựa chọn số dòng mỗi trang */
@@ -68,36 +71,46 @@ const LIST_SCROLL =
    (nằm ngoài vùng cuộn) để các cột thẳng hàng tuyệt đối với từng dòng dữ liệu. */
 const HEADER_PAD = "sm:pr-[15px]";
 
-/* Chuẩn hoá dữ liệu thô từ API về dạng dùng chung */
+/* Chuẩn hoá dữ liệu thô từ API về dạng dùng chung (hỗ trợ cả DestinationReviewResponse và DestinationResponse) */
 function normalizeDestination(raw) {
   if (!raw || typeof raw !== "object") return null;
-  const approvedFlag = raw.approved === true;
-  const deletedFlag = raw.deleted === true;
+  const base = raw.destination && typeof raw.destination === "object" ? raw.destination : raw;
+  const rawStatus = (raw.status || base.status || "").toUpperCase();
+  const approvedFlag = base.approved === true || rawStatus === "APPROVED" || rawStatus === "PUBLISHED";
+  const deletedFlag = base.deleted === true;
   let status;
   if (deletedFlag) status = "deleted";
-  else if (approvedFlag) status = STATUS.APPROVED;
+  else if (rawStatus === "APPROVED" || rawStatus === "PUBLISHED" || approvedFlag) status = STATUS.PUBLISHED;
+  else if (rawStatus === "REJECTED") status = STATUS.REJECTED;
+  else if (rawStatus === "DRAFT") status = STATUS.DRAFT;
   else status = STATUS.PENDING;
+
   return {
-    id: raw.id,
-    name: raw.name || "",
-    address: raw.address || "",
+    id: base.id || raw.destinationId || raw.reviewId,
+    name: base.name || raw.destinationName || "",
+    address: base.address || "",
     latitude:
-      raw.latitude !== undefined && raw.latitude !== null
-        ? Number(raw.latitude)
+      base.latitude !== undefined && base.latitude !== null
+        ? Number(base.latitude)
         : null,
     longitude:
-      raw.longitude !== undefined && raw.longitude !== null
-        ? Number(raw.longitude)
+      base.longitude !== undefined && base.longitude !== null
+        ? Number(base.longitude)
         : null,
-    capacity: raw.capacity ?? null,
+    capacity: base.capacity ?? null,
     approved: approvedFlag,
     deleted: deletedFlag,
-    createdBy: raw.createdBy || "",
-    createdAt: raw.createdAt || null,
-    updatedAt: raw.updatedAt || null,
+    createdBy: base.createdBy || raw.reviewerName || "",
+    createdAt: base.createdAt || raw.submittedAt || null,
+    updatedAt: base.updatedAt || raw.reviewedAt || null,
     status,
+    rawStatus: raw.status || base.status,
+    rejectionReason: raw.reason || base.rejectionReason,
+    otherReason: raw.otherReason || base.otherReason,
+    decisionNote: raw.decisionNote || base.decisionNote,
   };
 }
+
 
 /* Toast nội bộ (success/error) */
 function Toast({ msg, tone }) {
@@ -220,6 +233,7 @@ function StatusTab({ active, onClick, children, accent = "slate" }) {
     slate: { active: "bg-slate-900 text-white border-slate-900" },
     amber: { active: "bg-amber-500 text-white border-amber-500" },
     emerald: { active: "bg-emerald-600 text-white border-emerald-600" },
+    rose: { active: "bg-rose-600 text-white border-rose-600" },
   };
   const t = palette[accent] || palette.slate;
   return (
@@ -239,18 +253,34 @@ function StatusTab({ active, onClick, children, accent = "slate" }) {
 
 /* Badge trạng thái dùng trong danh sách */
 function StatusBadge({ status }) {
-  if (status === STATUS.APPROVED) {
+  if (status === STATUS.PUBLISHED) {
     return (
       <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-        Đã duyệt
+        Đã phát hành
+      </span>
+    );
+  }
+  if (status === STATUS.REJECTED) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+        Từ chối / Cần sửa
+      </span>
+    );
+  }
+  if (status === STATUS.DRAFT) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+        Bản nháp
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-      Chờ duyệt
+      Chờ thẩm định
     </span>
   );
 }
@@ -440,9 +470,44 @@ export default function ModeratorDestinationsPage() {
     setIsLoading(true);
     setFetchError("");
     try {
-      const data = await destinationService.getAll();
-      const list = Array.isArray(data) ? data : [];
-      setDestinations(list.map(normalizeDestination).filter(Boolean));
+      // Tải đồng thời hàng chờ PENDING, các điểm đến APPROVED và REJECTED từ Moderation API
+      const [pendingRes, approvedRes, rejectedRes] = await Promise.allSettled([
+        moderationService.getDestinationQueue({ size: 500 }),
+        moderationService.getDestinationsByStatus("APPROVED", { size: 500 }),
+        moderationService.getDestinationsByStatus("REJECTED", { size: 500 }),
+      ]);
+
+      const extractItems = (res) => {
+        if (res.status !== "fulfilled") return [];
+        const val = res.value;
+        if (Array.isArray(val)) return val;
+        if (Array.isArray(val?.content)) return val.content;
+        return [];
+      };
+
+      const allItems = [
+        ...extractItems(pendingRes),
+        ...extractItems(approvedRes),
+        ...extractItems(rejectedRes),
+      ];
+
+      if (allItems.length === 0) {
+        // Fallback gọi getAll truyền thống nếu moderation API rỗng
+        const data = await destinationService.getAll();
+        const list = Array.isArray(data) ? data : [];
+        setDestinations(list.map(normalizeDestination).filter(Boolean));
+      } else {
+        const seen = new Set();
+        const normalizedList = [];
+        for (const item of allItems) {
+          const norm = normalizeDestination(item);
+          if (norm && !seen.has(norm.id)) {
+            seen.add(norm.id);
+            normalizedList.push(norm);
+          }
+        }
+        setDestinations(normalizedList);
+      }
     } catch (err) {
       console.error("[Moderator Destinations] Fetch error:", err);
       setFetchError(
@@ -454,6 +519,7 @@ export default function ModeratorDestinationsPage() {
       setIsLoading(false);
     }
   }, []);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -491,33 +557,28 @@ export default function ModeratorDestinationsPage() {
     setDetailError("");
   }, []);
 
+  const [rejectDestTarget, setRejectDestTarget] = useState(null);
+  const [isRejectingDest, setIsRejectingDest] = useState(false);
+
   const handleApprove = useCallback(
     async (id, approved, displayName) => {
-      const ok = await confirm(
-        approved
-          ? {
-              tone: "success",
-              icon: "check",
-              title: "Phê duyệt điểm đến này?",
-              subject: displayName,
-              description:
-                "Điểm đến sẽ được công khai và hiển thị tới du khách trên ứng dụng.",
-              confirmLabel: "Phê duyệt",
-            }
-          : {
-              tone: "danger",
-              icon: "reject",
-              title: "Hủy phê duyệt điểm đến này?",
-              subject: displayName,
-              description:
-                "Điểm đến sẽ bị gỡ khỏi danh sách công khai và quay về trạng thái chờ thẩm định.",
-              confirmLabel: "Hủy phê duyệt",
-            }
-      );
+      if (!approved) {
+        setRejectDestTarget({ id, name: displayName });
+        return;
+      }
+      const ok = await confirm({
+        tone: "success",
+        icon: "check",
+        title: "Phê duyệt điểm đến này?",
+        subject: displayName,
+        description:
+          "Điểm đến sẽ được công khai và hiển thị tới du khách trên ứng dụng.",
+        confirmLabel: "Phê duyệt",
+      });
       if (!ok) return;
       setActionLoadingId(id);
       try {
-        const updated = await destinationService.setApproval(id, approved);
+        const updated = await destinationService.setApproval(id, true);
         const updatedNorm = normalizeDestination(updated);
         if (updatedNorm) {
           setDestinations((prev) =>
@@ -525,11 +586,7 @@ export default function ModeratorDestinationsPage() {
           );
           if (detailTarget?.id === id) setDetailTarget(updatedNorm);
         }
-        showToast(
-          approved
-            ? `Đã phê duyệt điểm đến "${displayName}".`
-            : `Đã hủy phê duyệt điểm đến "${displayName}".`
-        );
+        showToast(`Đã phê duyệt điểm đến "${displayName}".`);
       } catch (err) {
         console.error("[Moderator Approve] error:", err);
         showToast(
@@ -542,6 +599,39 @@ export default function ModeratorDestinationsPage() {
     },
     [detailTarget, showToast, confirm]
   );
+
+  const handleRejectDestConfirm = useCallback(
+    async (payload) => {
+      if (!rejectDestTarget) return;
+      setIsRejectingDest(true);
+      try {
+        const updated = await destinationService.setApproval(
+          rejectDestTarget.id,
+          false,
+          payload
+        );
+        const updatedNorm = normalizeDestination(updated);
+        if (updatedNorm) {
+          setDestinations((prev) =>
+            prev.map((d) =>
+              d.id === rejectDestTarget.id ? { ...d, ...updatedNorm } : d
+            )
+          );
+          if (detailTarget?.id === rejectDestTarget.id)
+            setDetailTarget(updatedNorm);
+        }
+        showToast(`Đã từ chối điểm đến "${rejectDestTarget.name}".`);
+        setRejectDestTarget(null);
+      } catch (err) {
+        console.error("[Moderator Reject] error:", err);
+        showToast(err?.message || "Không thể từ chối điểm đến.", "error");
+      } finally {
+        setIsRejectingDest(false);
+      }
+    },
+    [rejectDestTarget, detailTarget, showToast]
+  );
+
 
   /* ── Điều hướng phân trang + lọc ───────────────────────────── */
   const handleTabChange = useCallback((tab) => {
@@ -568,7 +658,9 @@ export default function ModeratorDestinationsPage() {
     () => ({
       all: destinations.filter((d) => d.status !== "deleted").length,
       pending: destinations.filter((d) => d.status === STATUS.PENDING).length,
-      approved: destinations.filter((d) => d.status === STATUS.APPROVED).length,
+      published: destinations.filter((d) => d.status === STATUS.PUBLISHED).length,
+      rejected: destinations.filter((d) => d.status === STATUS.REJECTED).length,
+      draft: destinations.filter((d) => d.status === STATUS.DRAFT).length,
     }),
     [destinations]
   );
@@ -580,7 +672,9 @@ export default function ModeratorDestinationsPage() {
       .filter((d) => d.status !== "deleted")
       .filter((item) => {
         if (statusTab === "pending" && item.status !== STATUS.PENDING) return false;
-        if (statusTab === "approved" && item.status !== STATUS.APPROVED) return false;
+        if (statusTab === "published" && item.status !== STATUS.PUBLISHED) return false;
+        if (statusTab === "rejected" && item.status !== STATUS.REJECTED) return false;
+        if (statusTab === "draft" && item.status !== STATUS.DRAFT) return false;
         if (!q) return true;
         return (
           (item.name || "").toLowerCase().includes(q) ||
@@ -657,22 +751,22 @@ export default function ModeratorDestinationsPage() {
         />
         <KpiCard
           icon={Clock}
-          label="HỒ SƠ CHỜ PHÊ DUYỆT"
+          label="HỒ SƠ CHỜ THẨM ĐỊNH"
           value={counts.pending}
           unit="chờ duyệt"
           tone="amber"
-          dot
+          dot={counts.pending > 0}
           active={statusTab === "pending"}
           onClick={() => handleTabChange("pending")}
         />
         <KpiCard
           icon={CheckCircle2}
           label="ĐIỂM ĐẾN ĐANG LƯU HÀNH"
-          value={counts.approved}
+          value={counts.published}
           unit="đã duyệt"
           tone="emerald"
-          active={statusTab === "approved"}
-          onClick={() => handleTabChange("approved")}
+          active={statusTab === "published"}
+          onClick={() => handleTabChange("published")}
         />
       </section>
 
@@ -697,20 +791,43 @@ export default function ModeratorDestinationsPage() {
                 statusTab === "pending" ? "bg-white animate-pulse" : "bg-amber-500"
               }`}
             />
-            <span>Chờ duyệt ({counts.pending})</span>
+            <span>Chờ thẩm định ({counts.pending})</span>
           </StatusTab>
           <StatusTab
-            active={statusTab === "approved"}
-            onClick={() => handleTabChange("approved")}
+            active={statusTab === "published"}
+            onClick={() => handleTabChange("published")}
             accent="emerald"
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
-                statusTab === "approved" ? "bg-white" : "bg-emerald-500"
+                statusTab === "published" ? "bg-white" : "bg-emerald-500"
               }`}
             />
-            <span>Đang lưu hành ({counts.approved})</span>
+            <span>Đang lưu hành ({counts.published})</span>
           </StatusTab>
+          {counts.rejected > 0 && (
+            <StatusTab
+              active={statusTab === "rejected"}
+              onClick={() => handleTabChange("rejected")}
+              accent="rose"
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  statusTab === "rejected" ? "bg-white" : "bg-rose-500"
+                }`}
+              />
+              <span>Yêu cầu sửa ({counts.rejected})</span>
+            </StatusTab>
+          )}
+          {counts.draft > 0 && (
+            <StatusTab
+              active={statusTab === "draft"}
+              onClick={() => handleTabChange("draft")}
+              accent="slate"
+            >
+              <span>Bản nháp ({counts.draft})</span>
+            </StatusTab>
+          )}
         </div>
 
         <div className="relative w-full sm:w-80 shrink-0">
@@ -794,7 +911,8 @@ export default function ModeratorDestinationsPage() {
           ) : (
             <ul className="divide-y divide-slate-100">
               {pagedItems.map((item) => {
-                const isApproved = item.approved === true;
+                const isApproved =
+                  item.status === STATUS.PUBLISHED || item.approved === true;
                 const isLoadingAction = actionLoadingId === item.id;
                 return (
                   <li
@@ -931,6 +1049,14 @@ export default function ModeratorDestinationsPage() {
         onApprove={(id, approve, name) => handleApprove(id, approve, name)}
         isActionLoading={actionLoadingId === detailTarget?.id}
         theme="emerald"
+      />
+
+      <RejectDestinationDialog
+        isOpen={Boolean(rejectDestTarget)}
+        destination={rejectDestTarget}
+        isSubmitting={isRejectingDest}
+        onClose={() => setRejectDestTarget(null)}
+        onConfirm={handleRejectDestConfirm}
       />
 
       {confirmDialog}

@@ -16,7 +16,7 @@ import {
   Video,
   BookOpen,
   FileText,
-  Sparkles,
+  Globe,
   Play,
   Pause,
   Volume2,
@@ -34,8 +34,13 @@ import {
   Layers,
   Calendar,
   Inbox,
+  XCircle,
+  AlertTriangle,
+  History,
+  Send,
 } from "lucide-react";
 import { culturalContentService } from "../services/culturalContentService";
+import { moderationService } from "../services/moderationService";
 import { experienceService } from "@/features/experience/services/experienceService";
 import { taskService } from "@/features/experience/services/taskService";
 import { checkInPointService } from "@/features/experience/services/checkInPointService";
@@ -70,12 +75,22 @@ const CONTENT_TYPES = [
   {
     type: "3D_VR",
     label: "Mô hình 3D / VR",
-    icon: Sparkles,
+    icon: Globe,
     badgeClass: "bg-violet-50 text-violet-700 border-violet-200",
   },
 ];
 
+const DEST_REASON_LABELS = {
+
+  INACCURATE_INFORMATION: "Thông tin điểm đến chưa chính xác",
+  INCOMPLETE_INFORMATION: "Thông tin điểm đến chưa đầy đủ",
+  INAPPROPRIATE_DESTINATION: "Điểm đến không phù hợp với nền tảng",
+  DUPLICATE_DESTINATION: "Điểm đến bị trùng lặp",
+  OTHER: "Lý do khác",
+};
+
 function formatDuration(sec) {
+
   if (!sec || Number.isNaN(sec) || sec <= 0) return "—";
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
@@ -128,14 +143,12 @@ export default function DestinationAssessmentModal({
   // Đánh dấu đã kiểm duyệt từng mục nội dung (Review Checklist in session)
   const [reviewedItems, setReviewedItems] = useState({});
 
-  // Dữ liệu gói trải nghiệm của điểm đến
-  const [experience, setExperience] = useState(null);
-  const [expLoading, setExpLoading] = useState(false);
-  const [expError, setExpError] = useState("");
-  const [expTasks, setExpTasks] = useState([]);
-  const [expCheckIns, setExpCheckIns] = useState([]);
-  const [expSlots, setExpSlots] = useState([]);
-  const [expDescExpanded, setExpDescExpanded] = useState(false);
+  // Trạng thái kiểm duyệt Cultural Content
+  const [contentToast, setContentToast] = useState("");
+  const showContentToast = useCallback((msg) => {
+    setContentToast(msg);
+    setTimeout(() => setContentToast(""), 3500);
+  }, []);
 
   const destId = destination?.id;
 
@@ -145,7 +158,7 @@ export default function DestinationAssessmentModal({
     setContentsLoading(true);
     setContentsError("");
     try {
-      const data = await culturalContentService.getByDestination(destId);
+      const data = await culturalContentService.getManageByDestination(destId);
       const list = Array.isArray(data) ? data : [];
       setContents(list);
     } catch (err) {
@@ -160,6 +173,130 @@ export default function DestinationAssessmentModal({
       setContentsLoading(false);
     }
   }, [destId]);
+
+  // Modal Phê duyệt Content
+  const [approveTarget, setApproveTarget] = useState(null);
+  const [approveNote, setApproveNote] = useState("");
+  const [isApprovingContent, setIsApprovingContent] = useState(false);
+
+  // Modal Từ chối Content
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectionReasons, setRejectionReasons] = useState([]);
+  const [selectedReasons, setSelectedReasons] = useState([]);
+  const [otherReason, setOtherReason] = useState("");
+  const [rejectNote, setRejectNote] = useState("");
+  const [rejectError, setRejectError] = useState("");
+  const [isRejectingContent, setIsRejectingContent] = useState(false);
+
+  // Modal Xem lịch sử Content
+  const [historyTarget, setHistoryTarget] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyData, setHistoryData] = useState(null);
+  const [historyError, setHistoryError] = useState("");
+
+  const handleOpenApproveContent = useCallback((content) => {
+    setApproveTarget(content);
+    setApproveNote("");
+  }, []);
+
+  const handleConfirmApproveContent = useCallback(async () => {
+    if (!approveTarget) return;
+    setIsApprovingContent(true);
+    try {
+      await moderationService.approveContent(approveTarget.id, approveNote);
+      showContentToast(`Đã duyệt thành công bài thuyết minh "${approveTarget.title}".`);
+      setApproveTarget(null);
+      await loadCulturalContents();
+    } catch (err) {
+      console.error("[Approve Content error]:", err);
+      showContentToast(err?.message || "Không thể phê duyệt nội dung này.");
+    } finally {
+      setIsApprovingContent(false);
+    }
+  }, [approveTarget, approveNote, loadCulturalContents, showContentToast]);
+
+  const handleOpenRejectContent = useCallback(async (content) => {
+    setRejectTarget(content);
+    setSelectedReasons([]);
+    setOtherReason("");
+    setRejectNote("");
+    setRejectError("");
+    try {
+      const reasons = await moderationService.getRejectionReasons();
+      setRejectionReasons(reasons);
+    } catch (err) {
+      console.error("[Get Rejection Reasons error]:", err);
+      setRejectionReasons([
+        { code: "IMAGE_NOT_RELEVANT", label: "Ảnh không phù hợp với nội dung" },
+        { code: "INACCURATE_INFORMATION", label: "Thông tin chưa chính xác" },
+        { code: "INAPPROPRIATE_CONTENT", label: "Nội dung không phù hợp" },
+        { code: "COPYRIGHT_VIOLATION", label: "Vi phạm bản quyền" },
+        { code: "INCOMPLETE_CONTENT", label: "Nội dung chưa đầy đủ" },
+        { code: "DUPLICATE_CONTENT", label: "Nội dung bị trùng lặp" },
+        { code: "OTHER", label: "Lý do khác" },
+      ]);
+    }
+  }, []);
+
+  const handleToggleReason = useCallback((code) => {
+    setSelectedReasons((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  }, []);
+
+  const handleConfirmRejectContent = useCallback(async () => {
+    if (!rejectTarget) return;
+    if (selectedReasons.length === 0) {
+      setRejectError("Vui lòng chọn ít nhất một lý do từ chối.");
+      return;
+    }
+    if (selectedReasons.includes("OTHER") && !otherReason.trim()) {
+      setRejectError("Khi chọn 'Lý do khác', bạn bắt buộc phải nhập mô tả chi tiết.");
+      return;
+    }
+    setIsRejectingContent(true);
+    setRejectError("");
+    try {
+      await moderationService.rejectContent(rejectTarget.id, {
+        reason: selectedReasons.join(","),
+        otherReason: otherReason.trim(),
+        note: rejectNote.trim(),
+      });
+      showContentToast(`Đã gửi phản hồi từ chối bài thuyết minh "${rejectTarget.title}".`);
+      setRejectTarget(null);
+      await loadCulturalContents();
+    } catch (err) {
+      console.error("[Reject Content error]:", err);
+      setRejectError(err?.message || "Không thể từ chối nội dung này.");
+    } finally {
+      setIsRejectingContent(false);
+    }
+  }, [rejectTarget, selectedReasons, otherReason, rejectNote, loadCulturalContents, showContentToast]);
+
+  const handleOpenContentHistory = useCallback(async (content) => {
+    setHistoryTarget(content);
+    setHistoryLoading(true);
+    setHistoryError("");
+    setHistoryData(null);
+    try {
+      const data = await moderationService.getContentHistory(content.id);
+      setHistoryData(data);
+    } catch (err) {
+      console.error("[Content History error]:", err);
+      setHistoryError(err?.message || "Chưa có lịch sử thẩm định cho bài viết này.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  // Dữ liệu gói trải nghiệm của điểm đến
+  const [experience, setExperience] = useState(null);
+  const [expLoading, setExpLoading] = useState(false);
+  const [expError, setExpError] = useState("");
+  const [expTasks, setExpTasks] = useState([]);
+  const [expCheckIns, setExpCheckIns] = useState([]);
+  const [expSlots, setExpSlots] = useState([]);
+  const [expDescExpanded, setExpDescExpanded] = useState(false);
 
   // Tải thông tin gói trải nghiệm (vé, nhiệm vụ, check-in, slots)
   const loadExperienceData = useCallback(async () => {
@@ -274,7 +411,8 @@ export default function DestinationAssessmentModal({
     }
 
     try {
-      const res = await culturalContentService.play(content.id);
+      // Bài chưa được duyệt không ghi nhận lượt nghe được, vẫn cho nghe thử để thẩm định.
+      const res = await culturalContentService.play(content.id).catch(() => null);
       setPlayingId(content.id);
 
       setContents((prev) =>
@@ -494,7 +632,53 @@ export default function DestinationAssessmentModal({
             ) : activeTab === "general" ? (
               /* ── TAB 1: THÔNG SỐ THỰC ĐỊA & SỨC CHỨA ── */
               <div className="space-y-4">
+                {/* Ý kiến thẩm định & lý do từ chối nếu có */}
+                {(destination?.status === "REJECTED" || destination?.rejectionReason) && (
+                  <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 space-y-2.5">
+                    <div className="flex items-center gap-1.5 text-rose-700">
+                      <AlertCircle size={14} className="shrink-0" />
+                      <p className="text-[11px] font-black uppercase tracking-wider">
+                        Ý kiến &amp; Lý do từ chối kiểm duyệt điểm đến
+                      </p>
+                    </div>
+
+                    {destination.rejectionReason && (
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {String(destination.rejectionReason)
+                          .split(",")
+                          .map((code) => {
+                            const trimmed = code.trim();
+                            const label = DEST_REASON_LABELS[trimmed] || trimmed;
+                            return (
+                              <span
+                                key={trimmed}
+                                className="inline-flex items-center px-2.5 py-1 rounded-xl bg-rose-100/90 text-rose-900 text-xs font-bold border border-rose-200/80 shadow-2xs"
+                              >
+                                {label}
+                              </span>
+                            );
+                          })}
+                      </div>
+                    )}
+
+                    {destination.otherReason && (
+                      <div className="bg-white/80 p-3 rounded-xl border border-rose-200/70 text-xs">
+                        <span className="font-bold text-rose-950 block mb-0.5">Chi tiết lý do khác:</span>
+                        <p className="text-rose-900 leading-relaxed font-medium">{destination.otherReason}</p>
+                      </div>
+                    )}
+
+                    {destination.decisionNote && (
+                      <div className="bg-white/80 p-3 rounded-xl border border-rose-200/70 text-xs">
+                        <span className="font-bold text-slate-900 block mb-0.5">Ghi chú từ Người thẩm định:</span>
+                        <p className="text-slate-700 leading-relaxed">{destination.decisionNote}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs">
+
                   <p className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                     <MapPin size={12} className="text-emerald-600" />
                     Địa chỉ hành chính thực địa
@@ -705,20 +889,37 @@ export default function DestinationAssessmentModal({
                                 <span>{item.playCount || 0} lượt nghe</span>
                               </span>
 
-                              {/* Checkbox đánh dấu đã thẩm định */}
-                              <button
-                                type="button"
-                                onClick={() => toggleReviewCheck(item.id)}
-                                className={`px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold flex items-center gap-1 transition-all cursor-pointer border ${
-                                  isReviewed
-                                    ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
-                                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                                }`}
-                                title="Đánh dấu đã thẩm định câu chuyện này"
-                              >
-                                <Check size={11} strokeWidth={3} />
-                                <span>{isReviewed ? "Đã duyệt mục này" : "Đánh dấu đã xem"}</span>
-                              </button>
+                              {/* Nút hành động Thẩm định từ Ban Thẩm định */}
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenApproveContent(item)}
+                                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 active:scale-95 shadow-2xs"
+                                  title="Phê duyệt bài thuyết minh này"
+                                >
+                                  <CheckCircle2 size={12} className="text-emerald-600" />
+                                  <span>Duyệt</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenRejectContent(item)}
+                                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 active:scale-95 shadow-2xs"
+                                  title="Từ chối và yêu cầu đính chính"
+                                >
+                                  <XCircle size={12} className="text-rose-600" />
+                                  <span>Từ chối</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenContentHistory(item)}
+                                  className="p-1 rounded-lg text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 border border-slate-200 transition-colors cursor-pointer"
+                                  title="Xem lịch sử kiểm duyệt của bài này"
+                                >
+                                  <History size={13} />
+                                </button>
+                              </div>
                             </div>
                           </div>
 
@@ -1128,21 +1329,34 @@ export default function DestinationAssessmentModal({
               )}
 
               {destination && !isApproved && onApprove && (
-                <button
-                  type="button"
-                  onClick={() => onApprove(destination.id, true, destination.name)}
-                  disabled={isActionLoading}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                  title="Phê duyệt điểm đến và phát hành cho du khách"
-                >
-                  {isActionLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <CheckCircle2 size={14} />
-                  )}
-                  <span>Phê duyệt điểm đến</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onApprove(destination.id, false, destination.name)}
+                    disabled={isActionLoading}
+                    className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                    title="Từ chối điểm đến và yêu cầu chỉnh sửa"
+                  >
+                    <Ban size={14} />
+                    <span>Từ chối</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onApprove(destination.id, true, destination.name)}
+                    disabled={isActionLoading}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                    title="Phê duyệt điểm đến và phát hành cho du khách"
+                  >
+                    {isActionLoading ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={14} />
+                    )}
+                    <span>Phê duyệt điểm đến</span>
+                  </button>
+                </>
               )}
+
 
               {destination && isApproved && onApprove && (
                 <button
@@ -1301,6 +1515,378 @@ export default function DestinationAssessmentModal({
                   Đóng
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          TOAST THÔNG BÁO THẨM ĐỊNH CONTENT
+          ======================================================== */}
+      {contentToast && (
+        <div className="fixed top-5 right-5 z-100 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3">
+          <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+          <span>{contentToast}</span>
+        </div>
+      )}
+
+      {/* ========================================================
+          MODAL 1: PHÊ DUYỆT BÀI THUYẾT MINH
+          ======================================================== */}
+      {approveTarget && (
+        <div
+          className="fixed inset-0 z-95 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setApproveTarget(null)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-extrabold text-slate-900">
+                  Phê duyệt bài thuyết minh?
+                </h4>
+                <p className="text-xs text-slate-500 truncate max-w-xs mt-0.5">
+                  {approveTarget.title}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Nội dung này sẽ được đánh dấu đã thẩm định chuẩn xác và hiển thị chính thức cho du khách thưởng thức trên ứng dụng.
+            </p>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 block">
+                Ghi chú phê duyệt (không bắt buộc)
+              </label>
+              <textarea
+                rows={2}
+                value={approveNote}
+                onChange={(e) => setApproveNote(e.target.value)}
+                placeholder="VD: Giọng đọc truyền cảm, tư liệu lịch sử chính xác..."
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-hidden focus:bg-white focus:border-emerald-500 transition-all"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setApproveTarget(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isApprovingContent}
+                onClick={handleConfirmApproveContent}
+                className="px-4 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {isApprovingContent && <Loader2 size={13} className="animate-spin" />}
+                <span>Xác nhận phê duyệt</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          MODAL 2: TỪ CHỐI BÀI THUYẾT MINH (TICKBOX LÝ DO CHUẨN)
+          ======================================================== */}
+      {rejectTarget && (
+        <div
+          className="fixed inset-0 z-95 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setRejectTarget(null)}
+        >
+          <div
+            className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                  <XCircle size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                    Từ chối tiếp nhận bài thuyết minh
+                  </h4>
+                  <p className="text-xs text-slate-500 truncate max-w-xs mt-0.5">
+                    {rejectTarget.title}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRejectTarget(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-3.5 [scrollbar-width:thin]">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">
+                  Chọn các lý do từ chối (có thể chọn nhiều):
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {rejectionReasons.map((r) => {
+                    const isChecked = selectedReasons.includes(r.code);
+                    return (
+                      <button
+                        key={r.code}
+                        type="button"
+                        onClick={() => handleToggleReason(r.code)}
+                        className={`p-2.5 rounded-xl border text-left text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                          isChecked
+                            ? "bg-rose-50 border-rose-300 text-rose-800 shadow-2xs"
+                            : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
+                            isChecked
+                              ? "bg-rose-600 border-rose-600 text-white"
+                              : "bg-white border-slate-300"
+                          }`}
+                        >
+                          {isChecked && <Check size={11} strokeWidth={3} />}
+                        </div>
+                        <span className="leading-snug">{r.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {selectedReasons.includes("OTHER") && (
+                <div className="space-y-1 pt-1">
+                  <label className="text-xs font-bold text-rose-700 block">
+                    Mô tả chi tiết lý do khác (Bắt buộc khi chọn &quot;Lý do khác&quot;):
+                  </label>
+                  <input
+                    type="text"
+                    value={otherReason}
+                    onChange={(e) => setOtherReason(e.target.value)}
+                    placeholder="VD: Âm thanh bị rè, sai lệch niên đại khởi dựng..."
+                    className="w-full px-3 py-2 text-xs bg-rose-50/50 border border-rose-200 rounded-xl outline-hidden focus:bg-white focus:border-rose-500 transition-all font-medium"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1 pt-1">
+                <label className="text-xs font-bold text-slate-700 block">
+                  Ý kiến thẩm định &amp; Hướng dẫn chỉnh sửa gửi Đối tác:
+                </label>
+                <textarea
+                  rows={3}
+                  value={rejectNote}
+                  onChange={(e) => setRejectNote(e.target.value)}
+                  placeholder="Ghi rõ yêu cầu hiệu đính để Đối tác nắm và chỉnh sửa lại kịp thời..."
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-hidden focus:bg-white focus:border-indigo-500 transition-all leading-relaxed"
+                />
+              </div>
+
+              {rejectError && (
+                <p className="text-xs font-bold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0" />
+                  <span>{rejectError}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRejectTarget(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isRejectingContent}
+                onClick={handleConfirmRejectContent}
+                className="px-4 py-2 text-xs font-bold rounded-xl text-white bg-rose-600 hover:bg-rose-700 transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm shadow-rose-600/20"
+              >
+                {isRejectingContent && <Loader2 size={13} className="animate-spin" />}
+                <span>Gửi từ chối hồ sơ</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          MODAL 3: XEM LỊCH SỬ KIỂM DUYỆT BÀI THUYẾT MINH
+          ======================================================== */}
+      {historyTarget && (
+        <div
+          className="fixed inset-0 z-95 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setHistoryTarget(null)}
+        >
+          <div
+            className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-100">
+                  <History size={16} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                    Lịch sử thẩm định thuyết minh
+                  </h4>
+                  <p className="text-xs text-slate-500 truncate max-w-xs mt-0.5">
+                    {historyTarget.title}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryTarget(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-3.5 [scrollbar-width:thin]">
+              {historyLoading ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
+                  <Loader2 size={24} className="animate-spin text-indigo-600" />
+                  <p className="text-xs font-bold">Đang tải lịch sử kiểm duyệt...</p>
+                </div>
+              ) : historyError ? (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <AlertCircle size={14} className="text-amber-600" />
+                    <span>Chưa có biên bản thẩm định</span>
+                  </p>
+                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                    Bài viết này chưa trải qua quy trình kiểm duyệt hoặc chưa được gửi thẩm định.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-600">Trạng thái:</span>
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${
+                        historyData?.status === "APPROVED"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          : historyData?.status === "REJECTED"
+                          ? "bg-rose-50 text-rose-800 border-rose-200"
+                          : "bg-amber-50 text-amber-800 border-amber-200"
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          historyData?.status === "APPROVED"
+                            ? "bg-emerald-500"
+                            : historyData?.status === "REJECTED"
+                            ? "bg-rose-500"
+                            : "bg-amber-500 animate-pulse"
+                        }`}
+                      />
+                      <span>
+                        {historyData?.status === "APPROVED"
+                          ? "Đã phê duyệt"
+                          : historyData?.status === "REJECTED"
+                          ? "Bị từ chối"
+                          : "Chờ kiểm duyệt"}
+                      </span>
+                    </span>
+                  </div>
+
+                  {historyData?.status === "REJECTED" && (historyData.reason || historyData.decisionNote) && (
+                    <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-rose-900">
+                        <AlertTriangle size={14} className="text-rose-600" />
+                        <span>Lý do từ chối:</span>
+                      </div>
+                      {historyData.reason && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {historyData.reason.split(",").map((code) => (
+                            <span
+                              key={code}
+                              className="px-2 py-0.5 rounded-lg bg-white border border-rose-200 text-rose-700 font-semibold text-[11px]"
+                            >
+                              {code.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {historyData.otherReason && (
+                        <p className="text-xs text-rose-800 bg-white/80 p-2 rounded-lg border border-rose-150 leading-relaxed font-medium">
+                          <span className="font-bold">Lý do khác:</span> {historyData.otherReason}
+                        </p>
+                      )}
+                      {historyData.decisionNote && (
+                        <p className="text-xs text-slate-700 italic">
+                          &ldquo;{historyData.decisionNote}&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {Array.isArray(historyData?.history) && historyData.history.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        Dòng thời gian sự kiện
+                      </h5>
+                      <div className="space-y-2">
+                        {historyData.history.map((evt, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 text-xs space-y-1"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-800">
+                                {evt.action === "SUBMITTED"
+                                  ? "Đã gửi hồ sơ thẩm định"
+                                  : evt.action === "APPROVED"
+                                  ? "Đã duyệt và xuất bản"
+                                  : "Đã từ chối hồ sơ"}
+                              </span>
+                              <span className="text-[10.5px] font-mono text-slate-400">
+                                {evt.createdAt ? new Date(evt.createdAt).toLocaleString("vi-VN") : "—"}
+                              </span>
+                            </div>
+                            {evt.actorName && (
+                              <p className="text-[11px] text-slate-500">
+                                Thực hiện bởi: <strong className="text-slate-700">{evt.actorName}</strong>
+                              </p>
+                            )}
+                            {evt.note && (
+                              <p className="text-xs text-slate-600 bg-white p-2 rounded-lg border border-slate-150 mt-1">
+                                {evt.note}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setHistoryTarget(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>

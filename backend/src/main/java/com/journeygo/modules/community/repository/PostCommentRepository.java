@@ -12,4 +12,6 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
     Page<PostComment> findByPostIdAndHiddenFalseOrderByCreatedAtAsc(Long postId, Pageable pageable);
 
     int countByPostIdAndHiddenFalse(Long postId);
+
+    void deleteByPostId(Long postId);
 }

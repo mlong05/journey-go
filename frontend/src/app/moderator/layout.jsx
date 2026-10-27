@@ -6,8 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   MapPin,
-  Bot,
-  Camera,
+  BookOpen,
+  MessageSquare,
   History,
   LogOut,
   Search,
@@ -15,7 +15,6 @@ import {
   Menu,
   X,
   Compass,
-  Sparkles,
   Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
@@ -72,17 +71,17 @@ export default function ModeratorLayout({ children }) {
     },
 
     {
-      id: "ai-knowledge",
-      label: "Kiểm tra Kiến thức AI",
+      id: "heritage-knowledge",
+      label: "Chuẩn hóa Thuyết minh Di sản",
       href: "/moderator/ai-auditing",
-      icon: Bot,
+      icon: BookOpen,
       badge: null,
     },
     {
       id: "community-media",
-      label: "Duyệt Ảnh & Bài Cộng đồng",
+      label: "Duyệt Bài Cộng đồng",
       href: "/moderator/community",
-      icon: Camera,
+      icon: MessageSquare,
       badge: null,
     },
     {

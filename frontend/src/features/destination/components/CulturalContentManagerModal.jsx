@@ -7,7 +7,7 @@ import {
   Video,
   BookOpen,
   FileText,
-  Sparkles,
+  Globe,
   Plus,
   Play,
   RotateCcw,
@@ -25,6 +25,10 @@ import {
   ArrowLeft,
   Filter,
   ExternalLink,
+  Send,
+  History,
+  ShieldCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { culturalContentService } from "../services/culturalContentService";
 
@@ -66,11 +70,21 @@ const CONTENT_TYPES = [
     type: "3D_VR",
     label: "Mô hình 3D / VR",
     desc: "Tái hiện không gian ảo, tương tác cổ vật đa chiều",
-    icon: Sparkles,
+    icon: Globe,
     badgeClass: "bg-violet-50 text-violet-700 border-violet-200",
     bgGradient: "from-violet-600 to-purple-700",
   },
 ];
+
+const REJECTION_LABELS = {
+  IMAGE_NOT_RELEVANT: "Ảnh không phù hợp với nội dung",
+  INACCURATE_INFORMATION: "Thông tin chưa chính xác",
+  INAPPROPRIATE_CONTENT: "Nội dung không phù hợp",
+  COPYRIGHT_VIOLATION: "Vi phạm bản quyền",
+  INCOMPLETE_CONTENT: "Nội dung chưa đầy đủ",
+  DUPLICATE_CONTENT: "Nội dung bị trùng lặp",
+  OTHER: "Lý do khác",
+};
 
 function formatDuration(sec) {
   if (!sec || Number.isNaN(sec) || sec <= 0) return "—";
@@ -97,6 +111,26 @@ function getYouTubeEmbedUrl(url) {
 function isDirectVideoUrl(url) {
   if (!url || typeof url !== "string") return false;
   return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url.trim());
+}
+
+const TITLE_MAX = 200;
+const MEDIA_URL_MAX = 1000;
+const DESCRIPTION_MAX = 300;
+const CONTENT_TEXT_MAX = 5000;
+
+/** Bộ đếm ký tự nhỏ ở góc phải dưới của ô nhập. */
+function CharCounter({ value, max, className = "bottom-2" }) {
+  const length = (value || "").length;
+  const nearLimit = length >= max * 0.9;
+  return (
+    <span
+      className={`pointer-events-none absolute right-3 ${className} text-[10px] font-mono font-semibold ${
+        nearLimit ? "text-rose-500" : "text-slate-400"
+      }`}
+    >
+      {length}/{max}
+    </span>
+  );
 }
 
 export default function CulturalContentManagerModal({
@@ -147,11 +181,41 @@ export default function CulturalContentManagerModal({
   // Confirmation dialog (xóa mềm / khôi phục)
   const [confirmDialog, setConfirmDialog] = useState(null);
 
+  // Lịch sử kiểm duyệt (History Dialog)
+  const [historyTarget, setHistoryTarget] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyData, setHistoryData] = useState(null);
+  const [historyError, setHistoryError] = useState("");
+
   // Toast
   const [toast, setToast] = useState({ message: "", tone: "success" });
   const showToast = useCallback((message, tone = "success") => {
     setToast({ message, tone });
     setTimeout(() => setToast({ message: "", tone }), 4000);
+  }, []);
+
+  const handleOpenHistory = useCallback(async (content) => {
+    setHistoryTarget(content);
+    setHistoryLoading(true);
+    setHistoryError("");
+    setHistoryData(null);
+    try {
+      const data = await culturalContentService.getHistory(content.id);
+      setHistoryData(data);
+    } catch (err) {
+      console.error("[Content History] fetch error:", err);
+      setHistoryError(
+        err?.message || "Không thể tải lịch sử kiểm duyệt cho nội dung này."
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  const handleCloseHistory = useCallback(() => {
+    setHistoryTarget(null);
+    setHistoryData(null);
+    setHistoryError("");
   }, []);
 
   const resetForm = useCallback(() => {
@@ -172,7 +236,7 @@ export default function CulturalContentManagerModal({
     setLoading(true);
     try {
       const [actives, deleteds] = await Promise.all([
-        culturalContentService.getByDestination(destination.id).catch(() => []),
+        culturalContentService.getManageByDestination(destination.id).catch(() => []),
         culturalContentService.getDeletedByDestination(destination.id).catch(() => []),
       ]);
       setActiveContents(actives || []);
@@ -184,6 +248,30 @@ export default function CulturalContentManagerModal({
       setLoading(false);
     }
   }, [destination, showToast]);
+
+  const handleSubmitForModeration = useCallback(
+    async (content) => {
+      setActionLoading(true);
+      try {
+        await culturalContentService.submit(content.id);
+        showToast(
+          `Đã gửi bài thuyết minh "${content.title}" vào hàng chờ kiểm duyệt thành công!`,
+          "success"
+        );
+        await loadData();
+        onUpdated?.();
+      } catch (err) {
+        console.error("[Submit Content Moderation] error:", err);
+        showToast(
+          err?.message || "Không thể gửi nội dung vào hàng chờ kiểm duyệt.",
+          "error"
+        );
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [loadData, onUpdated, showToast]
+  );
 
   useEffect(() => {
     if (!isOpen || !destination?.id) return;
@@ -343,7 +431,8 @@ export default function CulturalContentManagerModal({
     }
 
     try {
-      const res = await culturalContentService.play(content.id);
+      // Bài chưa được duyệt không ghi nhận lượt nghe được, vẫn cho chủ sở hữu nghe thử.
+      const res = await culturalContentService.play(content.id).catch(() => null);
       setPlayingId(content.id);
 
       setActiveContents((prev) =>
@@ -629,14 +718,16 @@ export default function CulturalContentManagerModal({
                       <label className="text-xs font-bold text-slate-700 block">
                         Tiêu đề thuyết minh / câu chuyện <span className="text-rose-500">*</span>
                       </label>
-                      <input
-                        type="text"
-                        maxLength={200}
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="VD: Lời chào cổng tam quan, Truyền thuyết giếng ngọc..."
-                        className="w-full px-3.5 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          maxLength={TITLE_MAX}
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          className="w-full pl-3.5 pr-14 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
+                        />
+                        <CharCounter value={title} max={TITLE_MAX} className="top-1/2 -translate-y-1/2" />
+                      </div>
                     </div>
 
                     <div className="sm:col-span-3 space-y-1">
@@ -666,7 +757,6 @@ export default function CulturalContentManagerModal({
                         min="0"
                         value={duration}
                         onChange={(e) => setDuration(e.target.value)}
-                        placeholder="VD: 180 (3 phút)"
                         className="w-full px-3.5 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
                       />
                     </div>
@@ -680,13 +770,16 @@ export default function CulturalContentManagerModal({
                         Hỗ trợ link YouTube, video MP4 và file âm thanh MP3
                       </span>
                     </label>
-                    <input
-                      type="url"
-                      value={mediaUrl}
-                      onChange={(e) => setMediaUrl(e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=... hoặc https://cdn.journeygo.com/audio/..."
-                      className="w-full px-3.5 py-2 text-xs font-mono font-medium bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
-                    />
+                    <div className="relative">
+                      <input
+                        type="url"
+                        maxLength={MEDIA_URL_MAX}
+                        value={mediaUrl}
+                        onChange={(e) => setMediaUrl(e.target.value)}
+                        className="w-full pl-3.5 pr-20 py-2 text-xs font-mono font-medium bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
+                      />
+                      <CharCounter value={mediaUrl} max={MEDIA_URL_MAX} className="top-1/2 -translate-y-1/2" />
+                    </div>
 
                     {/* Huy hiệu nhận diện YouTube thông minh */}
                     {getYouTubeEmbedUrl(mediaUrl) && (
@@ -702,13 +795,16 @@ export default function CulturalContentManagerModal({
                     <label className="text-xs font-bold text-slate-700 block">
                       Tóm tắt dẫn nhập (Description)
                     </label>
-                    <input
-                      type="text"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Tóm tắt ngắn 1-2 câu để du khách nắm được nội dung trước khi nghe..."
-                      className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        maxLength={DESCRIPTION_MAX}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        className="w-full pl-3.5 pr-16 py-2 text-xs bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
+                      />
+                      <CharCounter value={description} max={DESCRIPTION_MAX} className="top-1/2 -translate-y-1/2" />
+                    </div>
                   </div>
 
                   {/* 5. Kịch bản chi tiết / Lời bình thuyết minh */}
@@ -716,13 +812,16 @@ export default function CulturalContentManagerModal({
                     <label className="text-xs font-bold text-slate-700 block">
                       Lời bình thuyết minh chi tiết / Kịch bản câu chuyện (Script / Content text)
                     </label>
-                    <textarea
-                      rows={5}
-                      value={contentText}
-                      onChange={(e) => setContentText(e.target.value)}
-                      placeholder="Nhập toàn văn bài thuyết minh hoặc nội dung truyền thuyết để hiển thị cho du khách đọc kèm khi nghe audio..."
-                      className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all leading-relaxed"
-                    />
+                    <div className="relative">
+                      <textarea
+                        rows={5}
+                        maxLength={CONTENT_TEXT_MAX}
+                        value={contentText}
+                        onChange={(e) => setContentText(e.target.value)}
+                        className="w-full px-3.5 pt-2 pb-6 text-xs bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all leading-relaxed"
+                      />
+                      <CharCounter value={contentText} max={CONTENT_TEXT_MAX} className="bottom-2" />
+                    </div>
                   </div>
 
                   {formError && (
@@ -813,15 +912,6 @@ export default function CulturalContentManagerModal({
                   </button>
                 </div>
 
-                {/* Nút bật form tạo mới (Luôn hiển thị, không bị mất) */}
-                <button
-                  type="button"
-                  onClick={handleOpenCreate}
-                  className="h-9 px-4 rounded-xl text-xs font-bold inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 hover:from-indigo-700 hover:to-violet-800 text-white shadow-sm shadow-indigo-600/25 cursor-pointer transition-all active:scale-95 shrink-0"
-                >
-                  <Plus size={15} strokeWidth={2.4} />
-                  <span>Thêm thuyết minh mới</span>
-                </button>
               </div>
 
               {/* BỘ LỌC ĐỊNH DẠNG (POP-UP BẤM XỔ XUỐNG) & TÌM KIẾM */}
@@ -993,6 +1083,7 @@ export default function CulturalContentManagerModal({
                     )}
                   </div>
                 ) : (
+                  <div className="space-y-3.5">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                     {displayedContents.map((content) => {
                       const typeCfg =
@@ -1032,6 +1123,20 @@ export default function CulturalContentManagerModal({
                                   <Icon size={11} />
                                   <span>{typeCfg.label}</span>
                                 </span>
+                                {(() => {
+                                  const st = content.reviewStatus;
+                                  const cfg =
+                                    st === "PENDING"
+                                      ? { label: "Chờ duyệt", cls: "bg-amber-50 text-amber-700 border-amber-200" }
+                                      : st === "REJECTED"
+                                      ? { label: "Bị từ chối", cls: "bg-rose-50 text-rose-700 border-rose-200" }
+                                      : { label: "Đã duyệt", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+                                  return (
+                                    <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.cls}`}>
+                                      {cfg.label}
+                                    </span>
+                                  );
+                                })()}
                               </div>
 
                               {/* Số lượt nghe/xem playCount */}
@@ -1120,6 +1225,28 @@ export default function CulturalContentManagerModal({
                                 </button>
                               ) : (
                                 <>
+                                  {content.reviewStatus !== "PENDING" && content.reviewStatus !== "APPROVED" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSubmitForModeration(content)}
+                                      disabled={actionLoading}
+                                      className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/90 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs disabled:opacity-50"
+                                      title="Gửi bài thuyết minh này vào hàng chờ kiểm duyệt di sản"
+                                    >
+                                      <Send size={11} className="text-amber-700" />
+                                      <span>Gửi duyệt</span>
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenHistory(content)}
+                                    className="p-1.5 text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Xem lịch sử thẩm định & phản hồi"
+                                  >
+                                    <History size={14} />
+                                  </button>
+
                                   <button
                                     type="button"
                                     onClick={() => handleOpenEdit(content)}
@@ -1144,14 +1271,24 @@ export default function CulturalContentManagerModal({
                       );
                     })}
                   </div>
+                  {currentTab === "active" && (
+                    <button
+                      type="button"
+                      onClick={handleOpenCreate}
+                      className="w-full py-3 rounded-2xl border-2 border-dashed border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/50 text-indigo-700 font-bold text-xs inline-flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Plus size={14} strokeWidth={2.4} />
+                      <span>Thêm thuyết minh mới</span>
+                    </button>
+                  )}
+                  </div>
                 )}
               </div>
 
               {/* FOOTER MODAL */}
               <div className="shrink-0 px-6 sm:px-8 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>
-                  Tổng cộng <strong>{activeContents.length} tài liệu thuyết minh</strong> đã được xuất
-                  bản ({deletedContents.length} trong thùng rác).
+                  Tổng cộng <strong>{activeContents.length} tài liệu thuyết minh</strong> ({deletedContents.length} trong thùng rác).
                 </span>
 
                 <button
@@ -1373,6 +1510,188 @@ export default function CulturalContentManagerModal({
                     ) : (
                       "Xác nhận khôi phục"
                     )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================
+              HISTORY & REJECTION REASONS MODAL
+              ======================================================== */}
+          {historyTarget && (
+            <div
+              className="fixed inset-0 z-85 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+              onClick={handleCloseHistory}
+            >
+              <div
+                className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-100">
+                      <History size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                        Lịch sử kiểm duyệt di sản
+                      </h4>
+                      <p className="text-xs text-slate-500 truncate max-w-xs mt-0.5">
+                        {historyTarget.title}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCloseHistory}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto py-4 space-y-3.5 [scrollbar-width:thin]">
+                  {historyLoading ? (
+                    <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
+                      <Loader2 size={24} className="animate-spin text-indigo-600" />
+                      <p className="text-xs font-bold">Đang tải lịch sử thẩm định...</p>
+                    </div>
+                  ) : historyError ? (
+                    <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
+                      <p className="font-bold flex items-center gap-1.5">
+                        <AlertCircle size={14} className="text-amber-600" />
+                        <span>Chưa có biên bản thẩm định</span>
+                      </p>
+                      <p className="text-[11px] text-amber-700 leading-relaxed">
+                        Nội dung này chưa được gửi kiểm duyệt hoặc đang ở trạng thái bản nháp của Đối tác.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Trạng thái hiện tại */}
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-600">Trạng thái hiện tại:</span>
+                        <span
+                          className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${
+                            historyData?.status === "APPROVED"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : historyData?.status === "REJECTED"
+                              ? "bg-rose-50 text-rose-800 border-rose-200"
+                              : "bg-amber-50 text-amber-800 border-amber-200"
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              historyData?.status === "APPROVED"
+                                ? "bg-emerald-500"
+                                : historyData?.status === "REJECTED"
+                                ? "bg-rose-500"
+                                : "bg-amber-500 animate-pulse"
+                            }`}
+                          />
+                          <span>
+                            {historyData?.status === "APPROVED"
+                              ? "Đã phê duyệt"
+                              : historyData?.status === "REJECTED"
+                              ? "Bị từ chối"
+                              : "Đang chờ thẩm định"}
+                          </span>
+                        </span>
+                      </div>
+
+                      {/* Phản hồi từ chối (nếu có) */}
+                      {historyData?.status === "REJECTED" && (historyData.reason || historyData.decisionNote) && (
+                        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-2">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-rose-900">
+                            <AlertTriangle size={14} className="text-rose-600" />
+                            <span>Lý do từ chối từ Ban Thẩm định:</span>
+                          </div>
+
+                          {historyData.reason && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {historyData.reason.split(",").map((code) => {
+                                const trimmed = code.trim();
+                                const label = REJECTION_LABELS[trimmed] || trimmed;
+                                return (
+                                  <span
+                                    key={trimmed}
+                                    className="px-2 py-0.5 rounded-lg bg-white border border-rose-200 text-rose-700 font-semibold text-[11px]"
+                                  >
+                                    {label}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {historyData.otherReason && (
+                            <p className="text-xs text-rose-800 bg-white/80 p-2 rounded-lg border border-rose-150 leading-relaxed font-medium">
+                              <span className="font-bold">Ghi chú cụ thể:</span> {historyData.otherReason}
+                            </p>
+                          )}
+
+                          {historyData.decisionNote && (
+                            <p className="text-xs text-slate-700 italic">
+                              "{historyData.decisionNote}"
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Dòng thời gian các sự kiện */}
+                      {Array.isArray(historyData?.history) && historyData.history.length > 0 && (
+                        <div className="space-y-2 pt-1">
+                          <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            Dòng thời gian thẩm định
+                          </h5>
+                          <div className="space-y-2">
+                            {historyData.history.map((evt, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 text-xs space-y-1"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-slate-800">
+                                    {evt.action === "SUBMITTED"
+                                      ? "Đã gửi hồ sơ thẩm định"
+                                      : evt.action === "APPROVED"
+                                      ? "Đã phê duyệt xuất bản"
+                                      : "Đã từ chối hồ sơ"}
+                                  </span>
+                                  <span className="text-[10.5px] font-mono text-slate-400">
+                                    {evt.createdAt ? new Date(evt.createdAt).toLocaleString("vi-VN") : "—"}
+                                  </span>
+                                </div>
+                                {evt.actorName && (
+                                  <p className="text-[11px] text-slate-500 font-medium">
+                                    Thực hiện bởi: <strong className="text-slate-700">{evt.actorName}</strong>
+                                  </p>
+                                )}
+                                {evt.note && (
+                                  <p className="text-xs text-slate-600 bg-white p-2 rounded-lg border border-slate-150 mt-1">
+                                    {evt.note}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={handleCloseHistory}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Đóng
                   </button>
                 </div>
               </div>

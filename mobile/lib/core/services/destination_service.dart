@@ -12,10 +12,12 @@ class DestinationService {
 
   static const String _kCachedDestinationsKey = 'journeygo_cached_destinations_v1';
 
-  /// Lấy danh sách điểm đến đã duyệt từ API Backend (GET /api/v1/destinations/approved)
+  /// Lấy danh sách điểm đến đã duyệt từ API Backend (GET /api/v1/destinations)
   Future<List<DestinationModel>> getApprovedDestinations() async {
     final baseUrl = await TokenStorage.getBaseUrl();
-    final uri = Uri.parse('$baseUrl${ApiConstants.destinationsEndpoint}/approved');
+    // Backend không có /destinations/approved (bị hiểu là /destinations/{id}). GET /destinations
+    // vốn chỉ trả điểm đến đã duyệt, đặt size lớn vì mặc định chỉ 10 dòng.
+    final uri = Uri.parse('$baseUrl${ApiConstants.destinationsEndpoint}?page=0&size=200');
     final token = await TokenStorage.getAccessToken();
 
     final headers = <String, String>{
