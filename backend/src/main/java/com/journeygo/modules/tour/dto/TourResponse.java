@@ -2,13 +2,14 @@ package com.journeygo.modules.tour.dto;
 
 import com.journeygo.modules.destination.dto.DestinationResponse;
 import com.journeygo.modules.tour.entity.Tour;
-import com.journeygo.modules.tour.entity.TourStatus;
+import com.journeygo.modules.tour.entity.enums.TourStatus;
 import com.journeygo.modules.tour.entity.TourType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 
@@ -19,9 +20,10 @@ public record TourResponse(
         @Schema(description = "ID tour") Long tourId,
         @Schema(description = "Tên tour") String title,
         @Schema(description = "Loại hình tour") TourType tourType,
-        @Schema(description = "Tổng giá tour = tổng giá các Experience của các điểm đến trong hành trình (VND)")
-        BigDecimal price,
+        @Schema(description = "Giá tour cho mỗi người (VND)") BigDecimal price,
         @Schema(description = "Số ngày") int durationDays,
+        @Schema(description = "Ngày bắt đầu tour") LocalDate startDate,
+        @Schema(description = "Ngày kết thúc tour") LocalDate endDate,
         @Schema(description = "Đã được phê duyệt") boolean approved,
         @Schema(description = "Trạng thái quy trình (DRAFT, PENDING, PUBLISHED, REJECTED)") TourStatus status,
         @Schema(description = "Lý do từ chối (nếu có)") String rejectionReason,
@@ -33,7 +35,7 @@ public record TourResponse(
         @Schema(description = "Thời gian tạo") Instant createdAt,
         @Schema(description = "Thời gian cập nhật") Instant updatedAt
 ) {
-    public static TourResponse fromEntity(Tour t, BigDecimal price) {
+    public static TourResponse fromEntity(Tour t) {
         if (t == null) return null;
 
         List<TourDestinationResponse> destResponses = (t.getTourDestinations() == null)
@@ -46,8 +48,10 @@ public record TourResponse(
                 .tourId(t.getTourId())
                 .title(t.getTitle())
                 .tourType(t.getTourType())
-                .price(price)
+                .price(t.getPrice())
                 .durationDays(t.getDurationDays())
+                .startDate(t.getStartDate())
+                .endDate(t.getEndDate())
                 .approved(t.isApproved())
                 .status(t.getStatus())
                 .rejectionReason(t.getRejectionReason())

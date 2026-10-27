@@ -1,6 +1,7 @@
 package com.journeygo.modules.moderation.entity;
 
 import com.journeygo.modules.user.entity.User;
+import com.journeygo.modules.moderation.entity.enums.ContentReviewAction;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;

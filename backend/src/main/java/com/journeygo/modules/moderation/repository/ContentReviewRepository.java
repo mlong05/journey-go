@@ -1,7 +1,7 @@
 package com.journeygo.modules.moderation.repository;
 
 import com.journeygo.modules.moderation.entity.ContentReview;
-import com.journeygo.modules.moderation.entity.ContentReviewStatus;
+import com.journeygo.modules.moderation.entity.enums.ContentReviewStatus;
 import com.journeygo.modules.content.entity.CulturalContent;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

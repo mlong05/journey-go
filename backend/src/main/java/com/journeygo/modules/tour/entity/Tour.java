@@ -1,11 +1,14 @@
 package com.journeygo.modules.tour.entity;
 
 import com.journeygo.modules.user.entity.User;
+import com.journeygo.modules.tour.entity.enums.TourStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,6 +36,16 @@ public class Tour {
 
     @Column(nullable = false)
     private int durationDays;
+
+    /** Price per participant, captured directly on the tour. */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal price;
+
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
 
     /** Administrative approval flag (mirrors status for legacy compatibility). */
     @Column(nullable = false)
@@ -98,29 +111,6 @@ public class Tour {
     public void softRestore() {
         this.deleted = false;
         this.deletedAt = null;
-    }
-
-    // ── Workflow methods ──────────────────────────────────────────────────────
-
-    /** Submit tour for admin / moderator review. */
-    public void submit() {
-        this.status = TourStatus.PENDING;
-        this.approved = false;
-        this.rejectionReason = null;
-    }
-
-    /** Publish tour after successful review. */
-    public void publish() {
-        this.status = TourStatus.PUBLISHED;
-        this.approved = true;
-        this.rejectionReason = null;
-    }
-
-    /** Reject tour with a mandatory reason. */
-    public void reject(String reason) {
-        this.status = TourStatus.REJECTED;
-        this.approved = false;
-        this.rejectionReason = reason;
     }
 
     /** Calculate the total number of destinations in this tour. */
