@@ -7,7 +7,7 @@ import lombok.Builder;
 
 import java.time.Instant;
 
-@Builder
+@Builder(toBuilder = true)
 @Schema(description = "Thông tin nội dung văn hóa")
 public record CulturalContentResponse(
 
@@ -26,7 +26,8 @@ public record CulturalContentResponse(
         @Schema(description = "Số lượt phát / xem") long playCount,
         @Schema(description = "Đã xóa") boolean deleted,
         @Schema(description = "Thời gian tạo") Instant createdAt,
-        @Schema(description = "Thời gian cập nhật") Instant updatedAt
+        @Schema(description = "Thời gian cập nhật") Instant updatedAt,
+        @Schema(description = "Trạng thái kiểm duyệt (PENDING, APPROVED, REJECTED); null với nội dung cũ chưa qua kiểm duyệt") String reviewStatus
 ) {
     public static CulturalContentResponse fromEntity(CulturalContent content) {
         if (content == null) return null;

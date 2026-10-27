@@ -100,6 +100,18 @@ public class DestinationController {
 
     // ── ADMIN / MODERATOR / PROVIDER ─────────────────────────────────────────
 
+    @GetMapping("/my")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Lấy điểm đến của tôi",
+            description = "Trả về mọi điểm đến (kể cả DRAFT/PENDING/REJECTED) do người dùng hiện tại tạo")
+    public ResponseEntity<ApiResponse<PageResponse<DestinationResponse>>> getMine(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách điểm đến của tôi thành công",
+                destinationService.getByCreator(userPrincipal.getId(), pageable)));
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")

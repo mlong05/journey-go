@@ -13,14 +13,14 @@ import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 
-@Builder
+@Builder(toBuilder = true)
 @Schema(description = "Thông tin tour du lịch")
 public record TourResponse(
 
         @Schema(description = "ID tour") Long tourId,
         @Schema(description = "Tên tour") String title,
         @Schema(description = "Loại hình tour") TourType tourType,
-        @Schema(description = "Giá tour cho mỗi người (VND)") BigDecimal price,
+        @Schema(description = "Giá tour (VND) = tổng giá các Experience PUBLISHED của các điểm đến trong tour") BigDecimal price,
         @Schema(description = "Số ngày") int durationDays,
         @Schema(description = "Ngày bắt đầu tour") LocalDate startDate,
         @Schema(description = "Ngày kết thúc tour") LocalDate endDate,
@@ -48,7 +48,6 @@ public record TourResponse(
                 .tourId(t.getTourId())
                 .title(t.getTitle())
                 .tourType(t.getTourType())
-                .price(t.getPrice())
                 .durationDays(t.getDurationDays())
                 .startDate(t.getStartDate())
                 .endDate(t.getEndDate())

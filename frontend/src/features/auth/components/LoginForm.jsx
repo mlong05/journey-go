@@ -2,20 +2,16 @@
 
 import React from "react";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
-import RoleSelector from "./RoleSelector";
 
 /**
  * Form Đăng nhập hệ thống phỏng theo thiết kế Hình 2 (Travelista Tours):
  * - Input viền tròn xanh da trời với nhãn nổi (floating label) đặc trưng
  * - Phím bấm LOGIN xanh ngọc tươi sáng có bóng đổ mềm
- * - Đã loại bỏ vai trò "Khách du lịch"
+ * - Không chọn vai trò: hệ thống tự điều hướng theo role của tài khoản
  */
 export default function LoginForm({
   loginForm,
   setLoginForm,
-  roles,
-  selectedRoleId,
-  onSelectRole,
   showPassword,
   setShowPassword,
   loading,
@@ -25,15 +21,6 @@ export default function LoginForm({
 }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4 w-full">
-      {/* Bộ chọn vai trò nhanh (Đã loại bỏ Khách du lịch) */}
-      <div className="space-y-1.5">
-        <RoleSelector
-          roles={roles}
-          selectedRoleId={selectedRoleId}
-          onSelectRole={onSelectRole}
-        />
-      </div>
-
       {/* Trường Email / Tên tài khoản - Viền bo tròn xanh da trời với nhãn nổi như Hình 2 */}
       <div className="pt-1 w-full">
         <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all">

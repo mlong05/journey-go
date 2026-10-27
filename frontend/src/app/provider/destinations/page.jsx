@@ -177,7 +177,7 @@ export default function ProviderDestinationsPage() {
     setIsLoading(true);
     setFetchError("");
     try {
-      const data = await destinationService.getAll();
+      const data = await destinationService.getMine();
       const list = Array.isArray(data) ? data : [];
       const normalized = list
         .map((item) => normalizeDestination(item, STATUS.PENDING))

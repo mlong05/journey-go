@@ -9,7 +9,6 @@ import { ROUTES } from "@/constants/routes";
 import { STORAGE_KEYS } from "@/constants";
 import { authService } from "../services/authService";
 import { useAuth } from "../hooks/useAuth";
-import { ROLES } from "../constants/authData";
 
 import AuthHeroCarousel from "./AuthHeroCarousel";
 import AuthFeedbackModal from "./AuthFeedbackModal";
@@ -21,22 +20,12 @@ import SocialLoginButtons from "./SocialLoginButtons";
 import HeritageLandmarksArt from "./HeritageLandmarksArt";
 import { translateAuthError } from "@/services/errorMessage";
 
-// Loại bỏ vai trò Khách du lịch khỏi danh sách đăng nhập theo yêu cầu
-const LOGIN_ROLES = ROLES.filter(
-  (r) => r.id !== "tourist" && r.roleEnum !== "TOURIST"
-);
-
 export default function AuthScreen({ initialTab = "login" }) {
   const router = useRouter();
   const { loginWithGoogle } = useAuth();
 
   // Tab chuyển đổi: "login" (Đăng nhập) | "register" (Đăng ký tài khoản)
   const [activeTab, setActiveTab] = useState(initialTab);
-
-  // Vai trò truy cập được chọn (Mặc định: Quản trị viên)
-  const [selectedRoleId, setSelectedRoleId] = useState("admin");
-  const selectedRole =
-    LOGIN_ROLES.find((r) => r.id === selectedRoleId) || LOGIN_ROLES[0];
 
   // Trạng thái ẩn/hiện mật khẩu
   const [showPassword, setShowPassword] = useState(false);
@@ -73,13 +62,6 @@ export default function AuthScreen({ initialTab = "login" }) {
     targetLabel: "",
     redirectPath: "/",
   });
-
-  
-  const handleSelectRole = (roleId) => {
-    // Chỉ đổi pill vai trò — KHÔNG tự động điền tài khoản/mật khẩu mẫu.
-    // Người dùng phải tự nhập email và mật khẩu.
-    setSelectedRoleId(roleId);
-  };
 
   const showToast = (type, message) => {
     setToast({ type, message });
@@ -135,22 +117,6 @@ export default function AuthScreen({ initialTab = "login" }) {
       }
 
       const roleStr = String(user.role || "").toUpperCase();
-
-      // ==========================================================================
-      // KIỂM TRA KHỚP VAI TRÒ: Tài khoản phải thuộc đúng role đã chọn ở UI
-      // Ví dụ: chọn "Quản trị viên" thì chỉ user.role = ADMIN mới được vào.
-      // Lưu ý: Thông báo lỗi chỉ nêu chung "tài khoản/mật khẩu không đúng"
-      // để không lộ thông tin role thật của tài khoản.
-      // ==========================================================================
-      const expectedRole = String(selectedRole?.roleEnum || "").toUpperCase();
-      if (expectedRole && roleStr !== expectedRole) {
-        setLoading(false);
-        showToast(
-          "error",
-          "Tài khoản hoặc mật khẩu không đúng. Vui lòng kiểm tra lại hoặc chọn đúng vai trò tương ứng."
-        );
-        return;
-      }
 
       let targetPath = "/";
       let roleTitle = "Du khách khám phá";
@@ -269,7 +235,7 @@ export default function AuthScreen({ initialTab = "login" }) {
     setLoading(true);
 
     try {
-      const targetRoleEnum = selectedRole.roleEnum || (selectedRoleId === "provider" ? "PROVIDER" : "TOURIST");
+      const targetRoleEnum = "TOURIST";
 
       const result = await authService.register({
         fullName: registerForm.fullName.trim(),
@@ -312,7 +278,7 @@ export default function AuthScreen({ initialTab = "login" }) {
           role: roleStr.toLowerCase(),
           roleRaw: roleStr,
           roleTitle,
-          roleScope: selectedRole.scope,
+          roleScope: "Khám phá di sản",
         },
         token: accessToken,
         accessToken,
@@ -367,11 +333,7 @@ export default function AuthScreen({ initialTab = "login" }) {
 
     setLoading(true);
     try {
-      const targetRoleEnum =
-        selectedRole?.roleEnum ||
-        (selectedRoleId === "provider" ? "PROVIDER" : "TOURIST");
-
-      const res = await loginWithGoogle(response.credential, targetRoleEnum, {
+      const res = await loginWithGoogle(response.credential, "TOURIST", {
         redirect: false,
       });
 
@@ -387,23 +349,6 @@ export default function AuthScreen({ initialTab = "login" }) {
           showToast(
             "error",
             "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được hướng dẫn khôi phục."
-          );
-          return;
-        }
-
-        // ==========================================================================
-        // KIỂM TRA KHỚP VAI TRÒ cho luồng Google OAuth.
-        // Thông báo lỗi chung chung, không lộ role thật của tài khoản.
-        // ==========================================================================
-        const actualRole = String(user?.role || "").toUpperCase();
-        const expectedRole = String(
-          selectedRole?.roleEnum || targetRoleEnum || ""
-        ).toUpperCase();
-        if (expectedRole && actualRole && actualRole !== expectedRole) {
-          setLoading(false);
-          showToast(
-            "error",
-            "Tài khoản hoặc mật khẩu không đúng. Vui lòng kiểm tra lại hoặc chọn đúng vai trò tương ứng."
           );
           return;
         }
@@ -479,7 +424,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       if (timer) clearInterval(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRoleId, selectedRole]);
+  }, []);
 
   const handleGoogleClick = () => {
     if (typeof window === "undefined" || !window.google?.accounts?.id) {
@@ -514,67 +459,8 @@ export default function AuthScreen({ initialTab = "login" }) {
       return;
     }
 
-    setLoading(true);
-    showToast("info", `Đang kết nối xác thực ${providerName}...`);
-
-    setTimeout(() => {
-      // ==========================================================================
-      // KIỂM TRA KHỚP VAI TRÒ cho luồng SSO mô phỏng:
-      // Account SSO mặc định thuộc role của providerName đó (mỗi nhà cung cấp
-      // gắn với 1 role cố định). Nếu role đó khác pill đã chọn → chặn.
-      // Thông báo lỗi chung chung, không lộ role thật của tài khoản.
-      // ==========================================================================
-      const ssoRoleMap = {
-        "Doanh nghiệp": "PROVIDER",
-      };
-      const ssoAccountRole = ssoRoleMap[providerName] || "TOURIST";
-      const expectedRole = String(selectedRole?.roleEnum || "").toUpperCase();
-      if (expectedRole && ssoAccountRole !== expectedRole) {
-        setLoading(false);
-        showToast(
-          "error",
-          "Tài khoản hoặc mật khẩu không đúng. Vui lòng kiểm tra lại hoặc chọn đúng vai trò tương ứng."
-        );
-        return;
-      }
-
-      const authSession = {
-        user: {
-          email: `${providerName.toLowerCase().replace(/\s+/g, "")}@journeygo.vn`,
-          name: `Người dùng ${providerName}`,
-          role: selectedRole.id,
-          roleTitle: selectedRole.title,
-          roleScope: selectedRole.scope,
-        },
-        token: `jg_sso_${Math.random().toString(36).substring(2)}_${Date.now()}`,
-        role: selectedRole.id,
-        rolePath: selectedRole.redirectPath,
-        loginAt: new Date().toISOString(),
-      };
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("journey_go_auth", JSON.stringify(authSession));
-        localStorage.setItem("jg_access_token", authSession.token);
-        window.dispatchEvent(new Event("storage"));
-      }
-
-      setLoading(false);
-
-      setFeedbackModal({
-        isOpen: true,
-        type: "login",
-        title: `Đăng nhập ${providerName} thành công!`,
-        subtitle: "Đang xác thực thông tin và chuyển tiếp tới hệ thống...",
-        roleBadge: selectedRole.title,
-        targetLabel: selectedRole.redirectPath,
-        redirectPath: selectedRole.redirectPath,
-      });
-
-      setTimeout(() => {
-        setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
-        router.push(selectedRole.redirectPath);
-      }, 1250);
-    }, 700);
+    // Chỉ Google hiện có luồng xác thực thật; các nhà cung cấp khác chưa hỗ trợ.
+    showToast("info", `Đăng nhập bằng ${providerName} hiện chưa được hỗ trợ.`);
   };
 
   return (
@@ -692,9 +578,6 @@ export default function AuthScreen({ initialTab = "login" }) {
                   <LoginForm
                     loginForm={loginForm}
                     setLoginForm={setLoginForm}
-                    roles={LOGIN_ROLES}
-                    selectedRoleId={selectedRoleId}
-                    onSelectRole={handleSelectRole}
                     showPassword={showPassword}
                     setShowPassword={setShowPassword}
                     loading={loading}

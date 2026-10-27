@@ -53,6 +53,13 @@ public class DestinationService {
         return PageResponse.from(page, DestinationResponse::fromEntity);
     }
 
+    /** Retrieve every non-deleted destination created by the given user, regardless of approval status. */
+    @Transactional(readOnly = true)
+    public PageResponse<DestinationResponse> getByCreator(Long creatorId, Pageable pageable) {
+        Page<Destination> page = destinationRepository.findByCreatedBy_IdAndDeletedFalse(creatorId, sanitizePageable(pageable));
+        return PageResponse.from(page, DestinationResponse::fromEntity);
+    }
+
     /** Retrieve all non-deleted destinations as list. */
     @Transactional(readOnly = true)
     public List<DestinationResponse> getAll() {

@@ -158,7 +158,7 @@ export default function DestinationAssessmentModal({
     setContentsLoading(true);
     setContentsError("");
     try {
-      const data = await culturalContentService.getByDestination(destId);
+      const data = await culturalContentService.getManageByDestination(destId);
       const list = Array.isArray(data) ? data : [];
       setContents(list);
     } catch (err) {
@@ -411,7 +411,8 @@ export default function DestinationAssessmentModal({
     }
 
     try {
-      const res = await culturalContentService.play(content.id);
+      // Bài chưa được duyệt không ghi nhận lượt nghe được, vẫn cho nghe thử để thẩm định.
+      const res = await culturalContentService.play(content.id).catch(() => null);
       setPlayingId(content.id);
 
       setContents((prev) =>
