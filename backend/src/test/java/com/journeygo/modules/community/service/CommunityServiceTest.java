@@ -4,6 +4,8 @@ import com.journeygo.modules.community.dto.*;
 import com.journeygo.modules.community.entity.*;
 import com.journeygo.modules.community.entity.enums.*;
 import com.journeygo.modules.community.repository.*;
+import com.journeygo.modules.destination.repository.DestinationRepository;
+import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
 import com.journeygo.modules.user.entity.User;
@@ -44,6 +46,12 @@ class CommunityServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private DestinationRepository destinationRepository;
+
+    @Mock
+    private TourRepository tourRepository;
 
     @InjectMocks
     private CommunityService communityService;
@@ -167,7 +175,7 @@ class CommunityServiceTest {
         when(postRepository.findByIdWithMedia(100L)).thenReturn(Optional.of(samplePublishedPost));
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
-                communityService.getPostDetail(100L, 1L)
+                communityService.getPostDetail(100L, 1L, false)
         );
 
         assertEquals("POST-HIDDEN", ex.getCode());
@@ -180,7 +188,7 @@ class CommunityServiceTest {
         when(postRepository.findByIdWithMedia(100L)).thenReturn(Optional.of(samplePublishedPost));
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
-                communityService.getPostDetail(100L, 999L)
+                communityService.getPostDetail(100L, 999L, false)
         );
 
         assertEquals("POST-NOT-PUBLISHED", ex.getCode());
@@ -228,10 +236,10 @@ class CommunityServiceTest {
         when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
         when(reactionRepository.findByPostIdAndUserId(100L, 2L)).thenReturn(Optional.empty());
 
-        int likes = communityService.toggleReaction(100L, 2L, ReactionType.LIKE);
+        int likes = communityService.toggleReaction(100L, 2L, ReactionType.LOVE);
 
         assertEquals(6, likes);
-        verify(reactionRepository).save(argThat(r -> r.getReactionType() == ReactionType.LIKE && r.getUserId().equals(2L)));
+        verify(reactionRepository).save(argThat(r -> r.getReactionType() == ReactionType.LOVE && r.getUserId().equals(2L)));
         verify(postRepository).save(samplePublishedPost);
     }
 
@@ -243,11 +251,11 @@ class CommunityServiceTest {
                 .id(10L)
                 .postId(100L)
                 .userId(2L)
-                .reactionType(ReactionType.LIKE)
+                .reactionType(ReactionType.LOVE)
                 .build();
         when(reactionRepository.findByPostIdAndUserId(100L, 2L)).thenReturn(Optional.of(existing));
 
-        int likes = communityService.toggleReaction(100L, 2L, ReactionType.LIKE);
+        int likes = communityService.toggleReaction(100L, 2L, ReactionType.LOVE);
 
         assertEquals(4, likes);
         verify(reactionRepository).delete(existing);
@@ -277,7 +285,7 @@ class CommunityServiceTest {
     @Test
     @DisplayName("Báo cáo vi phạm thành công")
     void testReportPost_Success() {
-        when(postRepository.existsById(100L)).thenReturn(true);
+        when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
         when(reportRepository.existsByPostIdAndReporterId(100L, 2L)).thenReturn(false);
         when(reportRepository.save(any(PostReport.class))).thenAnswer(invocation -> {
             PostReport r = invocation.getArgument(0);
@@ -297,7 +305,7 @@ class CommunityServiceTest {
     @Test
     @DisplayName("Báo cáo trùng bài viết bị từ chối ALREADY-REPORTED")
     void testReportPost_AlreadyReported() {
-        when(postRepository.existsById(100L)).thenReturn(true);
+        when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
         when(reportRepository.existsByPostIdAndReporterId(100L, 2L)).thenReturn(true);
 
         CreateReportRequest req = new CreateReportRequest(ReportReason.INAPPROPRIATE_CONTENT, null);
