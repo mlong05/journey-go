@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Home, ArrowLeft } from "lucide-react";
 import Script from "next/script";
 import { ROUTES } from "@/constants/routes";
 import { STORAGE_KEYS } from "@/constants";
@@ -584,6 +586,17 @@ export default function AuthScreen({ initialTab = "login" }) {
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-sky-200/40 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
 
+      {/* Nút quay về xem Trang chủ nổi ở góc trên bên trái */}
+      <Link
+        href="/"
+        className="fixed top-4 left-4 sm:top-6 sm:left-6 z-50 inline-flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl bg-white/95 hover:bg-white text-slate-700 hover:text-emerald-600 shadow-md hover:shadow-lg border border-sky-100 backdrop-blur-md transition-all duration-200 font-semibold text-xs sm:text-sm group"
+        title="Quay lại Trang chủ Journey Go"
+      >
+        <ArrowLeft className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:-translate-x-0.5 transition-transform" />
+        <Home className="w-4 h-4 text-emerald-600" />
+        <span>Xem trang chủ</span>
+      </Link>
+
       {/* Modal phản hồi xác thực & chuyển hướng */}
       <AuthFeedbackModal feedbackModal={feedbackModal} />
 
@@ -653,6 +666,15 @@ export default function AuthScreen({ initialTab = "login" }) {
               <>
                 {/* Tiêu đề Chào mừng bạn quay trở lại */}
                 <div className="space-y-1 pt-1 sm:pt-2">
+                  <div className="flex items-center justify-between pb-1">
+                    <Link
+                      href="/"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-600 transition-colors group"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 group-hover:-translate-x-0.5 transition-transform" />
+                      <span>Xem trang chủ Journey Go</span>
+                    </Link>
+                  </div>
                   <h1 className="font-jakarta text-2xl sm:text-[26px] xl:text-[28px] font-bold text-[#009fe3] tracking-tight leading-snug">
                     {activeTab === "login"
                       ? "Chào mừng bạn quay trở lại"
