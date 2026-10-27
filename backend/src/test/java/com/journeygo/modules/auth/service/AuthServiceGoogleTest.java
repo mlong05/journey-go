@@ -53,6 +53,9 @@ class AuthServiceGoogleTest {
     @Mock
     private GoogleTokenVerifierService googleTokenVerifierService;
 
+    @Mock
+    private LoginRateLimiterService loginRateLimiterService;
+
     @InjectMocks
     private AuthService authService;
 
