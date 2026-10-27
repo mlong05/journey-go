@@ -1,15 +1,12 @@
 "use client";
 
-import { ExperiencesManager } from "@/features/experience";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function ModeratorExperiencesPage() {
-  return (
-    <ExperiencesManager
-      theme="teal"
-      heading="Thẩm Định Trải Nghiệm"
-      description="Kiểm duyệt viên theo dõi trải nghiệm của các điểm đến trong hệ thống."
-      canCreate={false}
-      canManage={false}
-    />
-  );
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/moderator/destinations");
+  }, [router]);
+  return null;
 }

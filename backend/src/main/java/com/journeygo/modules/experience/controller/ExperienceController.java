@@ -44,7 +44,7 @@ public class ExperienceController {
                 experienceService.getById(id)));
     }
 
-    @GetMapping("/destinations/{destinationId}/experiences")
+    @GetMapping({"/destinations/{destinationId}/experiences", "/destinations/{destinationId}/experience"})
     @Operation(summary = "Lấy danh sách Experience theo Destination")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Danh sách Experience, có thể rỗng")

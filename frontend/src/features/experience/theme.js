@@ -63,7 +63,7 @@ export const EXPERIENCE_STATUS_META = {
 };
 
 export function formatPrice(price, currency = "VND") {
-  const n = Number(price);
+  const n = Number(String(price ?? "").replace(/\./g, ""));
   if (Number.isNaN(n)) return "—";
   try {
     return new Intl.NumberFormat("vi-VN", {
@@ -74,4 +74,25 @@ export function formatPrice(price, currency = "VND") {
   } catch {
     return `${n.toLocaleString("vi-VN")} ${currency || ""}`.trim();
   }
+}
+
+/**
+ * Định dạng chuỗi số phân tách hàng nghìn bằng dấu chấm (VD: 50000 -> "50.000").
+ * Giữ nguyên chuỗi rỗng nếu chưa nhập.
+ */
+export function formatNumberWithDots(val) {
+  if (val === null || val === undefined || val === "") return "";
+  const str = String(val).replace(/\D/g, "");
+  if (!str) return "";
+  const normalized = str.replace(/^0+(?=\d)/, "");
+  return normalized.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+/**
+ * Chuyển đổi chuỗi có dấu chấm về dạng chuỗi số nguyên thô (VD: "50.000" -> "50000").
+ */
+export function parseRawNumber(val) {
+  if (val === null || val === undefined || val === "") return "";
+  const digits = String(val).replace(/\D/g, "");
+  return digits.replace(/^0+(?=\d)/, "");
 }

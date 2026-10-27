@@ -471,8 +471,7 @@ export default function CreateTaskPage() {
               {renderError("experienceId")}
               {selectedExperience && !isDraft && (
                 <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 font-semibold">
-                  Trải nghiệm đang ở trạng thái {selectedExperience.status}. Theo quy tắc BR-TASK-1,
-                  chỉ được thao tác tạo/sửa khi ở trạng thái Bản nháp (DRAFT).
+                  Điểm đến và trải nghiệm này đã được phát hành. Vui lòng chỉnh sửa thông tin điểm đến để chuyển về trạng thái chờ duyệt lại nếu cần thêm nhiệm vụ mới.
                 </p>
               )}
             </div>

@@ -49,6 +49,7 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_GET_ENDPOINTS = {
             "/api/v1/destinations/**",
+            "/api/v1/experiences/**",
             // Master data: public read, admin write
             "/api/v1/task-types",
             "/api/v1/task-types/*",

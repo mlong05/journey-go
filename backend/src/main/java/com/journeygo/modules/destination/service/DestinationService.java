@@ -27,6 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 
 import java.util.HashSet;
+import com.journeygo.modules.experience.entity.Experience;
+import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
+import com.journeygo.modules.experience.repository.ExperienceRepository;
 import java.util.List;
 import java.util.Set;
 
@@ -39,6 +42,7 @@ public class DestinationService {
     private final UserRepository userRepository;
     private final RegionRepository regionRepository;
     private final ThemeRepository themeRepository;
+    private final ExperienceRepository experienceRepository;
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
             "id", "name", "address", "latitude", "longitude",
@@ -70,6 +74,20 @@ public class DestinationService {
     @Transactional(readOnly = true)
     public List<DestinationResponse> getApproved() {
         return destinationRepository.findByApprovedAndDeletedFalse(true)
+                .stream().map(DestinationResponse::fromEntity).toList();
+    }
+
+    /** Retrieve destinations by status with pagination and sorting. */
+    @Transactional(readOnly = true)
+    public PageResponse<DestinationResponse> getByStatus(DestinationStatus status, Pageable pageable) {
+        Page<Destination> page = destinationRepository.findByStatusAndDeletedFalse(status, sanitizePageable(pageable));
+        return PageResponse.from(page, DestinationResponse::fromEntity);
+    }
+
+    /** Retrieve destinations by status as list. */
+    @Transactional(readOnly = true)
+    public List<DestinationResponse> getByStatus(DestinationStatus status) {
+        return destinationRepository.findByStatusAndDeletedFalse(status)
                 .stream().map(DestinationResponse::fromEntity).toList();
     }
 
@@ -237,9 +255,91 @@ public class DestinationService {
         existing.setStatus(DestinationStatus.DRAFT);
         existing.setApproved(false);
 
+        List<Experience> exps = experienceRepository.findByDestination_Id(existing.getId());
+        for (Experience exp : exps) {
+            if (exp.getStatus() != ExperienceStatus.INACTIVE) {
+                exp.setStatus(ExperienceStatus.DRAFT);
+                experienceRepository.save(exp);
+            }
+        }
+
         Destination saved = destinationRepository.save(existing);
         log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
         log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
+        return DestinationResponse.fromEntity(saved);
+    }
+
+    /** Submit destination for review (creator or admin/mod). */
+    @Transactional
+    public DestinationResponse submit(Long id, Long callerId, Role callerRole) {
+        Destination destination = findOrThrow(id);
+        checkOwnership(destination, callerId, callerRole);
+
+        destination.submit();
+        Destination saved = destinationRepository.save(destination);
+        log.info("Submitted destination id={} for review", saved.getId());
+        return DestinationResponse.fromEntity(saved);
+    }
+
+    /** Publish destination after review (admin or moderator). */
+    @Transactional
+    public DestinationResponse publish(Long id) {
+        Destination destination = findOrThrow(id);
+        destination.publish();
+        List<Experience> exps = experienceRepository.findByDestination_Id(id);
+        for (Experience exp : exps) {
+            if (exp.getStatus() != ExperienceStatus.INACTIVE) {
+                exp.setStatus(ExperienceStatus.PUBLISHED);
+                experienceRepository.save(exp);
+            }
+        }
+        Destination saved = destinationRepository.save(destination);
+        log.info("Published destination id={}", saved.getId());
+        return DestinationResponse.fromEntity(saved);
+    }
+
+    /** Reject destination (admin or moderator). */
+    @Transactional
+    public DestinationResponse reject(Long id) {
+        Destination destination = findOrThrow(id);
+        destination.reject();
+        List<Experience> exps = experienceRepository.findByDestination_Id(id);
+        for (Experience exp : exps) {
+            if (exp.getStatus() != ExperienceStatus.INACTIVE) {
+                exp.setStatus(ExperienceStatus.DRAFT);
+                experienceRepository.save(exp);
+            }
+        }
+        Destination saved = destinationRepository.save(destination);
+        log.info("Rejected destination id={}", saved.getId());
+        return DestinationResponse.fromEntity(saved);
+    }
+
+    /** Legacy approval toggle (admin or moderator). */
+    @Transactional
+    public DestinationResponse setApproval(Long id, boolean approved) {
+        Destination destination = findOrThrow(id);
+        if (approved) {
+            destination.publish();
+            List<Experience> exps = experienceRepository.findByDestination_Id(id);
+            for (Experience exp : exps) {
+                if (exp.getStatus() != ExperienceStatus.INACTIVE) {
+                    exp.setStatus(ExperienceStatus.PUBLISHED);
+                    experienceRepository.save(exp);
+                }
+            }
+        } else {
+            destination.reject();
+            List<Experience> exps = experienceRepository.findByDestination_Id(id);
+            for (Experience exp : exps) {
+                if (exp.getStatus() != ExperienceStatus.INACTIVE) {
+                    exp.setStatus(ExperienceStatus.DRAFT);
+                    experienceRepository.save(exp);
+                }
+            }
+        }
+        Destination saved = destinationRepository.save(destination);
+        log.info("Destination id={} approved={} status={}", saved.getId(), saved.isApproved(), saved.getStatus());
         return DestinationResponse.fromEntity(saved);
     }
 

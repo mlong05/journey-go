@@ -51,13 +51,6 @@ const ADMIN_NAV_ITEMS = [
     icon: MapPin,
     badge: null,
   },
-  {
-    id: "experiences",
-    label: "Quản lý trải nghiệm",
-    href: "/admin/experiences",
-    icon: Sparkles,
-    badge: null,
-  },
 
   {
     id: "finance",
