@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Plus,
-  Sparkles,
+  Compass,
   Landmark,
   List,
   RefreshCw,
@@ -95,7 +95,7 @@ export default function CreateClient() {
       <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-5 border border-emerald-200/60 space-y-3">
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-            <Sparkles size={16} />
+            <Compass size={16} />
           </div>
           <h3 className="text-sm font-black text-emerald-900 uppercase tracking-wider">
             Hướng dẫn nhanh

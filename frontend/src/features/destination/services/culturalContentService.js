@@ -95,12 +95,18 @@ export async function deleteContent(id) {
   return unwrap(res);
 }
 
-/**
- * Khôi phục nội dung văn hóa đã xóa mềm (ADMIN, MODERATOR, PROVIDER)
- * PATCH /api/v1/cultural-contents/{id}/restore
- */
 export async function restoreContent(id) {
   const res = await apiClient.patch(ENDPOINTS.RESTORE(id));
+  return unwrap(res);
+}
+
+export async function submitContent(id) {
+  const res = await apiClient.post(`/moderation/contents/${id}/submit`, {});
+  return unwrap(res);
+}
+
+export async function getContentHistory(id) {
+  const res = await apiClient.get(`/moderation/contents/${id}/history`);
   return unwrap(res);
 }
 
@@ -113,6 +119,8 @@ export const culturalContentService = {
   update: updateContent,
   delete: deleteContent,
   restore: restoreContent,
+  submit: submitContent,
+  getHistory: getContentHistory,
 };
 
 export default culturalContentService;

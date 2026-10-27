@@ -6,7 +6,6 @@ import {
   Globe2,
   Plus,
   Search,
-  Sparkles,
   Check,
   Loader2,
   AlertCircle,
