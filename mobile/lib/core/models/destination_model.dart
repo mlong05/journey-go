@@ -6,6 +6,7 @@ class DestinationModel {
   final double longitude;
   final int capacity;
   final bool approved;
+  final String? status;
   final bool deleted;
   final String? createdBy;
   final String? createdAt;
@@ -31,6 +32,7 @@ class DestinationModel {
     required this.longitude,
     required this.capacity,
     required this.approved,
+    this.status,
     required this.deleted,
     this.createdBy,
     this.createdAt,
@@ -150,6 +152,7 @@ class DestinationModel {
       longitude: json['longitude'] is num ? (json['longitude'] as num).toDouble() : double.tryParse(json['longitude']?.toString() ?? '0') ?? 0.0,
       capacity: json['capacity'] is num ? (json['capacity'] as num).toInt() : int.tryParse(json['capacity']?.toString() ?? '1000') ?? 1000,
       approved: json['approved'] == true,
+      status: json['status']?.toString(),
       deleted: json['deleted'] == true,
       createdBy: json['createdBy']?.toString(),
       createdAt: json['createdAt']?.toString(),
@@ -166,6 +169,7 @@ class DestinationModel {
       'longitude': longitude,
       'capacity': capacity,
       'approved': approved,
+      'status': status,
       'deleted': deleted,
       'createdBy': createdBy,
       'createdAt': createdAt,

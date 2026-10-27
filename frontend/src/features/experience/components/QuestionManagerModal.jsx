@@ -83,8 +83,9 @@ export default function QuestionManagerModal({
   const [expandedQuestions, setExpandedQuestions] = useState({});
 
   const taskId = task?.id;
-  const isDraft = task?.status === "DRAFT" || experience?.status === "DRAFT";
-  const allowManage = canEdit && isDraft && !isModerator;
+  // Cho phép quản lý nếu task đang DRAFT hoặc điểm đến đang ở chế độ chỉnh sửa của Provider/Admin
+  const isDraft = !task?.status || task?.status === "DRAFT" || experience?.status === "DRAFT";
+  const allowManage = canEdit && !isModerator && isDraft;
 
   const showToast = useCallback((msg) => {
     setToastMessage(msg);
@@ -339,9 +340,18 @@ export default function QuestionManagerModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-70 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-[70] bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
     >
-      <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col h-[700px] max-h-[92vh] animate-in zoom-in-95 duration-200">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col h-[700px] max-h-[92vh] animate-in zoom-in-95 duration-200"
+      >
         {/* Header Modal */}
         <div className="shrink-0 px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-indigo-50/25">
           <div className="flex items-center gap-3">
@@ -373,13 +383,28 @@ export default function QuestionManagerModal({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {allowManage && !showAddForm && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAddForm(true);
+                }}
+                className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+              >
+                <Plus size={14} />
+                <span>Thêm câu hỏi</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Thanh thông báo role & trạng thái */}
@@ -749,7 +774,10 @@ export default function QuestionManagerModal({
               {allowManage && (
                 <button
                   type="button"
-                  onClick={() => setShowAddForm(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAddForm(true);
+                  }}
                   className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
                 >
                   <Plus size={15} />
@@ -773,7 +801,10 @@ export default function QuestionManagerModal({
                 {allowManage && (
                   <button
                     type="button"
-                    onClick={() => setShowAddForm(true)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowAddForm(true);
+                    }}
                     className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
                   >
                     <Plus size={14} />

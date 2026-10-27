@@ -32,13 +32,30 @@ class DestinationService {
 
       if (response.statusCode == 200) {
         final dynamic decoded = jsonDecode(utf8.decode(response.bodyBytes));
-        final dynamic rawList = (decoded is Map && decoded.containsKey('data'))
-            ? decoded['data']
-            : decoded;
+        
+        // Hỗ trợ cả 3 cấu trúc response:
+        // 1. { data: { content: [...] } } (PageResponse của Spring Boot)
+        // 2. { data: [...] } (List thuần trong ApiResponse)
+        // 3. [...] (List mảng thô)
+        List<dynamic>? rawList;
+        if (decoded is Map) {
+          final data = decoded['data'];
+          if (data is List) {
+            rawList = data;
+          } else if (data is Map && data['content'] is List) {
+            rawList = data['content'] as List;
+          } else if (decoded['content'] is List) {
+            rawList = decoded['content'] as List;
+          }
+        } else if (decoded is List) {
+          rawList = decoded;
+        }
 
-        if (rawList is List && rawList.isNotEmpty) {
+        if (rawList != null && rawList.isNotEmpty) {
           final list = rawList
               .map((item) => DestinationModel.fromJson(item as Map<String, dynamic>))
+              // QUY TẮC NGHIỆP VỤ: Tourist chỉ được xem điểm đến đã duyệt (approved == true) và chưa bị xóa
+              .where((d) => d.approved && !d.deleted)
               .toList();
 
           // Lưu cache vào SharedPreferences để sử dụng offline
@@ -53,14 +70,15 @@ class DestinationService {
     // Đọc từ Cache đã lưu hoặc khởi tạo danh sách mặc định di sản
     final cached = await _loadFromCache();
     if (cached.isNotEmpty) {
-      return cached;
+      // Đảm bảo cache cũng phải tuân thủ điều kiện đã được duyệt
+      return cached.where((d) => d.approved && !d.deleted).toList();
     }
 
     return [];
   }
 
   /// Lấy thông tin chi tiết một điểm đến từ API Backend (GET /api/v1/destinations/{id})
-  /// Áp dụng cho mọi role: USER, PROVIDER, MODERATOR, ADMIN
+  /// Áp dụng cho Tourist: chỉ trả về nếu điểm đến đã được duyệt (approved) và chưa xóa
   Future<DestinationModel> getDestinationById(int id) async {
     final baseUrl = await TokenStorage.getBaseUrl();
     final uri = Uri.parse(
@@ -87,16 +105,24 @@ class DestinationService {
             ? decoded['data']
             : decoded;
         if (raw is Map<String, dynamic>) {
-          return DestinationModel.fromJson(raw);
+          final model = DestinationModel.fromJson(raw);
+          // QUY TẮC NGHIỆP VỤ: Tourist không được truy cập điểm đến chưa duyệt hoặc đã xóa
+          if (!model.approved || model.deleted) {
+            throw Exception('Điểm đến này chưa được phê duyệt hoặc đã tạm dừng phát hành.');
+          }
+          return model;
         }
       }
-    } catch (_) {
+    } catch (e) {
+      if (e.toString().contains('chưa được phê duyệt')) {
+        rethrow;
+      }
       // Rơi xuống fallback bên dưới khi không có kết nối tới server
     }
 
     // Fallback: tìm trong cache; nếu không có → throw error
     final cached = await _loadFromCache();
-    final fromCache = cached.where((d) => d.id == id).toList();
+    final fromCache = cached.where((d) => d.id == id && d.approved && !d.deleted).toList();
     if (fromCache.isNotEmpty) {
       return fromCache.first;
     }

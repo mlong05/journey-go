@@ -27,8 +27,19 @@ import {
   Copy,
   ChevronDown,
   ChevronUp,
+  Compass,
+  Trophy,
+  Banknote,
+  HelpCircle,
+  Layers,
+  Calendar,
+  Inbox,
 } from "lucide-react";
 import { culturalContentService } from "../services/culturalContentService";
+import { experienceService } from "@/features/experience/services/experienceService";
+import { taskService } from "@/features/experience/services/taskService";
+import { checkInPointService } from "@/features/experience/services/checkInPointService";
+import { slotService } from "@/features/experience/services/slotService";
 
 /* Cấu hình các định dạng nội dung văn hóa */
 const CONTENT_TYPES = [
@@ -117,6 +128,15 @@ export default function DestinationAssessmentModal({
   // Đánh dấu đã kiểm duyệt từng mục nội dung (Review Checklist in session)
   const [reviewedItems, setReviewedItems] = useState({});
 
+  // Dữ liệu gói trải nghiệm của điểm đến
+  const [experience, setExperience] = useState(null);
+  const [expLoading, setExpLoading] = useState(false);
+  const [expError, setExpError] = useState("");
+  const [expTasks, setExpTasks] = useState([]);
+  const [expCheckIns, setExpCheckIns] = useState([]);
+  const [expSlots, setExpSlots] = useState([]);
+  const [expDescExpanded, setExpDescExpanded] = useState(false);
+
   const destId = destination?.id;
 
   // Tải danh sách thuyết minh văn hóa khi modal mở hoặc destination đổi
@@ -141,6 +161,52 @@ export default function DestinationAssessmentModal({
     }
   }, [destId]);
 
+  // Tải thông tin gói trải nghiệm (vé, nhiệm vụ, check-in, slots)
+  const loadExperienceData = useCallback(async () => {
+    if (!destId) return;
+    setExpLoading(true);
+    setExpError("");
+    try {
+      const exp = await experienceService.getByDestinationId(destId);
+      setExperience(exp);
+      if (exp?.id) {
+        const [tasksRes, checkInsRes, slotsRes] = await Promise.allSettled([
+          taskService.listByExperience(exp.id),
+          checkInPointService.listByExperience(exp.id),
+          slotService.listByExperience(exp.id),
+        ]);
+        setExpTasks(
+          tasksRes.status === "fulfilled" && Array.isArray(tasksRes.value)
+            ? tasksRes.value
+            : []
+        );
+        setExpCheckIns(
+          checkInsRes.status === "fulfilled" && Array.isArray(checkInsRes.value)
+            ? checkInsRes.value
+            : []
+        );
+        setExpSlots(
+          slotsRes.status === "fulfilled" && Array.isArray(slotsRes.value)
+            ? slotsRes.value
+            : []
+        );
+      } else {
+        setExpTasks([]);
+        setExpCheckIns([]);
+        setExpSlots([]);
+      }
+    } catch (err) {
+      console.error("[AssessmentModal] Failed to load experience:", err);
+      setExpError(err?.message || "Không thể tải gói trải nghiệm.");
+      setExperience(null);
+      setExpTasks([]);
+      setExpCheckIns([]);
+      setExpSlots([]);
+    } finally {
+      setExpLoading(false);
+    }
+  }, [destId]);
+
   useEffect(() => {
     if (!isOpen || !destId) return;
     let cancelled = false;
@@ -151,7 +217,9 @@ export default function DestinationAssessmentModal({
         setPlayingId(null);
         setReviewedItems({});
         setExpandedScriptIds({});
+        setExpDescExpanded(false);
         loadCulturalContents();
+        loadExperienceData();
       }
     });
     return () => {
@@ -160,7 +228,7 @@ export default function DestinationAssessmentModal({
         currentAudio.pause();
       }
     };
-  }, [isOpen, destId, loadCulturalContents]);
+  }, [isOpen, destId, loadCulturalContents, loadExperienceData]);
 
   // Khóa cuộn trang nền khi mở modal
   useEffect(() => {
@@ -349,11 +417,11 @@ export default function DestinationAssessmentModal({
           {/* ========================================================
               TAB NAVIGATION: THỰC ĐỊA & HỒ SƠ THUYẾT MINH
               ======================================================== */}
-          <div className="shrink-0 px-6 sm:px-8 border-b border-slate-100 bg-white flex items-center gap-2">
+          <div className="shrink-0 px-6 sm:px-8 border-b border-slate-100 bg-white flex items-center gap-2 overflow-x-auto">
             <button
               type="button"
               onClick={() => setActiveTab("general")}
-              className={`py-3.5 px-3 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              className={`py-3.5 px-3 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
                 activeTab === "general"
                   ? "border-emerald-600 text-emerald-700"
                   : "border-transparent text-slate-500 hover:text-slate-900"
@@ -366,7 +434,7 @@ export default function DestinationAssessmentModal({
             <button
               type="button"
               onClick={() => setActiveTab("contents")}
-              className={`py-3.5 px-3 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              className={`py-3.5 px-3 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
                 activeTab === "contents"
                   ? "border-indigo-600 text-indigo-700"
                   : "border-transparent text-slate-500 hover:text-slate-900"
@@ -383,6 +451,24 @@ export default function DestinationAssessmentModal({
               >
                 {contentsLoading ? "…" : contents.length}
               </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("experience")}
+              className={`py-3.5 px-3 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
+                activeTab === "experience"
+                  ? "border-amber-600 text-amber-700"
+                  : "border-transparent text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              <Compass size={14} />
+              <span>Gói Trải Nghiệm &amp; Đố Vui</span>
+              {experience ? (
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              ) : expLoading ? (
+                <span className="text-[10px] text-slate-400">…</span>
+              ) : null}
             </button>
           </div>
 
@@ -501,7 +587,7 @@ export default function DestinationAssessmentModal({
                   </p>
                 </div>
               </div>
-            ) : (
+            ) : activeTab === "contents" ? (
               /* ── TAB 2: HỒ SƠ THUYẾT MINH & VĂN HÓA ── */
               <div className="space-y-4">
                 {/* Banner tóm tắt thẩm định */}
@@ -766,7 +852,250 @@ export default function DestinationAssessmentModal({
                   </div>
                 )}
               </div>
-            )}
+            ) : activeTab === "experience" ? (
+              /* ── TAB 3: GÓI TRẢI NGHIỆM & ĐỐ VUI ── */
+              <div className="space-y-4">
+                {expLoading ? (
+                  <div className="h-64 flex flex-col items-center justify-center gap-3 text-slate-400">
+                    <Loader2 size={32} className="animate-spin text-amber-600" />
+                    <p className="text-xs font-bold text-slate-600">
+                      Đang tải thông tin gói trải nghiệm &amp; đố vui…
+                    </p>
+                  </div>
+                ) : expError ? (
+                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-800">
+                    <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-black">Lỗi tải gói trải nghiệm</h4>
+                      <p className="text-xs mt-0.5">{expError}</p>
+                    </div>
+                  </div>
+                ) : !experience ? (
+                  <div className="bg-white rounded-2xl border border-slate-200/90 p-12 text-center space-y-3 shadow-2xs">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                      <Inbox size={24} />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-800">
+                      Điểm đến chưa thiết lập gói trải nghiệm
+                    </h4>
+                    <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                      Đối tác chưa thiết lập gói vé tham quan, nhiệm vụ thực địa hoặc câu hỏi đố vui cho di tích này. Gói trải nghiệm sẽ tự động kích hoạt khi đối tác khởi tạo.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Thẻ tổng quan gói trải nghiệm */}
+                    <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-amber-500" />
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              Gói Trải Nghiệm Thực Địa
+                            </p>
+                          </div>
+                          <h4 className="text-base font-bold text-slate-900 mt-1">
+                            {experience.title}
+                          </h4>
+                          {experience.description && (
+                            <div className="mt-1">
+                              <p
+                                className={`text-xs text-slate-600 leading-relaxed whitespace-pre-line ${
+                                  !expDescExpanded ? "line-clamp-2" : ""
+                                }`}
+                              >
+                                {experience.description}
+                              </p>
+                              {(experience.description.length > 90 ||
+                                experience.description.includes("\n")) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpDescExpanded((prev) => !prev)}
+                                  className="mt-1 text-[11.5px] font-bold text-amber-700 hover:text-amber-800 hover:underline inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <span>
+                                    {expDescExpanded
+                                      ? "Thu gọn văn bản"
+                                      : "Xem toàn bộ văn bản"}
+                                  </span>
+                                  {expDescExpanded ? (
+                                    <ChevronUp size={12} />
+                                  ) : (
+                                    <ChevronDown size={12} />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3 chỉ số tài chính & quy mô */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100">
+                        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/70">
+                          <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                            <Banknote size={12} className="text-emerald-600" />
+                            Giá vé tham quan
+                          </p>
+                          <p className="text-base font-extrabold text-slate-900">
+                            {Number(experience.price).toLocaleString("vi-VN")}{" "}
+                            <span className="text-xs font-semibold text-slate-500">
+                              {experience.currency || "VND"}
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/70">
+                          <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                            <Clock size={12} className="text-sky-600" />
+                            Thời lượng trải nghiệm
+                          </p>
+                          <p className="text-base font-extrabold text-slate-900">
+                            {experience.durationMinutes
+                              ? `${experience.durationMinutes} phút`
+                              : "Chưa đặt"}
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/70">
+                          <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                            <Trophy size={12} className="text-amber-600" />
+                            Nhiệm vụ &amp; Đố vui
+                          </p>
+                          <p className="text-base font-extrabold text-slate-900">
+                            {expTasks.length}{" "}
+                            <span className="text-xs font-semibold text-slate-500">
+                              nhiệm vụ
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Danh sách nhiệm vụ và câu hỏi đố vui */}
+                    <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <Trophy size={16} className="text-amber-600" />
+                          <h5 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                            Nhiệm Vụ &amp; Câu Hỏi Đố Vui ({expTasks.length})
+                          </h5>
+                        </div>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          Sắp xếp theo thứ tự thực địa
+                        </span>
+                      </div>
+
+                      {expTasks.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-3 text-center italic">
+                          Chưa có nhiệm vụ hoặc câu hỏi đố vui nào được thiết lập.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {expTasks.map((t, idx) => (
+                            <div
+                              key={t.id || idx}
+                              className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3 text-xs"
+                            >
+                              <span className="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-700 flex items-center justify-center font-bold text-[11px] shrink-0 font-mono">
+                                {t.sequenceOrder !== undefined ? t.sequenceOrder + 1 : idx + 1}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-slate-900">
+                                    {t.name || t.title || "Nhiệm vụ không tên"}
+                                  </span>
+                                  {t.typeName && (
+                                    <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                                      {t.typeName}
+                                    </span>
+                                  )}
+                                  {t.pointsReward > 0 && (
+                                    <span className="text-[10.5px] font-bold text-emerald-700">
+                                      +{t.pointsReward} điểm
+                                    </span>
+                                  )}
+                                </div>
+                                {t.prompt && (
+                                  <p className="text-slate-600 text-[11px] mt-1 leading-relaxed">
+                                    {t.prompt}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Trạm check-in và Khung giờ đón tiếp */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Trạm check-in */}
+                      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-2.5">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                          <MapPin size={14} className="text-emerald-600" />
+                          <h6 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                            Trạm Check-in Thực Địa ({expCheckIns.length})
+                          </h6>
+                        </div>
+                        {expCheckIns.length === 0 ? (
+                          <p className="text-xs text-slate-400 py-3 text-center italic">
+                            Chưa có trạm check-in nào.
+                          </p>
+                        ) : (
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {expCheckIns.map((cip, i) => (
+                              <div
+                                key={cip.id || i}
+                                className="p-2 rounded-lg bg-slate-50 border border-slate-200/60 text-xs flex items-center justify-between gap-2"
+                              >
+                                <span className="font-bold text-slate-800 truncate">
+                                  {cip.name}
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                  Bán kính: {cip.radiusMeters || 50}m
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Khung giờ đón tiếp (Slots) */}
+                      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-2.5">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                          <Calendar size={14} className="text-sky-600" />
+                          <h6 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                            Khung Giờ Đón Tiếp ({expSlots.length})
+                          </h6>
+                        </div>
+                        {expSlots.length === 0 ? (
+                          <p className="text-xs text-slate-400 py-3 text-center italic">
+                            Chưa cấu hình khung giờ đón tiếp.
+                          </p>
+                        ) : (
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {expSlots.map((s, i) => (
+                              <div
+                                key={s.id || i}
+                                className="p-2 rounded-lg bg-slate-50 border border-slate-200/60 text-xs flex items-center justify-between gap-2"
+                              >
+                                <span className="font-bold text-slate-800 font-mono">
+                                  {s.slotDate}
+                                </span>
+                                <span className="text-[10px] text-slate-500 shrink-0 bg-white px-1.5 py-0.5 rounded border border-slate-200 font-semibold">
+                                  Tối đa: {s.maxTourPerDay} lượt
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {/* ========================================================

@@ -29,11 +29,13 @@ function buildCreatePayload(payload) {
   const description = String(payload.description || "").trim();
   const duration = parseInt(payload.durationMinutes, 10);
 
+  const cleanPrice = String(payload.price ?? "").replace(/\./g, "").trim();
+
   return {
     destinationId: Number(payload.destinationId),
     title: String(payload.title || "").trim(),
     ...(description ? { description } : {}),
-    price: Number(payload.price),
+    price: Number(cleanPrice),
     currency: String(payload.currency || "VND").trim().toUpperCase(),
     ...(Number.isNaN(duration) ? {} : { durationMinutes: duration }),
   };
@@ -110,11 +112,19 @@ export async function getExperienceById(id) {
 
 export async function getExperienceByDestinationId(destinationId) {
   const res = await apiClient.get(ENDPOINTS.BY_DESTINATION(destinationId));
-  return unwrap(res);
+  const data = await unwrap(res);
+  if (Array.isArray(data)) {
+    return data[0] || null;
+  }
+  return data || null;
 }
 
 export async function updateExperience(id, payload) {
-  const res = await apiClient.patch(ENDPOINTS.BY_ID(id), payload);
+  const cleanPayload = payload ? { ...payload } : {};
+  if (cleanPayload.price !== undefined && cleanPayload.price !== null) {
+    cleanPayload.price = Number(String(cleanPayload.price).replace(/\./g, ""));
+  }
+  const res = await apiClient.patch(ENDPOINTS.BY_ID(id), cleanPayload);
   return unwrap(res);
 }
 
@@ -140,6 +150,7 @@ export const experienceService = {
   getMy: getMyExperiences,
   getById: getExperienceById,
   getByDestinationId: getExperienceByDestinationId,
+  getExperienceByDestinationId: getExperienceByDestinationId,
   update: updateExperience,
   delete: deleteExperience,
   changeStatus: changeExperienceStatus,

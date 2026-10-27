@@ -2,6 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ROUTES } from "@/constants/routes";
 
 const AuthScreen = dynamic(
   () => import("@/features/auth").then((m) => m.AuthScreen),
@@ -26,8 +28,31 @@ function LoadingFallback({ message }) {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    try {
+      const authRaw = localStorage.getItem("journey_go_auth");
+      if (authRaw) {
+        const auth = JSON.parse(authRaw);
+        const role = String(auth?.user?.role || auth?.role || "").toUpperCase();
+        if (role === "ADMIN") {
+          router.replace(ROUTES.ADMIN || "/admin");
+          return;
+        } else if (role === "MODERATOR") {
+          router.replace(ROUTES.MODERATOR || "/moderator");
+          return;
+        } else if (role === "PROVIDER") {
+          router.replace(ROUTES.PROVIDER || "/provider");
+          return;
+        }
+      }
+    } catch {
+      // Bỏ qua lỗi parse
+    }
+    setMounted(true);
+  }, [router]);
 
   if (!mounted) {
     return <LoadingFallback message="Đang tải cổng đăng nhập…" />;

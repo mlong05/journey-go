@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   X,
-  Sparkles,
+  Compass,
   Landmark,
   Type,
   AlignLeft,
@@ -15,7 +15,12 @@ import {
   Send,
 } from "lucide-react";
 import { experienceService } from "../services/experienceService";
-import { getExperienceTheme, formatPrice } from "../theme";
+import {
+  getExperienceTheme,
+  formatPrice,
+  formatNumberWithDots,
+  parseRawNumber,
+} from "../theme";
 
 const CURRENCIES = ["VND", "USD"];
 
@@ -36,7 +41,12 @@ const INITIAL_FORM = {
 export default function CreateExperienceModal({ isOpen, ...props }) {
   // Dialog con được mount mới mỗi lần mở, nên form tự reset mà không cần effect.
   if (!isOpen) return null;
-  return <CreateExperienceDialog {...props} />;
+  return (
+    <CreateExperienceDialog
+      key={props.defaultDestinationId ? `exp-dest-${props.defaultDestinationId}` : "exp-new"}
+      {...props}
+    />
+  );
 }
 
 function CreateExperienceDialog({
@@ -46,13 +56,23 @@ function CreateExperienceDialog({
   takenDestinationIds,
   theme = "emerald",
   title = "Tạo Trải Nghiệm Mới",
+  defaultDestinationId,
 }) {
   const palette = getExperienceTheme(theme);
-  const [form, setForm] = useState(INITIAL_FORM);
+  const [form, setForm] = useState(() => ({
+    ...INITIAL_FORM,
+    destinationId: defaultDestinationId ? String(defaultDestinationId) : "",
+  }));
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
   const [createdItem, setCreatedItem] = useState(null);
+
+  useEffect(() => {
+    if (defaultDestinationId) {
+      setForm((prev) => ({ ...prev, destinationId: String(defaultDestinationId) }));
+    }
+  }, [defaultDestinationId]);
 
   const taken = useMemo(
     () => (takenDestinationIds instanceof Set ? takenDestinationIds : new Set()),
@@ -87,6 +107,44 @@ function CreateExperienceDialog({
     setApiError("");
   };
 
+  const handlePriceChange = (e) => {
+    const input = e.target;
+    const cursorPosition = input.selectionStart || 0;
+    const previousVal = input.value;
+    const digitsBeforeCursor = previousVal
+      .slice(0, cursorPosition)
+      .replace(/\D/g, "").length;
+
+    const raw = parseRawNumber(previousVal);
+    handleChange("price", raw);
+
+    const formatted = formatNumberWithDots(raw);
+    let newCursorPos = 0;
+    let digitsCount = 0;
+    for (let i = 0; i < formatted.length; i++) {
+      if (digitsCount === digitsBeforeCursor) {
+        newCursorPos = i;
+        break;
+      }
+      if (/\d/.test(formatted[i])) {
+        digitsCount++;
+      }
+      if (digitsCount === digitsBeforeCursor) {
+        newCursorPos = i + 1;
+        break;
+      }
+    }
+    if (digitsCount < digitsBeforeCursor) {
+      newCursorPos = formatted.length;
+    }
+
+    requestAnimationFrame(() => {
+      if (input) {
+        input.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    });
+  };
+
   // Validation khớp CreateExperienceRequest ở backend
   const validate = () => {
     const e = {};
@@ -101,8 +159,9 @@ function CreateExperienceDialog({
     if (!t) e.title = "Vui lòng nhập tiêu đề trải nghiệm.";
     else if (t.length > 255) e.title = "Tiêu đề tối đa 255 ký tự.";
 
-    const price = Number(form.price);
-    if (form.price === "" || Number.isNaN(price)) {
+    const rawPrice = parseRawNumber(form.price);
+    const price = Number(rawPrice);
+    if (rawPrice === "" || Number.isNaN(price)) {
       e.price = "Vui lòng nhập giá hợp lệ.";
     } else if (price < 0) {
       e.price = "Giá phải lớn hơn hoặc bằng 0.";
@@ -130,7 +189,11 @@ function CreateExperienceDialog({
 
     setLoading(true);
     try {
-      const created = await experienceService.create(form);
+      const payload = {
+        ...form,
+        price: parseRawNumber(form.price),
+      };
+      const created = await experienceService.create(payload);
       setCreatedItem(created);
       onCreated?.(created);
     } catch (err) {
@@ -177,18 +240,18 @@ function CreateExperienceDialog({
                 {createdItem ? (
                   <CheckCircle2 size={20} className="text-emerald-600" />
                 ) : (
-                  <Sparkles size={20} className={palette.icon} />
+                  <Compass size={20} className={palette.icon} />
                 )}
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                   {createdItem ? "Đã tạo trải nghiệm thành công!" : title}
                 </h3>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-md">
-                  {createdItem
-                    ? "Trải nghiệm đang ở trạng thái bản nháp. Bạn có thể bổ sung nhiệm vụ và điểm check-in sau."
-                    : "Gắn một trải nghiệm mới (quiz, nhiệm vụ, check-in) vào một điểm đến. Mỗi điểm đến chỉ có 1 trải nghiệm."}
-                </p>
+                {createdItem && (
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-md">
+                    Trải nghiệm đang ở trạng thái bản nháp. Bạn có thể bổ sung nhiệm vụ và điểm check-in sau.
+                  </p>
+                )}
               </div>
             </div>
             <button
@@ -254,38 +317,40 @@ function CreateExperienceDialog({
                 </div>
               )}
 
-              {/* Điểm đến */}
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="exp-destination"
-                  className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider"
-                >
-                  <Landmark size={13} className={palette.icon} />
-                  <span>Điểm đến</span>
-                  <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  id="exp-destination"
-                  value={form.destinationId}
-                  onChange={(e) => handleChange("destinationId", e.target.value)}
-                  disabled={loading}
-                  className={`${inputBase} ${borderOf("destinationId")}`}
-                >
-                  <option value="">— Chọn điểm đến —</option>
-                  {destinations.map((d) => {
-                    const isTaken = taken.has(Number(d.id));
-                    return (
-                      <option key={d.id} value={d.id} disabled={isTaken}>
-                        #{d.id} · {d.name}
-                        {isTaken ? " (đã có trải nghiệm)" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-                {errors.destinationId && (
-                  <p className="text-[11px] text-rose-600 font-bold">{errors.destinationId}</p>
-                )}
-              </div>
+              {/* Điểm đến (ẩn nếu đã được chỉ định từ chi tiết điểm đến) */}
+              {!defaultDestinationId && (
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="exp-destination"
+                    className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider"
+                  >
+                    <Landmark size={13} className={palette.icon} />
+                    <span>Điểm đến</span>
+                    <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    id="exp-destination"
+                    value={form.destinationId}
+                    onChange={(e) => handleChange("destinationId", e.target.value)}
+                    disabled={loading}
+                    className={`${inputBase} ${borderOf("destinationId")}`}
+                  >
+                    <option value="">— Chọn điểm đến —</option>
+                    {destinations.map((d) => {
+                      const isTaken = taken.has(Number(d.id));
+                      return (
+                        <option key={d.id} value={d.id} disabled={isTaken}>
+                          #{d.id} · {d.name}
+                          {isTaken ? " (đã có trải nghiệm)" : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {errors.destinationId && (
+                    <p className="text-[11px] text-rose-600 font-bold">{errors.destinationId}</p>
+                  )}
+                </div>
+              )}
 
               {/* Tiêu đề */}
               <div className="space-y-1.5">
@@ -345,12 +410,11 @@ function CreateExperienceDialog({
                   </label>
                   <input
                     id="exp-price"
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={form.price}
-                    onChange={(e) => handleChange("price", e.target.value)}
-                    placeholder="50000"
+                    type="text"
+                    inputMode="numeric"
+                    value={formatNumberWithDots(form.price)}
+                    onChange={handlePriceChange}
+                    placeholder="50.000"
                     disabled={loading}
                     className={`${inputBase} ${borderOf("price")}`}
                   />
