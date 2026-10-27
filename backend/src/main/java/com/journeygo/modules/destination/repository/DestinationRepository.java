@@ -1,7 +1,6 @@
 package com.journeygo.modules.destination.repository;
 
 import com.journeygo.modules.destination.entity.Destination;
-import com.journeygo.modules.destination.entity.DestinationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,19 +17,22 @@ public interface DestinationRepository extends JpaRepository<Destination, Long> 
 
     Page<Destination> findByDeletedFalse(Pageable pageable);
 
+    Page<Destination> findByApprovedTrueAndDeletedFalse(Pageable pageable);
+    List<Destination> findByApprovedTrueAndDeletedFalse();
+
     Page<Destination> findByDeletedTrue(Pageable pageable);
 
     Page<Destination> findByApprovedAndDeletedFalse(boolean approved, Pageable pageable);
 
-    Page<Destination> findByStatusAndDeletedFalse(DestinationStatus status, Pageable pageable);
-
     Page<Destination> findByRegionIdAndDeletedFalse(Long regionId, Pageable pageable);
 
     Page<Destination> findByRegionSlugAndDeletedFalse(String regionSlug, Pageable pageable);
+    Page<Destination> findByRegionSlugAndApprovedTrueAndDeletedFalse(String regionSlug, Pageable pageable);
 
     Page<Destination> findByThemesIdAndDeletedFalse(Long themeId, Pageable pageable);
 
     Page<Destination> findByThemesSlugAndDeletedFalse(String themeSlug, Pageable pageable);
+    Page<Destination> findByThemesSlugAndApprovedTrueAndDeletedFalse(String themeSlug, Pageable pageable);
 
     // ── Non-paged list queries ───────────────────────────────────────────────
 
@@ -40,11 +42,11 @@ public interface DestinationRepository extends JpaRepository<Destination, Long> 
 
     List<Destination> findByApprovedAndDeletedFalse(boolean approved);
 
-    List<Destination> findByStatusAndDeletedFalse(DestinationStatus status);
-
     List<Destination> findByRegionSlugAndDeletedFalse(String regionSlug);
+    List<Destination> findByRegionSlugAndApprovedTrueAndDeletedFalse(String regionSlug);
 
     List<Destination> findByThemesSlugAndDeletedFalse(String themeSlug);
+    List<Destination> findByThemesSlugAndApprovedTrueAndDeletedFalse(String themeSlug);
 
     // ── Single item queries & Validations ────────────────────────────────────
 

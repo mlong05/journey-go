@@ -1,4 +1,4 @@
-package com.journeygo.modules.tour.entity;
+package com.journeygo.modules.tour.entity.enums;
 
 public enum TourStatus {
     DRAFT,

@@ -14,16 +14,21 @@ Tài liệu này bao gồm điểm đến, khu vực và chủ đề du lịch.
 
 | Method | Endpoint | Quyền | Chức năng |
 | --- | --- | --- | --- |
-| GET | /api/v1/destinations | Công khai | Danh sách chưa xóa, phân trang/sắp xếp |
-| GET | /api/v1/destinations/approved | Công khai | Điểm đến đã xuất bản |
+| GET | /api/v1/destinations | Công khai | Danh sách điểm đến đã duyệt, phân trang/sắp xếp |
+| GET | /api/v1/moderation/destinations/approved | Công khai | Điểm đến đã xuất bản |
 | GET | /api/v1/destinations/{id} | Công khai | Chi tiết điểm đến |
 | GET | /api/v1/destinations/region/{slug} | Công khai | Điểm đến theo khu vực |
 | GET | /api/v1/destinations/theme/{slug} | Công khai | Điểm đến theo chủ đề |
-| POST | /api/v1/destinations | ADMIN, MODERATOR, PROVIDER | Tạo điểm đến ở DRAFT |
-| PUT | /api/v1/destinations/{id} | ADMIN, MODERATOR, PROVIDER | Cập nhật; Provider chỉ sửa điểm đến của mình |
+| POST | /api/v1/destinations | ADMIN, MODERATOR, PROVIDER | Tạo điểm đến và tự gửi moderation |
+| PUT | /api/v1/destinations/{id} | ADMIN, MODERATOR, PROVIDER | Cập nhật và gửi duyệt lại; Provider chỉ sửa điểm đến của mình |
 | GET | /api/v1/destinations/deleted | ADMIN, MODERATOR | Danh sách đã xóa mềm |
 | DELETE | /api/v1/destinations/{id} | ADMIN, MODERATOR | Xóa mềm điểm đến và content liên quan |
-| PATCH | /api/v1/destinations/{id}/restore | ADMIN, MODERATOR | Khôi phục điểm đến |
+| PATCH | /api/v1/destinations/{id}/restore | ADMIN, MODERATOR | Khôi phục điểm đến về DRAFT |
+| POST | /api/v1/moderation/destinations/{id}/submit | PROVIDER, ADMIN, MODERATOR | Gửi lại điểm đến bị từ chối |
+| GET | /api/v1/moderation/destinations/queue | ADMIN, MODERATOR | Hàng chờ kiểm duyệt |
+| GET | /api/v1/moderation/destinations/{id}/history | PROVIDER, ADMIN, MODERATOR | Trạng thái, lý do và lịch sử quyết định |
+| PATCH | /api/v1/moderation/destinations/{id}/approve | ADMIN, MODERATOR | Duyệt điểm đến |
+| PATCH | /api/v1/moderation/destinations/{id}/reject | ADMIN, MODERATOR | Từ chối kèm lý do |
 
 Danh sách hỗ trợ page, size, sort. Ví dụ:
 
@@ -47,7 +52,7 @@ POST /api/v1/destinations
 }
 ~~~
 
-Tạo mới sẽ có trạng thái DRAFT. Lấy data.id từ response và gửi duyệt theo hướng dẫn trong [Moderation API Guide](MODERATION_API_GUIDE.md).
+Tạo mới sẽ tự gửi vào hàng chờ moderation và có trạng thái PENDING. Lấy data.id từ response để theo dõi lịch sử hoặc xử lý tại moderation.
 
 ## 2. Khu vực và chủ đề
 
@@ -79,7 +84,7 @@ Body tạo/cập nhật Region hoặc Theme:
 
 ## Luồng sử dụng
 
-Tạo Region/Theme trước nếu cần → tạo Destination → gửi Destination đến Moderation → Moderator duyệt hoặc từ chối. Sau khi cập nhật Destination, trạng thái trở về DRAFT và cần gửi duyệt lại.
+Tạo Region/Theme trước nếu cần → tạo Destination (tự gửi moderation) → Moderator duyệt hoặc từ chối. Cập nhật tự gửi duyệt lại; điểm đến PENDING không thể chỉnh sửa.
 
 
 
@@ -92,12 +97,12 @@ GET và DELETE không nhận JSON request body. Với các API này, hãy chạy
 | API | JSON dùng để test |
 | --- | --- |
 | GET /api/v1/destinations?page=0&size=10 | Response: {"code":200,"message":"Lấy danh sách điểm đến thành công","data":{"page":0,"size":10,"totalElements":1,"totalPages":1,"first":true,"last":true,"content":[{"id":1,"name":"Văn Miếu - Quốc Tử Giám","address":"Hà Nội","latitude":21.0277,"longitude":105.8351,"capacity":500,"booked":0,"approved":true,"status":"PUBLISHED","deleted":false,"regionId":1,"region":null,"themes":[],"contentCount":1,"experienceCount":0,"createdBy":"Provider","createdAt":"2026-10-01T08:00:00Z","updatedAt":"2026-10-01T08:00:00Z"}]},"timestamp":"2026-10-01T08:00:00Z"} |
-| GET /api/v1/destinations/approved?page=0&size=10 | Dùng JSON response phân trang ở dòng trên; content gồm các destination đã duyệt. |
+| GET /api/v1/moderation/destinations/approved?page=0&size=10 | Dùng JSON response phân trang ở dòng trên; content gồm các destination đã duyệt. |
 | GET /api/v1/destinations/1 | Response: {"code":200,"message":"Lấy thông tin điểm đến thành công","data":{"id":1,"name":"Văn Miếu - Quốc Tử Giám","address":"Hà Nội","latitude":21.0277,"longitude":105.8351,"capacity":500,"booked":0,"approved":true,"status":"PUBLISHED","deleted":false,"regionId":1,"region":null,"themes":[],"contentCount":1,"experienceCount":0,"createdBy":"Provider","createdAt":"2026-10-01T08:00:00Z","updatedAt":"2026-10-01T08:00:00Z"},"timestamp":"2026-10-01T08:00:00Z"} |
 | GET /api/v1/destinations/region/ha-noi?page=0&size=10 | Dùng JSON response phân trang ở trên; thay slug bằng slug khu vực tồn tại. |
 | GET /api/v1/destinations/theme/di-san-van-hoa?page=0&size=10 | Dùng JSON response phân trang ở trên; thay slug bằng slug chủ đề tồn tại. |
 | POST /api/v1/destinations | Request: {"name":"Văn Miếu - Quốc Tử Giám","address":"58 Quốc Tử Giám, Đống Đa, Hà Nội","latitude":21.0277,"longitude":105.8351,"capacity":500,"regionId":1,"themeIds":[1,2]} |
-| PUT /api/v1/destinations/1 | Gửi cùng JSON request tạo destination; thay ID ở URL. Cập nhật đưa status về DRAFT. |
+| PUT /api/v1/destinations/1 | Gửi cùng JSON request tạo destination; thay ID ở URL. Cập nhật tự gửi lại vào moderation. |
 | GET /api/v1/destinations/deleted?page=0&size=10 | Response có cấu trúc phân trang như GET danh sách; content là destination có deleted=true. |
 | DELETE /api/v1/destinations/1 | Response: {"code":200,"message":"Xóa điểm đến thành công","timestamp":"2026-10-01T08:00:00Z"} |
 | PATCH /api/v1/destinations/1/restore | Body: không cần. Response data là một DestinationResponse với status DRAFT. |
