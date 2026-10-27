@@ -1,4 +1,4 @@
-package com.journeygo.modules.destination.entity;
+package com.journeygo.modules.destination.entity.enums;
 
 public enum DestinationStatus {
     DRAFT,

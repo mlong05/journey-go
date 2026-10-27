@@ -8,9 +8,8 @@ import com.journeygo.modules.destination.repository.DestinationRepository;
 import com.journeygo.modules.tour.dto.*;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourDestination;
-import com.journeygo.modules.tour.entity.TourStatus;
-import com.journeygo.modules.tour.repository.TourPriceProjection;
 import com.journeygo.modules.tour.repository.TourRepository;
+import com.journeygo.modules.moderation.service.TourModerationService;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
@@ -23,12 +22,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -39,9 +34,10 @@ public class TourService {
     private final TourRepository tourRepository;
     private final UserRepository userRepository;
     private final DestinationRepository destinationRepository;
+    private final TourModerationService moderationService;
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
-            "tourId", "title", "tourType", "durationDays",
+            "tourId", "title", "tourType", "durationDays", "price", "startDate", "endDate",
             "approved", "status", "deleted", "createdAt", "updatedAt"
     );
 
@@ -61,13 +57,6 @@ public class TourService {
         return toPageResponse(page);
     }
 
-    /** Tours by workflow status (paginated). */
-    @Transactional(readOnly = true)
-    public PageResponse<TourResponse> getByStatus(TourStatus status, Pageable pageable) {
-        Page<Tour> page = tourRepository.findByStatus(status, sanitizePageable(pageable));
-        return toPageResponse(page);
-    }
-
     /** Tours created by a specific user (paginated). */
     @Transactional(readOnly = true)
     public PageResponse<TourResponse> getByCreator(Long creatorId, Pageable pageable) {
@@ -78,9 +67,9 @@ public class TourService {
     /** Single tour by ID. */
     @Transactional(readOnly = true)
     public TourResponse getById(Long tourId) {
+        moderationService.requireApproved(tourId);
         Tour tour = findOrThrow(tourId);
-        BigDecimal price = tourRepository.calculateTotalPriceByTourId(tourId);
-        return TourResponse.fromEntity(tour, price);
+        return TourResponse.fromEntity(tour);
     }
 
     /** Soft-deleted tours (admin / moderator). */
@@ -95,9 +84,10 @@ public class TourService {
 
     // ── Create / Update ───────────────────────────────────────────────────────
 
-    /** Create a new tour in DRAFT status. */
+    /** Create a tour and send it to moderation. */
     @Transactional
     public TourResponse create(TourRequest request, Long creatorId) {
+        validateDateRange(request);
         if (tourRepository.existsByTitle(request.title())) {
             throw new AppException(ErrorCode.TOUR_EXISTED);
         }
@@ -109,8 +99,10 @@ public class TourService {
                 .title(request.title().trim())
                 .tourType(request.tourType())
                 .durationDays(request.durationDays())
+                .price(request.price())
+                .startDate(request.startDate())
+                .endDate(request.endDate())
                 .approved(false)
-                .status(TourStatus.DRAFT)
                 .deleted(false)
                 .createdBy(creator)
                 .build();
@@ -118,16 +110,19 @@ public class TourService {
         attachDestinations(tour, request.destinations());
 
         Tour saved = tourRepository.save(tour);
+        moderationService.submit(saved.getTourId(), creatorId, Role.of(Role.PROVIDER));
         log.info("Created tour id={} title={}", saved.getTourId(), saved.getTitle());
-        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
+        return TourResponse.fromEntity(saved);
     }
 
     /** Update an existing tour and reset it to DRAFT for re-review.
      *  PROVIDER may only update their own tours. */
     @Transactional
     public TourResponse update(Long tourId, TourRequest request, Long callerId, Role callerRole) {
+        validateDateRange(request);
         Tour existing = findOrThrow(tourId);
         checkOwnership(existing, callerId, callerRole);
+        moderationService.assertCanEdit(tourId, callerId, callerRole);
 
         if (tourRepository.existsByTitleAndTourIdNot(request.title(), tourId)) {
             throw new AppException(ErrorCode.TOUR_EXISTED);
@@ -136,50 +131,18 @@ public class TourService {
         existing.setTitle(request.title().trim());
         existing.setTourType(request.tourType());
         existing.setDurationDays(request.durationDays());
-        existing.setStatus(TourStatus.DRAFT);
-        existing.setApproved(false);
-        existing.setRejectionReason(null);
+        existing.setPrice(request.price());
+        existing.setStartDate(request.startDate());
+        existing.setEndDate(request.endDate());
 
         // Replace destinations
         existing.getTourDestinations().clear();
         attachDestinations(existing, request.destinations());
 
         Tour saved = tourRepository.save(existing);
+        moderationService.submitAfterEdit(saved.getTourId(), callerId, callerRole);
         log.info("Updated tour id={} by userId={}", saved.getTourId(), callerId);
-        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
-    }
-
-    // ── Workflow ──────────────────────────────────────────────────────────────
-
-    /** Submit tour for review (PROVIDER / ADMIN / MODERATOR). */
-    @Transactional
-    public TourResponse submit(Long tourId, Long callerId, Role callerRole) {
-        Tour tour = findOrThrow(tourId);
-        checkOwnership(tour, callerId, callerRole);
-        tour.submit();
-        Tour saved = tourRepository.save(tour);
-        log.info("Submitted tour id={} for review", saved.getTourId());
-        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
-    }
-
-    /** Publish tour (ADMIN / MODERATOR). */
-    @Transactional
-    public TourResponse publish(Long tourId) {
-        Tour tour = findOrThrow(tourId);
-        tour.publish();
-        Tour saved = tourRepository.save(tour);
-        log.info("Published tour id={}", saved.getTourId());
-        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
-    }
-
-    /** Reject tour with a mandatory reason (ADMIN / MODERATOR). */
-    @Transactional
-    public TourResponse reject(Long tourId, String reason) {
-        Tour tour = findOrThrow(tourId);
-        tour.reject(reason);
-        Tour saved = tourRepository.save(tour);
-        log.info("Rejected tour id={} reason={}", saved.getTourId(), reason);
-        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
+        return TourResponse.fromEntity(saved);
     }
 
     // ── Soft-delete / Restore ─────────────────────────────────────────────────
@@ -199,51 +162,23 @@ public class TourService {
         Tour tour = tourRepository.findDeletedByTourId(tourId)
                 .orElseThrow(() -> new AppException(ErrorCode.TOUR_NOT_FOUND));
         tour.softRestore();
-        tour.setApproved(false);
-        tour.setStatus(TourStatus.DRAFT);
-        tour.setRejectionReason(null);
         Tour saved = tourRepository.save(tour);
+        moderationService.resetAfterRestore(saved.getTourId());
         log.info("Restored tour id={}", saved.getTourId());
-        return TourResponse.fromEntity(saved, tourRepository.calculateTotalPriceByTourId(saved.getTourId()));
+        return TourResponse.fromEntity(saved);
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
-    /**
-     * Chuyển trang Tour sang PageResponse, đồng thời gắn giá tính động cho
-     * từng tour (tổng giá Experience của các điểm đến trong hành trình).
-     *
-     * Giá được tính bằng MỘT truy vấn cho cả trang để tránh N+1.
-     */
     private PageResponse<TourResponse> toPageResponse(Page<Tour> page) {
-        Map<Long, BigDecimal> priceMap = calculatePriceMap(page.getContent());
-        return PageResponse.from(page, tour -> TourResponse.fromEntity(tour, priceMap.get(tour.getTourId())));
+        return PageResponse.from(page, TourResponse::fromEntity);
     }
 
-    /**
-     * Tính giá cho nhiều tour cùng lúc.
-     *
-     * @return Map tourId → tổng giá. Tour không có Experience sẽ không có trong map.
-     */
-    private Map<Long, BigDecimal> calculatePriceMap(List<Tour> tours) {
-        if (tours == null || tours.isEmpty()) {
-            return Collections.emptyMap();
+    private void validateDateRange(TourRequest request) {
+        if (request.endDate().isBefore(request.startDate())) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                    "Ngày kết thúc phải bằng hoặc sau ngày bắt đầu");
         }
-
-        List<Long> tourIds = tours.stream()
-                .map(Tour::getTourId)
-                .filter(java.util.Objects::nonNull)
-                .toList();
-
-        if (tourIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        Map<Long, BigDecimal> priceMap = new HashMap<>();
-        for (TourPriceProjection projection : tourRepository.calculateTotalPricesByTourIds(tourIds)) {
-            priceMap.put(projection.tourId(), projection.totalPrice());
-        }
-        return priceMap;
     }
 
     private Tour findOrThrow(Long tourId) {

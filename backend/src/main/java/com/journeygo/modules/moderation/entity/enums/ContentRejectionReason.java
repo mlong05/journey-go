@@ -1,4 +1,4 @@
-package com.journeygo.modules.moderation.entity;
+package com.journeygo.modules.moderation.entity.enums;
 
 public enum ContentRejectionReason {
     IMAGE_NOT_RELEVANT("Ảnh không phù hợp với nội dung"),
