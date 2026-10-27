@@ -40,18 +40,26 @@ public class AuthService {
     private final GoogleTokenVerifierService googleTokenVerifierService;
     private final com.journeygo.modules.auth.repository.PasswordResetOtpRepository passwordResetOtpRepository;
     private final EmailService emailService;
+    private final LoginRateLimiterService loginRateLimiterService;
 
     @org.springframework.beans.factory.annotation.Value("${app.mail.otp-expiration-minutes:10}")
     private int otpExpirationMinutes;
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
+        // Kiểm tra chống tấn công Brute-force đăng nhập bằng Redis
+        loginRateLimiterService.checkLoginAllowed(request.email());
+
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.email(), request.password())
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            // Đăng nhập thành công -> reset số lần thử sai
+            loginRateLimiterService.resetAttempts(request.email());
         } catch (BadCredentialsException ex) {
+            // Ghi nhận lần nhập sai mật khẩu vào Redis
+            loginRateLimiterService.recordFailedAttempt(request.email());
             throw new AppException(ErrorCode.INVALID_CREDENTIALS);
         }
 

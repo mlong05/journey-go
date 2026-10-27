@@ -46,6 +46,9 @@ class AuthServicePasswordTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private LoginRateLimiterService loginRateLimiterService;
+
     @InjectMocks
     private AuthService authService;
 
