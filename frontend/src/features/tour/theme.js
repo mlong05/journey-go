@@ -118,8 +118,28 @@ export const TOUR_STATUS_ORDER = ["DRAFT", "PENDING", "PUBLISHED", "REJECTED"];
 /** Trạng thái mà một tour được phép gửi duyệt (submit). */
 export const SUBMITTABLE_STATUSES = ["DRAFT", "REJECTED"];
 
-/** Trạng thái mà một tour được phép chỉnh sửa (sửa sẽ reset về DRAFT). */
+/** Trạng thái mà một tour được phép chỉnh sửa (sửa xong backend tự gửi lại vào hàng chờ duyệt). */
 export const EDITABLE_STATUSES = ["DRAFT", "REJECTED"];
+
+/** Nhãn tiếng Việt của mã lý do từ chối tour (khớp TourRejectionReason ở backend). */
+export const TOUR_REJECTION_LABELS = {
+  INACCURATE_INFORMATION: "Thông tin tour chưa chính xác",
+  INCOMPLETE_INFORMATION: "Thông tin tour chưa đầy đủ",
+  INAPPROPRIATE_TOUR: "Tour không phù hợp với nền tảng",
+  INVALID_PRICE_OR_DATES: "Giá hoặc ngày khởi hành không hợp lệ",
+  INVALID_ITINERARY: "Lịch trình hoặc điểm đến chưa hợp lệ",
+  DUPLICATE_TOUR: "Tour bị trùng lặp",
+  OTHER: "Lý do khác",
+};
+
+/** "A,B" (mã, phân cách dấu phẩy) -> ["Nhãn A", "Nhãn B"]. */
+export function getRejectionLabels(codes) {
+  return String(codes || "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .map((c) => TOUR_REJECTION_LABELS[c] || c);
+}
 
 /**
  * Ký tự thay thế khi thiếu dữ liệu.

@@ -1,259 +1,186 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/auth_models.dart';
-import '../../core/models/community_model.dart';
-import '../../core/models/destination_model.dart';
+import '../../core/models/forum_model.dart';
+import '../../core/services/api_client.dart';
 import '../../core/services/destination_service.dart';
-import '../../core/services/user_data_service.dart';
-import '../modals/create_post_modal.dart';
+import '../../core/services/forum_service.dart';
+import '../../core/services/tour_service.dart';
+import '../forum/compose_post_screen.dart';
+import '../forum/forum_widgets.dart';
+import '../forum/my_posts_screen.dart';
+import '../forum/post_detail_screen.dart';
+import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeletonList;
 
+/// Tab Diễn đàn: bảng tin bài viết đã được kiểm duyệt, lọc theo điểm đến hoặc tour.
 class CommunityTab extends StatefulWidget {
   final UserModel currentUser;
 
-  const CommunityTab({
-    super.key,
-    required this.currentUser,
-  });
+  const CommunityTab({super.key, required this.currentUser});
 
   @override
   State<CommunityTab> createState() => _CommunityTabState();
 }
 
 class _CommunityTabState extends State<CommunityTab> {
-  final UserDataService _userDataService = UserDataService();
-  final DestinationService _destinationService = DestinationService();
+  static const int _pageSize = 10;
 
-  List<CommunityPost> _posts = [];
-  List<DestinationModel> _destinations = [];
-  bool _isLoading = true;
-  String _activeCategory = 'all'; // 'all', 'checkin', 'review'
+  final ForumService _service = ForumService();
+  final ScrollController _scroll = ScrollController();
+
+  final List<ForumPost> _posts = [];
+  ForumOption? _destination;
+  ForumOption? _tour;
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = false;
+  String? _error;
+  int _page = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _scroll.addListener(() {
+      if (_scroll.hasClients &&
+          _scroll.position.pixels >= _scroll.position.maxScrollExtent - 300) {
+        _loadMore();
+      }
+    });
+    _load();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    final results = await Future.wait([
-      _userDataService.getPosts(),
-      _destinationService.getApprovedDestinations(),
-    ]);
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
-    if (mounted) {
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await _service.getFeed(
+        page: 0,
+        size: _pageSize,
+        destinationId: _destination?.id,
+        tourId: _tour?.id,
+      );
+      if (!mounted) return;
       setState(() {
-        _posts = results[0] as List<CommunityPost>;
-        _destinations = results[1] as List<DestinationModel>;
-        _isLoading = false;
+        _posts
+          ..clear()
+          ..addAll(result.items);
+        _page = 0;
+        _hasMore = result.hasMore;
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
       });
     }
   }
 
-  List<CommunityPost> get _filteredPosts {
-    if (_activeCategory == 'checkin') {
-      return _posts.where((p) => p.category == 'checkin').toList();
+  Future<void> _loadMore() async {
+    if (_loading || _loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final result = await _service.getFeed(
+        page: _page + 1,
+        size: _pageSize,
+        destinationId: _destination?.id,
+        tourId: _tour?.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _posts.addAll(result.items);
+        _page += 1;
+        _hasMore = result.hasMore;
+        _loadingMore = false;
+      });
+    } on ApiException {
+      if (mounted) setState(() => _loadingMore = false);
     }
-    if (_activeCategory == 'review') {
-      return _posts.where((p) => p.category == 'review' || p.category == 'tips').toList();
-    }
-    return _posts;
   }
 
-  void _openCreatePostModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => CreatePostModal(
-        authorName: widget.currentUser.fullName,
-        authorAvatar: widget.currentUser.avatarUrl ?? '',
-        destinations: _destinations,
-        onPostCreated: _loadData,
-      ),
+  Future<void> _toggleHeart(ForumPost post) async {
+    final index = _posts.indexWhere((p) => p.id == post.id);
+    if (index < 0) return;
+    final before = _posts[index];
+
+    // Cập nhật ngay trên màn hình, lỗi thì hoàn lại.
+    final ForumPost optimistic = before.isLiked
+        ? before.copyWith(likesCount: (before.likesCount - 1).clamp(0, 1 << 30), clearReaction: true)
+        : before.copyWith(likesCount: before.likesCount + 1, myReaction: kHeartReaction);
+    setState(() => _posts[index] = optimistic);
+
+    try {
+      final total = await _service.toggleHeart(before.id);
+      if (!mounted) return;
+      final i = _posts.indexWhere((p) => p.id == post.id);
+      if (i >= 0) setState(() => _posts[i] = _posts[i].copyWith(likesCount: total));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final i = _posts.indexWhere((p) => p.id == post.id);
+      if (i >= 0) setState(() => _posts[i] = before);
+      showForumSnack(context, e.message);
+    }
+  }
+
+  Future<void> _open(ForumPost post) async {
+    final result = await Navigator.of(context).push<ForumPost?>(
+      MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
     );
-  }
-
-  void _toggleLike(CommunityPost post) async {
+    if (!mounted) return;
+    final index = _posts.indexWhere((p) => p.id == post.id);
+    if (index < 0) return;
     setState(() {
-      post.isLiked = !post.isLiked;
-      post.likesCount += post.isLiked ? 1 : -1;
+      if (result == null) {
+        _posts.removeAt(index);
+      } else {
+        _posts[index] = result;
+      }
     });
-    await _userDataService.savePosts(_posts);
   }
 
-  void _openCommentsSheet(CommunityPost post) {
-    final commentController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          return Container(
-            height: MediaQuery.of(context).size.height * 0.75,
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Column(
-              children: [
-                Center(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 10),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Bình luận (${post.comments.length})',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        icon: const Icon(Icons.close_rounded, size: 20),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: post.comments.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Chưa có bình luận nào. Hãy là người đầu tiên chia sẻ!',
-                            style: TextStyle(color: AppCultureColors.textMuted, fontSize: 13),
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: post.comments.length,
-                          itemBuilder: (context, idx) {
-                            final c = post.comments[idx];
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: AppCultureColors.jadeLight,
-                                    child: const Icon(Icons.person, size: 18, color: AppCultureColors.heritageJade),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: AppCultureColors.surfaceSubtle,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                c.author,
-                                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                                              ),
-                                              Text(
-                                                c.time,
-                                                style: const TextStyle(fontSize: 11, color: AppCultureColors.textMuted),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            c.text,
-                                            style: const TextStyle(fontSize: 13, color: AppCultureColors.textDark),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(top: BorderSide(color: AppCultureColors.border)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: commentController,
-                          decoration: InputDecoration(
-                            hintText: 'Viết bình luận văn hóa...',
-                            hintStyle: const TextStyle(fontSize: 13, color: AppCultureColors.textLight),
-                            filled: true,
-                            fillColor: AppCultureColors.surfaceSubtle,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: const BorderSide(color: AppCultureColors.border),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: const BorderSide(color: AppCultureColors.border),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () async {
-                          final text = commentController.text.trim();
-                          if (text.isEmpty) return;
-
-                          final newComment = CommunityComment(
-                            id: 'c_${DateTime.now().millisecondsSinceEpoch}',
-                            author: widget.currentUser.fullName,
-                            avatar: widget.currentUser.avatarUrl ?? '',
-                            text: text,
-                            time: 'Vừa xong',
-                          );
-
-                          setState(() {
-                            post.comments.add(newComment);
-                            post.commentsCount = post.comments.length;
-                          });
-                          setSheetState(() {});
-                          commentController.clear();
-
-                          await _userDataService.savePosts(_posts);
-                        },
-                        icon: const Icon(Icons.send_rounded, color: AppCultureColors.heritageJade),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+  Future<void> _compose() async {
+    final saved = await Navigator.of(context).push<ForumPost>(
+      MaterialPageRoute(builder: (_) => const ComposePostScreen()),
     );
+    if (saved != null && mounted) _load();
+  }
+
+  void _openMyPosts() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyPostsScreen()));
+  }
+
+  Future<void> _filterDestination() async {
+    final picked = await showForumOptionPicker(
+      context,
+      title: 'Lọc theo điểm đến',
+      loader: () async => (await DestinationService().getApprovedDestinations())
+          .map((d) => ForumOption(d.id, d.name))
+          .toList(),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _destination = picked.id < 0 ? null : picked);
+    _load();
+  }
+
+  Future<void> _filterTour() async {
+    final picked = await showForumOptionPicker(
+      context,
+      title: 'Lọc theo tour',
+      loader: () async =>
+          (await TourService().getPublishedTours()).map((t) => ForumOption(t.id, t.title)).toList(),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _tour = picked.id < 0 ? null : picked);
+    _load();
   }
 
   @override
@@ -263,31 +190,8 @@ class _CommunityTabState extends State<CommunityTab> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top App Bar
             _buildHeader(),
-
-            // Filter Chips
-            _buildFilterChips(),
-
-            // Feed Content
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppCultureColors.heritageJade))
-                  : RefreshIndicator(
-                      onRefresh: _loadData,
-                      color: AppCultureColors.heritageJade,
-                      child: ListView(
-                        padding: const EdgeInsets.only(bottom: 90),
-                        children: [
-                          // Create post prompt box
-                          _buildCreatePostCard(),
-
-                          // Posts list
-                          ..._filteredPosts.map((post) => _buildPostCard(post)),
-                        ],
-                      ),
-                    ),
-            ),
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
@@ -296,450 +200,219 @@ class _CommunityTabState extends State<CommunityTab> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Flexible(
-                      child: Text(
-                        'Diễn đàn & Đánh giá Di sản',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: AppCultureColors.textDark,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppCultureColors.heritageJade,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  'Cộng đồng du khách khám phá thực địa Việt Nam',
-                  style: TextStyle(fontSize: 11, color: AppCultureColors.textMuted),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                decoration: const BoxDecoration(
-                  color: AppCultureColors.surfaceSubtle,
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.search_rounded, size: 20, color: AppCultureColors.textDark),
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.all(8),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                decoration: const BoxDecoration(
-                  color: AppCultureColors.surfaceSubtle,
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.tune_rounded, size: 20, color: AppCultureColors.textDark),
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.all(8),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Row(
-        children: [
-          _buildFilterChip('all', '✨ Tất cả bài viết'),
-          const SizedBox(width: 8),
-          _buildFilterChip('checkin', '📷 Ảnh Check-in Mới'),
-          const SizedBox(width: 8),
-          _buildFilterChip('review', '⭐ Review Điểm Đến'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String id, String label) {
-    final isSelected = _activeCategory == id;
-
-    return GestureDetector(
-      onTap: () => setState(() => _activeCategory = id),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppCultureColors.oceanBlue : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppCultureColors.oceanBlue : AppCultureColors.border,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-            color: isSelected ? Colors.white : AppCultureColors.textDark,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCreatePostCard() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppCultureColors.border),
-      ),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: _openCreatePostModal,
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: const Color(0xFFB6E3F4),
-                  child: const Icon(Icons.person, color: Color(0xFF0288D1), size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppCultureColors.surfaceSubtle,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'Chia sẻ cảm nhận hoặc ảnh chụp di tích của bạn...',
-                      style: TextStyle(fontSize: 12, color: AppCultureColors.textLight),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                Text(
+                  'Diễn đàn',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppCultureColors.textDark,
                   ),
                 ),
+                SizedBox(height: 2),
+                Text(
+                  'Chia sẻ trải nghiệm di sản cùng cộng đồng',
+                  style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                ),
               ],
             ),
           ),
+          TextButton.icon(
+            onPressed: _openMyPosts,
+            icon: const Icon(Icons.folder_open_rounded, size: 19),
+            label: const Text('Bài của tôi', style: TextStyle(fontWeight: FontWeight.w800)),
+            style: TextButton.styleFrom(foregroundColor: AppCultureColors.heritageJade),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading && _posts.isEmpty) {
+      return const RewardsSkeletonList(count: 3, itemHeight: 200);
+    }
+
+    if (_error != null && _posts.isEmpty) {
+      return RewardsMessageView(
+        icon: Icons.cloud_off_rounded,
+        title: 'Không tải được Diễn đàn',
+        message: _error,
+        onRetry: _load,
+      );
+    }
+
+    final filtering = _destination != null || _tour != null;
+    return RefreshIndicator(
+      color: AppCultureColors.heritageJade,
+      onRefresh: _load,
+      child: ListView(
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          _buildComposeCard(),
           const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildQuickPostAction(Icons.camera_alt_outlined, 'Ảnh thực địa', AppCultureColors.heritageJade),
-              _buildQuickPostAction(Icons.star_outline_rounded, 'Chấm sao', AppCultureColors.gold),
-              _buildQuickPostAction(Icons.location_on_outlined, 'Gắn di tích', AppCultureColors.oceanBlue),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickPostAction(IconData icon, String label, Color color) {
-    return GestureDetector(
-      onTap: _openCreatePostModal,
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPostCard(CommunityPost post) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppCultureColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Author header
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: AppCultureColors.jadeLight,
-                        child: const Icon(Icons.person, color: AppCultureColors.heritageJade, size: 24),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    post.authorName,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppCultureColors.textDark,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppCultureColors.surfaceSubtle,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: AppCultureColors.border),
-                                  ),
-                                  child: Text(
-                                    post.authorBadge,
-                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppCultureColors.textMuted),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                const Icon(Icons.schedule_rounded, size: 12, color: AppCultureColors.textLight),
-                                const SizedBox(width: 4),
-                                Text(
-                                  post.createdAt,
-                                  style: const TextStyle(fontSize: 11, color: AppCultureColors.textLight),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppCultureColors.rewardBg,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.star_rounded, size: 14, color: AppCultureColors.gold),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${post.rating} (${post.ratingLabel})',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: AppCultureColors.rewardText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Location badge
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.location_on_rounded, size: 14, color: Color(0xFFE11D48)),
-                  const SizedBox(width: 4),
-                  Text(
-                    post.location,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFE11D48)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Post text content
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Text(
-              post.content,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppCultureColors.textDark,
-                height: 1.45,
-              ),
-            ),
-          ),
-
-          // Attached photo with caption overlay
-          if (post.image != null) ...[
+          _buildFilters(),
+          const SizedBox(height: 14),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
+            )
+          else if (_posts.isEmpty)
             SizedBox(
-              height: 200,
-              width: double.infinity,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.asset(
-                    post.image!,
-                    fit: BoxFit.cover,
-                  ),
-                  if (post.imageCaption != null)
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                          ),
-                        ),
-                        child: Text(
-                          post.imageCaption!,
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                    ),
-                ],
+              height: 300,
+              child: RewardsMessageView(
+                icon: Icons.forum_outlined,
+                title: filtering ? 'Không có bài viết phù hợp' : 'Chưa có bài viết nào',
+                message: filtering
+                    ? 'Thử bỏ bớt bộ lọc để xem thêm bài viết.'
+                    : 'Hãy là người đầu tiên chia sẻ trải nghiệm của bạn.',
+              ),
+            )
+          else ...[
+            ..._posts.map(
+              (p) => ForumPostCard(
+                post: p,
+                onTap: () => _open(p),
+                onLike: () => _toggleHeart(p),
               ),
             ),
+            if (_loadingMore)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
+              ),
           ],
+        ],
+      ),
+    );
+  }
 
-          // Footer action buttons
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  Widget _buildComposeCard() {
+    return InkWell(
+      onTap: _compose,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppCultureColors.border),
+        ),
+        child: Row(
+          children: [
+            ForumAvatar(
+              name: widget.currentUser.fullName,
+              url: widget.currentUser.avatarUrl,
+              size: 42,
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Bạn vừa có trải nghiệm gì thú vị?',
+                style: TextStyle(fontSize: 14, color: AppCultureColors.textMuted),
+              ),
+            ),
+            const Icon(Icons.add_photo_alternate_outlined,
+                color: AppCultureColors.heritageJade, size: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilters() {
+    Widget chip({
+      required IconData icon,
+      required String hint,
+      required ForumOption? value,
+      required VoidCallback onTap,
+      required VoidCallback onClear,
+    }) {
+      final selected = value != null;
+      return Expanded(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? AppCultureColors.jadeLight : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? AppCultureColors.heritageJade : AppCultureColors.border,
+              ),
+            ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Like button
-                GestureDetector(
-                  onTap: () => _toggleLike(post),
-                  child: Row(
-                    children: [
-                      Icon(
-                        post.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        size: 20,
-                        color: post.isLiked ? const Color(0xFFE11D48) : AppCultureColors.textMuted,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${post.likesCount}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: post.isLiked ? const Color(0xFFE11D48) : AppCultureColors.textMuted,
-                        ),
-                      ),
-                    ],
+                Icon(
+                  icon,
+                  size: 16,
+                  color: selected ? AppCultureColors.jadeDark : AppCultureColors.textMuted,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    selected ? value.label : hint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? AppCultureColors.jadeDark : AppCultureColors.textDark,
+                    ),
                   ),
                 ),
-
-                // Comment button
-                GestureDetector(
-                  onTap: () => _openCommentsSheet(post),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: AppCultureColors.textMuted),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${post.commentsCount} bình luận',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppCultureColors.textMuted),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Share button
-                GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đã sao chép liên kết chia sẻ bài viết!')),
-                    );
-                  },
-                  child: const Row(
-                    children: [
-                      Icon(Icons.share_outlined, size: 18, color: AppCultureColors.textMuted),
-                      SizedBox(width: 4),
-                      Text(
-                        'Chia sẻ',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppCultureColors.textMuted),
-                      ),
-                    ],
-                  ),
-                ),
+                if (selected)
+                  InkWell(
+                    onTap: onClear,
+                    child: const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(Icons.close_rounded, size: 16, color: AppCultureColors.jadeDark),
+                    ),
+                  )
+                else
+                  const Icon(Icons.keyboard_arrow_down_rounded,
+                      size: 18, color: AppCultureColors.textMuted),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        chip(
+          icon: Icons.place_rounded,
+          hint: 'Điểm đến',
+          value: _destination,
+          onTap: _filterDestination,
+          onClear: () {
+            setState(() => _destination = null);
+            _load();
+          },
+        ),
+        const SizedBox(width: 10),
+        chip(
+          icon: Icons.route_rounded,
+          hint: 'Tour',
+          value: _tour,
+          onTap: _filterTour,
+          onClear: () {
+            setState(() => _tour = null);
+            _load();
+          },
+        ),
+      ],
     );
   }
 }

@@ -17,19 +17,10 @@ import {
   TOUR_STATUS_META,
   TOUR_TYPE_META,
   formatVND,
+  getRejectionLabels,
   formatDuration,
 } from "../theme";
 import { tourService } from "../services/tourService";
-
-const REASON_LABELS = {
-  INACCURATE_INFORMATION: "Thông tin tour chưa chính xác",
-  INCOMPLETE_INFORMATION: "Thông tin tour chưa đầy đủ",
-  INAPPROPRIATE_TOUR: "Tour không phù hợp với nền tảng",
-  INVALID_PRICE_OR_DATES: "Giá hoặc ngày khởi hành không hợp lệ",
-  INVALID_ITINERARY: "Lịch trình hoặc điểm đến chưa hợp lệ",
-  DUPLICATE_TOUR: "Tour bị trùng lặp",
-  OTHER: "Lý do khác",
-};
 
 /**
  * Modal xem chi tiết tour du lịch.
@@ -164,14 +155,11 @@ export default function TourDetailModal({
                   {/* Nhãn lý do chuẩn hoá */}
                   {(tour.rejectionReason || historyData?.reason) && (
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      {String(tour.rejectionReason || historyData?.reason)
-                        .split(",")
-                        .map((code) => {
-                          const trimmed = code.trim();
-                          const label = REASON_LABELS[trimmed] || trimmed;
+                      {getRejectionLabels(tour.rejectionReason || historyData?.reason)
+                        .map((label) => {
                           return (
                             <span
-                              key={trimmed}
+                              key={label}
                               className="inline-flex items-center px-2.5 py-1 rounded-xl bg-rose-100/90 text-rose-900 text-xs font-bold border border-rose-200/80 shadow-2xs"
                             >
                               {label}
@@ -345,14 +333,32 @@ export default function TourDetailModal({
                                   : ""}
                               </span>
                             </div>
-                            {h.reviewerName && (
+                            {h.actorName && (
                               <p className="text-[11px] text-slate-500 mt-0.5">
-                                Người thẩm định: <span className="font-medium text-slate-700">{h.reviewerName}</span>
+                                {isApproved || isRejected ? "Người thẩm định" : "Người gửi"}:{" "}
+                                <span className="font-medium text-slate-700">{h.actorName}</span>
                               </p>
                             )}
-                            {h.decisionNote && (
+                            {isRejected && h.reason && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {getRejectionLabels(h.reason).map((label) => (
+                                  <span
+                                    key={label}
+                                    className="inline-flex items-center px-2 py-0.5 rounded-lg bg-rose-50 text-rose-800 text-[10.5px] font-bold border border-rose-200"
+                                  >
+                                    {label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {isRejected && h.otherReason && (
+                              <p className="text-[11px] text-rose-900 mt-1 bg-rose-50/60 p-2 rounded-lg border border-rose-200">
+                                {h.otherReason}
+                              </p>
+                            )}
+                            {h.note && (
                               <p className="text-[11px] text-slate-700 mt-1 bg-white p-2 rounded-lg border border-slate-200">
-                                {h.decisionNote}
+                                {h.note}
                               </p>
                             )}
                           </div>

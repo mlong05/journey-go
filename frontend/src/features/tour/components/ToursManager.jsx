@@ -37,6 +37,7 @@ import {
   SUBMITTABLE_STATUSES,
   EDITABLE_STATUSES,
   formatVND,
+  getRejectionLabels,
   formatDuration,
   normalizeTour,
 } from "../theme";
@@ -544,11 +545,12 @@ export default function ToursManager({
       } catch (err) {
         console.error("[Tours] Publish error:", err);
         showToast(err?.message || "Không thể xuất bản tour.", "error");
+        fetchTours().then(setTours).catch(() => {});
       } finally {
         setActionLoadingId(null);
       }
     },
-    [detailTarget, mergeTour, showToast]
+    [detailTarget, mergeTour, showToast, fetchTours]
   );
 
   /* ── Hành động: từ chối ────────────────────────────────────── */
@@ -568,11 +570,14 @@ export default function ToursManager({
       } catch (err) {
         console.error("[Tours] Reject error:", err);
         showToast(err?.message || "Không thể từ chối tour.", "error");
+        // Trạng thái trên màn hình có thể đã cũ (tour đã được duyệt / từ chối ở nơi khác): đồng bộ lại.
+        setRejectTarget(null);
+        fetchTours().then(setTours).catch(() => {});
       } finally {
         setIsRejecting(false);
       }
     },
-    [rejectTarget, detailTarget, mergeTour, showToast]
+    [rejectTarget, detailTarget, mergeTour, showToast, fetchTours]
   );
 
 
@@ -804,7 +809,7 @@ export default function ToursManager({
           </button>
         )}
 
-        {canModerate && !tour.deleted && (
+        {canModerate && tour.status === "PENDING" && !tour.deleted && (
           <button
             type="button"
             onClick={() => handlePublish(tour)}
@@ -821,7 +826,7 @@ export default function ToursManager({
           </button>
         )}
 
-        {canModerate && !tour.deleted && (
+        {canModerate && tour.status === "PENDING" && !tour.deleted && (
           <button
             type="button"
             onClick={() => setRejectTarget(tour)}
@@ -1124,7 +1129,7 @@ export default function ToursManager({
                               Lý do từ chối
                             </p>
                             <p className="text-[11px] font-semibold text-rose-800 leading-relaxed line-clamp-3">
-                              {tour.rejectionReason}
+                              {getRejectionLabels(tour.rejectionReason).join(" · ")}
                             </p>
                           </div>
                         )}

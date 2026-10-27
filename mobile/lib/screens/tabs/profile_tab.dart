@@ -4,11 +4,13 @@ import '../../core/models/auth_models.dart';
 import '../../core/models/journey_model.dart';
 import '../../core/models/ticket_model.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/gamification_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../core/services/user_data_service.dart';
 import '../../tourist_auth_screen.dart' show TouristAuthScreen;
 import '../modals/edit_profile_modal.dart';
 import '../modals/notification_dialog.dart';
+import '../rewards/wallet_screen.dart';
 import '../tickets_screen.dart';
 
 class ProfileTab extends StatefulWidget {
@@ -53,9 +55,17 @@ class _ProfileTabState extends State<ProfileTab> {
       _userDataService.getTickets(),
     ]);
 
+    // Điểm thật từ máy chủ; nếu không kết nối được thì dùng số lưu trên máy.
+    int points = results[0] as int;
+    try {
+      points = (await GamificationService().getMyPoints()).currentBalance;
+    } on GamificationException {
+      // giữ điểm cục bộ
+    }
+
     if (mounted) {
       setState(() {
-        _points = results[0] as int;
+        _points = points;
         _badges = results[1] as List<BadgeItem>;
         _timeline = results[2] as List<JourneyTimelineItem>;
         _tickets = results[3] as List<TicketModel>;
@@ -799,6 +809,67 @@ class _ProfileTabState extends State<ProfileTab> {
         ),
 
         const SizedBox(height: 12),
+
+        // Card 0: Ví điểm & Đổi thưởng
+        GestureDetector(
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const WalletScreen()),
+            );
+            if (mounted) _loadProfileData(); // số dư có thể đã đổi
+          },
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppCultureColors.border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppCultureColors.rewardBg,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.card_giftcard_rounded, color: AppCultureColors.gold, size: 22),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ví điểm & Đổi thưởng',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Lịch sử điểm, đổi voucher & kho ưu đãi',
+                        style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppCultureColors.rewardBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$_points điểm',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppCultureColors.rewardText),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.chevron_right_rounded, color: AppCultureColors.textMuted, size: 18),
+              ],
+            ),
+          ),
+        ),
 
         // Card 1: Ví vé & Chi phí du lịch
         GestureDetector(
