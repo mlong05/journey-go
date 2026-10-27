@@ -4,7 +4,6 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.modules.destination.dto.DestinationRequest;
 import com.journeygo.modules.destination.dto.DestinationResponse;
-import com.journeygo.modules.destination.entity.DestinationStatus;
 import com.journeygo.modules.destination.service.DestinationService;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.security.UserPrincipal;
@@ -52,16 +51,6 @@ public class DestinationController {
                 destinationService.getApproved(pageable)));
     }
 
-    @GetMapping("/status/{status}")
-    @Operation(summary = "Lấy điểm đến theo trạng thái quy trình (phân trang & sắp xếp)",
-            description = "Lọc điểm đến theo status (DRAFT, PENDING, PUBLISHED, REJECTED)")
-    public ResponseEntity<ApiResponse<PageResponse<DestinationResponse>>> getByStatus(
-            @PathVariable DestinationStatus status,
-            @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách điểm đến theo trạng thái thành công",
-                destinationService.getByStatus(status, pageable)));
-    }
-
     @GetMapping("/region/{slug}")
     @Operation(summary = "Lấy điểm đến theo khu vực (phân trang & sắp xếp)",
             description = "Trả về danh sách điểm đến thuộc khu vực (theo slug)")
@@ -99,33 +88,6 @@ public class DestinationController {
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách điểm đến đã xóa thành công",
                 destinationService.getDeleted(pageable)));
-    }
-
-    @PatchMapping("/{id}/publish")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
-    @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Xuất bản điểm đến (+publish)", description = "Phê duyệt và chuyển trạng thái sang PUBLISHED")
-    public ResponseEntity<ApiResponse<DestinationResponse>> publish(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Xuất bản điểm đến thành công", destinationService.publish(id)));
-    }
-
-    @PatchMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
-    @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Từ chối điểm đến", description = "Từ chối phê duyệt điểm đến và chuyển trạng thái sang REJECTED")
-    public ResponseEntity<ApiResponse<DestinationResponse>> reject(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Từ chối điểm đến thành công", destinationService.reject(id)));
-    }
-
-    @PatchMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
-    @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Phê duyệt điểm đến (legacy)", description = "Phê duyệt hoặc hủy phê duyệt điểm đến (ADMIN / MODERATOR)")
-    public ResponseEntity<ApiResponse<DestinationResponse>> setApproval(
-            @PathVariable Long id,
-            @RequestParam boolean approved) {
-        String message = approved ? "Phê duyệt điểm đến thành công" : "Hủy phê duyệt điểm đến thành công";
-        return ResponseEntity.ok(ApiResponse.success(message, destinationService.setApproval(id, approved)));
     }
 
     @DeleteMapping("/{id}")
@@ -169,18 +131,6 @@ public class DestinationController {
         Role callerRole = extractRole(userPrincipal);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật điểm đến thành công",
                 destinationService.update(id, request, userPrincipal.getId(), callerRole)));
-    }
-
-    @PatchMapping("/{id}/submit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
-    @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Gửi duyệt điểm đến (+submit)", description = "Chuyển trạng thái điểm đến sang PENDING để chờ quản trị viên phê duyệt")
-    public ResponseEntity<ApiResponse<DestinationResponse>> submit(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        Role callerRole = extractRole(userPrincipal);
-        return ResponseEntity.ok(ApiResponse.success("Gửi duyệt điểm đến thành công",
-                destinationService.submit(id, userPrincipal.getId(), callerRole)));
     }
 
     private Role extractRole(UserPrincipal userPrincipal) {

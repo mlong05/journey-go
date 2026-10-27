@@ -29,6 +29,13 @@ public class ContentReview {
     @Column(name = "decision_note", length = 1000)
     private String decisionNote;
 
+    /** Comma-separated ContentRejectionReason codes selected by the reviewer. */
+    @Column(name = "reason", length = 500)
+    private String reason;
+
+    @Column(name = "other_reason", length = 500)
+    private String otherReason;
+
     @Column(name = "submitted_at", nullable = false)
     private Instant submittedAt;
 
