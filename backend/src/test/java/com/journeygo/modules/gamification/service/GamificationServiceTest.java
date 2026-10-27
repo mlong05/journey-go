@@ -160,7 +160,7 @@ class GamificationServiceTest {
 
     @Test
     void redeemVoucher_WhenValid_ShouldIssueUserVoucher() {
-        when(voucherRepository.findById(1L)).thenReturn(Optional.of(sampleVoucher));
+        when(voucherRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sampleVoucher));
         when(userPointRepository.findByUserId(10L)).thenReturn(Optional.of(sampleUserPoint));
         when(userPointRepository.save(any(UserPoint.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(voucherRepository.save(any(Voucher.class))).thenAnswer(invocation -> invocation.getArgument(0));
