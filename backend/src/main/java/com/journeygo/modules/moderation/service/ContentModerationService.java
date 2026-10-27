@@ -10,6 +10,7 @@ import com.journeygo.modules.moderation.entity.ContentReview;
 import com.journeygo.modules.moderation.entity.ContentReviewStatus;
 import com.journeygo.modules.moderation.entity.ContentReviewAction;
 import com.journeygo.modules.moderation.entity.ContentReviewHistory;
+import com.journeygo.modules.moderation.entity.ContentRejectionReason;
 import com.journeygo.modules.moderation.repository.ContentReviewRepository;
 import com.journeygo.modules.moderation.repository.ContentReviewHistoryRepository;
 import com.journeygo.modules.user.entity.Role;
@@ -33,20 +34,48 @@ public class ContentModerationService {
 
     @Transactional
     public ContentReviewResponse submit(Long contentId, Long callerId, Role role) {
+        return submit(contentId, callerId, role, false);
+    }
+
+    /** Re-submit after an edit; editing content also returns an approved item to moderation. */
+    @Transactional
+    public ContentReviewResponse submitAfterEdit(Long contentId, Long callerId, Role role) {
+        return submit(contentId, callerId, role, true);
+    }
+
+    private ContentReviewResponse submit(Long contentId, Long callerId, Role role, boolean contentWasEdited) {
         CulturalContent content = contentRepository.findByIdAndDeletedFalseAndDestinationDeletedFalse(contentId)
                 .orElseThrow(() -> new AppException(ErrorCode.CONTENT_NOT_FOUND));
         checkOwner(content, callerId, role);
-        ContentReview review = reviewRepository.findByContent_Id(contentId).orElseGet(() ->
-                ContentReview.builder().content(content).build());
+        ContentReview review = reviewRepository.findByContent_Id(contentId).orElse(null);
+        if (review != null && !contentWasEdited && review.getStatus() != ContentReviewStatus.REJECTED) {
+            throw new AppException(ErrorCode.INVALID_CONTENT_REVIEW_STATUS,
+                    "Chỉ có thể gửi mới hoặc gửi lại nội dung đã bị từ chối");
+        }
+        if (review != null && contentWasEdited && review.getStatus() == ContentReviewStatus.PENDING) {
+            throw new AppException(ErrorCode.INVALID_CONTENT_REVIEW_STATUS,
+                    "Nội dung đang chờ kiểm duyệt, không thể chỉnh sửa");
+        }
+        if (review == null) review = ContentReview.builder().content(content).build();
         review.setStatus(ContentReviewStatus.PENDING);
         review.setReviewer(null);
         review.setReviewedAt(null);
         review.setDecisionNote(null);
+        review.setReason(null);
+        review.setOtherReason(null);
         review.setSubmittedAt(Instant.now());
         ContentReview saved = reviewRepository.save(review);
         User actor = userRepository.findById(callerId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         historyRepository.save(ContentReviewHistory.builder().review(saved).action(ContentReviewAction.SUBMITTED).actor(actor).build());
         return toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public ContentReviewResponse getHistory(Long contentId, Long callerId, Role callerRole) {
+        ContentReview review = reviewRepository.findByContent_Id(contentId)
+                .orElseThrow(() -> new AppException(ErrorCode.CONTENT_NOT_FOUND));
+        checkOwner(review.getContent(), callerId, callerRole);
+        return toResponse(review);
     }
 
     @Transactional(readOnly = true)
@@ -57,13 +86,24 @@ public class ContentModerationService {
 
     @Transactional
     public ContentReviewResponse approve(Long contentId, Long reviewerId, String note) {
-        return decide(contentId, reviewerId, ContentReviewStatus.APPROVED, note);
+        return decide(contentId, reviewerId, ContentReviewStatus.APPROVED, note, null, null);
     }
 
     @Transactional
-    public ContentReviewResponse reject(Long contentId, Long reviewerId, String note) {
-        if (note == null || note.isBlank()) throw new AppException(ErrorCode.CONTENT_REVIEW_REASON_REQUIRED);
-        return decide(contentId, reviewerId, ContentReviewStatus.REJECTED, note.trim());
+    public ContentReviewResponse reject(Long contentId, Long reviewerId, String note, String reason, String otherReason) {
+        String normalizedReason = normalizeReason(reason);
+        if (normalizedReason == null) throw new AppException(ErrorCode.CONTENT_REVIEW_REASON_REQUIRED);
+        boolean hasOther = java.util.Arrays.asList(normalizedReason.split(",")).contains(ContentRejectionReason.OTHER.name());
+        String normalizedOtherReason = otherReason == null ? null : otherReason.trim();
+        if (hasOther && (normalizedOtherReason == null || normalizedOtherReason.isBlank())) {
+            throw new AppException(ErrorCode.CONTENT_REVIEW_REASON_REQUIRED, "Vui lòng nhập nội dung cho lý do OTHER");
+        }
+        if (!hasOther && normalizedOtherReason != null && !normalizedOtherReason.isBlank()) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "Chỉ gửi otherReason khi đã chọn lý do OTHER");
+        }
+        return decide(contentId, reviewerId, ContentReviewStatus.REJECTED,
+                note == null ? null : note.trim(), normalizedReason,
+                hasOther ? normalizedOtherReason : null);
     }
 
     @Transactional(readOnly = true)
@@ -86,7 +126,8 @@ public class ContentModerationService {
             throw new AppException(ErrorCode.CONTENT_NOT_FOUND);
     }
 
-    private ContentReviewResponse decide(Long contentId, Long reviewerId, ContentReviewStatus status, String note) {
+    private ContentReviewResponse decide(Long contentId, Long reviewerId, ContentReviewStatus status,
+                                         String note, String reason, String otherReason) {
         ContentReview review = reviewRepository.findByContent_Id(contentId)
                 .orElseThrow(() -> new AppException(ErrorCode.CONTENT_NOT_FOUND));
         if (review.getStatus() != ContentReviewStatus.PENDING)
@@ -96,11 +137,13 @@ public class ContentModerationService {
         review.setStatus(status);
         review.setReviewer(reviewer);
         review.setDecisionNote(note);
+        review.setReason(status == ContentReviewStatus.APPROVED ? null : reason);
+        review.setOtherReason(status == ContentReviewStatus.APPROVED ? null : otherReason);
         review.setReviewedAt(Instant.now());
         ContentReview saved = reviewRepository.save(review);
         historyRepository.save(ContentReviewHistory.builder().review(saved)
                 .action(status == ContentReviewStatus.APPROVED ? ContentReviewAction.APPROVED : ContentReviewAction.REJECTED)
-                .actor(reviewer).note(note).build());
+                .actor(reviewer).note(note).reason(review.getReason()).otherReason(review.getOtherReason()).build());
         return toResponse(saved);
     }
 
@@ -109,14 +152,31 @@ public class ContentModerationService {
                 .map(item -> new ContentReviewResponse.HistoryItem(item.getAction().name(),
                         item.getActor() == null ? null : item.getActor().getId(),
                         item.getActor() == null ? null : item.getActor().getFullName(),
-                        item.getNote(), item.getCreatedAt())).toList();
+                        item.getNote(), item.getReason(), item.getOtherReason(), item.getCreatedAt())).toList();
         return new ContentReviewResponse(review.getId(), review.getContent().getId(),
                 review.getContent().getDestination().getId(), review.getContent().getDestination().getName(),
                 review.getContent().getTitle(), review.getStatus(),
                 review.getReviewer() == null ? null : review.getReviewer().getId(),
                 review.getReviewer() == null ? null : review.getReviewer().getFullName(),
-                review.getDecisionNote(), review.getSubmittedAt(), review.getReviewedAt(),
+                review.getDecisionNote(), review.getReason(), review.getOtherReason(),
+                review.getSubmittedAt(), review.getReviewedAt(),
                 CulturalContentResponse.fromEntity(review.getContent()), history);
+    }
+
+    private String normalizeReason(String reason) {
+        if (reason == null || reason.isBlank()) return null;
+        java.util.LinkedHashSet<ContentRejectionReason> selected = new java.util.LinkedHashSet<>();
+        try {
+            for (String value : reason.split(",")) {
+                String code = value.trim();
+                if (!code.isEmpty()) selected.add(ContentRejectionReason.valueOf(code));
+            }
+        } catch (IllegalArgumentException exception) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                    "reason chỉ được chứa mã hợp lệ; xem GET /api/v1/moderation/contents/rejection-reasons");
+        }
+        return selected.isEmpty() ? null : selected.stream().map(Enum::name)
+                .collect(java.util.stream.Collectors.joining(","));
     }
 
     private void checkOwner(CulturalContent content, Long callerId, Role role) {

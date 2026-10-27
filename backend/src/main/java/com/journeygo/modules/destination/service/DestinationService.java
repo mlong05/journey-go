@@ -265,6 +265,7 @@ public class DestinationService {
 
         Destination saved = destinationRepository.save(existing);
         log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
+        log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
         return DestinationResponse.fromEntity(saved);
     }
 

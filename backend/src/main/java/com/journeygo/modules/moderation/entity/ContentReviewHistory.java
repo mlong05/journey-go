@@ -27,6 +27,12 @@ public class ContentReviewHistory {
     @Column(length = 1000)
     private String note;
 
+    @Column(length = 500)
+    private String reason;
+
+    @Column(name = "other_reason", length = 500)
+    private String otherReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

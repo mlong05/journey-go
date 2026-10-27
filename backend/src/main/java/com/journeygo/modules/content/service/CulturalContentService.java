@@ -119,7 +119,7 @@ public class CulturalContentService {
         content.setDuration(request.duration());
 
         CulturalContent saved = culturalContentRepository.save(content);
-        contentModerationService.submit(saved.getId(), callerId, callerRole);
+        contentModerationService.submitAfterEdit(saved.getId(), callerId, callerRole);
         if (previousPublicId != null && !previousPublicId.equals(saved.getMediaPublicId())) {
             cloudinaryImageService.deleteAfterCommit(previousPublicId);
         }
@@ -167,7 +167,7 @@ public class CulturalContentService {
         content.setMediaUrl(null);
         content.setMediaPublicId(null);
         CulturalContent saved = culturalContentRepository.save(content);
-        contentModerationService.submit(saved.getId(), callerId, callerRole);
+        contentModerationService.submitAfterEdit(saved.getId(), callerId, callerRole);
         if (previousPublicId != null) cloudinaryImageService.deleteAfterCommit(previousPublicId);
         return CulturalContentResponse.fromEntity(saved);
     }

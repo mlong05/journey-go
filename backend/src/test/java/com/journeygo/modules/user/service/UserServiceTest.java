@@ -100,9 +100,7 @@ class UserServiceTest {
                 "Tran Van C",
                 "0911223344",
                 moderatorRole,
-                true,
-                null,
-                null
+                true
         );
 
         when(userRepository.existsByEmail("newuser@journeygo.com")).thenReturn(false);
@@ -131,8 +129,6 @@ class UserServiceTest {
                 "user@journeygo.com",
                 "Password123@",
                 "Nguyen Van B",
-                null,
-                null,
                 null,
                 null,
                 null
@@ -232,9 +228,7 @@ class UserServiceTest {
                 "Nguyen Van Updated",
                 "0999888777",
                 providerRole,
-                true,
-                null,
-                null
+                true
         );
 
         when(userRepository.findById(2L)).thenReturn(Optional.of(sampleUser));
@@ -323,9 +317,7 @@ class UserServiceTest {
                 "Other Admin Updated",
                 null,
                 null,
-                false,
-                null,
-                null
+                false
         );
 
         when(userRepository.findById(99L)).thenReturn(Optional.of(otherAdmin));
