@@ -36,6 +36,21 @@ public class CulturalContentService {
         return contentModerationService.getApprovedByDestination(destinationId);
     }
 
+    /** Mọi nội dung chưa xóa của điểm đến (kể cả đang chờ duyệt / bị từ chối) cho chủ sở hữu quản lý. */
+    @Transactional(readOnly = true)
+    public List<CulturalContentResponse> getManageByDestinationId(Long destinationId, Long callerId, Role callerRole) {
+        Destination destination = findDestinationOrThrow(destinationId);
+        checkOwnership(destination, callerId, callerRole);
+        List<CulturalContent> contents = culturalContentRepository
+                .findByDestinationIdAndDeletedFalseAndDestinationDeletedFalseOrderBySequenceOrderAsc(destinationId);
+        var statuses = contentModerationService.getStatuses(contents.stream().map(CulturalContent::getId).toList());
+        return contents.stream()
+                .map(c -> CulturalContentResponse.fromEntity(c).toBuilder()
+                        .reviewStatus(statuses.containsKey(c.getId()) ? statuses.get(c.getId()).name() : null)
+                        .build())
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<CulturalContentResponse> getAllApproved() {
         return contentModerationService.getAllApproved();

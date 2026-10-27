@@ -8,7 +8,6 @@ import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,10 +35,6 @@ public class Tour {
 
     @Column(nullable = false)
     private int durationDays;
-
-    /** Price per participant, captured directly on the tour. */
-    @Column(precision = 12, scale = 2)
-    private BigDecimal price;
 
     @Column(name = "start_date")
     private LocalDate startDate;

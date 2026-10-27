@@ -33,6 +33,7 @@ import java.time.Instant;
 public class TourModerationService {
     private final TourRepository tourRepository;
     private final TourReviewRepository reviewRepository;
+    private final com.journeygo.modules.tour.service.TourPricingService pricingService;
     private final TourReviewHistoryRepository historyRepository;
     private final UserRepository userRepository;
 
@@ -207,7 +208,7 @@ public class TourModerationService {
                 review.getReviewer() == null ? null : review.getReviewer().getId(),
                 review.getReviewer() == null ? null : review.getReviewer().getFullName(), review.getDecisionNote(),
                 review.getReason(), review.getOtherReason(), review.getSubmittedAt(), review.getReviewedAt(),
-                TourResponse.fromEntity(tour), history);
+                pricingService.toResponse(tour), history);
     }
 
     private String normalizeReason(String reason) {

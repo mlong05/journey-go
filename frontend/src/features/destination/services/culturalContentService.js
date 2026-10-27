@@ -2,6 +2,7 @@ import { apiClient } from "@/services/apiClient";
 
 const ENDPOINTS = {
   BY_DESTINATION: (destinationId) => `/destinations/${destinationId}/contents`,
+  MANAGE_BY_DESTINATION: (destinationId) => `/destinations/${destinationId}/contents/manage`,
   DELETED_BY_DESTINATION: (destinationId) => `/destinations/${destinationId}/contents/deleted`,
   BY_ID: (id) => `/cultural-contents/${id}`,
   PLAY: (id) => `/cultural-contents/${id}/play`,
@@ -18,6 +19,16 @@ async function unwrap(res) {
  */
 export async function getContentsByDestination(destinationId) {
   const res = await apiClient.get(ENDPOINTS.BY_DESTINATION(destinationId));
+  const data = await unwrap(res);
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * Lấy toàn bộ nội dung của điểm đến để quản lý, gồm cả bài đang chờ duyệt / bị từ chối (ADMIN, MODERATOR, PROVIDER)
+ * GET /api/v1/destinations/{destinationId}/contents/manage
+ */
+export async function getManageContentsByDestination(destinationId) {
+  const res = await apiClient.get(ENDPOINTS.MANAGE_BY_DESTINATION(destinationId));
   const data = await unwrap(res);
   return Array.isArray(data) ? data : [];
 }
@@ -112,6 +123,7 @@ export async function getContentHistory(id) {
 
 export const culturalContentService = {
   getByDestination: getContentsByDestination,
+  getManageByDestination: getManageContentsByDestination,
   getDeletedByDestination: getDeletedContentsByDestination,
   getById: getContentById,
   play: playContent,

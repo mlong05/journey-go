@@ -18,6 +18,7 @@ import { apiClient } from "@/services/apiClient";
 const ENDPOINTS = {
   ROOT: "/destinations",
   APPROVED: "/destinations/approved",
+  MINE: "/destinations/my",
   DELETED: "/destinations/deleted",
   BY_ID: (id) => `/destinations/${id}`,
   APPROVE: (id) => `/destinations/${id}/approve`,
@@ -90,6 +91,11 @@ export async function getAllDestinations(params = {}) {
 
 export async function getApprovedDestinations(params = {}) {
   const res = await apiClient.get(`${ENDPOINTS.APPROVED}?${buildListQuery(params)}`);
+  return extractList(res);
+}
+
+export async function getMyDestinations(params = {}) {
+  const res = await apiClient.get(`${ENDPOINTS.MINE}?${buildListQuery(params)}`);
   return extractList(res);
 }
 
@@ -179,6 +185,7 @@ export const destinationService = {
   submit: submitDestination,
   getAll: getAllDestinations,
   getApproved: getApprovedDestinations,
+  getMine: getMyDestinations,
   getDeleted: getDeletedDestinations,
   getById: getDestinationById,
   setApproval: setDestinationApproval,

@@ -95,8 +95,8 @@ public class TourController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo tour mới (ADMIN / MODERATOR / PROVIDER)",
-            description = "Tạo tour và tự gửi vào hàng chờ moderation. Request cần có price (VND), "
-                    + "startDate và endDate theo định dạng yyyy-MM-dd.")
+            description = "Tạo tour và tự gửi vào hàng chờ moderation. Giá tour được tính tự động từ các Experience; "
+                    + "startDate và endDate (yyyy-MM-dd) là tùy chọn.")
     public ResponseEntity<ApiResponse<TourResponse>> create(
             @Valid @RequestBody TourRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -110,7 +110,7 @@ public class TourController {
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Cập nhật tour (ADMIN / MODERATOR / PROVIDER)",
             description = "PROVIDER chỉ được cập nhật tour của chính mình. Chỉnh sửa sẽ tự gửi duyệt lại. "
-                    + "Request cần có price (VND), startDate và endDate theo định dạng yyyy-MM-dd.")
+                    + "Giá tour được tính tự động; startDate và endDate (yyyy-MM-dd) là tùy chọn.")
     public ResponseEntity<ApiResponse<TourResponse>> update(
             @PathVariable Long tourId,
             @Valid @RequestBody TourRequest request,

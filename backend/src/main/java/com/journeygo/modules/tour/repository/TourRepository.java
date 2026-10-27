@@ -26,6 +26,16 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
 
     Page<Tour> findByCreatedBy_Id(Long creatorId, Pageable pageable);
 
+    @Query("""
+            SELECT new com.journeygo.modules.tour.repository.TourPriceProjection(td.tour.tourId, SUM(e.price))
+            FROM TourDestination td, Experience e
+            WHERE e.destination = td.destination
+              AND e.status = com.journeygo.modules.experience.entity.enums.ExperienceStatus.PUBLISHED
+              AND td.tour.tourId IN :tourIds
+            GROUP BY td.tour.tourId
+            """)
+    List<TourPriceProjection> sumExperiencePricesByTourIds(@Param("tourIds") List<Long> tourIds);
+
     boolean existsByTitle(String title);
 
     boolean existsByTitleAndTourIdNot(String title, Long tourId);

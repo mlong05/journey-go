@@ -106,6 +106,14 @@ public class ContentModerationService {
                 hasOther ? normalizedOtherReason : null);
     }
 
+    /** Trạng thái duyệt theo contentId; nội dung cũ chưa có bản ghi kiểm duyệt sẽ không có trong map. */
+    @Transactional(readOnly = true)
+    public java.util.Map<Long, ContentReviewStatus> getStatuses(java.util.Collection<Long> contentIds) {
+        if (contentIds.isEmpty()) return java.util.Map.of();
+        return reviewRepository.findByContent_IdIn(contentIds).stream()
+                .collect(java.util.stream.Collectors.toMap(r -> r.getContent().getId(), ContentReview::getStatus));
+    }
+
     @Transactional(readOnly = true)
     public List<CulturalContentResponse> getApprovedByDestination(Long destinationId) {
         return reviewRepository.findPublicContentByDestination(destinationId, ContentReviewStatus.APPROVED)
