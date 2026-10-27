@@ -4,7 +4,7 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.modules.moderation.dto.ContentReviewResponse;
 import com.journeygo.modules.moderation.dto.ReviewDecisionRequest;
-import com.journeygo.modules.moderation.entity.ContentRejectionReason;
+import com.journeygo.modules.moderation.entity.enums.ContentRejectionReason;
 import com.journeygo.modules.moderation.service.ContentModerationService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
