@@ -99,15 +99,62 @@ export async function getDeletedDestinations(params = {}) {
 }
 
 export async function getDestinationById(id) {
-  const res = await apiClient.get(ENDPOINTS.BY_ID(id));
-  return unwrap(res);
+  try {
+    const res = await apiClient.get(ENDPOINTS.BY_ID(id));
+    return unwrap(res);
+  } catch (err) {
+    try {
+      const hist = await apiClient.get(`/moderation/destinations/${id}/history`);
+      const data = await unwrap(hist);
+      return data?.destination || data;
+    } catch {
+      throw err;
+    }
+  }
 }
 
-export async function setDestinationApproval(id, approved) {
-  const endpoint = approved
-    ? `/moderation/destinations/${id}/approve`
-    : `/moderation/destinations/${id}/reject`;
-  const res = await apiClient.patch(endpoint);
+
+export async function setDestinationApproval(id, approved, payload = {}) {
+  if (approved) {
+    const body = payload?.note ? { note: String(payload.note).trim() } : {};
+    const res = await apiClient.patch(`/moderation/destinations/${id}/approve`, body);
+    return unwrap(res);
+  } else {
+    const isString = typeof payload === "string";
+    const reason = isString ? "OTHER" : (payload?.reason || "INCOMPLETE_INFORMATION");
+    const hasOther = String(reason)
+      .split(",")
+      .map((s) => s.trim())
+      .includes("OTHER");
+    const otherReason = isString
+      ? payload
+      : hasOther
+      ? payload?.otherReason || payload?.note || "Lý do khác"
+      : null;
+    const note = isString
+      ? null
+      : payload?.note
+      ? String(payload.note).trim()
+      : null;
+
+    const body = {
+      reason: String(reason).trim(),
+      otherReason: hasOther ? String(otherReason).trim() : null,
+      note,
+    };
+    const res = await apiClient.patch(`/moderation/destinations/${id}/reject`, body);
+    return unwrap(res);
+  }
+}
+
+export async function getDestinationRejectionReasons() {
+  const res = await apiClient.get("/moderation/destinations/rejection-reasons");
+  const data = await unwrap(res);
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getDestinationHistory(id) {
+  const res = await apiClient.get(`/moderation/destinations/${id}/history`);
   return unwrap(res);
 }
 
@@ -135,8 +182,11 @@ export const destinationService = {
   getDeleted: getDeletedDestinations,
   getById: getDestinationById,
   setApproval: setDestinationApproval,
+  getRejectionReasons: getDestinationRejectionReasons,
+  getHistory: getDestinationHistory,
   delete: deleteDestination,
   restore: restoreDestination,
 };
 
 export default destinationService;
+

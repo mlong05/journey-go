@@ -149,31 +149,37 @@ export function formatDuration(days) {
 
 /**
  * Chuẩn hoá response thô của backend về dạng dùng chung cho UI.
- * Backend trả `status` (DRAFT/PENDING/PUBLISHED/REJECTED) kèm cờ `deleted`.
+ * Hỗ trợ cả TourResponse trực tiếp và TourReviewResponse từ moderation.
+ * Backend trả `status` (DRAFT/PENDING/APPROVED/PUBLISHED/REJECTED) kèm cờ `deleted`.
  */
 export function normalizeTour(raw) {
   if (!raw || typeof raw !== "object") return null;
 
-  const deleted = raw.deleted === true;
-  const rawStatus = String(raw.status || "").toUpperCase();
-  const status = deleted ? "DELETED" : rawStatus || "DRAFT";
+  const inner = raw.tour && typeof raw.tour === "object" ? raw.tour : raw;
+  const deleted = inner.deleted === true || raw.deleted === true;
+  const rawStatus = String(raw.status || inner.status || "").toUpperCase();
+  let status = deleted ? "DELETED" : rawStatus || "DRAFT";
+  if (status === "APPROVED") status = "PUBLISHED";
 
   return {
-    tourId: raw.tourId ?? raw.id ?? null,
-    title: raw.title || "",
-    tourType: String(raw.tourType || "OTHER").toUpperCase(),
+    tourId: inner.tourId ?? inner.id ?? raw.tourId ?? raw.reviewId ?? null,
+    title: inner.title || raw.tourTitle || "",
+    tourType: String(inner.tourType || "OTHER").toUpperCase(),
     // Giá do backend tính động (tổng giá Experience của các điểm đến trong hành trình).
-    price: raw.price != null ? Number(raw.price) : null,
-    durationDays: raw.durationDays != null ? Number(raw.durationDays) : null,
-    approved: raw.approved === true,
+    price: inner.price != null ? Number(inner.price) : null,
+    durationDays: inner.durationDays != null ? Number(inner.durationDays) : null,
+    approved: inner.approved === true || status === "PUBLISHED",
     status,
-    rejectionReason: raw.rejectionReason || "",
+    rejectionReason: raw.reason || inner.rejectionReason || "",
+    otherReason: raw.otherReason || inner.otherReason || "",
+    decisionNote: raw.decisionNote || inner.decisionNote || "",
     deleted,
-    deletedAt: raw.deletedAt || null,
-    destinationCount: Number(raw.destinationCount ?? 0),
-    destinations: Array.isArray(raw.destinations) ? raw.destinations : [],
-    createdBy: raw.createdBy || "",
-    createdAt: raw.createdAt || null,
-    updatedAt: raw.updatedAt || null,
+    deletedAt: inner.deletedAt || raw.deletedAt || null,
+    destinationCount: Number(inner.destinationCount ?? (inner.destinations?.length || 0)),
+    destinations: Array.isArray(inner.destinations) ? inner.destinations : [],
+    createdBy: inner.createdBy || raw.reviewerName || "",
+    createdAt: inner.createdAt || raw.submittedAt || null,
+    updatedAt: inner.updatedAt || raw.reviewedAt || null,
   };
 }
+

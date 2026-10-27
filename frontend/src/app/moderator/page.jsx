@@ -52,40 +52,38 @@ export default function ModeratorDashboardPage() {
     async function fetchDashboardData() {
       setIsLoading(true);
       try {
-        const [destQueueRes, contentQueueRes, publishedDestsRes, rejectedDestsRes] =
+        const [destQueueRes, contentQueueRes, tourQueueRes, publishedDestsRes, rejectedDestsRes] =
           await Promise.allSettled([
             moderationService.getDestinationQueue(),
             moderationService.getContentQueue(),
+            moderationService.getTourQueue(),
             moderationService.getDestinationsByStatus("PUBLISHED"),
             moderationService.getDestinationsByStatus("REJECTED"),
           ]);
 
         if (!isMounted) return;
 
-        const destQueue =
-          destQueueRes.status === "fulfilled" && Array.isArray(destQueueRes.value)
-            ? destQueueRes.value
-            : [];
-        const contentQueue =
-          contentQueueRes.status === "fulfilled" && Array.isArray(contentQueueRes.value)
-            ? contentQueueRes.value
-            : [];
-        const publishedDests =
-          publishedDestsRes.status === "fulfilled" && Array.isArray(publishedDestsRes.value)
-            ? publishedDestsRes.value
-            : [];
-        const rejectedDests =
-          rejectedDestsRes.status === "fulfilled" && Array.isArray(rejectedDestsRes.value)
-            ? rejectedDestsRes.value
-            : [];
+        const extractQueueArray = (res) => {
+          if (res.status !== "fulfilled") return [];
+          const val = res.value;
+          if (Array.isArray(val)) return val;
+          if (Array.isArray(val?.content)) return val.content;
+          return [];
+        };
 
-        const totalPending = destQueue.length + contentQueue.length;
+        const destQueue = extractQueueArray(destQueueRes);
+        const contentQueue = extractQueueArray(contentQueueRes);
+        const tourQueue = extractQueueArray(tourQueueRes);
+        const publishedDests = extractQueueArray(publishedDestsRes);
+        const rejectedDests = extractQueueArray(rejectedDestsRes);
+
+        const totalPending = destQueue.length + contentQueue.length + tourQueue.length;
 
         setKpiMetrics({
           pendingCount: totalPending,
           pendingTrend:
             totalPending > 0
-              ? `${destQueue.length} điểm đến, ${contentQueue.length} bài thuyết minh`
+              ? `${destQueue.length} điểm đến, ${tourQueue.length} tour, ${contentQueue.length} thuyết minh`
               : "Hàng chờ hiện đang trống",
           publishedCount: publishedDests.length,
           publishedTrend: "Điểm đến đã chuẩn hóa & phát hành",
@@ -112,6 +110,25 @@ export default function ModeratorDashboardPage() {
           actionText: "Thẩm định ngay",
         }));
 
+        const mappedTourItems = tourQueue.map((t) => {
+          const tId = t.tourId || t.id;
+          return {
+            id: tId,
+            code: `TOUR-${tId}`,
+            title: t.title || `Hành trình #${tId}`,
+            type: "tour",
+            typeLabel: "Tuyến hành trình",
+            sender: t.createdBy || "Đối tác lữ hành",
+            submittedTime: t.updatedAt
+              ? new Date(t.updatedAt).toLocaleDateString("vi-VN")
+              : "Mới cập nhật",
+            urgency: "urgent",
+            urgencyLabel: "Cần thẩm định",
+            actionHref: `/moderator/tours`,
+            actionText: "Thẩm định tour",
+          };
+        });
+
         const mappedContentItems = contentQueue.map((c) => ({
           id: c.id,
           code: `DOC-${c.id}`,
@@ -128,7 +145,8 @@ export default function ModeratorDashboardPage() {
           actionText: "Kiểm tra nội dung",
         }));
 
-        setQueueData([...mappedDestItems, ...mappedContentItems]);
+        setQueueData([...mappedDestItems, ...mappedTourItems, ...mappedContentItems]);
+
       } catch (err) {
         console.error("[Moderator Dashboard] Fetch error:", err);
       } finally {
@@ -307,11 +325,13 @@ export default function ModeratorDashboardPage() {
               className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-400"
             >
               <option value="all">Tất cả loại hình</option>
-              <option value="destination">Điểm đến và tọa độ</option>
+              <option value="destination">Điểm đến và di tích</option>
+              <option value="tour">Tuyến hành trình &amp; Tour</option>
               <option value="cultural">Thuyết minh &amp; Di sản</option>
               <option value="route">Lộ trình và vé</option>
               <option value="quiz">Thử thách đố vui</option>
             </select>
+
           </div>
         </div>
 

@@ -80,7 +80,17 @@ const CONTENT_TYPES = [
   },
 ];
 
+const DEST_REASON_LABELS = {
+
+  INACCURATE_INFORMATION: "Thông tin điểm đến chưa chính xác",
+  INCOMPLETE_INFORMATION: "Thông tin điểm đến chưa đầy đủ",
+  INAPPROPRIATE_DESTINATION: "Điểm đến không phù hợp với nền tảng",
+  DUPLICATE_DESTINATION: "Điểm đến bị trùng lặp",
+  OTHER: "Lý do khác",
+};
+
 function formatDuration(sec) {
+
   if (!sec || Number.isNaN(sec) || sec <= 0) return "—";
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
@@ -621,7 +631,53 @@ export default function DestinationAssessmentModal({
             ) : activeTab === "general" ? (
               /* ── TAB 1: THÔNG SỐ THỰC ĐỊA & SỨC CHỨA ── */
               <div className="space-y-4">
+                {/* Ý kiến thẩm định & lý do từ chối nếu có */}
+                {(destination?.status === "REJECTED" || destination?.rejectionReason) && (
+                  <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 space-y-2.5">
+                    <div className="flex items-center gap-1.5 text-rose-700">
+                      <AlertCircle size={14} className="shrink-0" />
+                      <p className="text-[11px] font-black uppercase tracking-wider">
+                        Ý kiến &amp; Lý do từ chối kiểm duyệt điểm đến
+                      </p>
+                    </div>
+
+                    {destination.rejectionReason && (
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {String(destination.rejectionReason)
+                          .split(",")
+                          .map((code) => {
+                            const trimmed = code.trim();
+                            const label = DEST_REASON_LABELS[trimmed] || trimmed;
+                            return (
+                              <span
+                                key={trimmed}
+                                className="inline-flex items-center px-2.5 py-1 rounded-xl bg-rose-100/90 text-rose-900 text-xs font-bold border border-rose-200/80 shadow-2xs"
+                              >
+                                {label}
+                              </span>
+                            );
+                          })}
+                      </div>
+                    )}
+
+                    {destination.otherReason && (
+                      <div className="bg-white/80 p-3 rounded-xl border border-rose-200/70 text-xs">
+                        <span className="font-bold text-rose-950 block mb-0.5">Chi tiết lý do khác:</span>
+                        <p className="text-rose-900 leading-relaxed font-medium">{destination.otherReason}</p>
+                      </div>
+                    )}
+
+                    {destination.decisionNote && (
+                      <div className="bg-white/80 p-3 rounded-xl border border-rose-200/70 text-xs">
+                        <span className="font-bold text-slate-900 block mb-0.5">Ghi chú từ Người thẩm định:</span>
+                        <p className="text-slate-700 leading-relaxed">{destination.decisionNote}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs">
+
                   <p className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                     <MapPin size={12} className="text-emerald-600" />
                     Địa chỉ hành chính thực địa
@@ -1272,21 +1328,34 @@ export default function DestinationAssessmentModal({
               )}
 
               {destination && !isApproved && onApprove && (
-                <button
-                  type="button"
-                  onClick={() => onApprove(destination.id, true, destination.name)}
-                  disabled={isActionLoading}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                  title="Phê duyệt điểm đến và phát hành cho du khách"
-                >
-                  {isActionLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <CheckCircle2 size={14} />
-                  )}
-                  <span>Phê duyệt điểm đến</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onApprove(destination.id, false, destination.name)}
+                    disabled={isActionLoading}
+                    className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                    title="Từ chối điểm đến và yêu cầu chỉnh sửa"
+                  >
+                    <Ban size={14} />
+                    <span>Từ chối</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onApprove(destination.id, true, destination.name)}
+                    disabled={isActionLoading}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                    title="Phê duyệt điểm đến và phát hành cho du khách"
+                  >
+                    {isActionLoading ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={14} />
+                    )}
+                    <span>Phê duyệt điểm đến</span>
+                  </button>
+                </>
               )}
+
 
               {destination && isApproved && onApprove && (
                 <button

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Service layer cho module Tour du lịch.
  *
  * Endpoint tích hợp:
@@ -26,13 +26,11 @@ const ENDPOINTS = {
   PUBLISHED: "/tours/published",
   MINE: "/tours/my",
   DELETED: "/tours/deleted",
-  BY_STATUS: (status) => `/tours/status/${status}`,
+  BY_STATUS: (status) => `/moderation/tours/status/${status}`,
   BY_ID: (id) => `/tours/${id}`,
-  SUBMIT: (id) => `/tours/${id}/submit`,
-  PUBLISH: (id) => `/tours/${id}/publish`,
-  REJECT: (id) => `/tours/${id}/reject`,
   RESTORE: (id) => `/tours/${id}/restore`,
 };
+
 
 /**
  * Backend mặc định size=10. Các trang quản trị cần toàn bộ danh sách để
@@ -106,11 +104,14 @@ export async function getMyTours(params = {}) {
 }
 
 export async function getToursByStatus(status, params = {}) {
+  const rawStatus = String(status || "").toUpperCase();
+  const backendStatus = rawStatus === "PUBLISHED" ? "APPROVED" : rawStatus;
   const res = await apiClient.get(
-    `${ENDPOINTS.BY_STATUS(status)}?${buildListQuery(params)}`
+    `${ENDPOINTS.BY_STATUS(backendStatus)}?${buildListQuery(params)}`
   );
   return extractList(res);
 }
+
 
 export async function getDeletedTours(params = {}) {
   const res = await apiClient.get(
@@ -120,9 +121,20 @@ export async function getDeletedTours(params = {}) {
 }
 
 export async function getTourById(id) {
-  const res = await apiClient.get(ENDPOINTS.BY_ID(id));
-  return unwrap(res);
+  try {
+    const res = await apiClient.get(ENDPOINTS.BY_ID(id));
+    return unwrap(res);
+  } catch (err) {
+    try {
+      const hist = await apiClient.get(`/moderation/tours/${id}/history`);
+      const data = await unwrap(hist);
+      return data?.tour || data;
+    } catch {
+      throw err;
+    }
+  }
 }
+
 
 export async function createTour(payload) {
   const res = await apiClient.post(ENDPOINTS.ROOT, buildPayload(payload));
@@ -135,19 +147,64 @@ export async function updateTour(id, payload) {
 }
 
 export async function submitTour(id) {
-  const res = await apiClient.patch(ENDPOINTS.SUBMIT(id));
+  const res = await apiClient.post(`/moderation/tours/${id}/submit`, {});
   return unwrap(res);
 }
 
-export async function publishTour(id) {
-  const res = await apiClient.patch(ENDPOINTS.PUBLISH(id));
+export async function publishTour(id, note = null) {
+  const payload = note ? { note: String(note).trim() } : {};
+  const res = await apiClient.patch(`/moderation/tours/${id}/approve`, payload);
   return unwrap(res);
 }
 
-export async function rejectTour(id, reason) {
-  const res = await apiClient.patch(ENDPOINTS.REJECT(id), {
-    reason: String(reason || "").trim(),
-  });
+export async function rejectTour(id, payload = {}) {
+  const isString = typeof payload === "string";
+  const reason = isString ? "OTHER" : (payload?.reason || "INCOMPLETE_INFORMATION");
+  const hasOther = String(reason)
+    .split(",")
+    .map((s) => s.trim())
+    .includes("OTHER");
+  const otherReason = isString
+    ? payload
+    : hasOther
+    ? payload?.otherReason || payload?.note || "Lý do khác"
+    : null;
+  const note = isString
+    ? null
+    : payload?.note
+    ? String(payload.note).trim()
+    : null;
+
+  const body = {
+    reason: String(reason).trim(),
+    otherReason: hasOther ? String(otherReason).trim() : null,
+    note,
+  };
+
+  const res = await apiClient.patch(`/moderation/tours/${id}/reject`, body);
+  return unwrap(res);
+}
+
+export async function getTourRejectionReasons() {
+  const res = await apiClient.get("/moderation/tours/rejection-reasons");
+  const data = await unwrap(res);
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getTourHistory(id) {
+  const res = await apiClient.get(`/moderation/tours/${id}/history`);
+  return unwrap(res);
+}
+
+export async function getTourQueue(params = {}) {
+  const res = await apiClient.get(`/moderation/tours/queue?${buildListQuery(params)}`);
+  return unwrap(res);
+}
+
+export async function getToursByModerationStatus(status, params = {}) {
+  const res = await apiClient.get(
+    `/moderation/tours/status/${status}?${buildListQuery(params)}`
+  );
   return unwrap(res);
 }
 
@@ -173,8 +230,13 @@ export const tourService = {
   submit: submitTour,
   publish: publishTour,
   reject: rejectTour,
+  getRejectionReasons: getTourRejectionReasons,
+  getHistory: getTourHistory,
+  getQueue: getTourQueue,
+  getByModerationStatus: getToursByModerationStatus,
   delete: deleteTour,
   restore: restoreTour,
 };
 
 export default tourService;
+
