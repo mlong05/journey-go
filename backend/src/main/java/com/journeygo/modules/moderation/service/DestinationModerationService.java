@@ -7,6 +7,9 @@ import com.journeygo.modules.destination.dto.DestinationResponse;
 import com.journeygo.modules.destination.entity.Destination;
 import com.journeygo.modules.destination.entity.enums.DestinationStatus;
 import com.journeygo.modules.destination.repository.DestinationRepository;
+import com.journeygo.modules.experience.entity.Experience;
+import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
+import com.journeygo.modules.experience.repository.ExperienceRepository;
 import com.journeygo.modules.moderation.dto.DestinationReviewResponse;
 import com.journeygo.modules.moderation.entity.enums.DestinationReviewAction;
 import com.journeygo.modules.moderation.entity.enums.DestinationReviewStatus;
@@ -34,6 +37,7 @@ public class DestinationModerationService {
     private final DestinationReviewRepository reviewRepository;
     private final DestinationReviewHistoryRepository historyRepository;
     private final UserRepository userRepository;
+    private final ExperienceRepository experienceRepository;
 
     @Transactional
     public DestinationReviewResponse submit(Long id, Long callerId, Role callerRole) {
@@ -56,6 +60,7 @@ public class DestinationModerationService {
         if (review == null) review = DestinationReview.builder().destination(destination).build();
         destination.setStatus(DestinationStatus.PENDING);
         destination.setApproved(false);
+        if (edited) updateExperienceStatuses(id, ExperienceStatus.DRAFT);
         review.setStatus(DestinationReviewStatus.PENDING);
         review.setReviewer(null);
         review.setReviewedAt(null);
@@ -91,6 +96,7 @@ public class DestinationModerationService {
         Destination destination = review.getDestination();
         destination.setStatus(DestinationStatus.PUBLISHED);
         destination.setApproved(true);
+        updateExperienceStatuses(id, ExperienceStatus.PUBLISHED);
         review.setStatus(DestinationReviewStatus.APPROVED);
         review.setReviewer(findUserOrThrow(reviewerId));
         review.setDecisionNote(note);
@@ -118,6 +124,7 @@ public class DestinationModerationService {
         Destination destination = review.getDestination();
         destination.setStatus(DestinationStatus.REJECTED);
         destination.setApproved(false);
+        updateExperienceStatuses(id, ExperienceStatus.DRAFT);
         review.setStatus(DestinationReviewStatus.REJECTED);
         review.setReviewer(findUserOrThrow(reviewerId));
         review.setDecisionNote(note == null ? null : note.trim());
@@ -198,6 +205,15 @@ public class DestinationModerationService {
 
     private User findUserOrThrow(Long id) {
         return userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+    }
+
+    private void updateExperienceStatuses(Long destinationId, ExperienceStatus status) {
+        for (Experience experience : experienceRepository.findByDestination_Id(destinationId)) {
+            if (experience.getStatus() != ExperienceStatus.INACTIVE) {
+                experience.setStatus(status);
+                experienceRepository.save(experience);
+            }
+        }
     }
 
     private void addHistory(DestinationReview review, DestinationReviewAction action, Long actorId,
