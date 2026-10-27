@@ -34,6 +34,12 @@ class CulturalContentServiceTest {
     @Mock
     private DestinationRepository destinationRepository;
 
+    @Mock
+    private com.journeygo.modules.moderation.service.ContentModerationService contentModerationService;
+
+    @Mock
+    private com.journeygo.modules.media.service.CloudinaryImageService cloudinaryImageService;
+
     @InjectMocks
     private CulturalContentService culturalContentService;
 
@@ -75,8 +81,8 @@ class CulturalContentServiceTest {
     @DisplayName("Get contents by destination id")
     void testGetByDestinationId() {
         when(destinationRepository.findByIdAndDeletedFalse(50L)).thenReturn(Optional.of(destination));
-        when(culturalContentRepository.findByDestinationIdAndDeletedFalseAndDestinationDeletedFalseOrderBySequenceOrderAsc(50L))
-                .thenReturn(List.of(content));
+        when(contentModerationService.getApprovedByDestination(50L))
+                .thenReturn(List.of(CulturalContentResponse.fromEntity(content)));
 
         List<CulturalContentResponse> responses = culturalContentService.getByDestinationId(50L);
 
