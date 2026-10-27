@@ -76,17 +76,27 @@ feat/auth-redis-integration
 
 ## 3. Những Lưu Ý Quan Trọng Khi Chạy / Code
 
-### 1. Đảm bảo Redis luôn chạy trước khi Start Backend
-- Trước khi chạy `mvn spring-boot:run` hoặc nhấn Run trên IDE:
-  - Kiểm tra Docker container Redis:
-    ```powershell
-    docker ps
-    ```
-  - Nếu container `journeygo-redis` đang ở trạng thái `Exited`, bạn chỉ cần gõ:
-    ```powershell
-    docker start journeygo-redis
-    ```
-- *(Lưu ý: Backend được thiết kế cơ chế Fallback an toàn. Nếu Redis vô tình tắt, hệ thống vẫn fallback về database PostgreSQL mà không gây crash ứng dụng).*
+### 1. Quản lý Hạ Tầng (Redis & PostgreSQL) bằng Docker Compose
+Dự án đã được trang bị sẵn file `docker-compose.yml` ở thư mục gốc và `Dockerfile` trong `backend/`:
+
+* **Kịch bản A: Khi bạn code & debug trên IDE (Khuyên dùng khi dev hàng ngày)**
+  Chỉ cần khởi động 2 dịch vụ phụ thuộc (PostgreSQL & Redis), sau đó chạy code Java trực tiếp trên IDE:
+  ```powershell
+  # Từ thư mục gốc dự án (d:\S9\journey-go)
+  docker compose up -d postgres redis
+  ```
+  *(Lệnh này sẽ tự động bật PostgreSQL ở cổng 5432 và Redis ở cổng 6379 kèm lưu dữ liệu bền vững).*
+
+* **Kịch bản B: Khởi động toàn bộ hệ thống (Bao gồm cả Spring Boot Backend)**
+  Khi muốn demo hoặc chạy thử trọn gói toàn bộ Backend qua Docker:
+  ```powershell
+  docker compose up -d
+  ```
+
+* **Dừng các container:**
+  ```powershell
+  docker compose down
+  ```
 
 ### 2. Kiểm tra dữ liệu trong Redis (Debug CLI)
 Bạn có thể xem các key đang được lưu trong Redis bằng cách gõ lệnh trực tiếp vào container:
@@ -94,7 +104,7 @@ Bạn có thể xem các key đang được lưu trong Redis bằng cách gõ l�
 # Vào Redis CLI
 docker exec -it journeygo-redis redis-cli
 
-# Xem tất cả các key hiện có
+# Xem tất cả các key hiện có (ví dụ: blacklist token, rate limit counter)
 keys *
 
 # Xem giá trị và thời gian sống còn lại (TTL tính bằng giây) của 1 key
@@ -106,12 +116,13 @@ exit
 ```
 
 ### 3. File Môi Trường `.env`
-Đảm bảo file `.env` ở thư mục `backend/` có các biến sau:
+Đảm bảo file `.env` ở thư mục `backend/` có các biến sau khi chạy cục bộ:
 ```env
 SPRING_DATA_REDIS_HOST=localhost
 SPRING_DATA_REDIS_PORT=6379
 SPRING_DATA_REDIS_PASSWORD=
 ```
+*(Nếu chạy Backend bên trong Docker qua `docker compose up -d`, các biến này đã được `docker-compose.yml` tự động cấu hình trỏ sang hostname nội bộ `redis` và `postgres`).*
 
 ---
 *Tài liệu được cập nhật theo commit mới nhất của nhánh `feat/auth-redis-integration`.*
