@@ -1,7 +1,7 @@
 package com.journeygo.modules.destination.dto;
 
 import com.journeygo.modules.destination.entity.Destination;
-import com.journeygo.modules.destination.entity.DestinationStatus;
+import com.journeygo.modules.destination.entity.enums.DestinationStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 

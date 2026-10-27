@@ -15,6 +15,7 @@ import com.journeygo.modules.destination.repository.ThemeRepository;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
+import com.journeygo.modules.moderation.service.DestinationModerationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -42,6 +43,7 @@ public class DestinationService {
     private final UserRepository userRepository;
     private final RegionRepository regionRepository;
     private final ThemeRepository themeRepository;
+    private final DestinationModerationService moderationService;
     private final ExperienceRepository experienceRepository;
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
@@ -52,28 +54,14 @@ public class DestinationService {
     /** Retrieve all non-deleted destinations with pagination and sorting. */
     @Transactional(readOnly = true)
     public PageResponse<DestinationResponse> getAll(Pageable pageable) {
-        Page<Destination> page = destinationRepository.findByDeletedFalse(sanitizePageable(pageable));
+        Page<Destination> page = destinationRepository.findByApprovedTrueAndDeletedFalse(sanitizePageable(pageable));
         return PageResponse.from(page, DestinationResponse::fromEntity);
     }
 
     /** Retrieve all non-deleted destinations as list. */
     @Transactional(readOnly = true)
     public List<DestinationResponse> getAll() {
-        return destinationRepository.findByDeletedFalse()
-                .stream().map(DestinationResponse::fromEntity).toList();
-    }
-
-    /** Retrieve only approved/published, non-deleted destinations with pagination and sorting. */
-    @Transactional(readOnly = true)
-    public PageResponse<DestinationResponse> getApproved(Pageable pageable) {
-        Page<Destination> page = destinationRepository.findByApprovedAndDeletedFalse(true, sanitizePageable(pageable));
-        return PageResponse.from(page, DestinationResponse::fromEntity);
-    }
-
-    /** Retrieve only approved/published destinations as list. */
-    @Transactional(readOnly = true)
-    public List<DestinationResponse> getApproved() {
-        return destinationRepository.findByApprovedAndDeletedFalse(true)
+        return destinationRepository.findByApprovedTrueAndDeletedFalse()
                 .stream().map(DestinationResponse::fromEntity).toList();
     }
 
@@ -84,45 +72,41 @@ public class DestinationService {
         return PageResponse.from(page, DestinationResponse::fromEntity);
     }
 
-    /** Retrieve destinations by status as list. */
-    @Transactional(readOnly = true)
-    public List<DestinationResponse> getByStatus(DestinationStatus status) {
-        return destinationRepository.findByStatusAndDeletedFalse(status)
-                .stream().map(DestinationResponse::fromEntity).toList();
-    }
 
     /** Retrieve destinations by region slug with pagination and sorting. */
     @Transactional(readOnly = true)
     public PageResponse<DestinationResponse> getByRegion(String regionSlug, Pageable pageable) {
-        Page<Destination> page = destinationRepository.findByRegionSlugAndDeletedFalse(regionSlug, sanitizePageable(pageable));
+        Page<Destination> page = destinationRepository.findByRegionSlugAndApprovedTrueAndDeletedFalse(regionSlug, sanitizePageable(pageable));
         return PageResponse.from(page, DestinationResponse::fromEntity);
     }
 
     /** Retrieve destinations by region slug as list. */
     @Transactional(readOnly = true)
     public List<DestinationResponse> getByRegion(String regionSlug) {
-        return destinationRepository.findByRegionSlugAndDeletedFalse(regionSlug)
+        return destinationRepository.findByRegionSlugAndApprovedTrueAndDeletedFalse(regionSlug)
                 .stream().map(DestinationResponse::fromEntity).toList();
     }
 
     /** Retrieve destinations by theme slug with pagination and sorting. */
     @Transactional(readOnly = true)
     public PageResponse<DestinationResponse> getByTheme(String themeSlug, Pageable pageable) {
-        Page<Destination> page = destinationRepository.findByThemesSlugAndDeletedFalse(themeSlug, sanitizePageable(pageable));
+        Page<Destination> page = destinationRepository.findByThemesSlugAndApprovedTrueAndDeletedFalse(themeSlug, sanitizePageable(pageable));
         return PageResponse.from(page, DestinationResponse::fromEntity);
     }
 
     /** Retrieve destinations by theme slug as list. */
     @Transactional(readOnly = true)
     public List<DestinationResponse> getByTheme(String themeSlug) {
-        return destinationRepository.findByThemesSlugAndDeletedFalse(themeSlug)
+        return destinationRepository.findByThemesSlugAndApprovedTrueAndDeletedFalse(themeSlug)
                 .stream().map(DestinationResponse::fromEntity).toList();
     }
 
     /** Retrieve a single non-deleted destination by id. */
     @Transactional(readOnly = true)
     public DestinationResponse getById(Long id) {
-        return DestinationResponse.fromEntity(findOrThrow(id));
+        Destination destination = findOrThrow(id);
+        if (!destination.isApproved()) throw new AppException(ErrorCode.DESTINATION_NOT_FOUND);
+        return DestinationResponse.fromEntity(destination);
     }
 
     /** Retrieve all soft-deleted destinations with pagination and sorting. */
@@ -166,7 +150,7 @@ public class DestinationService {
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(validOrders));
     }
 
-    /** Create a new destination (DRAFT status by default). */
+    /** Create a destination and send it to moderation. */
     @Transactional
     public DestinationResponse create(DestinationRequest request, Long creatorId) {
         if (destinationRepository.existsByNameAndAddressAndDeletedFalse(request.name(), request.address())) {
@@ -198,7 +182,6 @@ public class DestinationService {
                 .capacity(request.capacity())
                 .booked(0)
                 .approved(false)
-                .status(DestinationStatus.DRAFT)
                 .region(region)
                 .themes(themes)
                 .deleted(false)
@@ -206,6 +189,7 @@ public class DestinationService {
                 .build();
 
         Destination saved = destinationRepository.save(destination);
+        moderationService.submit(saved.getId(), creatorId, Role.of(Role.PROVIDER));
         log.info("Created destination id={} name={}", saved.getId(), saved.getName());
         return DestinationResponse.fromEntity(saved);
     }
@@ -218,15 +202,7 @@ public class DestinationService {
         Destination existing = findOrThrow(id);
 
         checkOwnership(existing, callerId, callerRole);
-
-
-        // PROVIDER can only edit their own destination
-        if (callerRole != null && callerRole.isProvider()) {
-            Long ownerId = existing.getCreatedBy() != null ? existing.getCreatedBy().getId() : null;
-            if (!callerId.equals(ownerId)) {
-                throw new AppException(ErrorCode.UNAUTHORIZED);
-            }
-        }
+        moderationService.assertCanEdit(id, callerId, callerRole);
 
         if (destinationRepository.existsByLatitudeAndLongitudeAndDeletedFalseAndIdNot(request.latitude(), request.longitude(), id)) {
             throw new AppException(ErrorCode.DESTINATION_COORDINATE_EXISTED);
@@ -264,7 +240,7 @@ public class DestinationService {
         }
 
         Destination saved = destinationRepository.save(existing);
-        log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
+        moderationService.submitAfterEdit(saved.getId(), callerId, callerRole);
         log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
         return DestinationResponse.fromEntity(saved);
     }
@@ -361,12 +337,11 @@ public class DestinationService {
         Destination destination = destinationRepository.findByIdAndDeletedTrue(id)
                 .orElseThrow(() -> new AppException(ErrorCode.DESTINATION_NOT_FOUND));
         destination.setDeleted(false);
-        destination.setApproved(false);
-        destination.setStatus(DestinationStatus.DRAFT);
         if (destination.getContents() != null) {
             destination.getContents().forEach(c -> c.setDeleted(false));
         }
         Destination saved = destinationRepository.save(destination);
+        moderationService.resetAfterRestore(saved.getId());
         log.info("Restored destination id={}", saved.getId());
         return DestinationResponse.fromEntity(saved);
     }

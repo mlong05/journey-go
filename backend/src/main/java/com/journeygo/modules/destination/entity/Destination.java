@@ -2,6 +2,7 @@ package com.journeygo.modules.destination.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.journeygo.modules.content.entity.CulturalContent;
+import com.journeygo.modules.destination.entity.enums.DestinationStatus;
 import com.journeygo.modules.experience.entity.Experience;
 import com.journeygo.modules.user.entity.User;
 import jakarta.persistence.*;
@@ -122,23 +123,4 @@ public class Destination {
         this.regionId = region != null ? region.getId() : null;
     }
 
-    // ── Workflow methods from class diagram ──────────────────────────────────
-
-    /** Submit destination for approval */
-    public void submit() {
-        this.status = DestinationStatus.PENDING;
-        this.approved = false;
-    }
-
-    /** Publish destination after review */
-    public void publish() {
-        this.status = DestinationStatus.PUBLISHED;
-        this.approved = true;
-    }
-
-    /** Reject destination */
-    public void reject() {
-        this.status = DestinationStatus.REJECTED;
-        this.approved = false;
-    }
 }
