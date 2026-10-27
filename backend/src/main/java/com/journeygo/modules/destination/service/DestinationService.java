@@ -73,20 +73,6 @@ public class DestinationService {
                 .stream().map(DestinationResponse::fromEntity).toList();
     }
 
-    /** Retrieve destinations by status with pagination and sorting. */
-    @Transactional(readOnly = true)
-    public PageResponse<DestinationResponse> getByStatus(DestinationStatus status, Pageable pageable) {
-        Page<Destination> page = destinationRepository.findByStatusAndDeletedFalse(status, sanitizePageable(pageable));
-        return PageResponse.from(page, DestinationResponse::fromEntity);
-    }
-
-    /** Retrieve destinations by status as list. */
-    @Transactional(readOnly = true)
-    public List<DestinationResponse> getByStatus(DestinationStatus status) {
-        return destinationRepository.findByStatusAndDeletedFalse(status)
-                .stream().map(DestinationResponse::fromEntity).toList();
-    }
-
     /** Retrieve destinations by region slug with pagination and sorting. */
     @Transactional(readOnly = true)
     public PageResponse<DestinationResponse> getByRegion(String regionSlug, Pageable pageable) {
@@ -254,52 +240,6 @@ public class DestinationService {
         Destination saved = destinationRepository.save(existing);
         log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
         log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
-        return DestinationResponse.fromEntity(saved);
-    }
-
-    /** Submit destination for review (creator or admin/mod). */
-    @Transactional
-    public DestinationResponse submit(Long id, Long callerId, Role callerRole) {
-        Destination destination = findOrThrow(id);
-        checkOwnership(destination, callerId, callerRole);
-
-        destination.submit();
-        Destination saved = destinationRepository.save(destination);
-        log.info("Submitted destination id={} for review", saved.getId());
-        return DestinationResponse.fromEntity(saved);
-    }
-
-    /** Publish destination after review (admin or moderator). */
-    @Transactional
-    public DestinationResponse publish(Long id) {
-        Destination destination = findOrThrow(id);
-        destination.publish();
-        Destination saved = destinationRepository.save(destination);
-        log.info("Published destination id={}", saved.getId());
-        return DestinationResponse.fromEntity(saved);
-    }
-
-    /** Reject destination (admin or moderator). */
-    @Transactional
-    public DestinationResponse reject(Long id) {
-        Destination destination = findOrThrow(id);
-        destination.reject();
-        Destination saved = destinationRepository.save(destination);
-        log.info("Rejected destination id={}", saved.getId());
-        return DestinationResponse.fromEntity(saved);
-    }
-
-    /** Legacy approval toggle (admin or moderator). */
-    @Transactional
-    public DestinationResponse setApproval(Long id, boolean approved) {
-        Destination destination = findOrThrow(id);
-        if (approved) {
-            destination.publish();
-        } else {
-            destination.reject();
-        }
-        Destination saved = destinationRepository.save(destination);
-        log.info("Destination id={} approved={} status={}", saved.getId(), saved.isApproved(), saved.getStatus());
         return DestinationResponse.fromEntity(saved);
     }
 
