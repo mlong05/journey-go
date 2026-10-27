@@ -19,6 +19,8 @@ import java.io.IOException;
 public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
     private final HttpCookieOAuth2AuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;
+    @org.springframework.context.annotation.Lazy
+    private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
 
     @Value("${app.oauth2.default-redirect-uri:http://localhost:3000/oauth2/redirect}")
     private String defaultRedirectUri;
@@ -29,6 +31,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
                                         AuthenticationException exception) throws IOException {
         String targetUrl = CookieUtils.getCookie(request, HttpCookieOAuth2AuthorizationRequestRepository.REDIRECT_URI_PARAM_COOKIE_NAME)
                 .map(Cookie::getValue)
+                .filter(uri -> oAuth2AuthenticationSuccessHandler.isAuthorizedRedirectUri(uri))
                 .orElse(defaultRedirectUri);
 
         log.warn("OAuth2 đăng nhập thất bại: {}", exception.getMessage());

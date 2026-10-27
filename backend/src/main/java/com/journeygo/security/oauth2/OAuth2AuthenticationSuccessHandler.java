@@ -85,21 +85,34 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
-            // Đăng ký mới người dùng qua Google OAuth2
-            Role touristRole = roleRepository.findByName(Role.TOURIST)
-                    .orElseGet(() -> roleRepository.save(new Role(Role.TOURIST, "Khách du lịch")));
+            // Đọc role từ cookie nếu có truyền, mặc định là TOURIST
+            String requestedRole = CookieUtils.getCookie(request, HttpCookieOAuth2AuthorizationRequestRepository.ROLE_PARAM_COOKIE_NAME)
+                    .map(Cookie::getValue)
+                    .map(String::trim)
+                    .map(String::toUpperCase)
+                    .orElse(Role.TOURIST);
+
+            // Kiểm tra bảo mật: chỉ cho phép tự đăng ký TOURIST hoặc PROVIDER
+            if (!Role.TOURIST.equals(requestedRole) && !Role.PROVIDER.equals(requestedRole)) {
+                requestedRole = Role.TOURIST;
+            }
+
+            final String finalRole = requestedRole;
+            Role userRole = roleRepository.findByName(finalRole)
+                    .orElseGet(() -> roleRepository.save(new Role(finalRole, Role.PROVIDER.equals(finalRole) ? "Nhà cung cấp" : "Khách du lịch")));
+
             user = User.builder()
                     .email(email)
                     .fullName(name != null && !name.isBlank() ? name : email.split("@")[0])
                     .password(passwordEncoder.encode(UUID.randomUUID().toString()))
-                    .role(touristRole)
+                    .role(userRole)
                     .authProvider(AuthProvider.GOOGLE)
                     .providerId(sub)
                     .avatarUrl(picture)
                     .active(true)
                     .build();
             user = userRepository.save(user);
-            log.info("Đã tạo mới tài khoản Google OAuth2 cho email: {}", email);
+            log.info("Đã tạo mới tài khoản Google OAuth2 cho email: {} với role: {}", email, finalRole);
         } else {
             if (!user.isActive()) {
                 return UriComponentsBuilder.fromUriString(targetUrl)
@@ -135,14 +148,45 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         httpCookieOAuth2AuthorizationRequestRepository.removeAuthorizationRequestCookies(request, response);
     }
 
-    private boolean isAuthorizedRedirectUri(String uri) {
-        URI clientRedirectUri = URI.create(uri);
+    public boolean isAuthorizedRedirectUri(String uri) {
+        if (uri == null || uri.isBlank()) {
+            return false;
+        }
+
+        URI clientRedirectUri;
+        try {
+            clientRedirectUri = URI.create(uri.trim());
+        } catch (IllegalArgumentException e) {
+            log.warn("Malformed redirect URI: {}", uri);
+            return false;
+        }
+
         List<String> authorizedUris = Arrays.asList(authorizedRedirectUris);
 
         return authorizedUris.stream().anyMatch(authorizedUri -> {
-            URI authorizedURI = URI.create(authorizedUri);
-            return authorizedURI.getHost().equalsIgnoreCase(clientRedirectUri.getHost())
-                    && authorizedURI.getPort() == clientRedirectUri.getPort();
+            try {
+                URI authorizedURI = URI.create(authorizedUri.trim());
+
+                // 1. Trường hợp Custom App Scheme (Mobile Deep Link) như: journeygo://oauth2/redirect
+                if (authorizedURI.getScheme() != null
+                        && !authorizedURI.getScheme().equalsIgnoreCase("http")
+                        && !authorizedURI.getScheme().equalsIgnoreCase("https")) {
+                    boolean schemeMatch = authorizedURI.getScheme().equalsIgnoreCase(clientRedirectUri.getScheme());
+                    boolean hostMatch = authorizedURI.getHost() == null
+                            || authorizedURI.getHost().equalsIgnoreCase(clientRedirectUri.getHost());
+                    boolean pathMatch = authorizedURI.getPath() == null || authorizedURI.getPath().isEmpty()
+                            || authorizedURI.getPath().equalsIgnoreCase(clientRedirectUri.getPath());
+                    return schemeMatch && hostMatch && pathMatch;
+                }
+
+                // 2. Trường hợp HTTP / HTTPS Web URLs (Web Browser)
+                return authorizedURI.getHost() != null
+                        && authorizedURI.getHost().equalsIgnoreCase(clientRedirectUri.getHost())
+                        && authorizedURI.getPort() == clientRedirectUri.getPort();
+            } catch (Exception ex) {
+                log.warn("Error parsing authorized redirect URI: {}", authorizedUri, ex);
+                return false;
+            }
         });
     }
 }
