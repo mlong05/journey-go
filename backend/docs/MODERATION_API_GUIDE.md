@@ -5,7 +5,7 @@
 - Swagger UI: http://localhost:8088/swagger-ui/index.html
 - Đăng nhập qua POST /api/v1/auth/login, lấy data.accessToken rồi nhấn Authorize.
 - Các API quyết định kiểm duyệt và hàng chờ yêu cầu ADMIN hoặc MODERATOR.
-- Provider chỉ gửi content/destination của chính mình và xem lịch sử content của mình.
+- Provider chỉ gửi content/destination của chính mình và xem lịch sử gửi duyệt.
 - Response được bọc trong ApiResponse.
 
 ## 1. Kiểm duyệt Cultural Content
@@ -78,10 +78,13 @@ Provider tạo content hoặc gửi lại content REJECTED
 | Method | Endpoint | Quyền | Chức năng |
 | --- | --- | --- | --- |
 | POST | /api/v1/moderation/destinations/{destinationId}/submit | PROVIDER, ADMIN, MODERATOR | Gửi điểm đến vào hàng chờ |
+| GET | /api/v1/moderation/destinations/approved | Công khai | Danh sách điểm đến đã được duyệt |
 | GET | /api/v1/moderation/destinations/queue | ADMIN, MODERATOR | Hàng chờ destination PENDING |
-| GET | /api/v1/moderation/destinations/status/{status} | ADMIN, MODERATOR | Lọc DRAFT, PENDING, PUBLISHED, REJECTED |
-| PATCH | /api/v1/moderation/destinations/{destinationId}/approve | ADMIN, MODERATOR | Duyệt và xuất bản |
-| PATCH | /api/v1/moderation/destinations/{destinationId}/reject | ADMIN, MODERATOR | Từ chối |
+| GET | /api/v1/moderation/destinations/status/{status} | ADMIN, MODERATOR | Lọc DRAFT, PENDING, APPROVED, REJECTED |
+| GET | /api/v1/moderation/destinations/{destinationId}/history | PROVIDER, ADMIN, MODERATOR | Trạng thái và toàn bộ lịch sử |
+| GET | /api/v1/moderation/destinations/rejection-reasons | ADMIN, MODERATOR | Mã và nhãn checkbox lý do |
+| PATCH | /api/v1/moderation/destinations/{destinationId}/approve | ADMIN, MODERATOR | Duyệt, có thể kèm note |
+| PATCH | /api/v1/moderation/destinations/{destinationId}/reject | ADMIN, MODERATOR | Từ chối với reason và otherReason |
 
 Hàng chờ destination hỗ trợ page, size, sort:
 
@@ -89,7 +92,41 @@ Hàng chờ destination hỗ trợ page, size, sort:
 GET /api/v1/moderation/destinations/queue?page=0&size=10
 ~~~
 
-Khi cập nhật Destination, trạng thái quay về DRAFT. Sau đó gửi lại bằng endpoint submit.
+Tạo mới và cập nhật Destination tự gửi vào hàng chờ. Điểm đến PENDING không thể chỉnh sửa. Khi bị REJECTED, Provider sửa thông tin; hệ thống lưu lần gửi tiếp theo. Có thể gửi lại bằng endpoint submit. Mỗi lần gửi/duyệt/từ chối được lưu trong history.
+
+Lý do từ chối lấy từ GET /api/v1/moderation/destinations/rejection-reasons. Nếu chọn OTHER thì otherReason bắt buộc:
+
+~~~json
+{
+  "note": "Vui lòng xác nhận lại địa chỉ.",
+  "reason": "INACCURATE_INFORMATION,OTHER",
+  "otherReason": "Địa chỉ hiện tại không khớp với bản đồ."
+}
+~~~
+
+## 3. Kiểm duyệt Tour
+
+| Method | Endpoint | Quyền | Chức năng |
+| --- | --- | --- | --- |
+| POST | /api/v1/moderation/tours/{tourId}/submit | PROVIDER, ADMIN, MODERATOR | Gửi lại tour bị từ chối |
+| GET | /api/v1/moderation/tours/queue | ADMIN, MODERATOR | Hàng chờ tour PENDING |
+| GET | /api/v1/moderation/tours/status/{status} | ADMIN, MODERATOR | Lọc DRAFT, PENDING, APPROVED, REJECTED |
+| GET | /api/v1/moderation/tours/{tourId}/history | PROVIDER, ADMIN, MODERATOR | Trạng thái và toàn bộ lịch sử |
+| GET | /api/v1/moderation/tours/rejection-reasons | ADMIN, MODERATOR | Mã và nhãn checkbox lý do |
+| PATCH | /api/v1/moderation/tours/{tourId}/approve | ADMIN, MODERATOR | Duyệt tour, có thể kèm note |
+| PATCH | /api/v1/moderation/tours/{tourId}/reject | ADMIN, MODERATOR | Từ chối với reason và otherReason |
+
+Tạo mới/cập nhật tour tự gửi vào hàng chờ. Tour PENDING không thể sửa. Tour bị REJECTED có thể sửa rồi gửi lại; mọi quyết định được lưu trong history.
+
+Body từ chối:
+
+~~~json
+{
+  "note": "Vui lòng bổ sung lịch trình chi tiết.",
+  "reason": "INCOMPLETE_INFORMATION,OTHER",
+  "otherReason": "Chưa nêu rõ điểm tập trung của đoàn."
+}
+~~~
 
 ## Quyền và giới hạn
 
@@ -118,9 +155,22 @@ GET không có JSON request body. Dùng URL/query trong Swagger và xem JSON res
 
 | API | JSON dùng để test |
 | --- | --- |
-| POST /api/v1/moderation/destinations/5/submit | Không có request body. Response data destination có status PENDING. |
+| POST /api/v1/moderation/destinations/5/submit | Không body; dùng gửi mới hoặc gửi lại khi REJECTED. Tạo/sửa tự gửi duyệt. |
 | GET /api/v1/moderation/destinations/queue?page=0&size=10 | Response: {"code":200,"message":"Lấy hàng chờ kiểm duyệt điểm đến thành công","data":{"page":0,"size":10,"totalElements":1,"totalPages":1,"first":true,"last":true,"content":[{"id":5,"name":"Hồ Hoàn Kiếm","address":"Hà Nội","latitude":21.028,"longitude":105.854,"capacity":500,"booked":0,"approved":false,"status":"PENDING","deleted":false,"regionId":1,"region":null,"themes":[],"contentCount":0,"experienceCount":0,"createdBy":"Provider","createdAt":"2026-10-01T08:00:00Z","updatedAt":"2026-10-01T08:00:00Z"}]},"timestamp":"2026-10-01T08:00:00Z"} |
-| GET /api/v1/moderation/destinations/status/PENDING?page=0&size=10 | Response data có cấu trúc phân trang như queue, lọc theo status. |
-| PATCH /api/v1/moderation/destinations/5/approve | Không có request body. Response data destination có status PUBLISHED và approved=true. |
-| PATCH /api/v1/moderation/destinations/5/reject | Không có request body. Response data destination có status REJECTED và approved=false. |
+| GET /api/v1/moderation/destinations/status/REJECTED?page=0&size=10 | Response data có cấu trúc phân trang và lịch sử. |
+| GET /api/v1/moderation/destinations/5/history | Response gồm status, reason, otherReason và lịch sử SUBMITTED/REJECTED/APPROVED. |
+| GET /api/v1/moderation/destinations/rejection-reasons | Response data gồm mã/nhãn checkbox. |
+| PATCH /api/v1/moderation/destinations/5/approve | Request: {"note":"Thông tin điểm đến đã xác minh."}. Body có thể bỏ trống. |
+| PATCH /api/v1/moderation/destinations/5/reject | Request: {"note":"Vui lòng sửa địa chỉ.","reason":"INACCURATE_INFORMATION,OTHER","otherReason":"Địa chỉ không trùng với bản đồ."}. OTHER yêu cầu otherReason. |
+
+### Tour moderation
+
+| API | JSON dùng để test |
+| --- | --- |
+| POST /api/v1/moderation/tours/1/submit | Không body; dùng gửi lại tour REJECTED. Tạo/sửa tour tự gửi duyệt. |
+| GET /api/v1/moderation/tours/queue?page=0&size=10 | Response data là trang TourReviewResponse, gồm tour, trạng thái và history. |
+| GET /api/v1/moderation/tours/rejection-reasons | Response data gồm toàn bộ mã/nhãn checkbox cho lý do từ chối. |
+| GET /api/v1/moderation/tours/1/history | Response gồm trạng thái hiện tại, reason, otherReason và lịch sử SUBMITTED/APPROVED/REJECTED. |
+| PATCH /api/v1/moderation/tours/1/approve | Request: {"note":"Lịch trình và giá tour phù hợp."}. Có thể bỏ body. |
+| PATCH /api/v1/moderation/tours/1/reject | Request: {"note":"Vui lòng bổ sung lịch trình.","reason":"INCOMPLETE_INFORMATION,OTHER","otherReason":"Chưa ghi rõ điểm tập trung."}. OTHER yêu cầu otherReason. |
 

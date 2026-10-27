@@ -1,6 +1,7 @@
 package com.journeygo.modules.moderation.entity;
 
 import com.journeygo.modules.content.entity.CulturalContent;
+import com.journeygo.modules.moderation.entity.enums.ContentReviewStatus;
 import com.journeygo.modules.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;

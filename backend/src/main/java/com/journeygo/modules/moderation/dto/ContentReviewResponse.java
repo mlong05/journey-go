@@ -1,7 +1,7 @@
 package com.journeygo.modules.moderation.dto;
 
 import com.journeygo.modules.content.dto.CulturalContentResponse;
-import com.journeygo.modules.moderation.entity.ContentReviewStatus;
+import com.journeygo.modules.moderation.entity.enums.ContentReviewStatus;
 import java.time.Instant;
 
 public record ContentReviewResponse(Long id, Long contentId, Long destinationId, String destinationName,
