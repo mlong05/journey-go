@@ -1,10 +1,9 @@
 package com.journeygo.modules.community.dto;
 
 import com.journeygo.modules.community.entity.enums.ReactionType;
-import jakarta.validation.constraints.NotNull;
 
 public record PostReactionRequest(
-        @NotNull(message = "Loại tương tác không được để trống")
+        // Chỉ hỗ trợ thả tim (LOVE); bỏ trống thì mặc định là LOVE.
         ReactionType reactionType
 ) {
 }

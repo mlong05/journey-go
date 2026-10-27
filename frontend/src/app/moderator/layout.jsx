@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   MapPin,
   BookOpen,
-  Camera,
+  MessageSquare,
   History,
   LogOut,
   Search,
@@ -79,9 +79,9 @@ export default function ModeratorLayout({ children }) {
     },
     {
       id: "community-media",
-      label: "Duyệt Ảnh & Bài Cộng đồng",
+      label: "Duyệt Bài Cộng đồng",
       href: "/moderator/community",
-      icon: Camera,
+      icon: MessageSquare,
       badge: null,
     },
     {

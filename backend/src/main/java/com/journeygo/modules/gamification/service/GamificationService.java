@@ -184,7 +184,7 @@ public class GamificationService {
 
     @Transactional
     public UserVoucherResponse redeemVoucher(Long userId, Long voucherId) {
-        Voucher voucher = voucherRepository.findById(voucherId)
+        Voucher voucher = voucherRepository.findByIdForUpdate(voucherId)
                 .orElseThrow(() -> new BusinessException("VOUCHER-NOT-FOUND", "Voucher không tồn tại"));
 
         if (!voucher.isActive()) {
@@ -196,6 +196,9 @@ public class GamificationService {
         }
 
         Instant now = Instant.now();
+        if (voucher.getStartDate() != null && voucher.getStartDate().isAfter(now)) {
+            throw new BusinessException("VOUCHER-NOT-STARTED", "Chương trình quy đổi voucher này chưa bắt đầu");
+        }
         if (voucher.getEndDate() != null && voucher.getEndDate().isBefore(now)) {
             throw new BusinessException("VOUCHER-EXPIRED", "Chương trình quy đổi voucher này đã hết hạn");
         }

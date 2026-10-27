@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 
-@Builder
+@Builder(toBuilder = true)
 public record PostResponse(
         Long id,
         Long authorId,
@@ -20,10 +20,14 @@ public record PostResponse(
         Long tourId,
         Long destinationId,
         Long journeyId,
+        String destinationName,
+        String tourTitle,
         PostStatus status,
         String moderationNote,
         Integer likesCount,
         Integer commentsCount,
+        boolean hidden,
+        Integer reportCount,
         ReactionType myReaction,
         List<PostMediaResponse> mediaList,
         Instant createdAt,
@@ -48,6 +52,7 @@ public record PostResponse(
                 .moderationNote(post.getModerationNote())
                 .likesCount(post.getLikesCount())
                 .commentsCount(post.getCommentsCount())
+                .hidden(post.isHidden())
                 .myReaction(myReaction)
                 .mediaList(mediaResponses)
                 .createdAt(post.getCreatedAt())

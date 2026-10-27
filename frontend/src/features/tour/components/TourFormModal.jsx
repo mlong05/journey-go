@@ -304,8 +304,8 @@ export default function TourFormModal({
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-md">
                   {success
                     ? isEditing
-                      ? "Tour đã được đưa về trạng thái bản nháp. Bạn cần gửi duyệt lại trước khi xuất bản."
-                      : "Tour mới ở trạng thái bản nháp. Gửi duyệt để Hội đồng Thẩm định tiếp nhận."
+                      ? "Tour đã được gửi lại vào hàng chờ kiểm duyệt. Bạn không thể chỉnh sửa cho đến khi có kết quả."
+                      : "Tour mới đã được gửi vào hàng chờ để Hội đồng Thẩm định tiếp nhận."
                     : "Đặt tên và chọn các điểm đến theo đúng thứ tự hành trình. "
                       + "Giá tour được hệ thống tính tự động từ các trải nghiệm của các điểm đến."}
                 </p>
@@ -338,9 +338,9 @@ export default function TourFormModal({
                         {savedTour.title || form.title}
                       </p>
                     </div>
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                      Bản nháp
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      Chờ duyệt
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200/70">
