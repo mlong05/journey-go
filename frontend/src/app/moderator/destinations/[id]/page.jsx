@@ -30,7 +30,7 @@ import {
   Landmark,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { destinationService, moderationService } from "@/features/destination";
+import { destinationService, moderationService, RejectDestinationDialog } from "@/features/destination";
 
 /**
  * Trang Thẩm Định Chi Tiết Hồ Sơ Điểm Đến Di Tích - JourneyGo
@@ -149,57 +149,37 @@ export default function DestinationAuditDetailPage({ params }) {
     }
   };
 
-  // Xử lý yêu cầu hiệu đính
-  const handleRequestRevision = async () => {
-    const ok = await confirm({
-      tone: "warning",
-      icon: "warning",
-      title: "Gửi yêu cầu chỉnh sửa bổ sung?",
-      subject: destinationData?.name || `#${recordId}`,
-      description:
-        "Hồ sơ sẽ được chuyển về đơn vị đệ trình kèm ý kiến thẩm định của bạn.",
-      confirmLabel: "Gửi yêu cầu",
-    });
-    if (!ok) return;
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [isRejectSubmitting, setIsRejectSubmitting] = useState(false);
+
+  // Xử lý mở dialog từ chối / yêu cầu hiệu đính
+  const handleRequestRevision = () => {
+    setIsRejectDialogOpen(true);
+  };
+
+  const handleReject = () => {
+    setIsRejectDialogOpen(true);
+  };
+
+  const handleConfirmReject = async (payload) => {
+    setIsRejectSubmitting(true);
     try {
-      await moderationService.rejectDestination(recordId);
+      await moderationService.rejectDestination(recordId, payload);
       setSubmissionStatus("REJECTED");
       setDecisionModal({
         isOpen: true,
-        title: "Đã gửi yêu cầu hiệu đính",
-        message: `Phản hồi thẩm định đã được gửi đến đơn vị đệ trình. Hồ sơ sẽ được chuyển về trạng thái chờ đối tác chỉnh sửa.`,
-        type: "REVISION",
+        title: "Đã từ chối & Yêu cầu hiệu đính",
+        message: `Phản hồi thẩm định đã được gửi đến đối tác. Hồ sơ "${destinationData?.name || recordId}" đã chuyển sang trạng thái bị từ chối kèm lý do để đối tác chỉnh sửa.`,
+        type: "REJECTED",
       });
+      setIsRejectDialogOpen(false);
     } catch (err) {
-      console.error("[Moderator Revision error]:", err);
+      console.error("[Moderator Reject error]:", err);
+    } finally {
+      setIsRejectSubmitting(false);
     }
   };
 
-  // Xử lý từ chối hồ sơ
-  const handleReject = async () => {
-    const ok = await confirm({
-      tone: "danger",
-      icon: "reject",
-      title: "Từ chối tiếp nhận hồ sơ?",
-      subject: destinationData?.name || `#${recordId}`,
-      description:
-        "Hồ sơ sẽ bị từ chối và không được hiển thị tới du khách. Hành động này khó hoàn tác.",
-      confirmLabel: "Từ chối hồ sơ",
-    });
-    if (!ok) return;
-    try {
-      await moderationService.rejectDestination(recordId);
-      setSubmissionStatus("REJECTED");
-      setDecisionModal({
-        isOpen: true,
-        title: "Đã từ chối tiếp nhận hồ sơ",
-        message: `Hồ sơ đã bị từ chối do không đáp ứng tiêu chuẩn văn hóa hoặc vi phạm an toàn thực địa.`,
-        type: "REJECTED",
-      });
-    } catch (err) {
-      console.error("[Moderator Reject error]:", err);
-    }
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-200">
@@ -702,7 +682,16 @@ export default function DestinationAuditDetailPage({ params }) {
         </div>
       )}
 
+      <RejectDestinationDialog
+        isOpen={isRejectDialogOpen}
+        destination={destinationData}
+        isSubmitting={isRejectSubmitting}
+        onClose={() => setIsRejectDialogOpen(false)}
+        onConfirm={handleConfirmReject}
+      />
+
       {confirmDialog}
     </div>
   );
 }
+

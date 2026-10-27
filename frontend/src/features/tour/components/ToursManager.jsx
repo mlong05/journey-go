@@ -553,11 +553,11 @@ export default function ToursManager({
 
   /* ── Hành động: từ chối ────────────────────────────────────── */
   const handleRejectConfirm = useCallback(
-    async (reason) => {
+    async (payload) => {
       if (!rejectTarget) return;
       setIsRejecting(true);
       try {
-        const updated = await tourService.reject(rejectTarget.tourId, reason);
+        const updated = await tourService.reject(rejectTarget.tourId, payload);
         mergeTour(updated);
         showToast(`Đã từ chối tour "${rejectTarget.title}".`);
         if (detailTarget?.tourId === rejectTarget.tourId) {
@@ -574,6 +574,7 @@ export default function ToursManager({
     },
     [rejectTarget, detailTarget, mergeTour, showToast]
   );
+
 
   /* ── Hành động: xoá mềm / khôi phục ────────────────────────── */
   const handleDeleteConfirm = useCallback(async () => {
