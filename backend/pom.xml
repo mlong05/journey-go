@@ -75,6 +75,16 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Flyway — quản lý migration schema (booking / payment / refund / wallet / settlement) -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
         <!-- H2 Database for testing / local fallback -->
         <dependency>
             <groupId>com.h2database</groupId>
