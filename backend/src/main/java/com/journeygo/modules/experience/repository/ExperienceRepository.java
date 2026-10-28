@@ -20,6 +20,8 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
 
     List<Experience> findByDestination_Id(Long destinationId);
 
+    List<Experience> findByDestination_IdInOrderById(List<Long> destinationIds);
+
     Page<Experience> findByDestination_Id(Long destinationId, Pageable pageable);
 
     long countByDestination_Id(Long destinationId);
