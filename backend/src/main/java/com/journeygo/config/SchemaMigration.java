@@ -54,6 +54,27 @@ public class SchemaMigration {
     }
 
     /**
+     * Gỡ cột {@code users.role} legacy (kiểu {@code varchar}, NOT NULL + CHECK constraint).
+     *
+     * <p>Sau khi refactor {@code Role} thành entity (quan hệ 1-N), Hibernate map role sang
+     * {@code users.role_id}. Cột {@code users.role} cũ vẫn còn trong DB vì
+     * {@code ddl-auto=update} không drop cột, và vì NOT NULL nên mọi lần INSERT user mới
+     * đều fail với "null value in column \"role\" ... violates not-null constraint".
+     */
+    @Bean
+    public CommandLineRunner dropLegacyUsersRoleColumn() {
+        return args -> {
+            if (!columnExists("users", "role")) {
+                log.info("[Migration] Cột users.role đã được gỡ bỏ trước đó — bỏ qua.");
+                return;
+            }
+
+            jdbcTemplate.execute("ALTER TABLE users DROP COLUMN IF EXISTS role");
+            log.info("[Migration] Đã gỡ cột users.role — role hiện được lưu qua users.role_id.");
+        };
+    }
+
+    /**
      * Kiểm tra cột có tồn tại trong bảng hay không (PostgreSQL).
      */
     private boolean columnExists(String tableName, String columnName) {

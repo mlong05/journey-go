@@ -1,5 +1,6 @@
 package com.journeygo.modules.journey.service;
 
+import com.journeygo.modules.booking.service.BookingService;
 import com.journeygo.modules.experience.entity.enums.CheckInVerificationMethod;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
@@ -40,6 +41,7 @@ public class JourneyService {
     private final JourneyTaskProgressRepository taskProgressRepository;
     private final TourInfoProvider tourInfoProvider;
     private final GamificationService gamificationService;
+    private final BookingService bookingService;
 
     // ── JOURNEY LIFECYCLE ────────────────────────────────────────────────────────
 
@@ -477,6 +479,8 @@ public class JourneyService {
             journey.setCompletedAt(Instant.now());
             log.info("Chúc mừng! Du khách {} đã hoàn thành toàn bộ hành trình Tour {}", userId, journey.getTourName());
 
+            markBookingCompleted(journey, journey.getCompletedAt());
+
             gamificationService.awardPoints(
                     userId,
                     50,
@@ -664,6 +668,7 @@ public class JourneyService {
         if (completedDests >= journey.getTotalDestinations()) {
             journey.setStatus(JourneyStatus.COMPLETED);
             journey.setCompletedAt(Instant.now());
+            markBookingCompleted(journey, journey.getCompletedAt());
         }
 
         destinationProgressRepository.save(destProgress);
@@ -671,6 +676,25 @@ public class JourneyService {
 
         log.info("Du khách {} đã bỏ qua điểm đến {}", userId, destProgress.getDestinationName());
         return JourneyDestinationProgressResponse.fromEntity(destProgress);
+    }
+
+    /**
+     * Đánh dấu Booking tương ứng đã hoàn thành trải nghiệm.
+     *
+     * <p>Điều kiện tiên quyết để doanh thu Partner được xét điều kiện tất toán
+     * (Mục 4.1 — "Booking chỉ phát sinh doanh thu có thể tất toán sau khi trải nghiệm hoàn thành").
+     *
+     * <p>Không để lỗi ở đây làm hỏng luồng Journey — chỉ ghi log cảnh báo.
+     */
+    private void markBookingCompleted(Journey journey, Instant completedAt) {
+        if (journey.getBookingId() == null) {
+            return;
+        }
+        try {
+            bookingService.completeBooking(journey.getBookingId(), completedAt);
+        } catch (Exception e) {
+            log.warn("Không đánh dấu hoàn thành booking {}: {}", journey.getBookingId(), e.getMessage());
+        }
     }
 
     private Journey findJourneyAndVerifyOwner(Long journeyId, Long userId) {
