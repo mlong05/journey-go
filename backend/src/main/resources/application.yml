@@ -35,6 +35,17 @@ spring:
       port: ${SPRING_DATA_REDIS_PORT:6379}
       password: ${SPRING_DATA_REDIS_PASSWORD:}
       timeout: 3000ms
+  # ── Flyway ────────────────────────────────────────────────────────────────
+  # Migration cho các bảng nghiệp vụ mới (booking / payment / refund / wallet /
+  # settlement / partner revenue). Các bảng cũ do Hibernate `ddl-auto: update` quản lý.
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    # Không tự động sửa schema lệch — để dev phát hiện sai lệch.
+    repair: false
 
   mail:
     host: ${SPRING_MAIL_HOST:smtp.gmail.com}
@@ -98,6 +109,70 @@ app:
   mail:
     from-name: ${MAIL_FROM_NAME:JourneyGo Platform}
     otp-expiration-minutes: ${MAIL_OTP_EXPIRATION_MINUTES:10}
+
+  # ── Finance (Booking / Payment / Refund / Wallet & Settlement) ────────────
+  finance:
+    # Thời hạn gửi yêu cầu hoàn tiền kể từ thời điểm thanh toán thành công đã xác minh.
+    refund-window-hours: ${REFUND_WINDOW_HOURS:24}
+    # Tỷ lệ hoa hồng nền tảng mặc định (0.20 = 20%).
+    default-commission-rate: ${DEFAULT_COMMISSION_RATE:0.2000}
+    # Tỷ lệ hoàn tiền theo nguyên nhân.
+    tourist-fault-refund-rate: ${REFUND_RATE_TOURIST_FAULT:0.50}
+    platform-fault-refund-rate: ${REFUND_RATE_PLATFORM_FAULT:1.00}
+    # Số phút sau khi kỳ doanh thu kết thúc mới được tạo đợt tất toán chính thức.
+    settlement-grace-minutes: ${SETTLEMENT_GRACE_MINUTES:0}
+    # Cho phép tạo settlement cho kỳ chưa kết thúc hay không (mặc định false).
+    allow-open-period-settlement: ${ALLOW_OPEN_PERIOD_SETTLEMENT:false}
+    # Số giây giữa các lần quét Booking quá hạn thanh toán.
+    booking-expiry-scan-interval-seconds: ${BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS:60}
+    # Số giây giữa các lần kiểm tra trạng thái Refund đang chờ kết quả từ VNPay.
+    refund-status-check-interval-seconds: ${REFUND_STATUS_CHECK_INTERVAL_SECONDS:300}
+    # Số giờ cho phép gửi lại yêu cầu Refund sau khi yêu cầu trước bị từ chối (0 = không cho).
+    refund-resubmit-window-hours: ${REFUND_RESUBMIT_WINDOW_HOURS:0}
+
+  # ── VNPay Sandbox ─────────────────────────────────────────────────────────
+  # Toàn bộ credentials đọc từ biến môi trường — KHÔNG hardcode.
+  # Xem .env.example để biết cách thiết lập.
+  vnpay:
+    enabled: ${VNPAY_ENABLED:false}
+    tmn-code: ${VNPAY_TMN_CODE:}
+    hash-secret: ${VNPAY_HASH_SECRET:}
+    version: ${VNPAY_VERSION:2.1.0}
+    payment-url: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+    merchant-api-url: ${VNPAY_MERCHANT_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+    # URL nhận IPN (webhook) — phải là HTTPS và truy cập được từ internet.
+    ipn-url: ${VNPAY_IPN_URL:}
+    # URL nhận kết quả trả về (Return URL) sau khi khách thanh toán.
+    return-url: ${VNPAY_RETURN_URL:}
+    ip-addr: ${VNPAY_IP_ADDR:127.0.0.1}
+    timezone: ${VNPAY_TIMEZONE:Asia/Ho_Chi_Minh}
+    expiry-minutes: ${VNPAY_EXPIRY_MINUTES:10}
+    api-timeout-ms: ${VNPAY_API_TIMEOUT_MS:15000}
+    verify-signature: ${VNPAY_VERIFY_SIGNATURE:true}
+    locale: ${VNPAY_LOCALE:vn}
+    order-type: ${VNPAY_ORDER_TYPE:other}
+    # ── vnp_BankCode ────────────────────────────────────────────────────────
+    # ĐỂ TRỐNG (mặc định) → KHÔNG gửi vnp_BankCode → VNPay chuyển khách tới trang
+    # CHỌN phương thức thanh toán. Đây là hành vi đúng với 3 lựa chọn trên Sandbox:
+    #   1. Ứng dụng Ngân hàng và Ví điện tử
+    #   2. Thẻ nội địa và tài khoản ngân hàng
+    #   3. Thẻ thanh toán quốc tế
+    #
+    # Nếu muốn mở thẳng một phương thức, đặt một trong các mã sau:
+    #   VNPAYQR  = Thanh toán quét mã QR
+    #   VNBANK   = Thẻ ATM / Tài khoản ngân hàng nội địa
+    #   INTCARD  = Thẻ thanh toán quốc tế (Visa, Mastercard, JCB, UnionPay)
+    # Hoặc mã ngân hàng cụ thể (MB, VCB, ZINGPAY…) lấy từ API get_bank_list.
+    bank-code: ${VNPAY_BANK_CODE:}
+    # URL lấy danh sách ngân hàng / phương thức thanh toán (API chính thức VNPay).
+    bank-list-url: ${VNPAY_BANK_LIST_URL:https://sandbox.vnpayment.vn/qrpayauth/api/merchant/get_bank_list}
+    # ── Mapping bank_type của API get_bank_list ────────────────────────────
+    # Tài liệu chính thức chia danh sách thành 4 mục (QR, deep-link, ATM nội địa,
+    # thẻ quốc tế) nhưng KHÔNG nêu rõ mã số `bank_type` tương ứng. Các giá trị
+    # dưới đây là MẶC ĐỊNH và có thể chỉnh lại nếu Sandbox trả về khác.
+    qr-bank-type: ${VNPAY_QR_BANK_TYPE:1}
+    domestic-card-bank-type: ${VNPAY_DOMESTIC_CARD_BANK_TYPE:2}
+    international-card-bank-type: ${VNPAY_INTERNATIONAL_CARD_BANK_TYPE:3}
 
 # Cloudinary Storage Configuration
 cloudinary:
