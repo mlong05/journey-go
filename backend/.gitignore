@@ -33,3 +33,9 @@ target/
 .env.*
 !.env.example
 *.env
+
+### Runtime logs
+*.out
+*.err
+run-seed.*
+
