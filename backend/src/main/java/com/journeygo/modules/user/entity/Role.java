@@ -23,6 +23,13 @@ public class Role {
     public static final String ADMIN = "ADMIN";
     public static final String MODERATOR = "MODERATOR";
     public static final String PROVIDER = "PROVIDER";
+    /**
+     * Đối tác cung cấp dịch vụ — nắm giữ Wallet và là đối tượng hưởng doanh thu từ Booking.
+     *
+     * <p>Khác {@link #PROVIDER} (người tạo/nội dung Experience), {@code PARTNER} là đối tượng
+     * được hệ thống tất toán tiền (settlement).
+     */
+    public static final String PARTNER = "PARTNER";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -88,6 +95,10 @@ public class Role {
 
     public boolean isProvider() {
         return PROVIDER.equalsIgnoreCase(this.name);
+    }
+
+    public boolean isPartner() {
+        return PARTNER.equalsIgnoreCase(this.name);
     }
 
     public boolean isAdmin() {
