@@ -38,6 +38,9 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/v1/auth/**",
+            // VNPay callback — endpoint server-to-server, KHÔNG có JWT.
+            "/api/v1/payments/ipn",
+            "/api/v1/payments/return",
             "/oauth2/**",
             "/login/oauth2/**",
             "/v3/api-docs/**",
