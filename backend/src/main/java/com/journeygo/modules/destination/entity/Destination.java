@@ -43,7 +43,7 @@ public class Destination {
     @Column(nullable = false)
     private Integer capacity;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "integer default 0 not null")
     @Builder.Default
     private Integer booked = 0;
 
