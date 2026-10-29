@@ -12,7 +12,7 @@ import {
   Bell,
   Route,
   Receipt,
-  Wallet,
+  Award,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -48,6 +48,13 @@ const ADMIN_NAV_ITEMS = [
     icon: MapPin,
     badge: null,
   },
+  {
+    id: "badges",
+    label: "Huy hiệu di sản",
+    href: "/admin/badges",
+    icon: Award,
+    badge: null,
+  },
 
   {
     id: "finance",
@@ -61,13 +68,6 @@ const ADMIN_NAV_ITEMS = [
     label: "Đơn đặt tour",
     href: "/admin/bookings",
     icon: Receipt,
-    badge: null,
-  },
-  {
-    id: "payments",
-    label: "Giao dịch VNPay",
-    href: "/admin/payments",
-    icon: Wallet,
     badge: null,
   },
   {
