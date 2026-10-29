@@ -1072,7 +1072,8 @@ public class DataInitializer {
                     // Hạn thanh toán chỉ có ý nghĩa khi chưa thanh toán.
                     // Booking đã thanh toán đặt deadline = thời điểm hoàn tất để
                     // BookingExpiryScheduler không bao giờ quét nhầm.
-                    .paymentDeadline(targetStatus == BookingStatus.PENDING_PAYMENT
+                    // Đơn chưa từng thanh toán (chờ thanh toán, đã hủy, hết hạn) giữ hạn gốc createdAt + 10 phút.
+                    .paymentDeadline(targetStatus == BookingStatus.PENDING_PAYMENT || paidAt == null
                             ? createdAt.plusSeconds(600)
                             : (completedAt != null ? completedAt : paidAt))
                     .build();
