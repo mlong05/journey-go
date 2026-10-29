@@ -62,6 +62,52 @@ class UserPointModel {
       );
 }
 
+/// Nhãn tiếng Việt cho loại huy hiệu (BadgeType ở backend).
+String badgeTypeLabel(String type) {
+  switch (type) {
+    case 'DESTINATION_CHECKIN':
+      return 'Check-in điểm đến';
+    case 'TOUR_COMPLETION':
+      return 'Hoàn thành tour';
+    case 'TASK_MASTER':
+      return 'Bậc thầy nhiệm vụ';
+    case 'STREAK':
+      return 'Chuỗi ngày';
+    case 'SPECIAL_EVENT':
+      return 'Sự kiện đặc biệt';
+    default:
+      return 'Huy hiệu';
+  }
+}
+
+/// Huy hiệu trong danh mục toàn hệ thống (GET /gamification/badges).
+class BadgeModel {
+  final int id;
+  final String name;
+  final String description;
+  final String iconUrl;
+  final String badgeType;
+  final int bonusPoints;
+
+  const BadgeModel({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.iconUrl,
+    required this.badgeType,
+    required this.bonusPoints,
+  });
+
+  factory BadgeModel.fromJson(Map<String, dynamic> json) => BadgeModel(
+        id: _asInt(json['id']),
+        name: json['name']?.toString() ?? '',
+        description: json['description']?.toString() ?? '',
+        iconUrl: json['iconUrl']?.toString() ?? '',
+        badgeType: json['badgeType']?.toString() ?? '',
+        bonusPoints: _asInt(json['bonusPoints']),
+      );
+}
+
 /// Huy hiệu đã nhận (GET /gamification/badges/my).
 class UserBadgeModel {
   final int id;
