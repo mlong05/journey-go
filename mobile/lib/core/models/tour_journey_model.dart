@@ -257,6 +257,9 @@ class TaskContent {
   final int totalQuestions;
   final bool unlocked;
   final TaskStation? station;
+
+  /// Mọi trạm theo thứ tự câu hỏi (nhiệm vụ cần vị trí). Trạm chưa tới lượt không có tọa độ.
+  final List<TaskStation> stations;
   final int? distanceMeters;
   final List<TaskQuestion> questions;
 
@@ -276,6 +279,7 @@ class TaskContent {
     required this.totalQuestions,
     required this.unlocked,
     required this.station,
+    this.stations = const [],
     required this.distanceMeters,
     required this.questions,
   });
@@ -298,6 +302,7 @@ class TaskContent {
       totalQuestions: _int(j['totalQuestions']),
       unlocked: j['unlocked'] == true,
       station: station is Map<String, dynamic> ? TaskStation.fromJson(station) : null,
+      stations: _maps(j['stations']).map(TaskStation.fromJson).toList(),
       distanceMeters: _intOrNull(j['distanceMeters']),
       questions: _maps(j['questions']).map(TaskQuestion.fromJson).toList(),
     );

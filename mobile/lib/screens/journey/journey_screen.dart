@@ -13,6 +13,7 @@ import 'journey_map.dart';
 import 'journey_widgets.dart';
 import 'map_kit.dart';
 import 'qr_scan_screen.dart';
+import 'reward_effects.dart';
 import 'task_screen.dart';
 
 /// Hành trình trải nghiệm văn hóa: các điểm đến theo thứ tự, check-in GPS và nhiệm vụ tại từng điểm.
@@ -152,12 +153,11 @@ class _JourneyScreenState extends State<JourneyScreen> {
     await _load(silent: true);
     if (!mounted) return;
     if (result.badgeAwarded) {
-      await showRewardDialog(
+      await showBadgeUnlock(
         context,
-        title: 'Check-in thành công!',
-        subtitle: 'Bạn đã mở khóa nội dung văn hóa tại ${dest.name} và nhận huy hiệu di sản.',
-        badgeName: result.badgeName,
+        badgeName: (result.badgeName?.isNotEmpty ?? false) ? result.badgeName! : 'Huy hiệu di sản',
         badgeIconUrl: result.badgeIconUrl,
+        subtitle: 'Check-in thành công tại ${dest.name}. Nội dung văn hóa và nhiệm vụ đã được mở khóa.',
         buttonLabel: 'Bắt đầu nhiệm vụ',
       );
     } else {
@@ -922,7 +922,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
         const SizedBox(height: 14),
         _sectionLabel('CÂU CHUYỆN VĂN HÓA'),
         const SizedBox(height: 8),
-        CulturalStoriesSection(destinationId: dest.destinationId, unlocked: true),
+        CulturalStoriesSection(destinationId: dest.destinationId, unlocked: true, showTeaser: true),
         if (dest.tasks.isNotEmpty) ...[
           const SizedBox(height: 6),
           _sectionLabel('NHIỆM VỤ'),
