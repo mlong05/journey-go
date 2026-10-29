@@ -10,6 +10,7 @@ import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
 import 'journey_widgets.dart';
 import 'qr_scan_screen.dart';
+import 'map_kit.dart' show MapRoundButton, MapAttributionText;
 import 'station_map.dart';
 
 enum _Phase { loading, intro, locked, quiz, result, error }
@@ -57,6 +58,8 @@ class _TaskScreenState extends State<TaskScreen> {
   StreamSubscription<Position>? _positionSub;
   double? _heading; // hướng đang đi, null khi đứng yên
   DateTime? _lastAutoCheck;
+  final GlobalKey<StationMapState> _mapKey = GlobalKey<StationMapState>();
+  bool _satellite = false;
 
   int _index = 0;
   final Map<int, int> _choices = {};
@@ -78,6 +81,9 @@ class _TaskScreenState extends State<TaskScreen> {
   }
 
   TaskContent get _task => _content!;
+
+  /// Bước dẫn đường có tọa độ trạm: bản đồ phủ kín màn hình, không có AppBar.
+  bool get _fullScreenMap => _phase == _Phase.locked && _stationPoint != null;
 
   LatLng? get _stationPoint {
     final s = _content?.station;
@@ -352,7 +358,7 @@ class _TaskScreenState extends State<TaskScreen> {
       },
       child: Scaffold(
         backgroundColor: AppCultureColors.background,
-        appBar: AppBar(
+        appBar: _fullScreenMap ? null : AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
           scrolledUnderElevation: 0,
@@ -561,166 +567,372 @@ class _TaskScreenState extends State<TaskScreen> {
   // ── Dẫn đường tới trạm (nhiệm vụ cần vị trí) ───────────────────────────────
 
   Widget _buildLocked() {
-    final task = _task;
-    final station = task.station;
-    // Ưu tiên khoảng cách tính trên máy theo vị trí mới nhất; chưa có thì dùng số backend trả về.
-    final distance = _liveDistance ?? task.distanceMeters;
-    final radius = station?.radiusMeters ?? 50;
     final stationPoint = _stationPoint;
-    final userPoint = _userPoint;
-    final bearing = (stationPoint != null && userPoint != null) ? bearingBetween(userPoint, stationPoint) : null;
-    // 0 = còn rất xa, 1 = đã trong bán kính.
-    final closeness = distance == null ? 0.0 : (radius / (distance <= 0 ? 1 : distance)).clamp(0.0, 1.0);
+    if (stationPoint == null) return _buildLockedWithoutMap();
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    final task = _task;
+    final station = task.station!;
+    final radius = station.radiusMeters ?? 50;
+    final userPoint = _userPoint;
+    final distance = _liveDistance ?? task.distanceMeters;
+    final bearing = userPoint == null ? null : bearingBetween(userPoint, stationPoint);
+    final arrived = distance != null && distance <= radius;
+    final closeness = distance == null ? 0.0 : (radius / (distance <= 0 ? 1 : distance)).clamp(0.0, 1.0);
+    final topInset = MediaQuery.paddingOf(context).top;
+
+    return Stack(
       children: [
-        if (task.totalQuestions > 0)
-          SoftCard(
-            padding: const EdgeInsets.all(14),
-            child: Row(children: [
-              InfoChip(
-                icon: Icons.flag_rounded,
-                text: 'Câu ${task.questionIndex + 1}/${task.totalQuestions}',
-                background: AppCultureColors.oceanLight,
-                foreground: AppCultureColors.oceanDark,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: task.totalQuestions == 0 ? 0 : task.questionIndex / task.totalQuestions,
-                    minHeight: 8,
-                    backgroundColor: AppCultureColors.surfaceSubtle,
-                    color: AppCultureColors.heritageJade,
-                  ),
-                ),
-              ),
-            ]),
-          ),
-        const SizedBox(height: 14),
-        if (stationPoint != null) ...[
-          StationMap(
+        Positioned.fill(
+          child: StationMap(
+            key: _mapKey,
             station: stationPoint,
-            stationName: station?.name ?? 'Trạm kế tiếp',
+            stationName: station.name,
             radiusMeters: radius,
             user: userPoint,
             heading: _heading,
+            satellite: _satellite,
+            fitPadding: EdgeInsets.fromLTRB(64, topInset + 120, 64, 360),
           ),
-          const SizedBox(height: 14),
-        ],
-        SoftCard(
-          elevated: true,
-          padding: const EdgeInsets.all(22),
-          child: Column(children: [
-            if (stationPoint == null) ...[
-              Container(
-                width: 84,
-                height: 84,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppCultureColors.oceanLight,
+        ),
+
+        // Thanh nhiệm vụ nổi phía trên
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                MapRoundButton(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: 'Quay lại',
+                  onPressed: () => Navigator.of(context).pop(_changed),
                 ),
-                child: const Icon(Icons.near_me_rounded, size: 40, color: AppCultureColors.oceanBlue),
+                const SizedBox(width: 10),
+                Expanded(child: _navHeader(task)),
+              ],
+            ),
+          ),
+        ),
+
+        // Nút điều khiển bản đồ
+        Positioned(
+          right: 12,
+          top: topInset + 92,
+          child: Column(children: [
+            MapRoundButton(
+              icon: Icons.center_focus_strong_rounded,
+              tooltip: 'Xem cả bạn và trạm',
+              onPressed: () => _mapKey.currentState?.fitAll(),
+            ),
+            const SizedBox(height: 10),
+            MapRoundButton(
+              icon: Icons.my_location_rounded,
+              tooltip: 'Vị trí của tôi',
+              color: AppCultureColors.oceanBlue,
+              onPressed: userPoint == null ? _locateAndOpen : () => _mapKey.currentState?.focusUser(),
+            ),
+            const SizedBox(height: 10),
+            MapRoundButton(
+              icon: _satellite ? Icons.map_rounded : Icons.satellite_alt_rounded,
+              tooltip: _satellite ? 'Bản đồ đường phố' : 'Ảnh vệ tinh',
+              onPressed: () => setState(() => _satellite = !_satellite),
+            ),
+          ]),
+        ),
+
+        // Bảng dẫn đường phía dưới
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: _navPanel(
+            stationName: station.name,
+            radius: radius,
+            distance: distance,
+            bearing: bearing,
+            arrived: arrived,
+            closeness: closeness,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _navHeader(TaskContent task) {
+    final total = task.totalQuestions;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [
+            Expanded(
+              child: Text(task.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppCultureColors.textDark)),
+            ),
+            if (total > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppCultureColors.oceanLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('Trạm ${task.questionIndex + 1}/$total',
+                    style: const TextStyle(
+                        fontSize: 11.5, fontWeight: FontWeight.w800, color: AppCultureColors.oceanDark)),
+              ),
+          ]),
+          const SizedBox(height: 2),
+          Text(widget.destinationName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
+          if (total > 0) ...[
+            const SizedBox(height: 8),
+            Row(children: [
+              for (var i = 0; i < total; i++)
+                Expanded(
+                  child: Container(
+                    height: 5,
+                    margin: EdgeInsets.only(right: i == total - 1 ? 0 : 4),
+                    decoration: BoxDecoration(
+                      color: i < task.questionIndex
+                          ? AppCultureColors.heritageJade
+                          : i == task.questionIndex
+                              ? AppCultureColors.oceanBlue
+                              : AppCultureColors.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+            ]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _navPanel({
+    required String stationName,
+    required int radius,
+    required int? distance,
+    required double? bearing,
+    required bool arrived,
+    required double closeness,
+  }) {
+    // Mũi tên: chỉ hướng tới trạm; khi đang đi thì tính so với hướng đang đi.
+    final arrowAngle = bearing == null ? 0.0 : (bearing - (_heading ?? 0)) * 3.141592653589793 / 180;
+    final directionText = bearing == null
+        ? 'Đang xác định vị trí của bạn...'
+        : _heading != null
+            ? '${turnHint(_heading!, bearing)} · hướng ${compassLabel(bearing)}'
+            : 'Đi về hướng ${compassLabel(bearing)}';
+
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, -2))],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: AppCultureColors.border, borderRadius: BorderRadius.circular(2)),
               ),
               const SizedBox(height: 14),
-            ],
-            const Text('Hãy đến trạm tiếp theo',
-                style: TextStyle(fontSize: 13, color: AppCultureColors.textMuted)),
-            const SizedBox(height: 4),
-            Text(station?.name ?? 'Địa điểm kế tiếp',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, height: 1.25)),
-            const SizedBox(height: 18),
-            if (distance != null) ...[
-              Text(distance >= 1000 ? '${(distance / 1000).toStringAsFixed(1)} km' : '$distance m',
-                  style: const TextStyle(
-                      fontSize: 34, fontWeight: FontWeight.w900, color: AppCultureColors.oceanDark)),
-              const Text('còn cách bạn',
-                  style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
-              if (bearing != null) ...[
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Transform.rotate(
-                      // Mũi tên chỉ hướng tới trạm; khi đang đi thì tính so với hướng đang đi.
-                      angle: ((bearing - (_heading ?? 0)) * 3.141592653589793 / 180),
-                      child: const Icon(Icons.navigation_rounded, color: AppCultureColors.oceanBlue, size: 22),
+              Row(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: arrived ? AppCultureColors.jadeLight : AppCultureColors.oceanLight,
                     ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        _heading != null
-                            ? '${turnHint(_heading!, bearing)} · hướng ${compassLabel(bearing)}'
-                            : 'Đi về hướng ${compassLabel(bearing)}',
-                        style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w700, color: AppCultureColors.oceanDark),
-                      ),
+                    child: arrived
+                        ? const Icon(Icons.where_to_vote_rounded, color: AppCultureColors.heritageJade, size: 34)
+                        : AnimatedRotation(
+                            turns: arrowAngle / (2 * 3.141592653589793),
+                            duration: const Duration(milliseconds: 400),
+                            child: const Icon(Icons.navigation_rounded, color: AppCultureColors.oceanBlue, size: 34),
+                          ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          arrived
+                              ? 'Bạn đã tới trạm'
+                              : distance == null
+                                  ? '— m'
+                                  : formatDistance(distance),
+                          style: TextStyle(
+                            fontSize: arrived ? 22 : 30,
+                            height: 1.1,
+                            fontWeight: FontWeight.w900,
+                            color: arrived ? AppCultureColors.jadeDark : AppCultureColors.oceanDark,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          arrived ? (_busy ? 'Đang mở câu hỏi...' : 'Câu hỏi sẽ tự mở') : directionText,
+                          style: const TextStyle(
+                              fontSize: 13.5, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
               const SizedBox(height: 14),
+              Row(children: [
+                const Icon(Icons.flag_rounded, size: 16, color: AppCultureColors.heritageJade),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(stationName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800, color: AppCultureColors.textDark)),
+                ),
+                Text('Bán kính $radius m',
+                    style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
+              ]),
+              const SizedBox(height: 8),
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
                   value: closeness,
-                  minHeight: 10,
+                  minHeight: 8,
                   backgroundColor: AppCultureColors.surfaceSubtle,
                   color: AppCultureColors.heritageJade,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text('Cần ở trong bán kính $radius m để mở câu hỏi',
-                  style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
-            ] else
-              const Text('Bật định vị để biết bạn còn cách trạm bao xa.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: AppCultureColors.textMuted)),
-            if (_locationMessage != null) ...[
-              const SizedBox(height: 14),
-              _banner(Icons.location_off_rounded, _locationMessage!, const Color(0xFFFEF3C7),
-                  AppCultureColors.rewardText),
-              if (_locationNeedsSettings)
-                TextButton(
-                    onPressed: LocationService.openSettings, child: const Text('Mở cài đặt vị trí')),
+              if (_locationMessage != null) ...[
+                const SizedBox(height: 12),
+                _banner(Icons.location_off_rounded, _locationMessage!, const Color(0xFFFEF3C7),
+                    AppCultureColors.rewardText),
+                if (_locationNeedsSettings)
+                  TextButton(onPressed: LocationService.openSettings, child: const Text('Mở cài đặt vị trí')),
+              ],
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(
+                  child: arrived
+                      ? PrimaryButton(
+                          label: 'Mở câu hỏi',
+                          icon: Icons.quiz_rounded,
+                          loading: _busy,
+                          onPressed: _locateAndOpen,
+                        )
+                      : PrimaryButton(
+                          label: 'Quét QR tại trạm',
+                          icon: Icons.qr_code_scanner_rounded,
+                          loading: _busy,
+                          onPressed: _scanQr,
+                        ),
+                ),
+                const SizedBox(width: 10),
+                _squareAction(
+                  icon: Icons.directions_rounded,
+                  tooltip: 'Chỉ đường bằng Google Maps',
+                  onPressed: _openDirections,
+                ),
+              ]),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton.icon(
+                    onPressed: _busy ? null : _showClue,
+                    icon: const Icon(Icons.lightbulb_outline_rounded, size: 18),
+                    label: const Text('Manh mối'),
+                  ),
+                  TextButton.icon(
+                    onPressed: _busy ? null : _locateAndOpen,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Kiểm tra vị trí'),
+                  ),
+                ],
+              ),
+              MapAttributionText(satellite: _satellite),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _squareAction({required IconData icon, required String tooltip, required VoidCallback onPressed}) {
+    return SizedBox(
+      width: 52,
+      height: 52,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          foregroundColor: AppCultureColors.oceanDark,
+          side: const BorderSide(color: AppCultureColors.oceanBlue),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        child: Tooltip(message: tooltip, child: Icon(icon)),
+      ),
+    );
+  }
+
+  /// Trạm chưa có tọa độ (chỉ mở bằng QR): giao diện thẻ, không có bản đồ.
+  Widget _buildLockedWithoutMap() {
+    final task = _task;
+    final station = task.station;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        SoftCard(
+          elevated: true,
+          padding: const EdgeInsets.all(22),
+          child: Column(children: [
+            Container(
+              width: 84,
+              height: 84,
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppCultureColors.oceanLight),
+              child: const Icon(Icons.qr_code_2_rounded, size: 44, color: AppCultureColors.oceanBlue),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              task.totalQuestions > 0 ? 'Trạm ${task.questionIndex + 1}/${task.totalQuestions}' : 'Trạm kế tiếp',
+              style: const TextStyle(fontSize: 13, color: AppCultureColors.textMuted),
+            ),
+            const SizedBox(height: 4),
+            Text(station?.name ?? 'Địa điểm kế tiếp',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, height: 1.25)),
+            const SizedBox(height: 10),
+            const Text('Tìm mã QR đặt tại trạm và quét để mở câu hỏi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: AppCultureColors.textMuted)),
           ]),
         ),
         const SizedBox(height: 18),
         PrimaryButton(
-          label: 'Cập nhật vị trí của tôi',
-          icon: Icons.my_location_rounded,
+          label: 'Quét QR tại trạm',
+          icon: Icons.qr_code_scanner_rounded,
           loading: _busy,
-          onPressed: _locateAndOpen,
-        ),
-        if (stationPoint != null) ...[
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: _openDirections,
-            icon: const Icon(Icons.directions_walk_rounded),
-            label: const Text('Chỉ đường bằng Google Maps', style: TextStyle(fontWeight: FontWeight.w800)),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              foregroundColor: AppCultureColors.oceanDark,
-              side: const BorderSide(color: AppCultureColors.oceanBlue),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-          ),
-        ],
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: _busy ? null : _scanQr,
-          icon: const Icon(Icons.qr_code_scanner_rounded),
-          label: const Text('Quét QR tại trạm', style: TextStyle(fontWeight: FontWeight.w800)),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            foregroundColor: AppCultureColors.jadeDark,
-            side: const BorderSide(color: AppCultureColors.heritageJade),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
+          onPressed: _scanQr,
         ),
         const SizedBox(height: 6),
         Center(
