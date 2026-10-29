@@ -20,6 +20,7 @@ import { getDevicePosition, describeGeoError } from "@/lib/geolocation";
 import { destinationService } from "../services/destinationService";
 import { regionService } from "../services/regionService";
 import AdministrativeAddressFields from "./AdministrativeAddressFields";
+import CoverImageField from "./CoverImageField";
 
 /**
  * Modal "Cập Nhật Điểm Đến Di Sản" — dùng chung cho Provider & Admin.
@@ -72,6 +73,7 @@ export default function EditDestinationModal({
     latitude: "",
     longitude: "",
     capacity: "",
+    coverImageUrl: "",
   };
   const [form, setForm] = useState(initialForm);
   const [regions, setRegions] = useState([]);
@@ -135,6 +137,7 @@ export default function EditDestinationModal({
               dest.longitude != null ? String(dest.longitude) : "",
             capacity:
               dest.capacity != null ? String(dest.capacity) : "",
+            coverImageUrl: dest.coverImageUrl ?? "",
           });
         })
         .catch((err) => {
@@ -287,6 +290,7 @@ export default function EditDestinationModal({
         latitude: Number(form.latitude),
         longitude: Number(form.longitude),
         capacity: parseInt(form.capacity, 10),
+        coverImageUrl: form.coverImageUrl,
       };
       const updated = await destinationService.update(destinationId, payload);
       setUpdatedItem(updated);
@@ -648,6 +652,14 @@ export default function EditDestinationModal({
                   </p>
                 )}
               </div>
+
+              {/* ── Ảnh bìa ───────────────────────────────── */}
+              <CoverImageField
+                value={form.coverImageUrl}
+                onChange={(url) => handleChange("coverImageUrl", url)}
+                disabled={loading}
+                iconClassName={palette.icon}
+              />
 
               {/* ── Cảnh báo trạng thái duyệt ─────────────── */}
               <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
