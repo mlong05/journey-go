@@ -175,6 +175,7 @@ public class DestinationService {
                 .latitude(request.latitude())
                 .longitude(request.longitude())
                 .capacity(request.capacity())
+                .coverImageUrl(blankToNull(request.coverImageUrl()))
                 .booked(0)
                 .approved(false)
                 .region(region)
@@ -219,6 +220,10 @@ public class DestinationService {
         existing.setLatitude(request.latitude());
         existing.setLongitude(request.longitude());
         existing.setCapacity(request.capacity());
+        // null = client không gửi ảnh bìa (giữ nguyên); chuỗi rỗng = bỏ ảnh
+        if (request.coverImageUrl() != null) {
+            existing.setCoverImageUrl(blankToNull(request.coverImageUrl()));
+        }
         existing.setRegion(region);
         existing.setThemes(themes);
 
@@ -226,6 +231,10 @@ public class DestinationService {
         moderationService.submitAfterEdit(saved.getId(), callerId, callerRole);
         log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
         return DestinationResponse.fromEntity(saved);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     /** Soft-delete a destination by id (cascades soft-delete to contents). */
