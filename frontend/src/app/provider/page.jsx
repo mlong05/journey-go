@@ -15,7 +15,6 @@ import {
   Edit3,
   Eye,
   ChevronRight,
-  QrCode,
   Inbox,
   Plus,
   FileCheck,
@@ -29,6 +28,7 @@ import {
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { destinationService } from "@/features/destination";
+import { tourService, TOUR_STATUS_META } from "@/features/tour";
 import {
   PageHeader,
   StatusChip,
@@ -58,8 +58,8 @@ export default function ProviderOverviewPage() {
   // Dynamic Danh sách điểm đến do đối tác quản lý
   const [managedDestinations, setManagedDestinations] = useState([]);
 
-  // Dynamic Danh sách lộ trình văn hóa
-  const [activeRoutes, setActiveRoutes] = useState([]);
+  // Tour do đối tác tạo (GET /tours/my)
+  const [myTours, setMyTours] = useState([]);
 
   // Dynamic Tiến độ kiểm duyệt nội dung
   const [moderationUpdates, setModerationUpdates] = useState([]);
@@ -73,8 +73,12 @@ export default function ProviderOverviewPage() {
 
     async function loadData() {
       try {
-        const dests = await destinationService.getAll();
+        const [dests, tours] = await Promise.all([
+          destinationService.getAll(),
+          tourService.getMy().catch(() => []),
+        ]);
         if (!isSubscribed) return;
+        setMyTours(Array.isArray(tours) ? tours : []);
 
         const list = Array.isArray(dests) ? dests : [];
         const formatted = list.map((d) => ({
@@ -83,12 +87,8 @@ export default function ProviderOverviewPage() {
           address: d.address || "Chưa cập nhật địa chỉ",
           status: d.approved ? "published" : "pending",
           statusLabel: d.approved ? "Đang hoạt động" : "Chờ phê duyệt",
-          capacity: d.capacity || 500,
           latitude: d.latitude,
           longitude: d.longitude,
-          checkinsToday: Math.floor(Math.random() * 45) + (d.approved ? 80 : 0),
-          rating: (4.8 + Math.random() * 0.2).toFixed(1),
-          image: d.image || "/image/vanmieu.png",
         }));
 
         setManagedDestinations(formatted);
@@ -303,7 +303,6 @@ export default function ProviderOverviewPage() {
               <tr className="bg-slate-50/70 border-b border-slate-200 text-xs font-semibold text-slate-600">
                 <th className="py-3 px-5">Điểm đến</th>
                 <th className="py-3 px-4">Tọa độ GPS</th>
-                <th className="py-3 px-4">Check-in</th>
                 <th className="py-3 px-4">Trạng thái</th>
                 <th className="py-3 px-5 text-right">Thao tác</th>
               </tr>
@@ -311,7 +310,7 @@ export default function ProviderOverviewPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredDestinations.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={4}>
                     <EmptyBlock
                       icon={Inbox}
                       title="Chưa có điểm đến di tích nào trong danh sách."
@@ -339,12 +338,6 @@ export default function ProviderOverviewPage() {
                       <span className="inline-flex items-center gap-1.5 font-mono text-xs text-slate-600">
                         <Navigation size={12} className="text-slate-400 shrink-0" />
                         {dest.latitude ?? "—"}, {dest.longitude ?? "—"}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center gap-1.5 font-bold text-slate-800 tabular-nums">
-                        <QrCode size={14} className="text-slate-400" />
-                        {(dest.checkinsToday || 0).toLocaleString()} lượt
                       </span>
                     </td>
                     <td className="py-3.5 px-4">
@@ -379,18 +372,18 @@ export default function ProviderOverviewPage() {
 
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 pb-6">
         <Panel
-          id="routes"
+          id="tours"
           className="lg:col-span-7"
-          title="Lộ trình văn hóa đang kích hoạt"
-          description="Liên kết các điểm di tích thành tour chuyên đề"
+          title="Tour của bạn"
+          description="Hành trình nối các điểm di tích, du khách đặt và trải nghiệm"
           icon={Compass}
           tone="indigo"
           action={
             <Link
-              href="/provider/routes/builder"
+              href="/provider/tours"
               className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900"
             >
-              Tạo lộ trình mới <ChevronRight size={13} />
+              Quản lý tour <ChevronRight size={13} />
             </Link>
           }
           footer={
@@ -400,11 +393,33 @@ export default function ProviderOverviewPage() {
             </div>
           }
         >
-          <EmptyBlock
-            icon={Compass}
-            title="Chưa có lộ trình văn hóa nào được tạo."
-            description="Dùng công cụ thiết kế lộ trình để liên kết các điểm di tích thành tour chuyên đề số hóa."
-          />
+          {myTours.length === 0 ? (
+            <EmptyBlock
+              icon={Compass}
+              title="Bạn chưa có tour nào."
+              description="Vào Quản lý tour để nối các điểm đến thành hành trình và gửi duyệt."
+            />
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {myTours.slice(0, 6).map((t) => {
+                const meta = TOUR_STATUS_META[t.status] ?? TOUR_STATUS_META.DRAFT;
+                return (
+                  <li key={t.tourId ?? t.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-slate-900">{t.title || "Tour chưa đặt tên"}</p>
+                      <p className="text-xs text-slate-500">
+                        {(t.destinations?.length ?? t.destinationCount ?? 0)} điểm đến
+                        {t.durationDays ? ` · ${t.durationDays} ngày` : ""}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-bold ${meta.cls}`}>
+                      {meta.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Panel>
 
         <div className="lg:col-span-5 flex flex-col gap-5">

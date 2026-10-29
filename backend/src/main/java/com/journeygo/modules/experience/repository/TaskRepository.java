@@ -3,6 +3,7 @@ package com.journeygo.modules.experience.repository;
 import com.journeygo.modules.experience.entity.Task;
 import com.journeygo.modules.experience.entity.enums.TaskStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -35,4 +36,14 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             WHERE t.id = :id
             """)
     Optional<Task> findByIdWithOwner(@Param("id") Long id);
+
+    /**
+     * Đổi trạng thái mọi Task của một Experience đang ở {@code from} sang {@code to}.
+     * Task INACTIVE (đã xoá mềm) không bao giờ khớp nên không bị đụng tới.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("UPDATE Task t SET t.status = :to WHERE t.experience.id = :experienceId AND t.status = :from")
+    int updateStatusByExperience(@Param("experienceId") Long experienceId,
+                                 @Param("from") TaskStatus from,
+                                 @Param("to") TaskStatus to);
 }

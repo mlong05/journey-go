@@ -179,7 +179,24 @@ export async function restoreDestination(id) {
   return unwrap(res);
 }
 
+/**
+ * Mã QR check-in của điểm đến (chủ điểm đến / ADMIN / MODERATOR). Không có trong API công khai.
+ * GET /api/v1/destinations/{id}/qr → { destinationId, destinationName, qrToken }
+ */
+export async function getDestinationQr(id) {
+  const res = await apiClient.get(`${ENDPOINTS.BY_ID(id)}/qr`);
+  return unwrap(res);
+}
+
+/** Tạo mã QR mới khi mã cũ bị lộ; mã cũ hết hiệu lực ngay. POST /api/v1/destinations/{id}/qr/regenerate */
+export async function regenerateDestinationQr(id) {
+  const res = await apiClient.post(`${ENDPOINTS.BY_ID(id)}/qr/regenerate`);
+  return unwrap(res);
+}
+
 export const destinationService = {
+  getQr: getDestinationQr,
+  regenerateQr: regenerateDestinationQr,
   create: createDestination,
   update: updateDestination,
   submit: submitDestination,

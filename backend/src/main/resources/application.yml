@@ -123,6 +123,10 @@ app:
     settlement-grace-minutes: ${SETTLEMENT_GRACE_MINUTES:0}
     # Cho phép tạo settlement cho kỳ chưa kết thúc hay không (mặc định false).
     allow-open-period-settlement: ${ALLOW_OPEN_PERIOD_SETTLEMENT:false}
+    # Đặt tour vào ngày Provider chưa mở slot: true = tự mở slot (sức chứa bên dưới),
+    # false = báo "chưa mở bán". Bật để du khách đặt được ngay khi Provider chưa cấu hình lịch.
+    auto-open-slots: ${BOOKING_AUTO_OPEN_SLOTS:true}
+    auto-open-slot-capacity: ${BOOKING_AUTO_OPEN_SLOT_CAPACITY:50}
     # Số giây giữa các lần quét Booking quá hạn thanh toán.
     booking-expiry-scan-interval-seconds: ${BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS:60}
     # Số giây giữa các lần kiểm tra trạng thái Refund đang chờ kết quả từ VNPay.

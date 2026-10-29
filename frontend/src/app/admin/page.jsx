@@ -18,13 +18,13 @@ import {
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SURFACE, TABLE, BADGE, BUTTON, MODAL } from "./dashboard.tokens";
-import { PageHeader, StatusChip, StatCard } from "@/components/dashboard/DashboardUI";
+import { PageHeader, StatCard } from "@/components/dashboard/DashboardUI";
 
 // Màu nhấn & liên kết của từng thẻ KPI
 const KPI_META = {
   users: { tone: "sky", href: "/admin/users" },
   destinations: { tone: "emerald", href: "/admin/destinations" },
-  checkins: { tone: "amber", href: "/admin/analytics" },
+  checkins: { tone: "amber", href: "/admin/bookings" },
   gmv: { tone: "rose", href: "/admin/finance" },
 };
 
@@ -192,16 +192,9 @@ export default function AdminDashboardPage() {
         eyebrow="Quản trị"
         title="Tổng quan vận hành"
         description="Theo dõi người dùng, điểm đến, lượt kích hoạt và doanh số toàn sàn JourneyGo."
-        meta={
-          <>
-            <StatusChip tone="emerald">Cổng thanh toán: ổn định</StatusChip>
-            <StatusChip tone="sky">Bản đồ &amp; GPS: 99.98% uptime</StatusChip>
-            <StatusChip tone="amber">Kiểm toán &amp; phân quyền: kích hoạt</StatusChip>
-          </>
-        }
       >
-        <Link href="/admin/analytics" className={BUTTON.secondary}>
-          Báo cáo tăng trưởng
+        <Link href="/admin/payments" className={BUTTON.secondary}>
+          Giao dịch VNPay
         </Link>
         <Link href="/admin/finance" className={BUTTON.primary}>
           Tài chính &amp; thanh toán

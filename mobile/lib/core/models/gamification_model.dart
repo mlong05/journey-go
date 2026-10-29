@@ -62,6 +62,34 @@ class UserPointModel {
       );
 }
 
+/// Huy hiệu đã nhận (GET /gamification/badges/my).
+class UserBadgeModel {
+  final int id;
+  final String name;
+  final String description;
+  final String iconUrl;
+  final String badgeType;
+  final DateTime? earnedAt;
+
+  const UserBadgeModel({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.iconUrl,
+    required this.badgeType,
+    required this.earnedAt,
+  });
+
+  factory UserBadgeModel.fromJson(Map<String, dynamic> json) => UserBadgeModel(
+        id: _asInt(json['badgeId']),
+        name: json['badgeName']?.toString() ?? '',
+        description: json['badgeDescription']?.toString() ?? '',
+        iconUrl: json['badgeIconUrl']?.toString() ?? '',
+        badgeType: json['badgeType']?.toString() ?? '',
+        earnedAt: _parseDate(json['earnedAt']),
+      );
+}
+
 class PointTransactionModel {
   final int id;
   final int amount;

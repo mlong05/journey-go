@@ -381,11 +381,17 @@ export default function AuthScreen({ initialTab = "login" }) {
     }
   };
 
-  // Khởi tạo Google Identity Services: chỉ gọi initialize() để có thể dùng
-  // prompt() khi người dùng bấm nút. KHÔNG dùng renderButton() vì nút chính
-  // thức của Google sẽ render lại mỗi lần đổi role gây nhấp nháy text
-  // (đổi qua lại giữa "Sign in with Google" và "Đăng nhập với Google").
-  // Thay vào đó, dùng nút custom "Đăng nhập với Google" trong SocialLoginButtons.
+  // Khởi tạo Google Identity Services MỘT LẦN và render nút đăng nhập chính thức của Google
+  // vào một vùng ẩn. Nút tùy chỉnh của giao diện sẽ kích hoạt nút ẩn này (popup chuẩn).
+  // Không dùng One Tap (prompt) làm luồng chính vì bị FedCM hủy / Google tạm khóa sau khi
+  // người dùng đóng, và gọi initialize() nhiều lần sẽ hủy yêu cầu đang chạy.
+  const googleButtonRef = useRef(null);
+  const googleCallbackRef = useRef(handleGoogleCredentialResponse);
+  useEffect(() => {
+    // Luôn gọi bản handler mới nhất (handler đọc state của component).
+    googleCallbackRef.current = handleGoogleCredentialResponse;
+  });
+
   useEffect(() => {
     let attempts = 0;
     let timer;
@@ -398,12 +404,23 @@ export default function AuthScreen({ initialTab = "login" }) {
         return true; // không có clientId thì khỏi retry
       }
       try {
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: handleGoogleCredentialResponse,
-          auto_select: false,
-        });
-        googleInitializedRef.current = true;
+        if (!googleInitializedRef.current) {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: (response) => googleCallbackRef.current(response),
+            auto_select: false,
+          });
+          googleInitializedRef.current = true;
+        }
+        if (googleButtonRef.current) {
+          googleButtonRef.current.innerHTML = "";
+          window.google.accounts.id.renderButton(googleButtonRef.current, {
+            type: "standard",
+            theme: "outline",
+            size: "large",
+            width: 240,
+          });
+        }
         return true;
       } catch (e) {
         console.warn("[Google GIS Init Error]", e);
@@ -423,7 +440,6 @@ export default function AuthScreen({ initialTab = "login" }) {
     return () => {
       if (timer) clearInterval(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleGoogleClick = () => {
@@ -438,15 +454,21 @@ export default function AuthScreen({ initialTab = "login" }) {
       return;
     }
 
+    // Kích hoạt nút chính thức của Google đã render ẩn (popup đăng nhập chuẩn).
+    const nativeButton =
+      googleButtonRef.current?.querySelector('div[role="button"]') ||
+      googleButtonRef.current?.querySelector("iframe");
+    if (nativeButton && typeof nativeButton.click === "function") {
+      nativeButton.click();
+      return;
+    }
+
+    // Dự phòng: One Tap, KHÔNG gọi lại initialize().
     try {
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleCredentialResponse,
-        auto_select: false,
-      });
       window.google.accounts.id.prompt();
     } catch (err) {
       console.error("[Google OAuth Prompt Error]", err);
+      showToast("error", "Không mở được cửa sổ đăng nhập Google. Vui lòng thử lại.");
     }
   };
 
@@ -646,6 +668,13 @@ export default function AuthScreen({ initialTab = "login" }) {
           <HeritageLandmarksArt />
         </div>
       </div>
+
+      {/* Nút Google chính thức (ẩn): nút tùy chỉnh bên trên sẽ kích hoạt nó */}
+      <div
+        ref={googleButtonRef}
+        aria-hidden="true"
+        style={{ position: "fixed", left: -9999, top: 0, width: 240, height: 44, opacity: 0 }}
+      />
 
       {/* Tải thư viện Google Identity Services (GSI) */}
       <Script

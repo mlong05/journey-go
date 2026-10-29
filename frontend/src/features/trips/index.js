@@ -12,7 +12,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { apiClient } from "@/services/apiClient";
+import { ROUTES } from "@/constants/routes";
 
 const ENDPOINT = "/tours/published";
 
@@ -112,7 +114,10 @@ export function TripCard({ trip }) {
   const durationDays = Number(trip?.durationDays ?? 0);
 
   return (
-    <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+    <Link
+      href={ROUTES.TRIP_DETAIL(trip?.tourId ?? trip?.id)}
+      className="block rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+    >
       <div className="flex items-center justify-between gap-3">
         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
           {typeLabel}
@@ -141,7 +146,7 @@ export function TripCard({ trip }) {
       {trip?.createdBy && (
         <p className="mt-3 truncate text-xs text-gray-500">{trip.createdBy}</p>
       )}
-    </article>
+    </Link>
   );
 }
 

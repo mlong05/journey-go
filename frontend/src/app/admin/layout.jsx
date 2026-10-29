@@ -8,11 +8,11 @@ import {
   Users,
   MapPin,
   CreditCard,
-  BarChart3,
-  ShieldAlert,
   Settings,
   Bell,
   Route,
+  Receipt,
+  Wallet,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -57,17 +57,17 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
-    id: "analytics",
-    label: "Báo cáo tăng trưởng",
-    href: "/admin/analytics",
-    icon: BarChart3,
+    id: "bookings",
+    label: "Đơn đặt tour",
+    href: "/admin/bookings",
+    icon: Receipt,
     badge: null,
   },
   {
-    id: "audit-logs",
-    label: "Nhật ký kiểm toán",
-    href: "/admin/audit-logs",
-    icon: ShieldAlert,
+    id: "payments",
+    label: "Giao dịch VNPay",
+    href: "/admin/payments",
+    icon: Wallet,
     badge: null,
   },
   {

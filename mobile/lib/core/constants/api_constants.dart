@@ -33,6 +33,23 @@ class ApiConstants {
   // Vai trò cho phép trên Mobile Tourist App
   static const String requiredRole = 'USER';
 
+  // Thanh toán giả lập để thử luồng trải nghiệm khi backend chưa chạy VNPay.
+  // Chỉ bật khi dev: MOCK_PAYMENT=true trong .env, hoặc --dart-define=MOCK_PAYMENT=true.
+  // Booking trên server KHÔNG bị đổi trạng thái, chỉ giao diện coi như đã thanh toán.
+  static bool get mockPayment {
+    final fromEnv = dotenv.maybeGet('MOCK_PAYMENT');
+    if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv.toLowerCase() == 'true';
+    return const bool.fromEnvironment('MOCK_PAYMENT');
+  }
+
+  // Web Client ID: audience của idToken gửi lên backend (serverClientId của google_sign_in).
+  // Cùng giá trị với NEXT_PUBLIC_GOOGLE_CLIENT_ID của frontend.
+  static String get googleWebClientId {
+    final fromEnv = dotenv.maybeGet('GOOGLE_WEB_CLIENT_ID');
+    if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
+    return const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+  }
+
   // Google OAuth Client ID - ƯU TIÊN:
   //   1. File .env (khuyến nghị cho dev)
   //   2. --dart-define=GOOGLE_ANDROID_CLIENT_ID=... (CI/CD)

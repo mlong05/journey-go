@@ -5,9 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   MapPin,
-  Compass,
   Trophy,
-  BarChart3,
   FileCheck,
   Bell,
   CheckCircle2,
@@ -71,22 +69,10 @@ export default function ProviderLayout({ children }) {
       icon: MapPin,
     },
     {
-      id: "routes",
-      label: "Lộ trình Văn hóa",
-      href: "/provider/routes/builder",
-      icon: Compass,
-    },
-    {
       id: "missions",
       label: "Nhiệm vụ & Đố vui",
       href: "/provider/tasks/create",
       icon: Trophy,
-    },
-    {
-      id: "revenue",
-      label: "Báo cáo Thu nhập",
-      href: "/provider/reports",
-      icon: BarChart3,
     },
     {
       id: "reviews",

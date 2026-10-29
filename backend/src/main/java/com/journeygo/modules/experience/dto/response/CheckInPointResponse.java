@@ -34,4 +34,10 @@ public record CheckInPointResponse(
                 .createdAt(c.getCreatedAt())
                 .build();
     }
+
+    /** Bản trả cho du khách / khách vãng lai: giữ vị trí trạm, bỏ mã QR (mã chỉ có tại thực địa). */
+    public CheckInPointResponse withoutQrToken() {
+        return new CheckInPointResponse(id, experienceId, name, latitude, longitude, radiusMeters,
+                null, sequenceOrder, createdAt);
+    }
 }

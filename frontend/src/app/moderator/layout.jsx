@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   MapPin,
-  BookOpen,
   MessageSquare,
   History,
   LogOut,
@@ -68,13 +67,6 @@ export default function ModeratorLayout({ children }) {
       badge: null,
     },
 
-    {
-      id: "heritage-knowledge",
-      label: "Chuẩn hóa Thuyết minh Di sản",
-      href: "/moderator/ai-auditing",
-      icon: BookOpen,
-      badge: null,
-    },
     {
       id: "community-media",
       label: "Duyệt Bài Cộng đồng",

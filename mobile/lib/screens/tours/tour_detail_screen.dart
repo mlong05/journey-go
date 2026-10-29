@@ -4,7 +4,10 @@ import '../../core/models/experience_model.dart';
 import '../../core/models/gamification_model.dart' show formatThousands;
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
+import '../../core/services/booking_service.dart';
 import '../../core/services/tour_service.dart';
+import '../bookings/booking_checkout_screen.dart';
+import '../culture/cultural_stories.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
 import 'tour_style.dart';
 
@@ -20,6 +23,13 @@ class TourDetailScreen extends StatefulWidget {
 
 class _TourDetailScreenState extends State<TourDetailScreen> {
   final TourService _service = TourService();
+  final BookingService _bookingService = BookingService();
+
+  // Chặn bấm "Đặt tour" nhiều lần trong lúc đang tạo booking.
+  bool _bookingInProgress = false;
+
+  // Các điểm đến đang mở phần "Câu chuyện văn hóa" (chỉ tải khi mở).
+  final Set<int> _openStories = {};
 
   late TourModel _tour = widget.tour;
   // Trải nghiệm theo destinationId; null nghĩa là điểm đó tải lỗi.
@@ -65,14 +75,35 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   int get _totalExperiences =>
       _experiences.values.fold(0, (sum, list) => sum + (list?.length ?? 0));
 
-  void _onBook() {
-    // Thanh toán được nối ở bước tiếp theo của lộ trình làm app.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Tính năng đặt tour và thanh toán sẽ sớm được mở.'),
-        behavior: SnackBarBehavior.floating,
-      ),
+  /// Chọn ngày, tạo booking (giữ chỗ 10 phút) rồi sang màn thanh toán.
+  Future<void> _onBook() async {
+    if (_bookingInProgress) return;
+    final today = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: today,
+      firstDate: DateTime(today.year, today.month, today.day),
+      lastDate: today.add(const Duration(days: 365)),
+      helpText: 'Chọn ngày trải nghiệm',
     );
+    if (picked == null || !mounted) return;
+
+    setState(() => _bookingInProgress = true);
+    try {
+      final booking = await _bookingService.create(tourId: _tour.id, experienceDate: picked);
+      if (!mounted) return;
+      // Đơn chưa thanh toán vẫn nằm ở "Đơn đặt tour > Chờ thanh toán" nếu khách thoát giữa chừng.
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => BookingCheckoutScreen(bookingId: booking.id)),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), behavior: SnackBarBehavior.floating),
+      );
+    } finally {
+      if (mounted) setState(() => _bookingInProgress = false);
+    }
   }
 
   @override
@@ -293,6 +324,41 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                     const Divider(height: 1, color: AppCultureColors.borderLight),
                     const SizedBox(height: 10),
                     ..._buildExperienceRows(experiences),
+                    const SizedBox(height: 6),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => setState(() {
+                        if (!_openStories.remove(d.destinationId)) _openStories.add(d.destinationId);
+                      }),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.auto_stories_rounded,
+                                size: 17, color: AppCultureColors.amberDark),
+                            const SizedBox(width: 6),
+                            const Expanded(
+                              child: Text(
+                                'Câu chuyện văn hóa',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppCultureColors.amberDark,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              _openStories.contains(d.destinationId)
+                                  ? Icons.expand_less_rounded
+                                  : Icons.expand_more_rounded,
+                              color: AppCultureColors.amberDark,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_openStories.contains(d.destinationId))
+                      CulturalStoriesSection(destinationId: d.destinationId),
                   ],
                 ),
               ),
@@ -482,9 +548,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               ),
             ),
             FilledButton.icon(
-              onPressed: _onBook,
+              onPressed: _bookingInProgress ? null : _onBook,
               icon: const Icon(Icons.confirmation_number_outlined, size: 19),
-              label: const Text('Đặt tour', style: TextStyle(fontWeight: FontWeight.w800)),
+              label: Text(_bookingInProgress ? 'Đang giữ chỗ...' : 'Đặt tour',
+                  style: const TextStyle(fontWeight: FontWeight.w800)),
               style: FilledButton.styleFrom(
                 backgroundColor: AppCultureColors.heritageJade,
                 minimumSize: const Size(150, 50),

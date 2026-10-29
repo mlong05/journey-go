@@ -3,14 +3,13 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/auth_models.dart';
 import '../../core/models/destination_model.dart';
 import '../../core/models/experience_model.dart';
-import '../../core/models/journey_model.dart';
+import '../../core/models/tour_journey_model.dart';
 import '../../core/services/destination_service.dart';
 import '../../core/services/experience_service.dart';
-import '../../core/services/user_data_service.dart';
-import '../modals/checkin_modal.dart';
-import '../modals/mission_modal.dart';
+import '../../core/services/progress_service.dart';
+import '../journey/journey_launcher.dart';
+import '../journey/task_screen.dart';
 import '../modals/notification_dialog.dart';
-import '../modals/payment_modal.dart';
 
 class HomeTab extends StatefulWidget {
   final UserModel currentUser;
@@ -29,13 +28,13 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   final DestinationService _destinationService = DestinationService();
   final ExperienceService _experienceService = ExperienceService();
-  final UserDataService _userDataService = UserDataService();
+  final ProgressService _progress = ProgressService();
 
   List<DestinationModel> _destinations = [];
   List<ExperienceModel> _experiences = [];
-  List<ActiveMission> _missions = [];
-  int _userPoints = 350;
-  int _badgeCount = 4;
+  List<JourneyMission> _missions = [];
+  int _userPoints = 0;
+  int _badgeCount = 0;
   bool _isLoading = true;
   bool _hasUnreadNotification = true;
 
@@ -48,12 +47,21 @@ class _HomeTabState extends State<HomeTab> {
   Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
 
-    final results = await Future.wait([
+    // Điểm, huy hiệu, nhiệm vụ lấy từ backend; lỗi một mục không làm hỏng cả trang.
+    Future<T> safe<T>(Future<T> Function() load, T fallback) async {
+      try {
+        return await load();
+      } catch (_) {
+        return fallback;
+      }
+    }
+
+    final results = await Future.wait<Object>([
       _destinationService.getApprovedDestinations(),
       _experienceService.getPublishedExperiences(),
-      _userDataService.getUserPoints(),
-      _userDataService.getBadges(),
-      _userDataService.getMissions(),
+      safe<int>(_progress.getPoints, 0),
+      safe(() async => (await _progress.getBadges()).length, 0),
+      safe<List<JourneyMission>>(_progress.getMissions, const []),
     ]);
 
     if (mounted) {
@@ -61,61 +69,35 @@ class _HomeTabState extends State<HomeTab> {
         _destinations = results[0] as List<DestinationModel>;
         _experiences = (results[1] as List<ExperienceModel>).where((e) => e.isPublished).toList();
         _userPoints = results[2] as int;
-        _badgeCount = (results[3] as List<BadgeItem>).where((b) => b.isUnlocked).length;
-        _missions = results[4] as List<ActiveMission>;
+        _badgeCount = results[3] as int;
+        _missions = results[4] as List<JourneyMission>;
         _isLoading = false;
       });
     }
   }
 
-  void _openCheckInModal(String mode) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => CheckInModal(
-        initialTab: mode,
-        destinations: _destinations,
-        onCheckInSuccess: _loadAllData,
-      ),
-    );
+  /// Check-in thật: mở hành trình đang đi ([qr] = quét QR thay vì GPS).
+  Future<void> _openCheckIn({bool qr = false}) async {
+    await openActiveJourney(context, qr: qr);
+    if (mounted) _loadAllData();
   }
 
-  void _openMissionModal(ActiveMission mission) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => MissionModal(
-        mission: mission,
-        onMissionCompleted: _loadAllData,
+  Future<void> _openMission(JourneyMission mission) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => TaskScreen(
+          journeyId: mission.journeyId,
+          taskId: mission.taskId,
+          fallbackName: mission.title,
+          destinationName: mission.siteName,
+        ),
       ),
     );
+    if (mounted) _loadAllData();
   }
 
-  void _openPaymentModal(DestinationModel route) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => PaymentModal(
-        route: route,
-        onPaymentSuccess: _loadAllData,
-      ),
-    );
-  }
-
-  void _openExperiencePaymentModal(ExperienceModel exp) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => PaymentModal(
-        experience: exp,
-        onPaymentSuccess: _loadAllData,
-      ),
-    );
-  }
+  /// Đặt tour diễn ra ở tab Khám phá (danh sách tour và đặt chỗ thật).
+  void _goToTours() => widget.onNavigateToTab(1);
 
   void _openNotificationDialog() {
     showModalBottomSheet(
@@ -514,7 +496,7 @@ class _HomeTabState extends State<HomeTab> {
               // Định vị GPS button
               Expanded(
                 child: InkWell(
-                  onTap: () => _openCheckInModal('gps'),
+                  onTap: () => _openCheckIn(),
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     height: 48,
@@ -555,7 +537,7 @@ class _HomeTabState extends State<HomeTab> {
               // Quét mã QR button
               Expanded(
                 child: InkWell(
-                  onTap: () => _openCheckInModal('qr'),
+                  onTap: () => _openCheckIn(qr: true),
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     height: 48,
@@ -866,7 +848,7 @@ class _HomeTabState extends State<HomeTab> {
                       ],
                     ),
                     InkWell(
-                      onTap: () => _openExperiencePaymentModal(exp),
+                      onTap: _goToTours,
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -875,7 +857,7 @@ class _HomeTabState extends State<HomeTab> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Text(
-                          'Đặt vé',
+                          'Xem tour',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -971,7 +953,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _buildRouteHorizontalCard(DestinationModel route) {
     return GestureDetector(
-      onTap: () => _openPaymentModal(route),
+      onTap: _goToTours,
       child: Container(
         width: 220,
         margin: const EdgeInsets.only(right: 14),
@@ -1142,7 +1124,7 @@ class _HomeTabState extends State<HomeTab> {
             ),
             GestureDetector(
               onTap: () {
-                if (_missions.isNotEmpty) _openMissionModal(_missions.first);
+                if (_missions.isNotEmpty) _openMission(_missions.first);
               },
               child: const Row(
                 children: [
@@ -1163,9 +1145,23 @@ class _HomeTabState extends State<HomeTab> {
 
         const SizedBox(height: 12),
 
+        if (_missions.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppCultureColors.border),
+            ),
+            child: const Text(
+              'Chưa có nhiệm vụ. Hãy check-in tại điểm đến trong hành trình của bạn để mở nhiệm vụ.',
+              style: TextStyle(fontSize: 13, height: 1.45, color: AppCultureColors.textMuted),
+            ),
+          ),
         ..._missions.map((m) {
           return GestureDetector(
-            onTap: () => _openMissionModal(m),
+            onTap: () => _openMission(m),
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(14),
@@ -1227,7 +1223,7 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ),
                     child: Text(
-                      m.isCompleted ? 'Đã xong' : '+${m.rewardPoints} pts',
+                      m.isCompleted ? 'Đã xong' : 'Làm ngay',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,

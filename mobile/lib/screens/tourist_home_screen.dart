@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/constants/app_colors.dart';
 import '../core/models/auth_models.dart';
-import '../core/models/destination_model.dart';
-import '../core/services/destination_service.dart';
-import 'modals/checkin_modal.dart';
+import 'journey/journey_launcher.dart';
 import 'tabs/community_tab.dart';
 import 'tabs/explore_tab.dart';
 import 'tabs/home_tab.dart';
@@ -25,37 +23,15 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> {
   late UserModel _currentUser;
   int _currentIndex = 0; // 0: Home, 1: Explore, 2: Community, 3: Profile
 
-  final DestinationService _destinationService = DestinationService();
-  List<DestinationModel> _destinations = [];
 
   @override
   void initState() {
     super.initState();
     _currentUser = widget.initialUser;
-    _loadDestinations();
   }
 
-  Future<void> _loadDestinations() async {
-    final list = await _destinationService.getApprovedDestinations();
-    if (mounted) {
-      setState(() => _destinations = list);
-    }
-  }
-
-  void _openCheckInModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => CheckInModal(
-        initialTab: 'qr',
-        destinations: _destinations,
-        onCheckInSuccess: () {
-          setState(() {});
-        },
-      ),
-    );
-  }
+  /// Check-in thật: mở hành trình đang đi và quét QR tại điểm đến hiện tại.
+  void _openCheckIn() => openActiveJourney(context, qr: true);
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +81,7 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: _openCheckInModal,
+          onTap: _openCheckIn,
           customBorder: const CircleBorder(),
           child: const Column(
             mainAxisAlignment: MainAxisAlignment.center,

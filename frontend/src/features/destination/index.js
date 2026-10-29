@@ -9,4 +9,5 @@ export { default as RegionManagerModal } from "./components/RegionManagerModal";
 export { default as CulturalContentManagerModal } from "./components/CulturalContentManagerModal";
 export { default as DestinationAssessmentModal } from "./components/DestinationAssessmentModal";
 export { default as RejectDestinationDialog } from "./components/RejectDestinationDialog";
+export { default as DestinationQrModal } from "./components/DestinationQrModal";
 

@@ -73,7 +73,7 @@ public class RealTourInfoProvider implements TourInfoProvider {
                     d.getLatitude(),
                     d.getLongitude(),
                     DEFAULT_DESTINATION_RADIUS_METERS,
-                    null, // điểm đến chưa có mã QR riêng; check-in tại điểm đến dùng GPS
+                    d.getQrToken(), // mã QR dán tại cổng: check-in thay GPS
                     tasks
             ));
         }
