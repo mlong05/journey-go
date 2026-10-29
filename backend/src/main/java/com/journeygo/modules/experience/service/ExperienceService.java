@@ -7,6 +7,7 @@ import com.journeygo.modules.experience.dto.request.UpdateExperienceRequest;
 import com.journeygo.modules.experience.dto.response.ExperienceResponse;
 import com.journeygo.modules.experience.entity.Experience;
 import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
+import com.journeygo.modules.experience.entity.enums.TaskStatus;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
 import com.journeygo.modules.experience.repository.ExperienceRepository;
@@ -218,6 +219,16 @@ public class ExperienceService {
             e.setStatus(newStatus);
             experienceRepository.save(e);
             log.info("Experience id={} status: {} → {}", id, old, newStatus);
+        }
+
+        // Nhiệm vụ đi theo trạng thái của Experience: hành trình của du khách chỉ dùng Task PUBLISHED,
+        // còn sửa nhiệm vụ / câu hỏi / đáp án cần Task DRAFT. Chạy cả khi trùng status để sửa dữ liệu lệch.
+        int synced = newStatus == ExperienceStatus.PUBLISHED
+                ? taskRepository.updateStatusByExperience(e.getId(), TaskStatus.DRAFT, TaskStatus.PUBLISHED)
+                : taskRepository.updateStatusByExperience(e.getId(), TaskStatus.PUBLISHED, TaskStatus.DRAFT);
+        if (synced > 0) {
+            log.info("Experience id={}: chuyển {} nhiệm vụ sang {}", id, synced,
+                    newStatus == ExperienceStatus.PUBLISHED ? TaskStatus.PUBLISHED : TaskStatus.DRAFT);
         }
 
         int taskCount = (int) taskRepository.countByExperienceId(e.getId());

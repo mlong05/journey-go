@@ -117,7 +117,10 @@ class ApiClient {
       }
 
       if (!response.ok) {
-        throw new Error(data?.message || `HTTP error! status: ${response.status}`);
+        const apiError = new Error(data?.message || `HTTP error! status: ${response.status}`);
+        apiError.status = response.status;
+        apiError.code = data?.code;
+        throw apiError;
       }
 
       return data;

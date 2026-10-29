@@ -31,6 +31,7 @@ import {
   Trophy,
   Send,
   XCircle,
+  QrCode,
 } from "lucide-react";
 import {
   destinationService,
@@ -38,6 +39,7 @@ import {
   CreateDestinationModal,
   EditDestinationModal,
   CulturalContentManagerModal,
+  DestinationQrModal,
 } from "@/features/destination";
 import {
   experienceService,
@@ -45,6 +47,7 @@ import {
   EditExperienceModal as EditExpModal,
   TaskManager as TaskManagerModal,
   SlotManager as SlotManagerModal,
+  StationQrSheetModal,
 } from "@/features/experience";
 
 const STATUS = {
@@ -118,6 +121,8 @@ export default function ProviderDestinationsPage() {
 
   const [detailTarget, setDetailTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+  // Điểm đến đang mở hộp thoại mã QR check-in
+  const [qrTarget, setQrTarget] = useState(null);
   const [contentManagerTarget, setContentManagerTarget] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -133,6 +138,8 @@ export default function ProviderDestinationsPage() {
   const [expEditTarget, setExpEditTarget] = useState(null);
   const [expTaskTarget, setExpTaskTarget] = useState(null);
   const [expSlotTarget, setExpSlotTarget] = useState(null);
+  // Trải nghiệm đang mở bảng "QR các trạm"
+  const [expQrTarget, setExpQrTarget] = useState(null);
   const [expDescExpanded, setExpDescExpanded] = useState(false);
 
   const showToast = useCallback((msg, tone = "success") => {
@@ -822,6 +829,16 @@ export default function ProviderDestinationsPage() {
 
                       <button
                         type="button"
+                        onClick={() => setQrTarget(dest)}
+                        className="h-8 px-2.5 rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50/60 hover:text-sky-700 bg-white text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                        title="Mã QR check-in để in và dán tại cổng điểm đến"
+                      >
+                        <QrCode size={12} className="text-sky-600" />
+                        <span>Mã QR</span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => setEditTarget(dest)}
                         className="h-8 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold inline-flex items-center gap-1 shadow-xs shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer shrink-0"
                         title="Chỉnh sửa thông tin điểm đến"
@@ -1170,6 +1187,16 @@ export default function ProviderDestinationsPage() {
 
                     <button
                       type="button"
+                      onClick={() => setExpQrTarget(detailExp)}
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Xem, in lại và đổi mã QR của các trạm check-in"
+                    >
+                      <QrCode size={13} className="text-sky-600" />
+                      <span>QR các trạm</span>
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => setExpSlotTarget(detailExp)}
                       className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Quản lý khung giờ và suất phục vụ"
@@ -1233,6 +1260,8 @@ export default function ProviderDestinationsPage() {
         theme="emerald"
       />
 
+      {qrTarget && <DestinationQrModal destination={qrTarget} onClose={() => setQrTarget(null)} />}
+
       <CulturalContentManagerModal
         isOpen={Boolean(contentManagerTarget)}
         destination={contentManagerTarget}
@@ -1267,6 +1296,10 @@ export default function ProviderDestinationsPage() {
         experience={expTaskTarget}
         theme="emerald"
       />
+
+      {expQrTarget && (
+        <StationQrSheetModal experience={expQrTarget} onClose={() => setExpQrTarget(null)} />
+      )}
 
       <SlotManagerModal
         isOpen={Boolean(expSlotTarget)}

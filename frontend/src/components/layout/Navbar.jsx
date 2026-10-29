@@ -16,6 +16,12 @@ export default function Navbar() {
           <Link href={ROUTES.TRIPS} className="hover:text-blue-600 transition-colors">
             Chuyến đi
           </Link>
+          <Link href={ROUTES.BOOKINGS} className="hover:text-blue-600 transition-colors">
+            Đơn đặt của tôi
+          </Link>
+          <Link href={ROUTES.JOURNEYS} className="hover:text-blue-600 transition-colors">
+            Hành trình
+          </Link>
         </nav>
 
         <div className="flex items-center gap-3">

@@ -89,7 +89,17 @@ export async function deleteCheckInPoint(id) {
   return unwrap(res);
 }
 
+/**
+ * Đổi mã QR của trạm (mã cũ bị lộ); được phép cả khi trải nghiệm đã xuất bản.
+ * POST /api/v1/check-in-points/{id}/qr/regenerate  (chỉ owner / ADMIN)
+ */
+export async function regenerateCheckInPointQr(id) {
+  const res = await apiClient.post(`${ENDPOINTS.BY_ID(id)}/qr/regenerate`);
+  return unwrap(res);
+}
+
 export const checkInPointService = {
+  regenerateQr: regenerateCheckInPointQr,
   listByExperience: listCheckInPointsByExperience,
   getById: getCheckInPointById,
   create: createCheckInPoint,

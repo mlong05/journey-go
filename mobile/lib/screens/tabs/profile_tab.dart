@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/auth_models.dart';
 import '../../core/models/journey_model.dart';
-import '../../core/models/ticket_model.dart';
+import '../../core/models/booking_model.dart' show BookingModel, BookingStatus;
 import '../../core/services/auth_service.dart';
-import '../../core/services/gamification_service.dart';
+import '../../core/services/progress_service.dart';
 import '../../core/services/token_storage.dart';
-import '../../core/services/user_data_service.dart';
 import '../../tourist_auth_screen.dart' show TouristAuthScreen;
 import '../modals/edit_profile_modal.dart';
 import '../modals/notification_dialog.dart';
@@ -29,13 +28,13 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   final AuthService _authService = AuthService();
-  final UserDataService _userDataService = UserDataService();
+  final ProgressService _progress = ProgressService();
 
   late UserModel _user;
-  int _points = 350;
+  int _points = 0;
   List<BadgeItem> _badges = [];
   List<JourneyTimelineItem> _timeline = [];
-  List<TicketModel> _tickets = [];
+  List<BookingModel> _tickets = [];
   bool _isLoading = true;
 
   @override
@@ -48,27 +47,28 @@ class _ProfileTabState extends State<ProfileTab> {
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
 
-    final results = await Future.wait([
-      _userDataService.getUserPoints(),
-      _userDataService.getBadges(),
-      _userDataService.getTimeline(),
-      _userDataService.getTickets(),
-    ]);
-
-    // Điểm thật từ máy chủ; nếu không kết nối được thì dùng số lưu trên máy.
-    int points = results[0] as int;
-    try {
-      points = (await GamificationService().getMyPoints()).currentBalance;
-    } on GamificationException {
-      // giữ điểm cục bộ
+    // Mọi số liệu lấy từ backend. Một mục lỗi mạng thì giữ giá trị đang có, không dựng số giả.
+    Future<T> keep<T>(Future<T> Function() load, T current) async {
+      try {
+        return await load();
+      } catch (_) {
+        return current;
+      }
     }
+
+    final results = await Future.wait<Object>([
+      keep<int>(_progress.getPoints, _points),
+      keep<List<BadgeItem>>(_progress.getBadges, _badges),
+      keep<List<JourneyTimelineItem>>(_progress.getTimeline, _timeline),
+      keep<List<BookingModel>>(_progress.getTickets, _tickets),
+    ]);
 
     if (mounted) {
       setState(() {
-        _points = points;
+        _points = results[0] as int;
         _badges = results[1] as List<BadgeItem>;
         _timeline = results[2] as List<JourneyTimelineItem>;
-        _tickets = results[3] as List<TicketModel>;
+        _tickets = results[3] as List<BookingModel>;
         _isLoading = false;
       });
     }
@@ -158,7 +158,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
   @override
   Widget build(BuildContext context) {
-    final activeTicketsCount = _tickets.where((t) => t.isActive).length;
+    final activeTicketsCount = _tickets.where((t) => t.status != BookingStatus.completed).length;
 
     return Scaffold(
       backgroundColor: AppCultureColors.background,
@@ -272,7 +272,7 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Widget _buildProfileHeroCard() {
-    final rank = _userDataService.getRankTier(_points);
+    final rank = rankTierFor(_points);
 
     return Container(
       width: double.infinity,
@@ -405,7 +405,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 _buildCardStatItem(
                   icon: Icons.military_tech_rounded,
                   iconColor: Colors.white,
-                  value: '${_badges.where((b) => b.isUnlocked).length}',
+                  value: '${_badges.length}',
                   label: 'Huy hiệu',
                 ),
                 Container(width: 1, height: 32, color: Colors.white24),
@@ -519,6 +519,11 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  Widget _badgePlaceholder() => Container(
+        color: AppCultureColors.rewardBg,
+        child: const Icon(Icons.workspace_premium_rounded, color: AppCultureColors.gold, size: 30),
+      );
+
   Widget _buildBadgeCircle(BadgeItem badge) {
     return Column(
       children: [
@@ -539,11 +544,16 @@ class _ProfileTabState extends State<ProfileTab> {
                 ],
               ),
               child: ClipOval(
-                child: Image.asset(badge.imageUrl, fit: BoxFit.cover),
+                child: badge.imageUrl.startsWith('http')
+                    ? Image.network(
+                        badge.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => _badgePlaceholder(),
+                      )
+                    : _badgePlaceholder(),
               ),
             ),
-            if (badge.isUnlocked)
-              Positioned(
+            Positioned(
                 bottom: 0,
                 right: 0,
                 child: Container(
@@ -686,14 +696,15 @@ class _ProfileTabState extends State<ProfileTab> {
                       children: [
                         Row(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.asset(
-                                item.photoUrl,
-                                width: 56,
-                                height: 56,
-                                fit: BoxFit.cover,
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: AppCultureColors.jadeLight,
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              child: const Icon(Icons.place_rounded,
+                                  color: AppCultureColors.heritageJade, size: 28),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -706,19 +717,15 @@ class _ProfileTabState extends State<ProfileTab> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: item.method.contains('QR')
-                                              ? AppCultureColors.jadeLight
-                                              : AppCultureColors.oceanLight,
+                                          color: AppCultureColors.jadeLight,
                                           borderRadius: BorderRadius.circular(6),
                                         ),
-                                        child: Text(
-                                          item.method.contains('QR') ? 'QR SCANNED' : 'GPS VERIFIED',
+                                        child: const Text(
+                                          'ĐÃ CHECK-IN',
                                           style: TextStyle(
                                             fontSize: 9,
                                             fontWeight: FontWeight.w800,
-                                            color: item.method.contains('QR')
-                                                ? AppCultureColors.jadeDark
-                                                : AppCultureColors.oceanDark,
+                                            color: AppCultureColors.jadeDark,
                                           ),
                                         ),
                                       ),
@@ -743,7 +750,9 @@ class _ProfileTabState extends State<ProfileTab> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    item.checkinDate,
+                                    '${item.location} · ${item.checkinDate}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontSize: 11, color: AppCultureColors.textMuted),
                                   ),
                                 ],
@@ -751,24 +760,6 @@ class _ProfileTabState extends State<ProfileTab> {
                             ),
                           ],
                         ),
-                        if (item.caption.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppCultureColors.surfaceSubtle,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '“${item.caption}”',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontStyle: FontStyle.italic,
-                                color: AppCultureColors.textDark,
-                              ),
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),

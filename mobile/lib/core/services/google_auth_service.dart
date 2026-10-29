@@ -12,15 +12,16 @@ class GoogleAuthService {
   /// Phải gọi hàm này trong main.dart trước khi dùng [signIn].
   static Future<void> init() async {
     if (_instance != null) return;
-    final clientId = ApiConstants.googleAndroidClientId;
-    if (clientId.isEmpty) {
+    // Android chỉ trả idToken khi có serverClientId (Web Client ID).
+    final webClientId = ApiConstants.googleWebClientId;
+    if (webClientId.isEmpty) {
       throw Exception(
-        'GOOGLE_ANDROID_CLIENT_ID chưa được truyền.\n'
-        'Hãy chạy: flutter run --dart-define=GOOGLE_ANDROID_CLIENT_ID=<client_id>',
+        'GOOGLE_WEB_CLIENT_ID chưa được cấu hình.\n'
+        'Điền vào mobile/.env hoặc chạy: flutter run --dart-define=GOOGLE_WEB_CLIENT_ID=<client_id>',
       );
     }
     _instance = GoogleSignIn(
-      clientId: clientId,
+      serverClientId: webClientId,
       scopes: const ['email', 'profile', 'openid'],
     );
   }
@@ -28,11 +29,8 @@ class GoogleAuthService {
   /// Mở Google Sign-In flow và trả về idToken để gửi lên backend.
   /// Backend Spring sẽ verify idToken này và cấp accessToken/refreshToken.
   static Future<String> signInAndGetIdToken() async {
-    if (_instance == null) {
-      throw Exception(
-        'GoogleAuthService chưa được khởi tạo. Gọi GoogleAuthService.init() trong main.dart.',
-      );
-    }
+    // Thử khởi tạo lại: nếu vẫn thiếu cấu hình, init() ném lỗi nêu đúng biến còn thiếu.
+    await init();
     final GoogleSignInAccount? account = await _instance!.signIn();
     if (account == null) {
       throw Exception('Người dùng đã huỷ đăng nhập Google.');

@@ -143,6 +143,26 @@ class JourneyServiceTest {
     }
 
     @Test
+    void startJourney_TaskProgressIsLinkedToJourney() {
+        // Hồi quy: nhiệm vụ được thêm vào điểm đến trước khi điểm đến gắn vào hành trình,
+        // từng làm journey_task_progress.journey_id bị null khi lưu.
+        when(journeyRepository.findFirstByUserIdAndTourIdAndStatusInOrderByCreatedAtDesc(eq(10L), eq(1L), anyList()))
+                .thenReturn(Optional.empty());
+        when(tourInfoProvider.getTourInfo(1L)).thenReturn(sampleTourInfo);
+        org.mockito.ArgumentCaptor<Journey> saved = org.mockito.ArgumentCaptor.forClass(Journey.class);
+        when(journeyRepository.save(saved.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        journeyService.startJourney(10L, new StartJourneyRequest(999L, 1L));
+
+        Journey journey = saved.getValue();
+        assertFalse(journey.getDestinations().get(0).getTasks().isEmpty());
+        journey.getDestinations().forEach(dest -> dest.getTasks().forEach(task -> {
+            assertSame(journey, task.getJourney());
+            assertSame(dest, task.getDestinationProgress());
+        }));
+    }
+
+    @Test
     void startJourney_WhenActiveExists_ShouldResumeExisting() {
         StartJourneyRequest request = new StartJourneyRequest(999L, 1L);
 

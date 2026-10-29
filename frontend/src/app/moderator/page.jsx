@@ -39,7 +39,7 @@ import { moderationService } from "@/features/destination";
 const QUICK_LINKS = [
   { href: "/moderator/tours", label: "Thẩm định tour", icon: Compass },
   { href: "/moderator/destinations", label: "Duyệt điểm đến & lộ trình", icon: MapPin },
-  { href: "/moderator/ai-auditing", label: "Chuẩn hóa thuyết minh di sản", icon: BookOpen },
+  { href: "/moderator/destinations", label: "Duyệt thuyết minh di sản", icon: BookOpen },
   { href: "/moderator/community", label: "Duyệt bài cộng đồng", icon: MessageSquare },
   { href: "/moderator/history", label: "Nhật ký & lịch sử duyệt", icon: History },
 ];
@@ -219,7 +219,7 @@ export default function ModeratorDashboardPage() {
       icon: ShieldAlert,
       tone: "rose",
       linkText: "Chi tiết →",
-      linkHref: "/moderator/ai-auditing",
+      linkHref: "/moderator/community",
     },
   ];
 

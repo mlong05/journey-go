@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { MapPin, Navigation, QrCode, RefreshCw, ScanLine, Crosshair } from "lucide-react";
 import { checkInPointService } from "../services/checkInPointService";
 import LeafletMapPickerModal from "./LeafletMapPickerModal";
@@ -24,16 +25,15 @@ export const EMPTY_STATION = {
   qrToken: "",
 };
 
-export function generateQrToken(seed = "") {
-  const prefix = String(seed || "TASK")
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/Đ/g, "D")
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 8);
-  const rand = Math.floor(100000 + Math.random() * 900000);
-  return `QR_${prefix || "TASK"}_${rand}`;
+/**
+ * Sinh mã QR trạm ngẫu nhiên không đoán được (64 bit, crypto), cùng định dạng với backend: JGS-XXXXXXXXXXXXXXXX.
+ * Không dựa vào tên trạm vì tên trạm hiển thị công khai.
+ */
+export function generateQrToken() {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+  return `JGS-${hex}`;
 }
 
 export function stationFromPoint(point) {
@@ -91,6 +91,23 @@ export default function CheckInStationFields({
   const [mapOpen, setMapOpen] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState("");
+  // Ảnh QR sinh ngay trên trình duyệt: mã trạm là bí mật, không gửi sang dịch vụ bên ngoài.
+  const [qr, setQr] = useState({ token: "", preview: "", print: "" });
+
+  useEffect(() => {
+    const token = String(value.qrToken || "").trim();
+    if (!token) return undefined;
+    let active = true;
+    Promise.all([
+      QRCode.toDataURL(token, { width: 320, margin: 1, errorCorrectionLevel: "M" }),
+      QRCode.toDataURL(token, { width: 1000, margin: 4, errorCorrectionLevel: "M" }),
+    ])
+      .then(([preview, print]) => active && setQr({ token, preview, print }))
+      .catch(() => active && setQr({ token: "", preview: "", print: "" }));
+    return () => {
+      active = false;
+    };
+  }, [value.qrToken]);
 
   const set = (patch) => onChange({ ...value, ...patch });
 
@@ -130,16 +147,10 @@ export default function CheckInStationFields({
     }
   };
 
-  const qrImage = value.qrToken
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=2&data=${encodeURIComponent(
-        value.qrToken
-      )}`
-    : "";
-  const qrDownload = value.qrToken
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=10&data=${encodeURIComponent(
-        value.qrToken
-      )}`
-    : "";
+  // Chỉ dùng ảnh khớp với mã đang nhập (tránh hiện ảnh của mã cũ trong lúc đang sinh ảnh mới).
+  const currentToken = String(value.qrToken || "").trim();
+  const qrImage = currentToken && qr.token === currentToken ? qr.preview : "";
+  const qrDownload = currentToken && qr.token === currentToken ? qr.print : "";
 
   return (
     <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-4">
@@ -261,7 +272,7 @@ export default function CheckInStationFields({
           <button
             type="button"
             disabled={disabled}
-            onClick={() => set({ qrToken: generateQrToken(value.name) })}
+            onClick={() => set({ qrToken: generateQrToken() })}
             className="text-[11px] font-bold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
           >
             <RefreshCw size={11} />
@@ -291,11 +302,10 @@ export default function CheckInStationFields({
               {qrDownload && (
                 <a
                   href={qrDownload}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  download={`qr-tram-${(value.name || "check-in").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase()}.png`}
                   className="text-[11px] font-bold text-emerald-700 hover:underline"
                 >
-                  Mở ảnh QR lớn để in
+                  Tải ảnh QR lớn để in
                 </a>
               )}
               <span className="text-[11px] text-slate-500">Mã phải khác với mọi trạm khác.</span>

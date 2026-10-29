@@ -78,8 +78,8 @@ class ExperienceService {
       return cached.where((e) => e.isPublished).toList();
     }
 
-    // Dữ liệu mẫu ban đầu về trải nghiệm di sản văn hóa
-    return _getDefaultExperiences();
+    // Không có mạng và chưa có cache: trả danh sách rỗng để giao diện báo đúng trạng thái.
+    return [];
   }
 
   /// Lấy danh sách gói trải nghiệm theo Điểm đến (GET /api/v1/destinations/{destinationId}/experiences)
@@ -197,49 +197,5 @@ class ExperienceService {
       }
     } catch (_) {}
     return [];
-  }
-
-  List<ExperienceModel> _getDefaultExperiences() {
-    return [
-      ExperienceModel(
-        id: 1,
-        destinationId: 1,
-        title: 'Trải nghiệm Khám phá Khuê Văn Các & 82 Bia Tiến Sĩ',
-        description: 'Tham gia giải đố thử thách lịch sử khoa cử Nho học, check-in định vị GPS tại giếng Thiên Quang và nhận huy hiệu danh nhân.',
-        price: 50000,
-        currency: 'VND',
-        durationMinutes: 90,
-        status: 'PUBLISHED',
-        taskCount: 3,
-        checkInPointCount: 2,
-        coverImage: 'assets/images/vanmieu.png',
-      ),
-      ExperienceModel(
-        id: 2,
-        destinationId: 2,
-        title: 'Hành trình Theo dấu Vương triều Thăng Long ngàn năm',
-        description: 'Khám phá cổng Đoan Môn, lầu Hậu Lâu và khu khảo cổ 18 Hoàng Diệu với lộ trình check-in GPS và câu đố lịch sử Đại Việt.',
-        price: 80000,
-        currency: 'VND',
-        durationMinutes: 150,
-        status: 'PUBLISHED',
-        taskCount: 4,
-        checkInPointCount: 3,
-        coverImage: 'assets/images/thanglong.png',
-      ),
-      ExperienceModel(
-        id: 3,
-        destinationId: 3,
-        title: 'Tự tay Chuốt gốm & Tìm hiểu Men gốm cổ Bát Tràng',
-        description: 'Trải nghiệm xoay bàn gốm truyền thống, thử thách giải đố hoa văn men lam thời Lê - Nguyễn và nhận sản phẩm hoàn thiện.',
-        price: 120000,
-        currency: 'VND',
-        durationMinutes: 120,
-        status: 'PUBLISHED',
-        taskCount: 2,
-        checkInPointCount: 2,
-        coverImage: 'assets/images/gomsu.png',
-      ),
-    ];
   }
 }

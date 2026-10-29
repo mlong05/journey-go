@@ -37,6 +37,83 @@ public class SchemaMigration {
     }
 
     /**
+     * Đổi MỘT LẦN toàn bộ mã QR trạm check-in đã tạo trước 2026-10-29. Các mã đó có thể đã lộ: API công khai
+     * từng trả qr_token, giao diện cũ gửi mã sang api.qrserver.com để vẽ ảnh, và cách sinh cũ dễ đoán
+     * (tên trạm + 6 chữ số). Đánh dấu vào data_migration_marker để không đổi lại ở các lần khởi động sau;
+     * provider cần in lại QR các trạm (Quản lý điểm đến → trải nghiệm → "QR các trạm").
+     */
+    @Bean
+    public CommandLineRunner rotateLeakedCheckInPointQrTokens() {
+        return args -> {
+            final String marker = "rotate_check_in_point_qr_2026_10";
+            if (!columnExists("check_in_point", "qr_token")) {
+                return;
+            }
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS data_migration_marker (
+                        name VARCHAR(100) PRIMARY KEY,
+                        applied_at TIMESTAMP NOT NULL DEFAULT now()
+                    )
+                    """);
+            Integer done = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM data_migration_marker WHERE name = ?", Integer.class, marker);
+            if (done != null && done > 0) {
+                return;
+            }
+            int rotated = jdbcTemplate.update("""
+                    UPDATE check_in_point
+                    SET qr_token = 'JGS-' || upper(substr(md5(random()::text || id::text || clock_timestamp()::text), 1, 16))
+                    """);
+            jdbcTemplate.update("INSERT INTO data_migration_marker (name) VALUES (?)", marker);
+            log.warn("[Migration] Đã đổi mã QR của {} trạm check-in vì mã cũ có thể đã lộ. "
+                    + "Provider cần in lại QR các trạm.", rotated);
+        };
+    }
+
+    /**
+     * Điểm đến tạo trước khi có mã QR check-in thì chưa có qr_token: sinh mã ngẫu nhiên cho từng dòng
+     * (cùng định dạng Destination.newQrToken: JGD- + 16 ký tự hex in hoa).
+     */
+    @Bean
+    public CommandLineRunner backfillDestinationQrTokens() {
+        return args -> {
+            if (!columnExists("destinations", "qr_token")) {
+                return;
+            }
+            int updated = jdbcTemplate.update("""
+                    UPDATE destinations
+                    SET qr_token = 'JGD-' || upper(substr(md5(random()::text || id::text || clock_timestamp()::text), 1, 16))
+                    WHERE qr_token IS NULL
+                    """);
+            if (updated > 0) {
+                log.info("[Migration] Đã sinh mã QR check-in cho {} điểm đến.", updated);
+            }
+        };
+    }
+
+    /**
+     * Nhiệm vụ đi theo trạng thái của Experience (xem ExperienceService.changeStatus). Trước khi có
+     * quy tắc này, Experience đã PUBLISHED vẫn giữ Task ở DRAFT nên hành trình của du khách không thấy
+     * nhiệm vụ nào. Runner xuất bản các Task DRAFT đó; Task INACTIVE (xoá mềm) giữ nguyên.
+     */
+    @Bean
+    public CommandLineRunner publishTasksOfPublishedExperiences() {
+        return args -> {
+            if (!columnExists("task", "status") || !columnExists("experience", "status")) {
+                return;
+            }
+            int updated = jdbcTemplate.update("""
+                    UPDATE task SET status = 'PUBLISHED'
+                    WHERE status = 'DRAFT'
+                      AND experience_id IN (SELECT id FROM experience WHERE status = 'PUBLISHED')
+                    """);
+            if (updated > 0) {
+                log.info("[Migration] Đã xuất bản {} nhiệm vụ thuộc trải nghiệm đã PUBLISHED.", updated);
+            }
+        };
+    }
+
+    /**
      * Điểm thưởng nay nằm ở cấp nhiệm vụ (task.points_reward); câu hỏi không còn có điểm riêng.
      * Cột question.points cũ là NOT NULL không default nên phải gỡ, nếu không INSERT câu hỏi mới sẽ lỗi.
      */
