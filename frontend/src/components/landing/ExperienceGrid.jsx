@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import ExperienceCard from "./ExperienceCard";
-import { Sparkles, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { ArrowRight, Inbox, X } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import ExperienceCard from "./ExperienceCard";
+import CategoryPills from "./CategoryPills";
+import SectionHeading from "./SectionHeading";
 
 export const EXPERIENCES_DATA = [
   {
@@ -137,100 +139,103 @@ export const EXPERIENCES_DATA = [
   },
 ];
 
+const SORT_TABS = [
+  { id: "popular", label: "Phổ biến nhất" },
+  { id: "rating", label: "Đánh giá cao" },
+];
+
 export default function ExperienceGrid({
   activeCategory = "all",
+  onSelectCategory,
   searchDestination = "",
+  onClearDestination,
 }) {
   const [sortTab, setSortTab] = useState("popular");
 
   const filteredExperiences = useMemo(() => {
-    return EXPERIENCES_DATA.filter((item) => {
-      // Lọc theo Category
-      const matchCat =
-        activeCategory === "all" || item.category === activeCategory;
-
-      // Lọc theo Destination nếu có tìm kiếm
+    const q = searchDestination.toLowerCase();
+    const list = EXPERIENCES_DATA.filter((item) => {
+      const matchCat = activeCategory === "all" || item.category === activeCategory;
       const matchDest =
-        !searchDestination ||
-        item.destination.toLowerCase().includes(searchDestination.toLowerCase()) ||
-        item.location.toLowerCase().includes(searchDestination.toLowerCase());
-
+        !q ||
+        item.destination.toLowerCase().includes(q) ||
+        item.location.toLowerCase().includes(q);
       return matchCat && matchDest;
     });
-  }, [activeCategory, searchDestination]);
+    return [...list].sort((a, b) =>
+      sortTab === "rating" ? b.rating - a.rating : b.reviewsCount - a.reviewsCount
+    );
+  }, [activeCategory, searchDestination, sortTab]);
 
   return (
-    <section id="trai-nghiem" className="py-16 bg-slate-50/50">
+    <section id="trai-nghiem" className="py-20 bg-slate-50/70 scroll-mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Tiêu đề mục */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
-          <div>
-            <div className="flex items-center gap-2 text-emerald-600 text-xs sm:text-sm font-bold uppercase tracking-wider mb-2">
-              <Sparkles className="w-4 h-4" />
-              <span>Khám phá những khoảnh khắc chân thực</span>
-            </div>
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight font-jakarta">
-              Trải nghiệm được yêu thích nhất
-            </h2>
-            <p className="mt-2 text-slate-600 text-sm sm:text-base max-w-xl">
-              Được thiết kế và trực tiếp dẫn dắt bởi những con người sinh ra và
-              lớn lên tại từng miền đất.
-            </p>
+        <SectionHeading
+          eyebrow="Khám phá khoảnh khắc chân thực"
+          title="Trải nghiệm được yêu thích nhất"
+          description="Được thiết kế và dẫn dắt bởi chính những người sinh ra, lớn lên tại từng miền đất."
+        >
+          <div className="flex items-center gap-0.5 p-1 bg-white border border-slate-200 rounded-lg shadow-xs">
+            {SORT_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setSortTab(t.id)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                  sortTab === t.id
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
+        </SectionHeading>
 
-          {/* Tab chuyển đổi sắp xếp */}
-          <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200/80 shadow-xs self-start md:self-auto">
-            <button
-              type="button"
-              onClick={() => setSortTab("popular")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                sortTab === "popular"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Phổ biến nhất
-            </button>
-            <button
-              type="button"
-              onClick={() => setSortTab("rating")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                sortTab === "rating"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Đánh giá cao
-            </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+          <div className="flex-1 min-w-0">
+            <CategoryPills activeCategory={activeCategory} onSelectCategory={onSelectCategory} />
           </div>
+          {searchDestination && (
+            <button
+              type="button"
+              onClick={onClearDestination}
+              className="self-start sm:self-auto inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-emerald-50 border border-emerald-200 text-sm font-medium text-emerald-800 hover:bg-emerald-100 cursor-pointer"
+            >
+              {searchDestination}
+              <X size={14} />
+            </button>
+          )}
         </div>
 
-        {/* Lưới trải nghiệm (Grid Responsive) */}
         {filteredExperiences.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {filteredExperiences.map((exp) => (
               <ExperienceCard key={exp.id} item={exp} />
             ))}
           </div>
         ) : (
-          <div className="py-16 text-center bg-white rounded-2xl border border-dashed border-slate-200 p-8">
-            <p className="text-slate-600 font-medium">
-              Chưa tìm thấy trải nghiệm phù hợp với bộ lọc hiện tại.
+          <div className="py-16 text-center bg-white rounded-xl border border-dashed border-slate-300">
+            <div className="mx-auto w-11 h-11 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
+              <Inbox size={22} />
+            </div>
+            <p className="text-sm font-semibold text-slate-700">
+              Chưa có trải nghiệm phù hợp với bộ lọc hiện tại.
             </p>
-            <p className="text-sm text-slate-400 mt-1">
-              Thử chọn danh mục khác hoặc xóa bộ lọc tìm kiếm.
+            <p className="text-sm text-slate-500 mt-1">
+              Thử chọn thể loại khác hoặc bỏ điểm đến đang lọc.
             </p>
           </div>
         )}
 
-        {/* Khối xem thêm */}
-        <div className="mt-12 text-center">
+        <div className="mt-10 text-center">
           <Link
-            href={ROUTES.LOGIN || "/login"}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white border border-slate-200 text-slate-800 font-bold text-sm hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all group"
+            href={ROUTES.LOGIN}
+            className="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-white border border-slate-200 text-sm font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 shadow-xs transition-colors"
           >
-            <span>Khám phá toàn bộ 150+ trải nghiệm trên toàn quốc</span>
-            <ArrowRight className="w-4 h-4 text-emerald-600 group-hover:translate-x-1 transition-transform" />
+            Khám phá toàn bộ 150+ trải nghiệm
+            <ArrowRight size={16} className="text-emerald-700" />
           </Link>
         </div>
       </div>
