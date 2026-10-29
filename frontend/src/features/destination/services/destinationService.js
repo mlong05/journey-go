@@ -65,6 +65,10 @@ function buildPayload(payload) {
     longitude: Number(payload.longitude),
     capacity: parseInt(payload.capacity, 10),
   };
+  // Chỉ gửi khi form có trường ảnh bìa: không gửi = giữ ảnh cũ, chuỗi rỗng = bỏ ảnh
+  if (payload.coverImageUrl !== undefined) {
+    out.coverImageUrl = String(payload.coverImageUrl || "").trim();
+  }
   if (payload.regionId !== undefined && payload.regionId !== null && payload.regionId !== "") {
     out.regionId = Number(payload.regionId);
   }

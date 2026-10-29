@@ -19,6 +19,7 @@ import { getDevicePosition, describeGeoError } from "@/lib/geolocation";
 import { destinationService } from "../services/destinationService";
 import { regionService } from "../services/regionService";
 import AdministrativeAddressFields from "./AdministrativeAddressFields";
+import CoverImageField from "./CoverImageField";
 
 /**
  * Modal "Tạo Điểm Đến Di Sản Mới" — dùng chung cho Provider & Admin.
@@ -70,6 +71,7 @@ export default function CreateDestinationModal({
     latitude: "",
     longitude: "",
     capacity: "",
+    coverImageUrl: "",
   };
   const [form, setForm] = useState(initialForm);
   const [regions, setRegions] = useState([]);
@@ -232,6 +234,7 @@ export default function CreateDestinationModal({
         latitude: Number(form.latitude),
         longitude: Number(form.longitude),
         capacity: parseInt(form.capacity, 10),
+        coverImageUrl: form.coverImageUrl,
       };
       const created = await destinationService.create(payload);
       setCreatedItem(created);
@@ -547,6 +550,14 @@ export default function CreateDestinationModal({
                   <p className="text-[11px] text-rose-600 font-bold">{errors.capacity}</p>
                 )}
               </div>
+
+              {/* ── Trường 6: Ảnh bìa ─────────────────────── */}
+              <CoverImageField
+                value={form.coverImageUrl}
+                onChange={(url) => handleChange("coverImageUrl", url)}
+                disabled={loading}
+                iconClassName={palette.icon}
+              />
             </form>
           )}
         </div>
