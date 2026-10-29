@@ -4,6 +4,7 @@ import com.journeygo.modules.tour.dto.TourResponse;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.repository.TourPriceProjection;
 import com.journeygo.modules.tour.repository.TourRepository;
+import com.journeygo.modules.tour.repository.TourRewardProjection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,13 +35,24 @@ public class TourPricingService {
     @Transactional(readOnly = true)
     public Function<Tour, TourResponse> mapperFor(Collection<Tour> tours) {
         List<Long> ids = tours.stream().map(Tour::getTourId).toList();
-        Map<Long, BigDecimal> totals = ids.isEmpty()
-                ? Map.of()
-                : tourRepository.sumExperiencePricesByTourIds(ids).stream()
-                        .collect(Collectors.toMap(TourPriceProjection::tourId, TourPriceProjection::totalPrice));
-        return tour -> TourResponse.fromEntity(tour)
-                .toBuilder()
-                .price(totals.getOrDefault(tour.getTourId(), BigDecimal.ZERO))
-                .build();
+        if (ids.isEmpty()) return TourResponse::fromEntity;
+        Map<Long, BigDecimal> totals = tourRepository.sumExperiencePricesByTourIds(ids).stream()
+                .collect(Collectors.toMap(TourPriceProjection::tourId, TourPriceProjection::totalPrice));
+        // Phần thưởng hiển thị trên thẻ tour: nhiệm vụ, điểm tối đa, huy hiệu (mỗi điểm đến một huy hiệu check-in)
+        Map<Long, TourRewardProjection> rewards = tourRepository.sumTaskRewardsByTourIds(ids).stream()
+                .collect(Collectors.toMap(TourRewardProjection::tourId, Function.identity()));
+        Map<Long, Long> disabledBadges = tourRepository.countDisabledBadgesByTourIds(ids).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+        return tour -> {
+            TourRewardProjection reward = rewards.get(tour.getTourId());
+            long badges = tour.getDestinationCount() - disabledBadges.getOrDefault(tour.getTourId(), 0L);
+            return TourResponse.fromEntity(tour)
+                    .toBuilder()
+                    .price(totals.getOrDefault(tour.getTourId(), BigDecimal.ZERO))
+                    .taskCount(reward == null ? 0 : reward.taskCount().intValue())
+                    .totalTaskPoints(reward == null ? 0 : reward.totalPoints().intValue())
+                    .badgeCount((int) Math.max(0, badges))
+                    .build();
+        };
     }
 }
