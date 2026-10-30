@@ -7,13 +7,11 @@ import {
   CheckCircle2,
   Eye,
   X,
-  Compass,
   Inbox,
   Loader2,
   Users,
   Navigation,
   AlertCircle,
-  Building2,
   RefreshCw,
   Layers,
   Clock,
@@ -786,7 +784,8 @@ export default function ModeratorDestinationsPage() {
         <div
           className={`${ROW_GRID} shrink-0 pl-4 sm:pl-5 ${HEADER_PAD} py-3 bg-slate-50 border-b border-slate-200 text-[11px] font-bold  text-slate-600 `}
         >
-          <div className="col-span-12 md:col-span-4">Tên địa điểm</div>
+          <div className="hidden md:block md:col-span-1 text-center">STT</div>
+          <div className="col-span-12 md:col-span-3">Tên địa điểm</div>
           <div className="col-span-6 md:col-span-2">Sức chứa</div>
           <div className="col-span-6 md:col-span-3">Trạng thái</div>
           <div className="col-span-12 md:col-span-3">Thao tác</div>
@@ -822,7 +821,7 @@ export default function ModeratorDestinationsPage() {
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {pagedItems.map((item) => {
+              {pagedItems.map((item, idx) => {
                 const isApproved =
                   item.status === STATUS.PUBLISHED || item.approved === true;
                 const isLoadingAction = actionLoadingId === item.id;
@@ -832,29 +831,17 @@ export default function ModeratorDestinationsPage() {
                     className="pl-4 sm:pl-5 py-3.5 hover:bg-slate-50/60 transition-colors"
                   >
                     <div className={ROW_GRID}>
+                      {/* Số thứ tự (tính theo trang) */}
+                      <div className="hidden md:block md:col-span-1 text-center text-xs font-bold text-slate-500 tabular-nums">
+                        {safePageNumber * pageSize + idx + 1}
+                      </div>
+
                       {/* Cột 1 — Tên địa điểm */}
-                      <div className="col-span-12 md:col-span-4 flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
-                          <Compass size={18} />
-                        </div>
+                      <div className="col-span-12 md:col-span-3 flex items-center gap-3 min-w-0">
                         <div className="min-w-0 flex-1">
                           <h3 className="text-sm font-bold text-slate-900 truncate">
                             {item.name}
                           </h3>
-                          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-600">
-                            <span className="tabular-nums font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
-                              #{item.id}
-                            </span>
-                            <span className="flex items-center gap-1 font-bold text-slate-600 truncate">
-                              <Building2
-                                size={11}
-                                className="text-slate-400 shrink-0"
-                              />
-                              <span className="truncate">
-                                {item.createdBy || "Đơn vị không xác định"}
-                              </span>
-                            </span>
-                          </div>
                         </div>
                       </div>
 
