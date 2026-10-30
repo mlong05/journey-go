@@ -21,12 +21,12 @@ import { SURFACE, TABLE, BADGE, BUTTON } from "./dashboard.tokens";
 import { PageHeader, StatCard } from "@/components/dashboard/DashboardUI";
 import { dashboardService } from "@/features/dashboard";
 
-// Màu nhấn & liên kết của từng thẻ KPI
-const KPI_META = {
-  users: { tone: "sky", href: "/admin/users" },
-  destinations: { tone: "emerald", href: "/admin/destinations" },
-  checkins: { tone: "amber", href: "/admin/bookings" },
-  gmv: { tone: "rose", href: "/admin/finance" },
+// Màu nhấn của từng thẻ KPI
+const KPI_TONE = {
+  users: "sky",
+  destinations: "emerald",
+  checkins: "amber",
+  gmv: "rose",
 };
 
 const PAYMENT_STATUS = {
@@ -99,9 +99,6 @@ export default function AdminDashboardPage() {
       title: "Tổng Người dùng Hoạt động",
       count: users ? fmtNumber(users.active) : placeholder,
       unit: "tài khoản",
-      subBreakdown: users
-        ? `${fmtNumber(users.tourists)} du khách • ${fmtNumber(users.providers)} đối tác • ${fmtNumber(users.moderators)} kiểm duyệt`
-        : "Du khách • Đối tác • Kiểm duyệt viên",
       trend: users ? `+${fmtNumber(users.newThisMonth)} tháng này` : "Đang tải",
       icon: Users,
     },
@@ -110,9 +107,6 @@ export default function AdminDashboardPage() {
       title: "Điểm di tích & Lộ trình xuất bản",
       count: destinations ? fmtNumber(destinations.published) : placeholder,
       unit: "điểm",
-      subBreakdown: destinations
-        ? `Trên ${fmtNumber(destinations.total)} điểm • ${fmtNumber(destinations.publishedTours)} tour đang mở bán`
-        : "Tuyến tour di sản đã kích hoạt",
       trend: "Đã xuất bản",
       icon: MapPin,
     },
@@ -121,7 +115,6 @@ export default function AdminDashboardPage() {
       title: "Lượt Kích hoạt Thực tế",
       count: checkIns ? fmtNumber(checkIns.total) : placeholder,
       unit: "lượt",
-      subBreakdown: "Lượt check-in thực địa GPS / QR hợp lệ",
       trend: checkIns ? `Hôm nay: ${fmtNumber(checkIns.today)}` : "Đang tải",
       icon: QrCode,
     },
@@ -130,9 +123,6 @@ export default function AdminDashboardPage() {
       title: "Tổng Doanh số Toàn Sàn",
       count: revenue ? fmtNumber(revenue.gross) : placeholder,
       unit: "đ",
-      subBreakdown: revenue
-        ? `${fmtNumber(revenue.successfulPayments)} giao dịch thành công`
-        : "Doanh số giao dịch vé toàn sàn",
       trend: revenue ? `Tháng này: ${fmtNumber(revenue.thisMonth)} đ` : "Đang tải",
       icon: DollarSign,
     },
@@ -164,22 +154,17 @@ export default function AdminDashboardPage() {
       )}
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {kpiCards.map((card) => {
-          const meta = KPI_META[card.id];
-          return (
-            <StatCard
-              key={card.id}
-              title={card.title}
-              value={card.count}
-              unit={card.unit}
-              hint={card.subBreakdown}
-              icon={card.icon}
-              tone={meta.tone}
-              badge={{ text: card.trend }}
-              href={meta.href}
-            />
-          );
-        })}
+        {kpiCards.map((card) => (
+          <StatCard
+            key={card.id}
+            title={card.title}
+            value={card.count}
+            unit={card.unit}
+            icon={card.icon}
+            tone={KPI_TONE[card.id]}
+            badge={{ text: card.trend }}
+          />
+        ))}
       </section>
 
       {/* ────────────────────────────────────────────────────────
