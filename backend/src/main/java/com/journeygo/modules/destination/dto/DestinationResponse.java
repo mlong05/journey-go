@@ -20,6 +20,7 @@ public record DestinationResponse(
         @Schema(description = "Vĩ độ") BigDecimal latitude,
         @Schema(description = "Kinh độ") BigDecimal longitude,
         @Schema(description = "Sức chứa (số người)") Integer capacity,
+        @Schema(description = "Ảnh bìa") String coverImageUrl,
         @Schema(description = "Số lượt đặt chỗ") Integer booked,
         @Schema(description = "Trạng thái phê duyệt (legacy)") boolean approved,
         @Schema(description = "Trạng thái quy trình (DRAFT, PENDING, PUBLISHED, REJECTED)") DestinationStatus status,
@@ -50,6 +51,7 @@ public record DestinationResponse(
                 .latitude(d.getLatitude())
                 .longitude(d.getLongitude())
                 .capacity(d.getCapacity())
+                .coverImageUrl(d.getCoverImageUrl())
                 .booked(d.getBooked())
                 .approved(d.isApproved())
                 .status(d.getStatus())

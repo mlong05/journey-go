@@ -29,6 +29,8 @@ public record TaskQuestionsResponse(
         Integer totalQuestions,
         boolean unlocked,
         Station station,
+        // Mọi trạm của nhiệm vụ theo thứ tự câu hỏi; trạm chưa tới lượt chỉ có tên, không có tọa độ
+        List<Station> stations,
         Integer distanceMeters,
         List<Question> questions
 ) {

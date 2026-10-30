@@ -57,6 +57,10 @@ const STATUS = {
   DRAFT: "DRAFT",
 };
 
+// Dùng chung cho thanh tiêu đề và từng dòng để các cột thẳng hàng; cột thao tác có độ rộng cố định đủ chứa 4 nút trên một hàng
+const ROW_GRID =
+  "lg:grid-cols-[2.5rem_minmax(0,1.2fr)_minmax(0,1.5fr)_minmax(0,1fr)_7rem_14.5rem] xl:grid-cols-[2.5rem_minmax(0,1.2fr)_minmax(0,1.5fr)_minmax(0,1fr)_7rem_17.5rem]";
+
 const STATUS_LABEL = {
   [STATUS.PUBLISHED]: "Đang hoạt động",
   [STATUS.PENDING]: "Chờ phê duyệt",
@@ -710,13 +714,13 @@ export default function ProviderDestinationsPage() {
         ) : (
           <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
             {/* Thanh tiêu đề các cột (Cố định phía trên danh sách thẻ) */}
-            <div className="shrink-0 hidden lg:grid grid-cols-12 gap-4 px-5 py-3 bg-slate-100/90 border border-slate-200/90 rounded-xl text-[11px] font-bold text-slate-600 mb-2.5 shadow-2xs">
-              <div className="col-span-1 text-center">STT</div>
-              <div className="col-span-3">Điểm đến di tích</div>
-              <div className="col-span-3">Địa chỉ thực địa</div>
-              <div className="col-span-2">Sức chứa</div>
-              <div className="col-span-1 text-center">Trạng thái</div>
-              <div className="col-span-2 text-left">Thao tác</div>
+            <div className={`shrink-0 hidden lg:grid ${ROW_GRID} gap-4 px-5 py-3 bg-slate-100/90 border border-slate-200/90 rounded-xl text-[11px] font-bold text-slate-600 mb-2.5 shadow-2xs`}>
+              <div className="text-center">STT</div>
+              <div>Điểm đến di tích</div>
+              <div>Địa chỉ thực địa</div>
+              <div>Sức chứa</div>
+              <div className="text-center">Trạng thái</div>
+              <div className="text-left">Thao tác</div>
             </div>
 
             {/* Danh sách các thanh ngang điểm đến (CHỈ DUY NHẤT VÙNG NÀY CUỘN LÊN XUỐNG) */}
@@ -726,7 +730,7 @@ export default function ProviderDestinationsPage() {
                 return (
                   <div
                     key={dest.id}
-                    className="group bg-white rounded-xl border border-slate-200/90 hover:border-emerald-300 hover:shadow-sm transition-all duration-200 p-4 lg:py-3 lg:px-5 flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:gap-4 lg:items-center"
+                    className={`group bg-white rounded-xl border border-slate-200/90 hover:border-emerald-300 hover:shadow-sm transition-all duration-200 p-4 lg:py-3 lg:px-5 flex flex-col lg:grid ${ROW_GRID} gap-3 lg:gap-4 lg:items-center`}
                   >
                     {/* Cột STT */}
                     <div className="col-span-1 flex items-center justify-center">
@@ -736,7 +740,7 @@ export default function ProviderDestinationsPage() {
                     </div>
 
                     {/* Cột 1: Thông tin chính (Tên điểm đến) */}
-                    <div className="col-span-11 lg:col-span-3 min-w-0 flex items-center">
+                    <div className="col-span-11 lg:col-span-1 min-w-0 flex items-center">
                       <h3
                         className="text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors truncate"
                         title={dest.name}
@@ -746,7 +750,7 @@ export default function ProviderDestinationsPage() {
                     </div>
 
                     {/* Cột 2: Địa chỉ thực địa */}
-                    <div className="col-span-12 lg:col-span-3 min-w-0 flex items-start gap-1.5 text-xs text-slate-600">
+                    <div className="col-span-12 lg:col-span-1 min-w-0 flex items-start gap-1.5 text-xs text-slate-600">
                       <MapPin size={14} className="text-emerald-600 shrink-0 mt-0.5" />
                       <span className="line-clamp-2 leading-relaxed" title={dest.address}>
                         {dest.address || "Chưa cập nhật địa chỉ hành chính"}
@@ -754,7 +758,7 @@ export default function ProviderDestinationsPage() {
                     </div>
 
                     {/* Cột 3: Sức chứa */}
-                    <div className="col-span-6 lg:col-span-2 flex items-center min-w-0">
+                    <div className="col-span-6 lg:col-span-1 flex items-center min-w-0">
                       <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold truncate">
                         <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
                           <Users size={13} />
@@ -803,38 +807,27 @@ export default function ProviderDestinationsPage() {
                     </div>
 
                     {/* Cột 5: Cụm nút thao tác (Gửi duyệt, Chi tiết, Chỉnh sửa) */}
-                    <div className="col-span-12 lg:col-span-2 flex items-center justify-start gap-1.5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 flex-wrap">
-                      {(dest.status === STATUS.DRAFT || dest.status === STATUS.REJECTED) && (
-                        <button
-                          type="button"
-                          onClick={() => handleSubmitForModeration(dest)}
-                          disabled={isLoading}
-                          className="h-8 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-bold inline-flex items-center gap-1 shadow-xs shadow-amber-500/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                          title="Gửi hồ sơ điểm đến này tới Ban Thẩm định văn hóa"
-                        >
-                          <Send size={12} />
-                          <span>Gửi duyệt</span>
-                        </button>
-                      )}
-
+                    {/* Nút chung đứng trước để thẳng hàng giữa các dòng; Gửi duyệt chỉ có ở bản nháp/cần sửa nên đặt cuối */}
+                    <div className="col-span-12 lg:col-span-1 flex items-center justify-start gap-1.5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 flex-wrap lg:flex-nowrap whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => handleViewDetail(dest.id)}
-                        className="h-8 px-2.5 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-700 bg-white text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                        className="h-8 px-2.5 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-700 bg-white text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs shrink-0"
                         title="Xem thông tin chi tiết điểm đến & thuyết minh"
+                        aria-label="Chi tiết"
                       >
                         <Eye size={12} className="text-emerald-600" />
-                        <span>Chi tiết</span>
+                        <span className="lg:hidden xl:inline">Chi tiết</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setQrTarget(dest)}
-                        className="h-8 px-2.5 rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50/60 hover:text-sky-700 bg-white text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                        className="h-8 w-8 rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50/60 bg-white inline-flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-2xs shrink-0"
                         title="Mã QR check-in để in và dán tại cổng điểm đến"
+                        aria-label="Mã QR"
                       >
-                        <QrCode size={12} className="text-sky-600" />
-                        <span>Mã QR</span>
+                        <QrCode size={14} className="text-sky-600" />
                       </button>
 
                       <button
@@ -846,6 +839,19 @@ export default function ProviderDestinationsPage() {
                         <Edit3 size={12} />
                         <span>Sửa</span>
                       </button>
+
+                      {(dest.status === STATUS.DRAFT || dest.status === STATUS.REJECTED) && (
+                        <button
+                          type="button"
+                          onClick={() => handleSubmitForModeration(dest)}
+                          disabled={isLoading}
+                          className="h-8 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-bold inline-flex items-center gap-1 shadow-xs shadow-amber-500/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50 shrink-0"
+                          title="Gửi hồ sơ điểm đến này tới Ban Thẩm định văn hóa"
+                        >
+                          <Send size={12} />
+                          <span>Gửi duyệt</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

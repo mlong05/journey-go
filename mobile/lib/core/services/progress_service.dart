@@ -1,6 +1,14 @@
 import '../constants/api_constants.dart';
 import '../models/booking_model.dart' show BookingModel;
-import '../models/gamification_model.dart' show formatDate, formatDateTime, formatThousands;
+import '../models/gamification_model.dart'
+    show
+        BadgeModel,
+        PointTransactionModel,
+        UserPointModel,
+        badgeTypeLabel,
+        formatDate,
+        formatDateTime,
+        formatThousands;
 import '../models/journey_model.dart';
 import '../models/tour_journey_model.dart';
 import 'booking_service.dart';
@@ -22,6 +30,16 @@ class ProgressService {
 
   Future<int> getPoints() async => (await _gamification.getMyPoints()).currentBalance;
 
+  /// Số dư khả dụng, tổng đã tích lũy và đã tiêu.
+  Future<UserPointModel> getPointSummary() => _gamification.getMyPoints();
+
+  /// Các giao dịch điểm gần nhất (mới nhất trước).
+  Future<List<PointTransactionModel>> getRecentPointHistory({int size = 5}) =>
+      _gamification.getPointHistory(page: 0, size: size);
+
+  /// Danh mục mọi huy hiệu đang mở, để hiện cả huy hiệu chưa đạt.
+  Future<List<BadgeModel>> getBadgeCatalog() => _gamification.getAllBadges();
+
   Future<List<BadgeItem>> getBadges() async {
     final badges = await _gamification.getMyBadges();
     return badges
@@ -30,7 +48,7 @@ class ProgressService {
               name: b.name,
               imageUrl: b.iconUrl,
               earnedAt: formatDate(b.earnedAt),
-              category: b.badgeType,
+              category: badgeTypeLabel(b.badgeType),
               description: b.description,
             ))
         .toList();

@@ -17,12 +17,18 @@ class TourDestinationModel {
   final int sequenceOrder;
   final String name;
   final String address;
+  final double? latitude;
+  final double? longitude;
+  final String? coverImageUrl;
 
   const TourDestinationModel({
     required this.destinationId,
     required this.sequenceOrder,
     required this.name,
     required this.address,
+    this.latitude,
+    this.longitude,
+    this.coverImageUrl,
   });
 
   factory TourDestinationModel.fromJson(Map<String, dynamic> json) =>
@@ -31,7 +37,24 @@ class TourDestinationModel {
         sequenceOrder: _asInt(json['sequenceOrder']),
         name: json['destinationName']?.toString() ?? '',
         address: json['destinationAddress']?.toString() ?? '',
+        latitude: _asDoubleOrNull(json['latitude']),
+        longitude: _asDoubleOrNull(json['longitude']),
+        coverImageUrl: _httpsOrNull(json['coverImageUrl']),
       );
+
+  bool get hasLocation => latitude != null && longitude != null;
+}
+
+/// Chỉ nhận đường dẫn ảnh http(s); chuỗi rỗng hay giá trị lạ coi như chưa có ảnh.
+String? _httpsOrNull(dynamic value) {
+  final s = value?.toString().trim() ?? '';
+  return s.startsWith('http') ? s : null;
+}
+
+double? _asDoubleOrNull(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString());
 }
 
 /// Tour đã xuất bản. `price` do backend tính = tổng giá các trải nghiệm đã xuất bản
@@ -44,6 +67,14 @@ class TourModel {
   final int durationDays;
   final List<TourDestinationModel> destinations;
 
+  /// Phần thưởng có thể nhận (backend tổng hợp): nhiệm vụ, tổng điểm nhiệm vụ, huy hiệu check-in.
+  final int taskCount;
+  final int totalTaskPoints;
+  final int badgeCount;
+
+  /// Ảnh bìa tour (backend lấy từ điểm đến đầu tiên có ảnh); null thì dùng nền gradient.
+  final String? coverImageUrl;
+
   const TourModel({
     required this.id,
     required this.title,
@@ -51,15 +82,19 @@ class TourModel {
     required this.price,
     required this.durationDays,
     required this.destinations,
+    this.taskCount = 0,
+    this.totalTaskPoints = 0,
+    this.badgeCount = 0,
+    this.coverImageUrl,
   });
 
   factory TourModel.fromJson(Map<String, dynamic> json) {
     final raw = json['destinations'];
     final list = raw is List
         ? raw
-            .whereType<Map<String, dynamic>>()
-            .map(TourDestinationModel.fromJson)
-            .toList()
+              .whereType<Map<String, dynamic>>()
+              .map(TourDestinationModel.fromJson)
+              .toList()
         : <TourDestinationModel>[];
     list.sort((a, b) => a.sequenceOrder.compareTo(b.sequenceOrder));
     return TourModel(
@@ -69,14 +104,22 @@ class TourModel {
       price: _asDouble(json['price']),
       durationDays: _asInt(json['durationDays']),
       destinations: list,
+      taskCount: _asInt(json['taskCount']),
+      totalTaskPoints: _asInt(json['totalTaskPoints']),
+      badgeCount: _asInt(json['badgeCount']),
+      coverImageUrl: _httpsOrNull(json['coverImageUrl']),
     );
   }
 
+  bool get hasRewards => taskCount > 0 || totalTaskPoints > 0 || badgeCount > 0;
+
   int get destinationCount => destinations.length;
 
-  String get formattedPrice => price <= 0 ? 'Miễn phí' : '${formatThousands(price)} đ';
+  String get formattedPrice =>
+      price <= 0 ? 'Miễn phí' : '${formatThousands(price)} đ';
 
-  String get formattedDuration => durationDays <= 1 ? '1 ngày' : '$durationDays ngày';
+  String get formattedDuration =>
+      durationDays <= 1 ? '1 ngày' : '$durationDays ngày';
 
   String get typeLabel => tourTypeLabel(tourType);
 
