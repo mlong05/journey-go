@@ -36,6 +36,28 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
             """)
     List<TourPriceProjection> sumExperiencePricesByTourIds(@Param("tourIds") List<Long> tourIds);
 
+    @Query("""
+            SELECT new com.journeygo.modules.tour.repository.TourRewardProjection(
+                td.tour.tourId, COUNT(t), COALESCE(SUM(t.pointsReward), 0))
+            FROM TourDestination td, Task t
+            WHERE t.experience.destination = td.destination
+              AND t.experience.status = com.journeygo.modules.experience.entity.enums.ExperienceStatus.PUBLISHED
+              AND t.status = com.journeygo.modules.experience.entity.enums.TaskStatus.PUBLISHED
+              AND td.tour.tourId IN :tourIds
+            GROUP BY td.tour.tourId
+            """)
+    List<TourRewardProjection> sumTaskRewardsByTourIds(@Param("tourIds") List<Long> tourIds);
+
+    /** Số điểm đến trong tour có huy hiệu check-in đã bị quản trị viên tắt: [tourId, count]. */
+    @Query("""
+            SELECT td.tour.tourId, COUNT(b)
+            FROM TourDestination td, com.journeygo.modules.gamification.entity.Badge b
+            WHERE b.destinationId = td.destination.id AND b.active = false
+              AND td.tour.tourId IN :tourIds
+            GROUP BY td.tour.tourId
+            """)
+    List<Object[]> countDisabledBadgesByTourIds(@Param("tourIds") List<Long> tourIds);
+
     boolean existsByTitle(String title);
 
     boolean existsByTitleAndTourIdNot(String title, Long tourId);

@@ -29,6 +29,14 @@ import {
   StackedBar,
 } from "@/components/dashboard/DashboardUI";
 import { moderationService } from "@/features/destination";
+import { dashboardService } from "@/features/dashboard";
+
+function formatReviewHours(hours) {
+  if (hours == null) return "chưa có dữ liệu";
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} phút`;
+  if (hours < 48) return `${hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ`;
+  return `${Math.round(hours / 24)} ngày`;
+}
 
 /**
  * Trang Bảng Điều Khiển Ban Kiểm Định & Chuẩn Hóa Di Sản - JourneyGo
@@ -48,6 +56,7 @@ export default function ModeratorDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(false);
+  const [avgReviewHours, setAvgReviewHours] = useState(null);
 
   // Dynamic KPI Stats
   const [kpiMetrics, setKpiMetrics] = useState({
@@ -58,7 +67,7 @@ export default function ModeratorDashboardPage() {
     revisionCount: 0,
     revisionTrend: "Đang kiểm tra...",
     alertsCount: 0,
-    alertsTrend: "Hệ thống giám sát ổn định",
+    alertsTrend: "Đang kiểm tra...",
   });
 
   // Dynamic Priority Queue Data
@@ -69,13 +78,12 @@ export default function ModeratorDashboardPage() {
     async function fetchDashboardData() {
       setIsLoading(true);
       try {
-        const [destQueueRes, contentQueueRes, tourQueueRes, publishedDestsRes, rejectedDestsRes] =
+        const [destQueueRes, contentQueueRes, tourQueueRes, statsRes] =
           await Promise.allSettled([
             moderationService.getDestinationQueue({ size: 500 }),
             moderationService.getContentQueue({ size: 500 }),
             moderationService.getTourQueue({ size: 500 }),
-            moderationService.getDestinationsByStatus("PUBLISHED"),
-            moderationService.getDestinationsByStatus("REJECTED"),
+            dashboardService.getModerator(),
           ]);
 
         if (!isMounted) return;
@@ -91,23 +99,34 @@ export default function ModeratorDashboardPage() {
         const destQueue = extractQueueArray(destQueueRes);
         const contentQueue = extractQueueArray(contentQueueRes);
         const tourQueue = extractQueueArray(tourQueueRes);
-        const publishedDests = extractQueueArray(publishedDestsRes);
-        const rejectedDests = extractQueueArray(rejectedDestsRes);
+        const stats = statsRes.status === "fulfilled" ? statsRes.value : null;
+        if (!stats) console.error("[Moderator Dashboard] Stats error:", statsRes.reason);
 
-        const totalPending = destQueue.length + contentQueue.length + tourQueue.length;
+        // Số đếm lấy từ API thống kê (không bị giới hạn kích thước trang); hàng chờ chỉ dùng làm dự phòng
+        const pending = stats?.pending ?? {
+          destinations: destQueue.length,
+          tours: tourQueue.length,
+          contents: contentQueue.length,
+        };
+        const totalPending = pending.destinations + pending.tours + pending.contents;
 
+        setAvgReviewHours(stats?.avgReviewHours ?? null);
         setKpiMetrics({
           pendingCount: totalPending,
           pendingTrend:
             totalPending > 0
-              ? `${destQueue.length} điểm đến, ${tourQueue.length} tour, ${contentQueue.length} thuyết minh`
+              ? `${pending.destinations} điểm đến, ${pending.tours} tour, ${pending.contents} thuyết minh`
               : "Hàng chờ hiện đang trống",
-          publishedCount: publishedDests.length,
-          publishedTrend: "Điểm đến đã chuẩn hóa & phát hành",
-          revisionCount: rejectedDests.length,
-          revisionTrend: "Hồ sơ yêu cầu đối tác hiệu đính",
-          alertsCount: 0,
-          alertsTrend: "Hệ thống giám sát ổn định",
+          publishedCount: stats?.approvedToday ?? 0,
+          publishedTrend: stats
+            ? `Đã ra ${stats.decidedToday} quyết định trong hôm nay`
+            : "Không tải được số liệu",
+          revisionCount: stats?.rejectedTotal ?? 0,
+          revisionTrend: "Hồ sơ đang chờ đối tác hiệu đính",
+          alertsCount: stats?.pendingReports ?? 0,
+          alertsTrend: stats
+            ? `Báo cáo vi phạm chờ xử lý • ${stats.pendingPosts} bài cộng đồng chờ duyệt`
+            : "Không tải được số liệu",
         });
 
         // Xây dựng danh sách hàng chờ ưu tiên từ API thực tế
@@ -251,8 +270,14 @@ export default function ModeratorDashboardPage() {
         description="Đảm bảo dữ liệu lịch sử, tọa độ thực địa và bài thuyết minh đạt chuẩn di sản Việt Nam trước khi tiếp cận du khách."
         meta={
           <>
-            <StatusChip tone="emerald">Giám sát thẩm định: sẵn sàng</StatusChip>
-            <StatusChip tone="indigo">Xử lý trung bình: &lt; 2 giờ</StatusChip>
+            <StatusChip tone={kpiMetrics.pendingCount > 0 ? "amber" : "emerald"}>
+              {kpiMetrics.pendingCount > 0
+                ? `${kpiMetrics.pendingCount} hồ sơ đang chờ`
+                : "Hàng chờ đang trống"}
+            </StatusChip>
+            <StatusChip tone="indigo">
+              Xử lý trung bình (30 ngày): {formatReviewHours(avgReviewHours)}
+            </StatusChip>
           </>
         }
       >
@@ -363,8 +388,6 @@ export default function ModeratorDashboardPage() {
               <option value="destination">Điểm đến và di tích</option>
               <option value="tour">Tuyến hành trình &amp; Tour</option>
               <option value="cultural">Thuyết minh &amp; Di sản</option>
-              <option value="route">Lộ trình và vé</option>
-              <option value="quiz">Thử thách đố vui</option>
             </select>
 
           </div>

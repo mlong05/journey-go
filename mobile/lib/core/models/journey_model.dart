@@ -34,10 +34,20 @@ class BadgeItem {
   });
 }
 
-/// Hạng thành viên theo điểm tích lũy.
-String rankTierFor(int points) {
-  if (points >= 1000) return 'Bạch Kim';
-  if (points >= 500) return 'Hạng Vàng';
-  if (points >= 200) return 'Hạng Bạc';
-  return 'Hạng Đồng';
+const _rankTiers = [
+  (minPoints: 1000, name: 'Bạch Kim'),
+  (minPoints: 500, name: 'Hạng Vàng'),
+  (minPoints: 200, name: 'Hạng Bạc'),
+  (minPoints: 0, name: 'Hạng Đồng'),
+];
+
+/// Hạng thành viên theo điểm tích lũy (tổng điểm đã kiếm, không trừ điểm đã đổi voucher).
+String rankTierFor(int points) => _rankTiers.firstWhere((t) => points >= t.minPoints).name;
+
+/// Hạng kế tiếp và số điểm còn thiếu; null khi đã ở hạng cao nhất.
+({String name, int remaining})? nextRankFor(int points) {
+  final higher = _rankTiers.where((t) => t.minPoints > points).toList();
+  if (higher.isEmpty) return null;
+  final next = higher.last;
+  return (name: next.name, remaining: next.minPoints - points);
 }

@@ -100,8 +100,12 @@ public class CloudinaryService {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Tệp tải lên không được để trống");
         }
 
+        // Một số client di động gửi application/octet-stream cho mọi tệp, khi đó xét theo đuôi tên tệp
         String contentType = file.getContentType();
-        if (contentType == null || !contentType.toLowerCase().startsWith("image/")) {
+        boolean imageType = contentType != null && contentType.toLowerCase().startsWith("image/");
+        String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        boolean imageExtension = filename.matches(".*\\.(png|jpe?g|webp|gif|heic|heif)$");
+        if (!imageType && !imageExtension) {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Chỉ chấp nhận tệp hình ảnh (PNG, JPG, JPEG, WEBP, GIF)");
         }
 

@@ -8,6 +8,7 @@ import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +34,27 @@ public class GamificationController {
     @Operation(summary = "Xem danh mục huy hiệu toàn hệ thống", description = "Trả về danh sách tất cả huy hiệu di sản đang mở")
     public ResponseEntity<ApiResponse<List<BadgeResponse>>> getAllBadges() {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh mục huy hiệu thành công", gamificationService.getAllBadges()));
+    }
+
+    @GetMapping("/badges/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Quản trị: danh sách mọi huy hiệu", description = "Gồm cả huy hiệu đã tắt, kèm số du khách đã đạt")
+    public ResponseEntity<ApiResponse<List<AdminBadgeResponse>>> getAllBadgesForAdmin() {
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách huy hiệu thành công",
+                gamificationService.getAllBadgesForAdmin()));
+    }
+
+    @PutMapping("/badges/{badgeId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Quản trị: cập nhật huy hiệu", description = "Đổi tên, mô tả, ảnh, điểm thưởng hoặc bật/tắt huy hiệu")
+    public ResponseEntity<ApiResponse<AdminBadgeResponse>> updateBadge(
+            @PathVariable Long badgeId,
+            @Valid @RequestBody BadgeUpdateRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật huy hiệu thành công",
+                gamificationService.updateBadge(badgeId, request)));
     }
 
     @GetMapping("/badges/my")

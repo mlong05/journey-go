@@ -43,6 +43,10 @@ public class Destination {
     @Column(nullable = false)
     private Integer capacity;
 
+    /** Ảnh bìa (URL https trên Cloudinary) hiển thị trên thẻ tour và chi tiết hành trình của app. */
+    @Column(name = "cover_image_url", length = 500)
+    private String coverImageUrl;
+
     @Column(nullable = false, columnDefinition = "integer default 0 not null")
     @Builder.Default
     private Integer booked = 0;

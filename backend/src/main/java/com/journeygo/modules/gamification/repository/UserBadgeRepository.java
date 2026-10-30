@@ -20,4 +20,8 @@ public interface UserBadgeRepository extends JpaRepository<UserBadge, Long> {
     Optional<UserBadge> findByUserIdAndBadgeId(Long userId, Long badgeId);
 
     Optional<UserBadge> findByUserIdAndDestinationId(Long userId, Long destinationId);
+
+    /** Số du khách đã đạt mỗi huy hiệu: [badgeId, count]. */
+    @Query("SELECT ub.badge.id, COUNT(ub) FROM UserBadge ub GROUP BY ub.badge.id")
+    List<Object[]> countEarnedByBadge();
 }

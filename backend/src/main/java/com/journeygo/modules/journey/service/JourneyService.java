@@ -196,8 +196,10 @@ public class JourneyService {
                 userId, destinationId, destProgress.getDestinationName(), journeyId
         );
 
-        destProgress.setBadgeAwarded(true);
-        destProgress.setBadgeId(awardedBadge.getBadge().getId());
+        if (awardedBadge != null) {
+            destProgress.setBadgeAwarded(true);
+            destProgress.setBadgeId(awardedBadge.getBadge().getId());
+        }
 
         destinationProgressRepository.save(destProgress);
         finishDestinationIfDone(journey, destProgress, userId);
@@ -208,12 +210,14 @@ public class JourneyService {
                 .journeyId(journeyId)
                 .destinationId(destinationId)
                 .success(true)
-                .message("Check-in thành công! Bạn đã mở khóa nội dung văn hóa và nhận huy hiệu di sản")
+                .message(awardedBadge != null
+                        ? "Check-in thành công! Bạn đã mở khóa nội dung văn hóa và nhận huy hiệu di sản"
+                        : "Check-in thành công! Bạn đã mở khóa nội dung văn hóa")
                 .distanceMeters(distanceMeters)
-                .badgeAwarded(true)
-                .badgeId(awardedBadge.getBadge().getId())
-                .badgeName(awardedBadge.getBadge().getName())
-                .badgeIconUrl(awardedBadge.getBadge().getIconUrl())
+                .badgeAwarded(awardedBadge != null)
+                .badgeId(awardedBadge != null ? awardedBadge.getBadge().getId() : null)
+                .badgeName(awardedBadge != null ? awardedBadge.getBadge().getName() : null)
+                .badgeIconUrl(awardedBadge != null ? awardedBadge.getBadge().getIconUrl() : null)
                 .checkedInAt(destProgress.getCheckedInAt())
                 .build();
     }
@@ -302,6 +306,7 @@ public class JourneyService {
         // Nhiệm vụ tương tác ngoài thực tế: từng câu một, theo từng địa điểm
         int index = Math.min(taskProgress.getCurrentQuestionIndex(), Math.max(total - 1, 0));
         base.questionIndex(finished ? total : index);
+        base.stations(toStationList(task.questions(), finished ? total : index));
         if (finished || total == 0) {
             return base.unlocked(!finished).questions(finished ? null : List.of()).build();
         }
@@ -600,6 +605,20 @@ public class JourneyService {
                         : q.answers().stream()
                                 .map(x -> new TaskQuestionsResponse.Option(x.answerId(), x.content(), x.orderIndex()))
                                 .toList());
+    }
+
+    /** Trạm theo thứ tự câu hỏi; trạm sau câu hiện tại bị ẩn tọa độ để không lộ trước điểm đến kế tiếp. */
+    private List<TaskQuestionsResponse.Station> toStationList(List<TourInfo.QuestionInfo> questions, int currentIndex) {
+        if (questions == null) return List.of();
+        List<TaskQuestionsResponse.Station> result = new java.util.ArrayList<>(questions.size());
+        for (int i = 0; i < questions.size(); i++) {
+            TourInfo.QuestionInfo q = questions.get(i);
+            String name = q.stationName() != null ? q.stationName() : "Trạm " + (i + 1);
+            result.add(i <= currentIndex
+                    ? new TaskQuestionsResponse.Station(name, q.stationLatitude(), q.stationLongitude(), q.stationRadiusMeters())
+                    : new TaskQuestionsResponse.Station(name, null, null, q.stationRadiusMeters()));
+        }
+        return result;
     }
 
     private TaskQuestionsResponse.Station toStation(TourInfo.QuestionInfo q) {
