@@ -14,7 +14,6 @@ import {
   Send,
   ChevronRight,
   Inbox,
-  Plus,
   FileCheck,
   PhoneCall,
   Navigation,
@@ -233,13 +232,6 @@ export default function ProviderOverviewPage() {
         }
       >
         {rangeTabs}
-        <Link
-          href="/provider/destinations"
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors"
-        >
-          <Plus size={14} strokeWidth={2.5} />
-          Khai báo điểm mới
-        </Link>
       </PageHeader>
 
       {error && (
@@ -320,7 +312,7 @@ export default function ProviderOverviewPage() {
                     <EmptyBlock
                       icon={Inbox}
                       title={isLoading ? "Đang tải điểm đến…" : "Chưa có điểm đến di tích nào trong danh sách."}
-                      description="Bấm Khai báo điểm mới để nhập tọa độ thực địa và gửi hồ sơ thẩm định."
+                      description="Vào Quản lý Điểm đến để khai báo điểm mới và gửi hồ sơ thẩm định."
                     />
                   </td>
                 </tr>
