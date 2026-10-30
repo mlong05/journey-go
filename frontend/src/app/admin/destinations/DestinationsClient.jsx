@@ -11,7 +11,6 @@ import {
   X,
   Users,
   Loader2,
-  Compass,
   Inbox,
   RefreshCw,
   Navigation,
@@ -525,6 +524,9 @@ export default function DestinationsClient() {
             <table className="w-full text-xs border-collapse">
               <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 shadow-2xs">
                 <tr>
+                  <th className="text-center px-4 py-3 font-bold text-slate-700 text-[11px] w-14">
+                    STT
+                  </th>
                   <th className="text-left px-4 py-3 font-bold text-slate-700 text-[11px]">
                     Điểm đến
                   </th>
@@ -546,22 +548,20 @@ export default function DestinationsClient() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginatedDestinations.map((dest) => (
+                {paginatedDestinations.map((dest, idx) => (
                   <tr
                     key={dest.id}
                     className="hover:bg-slate-50/70 transition-colors"
                   >
+                    {/* Số thứ tự (tính theo trang) */}
+                    <td className="px-4 py-3 text-center font-bold text-slate-500 tabular-nums">
+                      {(currentPage - 1) * pageSize + idx + 1}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-slate-900/5 text-slate-700 flex items-center justify-center shrink-0">
-                          <Compass size={15} />
-                        </div>
                         <div>
                           <p className="font-bold text-slate-900 leading-tight">
                             {dest.name}
-                          </p>
-                          <p className="text-[11px] text-slate-600 mt-0.5">
-                            {dest.createdBy || "Không rõ"}
                           </p>
                         </div>
                       </div>

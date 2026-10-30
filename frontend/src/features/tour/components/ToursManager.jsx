@@ -10,7 +10,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Route,
   MapPin,
   Send,
   Pencil,
@@ -954,7 +953,8 @@ export default function ToursManager({
           <div
             className={`${ROW_GRID} px-4 sm:px-5 py-3 bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 sticky top-0 z-10`}
           >
-            <div className="col-span-12 md:col-span-4">Tour</div>
+            <div className="hidden md:block md:col-span-1 text-center">STT</div>
+            <div className="col-span-12 md:col-span-3">Tour</div>
             <div className="col-span-6 md:col-span-2">Hành trình</div>
             <div className="col-span-6 md:col-span-2">Tổng giá &amp; thời lượng</div>
             <div className="col-span-6 md:col-span-2">Trạng thái</div>
@@ -986,26 +986,26 @@ export default function ToursManager({
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {pagedItems.map((tour) => (
+              {pagedItems.map((tour, idx) => (
                 <li
                   key={tour.tourId}
                   className="px-4 sm:px-5 py-3.5 hover:bg-slate-50/60 transition-colors"
                 >
                   <div className={ROW_GRID}>
+                    {/* Số thứ tự (tính theo trang) */}
+                    <div className="hidden md:block md:col-span-1 text-center text-xs font-bold text-slate-500 tabular-nums">
+                      {safePageNumber * pageSize + idx + 1}
+                    </div>
+
                     {/* Cột 1: Tour */}
-                    <div className="col-span-12 md:col-span-4 flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-slate-900/5 text-slate-700 border border-slate-200/80 flex items-center justify-center shrink-0">
-                        <Route size={18} />
-                      </div>
+                    <div className="col-span-12 md:col-span-3 flex items-center gap-3 min-w-0">
                       <div className="min-w-0 flex-1">
                         <h3 className="text-sm font-bold text-slate-900 truncate">
                           {tour.title}
                         </h3>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-600">
                           <span className="font-semibold text-slate-600 truncate">
-                            {source === "mine"
-                              ? TOUR_TYPE_META[tour.tourType] || "Khác"
-                              : tour.createdBy || "Đơn vị không xác định"}
+                            {TOUR_TYPE_META[tour.tourType] || "Khác"}
                           </span>
                         </div>
                         {tour.status === "REJECTED" && tour.rejectionReason && (

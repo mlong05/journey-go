@@ -34,7 +34,6 @@ import {
   QrCode,
   Layers,
   Pencil,
-  Landmark,
 } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import {
@@ -176,7 +175,6 @@ function normalizeDestination(raw, fallbackStatus = STATUS.DRAFT) {
 export default function ProviderDestinationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRegion, setSelectedRegion] = useState("all");
-  const [selectedCategory, setSelectedCategory] = useState("all");
   const [statusTab, setStatusTab] = useState("all");
   const [destinations, setDestinations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -494,7 +492,7 @@ export default function ProviderDestinationsPage() {
   }, [destinations, searchQuery, selectedRegion, statusTab, provinceList]);
 
   // Reset về trang 1 khi thay đổi điều kiện tìm kiếm/bộ lọc (điều chỉnh state ngay khi render, không dùng effect)
-  const filterKey = [searchQuery, selectedRegion, selectedCategory, statusTab].join("|");
+  const filterKey = [searchQuery, selectedRegion, statusTab].join("|");
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (prevFilterKey !== filterKey) {
     setPrevFilterKey(filterKey);
@@ -612,12 +610,12 @@ export default function ProviderDestinationsPage() {
       </section>
 
       {/* ── THANH LỌC ────────────────────────────────────────── */}
-      <div className="shrink-0 bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="shrink-0 bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-3 xl:gap-4">
+        <div className="flex flex-wrap xl:flex-nowrap items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={() => setStatusTab("all")}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+            className={`px-2.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
               statusTab === "all"
                 ? "bg-slate-900 text-white shadow-xs"
                 : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
@@ -632,7 +630,7 @@ export default function ProviderDestinationsPage() {
                 key={tab.status}
                 type="button"
                 onClick={() => setStatusTab(tab.status)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-2.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer flex items-center gap-1.5 ${
                   isActive ? tab.activeCls : tab.idleCls
                 }`}
               >
@@ -649,8 +647,8 @@ export default function ProviderDestinationsPage() {
           })}
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full xl:w-auto">
-          <div className="relative sm:w-48 shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full xl:flex-1 xl:min-w-0">
+          <div className="relative sm:w-44 shrink-0">
             <select
               value={selectedRegion}
               onChange={(e) => setSelectedRegion(e.target.value)}
@@ -678,26 +676,7 @@ export default function ProviderDestinationsPage() {
             />
           </div>
 
-          <div className="relative sm:w-40 shrink-0">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              aria-label="Lọc theo thể loại"
-              className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20 appearance-none cursor-pointer"
-            >
-              <option value="all">Tất cả Thể loại</option>
-              <option value="Di tích">Di tích lịch sử</option>
-              <option value="Làng nghề">Làng nghề truyền thống</option>
-              <option value="Bảo tàng">Bảo tàng</option>
-              <option value="Danh thắng">Danh thắng</option>
-            </select>
-            <ChevronDown
-              size={14}
-              className="absolute inset-y-0 right-2.5 my-auto pointer-events-none text-slate-400"
-            />
-          </div>
-
-          <div className="relative w-full sm:w-72 shrink-0">
+          <div className="relative w-full sm:flex-1 sm:min-w-[220px]">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
               <Search size={14} />
             </div>
@@ -793,9 +772,6 @@ export default function ProviderDestinationsPage() {
 
                       {/* Cột 1: Điểm đến */}
                       <div className="col-span-12 md:col-span-1 flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-slate-900/5 text-slate-700 border border-slate-200/80 flex items-center justify-center shrink-0">
-                          <Landmark size={18} />
-                        </div>
                         <div className="min-w-0 flex-1">
                           <h3
                             className="text-sm font-bold text-slate-900 truncate"
@@ -803,11 +779,6 @@ export default function ProviderDestinationsPage() {
                           >
                             {dest.name}
                           </h3>
-                          <p className="mt-0.5 text-[11px] font-semibold text-slate-600 truncate">
-                            {dest.contentCount > 0
-                              ? `${dest.contentCount} nội dung thuyết minh`
-                              : `Mã số #${dest.id}`}
-                          </p>
                         </div>
                       </div>
 
