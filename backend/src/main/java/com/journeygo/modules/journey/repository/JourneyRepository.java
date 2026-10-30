@@ -19,6 +19,8 @@ public interface JourneyRepository extends JpaRepository<Journey, Long> {
 
     Optional<Journey> findByUserIdAndBookingId(Long userId, Long bookingId);
 
+    Optional<Journey> findFirstByUserIdAndBookingIdOrderByCreatedAtDesc(Long userId, Long bookingId);
+
     Optional<Journey> findFirstByUserIdAndTourIdAndStatusInOrderByCreatedAtDesc(
             Long userId, Long tourId, List<JourneyStatus> statuses
     );

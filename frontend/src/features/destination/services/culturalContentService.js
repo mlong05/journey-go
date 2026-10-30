@@ -74,6 +74,8 @@ export async function createContent(destinationId, payload) {
     contentText: payload.contentText ? String(payload.contentText).trim() : null,
     mediaUrl: payload.mediaUrl ? String(payload.mediaUrl).trim() : null,
     duration: payload.duration != null && payload.duration !== "" ? Number(payload.duration) : null,
+    // Thư viện ảnh; undefined = không gửi (giữ nguyên ảnh cũ khi cập nhật)
+    imageUrls: Array.isArray(payload.imageUrls) ? payload.imageUrls : undefined,
   };
   const res = await apiClient.post(ENDPOINTS.BY_DESTINATION(destinationId), body);
   return unwrap(res);
@@ -92,6 +94,8 @@ export async function updateContent(id, payload) {
     contentText: payload.contentText ? String(payload.contentText).trim() : null,
     mediaUrl: payload.mediaUrl ? String(payload.mediaUrl).trim() : null,
     duration: payload.duration != null && payload.duration !== "" ? Number(payload.duration) : null,
+    // Thư viện ảnh; undefined = không gửi (giữ nguyên ảnh cũ khi cập nhật)
+    imageUrls: Array.isArray(payload.imageUrls) ? payload.imageUrls : undefined,
   };
   const res = await apiClient.put(ENDPOINTS.BY_ID(id), body);
   return unwrap(res);

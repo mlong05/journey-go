@@ -32,7 +32,11 @@ import {
   Send,
   XCircle,
   QrCode,
+  Layers,
+  Pencil,
+  Landmark,
 } from "lucide-react";
+import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import {
   destinationService,
   provinceService,
@@ -57,9 +61,16 @@ const STATUS = {
   DRAFT: "DRAFT",
 };
 
-// Dùng chung cho thanh tiêu đề và từng dòng để các cột thẳng hàng; cột thao tác có độ rộng cố định đủ chứa 4 nút trên một hàng
+// Lưới dùng chung cho tiêu đề cột và từng dòng để các cột thẳng hàng (cùng phong cách bảng Tour)
 const ROW_GRID =
-  "lg:grid-cols-[2.5rem_minmax(0,1.2fr)_minmax(0,1.5fr)_minmax(0,1fr)_7rem_14.5rem] xl:grid-cols-[2.5rem_minmax(0,1.2fr)_minmax(0,1.5fr)_minmax(0,1fr)_7rem_17.5rem]";
+  "grid grid-cols-12 md:grid-cols-[2.5rem_minmax(0,1.3fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_9rem_8.5rem] gap-3 sm:gap-4 items-center";
+
+/* Vùng cuộn: ổn định scrollbar + chặn cuộn chồng sang vùng cha */
+const LIST_SCROLL =
+  "[scrollbar-gutter:stable] overflow-y-auto overscroll-contain";
+
+const PAGE_NAV_BTN =
+  "p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
 
 const STATUS_LABEL = {
   [STATUS.PUBLISHED]: "Đang hoạt động",
@@ -67,6 +78,58 @@ const STATUS_LABEL = {
   [STATUS.REJECTED]: "Cần chỉnh sửa",
   [STATUS.DRAFT]: "Bản nháp",
 };
+
+const STATUS_BADGE = {
+  [STATUS.PUBLISHED]: { cls: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
+  [STATUS.PENDING]: { cls: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500 animate-pulse" },
+  [STATUS.REJECTED]: { cls: "bg-rose-50 text-rose-700 border-rose-200", dot: "bg-rose-500" },
+  [STATUS.DRAFT]: { cls: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
+};
+
+// Thứ tự và màu các tab trạng thái, giống thanh lọc của trang Tour
+const STATUS_TABS = [
+  {
+    status: STATUS.DRAFT,
+    countKey: "draft",
+    activeCls: "bg-slate-700 text-white border-slate-700",
+    idleCls: "bg-white text-slate-600 border-slate-200 hover:bg-slate-50",
+    dot: "bg-slate-400",
+  },
+  {
+    status: STATUS.PENDING,
+    countKey: "pending",
+    activeCls: "bg-amber-500 text-white border-amber-500",
+    idleCls: "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100",
+    dot: "bg-amber-500 animate-pulse",
+  },
+  {
+    status: STATUS.PUBLISHED,
+    countKey: "published",
+    activeCls: "bg-emerald-600 text-white border-emerald-600",
+    idleCls: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100",
+    dot: "bg-emerald-500",
+  },
+  {
+    status: STATUS.REJECTED,
+    countKey: "rejected",
+    activeCls: "bg-rose-600 text-white border-rose-600",
+    idleCls: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100",
+    dot: "bg-rose-500",
+  },
+];
+
+function StatusBadge({ status }) {
+  const meta = STATUS_BADGE[status] || STATUS_BADGE[STATUS.DRAFT];
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${meta.cls}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
+      {STATUS_LABEL[status] || STATUS_LABEL[STATUS.DRAFT]}
+    </span>
+  );
+}
+
 
 function normalizeDestination(raw, fallbackStatus = STATUS.DRAFT) {
   if (!raw || typeof raw !== "object") return null;
@@ -473,10 +536,10 @@ export default function ProviderDestinationsPage() {
   };
 
   return (
-    <div className="h-full min-h-0 w-full overflow-hidden flex flex-col animate-in fade-in-50 duration-200">
+    <div className="h-full min-h-0 flex flex-col gap-4 overflow-hidden animate-in fade-in-50 duration-200">
       {toastMessage && (
         <div
-          className={`fixed top-5 right-5 z-50 ${toastPalette[toastTone]} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-3 max-w-md`}
+          className={`fixed top-5 right-5 z-[70] ${toastPalette[toastTone]} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-3 max-w-md`}
         >
           {toastTone === "success" ? (
             <CheckCircle2 size={16} className="text-emerald-300 shrink-0" />
@@ -489,71 +552,118 @@ export default function ProviderDestinationsPage() {
         </div>
       )}
 
-      {/* ── 1. TIÊU ĐỀ TRANG VÀ THAO TÁC (SHRINK-0: CỐ ĐỊNH TRÊN CÙNG) ── */}
-      <div className="shrink-0 mb-4 pb-4 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-5 bg-emerald-600 rounded-full" />
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Quản Lý Điểm Đến Di Tích
-            </h1>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Khai báo tọa độ thực địa, quản lý trạng thái phê duyệt và đồng bộ với Hội đồng Thẩm định văn hóa.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+      {/* ── TIÊU ĐỀ TRANG + NÚT THAO TÁC ───────────────────────── */}
+      <div className="shrink-0">
+        <PageHeader
+          title="Quản Lý Điểm Đến Di Tích"
+          description="Khai báo tọa độ thực địa, quản lý trạng thái phê duyệt và đồng bộ với Hội đồng Thẩm định văn hóa."
+        >
           <button
             type="button"
             onClick={fetchAllList}
             disabled={isLoading}
-            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+            className="h-9 px-3.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-[13px] flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
             title="Làm mới danh sách"
           >
-            <RefreshCw
-              size={14}
-              className={isLoading ? "animate-spin" : ""}
-            />
+            <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
             <span className="hidden sm:inline">Làm mới</span>
           </button>
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm shadow-emerald-600/25 text-xs sm:text-sm transition-all cursor-pointer"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-xs text-[13px] transition-colors cursor-pointer active:scale-[0.98]"
           >
-            <Plus size={18} strokeWidth={2.4} />
-            <span>Thêm Điểm Đến Mới</span>
+            <Plus size={16} strokeWidth={2.2} />
+            <span>Thêm điểm đến mới</span>
           </button>
-        </div>
+        </PageHeader>
       </div>
 
-      {/* ── 2. BỘ LỌC TÌM KIẾM VÀ TABS TRẠNG THÁI (SHRINK-0: CỐ ĐỊNH TRÊN CÙNG) ── */}
-      <div className="shrink-0 mb-4 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-3.5">
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div className="sm:col-span-6 relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <Search size={15} />
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo tên điểm đến, địa chỉ hoặc mã số..."
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all"
-            />
-          </div>
+      {/* ── KPI ───────────────────────────────────────────────── */}
+      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiTile
+          icon={Layers}
+          label="Tổng điểm đến"
+          value={counts.all}
+          unit="điểm đến"
+          tone="slate"
+        />
+        <KpiTile
+          icon={Pencil}
+          label="Bản nháp"
+          value={counts.draft}
+          unit="điểm đến"
+          tone="slate"
+        />
+        <KpiTile
+          icon={Clock}
+          label="Chờ duyệt"
+          value={counts.pending}
+          unit="điểm đến"
+          tone="amber"
+        />
+        <KpiTile
+          icon={CheckCircle2}
+          label="Đang hoạt động"
+          value={counts.published}
+          unit="điểm đến"
+          tone="emerald"
+        />
+      </section>
 
-          <div className="sm:col-span-3 relative">
+      {/* ── THANH LỌC ────────────────────────────────────────── */}
+      <div className="shrink-0 bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setStatusTab("all")}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              statusTab === "all"
+                ? "bg-slate-900 text-white shadow-xs"
+                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            Tất cả ({counts.all})
+          </button>
+          {STATUS_TABS.map((tab) => {
+            const isActive = statusTab === tab.status;
+            return (
+              <button
+                key={tab.status}
+                type="button"
+                onClick={() => setStatusTab(tab.status)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isActive ? tab.activeCls : tab.idleCls
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    isActive ? "bg-white" : tab.dot
+                  }`}
+                />
+                <span>
+                  {STATUS_LABEL[tab.status]} ({counts[tab.countKey]})
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full xl:w-auto">
+          <div className="relative sm:w-48 shrink-0">
             <select
               value={selectedRegion}
               onChange={(e) => setSelectedRegion(e.target.value)}
               disabled={provinceLoading && provinceList.length === 0}
-              className="w-full pl-3.5 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none disabled:opacity-60 cursor-pointer"
+              aria-label="Lọc theo tỉnh / thành phố"
+              title={provinceError || undefined}
+              className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20 appearance-none disabled:opacity-60 cursor-pointer"
             >
               <option value="all">
                 {provinceLoading && provinceList.length === 0
                   ? "Đang tải tỉnh/thành..."
+                  : provinceError
+                  ? "⚠ Không tải được tỉnh/thành"
                   : "Tất cả Tỉnh / Thành phố"}
               </option>
               {provinceList.map((p) => (
@@ -566,18 +676,14 @@ export default function ProviderDestinationsPage() {
               size={14}
               className="absolute inset-y-0 right-2.5 my-auto pointer-events-none text-slate-400"
             />
-            {provinceError && (
-              <p className="mt-1 text-[11px] text-rose-600 font-bold">
-                ⚠ {provinceError}
-              </p>
-            )}
           </div>
 
-          <div className="sm:col-span-3 relative">
+          <div className="relative sm:w-40 shrink-0">
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full pl-3.5 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none cursor-pointer"
+              aria-label="Lọc theo thể loại"
+              className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20 appearance-none cursor-pointer"
             >
               <option value="all">Tất cả Thể loại</option>
               <option value="Di tích">Di tích lịch sử</option>
@@ -590,73 +696,25 @@ export default function ProviderDestinationsPage() {
               className="absolute inset-y-0 right-2.5 my-auto pointer-events-none text-slate-400"
             />
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={() => setStatusTab("all")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              statusTab === "all"
-                ? "bg-emerald-600 text-white shadow-xs"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
-            }`}
-          >
-            Tất cả ({counts.all})
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab(STATUS.PUBLISHED)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === STATUS.PUBLISHED
-                ? "bg-emerald-600 text-white shadow-xs"
-                : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/80"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Đang hoạt động ({counts.published})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab(STATUS.PENDING)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === STATUS.PENDING
-                ? "bg-amber-600 text-white shadow-xs"
-                : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/80"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <span>Chờ phê duyệt ({counts.pending})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab(STATUS.REJECTED)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === STATUS.REJECTED
-                ? "bg-rose-600 text-white shadow-xs"
-                : "bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200/80"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-rose-500" />
-            <span>Cần chỉnh sửa ({counts.rejected})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab(STATUS.DRAFT)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusTab === STATUS.DRAFT
-                ? "bg-slate-700 text-white shadow-xs"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200/80"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-slate-400" />
-            <span>Bản nháp ({counts.draft})</span>
-          </button>
+          <div className="relative w-full sm:w-72 shrink-0">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <Search size={14} />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm tên điểm đến, địa chỉ, mã số..."
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-400"
+            />
+          </div>
         </div>
       </div>
 
+      {/* ── LỖI ───────────────────────────────────────────────── */}
       {fetchError && (
-        <div className="shrink-0 mb-4 flex items-start gap-2.5 p-4 rounded-xl bg-rose-50 border border-rose-200">
+        <div className="shrink-0 flex items-start gap-2.5 p-4 rounded-xl bg-rose-50 border border-rose-200">
           <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-bold text-rose-800">
@@ -674,291 +732,272 @@ export default function ProviderDestinationsPage() {
         </div>
       )}
 
-      {/* ── 3. KHU VỰC DANH SÁCH THẺ VÀ PHÂN TRANG (CỐ ĐỊNH PHÂN TRANG, CHỈ CUỘN BÊN TRONG CÁC THẺ) ── */}
-      <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
-        {isLoading && destinations.length === 0 ? (
-          <div className="bg-white rounded-2xl p-16 text-center border border-slate-200/90 shadow-2xs">
-            <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
-            <p className="text-xs text-slate-400 mt-3">
-              Đang tải danh sách điểm đến từ máy chủ…
-            </p>
+      {/* ── BẢNG ──────────────────────────────────────────────── */}
+      <section className="flex-1 min-h-0 flex flex-col bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        {/* Tiêu đề cột và thân danh sách nằm trong cùng một vùng cuộn để các cột luôn thẳng hàng */}
+        <div className={`${LIST_SCROLL} flex-1 min-h-0`}>
+          {/* Tiêu đề cột */}
+          <div
+            className={`${ROW_GRID} px-4 sm:px-5 py-3 bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 sticky top-0 z-10`}
+          >
+            <div className="hidden md:block text-center">STT</div>
+            <div className="col-span-12 md:col-span-1">Điểm đến di tích</div>
+            <div className="hidden md:block">Địa chỉ thực địa</div>
+            <div className="hidden md:block">Sức chứa</div>
+            <div className="hidden md:block">Trạng thái</div>
+            <div className="hidden md:block">Thao tác</div>
           </div>
-        ) : filteredDestinations.length === 0 ? (
-          <div className="bg-white rounded-2xl p-16 text-center border border-slate-200/90 shadow-2xs space-y-3">
-            <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
-              <Inbox size={28} />
-            </div>
-            <h3 className="text-base font-bold text-slate-800">
-              {searchQuery || statusTab !== "all" || selectedRegion !== "all"
-                ? "Không tìm thấy điểm đến nào phù hợp với bộ lọc"
-                : "Chưa có điểm đến nào trong danh sách"}
-            </h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
-              {searchQuery || statusTab !== "all"
-                ? "Thử xóa từ khóa tìm kiếm hoặc đặt lại các bộ lọc về mặc định."
-                : "Bấm nút Thêm Điểm Đến Mới để khai báo thông tin, tọa độ thực địa và gửi phê duyệt."}
-            </p>
-            {!searchQuery && statusTab === "all" && (
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                >
-                  <Plus size={16} />
-                  <span>Thêm Điểm Đến Ngay</span>
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
-            {/* Thanh tiêu đề các cột (Cố định phía trên danh sách thẻ) */}
-            <div className={`shrink-0 hidden lg:grid ${ROW_GRID} gap-4 px-5 py-3 bg-slate-100/90 border border-slate-200/90 rounded-xl text-[11px] font-bold text-slate-600 mb-2.5 shadow-2xs`}>
-              <div className="text-center">STT</div>
-              <div>Điểm đến di tích</div>
-              <div>Địa chỉ thực địa</div>
-              <div>Sức chứa</div>
-              <div className="text-center">Trạng thái</div>
-              <div className="text-left">Thao tác</div>
-            </div>
 
-            {/* Danh sách các thanh ngang điểm đến (CHỈ DUY NHẤT VÙNG NÀY CUỘN LÊN XUỐNG) */}
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1.5 space-y-2.5 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+          {/* Thân danh sách */}
+          {isLoading && destinations.length === 0 ? (
+            <div className="p-16 text-center">
+              <Loader2 size={28} className="text-slate-300 mx-auto animate-spin" />
+              <p className="text-xs text-slate-400 mt-3 font-bold">
+                Đang tải danh sách điểm đến...
+              </p>
+            </div>
+          ) : pagedDestinations.length === 0 ? (
+            <div className="p-16 text-center space-y-3">
+              <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center">
+                <Inbox size={28} />
+              </div>
+              <h3 className="text-base font-bold text-slate-800">
+                {searchQuery || statusTab !== "all" || selectedRegion !== "all"
+                  ? "Không tìm thấy điểm đến nào phù hợp với bộ lọc"
+                  : "Chưa có điểm đến nào trong danh sách"}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                {searchQuery || statusTab !== "all"
+                  ? "Thử xóa từ khóa tìm kiếm hoặc đặt lại các bộ lọc về mặc định."
+                  : "Bấm nút Thêm điểm đến mới để khai báo thông tin, tọa độ thực địa và gửi phê duyệt."}
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
               {pagedDestinations.map((dest, idx) => {
                 const stt = (safeCurrentPage - 1) * pageSize + idx + 1;
+                const canSubmit =
+                  dest.status === STATUS.DRAFT || dest.status === STATUS.REJECTED;
                 return (
-                  <div
+                  <li
                     key={dest.id}
-                    className={`group bg-white rounded-xl border border-slate-200/90 hover:border-emerald-300 hover:shadow-sm transition-all duration-200 p-4 lg:py-3 lg:px-5 flex flex-col lg:grid ${ROW_GRID} gap-3 lg:gap-4 lg:items-center`}
+                    className="px-4 sm:px-5 py-3.5 hover:bg-slate-50/60 transition-colors"
                   >
-                    {/* Cột STT */}
-                    <div className="col-span-1 flex items-center justify-center">
-                      <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 border border-slate-200/80 flex items-center justify-center tabular-nums text-xs font-bold shrink-0">
-                        {stt}
-                      </span>
-                    </div>
-
-                    {/* Cột 1: Thông tin chính (Tên điểm đến) */}
-                    <div className="col-span-11 lg:col-span-1 min-w-0 flex items-center">
-                      <h3
-                        className="text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors truncate"
-                        title={dest.name}
-                      >
-                        {dest.name}
-                      </h3>
-                    </div>
-
-                    {/* Cột 2: Địa chỉ thực địa */}
-                    <div className="col-span-12 lg:col-span-1 min-w-0 flex items-start gap-1.5 text-xs text-slate-600">
-                      <MapPin size={14} className="text-emerald-600 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2 leading-relaxed" title={dest.address}>
-                        {dest.address || "Chưa cập nhật địa chỉ hành chính"}
-                      </span>
-                    </div>
-
-                    {/* Cột 3: Sức chứa */}
-                    <div className="col-span-6 lg:col-span-1 flex items-center min-w-0">
-                      <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold truncate">
-                        <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                          <Users size={13} />
-                        </div>
-                        <span className="truncate">
-                          {dest.capacity ? (
-                            <>
-                              <strong className="font-bold text-slate-900">
-                                {Number(dest.capacity).toLocaleString("vi-VN")}
-                              </strong>
-                              <span className="text-slate-600 text-[11px] ml-1">du khách/lượt</span>
-                            </>
-                          ) : (
-                            <span className="text-slate-400 text-xs italic">Chưa đặt sức chứa</span>
-                          )}
+                    <div className={ROW_GRID}>
+                      {/* Cột STT */}
+                      <div className="hidden md:flex justify-center">
+                        <span className="text-xs font-bold text-slate-500 tabular-nums">
+                          {stt}
                         </span>
                       </div>
-                    </div>
 
-                    {/* Cột 4: Trạng thái phê duyệt */}
-                    <div className="col-span-6 lg:col-span-1 flex lg:justify-center items-center">
-                      {dest.status === STATUS.PUBLISHED && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />
-                          <span>Hoạt động</span>
+                      {/* Cột 1: Điểm đến */}
+                      <div className="col-span-12 md:col-span-1 flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-xl bg-slate-900/5 text-slate-700 border border-slate-200/80 flex items-center justify-center shrink-0">
+                          <Landmark size={18} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3
+                            className="text-sm font-bold text-slate-900 truncate"
+                            title={dest.name}
+                          >
+                            {dest.name}
+                          </h3>
+                          <p className="mt-0.5 text-[11px] font-semibold text-slate-600 truncate">
+                            {dest.contentCount > 0
+                              ? `${dest.contentCount} nội dung thuyết minh`
+                              : `Mã số #${dest.id}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Cột 2: Địa chỉ thực địa */}
+                      <div className="col-span-12 md:col-span-1 flex items-start gap-1.5 min-w-0">
+                        <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
+                        <span
+                          className="text-xs text-slate-600 line-clamp-2 leading-relaxed"
+                          title={dest.address}
+                        >
+                          {dest.address || "Chưa cập nhật địa chỉ hành chính"}
                         </span>
-                      )}
-                      {dest.status === STATUS.PENDING && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                          <span>Chờ duyệt</span>
-                        </span>
-                      )}
-                      {dest.status === STATUS.REJECTED && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          <span>Cần sửa</span>
-                        </span>
-                      )}
-                      {dest.status === STATUS.DRAFT && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                          <span>Bản nháp</span>
-                        </span>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Cột 5: Cụm nút thao tác (Gửi duyệt, Chi tiết, Chỉnh sửa) */}
-                    {/* Nút chung đứng trước để thẳng hàng giữa các dòng; Gửi duyệt chỉ có ở bản nháp/cần sửa nên đặt cuối */}
-                    <div className="col-span-12 lg:col-span-1 flex items-center justify-start gap-1.5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 flex-wrap lg:flex-nowrap whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => handleViewDetail(dest.id)}
-                        className="h-8 px-2.5 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-700 bg-white text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs shrink-0"
-                        title="Xem thông tin chi tiết điểm đến & thuyết minh"
-                        aria-label="Chi tiết"
-                      >
-                        <Eye size={12} className="text-emerald-600" />
-                        <span className="lg:hidden xl:inline">Chi tiết</span>
-                      </button>
+                      {/* Cột 3: Sức chứa */}
+                      <div className="col-span-6 md:col-span-1 flex flex-col gap-0.5">
+                        {dest.capacity ? (
+                          <>
+                            <span className="text-xs font-bold text-slate-900 tabular-nums leading-none">
+                              {Number(dest.capacity).toLocaleString("vi-VN")}
+                            </span>
+                            <span className="text-[10.5px] font-bold text-slate-600">
+                              du khách/lượt
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">
+                            Chưa đặt sức chứa
+                          </span>
+                        )}
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setQrTarget(dest)}
-                        className="h-8 w-8 rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50/60 bg-white inline-flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-2xs shrink-0"
-                        title="Mã QR check-in để in và dán tại cổng điểm đến"
-                        aria-label="Mã QR"
-                      >
-                        <QrCode size={14} className="text-sky-600" />
-                      </button>
+                      {/* Cột 4: Trạng thái */}
+                      <div className="col-span-6 md:col-span-1 flex items-center">
+                        <StatusBadge status={dest.status} />
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setEditTarget(dest)}
-                        className="h-8 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold inline-flex items-center gap-1 shadow-xs shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer shrink-0"
-                        title="Chỉnh sửa thông tin điểm đến"
-                      >
-                        <Edit3 size={12} />
-                        <span>Sửa</span>
-                      </button>
-
-                      {(dest.status === STATUS.DRAFT || dest.status === STATUS.REJECTED) && (
+                      {/* Cột 5: Thao tác */}
+                      <div className="col-span-12 md:col-span-1 flex items-center justify-start gap-1.5 shrink-0">
                         <button
                           type="button"
-                          onClick={() => handleSubmitForModeration(dest)}
-                          disabled={isLoading}
-                          className="h-8 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-bold inline-flex items-center gap-1 shadow-xs shadow-amber-500/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50 shrink-0"
-                          title="Gửi hồ sơ điểm đến này tới Ban Thẩm định văn hóa"
+                          onClick={() => handleViewDetail(dest.id)}
+                          className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
+                          title="Xem chi tiết điểm đến & thuyết minh"
+                          aria-label="Xem chi tiết"
                         >
-                          <Send size={12} />
-                          <span>Gửi duyệt</span>
+                          <Eye size={14} />
                         </button>
-                      )}
+
+                        <button
+                          type="button"
+                          onClick={() => setQrTarget(dest)}
+                          className="p-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                          title="Mã QR check-in để in và dán tại cổng điểm đến"
+                          aria-label="Mã QR"
+                        >
+                          <QrCode size={14} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setEditTarget(dest)}
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                          title="Chỉnh sửa điểm đến"
+                          aria-label="Chỉnh sửa điểm đến"
+                        >
+                          <Pencil size={14} />
+                        </button>
+
+                        {canSubmit && (
+                          <button
+                            type="button"
+                            onClick={() => handleSubmitForModeration(dest)}
+                            disabled={isLoading}
+                            className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors cursor-pointer disabled:opacity-50"
+                            title="Gửi hồ sơ điểm đến tới Ban Thẩm định văn hóa"
+                            aria-label="Gửi duyệt"
+                          >
+                            <Send size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
+          )}
+        </div>
 
-            {/* Thanh phân trang ở dưới (CỐ ĐỊNH, KHÔNG BỊ CUỘN) */}
-            <div className="shrink-0 mt-3 px-4 py-2.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-slate-600 font-semibold">
-                  Trang <strong className="text-slate-900 font-bold">{safeCurrentPage}</strong> /{" "}
-                  <strong className="text-slate-900 font-bold">{totalPages}</strong>{" "}
-                  <span className="text-slate-400">
-                    (Tổng{" "}
-                    <strong className="text-slate-700 font-bold">
-                      {totalElements.toLocaleString("vi-VN")}
-                    </strong>{" "}
-                    điểm đến)
-                  </span>
-                </span>
-
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-600 font-semibold text-[11px]">
-                    Số dòng/trang:
-                  </span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => {
-                      setPageSize(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="px-2 py-1 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer transition-colors"
-                  >
-                    {[5, 10, 20, 50].map((size) => (
-                      <option key={size} value={size}>
-                        {size}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Nút phân trang */}
-              <div className="flex items-center gap-1 self-center sm:self-auto">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={safeCurrentPage <= 1}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                  title="Trang đầu"
-                >
-                  <ChevronsLeft size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={safeCurrentPage <= 1}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                  title="Trang trước"
-                >
-                  <ChevronLeft size={14} />
-                </button>
-
-                {visiblePages.map((p, idx) =>
-                  p === "..." ? (
-                    <span key={`dots-${idx}`} className="px-1 text-slate-400 font-bold">
-                      ...
-                    </span>
-                  ) : (
-                    <button
-                      key={`page-${p}`}
-                      type="button"
-                      onClick={() => setCurrentPage(Number(p))}
-                      className={`min-w-[28px] h-7 px-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
-                        Number(p) === safeCurrentPage
-                          ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  )
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={safeCurrentPage >= totalPages}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                  title="Trang sau"
-                >
-                  <ChevronRight size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={safeCurrentPage >= totalPages}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                  title="Trang cuối"
-                >
-                  <ChevronsRight size={14} />
-                </button>
-              </div>
+        {/* Phân trang */}
+        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-3 bg-slate-50/60 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+            <span className="text-xs text-slate-600 font-semibold">
+              Đang xem trang{" "}
+              <strong className="font-bold text-slate-900">{safeCurrentPage}</strong> /{" "}
+              <strong className="font-bold text-slate-900">{totalPages}</strong>{" "}
+              <span className="text-slate-400">
+                ({totalElements.toLocaleString("vi-VN")} điểm đến)
+              </span>
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-slate-600 font-bold">
+                Số dòng/trang:
+              </span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                aria-label="Số dòng mỗi trang"
+                className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/20 cursor-pointer"
+              >
+                {[5, 10, 20, 50].map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setCurrentPage(1)}
+              disabled={safeCurrentPage <= 1}
+              className={PAGE_NAV_BTN}
+              title="Trang đầu"
+              aria-label="Trang đầu"
+            >
+              <ChevronsLeft size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={safeCurrentPage <= 1}
+              className={PAGE_NAV_BTN}
+              title="Trang trước"
+              aria-label="Trang trước"
+            >
+              <ChevronLeft size={14} />
+            </button>
+
+            {visiblePages.map((p, idx) =>
+              p === "..." ? (
+                <span key={`dots-${idx}`} className="px-2 text-xs text-slate-400 font-bold select-none">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={`page-${p}`}
+                  type="button"
+                  onClick={() => setCurrentPage(Number(p))}
+                  aria-current={Number(p) === safeCurrentPage ? "page" : undefined}
+                  className={`min-w-[32px] h-7 px-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                    Number(p) === safeCurrentPage
+                      ? "bg-slate-900 text-white border-slate-900"
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safeCurrentPage >= totalPages}
+              className={PAGE_NAV_BTN}
+              title="Trang sau"
+              aria-label="Trang sau"
+            >
+              <ChevronRight size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={safeCurrentPage >= totalPages}
+              className={PAGE_NAV_BTN}
+              title="Trang cuối"
+              aria-label="Trang cuối"
+            >
+              <ChevronsRight size={14} />
+            </button>
+          </div>
+        </div>
+      </section>
 
       {detailTarget && (
         <div
@@ -1062,7 +1101,7 @@ export default function ProviderDestinationsPage() {
                   </div>
                   <div className="flex items-center gap-2.5">
                     <h4 className="text-sm font-bold text-slate-900">
-                      Nội Dung &amp; Thuyết Minh Văn Hóa
+                      Thuyết minh &amp; câu chuyện văn hóa
                     </h4>
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-600 text-white text-[11px] font-bold shadow-2xs">
                       {detailTarget.contentCount ?? 0} nội dung
@@ -1079,7 +1118,7 @@ export default function ProviderDestinationsPage() {
                   className="sm:self-center px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs inline-flex items-center justify-center gap-1.5 transition-all shadow-xs shadow-amber-600/20 active:scale-95 cursor-pointer shrink-0"
                 >
                   <Headphones size={14} />
-                  <span>Quản lý Thuyết minh</span>
+                  <span>Quản lý nội dung</span>
                 </button>
               </div>
             </div>

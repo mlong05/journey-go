@@ -47,6 +47,16 @@ public class JourneyService {
 
     @Transactional
     public JourneyResponse startJourney(Long userId, StartJourneyRequest request) {
+        // Mỗi đơn đặt tour chỉ có một hành trình: đã đi xong thì mở lại hành trình cũ, không tạo mới để check-in lại.
+        if (request.bookingId() != null) {
+            var byBooking = journeyRepository.findFirstByUserIdAndBookingIdOrderByCreatedAtDesc(userId, request.bookingId());
+            if (byBooking.isPresent()) {
+                log.info("Du khách {} mở lại hành trình của đơn {} (journeyId={}, status={})",
+                        userId, request.bookingId(), byBooking.get().getId(), byBooking.get().getStatus());
+                return JourneyResponse.fromEntity(byBooking.get());
+            }
+        }
+
         var existingActive = journeyRepository.findFirstByUserIdAndTourIdAndStatusInOrderByCreatedAtDesc(
                 userId, request.tourId(), List.of(JourneyStatus.NOT_STARTED, JourneyStatus.IN_PROGRESS)
         );
@@ -127,25 +137,32 @@ public class JourneyService {
     public CheckInResultResponse checkInDestination(Long journeyId, Long destinationId, CheckInJourneyRequest request, Long userId) {
         Journey journey = findJourneyAndVerifyOwner(journeyId, userId);
 
-        if (journey.getStatus() != JourneyStatus.IN_PROGRESS) {
-            throw new BusinessException("JOURNEY-NOT-ACTIVE", "Hành trình hiện không ở trạng thái hoạt động");
-        }
-
         JourneyDestinationProgress destProgress = destinationProgressRepository
                 .findByJourneyIdAndDestinationId(journeyId, destinationId)
                 .orElseThrow(() -> new ResourceNotFoundException("JourneyDestinationProgress", destinationId));
 
+        // Đã check-in (kể cả khi hành trình đã hoàn thành): không check-in lại, chỉ báo cho du khách.
+        // Không cấp lại huy hiệu (badgeAwarded = false) để app không hiện màn mở khóa lần nữa.
         if (destProgress.isCheckedIn()) {
-            log.info("Destination {} trong Journey {} đã check-in trước đó (idempotent)", destinationId, journeyId);
+            log.info("Destination {} trong Journey {} đã check-in trước đó", destinationId, journeyId);
             return CheckInResultResponse.builder()
                     .journeyId(journeyId)
                     .destinationId(destinationId)
                     .success(true)
-                    .message("Bạn đã check-in điểm đến này trước đó")
+                    .alreadyCheckedIn(true)
+                    .message(journey.getStatus() == JourneyStatus.COMPLETED
+                            ? "Bạn đã check-in điểm đến này và hoàn thành hành trình rồi"
+                            : "Bạn đã check-in điểm đến này rồi")
                     .checkedInAt(destProgress.getCheckedInAt())
-                    .badgeAwarded(destProgress.isBadgeAwarded())
                     .badgeId(destProgress.getBadgeId())
                     .build();
+        }
+
+        if (journey.getStatus() == JourneyStatus.COMPLETED) {
+            throw new BusinessException("JOURNEY-COMPLETED", "Bạn đã hoàn thành hành trình này, không cần check-in thêm");
+        }
+        if (journey.getStatus() != JourneyStatus.IN_PROGRESS) {
+            throw new BusinessException("JOURNEY-NOT-ACTIVE", "Hành trình hiện không ở trạng thái hoạt động");
         }
 
         TourInfo tourInfo = tourInfoProvider.getTourInfo(journey.getTourId());
@@ -191,6 +208,7 @@ public class JourneyService {
         destProgress.setCheckedIn(true);
         destProgress.setCheckedInAt(Instant.now());
         destProgress.setStatus(DestinationProgressStatus.IN_PROGRESS);
+        syncMissingTasks(destProgress, currentDestInfo);
 
         UserBadge awardedBadge = gamificationService.awardCheckInBadge(
                 userId, destinationId, destProgress.getDestinationName(), journeyId
@@ -446,6 +464,31 @@ public class JourneyService {
             taskProgress.setStatus(TaskProgressStatus.FAILED);
             log.info("Du khách {} hết lượt làm nhiệm vụ {} (journey {})", userId, taskId, journeyId);
         }
+    }
+
+    /**
+     * Bổ sung nhiệm vụ đang mở của điểm đến mà hành trình chưa có (hành trình chụp danh sách nhiệm vụ lúc bắt đầu;
+     * nhiệm vụ được phát hành sau đó sẽ được thêm khi du khách check-in), rồi cập nhật tổng số nhiệm vụ.
+     */
+    private void syncMissingTasks(JourneyDestinationProgress destProgress, TourInfo.TourDestinationInfo destInfo) {
+        if (destInfo.tasks() == null || destInfo.tasks().isEmpty()) return;
+        java.util.Set<Long> existing = destProgress.getTasks().stream()
+                .map(JourneyTaskProgress::getTaskId)
+                .collect(java.util.stream.Collectors.toSet());
+        for (TourInfo.TourTaskInfo tInfo : destInfo.tasks()) {
+            if (existing.contains(tInfo.taskId())) continue;
+            destProgress.addTask(JourneyTaskProgress.builder()
+                    .taskId(tInfo.taskId())
+                    .taskName(tInfo.taskName())
+                    .taskType(tInfo.taskType())
+                    .orderIndex(tInfo.orderIndex())
+                    .status(TaskProgressStatus.NOT_STARTED)
+                    .pointsEarned(0)
+                    .attempts(0)
+                    .build());
+            log.info("Bổ sung nhiệm vụ {} vào hành trình tại điểm đến {}", tInfo.taskId(), destProgress.getDestinationName());
+        }
+        destProgress.setTotalTasks(destProgress.getTasks().size());
     }
 
     /** Điểm đến xong khi mọi nhiệm vụ đã có kết quả (hoàn thành hoặc hết lượt); sau đó mở điểm kế tiếp. */

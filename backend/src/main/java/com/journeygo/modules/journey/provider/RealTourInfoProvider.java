@@ -54,7 +54,8 @@ public class RealTourInfoProvider implements TourInfoProvider {
         for (TourDestination td : tour.getTourDestinations().stream()
                 .sorted(Comparator.comparingInt(TourDestination::getSequenceOrder)).toList()) {
             Destination d = td.getDestination();
-            if (d == null || d.isDeleted()) continue;
+            // Điểm đến bị thu hồi duyệt (hoặc chưa duyệt) không đưa vào hành trình mới
+            if (d == null || d.isDeleted() || !d.isApproved()) continue;
 
             Experience experience = experienceRepository.findByDestination_Id(d.getId()).stream()
                     .filter(e -> e.getStatus() == ExperienceStatus.PUBLISHED)
@@ -84,7 +85,11 @@ public class RealTourInfoProvider implements TourInfoProvider {
     private List<TourInfo.TourTaskInfo> loadTasks(Long experienceId) {
         List<TourInfo.TourTaskInfo> result = new ArrayList<>();
         int order = 1;
-        for (Task task : taskRepository.findByExperienceIdAndStatus(experienceId, TaskStatus.PUBLISHED).stream()
+        // Chỉ gọi khi trải nghiệm đang phát hành, nên mọi nhiệm vụ chưa xóa (khác INACTIVE) đều thuộc gói đang mở.
+        // Không lọc riêng PUBLISHED: dữ liệu cũ có trải nghiệm đã duyệt nhưng nhiệm vụ còn DRAFT
+        // khiến hành trình báo 0/0 nhiệm vụ và tự hoàn thành ngay khi check-in.
+        for (Task task : taskRepository.findByExperienceIdOrderBySequenceOrderAsc(experienceId).stream()
+                .filter(t -> t.getStatus() != TaskStatus.INACTIVE)
                 .sorted(Comparator.comparing(Task::getSequenceOrder)).toList()) {
             boolean requiresLocation = task.getTaskType() != null && task.getTaskType().isRequiresLocation();
 

@@ -10,7 +10,15 @@ const MAX_BYTES = 10 * 1024 * 1024;
  * Ảnh bìa điểm đến: tải lên Cloudinary qua POST /upload/image rồi trả URL https cho form.
  * Ảnh này hiện trên thẻ tour, chi tiết tour và hành trình trong app du khách.
  */
-export default function CoverImageField({ value, onChange, disabled = false, iconClassName = "text-emerald-600" }) {
+export default function CoverImageField({
+  value,
+  onChange,
+  disabled = false,
+  iconClassName = "text-emerald-600",
+  label = "Ảnh bìa điểm đến",
+  folder = "journeygo/destinations",
+  hint = "",
+}) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -32,7 +40,7 @@ export default function CoverImageField({ value, onChange, disabled = false, ico
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("folder", "journeygo/destinations");
+      formData.append("folder", folder);
       const res = await apiClient.upload("/upload/image", formData);
       const url = res?.data?.url || res?.url;
       if (!url) throw new Error("Máy chủ không trả về đường dẫn ảnh.");
@@ -50,11 +58,12 @@ export default function CoverImageField({ value, onChange, disabled = false, ico
     <div className="space-y-1.5">
       <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
         <ImageIcon size={13} className={iconClassName} />
-        <span>Ảnh bìa điểm đến</span>
+        <span>{label}</span>
         <span className="text-[10px] font-semibold normal-case tracking-normal text-slate-400">
           (khuyến nghị)
         </span>
       </label>
+      {hint && <p className="text-[11px] text-slate-500 -mt-0.5">{hint}</p>}
 
       <input
         ref={inputRef}
@@ -67,7 +76,7 @@ export default function CoverImageField({ value, onChange, disabled = false, ico
       {value ? (
         <div className="relative rounded-xl overflow-hidden border border-slate-200 aspect-[16/9] bg-slate-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="Ảnh bìa điểm đến" className="w-full h-full object-cover" />
+          <img src={value} alt={label} className="w-full h-full object-cover" />
           {uploading && (
             <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
               <Loader2 size={22} className="animate-spin text-slate-600" />

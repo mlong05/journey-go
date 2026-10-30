@@ -7,6 +7,7 @@ import com.journeygo.modules.experience.dto.request.UpdateExperienceRequest;
 import com.journeygo.modules.experience.dto.response.ExperienceResponse;
 import com.journeygo.modules.experience.entity.Experience;
 import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
+import com.journeygo.modules.experience.entity.enums.ExperienceReviewStatus;
 import com.journeygo.modules.experience.entity.enums.TaskStatus;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
@@ -141,6 +142,7 @@ public class ExperienceService {
                 .currency(req.currency() != null ? req.currency() : "VND")
                 .durationMinutes(req.durationMinutes())
                 .status(ExperienceStatus.DRAFT)   // mặc định DRAFT
+                .reviewStatus(ExperienceReviewStatus.PENDING) // chờ Kiểm duyệt viên duyệt riêng
                 .createdBy(creator)
                 .build();
 
@@ -164,6 +166,10 @@ public class ExperienceService {
         if (req.price() != null) e.setPrice(req.price());
         if (req.currency() != null) e.setCurrency(req.currency());
         if (req.durationMinutes() != null) e.setDurationMinutes(req.durationMinutes());
+        // Sửa nội dung thì phải được duyệt lại
+        e.setReviewStatus(ExperienceReviewStatus.PENDING);
+        e.setReviewNote(null);
+        e.setReviewedAt(null);
 
         Experience saved = experienceRepository.save(e);
         log.info("Updated Experience id={}", saved.getId());
@@ -209,6 +215,14 @@ public class ExperienceService {
         if (newStatus != ExperienceStatus.DRAFT && newStatus != ExperienceStatus.PUBLISHED) {
             throw new BusinessException("BR-EXP-3-CHG",
                     "Chỉ có thể chuyển sang DRAFT hoặc PUBLISHED. INACTIVE là xoá mềm.");
+        }
+
+        // Phát hành cần được Kiểm duyệt viên duyệt riêng (dữ liệu cũ chưa có kết quả kiểm duyệt thì vẫn cho)
+        if (newStatus == ExperienceStatus.PUBLISHED
+                && (e.getReviewStatus() == ExperienceReviewStatus.PENDING
+                    || e.getReviewStatus() == ExperienceReviewStatus.REJECTED)) {
+            throw new BusinessException("BR-EXP-REVIEW",
+                    "Trải nghiệm cần được Kiểm duyệt viên duyệt trước khi phát hành.");
         }
 
         // Idempotent: nếu trùng status hiện tại thì trả về luôn

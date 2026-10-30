@@ -32,6 +32,7 @@ import {
   RejectDestinationDialog,
 } from "@/features/destination";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { KpiTile } from "@/components/dashboard/DashboardUI";
 
 /* =========================================================================
  *  TRANG: Thẩm định điểm đến di sản (Moderator)
@@ -122,7 +123,7 @@ function Toast({ msg, tone }) {
   const Icon = tone === "error" ? AlertCircle : CheckCircle2;
   return (
     <div
-      className={`fixed top-5 right-5 z-50 ${palette} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3`}
+      className={`fixed top-5 right-5 z-[200] ${palette} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3`}
     >
       <Icon size={16} className="shrink-0" />
       <span>{msg}</span>
@@ -138,94 +139,6 @@ function Toast({ msg, tone }) {
  *  • Toàn bộ số liệu dùng chung slate-900 (đen tuyền), KHÔNG số vàng/số xanh
  *  • Màu nhấn chỉ nằm ở khung icon góc phải
  * ---------------------------------------------------------------------- */
-/* Bộ tông màu KPI.
-   Mỗi tone cung cấp 3 nhóm class ĐỘC LẬP — dùng THỐNG NHẤT giữa 3 ô để
-   dù bấm vào ô nào, layout cũng giống nhau 100%:
-     • icon       — chỉ dùng khi KHÔNG active
-     • activeIcon — chỉ dùng khi CÓ active (icon đậm hơn, đồng tone với nền)
-     • activeBg   — nền ô khi active (thay cho nền trắng cố định)
-     • activeBorder — viền tone khi active (thay cho viền slate-200 cố định)
-
-   LƯU Ý: KHÔNG dùng ring-NUMBER hoặc tăng độ dày shadow/border làm active — chỉ đổi màu —
-   để kích thước ô bất biến 1 pixel khi nhấn. */
-const KPI_TONES = {
-  slate: {
-    icon: "bg-slate-100 text-slate-600 border-slate-200/80",
-    activeIcon: "bg-slate-900/10 text-slate-900 border-slate-300",
-    activeBg: "bg-slate-50",
-    activeBorder: "border-slate-300",
-  },
-  amber: {
-    icon: "bg-amber-50 text-amber-600 border-amber-200/70",
-    activeIcon: "bg-amber-100 text-amber-700 border-amber-300",
-    activeBg: "bg-amber-50",
-    activeBorder: "border-amber-300",
-  },
-  emerald: {
-    icon: "bg-emerald-50 text-emerald-600 border-emerald-200/70",
-    activeIcon: "bg-emerald-100 text-emerald-700 border-emerald-300",
-    activeBg: "bg-emerald-50",
-    activeBorder: "border-emerald-300",
-  },
-};
-
-/* Ô thống kê — bấm để lọc nhanh danh sách bên dưới (đồng bộ trang Admin) */
-function KpiCard({
-  icon: Icon,
-  label,
-  value,
-  unit,
-  tone = "slate",
-  dot = false,
-  active = false,
-  onClick,
-}) {
-  const t = KPI_TONES[tone] || KPI_TONES.slate;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      title={`Lọc theo: ${label}`}
-      /* Ô KPI hoàn toàn TĨNH: KHÔNG dùng ring/border đổi độ dày (gây lệch khi
-         bấm), cũng không animate nội dung. Mọi thay đổi khi active chỉ đổi
-         MÀU nền/màu chữ/icon đã được khai báo cố định trong t.activeBg —
-         kích thước khung không đổi 1 pixel. */
-      className={`bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex items-center justify-between transition-colors hover:border-slate-300 cursor-pointer text-left w-full ${
-        active
-          ? `${t.activeBg} ${t.activeBorder}`
-          : "bg-white border-slate-200/90"
-      }`}
-    >
-      {/* Cột chữ bên trái */}
-      <div className="flex flex-col text-left min-w-0">
-        <p className="text-[11px] font-bold text-slate-400 truncate">
-          {label}
-        </p>
-        <div className="mt-1 flex items-baseline gap-1.5">
-          <span className="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums leading-none">
-            {value}
-          </span>
-          <span className="text-xs font-bold text-slate-600 whitespace-nowrap">
-            {unit}
-          </span>
-          {dot && (
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse inline-block ml-1 shrink-0" />
-          )}
-        </div>
-      </div>
-
-      {/* Icon góc phải — đổi sang activeIcon khi active (cùng 10x10 cố định) */}
-      <div
-        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-          active ? t.activeIcon : t.icon
-        }`}
-      >
-        <Icon size={18} strokeWidth={2.2} />
-      </div>
-    </button>
-  );
-}
 
 /* Segmented Tab filter */
 function StatusTab({ active, onClick, children, accent = "slate" }) {
@@ -563,7 +476,9 @@ export default function ModeratorDestinationsPage() {
   const handleApprove = useCallback(
     async (id, approved, displayName) => {
       if (!approved) {
-        setRejectDestTarget({ id, name: displayName });
+        // Điểm đến đang phát hành thì đây là thu hồi duyệt (cùng API từ chối)
+        const current = destinations.find((d) => d.id === id) || (detailTarget?.id === id ? detailTarget : null);
+        setRejectDestTarget({ id, name: displayName, revoke: current?.approved === true });
         return;
       }
       const ok = await confirm({
@@ -597,7 +512,7 @@ export default function ModeratorDestinationsPage() {
         setActionLoadingId(null);
       }
     },
-    [detailTarget, showToast, confirm]
+    [destinations, detailTarget, showToast, confirm]
   );
 
   const handleRejectDestConfirm = useCallback(
@@ -620,7 +535,11 @@ export default function ModeratorDestinationsPage() {
           if (detailTarget?.id === rejectDestTarget.id)
             setDetailTarget(updatedNorm);
         }
-        showToast(`Đã từ chối điểm đến "${rejectDestTarget.name}".`);
+        showToast(
+          rejectDestTarget.revoke
+            ? `Đã thu hồi duyệt điểm đến "${rejectDestTarget.name}". Đối tác sẽ nhận phản hồi để chỉnh sửa.`
+            : `Đã từ chối điểm đến "${rejectDestTarget.name}".`
+        );
         setRejectDestTarget(null);
       } catch (err) {
         console.error("[Moderator Reject] error:", err);
@@ -740,33 +659,26 @@ export default function ModeratorDestinationsPage() {
           TẦNG 2 — 3 KPI (shrink-0, không cuộn) — bấm để lọc nhanh
          ══════════════════════════════════════════════════════════ */}
       <section className="shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 mt-4">
-        <KpiCard
+        <KpiTile
           icon={Layers}
-          label="TỔNG HỒ SƠ HỆ THỐNG"
+          label="Tổng hồ sơ"
           value={counts.all}
           unit="hồ sơ"
           tone="slate"
-          active={statusTab === "all"}
-          onClick={() => handleTabChange("all")}
         />
-        <KpiCard
+        <KpiTile
           icon={Clock}
-          label="HỒ SƠ CHỜ THẨM ĐỊNH"
+          label="Chờ thẩm định"
           value={counts.pending}
           unit="chờ duyệt"
           tone="amber"
-          dot={counts.pending > 0}
-          active={statusTab === "pending"}
-          onClick={() => handleTabChange("pending")}
         />
-        <KpiCard
+        <KpiTile
           icon={CheckCircle2}
-          label="ĐIỂM ĐẾN ĐANG LƯU HÀNH"
+          label="Đang lưu hành"
           value={counts.published}
           unit="đã duyệt"
           tone="emerald"
-          active={statusTab === "published"}
-          onClick={() => handleTabChange("published")}
         />
       </section>
 
@@ -1047,6 +959,17 @@ export default function ModeratorDestinationsPage() {
         error={detailError}
         onClose={closeDetail}
         onApprove={(id, approve, name) => handleApprove(id, approve, name)}
+        onCompleted={({ approved, revoked, name }) => {
+          closeDetail();
+          loadAll();
+          showToast(
+            revoked
+              ? `Đã thu hồi duyệt điểm đến "${name}". Đối tác sẽ nhận phản hồi để chỉnh sửa.`
+              : approved
+              ? `Đã gửi kết quả thẩm định và phát hành điểm đến "${name}".`
+              : `Đã gửi kết quả thẩm định: điểm đến "${name}" bị từ chối.`
+          );
+        }}
         isActionLoading={actionLoadingId === detailTarget?.id}
         theme="emerald"
       />

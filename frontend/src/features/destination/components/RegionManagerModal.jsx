@@ -92,7 +92,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
       setDeletedRegions(deleteds || []);
     } catch (err) {
       console.error("[RegionManagerModal] load error:", err);
-      showToast("Không thể tải danh sách khu vực du lịch.", "error");
+      showToast("Không thể tải danh sách vùng du lịch.", "error");
     } finally {
       setLoading(false);
     }
@@ -148,7 +148,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
     e.preventDefault();
     const cleanName = name.trim();
     if (!cleanName) {
-      setFormError("Tên vùng miền không được để trống.");
+      setFormError("Vui lòng nhập tên vùng.");
       return;
     }
     const cleanSlug = slug.trim() || toVietnameseSlug(cleanName);
@@ -159,7 +159,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
         name: cleanName,
         slug: cleanSlug,
       });
-      showToast(`Đã thêm thành công khu vực: "${created.name || cleanName}"`);
+      showToast(`Đã thêm vùng "${created.name || cleanName}".`);
       setName("");
       setSlug("");
       setIsCustomSlug(false);
@@ -169,7 +169,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
     } catch (err) {
       console.error("[RegionManagerModal] create error:", err);
       setFormError(
-        err?.response?.data?.message || err?.message || "Không thể tạo khu vực mới."
+        err?.response?.data?.message || err?.message || "Không thể thêm vùng mới."
       );
     } finally {
       setActionLoading(false);
@@ -190,7 +190,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
     if (!editingRegion) return;
     const cleanName = editName.trim();
     if (!cleanName) {
-      setEditError("Tên vùng miền không được để trống.");
+      setEditError("Vui lòng nhập tên vùng.");
       return;
     }
     const cleanSlug = editSlug.trim() || toVietnameseSlug(cleanName);
@@ -201,14 +201,14 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
         name: cleanName,
         slug: cleanSlug,
       });
-      showToast(`Đã cập nhật khu vực: "${cleanName}"`);
+      showToast(`Đã cập nhật vùng "${cleanName}".`);
       setEditingRegion(null);
       await loadData();
       onUpdated?.();
     } catch (err) {
       console.error("[RegionManagerModal] update error:", err);
       setEditError(
-        err?.response?.data?.message || err?.message || "Không thể cập nhật khu vực."
+        err?.response?.data?.message || err?.message || "Không thể cập nhật vùng."
       );
     } finally {
       setActionLoading(false);
@@ -222,13 +222,13 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
     setActionLoading(true);
     try {
       await regionService.delete(reg.id);
-      showToast(`Đã chuyển khu vực "${reg.name}" vào thùng rác.`);
+      showToast(`Đã chuyển vùng "${reg.name}" vào thùng rác.`);
       setConfirmDialog(null);
       await loadData();
       onUpdated?.();
     } catch (err) {
       console.error("[RegionManagerModal] delete error:", err);
-      showToast(err?.response?.data?.message || err?.message || "Không thể xóa khu vực.", "error");
+      showToast(err?.response?.data?.message || err?.message || "Không thể xóa vùng.", "error");
     } finally {
       setActionLoading(false);
     }
@@ -241,13 +241,13 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
     setActionLoading(true);
     try {
       await regionService.restore(reg.id);
-      showToast(`Đã khôi phục thành công khu vực "${reg.name}".`);
+      showToast(`Đã khôi phục vùng "${reg.name}".`);
       setConfirmDialog(null);
       await loadData();
       onUpdated?.();
     } catch (err) {
       console.error("[RegionManagerModal] restore error:", err);
-      showToast(err?.response?.data?.message || err?.message || "Không thể khôi phục khu vực.", "error");
+      showToast(err?.response?.data?.message || err?.message || "Không thể khôi phục vùng.", "error");
     } finally {
       setActionLoading(false);
     }
@@ -274,25 +274,28 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
       aria-modal="true"
       className="fixed inset-0 z-70 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
     >
-      {/* Outer Shell: Double-Bezel Architecture */}
-      <div className="w-full max-w-4xl p-1.5 sm:p-2 bg-slate-900/10 dark:bg-white/10 rounded-[2.25rem] ring-1 ring-slate-900/15 shadow-2xl animate-in zoom-in-95 duration-200">
+      {/* Khung hộp thoại */}
+      <div className="w-full max-w-4xl animate-in zoom-in-95 duration-200">
         {/* Inner Core */}
-        <div className="bg-white rounded-[2rem] overflow-hidden flex flex-col h-[720px] max-h-[92vh] shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] border border-slate-200/80">
+        <div className="bg-white rounded-2xl overflow-hidden flex flex-col h-[720px] max-h-[92vh] shadow-2xl border border-slate-200/80">
           {/* ========================================================
               HEADER MODAL
               ======================================================== */}
-          <div className="shrink-0 px-6 sm:px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-teal-50/40">
+          <div className="shrink-0 px-6 sm:px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-emerald-50/40">
             <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-500 via-teal-600 to-emerald-700 text-white flex items-center justify-center shadow-md shadow-teal-500/20 ring-4 ring-teal-50 shrink-0">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 ring-4 ring-emerald-50 shrink-0">
                 <Globe2 size={22} strokeWidth={2.2} />
               </div>
               <div>
-                <span className="rounded-full px-2.5 py-0.5 text-[10px] uppercase tracking-[0.2em] font-extrabold bg-teal-50 text-teal-800 border border-teal-200/80">
-                  Địa Lý &amp; Vùng Lãnh Thổ Du Lịch
+                <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                  Trải nghiệm văn hóa
                 </span>
                 <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-                  Quản Lý Khu Vực Di Sản (Regions)
+                  Vùng du lịch văn hóa
                 </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Nhóm các điểm đến theo vùng miền để du khách khám phá bản sắc văn hóa từng vùng.
+                </p>
               </div>
             </div>
 
@@ -336,17 +339,17 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 onClick={() => setCurrentTab("active")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   currentTab === "active"
-                    ? "bg-teal-700 text-white shadow-sm"
+                    ? "bg-emerald-700 text-white shadow-sm"
                     : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
                 }`}
               >
                 <MapPin size={13} />
-                <span>Đang hoạt động</span>
+                <span>Đang sử dụng</span>
                 <span
                   className={`px-1.5 py-0.2 rounded-md text-[10px] ${
                     currentTab === "active"
                       ? "bg-white/20 text-white"
-                      : "bg-teal-50 text-teal-800"
+                      : "bg-emerald-50 text-emerald-800"
                   }`}
                 >
                   {activeRegions.length}
@@ -364,7 +367,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 }`}
               >
                 <Trash2 size={13} />
-                <span>Thùng rác (Đã xóa mềm)</span>
+                <span>Thùng rác</span>
                 <span
                   className={`px-1.5 py-0.2 rounded-md text-[10px] ${
                     currentTab === "trash"
@@ -388,18 +391,18 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
               className={`h-9 px-4 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer transition-all active:scale-95 shadow-sm ${
                 isCreating
                   ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                  : "bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-teal-600/20"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
               }`}
             >
               {isCreating ? (
                 <>
                   <X size={14} />
-                  <span>Đóng form tạo</span>
+                  <span>Đóng</span>
                 </>
               ) : (
                 <>
                   <Plus size={15} strokeWidth={2.4} />
-                  <span>Thêm vùng mới</span>
+                  <span>Thêm vùng</span>
                 </>
               )}
             </button>
@@ -409,61 +412,46 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
               FORM TẠO MỚI KHU VỰC
               ======================================================== */}
           {isCreating && (
-            <div className="shrink-0 mx-6 sm:mx-8 mt-3.5 p-4 bg-gradient-to-br from-teal-50/50 via-white to-slate-50 rounded-2xl border-2 border-teal-200/80 shadow-md animate-in fade-in slide-in-from-top-3 duration-200">
-              <div className="flex items-center justify-between pb-2.5 border-b border-teal-100">
+            <div className="shrink-0 mx-6 sm:mx-8 mt-3.5 p-4 bg-gradient-to-br from-emerald-50/50 via-white to-slate-50 rounded-2xl border-2 border-emerald-200/80 shadow-md animate-in fade-in slide-in-from-top-3 duration-200">
+              <div className="flex items-center justify-between pb-2.5 border-b border-emerald-100">
                 <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-md bg-teal-600 text-white flex items-center justify-center font-black text-xs">
+                  <span className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center font-black text-xs">
                     +
                   </span>
-                  <span>Định Nghĩa Khu Vực Địa Lý Mới</span>
+                  <span>Thêm vùng du lịch mới</span>
                 </h4>
-                <span className="text-[10.5px] font-mono text-teal-700 bg-teal-100/60 px-2 py-0.5 rounded-md font-bold">
-                  POST /api/v1/regions
-                </span>
               </div>
 
               <form onSubmit={handleCreate} className="mt-3 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Tên khu vực / vùng miền <span className="text-rose-500">*</span>
+                      Tên vùng <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
                       maxLength={150}
                       value={name}
                       onChange={(e) => handleNameChange(e.target.value)}
-                      placeholder="VD: Tây Bắc, Đồng bằng sông Cửu Long, Tây Nguyên..."
-                      className="w-full px-3.5 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all"
+                      placeholder="Ví dụ: Tây Bắc, Đồng bằng sông Cửu Long, Tây Nguyên..."
+                      className="w-full px-3.5 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all"
                     />
                   </div>
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Đường dẫn định danh (Slug)
+                      Đường dẫn (tự tạo từ tên vùng)
                     </label>
                     <input
                       type="text"
                       maxLength={150}
                       value={slug}
                       onChange={(e) => handleSlugChange(e.target.value)}
-                      placeholder="VD: tay-bac, dong-bang-song-cuu-long..."
-                      className="w-full px-3.5 py-2 text-xs font-mono font-medium bg-white border border-slate-200 rounded-xl outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all"
+                      placeholder="tay-bac"
+                      className="w-full px-3.5 py-2 text-xs font-mono font-medium bg-white border border-slate-200 rounded-xl outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all"
                     />
                   </div>
                 </div>
-
-                {/* Live Preview */}
-                {name && (
-                  <div className="p-2.5 bg-white rounded-xl border border-teal-100 flex items-center justify-between text-xs text-slate-600">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-700">Xem trước URL:</span>
-                      <code className="text-[11px] font-mono bg-teal-50 text-teal-800 px-2 py-0.5 rounded border border-teal-200/80">
-                        /destinations/region/{slug || toVietnameseSlug(name)}
-                      </code>
-                    </div>
-                  </div>
-                )}
 
                 {formError && (
                   <p className="text-xs font-bold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 flex items-center gap-2">
@@ -486,14 +474,14 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                   <button
                     type="submit"
                     disabled={actionLoading}
-                    className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm shadow-teal-600/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     {actionLoading ? (
                       <Loader2 size={13} className="animate-spin" />
                     ) : (
                       <Check size={13} />
                     )}
-                    <span>Lưu khu vực mới</span>
+                    <span>Lưu vùng</span>
                   </button>
                 </div>
               </form>
@@ -508,18 +496,15 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
               <div className="flex items-center justify-between pb-2.5 border-b border-amber-100">
                 <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
                   <Pencil size={14} className="text-amber-600" />
-                  <span>Chỉnh Sửa Khu Vực #{editingRegion.id}</span>
+                  <span>Chỉnh sửa vùng &quot;{editingRegion.name}&quot;</span>
                 </h4>
-                <span className="text-[10.5px] font-mono text-amber-800 bg-amber-100/60 px-2 py-0.5 rounded-md font-bold">
-                  PUT /api/v1/regions/{editingRegion.id}
-                </span>
               </div>
 
               <form onSubmit={handleSaveEdit} className="mt-3 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Tên khu vực <span className="text-rose-500">*</span>
+                      Tên vùng <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -532,7 +517,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Đường dẫn định danh (Slug)
+                      Đường dẫn (tự tạo từ tên vùng)
                     </label>
                     <input
                       type="text"
@@ -569,7 +554,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                     ) : (
                       <Check size={13} />
                     )}
-                    <span>Cập nhật</span>
+                    <span>Lưu thay đổi</span>
                   </button>
                 </div>
               </form>
@@ -589,8 +574,8 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm kiếm khu vực theo tên hoặc slug URL..."
-                className="w-full pl-9 pr-8 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl outline-hidden focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 transition-all"
+                placeholder="Tìm vùng du lịch theo tên..."
+                className="w-full pl-9 pr-8 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl outline-hidden focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all"
               />
               {searchQuery && (
                 <button
@@ -610,8 +595,8 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
           <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-3 bg-slate-50/40">
             {loading ? (
               <div className="h-64 flex flex-col items-center justify-center gap-3 text-slate-400">
-                <Loader2 size={32} className="animate-spin text-teal-600" />
-                <p className="text-xs font-bold">Đang tải danh sách khu vực du lịch...</p>
+                <Loader2 size={32} className="animate-spin text-emerald-600" />
+                <p className="text-xs font-bold">Đang tải danh sách vùng du lịch...</p>
               </div>
             ) : displayedList.length === 0 ? (
               <div className="py-16 text-center max-w-sm mx-auto space-y-3">
@@ -621,13 +606,13 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 <div>
                   <h4 className="font-extrabold text-slate-800 text-sm">
                     {currentTab === "active"
-                      ? "Chưa có khu vực nào"
+                      ? "Chưa có vùng du lịch nào"
                       : "Thùng rác đang trống"}
                   </h4>
                   <p className="text-xs text-slate-500 mt-1">
                     {currentTab === "active"
-                      ? "Bấm vào nút 'Thêm vùng mới' để tạo phân vùng địa lý du lịch đầu tiên."
-                      : "Không có khu vực nào đang ở trạng thái xóa mềm."}
+                      ? "Bấm \"Thêm vùng\" để nhóm các điểm đến theo vùng miền, giúp du khách khám phá văn hóa từng vùng."
+                      : "Chưa có vùng nào bị xóa."}
                   </p>
                 </div>
               </div>
@@ -639,21 +624,25 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                     className={`group bg-white rounded-2xl p-4 sm:p-4.5 border transition-all shadow-2xs hover:shadow-md flex flex-col justify-between gap-3 relative overflow-hidden ${
                       reg.deleted
                         ? "border-rose-200 bg-rose-50/30"
-                        : "border-slate-200 hover:border-teal-300"
+                        : "border-slate-200 hover:border-emerald-300"
                     }`}
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <span className="font-mono text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/80">
-                          #{reg.id}
-                        </span>
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            reg.deleted ? "bg-rose-50 text-rose-500" : "bg-emerald-50 text-emerald-600"
+                          }`}
+                        >
+                          <MapPin size={17} />
+                        </div>
                         {reg.deleted ? (
                           <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
-                            Đã xóa mềm
+                            Đã xóa
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
-                            Hoạt động
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            Đang sử dụng
                           </span>
                         )}
                       </div>
@@ -661,8 +650,8 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                       <h4 className="text-base font-extrabold text-slate-900 tracking-tight mt-2">
                         {reg.name}
                       </h4>
-                      <p className="text-[11px] font-mono text-slate-400 mt-1">
-                        slug: <span className="text-teal-700 font-semibold">{reg.slug}</span>
+                      <p className="text-[11px] font-mono text-slate-400 mt-0.5 truncate">
+                        /{reg.slug}
                       </p>
                     </div>
 
@@ -673,7 +662,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                           type="button"
                           onClick={() => setConfirmDialog({ type: "restore", region: reg })}
                           className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                          title="Khôi phục khu vực này"
+                          title="Khôi phục vùng này"
                         >
                           <RotateCcw size={12} />
                           <span>Khôi phục</span>
@@ -684,7 +673,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                             type="button"
                             onClick={() => handleStartEdit(reg)}
                             className="p-1.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                            title="Chỉnh sửa khu vực"
+                            title="Chỉnh sửa vùng"
                           >
                             <Pencil size={14} />
                           </button>
@@ -692,7 +681,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                             type="button"
                             onClick={() => setConfirmDialog({ type: "delete", region: reg })}
                             className="p-1.5 text-slate-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Xóa mềm khu vực này"
+                            title="Chuyển vào thùng rác"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -710,7 +699,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
               ======================================================== */}
           <div className="shrink-0 px-6 sm:px-8 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>
-              Tổng cộng <strong>{activeRegions.length} khu vực</strong> đang hoạt động (
+              Tổng cộng <strong>{activeRegions.length} vùng du lịch</strong> đang sử dụng (
               {deletedRegions.length} trong thùng rác).
             </span>
 
@@ -748,13 +737,13 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
               <div>
                 <h3 className="font-extrabold text-slate-900 text-base">
                   {confirmDialog.type === "delete"
-                    ? "Xác nhận xóa khu vực?"
-                    : "Xác nhận khôi phục?"}
+                    ? "Chuyển vùng vào thùng rác?"
+                    : "Khôi phục vùng?"}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                   {confirmDialog.type === "delete"
-                    ? `Khu vực "${confirmDialog.region.name}" sẽ được chuyển vào thùng rác. Bạn có thể khôi phục lại bất kỳ lúc nào.`
-                    : `Khu vực "${confirmDialog.region.name}" sẽ được kích hoạt lại cho các điểm đến.`}
+                    ? `Vùng "${confirmDialog.region.name}" sẽ được chuyển vào thùng rác. Bạn có thể khôi phục lại bất kỳ lúc nào.`
+                    : `Vùng "${confirmDialog.region.name}" sẽ dùng lại được khi tạo và sửa điểm đến.`}
                 </p>
               </div>
             </div>

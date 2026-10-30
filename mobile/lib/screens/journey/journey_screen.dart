@@ -88,7 +88,14 @@ class _JourneyScreenState extends State<JourneyScreen> {
       _loadCoords(journey);
       if (firstLoad && widget.autoQr) {
         final pending = journey.destinations.where((d) => d.isCurrent && !d.checkedIn);
-        if (pending.isNotEmpty) _checkInQr(pending.first);
+        if (pending.isNotEmpty) {
+          _checkInQr(pending.first);
+        } else {
+          // Không còn điểm nào cần check-in: báo thay vì mở màn quét QR
+          _showAlreadyCheckedIn(journey.isCompleted
+              ? 'Hành trình này đã kết thúc. Bạn có thể xem lại câu chuyện văn hóa đã mở khóa.'
+              : 'Bạn đã check-in điểm đến hiện tại rồi. Hãy hoàn thành nhiệm vụ để mở điểm đến kế tiếp.');
+        }
       }
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -101,6 +108,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
   }
 
   Future<void> _checkIn(JourneyDestination dest) async {
+    if (_blockRepeatCheckIn(dest)) return;
     final journey = _journey!;
     setState(() => _busyDestinationId = dest.destinationId);
     try {
@@ -123,6 +131,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
   /// Check-in bằng cách quét mã QR đặt tại điểm đến.
   Future<void> _checkInQr(JourneyDestination dest) async {
+    if (_blockRepeatCheckIn(dest)) return;
     final journey = _journey!;
     final value = await Navigator.of(context).push<String>(
       MaterialPageRoute(
@@ -152,6 +161,11 @@ class _JourneyScreenState extends State<JourneyScreen> {
   Future<void> _afterCheckIn(CheckInResult result, JourneyDestination dest) async {
     await _load(silent: true);
     if (!mounted) return;
+    if (result.alreadyCheckedIn) {
+      await _showAlreadyCheckedIn(
+          result.message.isEmpty ? 'Bạn đã check-in ${dest.name} rồi.' : '${result.message}.');
+      return;
+    }
     if (result.badgeAwarded) {
       await showBadgeUnlock(
         context,
@@ -249,6 +263,57 @@ class _JourneyScreenState extends State<JourneyScreen> {
         ],
       ),
     );
+  }
+
+  /// Báo du khách đã check-in (hoặc đã hoàn thành hành trình), không cho check-in lại.
+  Future<void> _showAlreadyCheckedIn(String message) {
+    final completed = _journey?.isCompleted ?? false;
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                completed ? Icons.emoji_events_rounded : Icons.verified_rounded,
+                size: 48,
+                color: completed ? AppCultureColors.amberDark : AppCultureColors.heritageJade,
+              ),
+              const SizedBox(height: 12),
+              Text(completed ? 'Bạn đã hoàn thành hành trình' : 'Bạn đã check-in rồi',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              Text(message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(height: 1.45, color: AppCultureColors.textMuted)),
+              const SizedBox(height: 18),
+              PrimaryButton(label: 'Đã hiểu', onPressed: () => Navigator.pop(ctx)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Chặn check-in lại ngay trên app: điểm đã check-in hoặc hành trình đã xong thì chỉ báo.
+  bool _blockRepeatCheckIn(JourneyDestination dest) {
+    final journey = _journey;
+    if (journey == null) return false;
+    if (dest.checkedIn) {
+      _showAlreadyCheckedIn(journey.isCompleted
+          ? 'Bạn đã check-in ${dest.name} và đi trọn hành trình. Không cần check-in thêm.'
+          : 'Bạn đã check-in ${dest.name} rồi. Hãy tiếp tục làm nhiệm vụ tại điểm đến này.');
+      return true;
+    }
+    if (journey.isCompleted) {
+      _showAlreadyCheckedIn('Hành trình này đã kết thúc. Bạn có thể xem lại câu chuyện văn hóa đã mở khóa.');
+      return true;
+    }
+    return false;
   }
 
   Future<void> _showCheckInProblem(String message) {

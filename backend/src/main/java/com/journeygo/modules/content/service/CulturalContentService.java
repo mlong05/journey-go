@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -88,6 +89,7 @@ public class CulturalContentService {
                 .mediaUrl(request.mediaUrl())
                 .mediaPublicId(request.mediaPublicId())
                 .duration(request.duration())
+                .imageUrls(sanitizeImageUrls(request.imageUrls()))
                 .playCount(0L)
                 .deleted(false)
                 .build();
@@ -105,7 +107,7 @@ public class CulturalContentService {
         CloudinaryUploadedImage uploaded = cloudinaryImageService.uploadImage(image, destinationId, callerId, callerRole);
         CulturalContentRequest requestWithImage = new CulturalContentRequest(request.title(), request.contentType(),
                 request.sequenceOrder(), request.description(), request.contentText(), uploaded.secureUrl(),
-                uploaded.publicId(), request.duration());
+                uploaded.publicId(), request.duration(), request.imageUrls());
         try {
             return create(destinationId, requestWithImage, callerId, callerRole);
         } catch (RuntimeException exception) {
@@ -132,6 +134,11 @@ public class CulturalContentService {
         content.setMediaUrl(request.mediaUrl());
         content.setMediaPublicId(request.mediaPublicId());
         content.setDuration(request.duration());
+        // null = client cũ không gửi thư viện ảnh nên giữ nguyên; danh sách (kể cả rỗng) = thay toàn bộ
+        if (request.imageUrls() != null) {
+            content.getImageUrls().clear();
+            content.getImageUrls().addAll(sanitizeImageUrls(request.imageUrls()));
+        }
 
         CulturalContent saved = culturalContentRepository.save(content);
         contentModerationService.submitAfterEdit(saved.getId(), callerId, callerRole);
@@ -152,7 +159,7 @@ public class CulturalContentService {
                 image, current.getDestination().getId(), callerId, callerRole);
         CulturalContentRequest requestWithImage = new CulturalContentRequest(request.title(), request.contentType(),
                 request.sequenceOrder(), request.description(), request.contentText(), uploaded.secureUrl(),
-                uploaded.publicId(), request.duration());
+                uploaded.publicId(), request.duration(), request.imageUrls());
         try {
             return update(id, requestWithImage, callerId, callerRole);
         } catch (RuntimeException exception) {
@@ -213,6 +220,21 @@ public class CulturalContentService {
     }
 
     // ── Helper methods ───────────────────────────────────────────────────────
+
+    /** Chỉ giữ URL https hợp lệ, bỏ trùng, giữ thứ tự và giới hạn số ảnh. */
+    private List<String> sanitizeImageUrls(List<String> imageUrls) {
+        if (imageUrls == null) return new ArrayList<>();
+        List<String> result = new ArrayList<>(imageUrls.stream()
+                .filter(url -> url != null && !url.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList());
+        if (result.size() > CulturalContentRequest.MAX_IMAGES
+                || result.stream().anyMatch(url -> !url.regionMatches(true, 0, "https://", 0, 8))) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+        return result;
+    }
 
     private Destination findDestinationOrThrow(Long destinationId) {
         return destinationRepository.findByIdAndDeletedFalse(destinationId)

@@ -25,7 +25,7 @@ import {
   ChevronsRight,
   Layers,
 } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/DashboardUI";
+import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { tourService } from "../services/tourService";
 import {
   getTourTheme,
@@ -117,45 +117,6 @@ function Toast({ msg, tone }) {
   );
 }
 
-/* ── Ô KPI bấm để lọc nhanh ──────────────────────────────────── */
-const KPI_TONES = {
-  slate: { icon: "bg-slate-100 text-slate-600", ring: "ring-slate-300" },
-  amber: { icon: "bg-amber-50 text-amber-600", ring: "ring-amber-300" },
-  emerald: { icon: "bg-emerald-50 text-emerald-600", ring: "ring-emerald-300" },
-  rose: { icon: "bg-rose-50 text-rose-600", ring: "ring-rose-300" },
-};
-
-function KpiCard({ icon: Icon, label, value, unit, tone = "slate", active, onClick }) {
-  const t = KPI_TONES[tone] || KPI_TONES.slate;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      title={`Lọc theo: ${label}`}
-      className={`bg-white border rounded-xl p-4 shadow-xs flex items-center justify-between gap-3 transition-all hover:border-slate-300 cursor-pointer text-left w-full ${
-        active ? `border-transparent ring-2 ${t.ring}` : "border-slate-200"
-      }`}
-    >
-      <div className="flex flex-col text-left min-w-0">
-        <p className="text-[13px] font-semibold text-slate-600 truncate">{label}</p>
-        <div className="mt-1 flex items-baseline gap-1.5">
-          <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums leading-none">
-            {value}
-          </span>
-          <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">
-            {unit}
-          </span>
-        </div>
-      </div>
-      <div
-        className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${t.icon}`}
-      >
-        <Icon size={18} strokeWidth={2} />
-      </div>
-    </button>
-  );
-}
 
 /* ── Thanh phân trang ────────────────────────────────────────── */
 function PaginationBar({
@@ -882,54 +843,44 @@ export default function ToursManager({
       <div className="shrink-0">{renderHeader()}</div>
 
       {/* ── KPI ───────────────────────────────────────────────── */}
-      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KpiCard
+      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiTile
           icon={Layers}
           label="Tổng tour"
           value={counts.all}
           unit="tour"
           tone="slate"
-          active={statusTab === "all"}
-          onClick={() => handleStatusChange("all")}
         />
         {source === "mine" && (
-          <KpiCard
+          <KpiTile
             icon={Pencil}
             label="Bản nháp"
             value={counts.DRAFT}
             unit="tour"
             tone="slate"
-            active={statusTab === "DRAFT"}
-            onClick={() => handleStatusChange("DRAFT")}
           />
         )}
-        <KpiCard
+        <KpiTile
           icon={Clock}
           label="Chờ duyệt"
           value={counts.PENDING}
           unit="tour"
           tone="amber"
-          active={statusTab === "PENDING"}
-          onClick={() => handleStatusChange("PENDING")}
         />
-        <KpiCard
+        <KpiTile
           icon={CheckCircle2}
           label="Đã xuất bản"
           value={counts.PUBLISHED}
           unit="tour"
           tone="emerald"
-          active={statusTab === "PUBLISHED"}
-          onClick={() => handleStatusChange("PUBLISHED")}
         />
         {source !== "mine" && (
-          <KpiCard
+          <KpiTile
             icon={Ban}
             label="Bị từ chối"
             value={counts.REJECTED}
             unit="tour"
             tone="rose"
-            active={statusTab === "REJECTED"}
-            onClick={() => handleStatusChange("REJECTED")}
           />
         )}
       </section>

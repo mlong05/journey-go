@@ -644,7 +644,6 @@ export default function QuestionManagerModal({
                     }}
                     errors={stationErrors}
                     disabled={actionLoading}
-                    placeHint={form.content}
                   />
                 </>
               )}

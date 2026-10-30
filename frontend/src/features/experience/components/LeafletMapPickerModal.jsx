@@ -116,6 +116,8 @@ export default function LeafletMapPickerModal({
   initialLongitude,
   radiusMeters = 50,
   placeName = "",
+  // Ẩn vòng tròn bán kính quét khi chỉ cần chọn tọa độ (vd: tọa độ điểm đến)
+  showRadius = true,
   onSelect,
 }) {
   const mapContainerRef = useRef(null);
@@ -261,7 +263,8 @@ export default function LeafletMapPickerModal({
       const circle = L.circle([defaultLat, defaultLng], {
         color: "#059669",
         fillColor: "#10b981",
-        fillOpacity: 0.16,
+        fillOpacity: showRadius ? 0.16 : 0,
+        opacity: showRadius ? 1 : 0,
         radius: rad,
         weight: 2,
         dashArray: "4, 6",
@@ -299,7 +302,7 @@ export default function LeafletMapPickerModal({
       setLoadError("Không thể tải bản đồ OpenStreetMap. Vui lòng kiểm tra kết nối mạng.");
       setLoading(false);
     }
-  }, [initialLatitude, initialLongitude, radiusMeters, activeLayerId]);
+  }, [initialLatitude, initialLongitude, radiusMeters, showRadius, activeLayerId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -387,6 +390,7 @@ export default function LeafletMapPickerModal({
 
   // Bay về vị trí GPS hiện tại của máy
   const handleGoToMyLocation = async () => {
+    setSearchError("");
     try {
       const { latitude: lat, longitude: lng } = await getDevicePosition();
       setCurrentPos({ lat, lng });
@@ -397,7 +401,7 @@ export default function LeafletMapPickerModal({
         circleRef.current.setLatLng([lat, lng]);
       }
     } catch (err) {
-      alert(describeGeoError(err));
+      setSearchError(describeGeoError(err));
     }
   };
 
@@ -614,9 +618,11 @@ export default function LeafletMapPickerModal({
               <span className="text-slate-400 font-bold">Kinh độ (Lng):</span>
               <span className="font-black text-slate-900">{currentPos.lng.toFixed(7)}</span>
             </div>
-            <span className="text-[11px] text-slate-400 font-medium hidden md:inline">
-              Vòng tròn xanh: Bán kính quét GPS {radiusMeters}m
-            </span>
+            {showRadius && (
+              <span className="text-[11px] text-slate-400 font-medium hidden md:inline">
+                Vòng tròn xanh: Bán kính quét GPS {radiusMeters}m
+              </span>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-2 shrink-0">

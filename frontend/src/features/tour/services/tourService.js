@@ -82,6 +82,8 @@ function buildPayload(payload) {
     title: String(payload.title || "").trim(),
     tourType: String(payload.tourType || "OTHER").trim().toUpperCase(),
     durationDays: Number(payload.durationDays),
+    // Ảnh bìa riêng của tour; rỗng thì backend dùng ảnh điểm đến đầu tiên
+    coverImageUrl: payload.coverImageUrl ? String(payload.coverImageUrl).trim() : null,
     destinations,
   };
 }

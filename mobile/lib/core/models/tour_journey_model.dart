@@ -163,6 +163,9 @@ class CheckInResult {
   final String? badgeName;
   final String? badgeIconUrl;
 
+  /// Điểm đến đã check-in từ trước: không check-in lại, chỉ báo cho du khách.
+  final bool alreadyCheckedIn;
+
   const CheckInResult({
     required this.success,
     required this.message,
@@ -170,6 +173,7 @@ class CheckInResult {
     required this.badgeAwarded,
     required this.badgeName,
     required this.badgeIconUrl,
+    this.alreadyCheckedIn = false,
   });
 
   factory CheckInResult.fromJson(Map<String, dynamic> j) => CheckInResult(
@@ -179,6 +183,7 @@ class CheckInResult {
         badgeAwarded: j['badgeAwarded'] == true,
         badgeName: j['badgeName']?.toString(),
         badgeIconUrl: j['badgeIconUrl']?.toString(),
+        alreadyCheckedIn: j['alreadyCheckedIn'] == true,
       );
 }
 

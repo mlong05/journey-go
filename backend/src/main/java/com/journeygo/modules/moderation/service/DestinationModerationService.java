@@ -9,7 +9,10 @@ import com.journeygo.modules.destination.entity.enums.DestinationStatus;
 import com.journeygo.modules.destination.repository.DestinationRepository;
 import com.journeygo.modules.experience.entity.Experience;
 import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
+import com.journeygo.modules.experience.entity.enums.ExperienceReviewStatus;
 import com.journeygo.modules.experience.repository.ExperienceRepository;
+import com.journeygo.modules.experience.repository.TaskRepository;
+import com.journeygo.modules.experience.entity.enums.TaskStatus;
 import com.journeygo.modules.moderation.dto.DestinationReviewResponse;
 import com.journeygo.modules.moderation.entity.enums.DestinationReviewAction;
 import com.journeygo.modules.moderation.entity.enums.DestinationReviewStatus;
@@ -38,6 +41,7 @@ public class DestinationModerationService {
     private final DestinationReviewHistoryRepository historyRepository;
     private final UserRepository userRepository;
     private final ExperienceRepository experienceRepository;
+    private final TaskRepository taskRepository;
 
     @Transactional
     public DestinationReviewResponse submit(Long id, Long callerId, Role callerRole) {
@@ -61,6 +65,7 @@ public class DestinationModerationService {
         destination.setStatus(DestinationStatus.PENDING);
         destination.setApproved(false);
         if (edited) updateExperienceStatuses(id, ExperienceStatus.DRAFT);
+        markExperiencesPendingReview(id);
         review.setStatus(DestinationReviewStatus.PENDING);
         review.setReviewer(null);
         review.setReviewedAt(null);
@@ -120,7 +125,9 @@ public class DestinationModerationService {
         if (!hasOther && otherReason != null && !otherReason.isBlank())
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Chỉ gửi otherReason khi đã chọn lý do OTHER");
         DestinationReview review = findReviewOrThrow(id);
-        requirePending(review);
+        // Từ chối hồ sơ đang chờ, hoặc thu hồi duyệt điểm đến đang phát hành (gỡ khỏi app, đối tác sửa rồi gửi lại)
+        boolean revoking = review.getStatus() == DestinationReviewStatus.APPROVED;
+        if (!revoking) requirePending(review);
         Destination destination = review.getDestination();
         destination.setStatus(DestinationStatus.REJECTED);
         destination.setApproved(false);
@@ -134,7 +141,7 @@ public class DestinationModerationService {
         reviewRepository.save(review);
         destinationRepository.save(destination);
         addHistory(review, DestinationReviewAction.REJECTED, reviewerId, review.getDecisionNote(), review.getReason(), review.getOtherReason());
-        log.info("Rejected destination id={}", id);
+        log.info(revoking ? "Revoked approval of destination id={}" : "Rejected destination id={}", id);
         return toResponse(review);
     }
 
@@ -207,11 +214,40 @@ public class DestinationModerationService {
         return userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
     }
 
+    /** Gửi (lại) hồ sơ điểm đến thì gói trải nghiệm cũng vào hàng chờ duyệt riêng (bước 3 của quy trình). */
+    private void markExperiencesPendingReview(Long destinationId) {
+        for (Experience experience : experienceRepository.findByDestination_Id(destinationId)) {
+            if (experience.getStatus() == ExperienceStatus.INACTIVE
+                    || experience.getReviewStatus() == ExperienceReviewStatus.APPROVED
+                    && experience.getStatus() == ExperienceStatus.PUBLISHED) {
+                continue; // đã duyệt và đang phát hành, không sửa gì thì giữ nguyên
+            }
+            experience.setReviewStatus(ExperienceReviewStatus.PENDING);
+            experience.setReviewNote(null);
+            experience.setReviewedAt(null);
+            experienceRepository.save(experience);
+        }
+    }
+
     private void updateExperienceStatuses(Long destinationId, ExperienceStatus status) {
         for (Experience experience : experienceRepository.findByDestination_Id(destinationId)) {
             if (experience.getStatus() != ExperienceStatus.INACTIVE) {
-                experience.setStatus(status);
+                // Trải nghiệm được duyệt riêng: duyệt điểm đến chỉ phát hành trải nghiệm đã được duyệt
+                // (hoặc dữ liệu cũ chưa có kết quả kiểm duyệt); trải nghiệm chờ duyệt / bị từ chối giữ ở bản nháp.
+                boolean notApproved = experience.getReviewStatus() != null
+                        && experience.getReviewStatus() != ExperienceReviewStatus.APPROVED;
+                ExperienceStatus target = status == ExperienceStatus.PUBLISHED && notApproved
+                        ? ExperienceStatus.DRAFT
+                        : status;
+                experience.setStatus(target);
                 experienceRepository.save(experience);
+                // Nhiệm vụ đi theo trạng thái trải nghiệm (giống ExperienceService.changeStatus):
+                // hành trình của du khách chỉ nạp nhiệm vụ PUBLISHED.
+                if (target == ExperienceStatus.PUBLISHED) {
+                    taskRepository.updateStatusByExperience(experience.getId(), TaskStatus.DRAFT, TaskStatus.PUBLISHED);
+                } else {
+                    taskRepository.updateStatusByExperience(experience.getId(), TaskStatus.PUBLISHED, TaskStatus.DRAFT);
+                }
             }
         }
     }
