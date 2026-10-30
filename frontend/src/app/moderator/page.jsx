@@ -23,20 +23,12 @@ import {
 import { SURFACE, TABLE, BADGE, BUTTON, INPUT } from "../admin/dashboard.tokens";
 import {
   PageHeader,
-  StatusChip,
   StatCard,
   Panel,
   StackedBar,
 } from "@/components/dashboard/DashboardUI";
 import { moderationService } from "@/features/destination";
 import { dashboardService } from "@/features/dashboard";
-
-function formatReviewHours(hours) {
-  if (hours == null) return "chưa có dữ liệu";
-  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} phút`;
-  if (hours < 48) return `${hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ`;
-  return `${Math.round(hours / 24)} ngày`;
-}
 
 /**
  * Trang Bảng Điều Khiển Ban Kiểm Định & Chuẩn Hóa Di Sản - JourneyGo
@@ -56,7 +48,6 @@ export default function ModeratorDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(false);
-  const [avgReviewHours, setAvgReviewHours] = useState(null);
 
   // Dynamic KPI Stats
   const [kpiMetrics, setKpiMetrics] = useState({
@@ -110,7 +101,6 @@ export default function ModeratorDashboardPage() {
         };
         const totalPending = pending.destinations + pending.tours + pending.contents;
 
-        setAvgReviewHours(stats?.avgReviewHours ?? null);
         setKpiMetrics({
           pendingCount: totalPending,
           pendingTrend:
@@ -268,27 +258,7 @@ export default function ModeratorDashboardPage() {
         eyebrow="Thẩm định"
         title="Bàn làm việc tổng quan"
         description="Đảm bảo dữ liệu lịch sử, tọa độ thực địa và bài thuyết minh đạt chuẩn di sản Việt Nam trước khi tiếp cận du khách."
-        meta={
-          <>
-            <StatusChip tone={kpiMetrics.pendingCount > 0 ? "amber" : "emerald"}>
-              {kpiMetrics.pendingCount > 0
-                ? `${kpiMetrics.pendingCount} hồ sơ đang chờ`
-                : "Hàng chờ đang trống"}
-            </StatusChip>
-            <StatusChip tone="indigo">
-              Xử lý trung bình (30 ngày): {formatReviewHours(avgReviewHours)}
-            </StatusChip>
-          </>
-        }
-      >
-        <Link href="/moderator/history" className={BUTTON.secondary}>
-          Lịch sử duyệt
-        </Link>
-        <Link href="/moderator/destinations" className={BUTTON.primary}>
-          Duyệt điểm đến
-          <ArrowUpRight size={13} />
-        </Link>
-      </PageHeader>
+      />
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpiStats.map((stat) => (
@@ -297,7 +267,6 @@ export default function ModeratorDashboardPage() {
             title={stat.title}
             value={stat.count}
             unit={stat.unit}
-            hint={stat.trend}
             icon={stat.icon}
             tone={stat.tone}
             href={stat.linkHref}

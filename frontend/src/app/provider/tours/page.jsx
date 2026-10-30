@@ -19,7 +19,6 @@ export default function ProviderToursPage() {
       theme="emerald"
       source="mine"
       heading="Tour Du Lịch Của Tôi"
-      description="Khai báo hành trình, định giá tour và gửi duyệt lên Hội đồng Thẩm định. Tour mới luôn ở trạng thái bản nháp cho tới khi được phát hành."
       canCreate
       canModerate={false}
       canDelete={false}

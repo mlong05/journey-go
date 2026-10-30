@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
 import java.time.Instant;
+import java.util.List;
 
 @Builder(toBuilder = true)
 @Schema(description = "Thông tin nội dung văn hóa")
@@ -23,6 +24,7 @@ public record CulturalContentResponse(
         @JsonIgnore
         @Schema(hidden = true, description = "Cloudinary public ID nội bộ") String mediaPublicId,
         @Schema(description = "Thời lượng phát (giây)") Integer duration,
+        @Schema(description = "Thư viện ảnh của nội dung") List<String> imageUrls,
         @Schema(description = "Số lượt phát / xem") long playCount,
         @Schema(description = "Đã xóa") boolean deleted,
         @Schema(description = "Thời gian tạo") Instant createdAt,
@@ -43,6 +45,7 @@ public record CulturalContentResponse(
                 .mediaUrl(content.getMediaUrl())
                 .mediaPublicId(content.getMediaPublicId())
                 .duration(content.getDuration())
+                .imageUrls(content.getImageUrls() == null ? List.of() : List.copyOf(content.getImageUrls()))
                 .playCount(content.getPlayCount())
                 .deleted(content.isDeleted())
                 .createdAt(content.getCreatedAt())

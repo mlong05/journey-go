@@ -19,6 +19,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { communityModerationService as api } from "@/features/community/services/communityModerationService";
 
 /**
@@ -117,7 +118,7 @@ function NoteDialog({ config, busy, onClose, onConfirm }) {
         aria-modal="true"
         aria-label={config.title}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden"
+        className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden"
       >
         <div className="px-6 pt-6 pb-4 flex items-start gap-3">
           <div
@@ -258,11 +259,12 @@ function EmptyState({ icon: Icon, title, text }) {
   );
 }
 
+
 function Skeleton() {
   return (
     <div className="space-y-4">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="h-44 rounded-3xl bg-slate-100 animate-pulse" />
+        <div key={i} className="h-44 rounded-xl bg-slate-100 animate-pulse" />
       ))}
     </div>
   );
@@ -531,7 +533,7 @@ export default function ModeratorCommunityPage() {
 
   /* ── Hiển thị ───────────────────────────────────────────────────────── */
   const renderPostCard = (post) => (
-    <article key={post.id} className="rounded-3xl border border-slate-200 bg-white p-5 space-y-4">
+    <article key={post.id} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4 hover:border-slate-300 transition-colors">
       <div className="flex items-start gap-3">
         <Avatar name={post.authorName} url={post.authorAvatarUrl} />
         <div className="min-w-0 flex-1">
@@ -575,7 +577,7 @@ export default function ModeratorCommunityPage() {
     const pending = report.status === "PENDING";
     const postStatus = POST_STATUS[report.postStatus];
     return (
-      <article key={report.id} className="rounded-3xl border border-slate-200 bg-white p-5 space-y-4">
+      <article key={report.id} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4 hover:border-slate-300 transition-colors">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 text-xs font-black text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-3 py-1">
             <Flag size={12} />
@@ -655,7 +657,7 @@ export default function ModeratorCommunityPage() {
     if (state.loading) return <Skeleton />;
     if (state.error && data.items.length === 0) {
       return (
-        <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5 flex items-start gap-3">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 flex items-start gap-3">
           <AlertCircle size={18} className="text-rose-600 mt-0.5 shrink-0" />
           <div className="min-w-0">
             <p className="text-sm font-black text-rose-800">Không tải được dữ liệu</p>
@@ -693,108 +695,135 @@ export default function ModeratorCommunityPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-1 pb-12 space-y-6">
-      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 pt-2">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Duyệt Bài Viết Cộng Đồng
-          </h1>
-          <p className="text-sm text-slate-500 mt-1.5 max-w-2xl leading-relaxed">
-            Xem xét bài viết du khách gửi lên diễn đàn trước khi hiển thị, và xử lý các báo cáo vi phạm từ cộng đồng.
-            Chỉ bài đã được duyệt mới xuất hiện trên bảng tin.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={refreshAll}
-          className="self-start sm:self-auto px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 inline-flex items-center gap-2 cursor-pointer"
+    <div className="h-full min-h-0 flex flex-col gap-4 overflow-hidden animate-in fade-in-50 duration-200">
+      {/* ── TIÊU ĐỀ ───────────────────────────────────────────── */}
+      <div className="shrink-0">
+        <PageHeader
+          title="Duyệt Bài Viết Cộng Đồng"
+          description="Xem xét bài chia sẻ trải nghiệm của du khách trước khi lên bảng tin, và xử lý các báo cáo vi phạm từ cộng đồng."
         >
-          <RefreshCw size={14} />
-          Làm mới
-        </button>
-      </header>
-
-      <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl w-fit">
-        <button
-          type="button"
-          onClick={() => setActiveTab("posts")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer transition-all ${
-            activeTab === "posts" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <MessageSquare size={14} />
-          Bài chờ duyệt ({posts.total})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("reports")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer transition-all ${
-            activeTab === "reports" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <Flag size={14} />
-          Báo cáo vi phạm ({pendingReportTotal})
-        </button>
+          <button
+            type="button"
+            onClick={refreshAll}
+            disabled={postsState.loading || reportsState.loading}
+            className="h-9 px-3.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-[13px] flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+            title="Làm mới danh sách"
+          >
+            <RefreshCw
+              size={14}
+              className={postsState.loading || reportsState.loading ? "animate-spin" : ""}
+            />
+            <span className="hidden sm:inline">Làm mới</span>
+          </button>
+        </PageHeader>
       </div>
 
-      {activeTab === "posts" &&
-        renderList({
-          state: postsState,
-          data: posts,
-          render: renderPostCard,
-          onRetry: () => loadPosts(0),
-          onMore: () => loadPosts(posts.page + 1),
-          empty: (
-            <EmptyState
-              icon={Inbox}
-              title="Không có bài nào đang chờ duyệt"
-              text="Bài viết mới của du khách sẽ xuất hiện tại đây để bạn xem xét."
-            />
-          ),
-        })}
+      {/* ── KPI: bấm để chuyển nhanh giữa hai việc ───────────── */}
+      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiTile
+          icon={MessageSquare}
+          label="Bài chờ duyệt"
+          value={posts.total}
+          unit="bài viết"
+          tone="amber"
+        />
+        <KpiTile
+          icon={Flag}
+          label="Báo cáo chờ xử lý"
+          value={pendingReportTotal}
+          unit="báo cáo"
+          tone="rose"
+        />
+      </section>
 
-      {activeTab === "reports" && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
+      {/* ── THANH LỌC ─────────────────────────────────────────── */}
+      <div className="shrink-0 bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { id: "posts", icon: MessageSquare, label: `Bài chờ duyệt (${posts.total})` },
+            { id: "reports", icon: Flag, label: `Báo cáo vi phạm (${pendingReportTotal})` },
+          ].map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                activeTab === id
+                  ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <Icon size={13} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Trạng thái báo cáo chỉ hiện ở tab báo cáo */}
+        {activeTab === "reports" && (
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-lg w-fit">
             {REPORT_STATUS_TABS.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => changeReportStatus(tab.id)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold border cursor-pointer transition-colors ${
+                className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all ${
                   reportStatus === tab.id
-                    ? "bg-slate-900 text-white border-slate-900"
-                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
                 {tab.label}
               </button>
             ))}
           </div>
-          {renderList({
-            state: reportsState,
-            data: reports,
-            render: renderReportCard,
-            onRetry: () => loadReports(reportStatus, 0),
-            onMore: () => loadReports(reportStatus, reports.page + 1),
-            empty: (
-              <EmptyState
-                icon={Flag}
-                title={
-                  reportStatus === "PENDING"
-                    ? "Không có báo cáo nào cần xử lý"
-                    : "Chưa có báo cáo ở mục này"
-                }
-                text={
-                  reportStatus === "PENDING"
-                    ? "Báo cáo vi phạm từ cộng đồng sẽ xuất hiện tại đây."
-                    : undefined
-                }
-              />
-            ),
-          })}
+        )}
+      </div>
+
+      {/* ── DANH SÁCH (chỉ vùng này cuộn) ─────────────────────── */}
+      <section className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] p-4 sm:p-5">
+          {activeTab === "posts" &&
+            renderList({
+              state: postsState,
+              data: posts,
+              render: renderPostCard,
+              onRetry: () => loadPosts(0),
+              onMore: () => loadPosts(posts.page + 1),
+              empty: (
+                <EmptyState
+                  icon={Inbox}
+                  title="Không có bài nào đang chờ duyệt"
+                  text="Bài chia sẻ trải nghiệm mới của du khách sẽ xuất hiện tại đây để bạn xem xét."
+                />
+              ),
+            })}
+
+          {activeTab === "reports" &&
+            renderList({
+              state: reportsState,
+              data: reports,
+              render: renderReportCard,
+              onRetry: () => loadReports(reportStatus, 0),
+              onMore: () => loadReports(reportStatus, reports.page + 1),
+              empty: (
+                <EmptyState
+                  icon={Flag}
+                  title={
+                    reportStatus === "PENDING"
+                      ? "Không có báo cáo nào cần xử lý"
+                      : "Chưa có báo cáo ở mục này"
+                  }
+                  text={
+                    reportStatus === "PENDING"
+                      ? "Báo cáo vi phạm từ cộng đồng sẽ xuất hiện tại đây."
+                      : undefined
+                  }
+                />
+              ),
+            })}
         </div>
-      )}
+      </section>
 
       <NoteDialog
         key={dialog ? `${dialog.kind}-${dialog.post?.id ?? dialog.report?.id}-${dialog.action ?? dialog.mode}` : "closed"}

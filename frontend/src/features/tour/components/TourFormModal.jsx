@@ -19,6 +19,7 @@ import {
   Compass,
 } from "lucide-react";
 import { destinationService } from "@/features/destination";
+import CoverImageField from "@/features/destination/components/CoverImageField";
 import { tourService } from "../services/tourService";
 import {
   getTourTheme,
@@ -70,6 +71,8 @@ export default function TourFormModal({
     tourType: tour?.tourType || "CULTURAL",
     durationDays:
       tour?.durationDays != null ? String(tour.durationDays) : "",
+    // Chỉ ảnh riêng của tour (không lấy ảnh điểm đến đang dùng thay)
+    coverImageUrl: tour?.tourCoverImageUrl || "",
   }));
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState("");
@@ -108,7 +111,8 @@ export default function TourFormModal({
         const arr = Array.isArray(list) ? list : [];
         setDestinationOptions(
           arr
-            .filter((d) => d && d.deleted !== true && d.id != null)
+            // Tour chỉ được gắn điểm đến đã qua thẩm định (backend cũng chặn)
+            .filter((d) => d && d.deleted !== true && d.id != null && d.approved === true)
             .map((d) => ({
               destinationId: Number(d.id),
               name: d.name || "",
@@ -233,6 +237,7 @@ export default function TourFormModal({
         title: form.title.trim(),
         tourType: form.tourType,
         durationDays: parseInt(form.durationDays, 10),
+        coverImageUrl: form.coverImageUrl || null,
         destinations: route.map((r, index) => ({
           destinationId: r.destinationId,
           sequenceOrder: index + 1,
@@ -512,6 +517,16 @@ export default function TourFormModal({
                     )}
                   </div>
                 </div>
+
+                {/* Ảnh bìa riêng của tour: hiện trên thẻ tour và trang chi tiết trong app du khách */}
+                <CoverImageField
+                  value={form.coverImageUrl}
+                  onChange={(url) => handleChange("coverImageUrl", url)}
+                  disabled={loading}
+                  label="Ảnh bìa tour"
+                  folder="journeygo/tours"
+                  hint="Hiện trên thẻ tour và trang chi tiết tour trong app du khách. Bỏ trống thì dùng ảnh bìa của điểm đến đầu tiên."
+                />
               </div>
 
               {/* ── Khối 2: Hành trình ───────────────────────── */}
@@ -601,7 +616,7 @@ export default function TourFormModal({
                       Chưa chọn điểm đến nào
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Tìm và chọn tối thiểu 1 điểm đến từ danh sách bên dưới.
+                      Tìm và chọn tối thiểu 1 điểm đến đã được duyệt từ danh sách bên dưới.
                     </p>
                   </div>
                 )}
@@ -638,7 +653,7 @@ export default function TourFormModal({
                       </div>
                     ) : filteredDestinations.length === 0 ? (
                       <p className="py-8 text-center text-[11px] font-bold text-slate-400">
-                        Không tìm thấy điểm đến phù hợp
+                        Không có điểm đến đã duyệt nào phù hợp
                       </p>
                     ) : (
                       <ul className="divide-y divide-slate-100">

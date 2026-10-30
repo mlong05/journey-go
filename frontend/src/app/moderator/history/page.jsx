@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { History, Search } from "lucide-react";
+import { Ban, CheckCircle2, History, Search } from "lucide-react";
+import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { moderationService } from "@/features/destination";
 
 /**
@@ -122,19 +123,22 @@ export default function ModeratorHistoryPage() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center gap-2">
-          <History className="h-5 w-5 text-slate-500" />
-          <h1 className="text-xl font-bold text-slate-900">Nhật ký & lịch sử duyệt</h1>
-        </div>
-        <p className="mt-1 text-sm text-slate-500">
-          Các quyết định duyệt / từ chối điểm đến và tour, kèm dòng thời gian của từng hồ sơ.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">{approvedCount} đã duyệt</span>
-          <span className="rounded-full bg-red-50 px-3 py-1 text-red-700">{rejectedCount} bị từ chối</span>
-        </div>
-      </div>
+      <PageHeader
+        title="Nhật ký & lịch sử duyệt"
+        description="Các quyết định duyệt / từ chối điểm đến và tour, kèm dòng thời gian của từng hồ sơ."
+      />
+
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <KpiTile
+          icon={History}
+          label={`Quyết định về ${cfg.label.toLowerCase()}`}
+          value={records.length}
+          unit="hồ sơ"
+          tone="slate"
+        />
+        <KpiTile icon={CheckCircle2} label="Đã duyệt" value={approvedCount} unit="hồ sơ" tone="emerald" />
+        <KpiTile icon={Ban} label="Bị từ chối" value={rejectedCount} unit="hồ sơ" tone="rose" />
+      </section>
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">

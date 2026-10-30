@@ -2,6 +2,7 @@ package com.journeygo.modules.experience.entity;
 
 import com.journeygo.modules.destination.entity.Destination;
 import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
+import com.journeygo.modules.experience.entity.enums.ExperienceReviewStatus;
 import com.journeygo.modules.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -50,6 +51,18 @@ public class Experience {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private ExperienceStatus status = ExperienceStatus.DRAFT;
+
+    /** Kết quả kiểm duyệt riêng của gói trải nghiệm (bước 3 trong quy trình thẩm định điểm đến) */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_status", length = 20)
+    private ExperienceReviewStatus reviewStatus;
+
+    /** Ghi chú / lý do từ chối của Kiểm duyệt viên gửi đối tác */
+    @Column(name = "review_note", columnDefinition = "TEXT")
+    private String reviewNote;
+
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

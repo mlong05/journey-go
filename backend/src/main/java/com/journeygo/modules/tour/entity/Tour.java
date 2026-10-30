@@ -53,6 +53,10 @@ public class Tour {
     private TourStatus status = TourStatus.DRAFT;
 
     /** Populated by admin/moderator when rejecting the tour. */
+    /** Ảnh bìa riêng của tour (URL https tải lên qua /upload/image); trống thì dùng ảnh điểm đến đầu tiên */
+    @Column(name = "cover_image_url", length = 1000)
+    private String coverImageUrl;
+
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 

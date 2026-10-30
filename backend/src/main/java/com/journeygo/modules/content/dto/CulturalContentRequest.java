@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 @Schema(description = "Yêu cầu tạo hoặc cập nhật nội dung văn hóa")
 public record CulturalContentRequest(
 
@@ -36,12 +38,25 @@ public record CulturalContentRequest(
 
         @Schema(description = "Thời lượng phát (giây) nếu là audio/video", example = "180")
         @Min(value = 0, message = "Thời lượng phải >= 0")
-        Integer duration
+        Integer duration,
+
+        @Schema(description = "Thư viện ảnh của nội dung (URL https đã tải lên qua /upload/image)")
+        @Size(max = MAX_IMAGES, message = "Tối đa " + MAX_IMAGES + " ảnh cho mỗi nội dung")
+        List<@NotBlank @Size(max = 1000, message = "Đường dẫn ảnh không được quá 1000 ký tự") String> imageUrls
 ) {
+    public static final int MAX_IMAGES = 20;
+
+    /** Preserve compatibility with callers that predate the image gallery field. */
+    public CulturalContentRequest(String title, String contentType, int sequenceOrder,
+                                  String description, String contentText, String mediaUrl,
+                                  String mediaPublicId, Integer duration) {
+        this(title, contentType, sequenceOrder, description, contentText, mediaUrl, mediaPublicId, duration, null);
+    }
+
     /** Preserve compatibility with clients that predate the Cloudinary public ID field. */
     public CulturalContentRequest(String title, String contentType, int sequenceOrder,
                                   String description, String contentText, String mediaUrl,
                                   Integer duration) {
-        this(title, contentType, sequenceOrder, description, contentText, mediaUrl, null, duration);
+        this(title, contentType, sequenceOrder, description, contentText, mediaUrl, null, duration, null);
     }
 }

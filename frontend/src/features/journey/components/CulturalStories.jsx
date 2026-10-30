@@ -89,6 +89,27 @@ function ContentViewer({ content, onClose }) {
           </div>
 
           {kind === "audio" && <audio src={content.mediaUrl} controls className="w-full" />}
+
+          {/* Thư viện ảnh kèm nội dung: vuốt ngang để xem, bấm để mở ảnh gốc */}
+          {Array.isArray(content.imageUrls) && content.imageUrls.length > 0 && (
+            <div className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-1">
+              {content.imageUrls.map((url, i) => (
+                <a
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative h-48 w-72 shrink-0 snap-start overflow-hidden rounded-2xl bg-gray-100"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`${content.title} - ảnh ${i + 1}`} className="h-full w-full object-cover" />
+                  <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-bold text-white">
+                    {i + 1}/{content.imageUrls.length}
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
           {kind === "link" && (
             <a
               href={content.mediaUrl}

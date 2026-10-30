@@ -10,6 +10,7 @@ class CulturalContentModel {
   final String contentText;
   final String mediaUrl;
   final int? duration; // giây
+  final List<String> imageUrls; // thư viện ảnh kèm nội dung
 
   const CulturalContentModel({
     required this.id,
@@ -22,6 +23,7 @@ class CulturalContentModel {
     required this.contentText,
     required this.mediaUrl,
     required this.duration,
+    this.imageUrls = const [],
   });
 
   factory CulturalContentModel.fromJson(Map<String, dynamic> j) {
@@ -37,8 +39,35 @@ class CulturalContentModel {
       contentText: j['contentText']?.toString() ?? '',
       mediaUrl: j['mediaUrl']?.toString() ?? '',
       duration: j['duration'] == null ? null : asInt(j['duration']),
+      imageUrls: (j['imageUrls'] as List?)
+              ?.map((e) => e?.toString() ?? '')
+              .where((u) => u.startsWith('http'))
+              .toList() ??
+          const [],
     );
   }
+
+  /// Mã video YouTube nếu mediaUrl là link YouTube.
+  String? get youTubeId => RegExp(
+        r'(?:youtu\.be/|youtube\.com/(?:embed/|v/|watch\?v=|watch\?.+&v=|shorts/))([\w-]{11})',
+      ).firstMatch(mediaUrl)?.group(1);
+
+  bool get isVideo =>
+      youTubeId != null ||
+      RegExp(r'\.(mp4|webm|mov)(\?.*)?$', caseSensitive: false).hasMatch(mediaUrl) ||
+      mediaUrl.contains('/video/upload/');
+
+  /// Ảnh đại diện: ảnh media (nội dung cũ) hoặc ảnh đầu tiên trong thư viện.
+  String? get coverImage =>
+      hasImage ? mediaUrl : (imageUrls.isNotEmpty ? imageUrls.first : null);
+
+  /// Toàn bộ ảnh để xem: ảnh media cũ (nếu có) + thư viện ảnh.
+  List<String> get galleryImages =>
+      [if (hasImage) mediaUrl, ...imageUrls.where((u) => u != mediaUrl)];
+
+  /// Ảnh xem trước của video (YouTube có sẵn ảnh thu nhỏ).
+  String? get videoThumbnail =>
+      youTubeId != null ? 'https://img.youtube.com/vi/$youTubeId/hqdefault.jpg' : coverImage;
 
   /// Cách hiển thị media: image (xem trong app) hoặc playable (mở trình phát ngoài).
   bool get hasImage =>

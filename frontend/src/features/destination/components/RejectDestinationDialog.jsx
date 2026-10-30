@@ -136,14 +136,16 @@ export default function RejectDestinationDialog({
             </div>
             <div className="min-w-0">
               <h3 className="text-base font-black text-slate-900 tracking-tight">
-                Từ chối thẩm định điểm đến
+                {destination?.revoke ? "Thu hồi duyệt điểm đến" : "Từ chối thẩm định điểm đến"}
               </h3>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                 Điểm đến{" "}
                 <strong className="text-slate-700 truncate inline-block max-w-[260px] align-bottom">
                   {destination?.name || "Chưa có"}
                 </strong>{" "}
-                sẽ chuyển sang trạng thái bị từ chối kèm phản hồi để đối tác chỉnh sửa.
+                {destination?.revoke
+                  ? "đang phát hành sẽ bị gỡ khỏi app du khách và chuyển sang trạng thái bị từ chối kèm phản hồi để đối tác chỉnh sửa, gửi duyệt lại."
+                  : "sẽ chuyển sang trạng thái bị từ chối kèm phản hồi để đối tác chỉnh sửa."}
               </p>
             </div>
           </div>
@@ -267,7 +269,7 @@ export default function RejectDestinationDialog({
             ) : (
               <>
                 <Ban size={14} />
-                <span>Xác nhận từ chối</span>
+                <span>{destination?.revoke ? "Xác nhận thu hồi" : "Xác nhận từ chối"}</span>
               </>
             )}
           </button>

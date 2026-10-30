@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/cultural_content_model.dart';
 import '../../core/services/api_client.dart';
@@ -357,15 +358,45 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
           ),
           child: Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: meta.color.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(meta.icon, color: meta.color, size: 22),
-              ),
+              // Có ảnh thì hiện ảnh thu nhỏ, chưa có thì hiện biểu tượng loại nội dung
+              c.coverImage != null || c.youTubeId != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(
+                              (c.coverImage ?? c.videoThumbnail)!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Container(
+                                color: meta.color.withValues(alpha: 0.1),
+                                child: Icon(meta.icon, color: meta.color),
+                              ),
+                            ),
+                            if (c.isVideo)
+                              const Center(
+                                child: Icon(
+                                  Icons.play_circle_fill_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: meta.color.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(meta.icon, color: meta.color, size: 22),
+                    ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -384,6 +415,8 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                       [
                         meta.label,
                         if (c.durationLabel.isNotEmpty) c.durationLabel,
+                        if (c.galleryImages.isNotEmpty)
+                          '${c.galleryImages.length} ảnh',
                       ].join(' · '),
                       style: TextStyle(
                         fontSize: 11.5,
@@ -449,6 +482,30 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
         });
   }
 
+  /// Trình phát YouTube nhúng; chỉ tạo khi người dùng bấm phát để màn mở nhanh và không tốn dữ liệu.
+  YoutubePlayerController? _youTube;
+
+  void _startYouTube() {
+    final id = _content.youTubeId;
+    if (id == null) return;
+    setState(() {
+      _youTube = YoutubePlayerController.fromVideoId(
+        videoId: id,
+        autoPlay: true,
+        params: const YoutubePlayerParams(
+          showFullscreenButton: true,
+          strictRelatedVideos: true,
+        ),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _youTube?.close();
+    super.dispose();
+  }
+
   Future<void> _playMedia() async {
     final ok = await launchUrl(
       Uri.parse(_content.mediaUrl),
@@ -464,26 +521,43 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
     }
   }
 
+  Widget _sectionTitle(IconData icon, String text) => Row(
+        children: [
+          Icon(icon, size: 18, color: AppCultureColors.heritageJade),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppCultureColors.textDark,
+            ),
+          ),
+        ],
+      );
+
   @override
   Widget build(BuildContext context) {
     final c = _content;
     final meta = contentTypeMeta(c.contentType);
+    final cover = c.coverImage;
+    final gallery = c.galleryImages;
     return Scaffold(
       backgroundColor: AppCultureColors.background,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: c.hasImage ? 260 : 150,
+            expandedHeight: cover != null ? 260 : 150,
             backgroundColor: meta.color,
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
-              background: c.hasImage
+              background: cover != null
                   ? Stack(
                       fit: StackFit.expand,
                       children: [
                         Image.network(
-                          c.mediaUrl,
+                          cover,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) =>
                               Container(color: meta.color),
@@ -597,7 +671,24 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
                     ],
                   ),
                 ],
-                if (c.hasPlayableMedia) ...[
+                // Video chính: YouTube phát ngay trong app, video khác mở trình phát của máy
+                if (c.hasPlayableMedia && c.isVideo) ...[
+                  const SizedBox(height: 18),
+                  _sectionTitle(Icons.smart_display_rounded, 'Video'),
+                  const SizedBox(height: 8),
+                  if (_youTube != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: YoutubePlayer(controller: _youTube!),
+                    )
+                  else
+                    _VideoCard(
+                      thumbnail: c.videoThumbnail,
+                      color: meta.color,
+                      durationLabel: c.durationLabel,
+                      onTap: c.youTubeId != null ? _startYouTube : _playMedia,
+                    ),
+                ] else if (c.hasPlayableMedia) ...[
                   const SizedBox(height: 18),
                   FilledButton.icon(
                     onPressed: _playMedia,
@@ -642,8 +733,55 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
                     ),
                   ),
                 ],
+                // Thư viện ảnh: vuốt ngang, chạm để xem toàn màn hình
+                if (gallery.isNotEmpty) ...[
+                  const SizedBox(height: 22),
+                  _sectionTitle(
+                    Icons.photo_library_rounded,
+                    'Hình ảnh (${gallery.length})',
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 170,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: gallery.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 10),
+                      itemBuilder: (context, i) => GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            fullscreenDialog: true,
+                            builder: (_) => _ImageViewerScreen(
+                              images: gallery,
+                              initialIndex: i,
+                            ),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: AspectRatio(
+                            aspectRatio: 4 / 3,
+                            child: Image.network(
+                              gallery[i],
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Container(
+                                color: AppCultureColors.border,
+                                child: const Icon(
+                                  Icons.broken_image_rounded,
+                                  color: AppCultureColors.textLight,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 if (c.contentText.isNotEmpty) ...[
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 22),
+                  _sectionTitle(Icons.menu_book_rounded, 'Câu chuyện'),
+                  const SizedBox(height: 8),
                   Text(
                     c.contentText,
                     style: const TextStyle(
@@ -657,6 +795,149 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Khung xem trước video 16:9 với nút phát ở giữa; chạm để mở trình phát.
+class _VideoCard extends StatelessWidget {
+  final String? thumbnail;
+  final Color color;
+  final String durationLabel;
+  final VoidCallback onTap;
+
+  const _VideoCard({
+    required this.thumbnail,
+    required this.color,
+    required this.durationLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (thumbnail != null)
+                Image.network(
+                  thumbnail!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(color: Colors.black87),
+                )
+              else
+                Container(color: Colors.black87),
+              const DecoratedBox(
+                decoration: BoxDecoration(color: Colors.black26),
+              ),
+              Center(
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black38, blurRadius: 12),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+              ),
+              if (durationLabel.isNotEmpty)
+                Positioned(
+                  right: 10,
+                  bottom: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      durationLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Xem ảnh toàn màn hình: vuốt ngang để chuyển ảnh, chụm ngón tay để phóng to.
+class _ImageViewerScreen extends StatefulWidget {
+  final List<String> images;
+  final int initialIndex;
+
+  const _ImageViewerScreen({required this.images, required this.initialIndex});
+
+  @override
+  State<_ImageViewerScreen> createState() => _ImageViewerScreenState();
+}
+
+class _ImageViewerScreenState extends State<_ImageViewerScreen> {
+  late final PageController _controller =
+      PageController(initialPage: widget.initialIndex);
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(
+          '${_index + 1} / ${widget.images.length}',
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+      ),
+      body: PageView.builder(
+        controller: _controller,
+        itemCount: widget.images.length,
+        onPageChanged: (i) => setState(() => _index = i),
+        itemBuilder: (_, i) => InteractiveViewer(
+          minScale: 1,
+          maxScale: 4,
+          child: Center(
+            child: Image.network(
+              widget.images[i],
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const Icon(
+                Icons.broken_image_rounded,
+                color: Colors.white54,
+                size: 48,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
