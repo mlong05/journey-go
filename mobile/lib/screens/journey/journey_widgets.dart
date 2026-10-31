@@ -43,7 +43,7 @@ class ProgressRing extends StatelessWidget {
             children: [
               Text(label,
                   style: const TextStyle(
-                      color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, height: 1)),
+                      color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, height: 1)),
               const SizedBox(height: 2),
               Text(caption, style: const TextStyle(color: Colors.white70, fontSize: 10.5)),
             ],
@@ -169,7 +169,7 @@ class PrimaryButton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 8)],
-                Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ],
             ),
     );
@@ -235,14 +235,14 @@ Future<void> showRewardDialog(
               Text(title,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      fontSize: 19, fontWeight: FontWeight.w900, color: AppCultureColors.textDark)),
+                      fontSize: 19, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
               if (badgeName != null && badgeName.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text(badgeName,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppCultureColors.amberDark)),
               ],
               const SizedBox(height: 8),

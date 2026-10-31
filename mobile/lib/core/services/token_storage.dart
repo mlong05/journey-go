@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../constants/api_constants.dart';
 import '../models/auth_models.dart';
+import 'server_finder.dart';
 
 class TokenStorage {
   static const String _keyAccessToken = 'jg_mobile_access_token';
@@ -91,10 +91,16 @@ class TokenStorage {
   /// Alias xóa toàn bộ phiên đăng nhập
   static Future<void> clear() async => clearSession();
 
-  /// Lấy cấu hình Base URL máy chủ
+  /// Lấy cấu hình Base URL máy chủ: địa chỉ đã lưu, nếu chưa lưu thì tự dò địa chỉ đang trả lời.
   static Future<String> getBaseUrl() async {
     final prefs = await _getPrefs();
-    return prefs.getString(_keyBaseUrl) ?? ApiConstants.getDefaultBaseUrl();
+    return prefs.getString(_keyBaseUrl) ?? await ServerFinder.find();
+  }
+
+  /// Người dùng đã tự lưu địa chỉ máy chủ chưa (chưa thì app tự dò).
+  static Future<bool> hasCustomBaseUrl() async {
+    final prefs = await _getPrefs();
+    return prefs.getString(_keyBaseUrl) != null;
   }
 
   /// Thiết lập cấu hình Base URL máy chủ
@@ -107,6 +113,7 @@ class TokenStorage {
   static Future<void> resetBaseUrl() async {
     final prefs = await _getPrefs();
     await prefs.remove(_keyBaseUrl);
+    ServerFinder.reset();
   }
 
   /// Lưu tuỳ chọn ghi nhớ đăng nhập

@@ -21,6 +21,7 @@ import {
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { communityModerationService as api } from "@/features/community/services/communityModerationService";
+import { useQueueRefresh } from "@/context/NotificationContext";
 
 /**
  * Trang Duyệt Bài Viết Cộng Đồng của Kiểm duyệt viên.
@@ -360,8 +361,8 @@ export default function ModeratorCommunityPage() {
   }, []);
 
   /* Tải danh sách; page 0 thay thế, page lớn hơn thì nối thêm */
-  const loadPosts = useCallback(async (page = 0) => {
-    setPostsState((s) => ({ ...s, loading: page === 0, more: page > 0, error: "" }));
+  const loadPosts = useCallback(async (page = 0, silent = false) => {
+    if (!silent) setPostsState((s) => ({ ...s, loading: page === 0, more: page > 0, error: "" }));
     try {
       const result = await api.getPendingPosts({ page, size: PAGE_SIZE });
       setPosts((prev) => ({
@@ -413,6 +414,14 @@ export default function ModeratorCommunityPage() {
       // giữ số cũ
     }
   }, []);
+
+  // Thời gian thực: bài mới chờ duyệt → tải ngầm danh sách; báo cáo mới → cập nhật số trên tab
+  // (danh sách báo cáo đang xem chỉ tải lại khi đang mở tab báo cáo chờ xử lý)
+  useQueueRefresh(["post-review"], () => loadPosts(0, true));
+  useQueueRefresh(["post-report"], () => {
+    refreshPendingReportTotal();
+    if (activeTab === "reports" && reportStatus === "PENDING") loadReports("PENDING", 0);
+  });
 
   useEffect(() => {
     let cancelled = false;

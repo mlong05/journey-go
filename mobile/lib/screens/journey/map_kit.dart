@@ -246,7 +246,7 @@ class PlacePin extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11.5,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: emphasized ? AppCultureColors.textDark : AppCultureColors.textMuted,
               ),
             ),

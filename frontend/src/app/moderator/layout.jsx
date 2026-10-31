@@ -15,6 +15,8 @@ import {
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
 import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout";
+import { NotificationProvider } from "@/context/NotificationContext";
+import NotificationToaster from "@/components/notifications/NotificationToaster";
 
 /**
  * Layout Làm Việc Của Kiểm Duyệt Viên - JourneyGo
@@ -98,66 +100,69 @@ export default function ModeratorLayout({ children }) {
       })?.label || "Bàn làm việc tổng quan";
 
   return (
-    <div className="h-screen w-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
-      <Sidebar
-        role="moderator"
-        navItems={moderatorNavItems}
-        onLogout={performLogout}
-        isOpenMobile={isSidebarOpen}
-        onCloseMobile={() => setIsSidebarOpen(false)}
-        isWide={isSidebarWide}
-        onToggleWide={() => setIsSidebarWide((prev) => !prev)}
-      />
-
-      <div className="flex-1 min-w-0 w-full h-screen flex flex-col overflow-hidden">
-        <DashboardHeader
+    <NotificationProvider>
+      <div className="h-screen w-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
+        <Sidebar
           role="moderator"
-          user={authData?.user}
-          section="Thẩm định"
-          title={currentTitle}
-          onOpenMenu={() => setIsSidebarOpen(true)}
-          searchValue={topSearch}
-          onSearchChange={setTopSearch}
-          onSearchSubmit={handleTopSearchSubmit}
-          searchPlaceholder="Tìm mã hồ sơ, tên di tích..."
-        >
-          <NotificationBell hint="Hồ sơ mới gửi duyệt và báo cáo vi phạm sẽ hiện ở đây." />
-        </DashboardHeader>
+          navItems={moderatorNavItems}
+          onLogout={performLogout}
+          isOpenMobile={isSidebarOpen}
+          onCloseMobile={() => setIsSidebarOpen(false)}
+          isWide={isSidebarWide}
+          onToggleWide={() => setIsSidebarWide((prev) => !prev)}
+        />
 
-        {/* Nội dung trang làm việc.
-            • TRANG DANH SÁCH (/moderator/destinations): dùng khung cố định
-              h-full + overflow-hidden NGAY TỪ RENDER ĐẦU TIÊN để trang con tự
-              cuộn riêng vùng danh sách, không bị nhảy layout khi dữ liệu về.
-            • CÁC TRANG KHÁC: giữ nguyên cuộn toàn trang + padding như cũ. */}
-        <main
-          className={
-            isDestinationList
-              ? "flex-1 w-full h-full overflow-hidden bg-slate-50"
-              : isExperiencesPage
-                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8 bg-slate-50"
-                : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
-          }
-        >
-          <div
+        <div className="flex-1 min-w-0 w-full h-screen flex flex-col overflow-hidden">
+          <DashboardHeader
+            role="moderator"
+            user={authData?.user}
+            section="Thẩm định"
+            title={currentTitle}
+            onOpenMenu={() => setIsSidebarOpen(true)}
+            searchValue={topSearch}
+            onSearchChange={setTopSearch}
+            onSearchSubmit={handleTopSearchSubmit}
+            searchPlaceholder="Tìm mã hồ sơ, tên di tích..."
+          >
+            <NotificationBell hint="Hồ sơ mới gửi duyệt và báo cáo vi phạm sẽ hiện ở đây." openLinks={false} />
+          </DashboardHeader>
+
+          {/* Nội dung trang làm việc.
+              • TRANG DANH SÁCH (/moderator/destinations): dùng khung cố định
+                h-full + overflow-hidden NGAY TỪ RENDER ĐẦU TIÊN để trang con tự
+                cuộn riêng vùng danh sách, không bị nhảy layout khi dữ liệu về.
+              • CÁC TRANG KHÁC: giữ nguyên cuộn toàn trang + padding như cũ. */}
+          <main
             className={
               isDestinationList
-                ? "w-full max-w-[1600px] mx-auto h-full flex flex-col"
+                ? "flex-1 w-full h-full overflow-hidden bg-slate-50"
                 : isExperiencesPage
-                  ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
-                  : "w-full max-w-[1600px] mx-auto space-y-6"
+                  ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8 bg-slate-50"
+                  : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
             }
           >
-            {children}
-          </div>
-        </main>
-      </div>
+            <div
+              className={
+                isDestinationList
+                  ? "w-full max-w-[1600px] mx-auto h-full flex flex-col"
+                  : isExperiencesPage
+                    ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
+                    : "w-full max-w-[1600px] mx-auto space-y-6"
+              }
+            >
+              {children}
+            </div>
+          </main>
+        </div>
 
-      {/* Modal đăng xuất cao cấp tích hợp */}
-      <LogoutModal
-        isOpen={logoutModal.isOpen}
-        status={logoutModal.status}
-        message={logoutModal.message}
-      />
-    </div>
+        {/* Modal đăng xuất cao cấp tích hợp */}
+        <LogoutModal
+          isOpen={logoutModal.isOpen}
+          status={logoutModal.status}
+          message={logoutModal.message}
+        />
+      </div>
+      <NotificationToaster openLinks={false} />
+    </NotificationProvider>
   );
 }

@@ -29,6 +29,7 @@ import {
 } from "@/components/dashboard/DashboardUI";
 import { moderationService } from "@/features/destination";
 import { dashboardService } from "@/features/dashboard";
+import { useQueueRefresh } from "@/context/NotificationContext";
 
 /**
  * Trang Bảng Điều Khiển Ban Kiểm Định & Chuẩn Hóa Di Sản - JourneyGo
@@ -64,10 +65,17 @@ export default function ModeratorDashboardPage() {
   // Dynamic Priority Queue Data
   const [queueData, setQueueData] = useState([]);
 
+  // Thời gian thực: hồ sơ mới gửi duyệt hoặc moderator khác vừa xử lý → tải ngầm lại hàng chờ
+  const [reloadKey, setReloadKey] = useState(0);
+  useQueueRefresh(
+    ["destination-review", "tour-review", "content-review", "experience-review", "post-review", "post-report"],
+    () => setReloadKey((k) => k + 1),
+  );
+
   useEffect(() => {
     let isMounted = true;
     async function fetchDashboardData() {
-      setIsLoading(true);
+      if (reloadKey === 0) setIsLoading(true);
       try {
         const [destQueueRes, contentQueueRes, tourQueueRes, statsRes] =
           await Promise.allSettled([
@@ -183,7 +191,7 @@ export default function ModeratorDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const kpiStats = [
     {

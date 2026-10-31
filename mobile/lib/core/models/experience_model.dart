@@ -67,8 +67,17 @@ class ExperienceModel {
     } else if (lower.contains('bảo tàng') || lower.contains('chiến tích') || lower.contains('khải định') || lower.contains('huế')) {
       return 'assets/images/baotang.png';
     }
-    return 'assets/images/vanmieu.png';
+    // Tên không khớp di tích nào: chọn ảnh cố định theo tên để các thẻ không trùng một ảnh.
+    return _fallbackCovers[title.codeUnits.fold<int>(0, (a, c) => a + c) % _fallbackCovers.length];
   }
+
+  static const _fallbackCovers = [
+    'assets/images/vanmieu.png',
+    'assets/images/thanglong.png',
+    'assets/images/trangan.png',
+    'assets/images/gomsu.png',
+    'assets/images/baotang.png',
+  ];
 
   static String _formatPrice(double price, String currency) {
     if (price <= 0) return 'Miễn phí';

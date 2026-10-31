@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/forum_model.dart';
+import '../../core/models/notification_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/forum_service.dart';
+import '../../core/services/notification_service.dart';
+import '../common/heritage_motion.dart';
 import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeletonList;
 import 'compose_post_screen.dart';
 import 'forum_widgets.dart';
@@ -55,19 +59,28 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
       }
     });
     _load();
+    // Thời gian thực: bài được duyệt / từ chối / bị ẩn / có bình luận → cập nhật trạng thái ngay
+    _notificationSub = NotificationCenter.instance.incoming.listen((n) {
+      if (n.refType == 'POST' && mounted) _load(silent: true);
+    });
   }
+
+  StreamSubscription<AppNotification>? _notificationSub;
 
   @override
   void dispose() {
+    _notificationSub?.cancel();
     _scroll.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final result = await _service.getMyPosts(page: 0, size: _pageSize);
       if (!mounted) return;
@@ -80,7 +93,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
         _loading = false;
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
+      if (!mounted || silent) return; // tải ngầm lỗi thì giữ danh sách đang xem
       setState(() {
         _error = e.message;
         _loading = false;
@@ -149,20 +162,31 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
             'Bài của tôi',
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: AppCultureColors.textDark,
             ),
           ),
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            labelColor: AppCultureColors.heritageJade,
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+            dividerColor: Colors.transparent,
+            labelColor: Colors.white,
             unselectedLabelColor: AppCultureColors.textMuted,
-            indicatorColor: AppCultureColors.heritageJade,
-            labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                colors: [AppCultureColors.jadeGradientStart, AppCultureColors.jadeGradientEnd],
+              ),
+            ),
+            splashBorderRadius: BorderRadius.circular(20),
+            labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
             tabs: [
               for (final t in _tabs)
-                Tab(text: _loading ? t.label : '${t.label} (${_posts.where(t.match).length})'),
+                Tab(height: 34, text: _loading ? t.label : '${t.label} (${_posts.where(t.match).length})'),
             ],
           ),
         ),
@@ -171,7 +195,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
           backgroundColor: AppCultureColors.heritageJade,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.edit_rounded),
-          label: const Text('Viết bài', style: TextStyle(fontWeight: FontWeight.w800)),
+          label: const Text('Viết bài', style: TextStyle(fontWeight: FontWeight.w600)),
         ),
         body: _loading
             ? const RewardsSkeletonList(count: 3, itemHeight: 170)
@@ -222,10 +246,14 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
                     child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
                   );
                 }
-                return ForumPostCard(
-                  post: items[i],
-                  showStatus: true,
-                  onTap: () => _open(items[i]),
+                return Reveal(
+                  key: ValueKey(items[i].id),
+                  order: i < 4 ? i : 0,
+                  child: ForumPostCard(
+                    post: items[i],
+                    showStatus: true,
+                    onTap: () => _open(items[i]),
+                  ),
                 );
               },
             ),

@@ -128,7 +128,7 @@ class _RefundsScreenState extends State<RefundsScreen> {
                   r.refundCode,
                   style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppCultureColors.textDark,
                   ),
                 ),
@@ -143,7 +143,7 @@ class _RefundsScreenState extends State<RefundsScreen> {
                   r.statusLabel,
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: colors.fg,
                   ),
                 ),
@@ -204,7 +204,7 @@ class _RefundsScreenState extends State<RefundsScreen> {
                   '${formatThousands(amount)} ₫',
                   style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     color: AppCultureColors.textDark,
                   ),
                 ),

@@ -52,6 +52,8 @@ import {
   SlotManager as SlotManagerModal,
   StationQrSheetModal,
 } from "@/features/experience";
+import { useQueueRefresh } from "@/context/NotificationContext";
+import DestinationDetailModal from "./DestinationDetailModal";
 
 const STATUS = {
   PUBLISHED: "PUBLISHED",
@@ -206,7 +208,6 @@ export default function ProviderDestinationsPage() {
   const [expSlotTarget, setExpSlotTarget] = useState(null);
   // Trải nghiệm đang mở bảng "QR các trạm"
   const [expQrTarget, setExpQrTarget] = useState(null);
-  const [expDescExpanded, setExpDescExpanded] = useState(false);
 
   const showToast = useCallback((msg, tone = "success") => {
     setToastMessage(msg);
@@ -219,7 +220,6 @@ export default function ProviderDestinationsPage() {
       setDetailExp(null);
       return;
     }
-    setExpDescExpanded(false);
     setLoadingExp(true);
     try {
       const exp = await experienceService.getExperienceByDestinationId(destinationId);
@@ -244,9 +244,11 @@ export default function ProviderDestinationsPage() {
   }, [showToast]);
 
 
-  const fetchAllList = useCallback(async () => {
-    setIsLoading(true);
-    setFetchError("");
+  const fetchAllList = useCallback(async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+      setFetchError("");
+    }
     try {
       const data = await destinationService.getMine();
       const list = Array.isArray(data) ? data : [];
@@ -256,15 +258,19 @@ export default function ProviderDestinationsPage() {
       setDestinations(normalized);
     } catch (err) {
       console.error("[Provider Destinations] Fetch error:", err);
+      if (silent) return; // tải ngầm lỗi thì giữ danh sách đang xem
       setFetchError(
         err?.message ||
           "Không thể tải danh sách điểm đến. Vui lòng kiểm tra kết nối."
       );
       setDestinations([]);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, []);
+
+  // Thời gian thực: điểm đến / nội dung / trải nghiệm vừa được duyệt hoặc từ chối → cập nhật trạng thái ngay
+  useQueueRefresh(["my-content"], () => fetchAllList(true));
 
   useEffect(() => {
     let cancelled = false;
@@ -559,7 +565,7 @@ export default function ProviderDestinationsPage() {
         >
           <button
             type="button"
-            onClick={fetchAllList}
+            onClick={() => fetchAllList()}
             disabled={isLoading}
             className="h-9 px-3.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-[13px] flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
             title="Làm mới danh sách"
@@ -703,7 +709,7 @@ export default function ProviderDestinationsPage() {
             <p className="text-[11px] text-rose-700 mt-0.5">{fetchError}</p>
             <button
               type="button"
-              onClick={fetchAllList}
+              onClick={() => fetchAllList()}
               className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900 cursor-pointer"
             >
               Thử lại
@@ -972,294 +978,26 @@ export default function ProviderDestinationsPage() {
         </div>
       </section>
 
-      {detailTarget && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150"
-          onClick={() => setDetailTarget(null)}
-        >
-          <div
-            className="w-full max-w-2xl bg-white rounded-2xl p-5 sm:p-7 shadow-xl border border-slate-100 relative animate-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-slate-900">
-                  {detailTarget.name}
-                </h3>
-                <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
-                  <MapPin size={12} className="text-slate-400" />
-                  <span>{detailTarget.address}</span>
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setDetailTarget(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-              <div className="p-4 rounded-xl bg-sky-50/70 border border-sky-200">
-                <p className="text-[11px] font-bold text-sky-700 mb-2 flex items-center gap-1">
-                  <Navigation size={11} /> Tọa độ GPS
-                </p>
-                <div className="space-y-1.5 text-xs tabular-nums">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Vĩ độ (LAT):</span>
-                    <span className="font-bold text-slate-800">
-                      {detailTarget.latitude?.toFixed(6) ?? "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Kinh độ (LNG):</span>
-                    <span className="font-bold text-slate-800">
-                      {detailTarget.longitude?.toFixed(6) ?? "—"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200">
-                <p className="text-[11px] font-bold text-emerald-700 mb-2 flex items-center gap-1">
-                  <Users size={11} /> Sức chứa tối đa
-                </p>
-                <p className="text-base font-bold text-slate-900">
-                  {detailTarget.capacity ?? "—"} du khách / lượt
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <p className="text-[11px] font-bold text-slate-600 mb-2">
-                  Đơn vị khởi tạo
-                </p>
-                <p className="text-sm font-bold text-slate-800">
-                  {detailTarget.createdBy || "—"}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <p className="text-[11px] font-bold text-slate-600 mb-2">
-                  Trạng thái phê duyệt
-                </p>
-                {detailTarget.status === STATUS.APPROVED && (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    {STATUS_LABEL[STATUS.APPROVED]}
-                  </span>
-                )}
-                {detailTarget.status === STATUS.PENDING && (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                    {STATUS_LABEL[STATUS.PENDING]}
-                  </span>
-                )}
-                {detailTarget.status === STATUS.REVOKED && (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-orange-100 text-orange-800 border border-orange-200">
-                    <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                    {STATUS_LABEL[STATUS.REVOKED]}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Khối Thuyết minh & Nội dung văn hóa nằm trong phần Chi tiết */}
-            <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-orange-50/30 border border-amber-200/90 shadow-2xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs shadow-amber-500/20">
-                    <Headphones size={20} />
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <h4 className="text-sm font-bold text-slate-900">
-                      Thuyết minh &amp; câu chuyện văn hóa
-                    </h4>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-600 text-white text-[11px] font-bold shadow-2xs">
-                      {detailTarget.contentCount ?? 0} nội dung
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setContentManagerTarget(detailTarget);
-                    setDetailTarget(null);
-                  }}
-                  className="sm:self-center px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs inline-flex items-center justify-center gap-1.5 transition-all shadow-xs shadow-amber-600/20 active:scale-95 cursor-pointer shrink-0"
-                >
-                  <Headphones size={14} />
-                  <span>Quản lý nội dung</span>
-                </button>
-              </div>
-            </div>
-
-            {/* ── Khối Gói Trải Nghiệm Tương Tác ── */}
-            <div className="mt-4 p-4.5 rounded-xl border border-slate-200/90 bg-slate-50/70">
-              <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/70">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
-                    <Compass size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900">
-                      Gói Trải Nghiệm Tương Tác
-                    </h4>
-                    <p className="text-[11px] text-slate-600">
-                      Nhiệm vụ khám phá, câu hỏi đố vui &amp; khung giờ tham quan
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {loadingExp ? (
-                <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                  <Loader2 size={16} className="animate-spin text-slate-400" />
-                  <span>Đang tải thông tin gói trải nghiệm...</span>
-                </div>
-              ) : !detailExp ? (
-                <div className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <p className="text-xs text-slate-600 leading-relaxed max-w-md">
-                    Điểm đến này chưa thiết lập gói trải nghiệm. Bạn có thể tạo gói trải nghiệm để mở bán vé tham quan, nhiệm vụ thực địa và câu hỏi đố vui cho du khách.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setExpCreateOpen(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
-                  >
-                    <Plus size={14} />
-                    <span>Thiết lập Trải nghiệm</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="pt-3 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <h5 className="text-sm font-bold text-slate-900">
-                        {detailExp.title}
-                      </h5>
-                      {detailExp.description && (
-                        <div className="mt-1">
-                          <p
-                            className={`text-xs text-slate-600 leading-relaxed whitespace-pre-line ${
-                              !expDescExpanded ? "line-clamp-2" : ""
-                            }`}
-                          >
-                            {detailExp.description}
-                          </p>
-                          {(detailExp.description.length > 90 ||
-                            detailExp.description.includes("\n")) && (
-                            <button
-                              type="button"
-                              onClick={() => setExpDescExpanded((prev) => !prev)}
-                              className="mt-1 text-[11.5px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline inline-flex items-center gap-1 cursor-pointer transition-colors"
-                            >
-                              <span>
-                                {expDescExpanded
-                                  ? "Thu gọn văn bản"
-                                  : "Xem toàn bộ văn bản"}
-                              </span>
-                              {expDescExpanded ? (
-                                <ChevronUp size={12} />
-                              ) : (
-                                <ChevronDown size={12} />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4 text-xs shrink-0 bg-white px-3 py-2 rounded-xl border border-slate-200">
-                      <div>
-                        <span className="text-[11px] font-bold text-slate-400 block">
-                          Giá vé
-                        </span>
-                        <span className="font-bold text-slate-900">
-                          {Number(detailExp.price).toLocaleString("vi-VN")} {detailExp.currency || "VND"}
-                        </span>
-                      </div>
-                      <div className="h-6 w-px bg-slate-200" />
-                      <div>
-                        <span className="text-[11px] font-bold text-slate-400 block">
-                          Thời lượng
-                        </span>
-                        <span className="font-bold text-slate-700">
-                          {detailExp.durationMinutes ? `${detailExp.durationMinutes} phút` : "Chưa đặt"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200/60">
-                    <button
-                      type="button"
-                      onClick={() => setExpTaskTarget(detailExp)}
-                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Quản lý nhiệm vụ và đố vui tương tác"
-                    >
-                      <Trophy size={13} className="text-amber-600" />
-                      <span>Nhiệm vụ &amp; Đố vui</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setExpQrTarget(detailExp)}
-                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Xem, in lại và đổi mã QR của các trạm check-in"
-                    >
-                      <QrCode size={13} className="text-sky-600" />
-                      <span>QR các trạm</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setExpSlotTarget(detailExp)}
-                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Quản lý khung giờ và suất phục vụ"
-                    >
-                      <Clock size={13} className="text-sky-600" />
-                      <span>Khung giờ (Slots)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setExpEditTarget(detailExp)}
-                      className="h-8 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Chỉnh sửa thông tin cơ bản gói trải nghiệm"
-                    >
-                      <Edit3 size={13} className="text-slate-600" />
-                      <span>Sửa</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-end gap-2.5 flex-wrap">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditTarget(detailTarget);
-                  setDetailTarget(null);
-                }}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shadow-emerald-600/20 active:scale-95 cursor-pointer"
-              >
-                <Edit3 size={13} />
-                <span>Chỉnh sửa điểm đến</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailTarget(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DestinationDetailModal
+        key={detailTarget?.id ?? "none"}
+        destination={detailTarget}
+        experience={detailExp}
+        loadingExperience={loadingExp}
+        onClose={() => setDetailTarget(null)}
+        onEdit={() => {
+          setEditTarget(detailTarget);
+          setDetailTarget(null);
+        }}
+        onManageContent={() => {
+          setContentManagerTarget(detailTarget);
+          setDetailTarget(null);
+        }}
+        onCreateExperience={() => setExpCreateOpen(true)}
+        onExperienceTasks={() => setExpTaskTarget(detailExp)}
+        onExperienceQr={() => setExpQrTarget(detailExp)}
+        onExperienceSlots={() => setExpSlotTarget(detailExp)}
+        onEditExperience={() => setExpEditTarget(detailExp)}
+      />
 
       <CreateDestinationModal
         isOpen={isCreateOpen}
@@ -1284,7 +1022,7 @@ export default function ProviderDestinationsPage() {
         isOpen={Boolean(contentManagerTarget)}
         destination={contentManagerTarget}
         onClose={() => setContentManagerTarget(null)}
-        onUpdated={fetchAllList}
+        onUpdated={() => fetchAllList()}
       />
 
       {/* ── Các Modal nghiệp vụ Trải nghiệm gắn với Điểm đến ── */}

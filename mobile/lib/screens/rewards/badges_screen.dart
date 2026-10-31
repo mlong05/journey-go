@@ -177,7 +177,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
                 '$earnedCount / $total huy hiệu',
                 style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: AppCultureColors.textDark,
                 ),
               ),
@@ -225,7 +225,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11.5,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: entry.earned
                     ? AppCultureColors.textDark
                     : AppCultureColors.textMuted,
@@ -269,7 +269,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: AppCultureColors.textDark,
                 ),
               ),

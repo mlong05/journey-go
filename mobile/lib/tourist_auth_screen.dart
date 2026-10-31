@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'core/models/auth_models.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/google_auth_service.dart';
+import 'core/services/server_finder.dart';
+import 'screens/account/password_screens.dart';
 import 'core/services/token_storage.dart';
 import 'screens/tourist_home_screen.dart';
 
@@ -397,110 +400,181 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
   }
 
   // Hộp thoại tùy chỉnh cấu hình máy chủ Backend API
+  /// Cấu hình địa chỉ backend (chỉ có ở bản chạy thử). Điện thoại thật không dùng được 10.0.2.2:
+  /// cần IP Wi-Fi của máy tính, hoặc cắm USB + `adb reverse tcp:8088 tcp:8088` rồi dùng 127.0.0.1.
   void _showServerConfigDialog() async {
+    final custom = await TokenStorage.hasCustomBaseUrl();
     final currentUrl = await TokenStorage.getBaseUrl();
     final urlController = TextEditingController(text: currentUrl);
+    final envUrl = ServerFinder.envBaseUrl;
 
     if (!mounted) return;
 
+    // null: chưa kiểm tra · true/false: kết quả kiểm tra địa chỉ đang nhập
+    bool? reachable;
+    bool checking = false;
+    String note = custom ? 'Đang dùng địa chỉ bạn đã lưu.' : 'Đang tự dò máy chủ (chưa lưu địa chỉ).';
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: Colors.white,
-        title: const Row(
-          children: [
-            Icon(Icons.dns_rounded, color: AppCultureColors.oceanBlue, size: 22),
-            SizedBox(width: 10),
-            Text(
-              'Cấu hình Máy chủ API',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: AppCultureColors.textDark,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Địa chỉ API Backend Spring Boot (mặc định cổng 8088):',
-              style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: urlController,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: AppCultureColors.surface,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppCultureColors.border),
-                ),
-              ),
-              style: const TextStyle(fontSize: 12.5, fontFamily: 'monospace'),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Chọn nhanh theo thiết bị:',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: AppCultureColors.textDark,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          Future<void> check() async {
+            setDialogState(() {
+              checking = true;
+              reachable = null;
+            });
+            final ok = await ServerFinder.isReachable(urlController.text);
+            if (ctx.mounted) {
+              setDialogState(() {
+                checking = false;
+                reachable = ok;
+              });
+            }
+          }
+
+          Widget chip(String label, String url) => ActionChip(
+                label: Text(label),
+                labelStyle: const TextStyle(fontSize: 12),
+                onPressed: () {
+                  urlController.text = url;
+                  check();
+                },
+              );
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: Colors.white,
+            title: const Row(
               children: [
-                ActionChip(
-                  label: const Text('Android Emulator (10.0.2.2)'),
-                  labelStyle: const TextStyle(fontSize: 10.5),
-                  onPressed: () {
-                    urlController.text = 'http://10.0.2.2:8088/api/v1';
-                  },
-                ),
-                ActionChip(
-                  label: const Text('Localhost (127.0.0.1)'),
-                  labelStyle: const TextStyle(fontSize: 10.5),
-                  onPressed: () {
-                    urlController.text = 'http://127.0.0.1:8088/api/v1';
-                  },
+                Icon(Icons.dns_rounded, color: AppCultureColors.oceanBlue, size: 22),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Máy chủ API',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await TokenStorage.resetBaseUrl();
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Mặc định', style: TextStyle(color: AppCultureColors.textMuted)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newUrl = urlController.text.trim();
-              if (newUrl.isNotEmpty) {
-                await TokenStorage.setBaseUrl(newUrl);
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppCultureColors.oceanBlue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              elevation: 0,
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(note, style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted)),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: urlController,
+                    keyboardType: TextInputType.url,
+                    onChanged: (_) => setDialogState(() => reachable = null),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: AppCultureColors.surface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppCultureColors.border),
+                      ),
+                      suffixIcon: checking
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                            )
+                          : reachable == null
+                              ? null
+                              : Icon(
+                                  reachable! ? Icons.check_circle_rounded : Icons.error_rounded,
+                                  color: reachable! ? AppCultureColors.heritageJade : AppCultureColors.error,
+                                ),
+                    ),
+                    style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                  ),
+                  if (reachable != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      reachable! ? 'Kết nối được máy chủ.' : 'Không kết nối được địa chỉ này.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: reachable! ? AppCultureColors.jadeDark : AppCultureColors.error,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Chọn nhanh:',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      if (envUrl != null) chip('Từ .env', envUrl),
+                      chip('USB (127.0.0.1)', 'http://127.0.0.1:8088/api/v1'),
+                      chip('Máy ảo (10.0.2.2)', 'http://10.0.2.2:8088/api/v1'),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppCultureColors.oceanLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Điện thoại thật: nhập IP Wi-Fi của máy tính, ví dụ http://192.168.1.5:8088/api/v1 '
+                      '(cùng mạng Wi-Fi), hoặc cắm cáp USB, chạy "adb reverse tcp:8088 tcp:8088" rồi chọn USB. '
+                      'Địa chỉ 10.0.2.2 chỉ dùng cho máy ảo.',
+                      style: TextStyle(fontSize: 12, height: 1.4, color: AppCultureColors.oceanDark),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: const Text('Lưu cấu hình'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: checking
+                    ? null
+                    : () async {
+                        await TokenStorage.resetBaseUrl();
+                        final found = await ServerFinder.find();
+                        final ok = await ServerFinder.isReachable(found);
+                        if (ctx.mounted) {
+                          setDialogState(() {
+                            urlController.text = found;
+                            reachable = ok;
+                            note = ok
+                                ? 'Đã tự dò thấy máy chủ. App sẽ tự dò mỗi lần mở.'
+                                : 'Không dò thấy máy chủ. Hãy nhập IP Wi-Fi của máy tính.';
+                          });
+                        }
+                      },
+                child: const Text('Tự dò'),
+              ),
+              TextButton(
+                onPressed: checking ? null : check,
+                child: const Text('Kiểm tra'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final newUrl = urlController.text.trim();
+                  if (newUrl.isNotEmpty) {
+                    await TokenStorage.setBaseUrl(newUrl);
+                  }
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppCultureColors.oceanBlue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                child: const Text('Lưu'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -587,137 +661,21 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
   }
 
   // Dialog Quên Mật Khẩu
-  void _showForgotPasswordDialog() {
-    final TextEditingController resetEmailController = TextEditingController(
-      text: _emailController.text,
+  /// Khôi phục mật khẩu bằng mã OTP qua email; xong thì điền sẵn email để đăng nhập lại.
+  Future<void> _showForgotPasswordDialog() async {
+    final email = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(initialEmail: _emailController.text.trim()),
+      ),
     );
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          backgroundColor: Colors.white,
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppCultureColors.oceanLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.lock_reset_rounded,
-                  color: AppCultureColors.oceanBlue,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Khôi phục mật khẩu',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppCultureColors.textDark,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Nhập địa chỉ email du khách đã đăng ký. Hệ thống sẽ gửi mã xác thực khôi phục bảo mật trong tích tắc.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppCultureColors.textMuted,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: resetEmailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'vidu@di-san.vn',
-                  prefixIcon: const Icon(
-                    Icons.alternate_email_rounded,
-                    color: AppCultureColors.oceanBlue,
-                    size: 20,
-                  ),
-                  filled: true,
-                  fillColor: AppCultureColors.surface,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppCultureColors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppCultureColors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: AppCultureColors.oceanBlue,
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text(
-                'Hủy bỏ',
-                style: TextStyle(color: AppCultureColors.textMuted),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    backgroundColor: AppCultureColors.oceanBlue,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    content: const Text(
-                      'Đã gửi liên kết khôi phục tới email của quý khách.',
-                    ),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppCultureColors.oceanBlue,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Gửi liên kết',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+    if (email != null && mounted) {
+      setState(() {
+        _emailController.text = email;
+        _passwordController.clear();
+      });
+    }
   }
 
-  // Modal Điều Khoản Dịch Vụ
   void _showTermsModal() {
     showModalBottomSheet(
       context: context,
@@ -1117,7 +1075,8 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Nút cấu hình máy chủ Backend API
+                      // Nút cấu hình máy chủ Backend API: chỉ hiện ở bản chạy thử (debug)
+                      if (kDebugMode)
                       Material(
                         color: Colors.transparent,
                         child: InkWell(
@@ -1160,7 +1119,9 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                             ),
                           ),
                         ),
-                      ),
+                      )
+                      else
+                        const SizedBox(width: 1),
 
                       // Logo thương hiệu "journey go" có hoa sen cách điệu
                       Container(
@@ -1194,7 +1155,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                               style: TextStyle(
                                 color: AppCultureColors.textDark,
                                 fontSize: 13,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 letterSpacing: -0.3,
                               ),
                             ),
@@ -1230,12 +1191,12 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                         ),
                         SizedBox(width: 4),
                         Text(
-                          'CỔNG TRẢI NGHIỆM DU KHÁCH',
+                          'Cổng trải nghiệm du khách',
                           style: TextStyle(
                             color: AppCultureColors.heritageJade,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
+                            letterSpacing: 0.2,
                           ),
                         ),
                       ],
@@ -1250,7 +1211,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                     style: TextStyle(
                       color: AppCultureColors.textDark,
                       fontSize: 19.5,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -0.4,
                       height: 1.2,
                     ),
@@ -1399,7 +1360,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                   ),
                   TextSpan(
                     text: '+100 điểm thưởng ',
-                    style: TextStyle(fontWeight: FontWeight.w800),
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   TextSpan(
                     text: 'khám phá di sản khi tạo tài khoản mới!',
@@ -1696,11 +1657,11 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 12.0),
               child: Text(
-                'HOẶC TIẾP TỤC VỚI',
+                'hoặc tiếp tục với',
                 style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8,
+                  letterSpacing: 0.2,
                   color: AppCultureColors.textMuted,
                 ),
               ),
@@ -1716,36 +1677,17 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
 
         const SizedBox(height: 16),
 
-        // 2 Nút Google & Apple ID thiết kế phẳng tinh tế
-        Row(
-          children: [
-            // Nút Google
-            Expanded(
-              child: _buildSocialButton(
-                label: 'Google',
-                iconWidget: CustomPaint(
-                  size: const Size(18, 18),
-                  painter: GoogleLogoPainter(),
-                ),
-                onTap: () => _handleSocialLogin('Google'),
-              ),
+        // Đăng nhập Google (Apple ID chưa hỗ trợ trên Android nên chưa hiện)
+        SizedBox(
+          width: double.infinity,
+          child: _buildSocialButton(
+            label: 'Tiếp tục với Google',
+            iconWidget: CustomPaint(
+              size: const Size(18, 18),
+              painter: GoogleLogoPainter(),
             ),
-
-            const SizedBox(width: 12),
-
-            // Nút Apple ID
-            Expanded(
-              child: _buildSocialButton(
-                label: 'Apple ID',
-                iconWidget: const Icon(
-                  Icons.apple,
-                  size: 21,
-                  color: AppCultureColors.textDark,
-                ),
-                onTap: () => _handleSocialLogin('Apple'),
-              ),
-            ),
-          ],
+            onTap: () => _handleSocialLogin('Google'),
+          ),
         ),
       ],
     );

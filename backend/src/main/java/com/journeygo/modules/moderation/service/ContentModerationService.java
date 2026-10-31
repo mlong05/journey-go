@@ -13,6 +13,8 @@ import com.journeygo.modules.moderation.entity.ContentReviewHistory;
 import com.journeygo.modules.moderation.entity.enums.ContentRejectionReason;
 import com.journeygo.modules.moderation.repository.ContentReviewRepository;
 import com.journeygo.modules.moderation.repository.ContentReviewHistoryRepository;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
@@ -31,6 +33,7 @@ public class ContentModerationService {
     private final ContentReviewHistoryRepository historyRepository;
     private final CulturalContentRepository contentRepository;
     private final UserRepository userRepository;
+    private final NotificationPublisher notifications;
 
     @Transactional
     public ContentReviewResponse submit(Long contentId, Long callerId, Role role) {
@@ -67,6 +70,18 @@ public class ContentModerationService {
         ContentReview saved = reviewRepository.save(review);
         User actor = userRepository.findById(callerId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         historyRepository.save(ContentReviewHistory.builder().review(saved).action(ContentReviewAction.SUBMITTED).actor(actor).build());
+
+        var destination = content.getDestination();
+        notifications.send(NotificationType.CONTENT_PENDING)
+                .toRole(Role.MODERATOR)
+                .except(callerId)
+                .title(contentWasEdited ? "Nội dung văn hóa được cập nhật" : "Nội dung văn hóa mới chờ duyệt")
+                .body(NotificationPublisher.quote(content.getTitle()) + " thuộc điểm đến "
+                        + NotificationPublisher.quote(destination.getName()) + " đang chờ bạn thẩm định.")
+                .link("/moderator/destinations/" + destination.getId())
+                .ref("CONTENT", contentId)
+                .queue(NotificationPublisher.Queue.CONTENT_REVIEW)
+                .publish();
         return toResponse(saved);
     }
 
@@ -152,6 +167,21 @@ public class ContentModerationService {
         historyRepository.save(ContentReviewHistory.builder().review(saved)
                 .action(status == ContentReviewStatus.APPROVED ? ContentReviewAction.APPROVED : ContentReviewAction.REJECTED)
                 .actor(reviewer).note(note).reason(review.getReason()).otherReason(review.getOtherReason()).build());
+
+        boolean approved = status == ContentReviewStatus.APPROVED;
+        var destination = review.getContent().getDestination();
+        notifications.send(approved ? NotificationType.CONTENT_APPROVED : NotificationType.CONTENT_REJECTED)
+                .to(NotificationPublisher.idOf(destination.getCreatedBy()))
+                .except(reviewerId)
+                .title(approved ? "Nội dung văn hóa đã được duyệt" : "Nội dung văn hóa cần chỉnh sửa")
+                .body(NotificationPublisher.withNote(NotificationPublisher.quote(review.getContent().getTitle())
+                        + (approved ? " đã hiển thị cho du khách tại " : " chưa được duyệt tại ")
+                        + NotificationPublisher.quote(destination.getName()) + ".", note))
+                .link(NotificationPublisher.dashboardPath(destination.getCreatedBy(), "/destinations"))
+                .ref("CONTENT", contentId)
+                .queue(NotificationPublisher.Queue.MY_CONTENT)
+                .publish();
+        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.CONTENT_REVIEW);
         return toResponse(saved);
     }
 

@@ -23,6 +23,7 @@ import {
 import { useAuthSession } from "@/hooks";
 import { tourService, TOUR_STATUS_META } from "@/features/tour";
 import { dashboardService, percentChange } from "@/features/dashboard";
+import { useQueueRefresh } from "@/context/NotificationContext";
 import {
   PageHeader,
   StatusChip,
@@ -93,10 +94,18 @@ export default function ProviderOverviewPage() {
   // Tour do đối tác tạo (GET /tours/my)
   const [myTours, setMyTours] = useState([]);
 
+  // Thời gian thực: booking mới, đối soát, kết quả duyệt → tải ngầm lại số liệu
+  const [reloadKey, setReloadKey] = useState(0);
+  const lastRange = React.useRef(timeRange);
+  useQueueRefresh(["bookings", "settlements", "my-content"], () => setReloadKey((k) => k + 1));
+
   useEffect(() => {
     let isSubscribed = true;
+    // Chỉ hiện trạng thái đang tải khi đổi khoảng thời gian, không hiện khi tải ngầm
+    const silent = lastRange.current === timeRange && reloadKey > 0;
+    lastRange.current = timeRange;
     queueMicrotask(() => {
-      if (isSubscribed) setIsLoading(true);
+      if (isSubscribed && !silent) setIsLoading(true);
     });
 
     async function loadData() {
@@ -121,7 +130,7 @@ export default function ProviderOverviewPage() {
     return () => {
       isSubscribed = false;
     };
-  }, [timeRange]);
+  }, [timeRange, reloadKey]);
 
   const partnerName = authData?.user?.fullName || authData?.user?.name || "Đối tác điểm đến";
   const range = RANGE_OPTIONS.find((r) => r.id === timeRange) ?? RANGE_OPTIONS[2];

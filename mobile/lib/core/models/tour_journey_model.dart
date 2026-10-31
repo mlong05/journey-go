@@ -121,6 +121,9 @@ class TourJourney {
   final int totalDestinations;
   final List<JourneyDestination> destinations;
 
+  /// Thời điểm đi xong toàn bộ hành trình; null khi chưa xong.
+  final DateTime? completedAt;
+
   const TourJourney({
     required this.id,
     required this.tourId,
@@ -130,6 +133,7 @@ class TourJourney {
     required this.currentOrder,
     required this.totalDestinations,
     required this.destinations,
+    this.completedAt,
   });
 
   factory TourJourney.fromJson(Map<String, dynamic> j) {
@@ -144,6 +148,7 @@ class TourJourney {
       currentOrder: _int(j['currentDestinationOrder'], 1),
       totalDestinations: _int(j['totalDestinations'], dests.length),
       destinations: dests,
+      completedAt: DateTime.tryParse(_str(j['completedAt']))?.toLocal(),
     );
   }
 

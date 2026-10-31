@@ -23,6 +23,9 @@ import com.journeygo.modules.settlement.entity.SettlementDetail;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
 import com.journeygo.modules.settlement.repository.SettlementDetailRepository;
 import com.journeygo.modules.settlement.repository.SettlementRepository;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
+import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import com.journeygo.modules.wallet.entity.Wallet;
@@ -72,6 +75,7 @@ public class SettlementService {
     private final PartnerRevenueService revenueService;
     private final WalletService walletService;
     private final FinanceProperties financeProperties;
+    private final NotificationPublisher notifications;
 
     // ── Ứng viên tất toán ────────────────────────────────────────────────────
 
@@ -380,6 +384,17 @@ public class SettlementService {
         log.info("[Settlement] Đã duyệt settlement {} — cộng {} vào ví partner {}",
                 settlement.getSettlementCode(), recomputedNet, settlement.getPartner().getId());
 
+        notifications.send(NotificationType.SETTLEMENT_APPROVED)
+                .to(NotificationPublisher.idOf(settlement.getPartner().getUser()))
+                .title("Đối soát doanh thu đã được duyệt")
+                .body(NotificationPublisher.money(recomputedNet) + " của kỳ " + settlement.getRevenuePeriod()
+                        + " (đợt " + settlement.getSettlementCode() + ") đã được cộng vào ví của bạn.")
+                .link("/provider")
+                .ref("SETTLEMENT", settlement.getId())
+                .queue(NotificationPublisher.Queue.SETTLEMENTS)
+                .publish();
+        notifications.queueChanged(Role.ADMIN, NotificationPublisher.Queue.SETTLEMENTS);
+
         return SettlementResponse.fromEntity(settlement);
     }
 
@@ -413,6 +428,19 @@ public class SettlementService {
 
         log.info("[Settlement] Đã từ chối settlement {} — giải phóng các khoản doanh thu",
                 settlement.getSettlementCode());
+
+        notifications.send(NotificationType.SETTLEMENT_REJECTED)
+                .to(NotificationPublisher.idOf(settlement.getPartner().getUser()))
+                .title("Đợt đối soát chưa được duyệt")
+                .body("Đợt " + settlement.getSettlementCode() + " kỳ " + settlement.getRevenuePeriod()
+                        + " chưa được duyệt" + (request.reason() == null || request.reason().isBlank()
+                        ? "." : ". Lý do: " + request.reason().trim())
+                        + " Doanh thu sẽ được đối soát lại ở đợt sau.")
+                .link("/provider")
+                .ref("SETTLEMENT", settlement.getId())
+                .queue(NotificationPublisher.Queue.SETTLEMENTS)
+                .publish();
+        notifications.queueChanged(Role.ADMIN, NotificationPublisher.Queue.SETTLEMENTS);
 
         return SettlementResponse.fromEntity(settlement);
     }

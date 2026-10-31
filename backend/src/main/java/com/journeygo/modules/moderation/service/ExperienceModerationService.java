@@ -10,6 +10,9 @@ import com.journeygo.modules.experience.exception.ResourceNotFoundException;
 import com.journeygo.modules.experience.repository.CheckInPointRepository;
 import com.journeygo.modules.experience.repository.ExperienceRepository;
 import com.journeygo.modules.experience.repository.TaskRepository;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
+import com.journeygo.modules.user.entity.Role;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,7 @@ public class ExperienceModerationService {
     private final ExperienceRepository experienceRepository;
     private final TaskRepository taskRepository;
     private final CheckInPointRepository checkInPointRepository;
+    private final NotificationPublisher notifications;
 
     @Transactional
     public ExperienceResponse approve(Long experienceId, String note) {
@@ -45,6 +49,7 @@ public class ExperienceModerationService {
         }
         experienceRepository.save(e);
         log.info("Approved experience id={} (status={})", e.getId(), e.getStatus());
+        notifyOwner(e, true);
         return toResponse(e);
     }
 
@@ -61,7 +66,25 @@ public class ExperienceModerationService {
         taskRepository.updateStatusByExperience(e.getId(), TaskStatus.PUBLISHED, TaskStatus.DRAFT);
         experienceRepository.save(e);
         log.info("Rejected experience id={}", e.getId());
+        notifyOwner(e, false);
         return toResponse(e);
+    }
+
+    private void notifyOwner(Experience e, boolean approved) {
+        String sentence = NotificationPublisher.quote(e.getTitle()) + (approved
+                ? (e.getStatus() == ExperienceStatus.PUBLISHED
+                        ? " đã được duyệt và mở cho du khách."
+                        : " đã được duyệt, sẽ mở cho du khách khi điểm đến được phát hành.")
+                : " chưa được duyệt. Vui lòng xem lý do và chỉnh sửa.");
+        notifications.send(approved ? NotificationType.EXPERIENCE_APPROVED : NotificationType.EXPERIENCE_REJECTED)
+                .to(NotificationPublisher.idOf(e.getCreatedBy()))
+                .title(approved ? "Trải nghiệm đã được duyệt" : "Trải nghiệm cần chỉnh sửa")
+                .body(NotificationPublisher.withNote(sentence, e.getReviewNote()))
+                .link(NotificationPublisher.dashboardPath(e.getCreatedBy(), "/destinations"))
+                .ref("EXPERIENCE", e.getId())
+                .queue(NotificationPublisher.Queue.MY_CONTENT)
+                .publish();
+        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.EXPERIENCE_REVIEW);
     }
 
     private Experience findActiveOrThrow(Long id) {

@@ -364,13 +364,13 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
             const SizedBox(height: 6),
             Text(booking.tourTitle,
                 style: const TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w800, color: AppCultureColors.textDark)),
+                    fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
             const SizedBox(height: 10),
             Text('Ngày trải nghiệm: ${formatDay(booking.experienceDate)}'),
             const SizedBox(height: 4),
             Text(formatMoney(booking.totalAmount),
                 style: const TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.w900, color: AppCultureColors.jadeDark)),
+                    fontSize: 22, fontWeight: FontWeight.w700, color: AppCultureColors.jadeDark)),
             if (pending) ...[
               const SizedBox(height: 12),
               Container(
@@ -420,7 +420,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
             _busy
                 ? 'Đang xử lý...'
                 : 'Thanh toán ${formatMoney(booking.totalAmount)}${ApiConstants.mockPayment ? ' (giả lập)' : ''}',
-            style: const TextStyle(fontWeight: FontWeight.w800),
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
         const SizedBox(height: 8),
@@ -431,7 +431,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
         _card(Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Các lần thanh toán', style: TextStyle(fontWeight: FontWeight.w800)),
+            const Text('Các lần thanh toán', style: TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             for (final p in _attempts)
               Padding(
@@ -475,7 +475,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
           ),
           const SizedBox(height: 12),
           const Text('Thanh toán thành công',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppCultureColors.textDark)),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
           const SizedBox(height: 6),
           Text(
             _mockPaid
@@ -517,7 +517,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
         child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Phương thức thanh toán', style: TextStyle(fontWeight: FontWeight.w800)),
+          const Text('Phương thức thanh toán', style: TextStyle(fontWeight: FontWeight.w700)),
           option(null, 'Chọn trên cổng VNPay', 'Bạn sẽ chọn ngân hàng hoặc ví ở trang VNPay.'),
           for (final m in _methods.where((m) => m.bankCode != null && m.bankCode!.isNotEmpty))
             option(m.bankCode, m.label, m.description),

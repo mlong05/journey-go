@@ -51,3 +51,12 @@ String rankTierFor(int points) => _rankTiers.firstWhere((t) => points >= t.minPo
   final next = higher.last;
   return (name: next.name, remaining: next.minPoints - points);
 }
+
+/// Tiến độ (0..1) từ mốc hạng hiện tại tới mốc hạng kế tiếp; 1 khi đã ở hạng cao nhất.
+double rankProgressFor(int points) {
+  final current = _rankTiers.firstWhere((t) => points >= t.minPoints);
+  final higher = _rankTiers.where((t) => t.minPoints > points).toList();
+  if (higher.isEmpty) return 1;
+  final next = higher.last;
+  return (points - current.minPoints) / (next.minPoints - current.minPoints);
+}

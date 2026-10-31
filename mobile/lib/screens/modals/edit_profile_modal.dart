@@ -113,7 +113,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
                 'Chỉnh Sửa Hồ Sơ Du Khách',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppCultureColors.textDark,
                 ),
               ),
@@ -271,7 +271,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
                     )
                   : const Text(
                       'Lưu Thông Tin Mới',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                     ),
             ),
           ),

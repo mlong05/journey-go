@@ -15,6 +15,8 @@ import {
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
 import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout";
+import { NotificationProvider } from "@/context/NotificationContext";
+import NotificationToaster from "@/components/notifications/NotificationToaster";
 
 // Navigation items được định nghĩa ngoài component để tránh re-create mỗi render
 const ADMIN_NAV_ITEMS = [
@@ -130,58 +132,61 @@ export default function AdminLayout({ children }) {
       })?.label || "Tổng quan vận hành";
 
   return (
-    <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
-      <Sidebar
-        role="admin"
-        navItems={ADMIN_NAV_ITEMS}
-        onLogout={performLogout}
-        isOpenMobile={isSidebarOpen}
-        onCloseMobile={() => setIsSidebarOpen(false)}
-        isWide={isSidebarWide}
-        onToggleWide={() => setIsSidebarWide((prev) => !prev)}
-      />
-
-      <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
-        <DashboardHeader
+    <NotificationProvider>
+      <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
+        <Sidebar
           role="admin"
-          user={authData?.user}
-          section="Quản trị"
-          title={currentTitle}
-          onOpenMenu={() => setIsSidebarOpen(true)}
-          searchValue={topSearch}
-          onSearchChange={setTopSearch}
-          onSearchSubmit={handleTopSearchSubmit}
-          searchPlaceholder="Tìm tài khoản, đơn hàng..."
-        >
-          <NotificationBell hint="Cảnh báo hệ thống và các yêu cầu cần xử lý sẽ hiện ở đây." />
-        </DashboardHeader>
+          navItems={ADMIN_NAV_ITEMS}
+          onLogout={performLogout}
+          isOpenMobile={isSidebarOpen}
+          onCloseMobile={() => setIsSidebarOpen(false)}
+          isWide={isSidebarWide}
+          onToggleWide={() => setIsSidebarWide((prev) => !prev)}
+        />
 
-        {/* Main Content bên dưới */}
-        <main
-          className={
-            isScrollLockedPage
-              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 bg-slate-50"
-              : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-slate-50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
-          }
-        >
-          <div
+        <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
+          <DashboardHeader
+            role="admin"
+            user={authData?.user}
+            section="Quản trị"
+            title={currentTitle}
+            onOpenMenu={() => setIsSidebarOpen(true)}
+            searchValue={topSearch}
+            onSearchChange={setTopSearch}
+            onSearchSubmit={handleTopSearchSubmit}
+            searchPlaceholder="Tìm tài khoản, đơn hàng..."
+          >
+            <NotificationBell hint="Cảnh báo hệ thống và các yêu cầu cần xử lý sẽ hiện ở đây." />
+          </DashboardHeader>
+
+          {/* Main Content bên dưới */}
+          <main
             className={
               isScrollLockedPage
-                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
-                : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
+                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 bg-slate-50"
+                : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-slate-50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
             }
           >
-            {children}
-          </div>
-        </main>
-      </div>
+            <div
+              className={
+                isScrollLockedPage
+                  ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
+                  : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
+              }
+            >
+              {children}
+            </div>
+          </main>
+        </div>
 
-      {/* Modal đăng xuất cao cấp tích hợp */}
-      <LogoutModal
-        isOpen={logoutModal.isOpen}
-        status={logoutModal.status}
-        message={logoutModal.message}
-      />
-    </div>
+        {/* Modal đăng xuất cao cấp tích hợp */}
+        <LogoutModal
+          isOpen={logoutModal.isOpen}
+          status={logoutModal.status}
+          message={logoutModal.message}
+        />
+      </div>
+      <NotificationToaster />
+    </NotificationProvider>
   );
 }

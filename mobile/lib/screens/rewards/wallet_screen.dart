@@ -229,7 +229,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   color: Colors.white,
                   fontSize: 38,
                   height: 1,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(width: 6),
@@ -272,7 +272,7 @@ class _WalletScreenState extends State<WalletScreen> {
           style: const TextStyle(
             color: Colors.white,
             fontSize: 16,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 2),
@@ -323,7 +323,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     label,
                     style: TextStyle(
                       fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: primary ? Colors.white : AppCultureColors.textDark,
                     ),
                   ),
@@ -360,11 +360,11 @@ class _WalletScreenState extends State<WalletScreen> {
     return const Padding(
       padding: EdgeInsets.only(top: 24, bottom: 10),
       child: Text(
-        'LỊCH SỬ ĐIỂM',
+        'Lịch sử điểm',
         style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.8,
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
           color: AppCultureColors.textDark,
         ),
       ),

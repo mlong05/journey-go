@@ -20,6 +20,7 @@ import {
 import { SURFACE, TABLE, BADGE, BUTTON } from "./dashboard.tokens";
 import { PageHeader, StatCard } from "@/components/dashboard/DashboardUI";
 import { dashboardService } from "@/features/dashboard";
+import { useQueueRefresh } from "@/context/NotificationContext";
 
 // Màu nhấn của từng thẻ KPI
 const KPI_TONE = {
@@ -66,22 +67,30 @@ export default function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadDashboard = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
+  const loadDashboard = useCallback(async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+      setError("");
+    }
     try {
       setData(await dashboardService.getAdmin());
     } catch (err) {
       console.error("Lỗi tải dữ liệu dashboard:", err);
-      setError(err?.message || "Không tải được số liệu tổng quan.");
+      if (!silent) setError(err?.message || "Không tải được số liệu tổng quan.");
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     queueMicrotask(loadDashboard);
   }, [loadDashboard]);
+
+  // Thời gian thực: yêu cầu hoàn tiền, giao dịch, đối soát mới thì tự cập nhật thẻ và bảng (không cần bấm "Làm mới")
+  useQueueRefresh(
+    ["refund-review", "adjustment-review", "bookings", "settlements", "destination-review", "tour-review"],
+    () => loadDashboard(true),
+  );
 
   const users = data?.users;
   const destinations = data?.destinations;
@@ -137,7 +146,7 @@ export default function AdminDashboardPage() {
       >
         <button
           type="button"
-          onClick={loadDashboard}
+          onClick={() => loadDashboard()}
           disabled={isLoading}
           className={`${BUTTON.secondary} disabled:opacity-60`}
         >

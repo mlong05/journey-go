@@ -63,7 +63,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Text(
           'Xác nhận đổi voucher',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         content: Text(
           'Dùng ${formatThousands(voucher.pointsRequired)} điểm để đổi '
@@ -203,7 +203,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
             _balance == null ? '—' : formatThousands(_balance!),
             style: const TextStyle(
               fontSize: 22,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: AppCultureColors.amberDark,
             ),
           ),
@@ -260,7 +260,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 15,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             color: AppCultureColors.jadeDark,
                           ),
                         ),
@@ -276,7 +276,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
                           v.title,
                           style: const TextStyle(
                             fontSize: 14.5,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             height: 1.3,
                             color: AppCultureColors.textDark,
                           ),
@@ -336,7 +336,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
                               '${formatThousands(v.pointsRequired)} điểm',
                               style: const TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                                 color: AppCultureColors.amberDark,
                               ),
                             ),
@@ -375,7 +375,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Đổi', style: TextStyle(fontWeight: FontWeight.w800)),
+                        : const Text('Đổi', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),

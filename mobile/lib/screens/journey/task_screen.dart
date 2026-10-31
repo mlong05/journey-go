@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart' show Position;
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,13 +9,22 @@ import '../../core/models/tour_journey_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
+import '../../core/services/route_service.dart';
 import 'journey_widgets.dart';
 import 'qr_scan_screen.dart';
 import 'map_kit.dart' show MapRoundButton, MapAttributionText, formatDistance;
+import 'navigation.dart' show formatDuration;
 import 'reward_effects.dart';
 import 'station_map.dart';
 
 enum _Phase { loading, intro, locked, quiz, result, error }
+
+/// Trong khoảng này tới trạm thì bỏ tuyến đường, chỉ còn la bàn + khoảng cách đường chim bay
+/// (lối đi trong khuôn viên di tích hầu như không có trên bản đồ).
+const int _compassRangeMeters = 250;
+
+/// Đi lệch khỏi điểm xuất phát của tuyến quá mức này thì tìm lại đường.
+const double _rerouteMeters = 60;
 
 /// Một nhiệm vụ tại điểm đến: giới thiệu, (dẫn đường tới trạm nếu cần vị trí), trả lời câu hỏi, kết quả.
 ///
@@ -61,6 +71,12 @@ class _TaskScreenState extends State<TaskScreen> {
   // Theo dõi vị trí liên tục khi đang dẫn đường tới trạm (bước "locked").
   StreamSubscription<Position>? _positionSub;
   double? _heading; // hướng đang đi, null khi đứng yên
+  StreamSubscription<CompassEvent>? _compassSub;
+  double? _compassHeading; // hướng điện thoại đang quay, dùng khi đứng yên
+  RouteModel? _walkRoute; // tuyến đi bộ khi còn xa trạm
+  LatLng? _walkRouteOrigin;
+  DateTime? _walkRouteAt;
+  bool _walkRouteLoading = false;
   DateTime? _lastAutoCheck;
   final GlobalKey<StationMapState> _mapKey = GlobalKey<StationMapState>();
   bool _satellite = false;
@@ -78,6 +94,7 @@ class _TaskScreenState extends State<TaskScreen> {
   @override
   void dispose() {
     _positionSub?.cancel();
+    _compassSub?.cancel();
     for (final c in _texts.values) {
       c.dispose();
     }
@@ -121,10 +138,61 @@ class _TaskScreenState extends State<TaskScreen> {
           // Mất tín hiệu tạm thời: giữ vị trí cuối, du khách vẫn bấm cập nhật được.
         },
       );
+      // Máy không có cảm biến từ trường: events là null, chỉ dùng hướng GPS.
+      _compassSub ??= FlutterCompass.events?.listen((e) {
+        final h = e.heading;
+        if (!mounted || h == null) return;
+        final next = (h + 360) % 360;
+        // Bỏ dao động nhỏ để mũi tên không rung
+        final prev = _compassHeading;
+        if (prev != null && ((next - prev + 540) % 360 - 180).abs() < 3) return;
+        setState(() => _compassHeading = next);
+      });
     } else {
       _positionSub?.cancel();
       _positionSub = null;
+      _compassSub?.cancel();
+      _compassSub = null;
       _heading = null;
+      _compassHeading = null;
+      _walkRoute = null;
+      _walkRouteOrigin = null;
+      _walkRouteAt = null;
+    }
+  }
+
+  /// Hướng để xoay mũi tên: hướng đi theo GPS khi đang đi, la bàn khi đứng yên.
+  double? get _effectiveHeading => _heading ?? _compassHeading;
+
+  /// Còn xa trạm: tìm tuyến đi bộ (tìm lại khi đi lệch). Gần trạm: bỏ tuyến, chỉ dùng la bàn.
+  Future<void> _refreshWalkRoute() async {
+    final user = _userPoint;
+    final station = _stationPoint;
+    final distance = _liveDistance;
+    if (user == null || station == null || distance == null) return;
+    if (distance <= _compassRangeMeters || _walkRouteLoading) return;
+
+    final origin = _walkRouteOrigin;
+    final movedAway = origin == null ||
+        LocationService.distanceMeters(origin.latitude, origin.longitude, user.latitude, user.longitude) >
+            _rerouteMeters;
+    final at = _walkRouteAt;
+    final cooledDown = at == null || DateTime.now().difference(at) > const Duration(seconds: 20);
+    if (!movedAway || !cooledDown) return;
+
+    _walkRouteLoading = true;
+    _walkRouteAt = DateTime.now();
+    try {
+      final route = await RouteService().direction(user, station, vehicle: RouteVehicle.walk);
+      if (!mounted || _phase != _Phase.locked) return;
+      setState(() {
+        _walkRoute = route;
+        _walkRouteOrigin = user;
+      });
+    } catch (_) {
+      // Không tìm được đường (mất mạng, hết hạn mức): vẫn còn đường thẳng + mũi tên chỉ hướng.
+    } finally {
+      _walkRouteLoading = false;
     }
   }
 
@@ -136,6 +204,7 @@ class _TaskScreenState extends State<TaskScreen> {
       // Hướng do GPS tính chỉ đáng tin khi đang đi (trên ~0,7 m/s).
       _heading = (p.speed > 0.7 && p.heading >= 0) ? p.heading : null;
     });
+    _refreshWalkRoute();
     // Vào trong bán kính: tự hỏi backend để mở câu hỏi (backend vẫn là nơi xác nhận).
     final distance = _liveDistance;
     final radius = _content?.station?.radiusMeters ?? 50;
@@ -373,7 +442,7 @@ class _TaskScreenState extends State<TaskScreen> {
                       'Manh mối',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -441,7 +510,7 @@ class _TaskScreenState extends State<TaskScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppCultureColors.textDark,
                       ),
                     ),
@@ -522,8 +591,9 @@ class _TaskScreenState extends State<TaskScreen> {
     if (task == null ||
         !task.requiresLocation ||
         task.isFinished ||
-        _stationPoint == null)
+        _stationPoint == null) {
       return;
+    }
     setState(() => _locatingIntro = true);
     try {
       final p = await LocationService.currentPosition();
@@ -587,12 +657,12 @@ class _TaskScreenState extends State<TaskScreen> {
                   children: [
                     Text(
                       task.requiresLocation
-                          ? 'NHIỆM VỤ THỰC ĐỊA'
-                          : 'ĐỐ VUI DI SẢN',
+                          ? 'Nhiệm vụ thực địa'
+                          : 'Đố vui di sản',
                       style: const TextStyle(
                         fontSize: 10.5,
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.2,
+                        fontWeight: FontWeight.w700,
                         color: AppCultureColors.heritageJade,
                       ),
                     ),
@@ -601,7 +671,7 @@ class _TaskScreenState extends State<TaskScreen> {
                       task.name,
                       style: const TextStyle(
                         fontSize: 19,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         height: 1.2,
                       ),
                     ),
@@ -661,7 +731,7 @@ class _TaskScreenState extends State<TaskScreen> {
             children: [
               const Text(
                 'Thể lệ',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
               ),
               const SizedBox(height: 10),
               _rule(
@@ -742,7 +812,7 @@ class _TaskScreenState extends State<TaskScreen> {
                         SizedBox(width: 6),
                         Text(
                           'Manh mối',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                          style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ],
                     ),
@@ -771,7 +841,7 @@ class _TaskScreenState extends State<TaskScreen> {
             children: [
               const Text(
                 'Các chặng',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
               ),
               const Spacer(),
               Text(
@@ -866,7 +936,7 @@ class _TaskScreenState extends State<TaskScreen> {
                           '${index + 1}',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             fontSize: 12,
                           ),
                         )
@@ -900,7 +970,7 @@ class _TaskScreenState extends State<TaskScreen> {
                     'Chặng ${index + 1} · ${station.name}',
                     style: TextStyle(
                       fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: done || active
                           ? AppCultureColors.textDark
                           : AppCultureColors.textMuted,
@@ -949,7 +1019,7 @@ class _TaskScreenState extends State<TaskScreen> {
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
           ),
           Text(
             label,
@@ -1042,8 +1112,10 @@ class _TaskScreenState extends State<TaskScreen> {
             stationName: station.name,
             radiusMeters: radius,
             user: userPoint,
-            heading: _heading,
+            heading: _effectiveHeading,
             satellite: _satellite,
+            route: distance != null && distance > _compassRangeMeters ? _walkRoute?.points : null,
+            inside: arrived,
             fitPadding: EdgeInsets.fromLTRB(64, topInset + 120, 64, 360),
           ),
         ),
@@ -1143,7 +1215,7 @@ class _TaskScreenState extends State<TaskScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     color: AppCultureColors.textDark,
                   ),
                 ),
@@ -1162,7 +1234,7 @@ class _TaskScreenState extends State<TaskScreen> {
                     'Trạm ${task.questionIndex + 1}/$total',
                     style: const TextStyle(
                       fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: AppCultureColors.oceanDark,
                     ),
                   ),
@@ -1215,13 +1287,18 @@ class _TaskScreenState extends State<TaskScreen> {
     required double closeness,
   }) {
     // Mũi tên: chỉ hướng tới trạm; khi đang đi thì tính so với hướng đang đi.
+    // Hướng đang đi (GPS) khi di chuyển, hướng điện thoại (la bàn) khi đứng yên.
+    final heading = _effectiveHeading;
     final arrowAngle = bearing == null
         ? 0.0
-        : (bearing - (_heading ?? 0)) * 3.141592653589793 / 180;
+        : (bearing - (heading ?? 0)) * 3.141592653589793 / 180;
+    final walkRoute = distance != null && distance > _compassRangeMeters ? _walkRoute : null;
     final directionText = bearing == null
         ? 'Đang xác định vị trí của bạn...'
-        : _heading != null
-        ? '${turnHint(_heading!, bearing)} · hướng ${compassLabel(bearing)}'
+        : walkRoute != null
+        ? 'Đi bộ ~${formatDuration(walkRoute.durationSeconds)} theo đường trên bản đồ'
+        : heading != null
+        ? '${turnHint(heading, bearing)} · hướng ${compassLabel(bearing)}'
         : 'Đi về hướng ${compassLabel(bearing)}';
 
     return Container(
@@ -1294,7 +1371,7 @@ class _TaskScreenState extends State<TaskScreen> {
                           style: TextStyle(
                             fontSize: arrived ? 22 : 30,
                             height: 1.1,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             color: arrived
                                 ? AppCultureColors.jadeDark
                                 : AppCultureColors.oceanDark,
@@ -1333,7 +1410,7 @@ class _TaskScreenState extends State<TaskScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppCultureColors.textDark,
                       ),
                     ),
@@ -1485,7 +1562,7 @@ class _TaskScreenState extends State<TaskScreen> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
               ),
@@ -1555,7 +1632,7 @@ class _TaskScreenState extends State<TaskScreen> {
                   Text(
                     'Câu $shownNumber / $shownTotal',
                     style: const TextStyle(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       fontSize: 13.5,
                     ),
                   ),
@@ -1639,7 +1716,7 @@ class _TaskScreenState extends State<TaskScreen> {
                     style: const TextStyle(
                       fontSize: 18,
                       height: 1.4,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: AppCultureColors.textDark,
                     ),
                   ),
@@ -1754,7 +1831,7 @@ class _TaskScreenState extends State<TaskScreen> {
                           : Text(
                               i < letters.length ? letters[i] : '${i + 1}',
                               style: const TextStyle(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: AppCultureColors.textMuted,
                               ),
                             ),
@@ -1877,7 +1954,7 @@ class _TaskScreenState extends State<TaskScreen> {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 10),
         Text(

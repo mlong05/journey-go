@@ -25,7 +25,7 @@ AppBar buildRewardsAppBar(
       title,
       style: const TextStyle(
         fontSize: 16,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w700,
         color: AppCultureColors.textDark,
       ),
     ),
@@ -75,7 +75,7 @@ class RewardsMessageView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: AppCultureColors.textDark,
               ),
             ),
@@ -151,7 +151,7 @@ Future<void> showCopyableCodeDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       title: Text(
         title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -182,7 +182,7 @@ Future<void> showCopyableCodeDialog(
               style: const TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 15,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0.6,
                 color: AppCultureColors.jadeDark,
               ),
@@ -267,7 +267,7 @@ class PointTransactionTile extends StatelessWidget {
                 '${earning ? '+' : '-'}${formatThousands(tx.amount.abs())}',
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: color,
                 ),
               ),
