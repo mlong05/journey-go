@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { taskTypeService, TaskTypeManagerModal } from "@/features/experience";
 import { regionService } from "@/features/destination";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /**
  * Trang Cấu Hình Danh Mục & Luật Hệ Thống (System Config & Rules) - JourneyGo
@@ -43,6 +44,7 @@ export default function AdminSystemConfigPage() {
   // State Toast & Loading
   const [toastMsg, setToastMsg] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -217,7 +219,15 @@ export default function AdminSystemConfigPage() {
 
   // Xử lý xóa mềm Vùng miền qua DELETE /api/v1/regions/{id}
   const handleDeleteRegion = async (id, name) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn chuyển vùng "${name}" vào thùng rác?`)) return;
+    const ok = await confirm({
+      tone: "danger",
+      icon: "trash",
+      title: "Chuyển vùng vào thùng rác?",
+      subject: name,
+      description: "Bạn có thể khôi phục lại ở mục Đã xóa.",
+      confirmLabel: "Chuyển vào thùng rác",
+    });
+    if (!ok) return;
     setRegionActionLoading(true);
     try {
       await regionService.delete(id);
@@ -285,6 +295,7 @@ export default function AdminSystemConfigPage() {
 
   return (
     <div className="space-y-6 pb-24 animate-in fade-in-50 duration-200">
+      {confirmDialog}
       {/* Toast thông báo */}
       {toastMsg && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 text-xs font-bold flex items-center gap-2.5 animate-in slide-in-from-top-3 max-w-md">
@@ -299,11 +310,11 @@ export default function AdminSystemConfigPage() {
           <div>
             <div className="flex items-center gap-2 mb-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-teal-600" />
-              <span className="text-[11px] font-black uppercase tracking-wider text-teal-700">
+              <span className="text-xs font-bold text-teal-700">
                 Thiết Lập Vận Hành Nền Tảng
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Cấu Hình Danh Mục & Luật Hệ Thống
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -371,7 +382,7 @@ export default function AdminSystemConfigPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <Globe2 size={16} className="text-teal-600" />
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                  <h3 className="text-sm font-bold text-slate-900">
                     Phân Vùng Địa Lý &amp; Lãnh Thổ (Regions)
                   </h3>
                 </div>
@@ -419,7 +430,7 @@ export default function AdminSystemConfigPage() {
                 }`}
               >
                 <span>Đang hoạt động</span>
-                <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px]">
+                <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[11px]">
                   {regions.length}
                 </span>
               </button>
@@ -434,7 +445,7 @@ export default function AdminSystemConfigPage() {
               >
                 <Trash2 size={12} />
                 <span>Thùng rác</span>
-                <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px]">
+                <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[11px]">
                   {deletedRegions.length}
                 </span>
               </button>
@@ -466,7 +477,7 @@ export default function AdminSystemConfigPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900 text-sm">{reg.name}</span>
-                        <span className="font-mono text-[10px] text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200/60 font-semibold">
+                        <span className="font-mono text-[11px] text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200/60 font-semibold">
                           #{reg.id}
                         </span>
                       </div>
@@ -506,7 +517,7 @@ export default function AdminSystemConfigPage() {
           {/* 1.2 Quản lý danh mục Chủ đề di sản */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
             <div className="pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-slate-900">
                 Chủ Đề & Thể Loại Di Sản
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -527,7 +538,7 @@ export default function AdminSystemConfigPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <span
-                        className={`inline-block px-2.5 py-0.5 rounded-md text-[10.5px] font-bold border mb-1.5 ${theme.color}`}
+                        className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-bold border mb-1.5 ${theme.color}`}
                       >
                         {theme.count} điểm di tích
                       </span>
@@ -555,9 +566,9 @@ export default function AdminSystemConfigPage() {
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
             <div className="pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span>Cơ Chế Loại Nhiệm Vụ Trải Nghiệm Thực Địa (TaskType)</span>
-                  <span className="text-[10.5px] font-mono font-bold bg-violet-100 text-violet-800 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-mono font-bold bg-violet-100 text-violet-800 px-2 py-0.5 rounded-full">
                     {taskTypes.length} loại
                   </span>
                 </h3>
@@ -598,7 +609,7 @@ export default function AdminSystemConfigPage() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-[11px] font-black uppercase text-violet-700 bg-violet-50 px-2 py-0.5 rounded border border-violet-200">
+                        <span className="font-mono text-xs font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded border border-violet-200">
                           {task.code}
                         </span>
                         <button
@@ -615,16 +626,16 @@ export default function AdminSystemConfigPage() {
                       </h4>
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                        <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
                           {task.verificationMethod}
                         </span>
                         {task.hasQuestions && (
-                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                          <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
                             Có câu hỏi
                           </span>
                         )}
                         {task.requiresLocation && (
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                             Cần vị trí
                           </span>
                         )}
@@ -646,7 +657,7 @@ export default function AdminSystemConfigPage() {
           {/* Định mức điểm */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
             <div className="pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-slate-900">
                 Định Mức Điểm Thưởng Di Sản
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -664,7 +675,7 @@ export default function AdminSystemConfigPage() {
                       Check-in GPS Thực Địa
                     </label>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                     Bắt buộc
                   </span>
                 </div>
@@ -681,7 +692,7 @@ export default function AdminSystemConfigPage() {
                         gpsCheckin: Number(e.target.value),
                       })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                   />
                   <span className="absolute inset-y-0 right-0 pr-3 pt-1 flex items-center text-xs font-bold text-slate-400 pointer-events-none">
                     điểm / lượt
@@ -698,7 +709,7 @@ export default function AdminSystemConfigPage() {
                       Đúng Câu Hỏi Lịch Sử
                     </label>
                   </div>
-                  <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                  <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
                     Kiến thức
                   </span>
                 </div>
@@ -715,7 +726,7 @@ export default function AdminSystemConfigPage() {
                         quizCorrect: Number(e.target.value),
                       })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                   />
                   <span className="absolute inset-y-0 right-0 pr-3 pt-1 flex items-center text-xs font-bold text-slate-400 pointer-events-none">
                     điểm / câu
@@ -732,7 +743,7 @@ export default function AdminSystemConfigPage() {
                       Săn Ảnh Di Sản Đạt Chuẩn
                     </label>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                     Thẩm định
                   </span>
                 </div>
@@ -749,7 +760,7 @@ export default function AdminSystemConfigPage() {
                         photoChallenge: Number(e.target.value),
                       })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                   />
                   <span className="absolute inset-y-0 right-0 pr-3 pt-1 flex items-center text-xs font-bold text-slate-400 pointer-events-none">
                     điểm / ảnh
@@ -762,7 +773,7 @@ export default function AdminSystemConfigPage() {
           {/* Cấp bậc & Danh hiệu du khách */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
             <div className="pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-slate-900">
                 Hệ Thống Cấp Bậc & Danh Hiệu Du Khách
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -777,7 +788,7 @@ export default function AdminSystemConfigPage() {
                   className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-black text-sm shadow-2xs">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-bold text-sm shadow-2xs">
                       <Sparkles size={18} className="text-amber-500" />
                     </div>
                     <div>
@@ -786,7 +797,7 @@ export default function AdminSystemConfigPage() {
                           {tier.name}
                         </h4>
                         <span
-                          className={`text-[10.5px] px-2 py-0.5 rounded-full border ${tier.badgeColor}`}
+                          className={`text-[11px] px-2 py-0.5 rounded-full border ${tier.badgeColor}`}
                         >
                           {tier.range}
                         </span>
@@ -816,7 +827,7 @@ export default function AdminSystemConfigPage() {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
             <div className="pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-slate-900">
                 Tỷ Lệ Phí Nền Tảng
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -827,7 +838,7 @@ export default function AdminSystemConfigPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               {/* Ô nhập tỷ lệ phí */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="block text-xs font-bold text-slate-700">
                   Mức phí chiết khấu mặc định
                 </label>
                 <div className="relative max-w-xs">
@@ -837,9 +848,9 @@ export default function AdminSystemConfigPage() {
                     max={50}
                     value={platformFeePercent}
                     onChange={(e) => setPlatformFeePercent(Number(e.target.value))}
-                    className="w-full pl-4 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-black text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                    className="w-full pl-4 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                   />
-                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-500 font-black text-base">
+                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-500 font-bold text-base">
                     %
                   </div>
                 </div>
@@ -876,7 +887,7 @@ export default function AdminSystemConfigPage() {
           {/* Cổng thanh toán */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
             <div className="pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-slate-900">
                 Cổng Thanh Toán Mặc Định
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -894,9 +905,9 @@ export default function AdminSystemConfigPage() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <h4 className="font-black text-slate-900 text-sm">Cổng VNPay QR / Thẻ nội địa</h4>
+                  <h4 className="font-bold text-slate-900 text-sm">Cổng VNPay QR / Thẻ nội địa</h4>
                   {defaultGateway === "VNPay" && (
-                    <span className="text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                    <span className="text-[11px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">
                       Mặc định
                     </span>
                   )}
@@ -915,9 +926,9 @@ export default function AdminSystemConfigPage() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <h4 className="font-black text-slate-900 text-sm">Ví Điện Tử MoMo</h4>
+                  <h4 className="font-bold text-slate-900 text-sm">Ví Điện Tử MoMo</h4>
                   {defaultGateway === "MoMo" && (
-                    <span className="text-[10px] font-bold bg-pink-600 text-white px-2 py-0.5 rounded-full">
+                    <span className="text-[11px] font-bold bg-pink-600 text-white px-2 py-0.5 rounded-full">
                       Mặc định
                     </span>
                   )}

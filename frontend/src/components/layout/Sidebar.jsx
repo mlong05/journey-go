@@ -194,7 +194,7 @@ export default function Sidebar({
 
                     {item.badge && isWide && (
                       <span
-                        className={`ml-auto shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-semibold ring-1 ring-inset ${
+                        className={`ml-auto shrink-0 px-1.5 py-0.5 rounded-md text-[11px] font-semibold ring-1 ring-inset ${
                           item.badge.color || theme.chip
                         }`}
                       >

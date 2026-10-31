@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { Download, MapPin, Printer, QrCode, RefreshCw, X } from "lucide-react";
 import { checkInPointService } from "../services/checkInPointService";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 function slug(text) {
   return String(text || "tram")
@@ -38,6 +39,7 @@ async function withImages(points) {
  */
 export default function StationQrSheetModal({ experience, onClose }) {
   const [stations, setStations] = useState(null);
+  const { confirm, confirmDialog } = useConfirm();
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
 
@@ -54,9 +56,15 @@ export default function StationQrSheetModal({ experience, onClose }) {
   }, [experience.id]);
 
   async function regenerate(station) {
-    if (!window.confirm(`Đổi mã QR của "${station.name}"? Mã cũ hết hiệu lực ngay, bạn cần in lại QR tại trạm.`)) {
-      return;
-    }
+    const ok = await confirm({
+      tone: "warning",
+      icon: "restore",
+      title: "Đổi mã QR của trạm?",
+      subject: station.name,
+      description: "Mã cũ hết hiệu lực ngay, bạn cần in lại QR tại trạm.",
+      confirmLabel: "Đổi mã",
+    });
+    if (!ok) return;
     setBusyId(station.id);
     setError("");
     try {
@@ -169,7 +177,7 @@ export default function StationQrSheetModal({ experience, onClose }) {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {stations.map((s, i) => (
                 <div key={s.id} className="flex flex-col rounded-2xl border border-slate-200 p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Trạm {i + 1}</p>
+                  <p className="text-xs font-bold text-emerald-700">Trạm {i + 1}</p>
                   <p className="font-bold text-slate-900">{s.name}</p>
                   <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
                     <MapPin size={11} /> {s.latitude}, {s.longitude} · {s.radiusMeters ?? 50} m
@@ -209,6 +217,7 @@ export default function StationQrSheetModal({ experience, onClose }) {
           )}
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

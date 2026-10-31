@@ -121,10 +121,11 @@ function StatusBadge({ status }) {
   const meta = STATUS_BADGE[status] || STATUS_BADGE[STATUS.DRAFT];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${meta.cls}`}
+      className={`inline-flex items-center gap-1.5 max-w-full text-[11px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${meta.cls}`}
+      title={STATUS_LABEL[status] || STATUS_LABEL[STATUS.DRAFT]}
     >
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
-      {STATUS_LABEL[status] || STATUS_LABEL[STATUS.DRAFT]}
+      <span className="truncate">{STATUS_LABEL[status] || STATUS_LABEL[STATUS.DRAFT]}</span>
     </span>
   );
 }
@@ -717,7 +718,7 @@ export default function ProviderDestinationsPage() {
         <div className={`${LIST_SCROLL} flex-1 min-h-0`}>
           {/* Tiêu đề cột */}
           <div
-            className={`${ROW_GRID} px-4 sm:px-5 py-3 bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 sticky top-0 z-10`}
+            className={`${ROW_GRID} px-4 sm:px-5 py-3 bg-slate-50 border-b border-slate-200 shadow-[0_1px_0_0_rgb(226_232_240)] text-xs font-semibold text-slate-600 sticky top-0 z-20`}
           >
             <div className="hidden md:block text-center">STT</div>
             <div className="col-span-12 md:col-span-1">Điểm đến di tích</div>
@@ -786,33 +787,34 @@ export default function ProviderDestinationsPage() {
                       <div className="col-span-12 md:col-span-1 flex items-start gap-1.5 min-w-0">
                         <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
                         <span
-                          className="text-xs text-slate-600 line-clamp-2 leading-relaxed"
-                          title={dest.address}
+                          className="min-w-0 flex-1 text-xs text-slate-600 truncate"
+                          title={dest.address || undefined}
                         >
                           {dest.address || "Chưa cập nhật địa chỉ hành chính"}
                         </span>
                       </div>
 
-                      {/* Cột 3: Sức chứa */}
-                      <div className="col-span-6 md:col-span-1 flex flex-col gap-0.5">
+                      {/* Cột 3: Sức chứa (một dòng, quá dài thì "…", rê chuột xem đủ) */}
+                      <div className="col-span-6 md:col-span-1 min-w-0">
                         {dest.capacity ? (
-                          <>
-                            <span className="text-xs font-bold text-slate-900 tabular-nums leading-none">
+                          <p
+                            className="text-xs text-slate-600 truncate"
+                            title={`${Number(dest.capacity).toLocaleString("vi-VN")} du khách/lượt`}
+                          >
+                            <span className="font-bold text-slate-900 tabular-nums">
                               {Number(dest.capacity).toLocaleString("vi-VN")}
-                            </span>
-                            <span className="text-[10.5px] font-bold text-slate-600">
-                              du khách/lượt
-                            </span>
-                          </>
+                            </span>{" "}
+                            khách/lượt
+                          </p>
                         ) : (
-                          <span className="text-[11px] text-slate-400 italic">
+                          <p className="text-[11px] text-slate-400 italic truncate" title="Chưa đặt sức chứa">
                             Chưa đặt sức chứa
-                          </span>
+                          </p>
                         )}
                       </div>
 
                       {/* Cột 4: Trạng thái */}
-                      <div className="col-span-6 md:col-span-1 flex items-center">
+                      <div className="col-span-6 md:col-span-1 flex items-center min-w-0">
                         <StatusBadge status={dest.status} />
                       </div>
 

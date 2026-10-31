@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -9,14 +8,13 @@ import {
   MessageSquare,
   History,
   LogOut,
-  Bell,
   X,
   Compass,
   Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
-import { Sidebar, DashboardHeader } from "@/components/layout";
+import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout";
 
 /**
  * Layout Làm Việc Của Kiểm Duyệt Viên - JourneyGo
@@ -35,13 +33,13 @@ export default function ModeratorLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarWide, setIsSidebarWide] = useState(true);
   const [topSearch, setTopSearch] = useState("");
-  const [urgentAlertsCount, setUrgentAlertsCount] = useState(0);
 
   /* Chỉ trang DANH SÁCH điểm đến mới dùng khung cố định h-full/overflow-hidden
      để vùng bảng tự cuộn. Các trang khác (kể cả hồ sơ chi tiết /destinations/[id])
      vẫn cuộn toàn trang như cũ. So khớp chính xác để không áp nhầm. */
   const isDestinationList = /^\/moderator\/destinations\/?$/.test(pathname || "");
-  const isExperiencesPage = /^\/moderator\/(experiences|tours)\/?$/.test(pathname || "");
+  // Trang khung cố định: tiêu đề, thẻ số liệu, bộ lọc đứng yên, chỉ vùng danh sách tự cuộn
+  const isExperiencesPage = /^\/moderator\/(experiences|tours|community)\/?$/.test(pathname || "");
 
   // 5 mục menu điều hướng chuyên biệt của kiểm duyệt viên
   const moderatorNavItems = [
@@ -123,16 +121,7 @@ export default function ModeratorLayout({ children }) {
           onSearchSubmit={handleTopSearchSubmit}
           searchPlaceholder="Tìm mã hồ sơ, tên di tích..."
         >
-          <Link
-            href="/moderator"
-            className="relative w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-colors"
-            title="Thông báo hồ sơ chờ duyệt"
-          >
-            <Bell size={16} />
-            {urgentAlertsCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
-            )}
-          </Link>
+          <NotificationBell hint="Hồ sơ mới gửi duyệt và báo cáo vi phạm sẽ hiện ở đây." />
         </DashboardHeader>
 
         {/* Nội dung trang làm việc.

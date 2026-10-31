@@ -49,7 +49,7 @@ function PreviewGallery({ images, title }) {
 
   return (
     <div className="px-5 sm:px-6 pt-5 bg-white space-y-2.5">
-      <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+      <h5 className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
         <ImagePlus size={12} />
         Thư viện ảnh ({index + 1}/{images.length})
       </h5>
@@ -191,7 +191,7 @@ function CharCounter({ value, max, className = "bottom-2" }) {
   const nearLimit = length >= max * 0.9;
   return (
     <span
-      className={`pointer-events-none absolute right-3 ${className} text-[10px] font-mono font-semibold ${
+      className={`pointer-events-none absolute right-3 ${className} text-[11px] font-mono font-semibold ${
         nearLimit ? "text-rose-500" : "text-slate-400"
       }`}
     >
@@ -663,7 +663,7 @@ export default function CulturalContentManagerModal({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                  <span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
                     Trải nghiệm văn hóa
                   </span>
                   <span className="text-xs font-bold text-slate-400">&bull;</span>
@@ -671,7 +671,7 @@ export default function CulturalContentManagerModal({
                     {destination.name}
                   </span>
                 </div>
-                <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight mt-0.5 truncate">
+                <h2 className="text-base sm:text-lg font-semibold text-slate-900 tracking-tight mt-0.5 truncate">
                   Thuyết minh &amp; câu chuyện văn hóa
                 </h2>
               </div>
@@ -721,8 +721,8 @@ export default function CulturalContentManagerModal({
                   <span>Quay lại danh sách</span>
                 </button>
 
-                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-lg bg-emerald-600 text-white text-[11px] font-black inline-flex items-center justify-center">
+                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-lg bg-emerald-600 text-white text-[11px] font-bold inline-flex items-center justify-center">
                     {editingContent ? "✏" : "+"}
                   </span>
                   <span>
@@ -761,7 +761,7 @@ export default function CulturalContentManagerModal({
                             <SelectedFormFormatIcon size={15} />
                           </div>
                           <div className="min-w-0">
-                            <span className="text-slate-900 font-extrabold block">
+                            <span className="text-slate-900 font-semibold block">
                               {selectedFormFormat.label}
                             </span>
                             <span className="text-[11px] text-slate-500 font-normal truncate block">
@@ -794,7 +794,7 @@ export default function CulturalContentManagerModal({
                                 }}
                                 className={`w-full px-4 py-2.5 text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
                                   isSelected
-                                    ? "bg-emerald-50/80 text-emerald-900 font-extrabold"
+                                    ? "bg-emerald-50/80 text-emerald-900 font-semibold"
                                     : "hover:bg-slate-50 text-slate-700 font-medium"
                                 }`}
                               >
@@ -809,7 +809,7 @@ export default function CulturalContentManagerModal({
                                     <Icon size={14} />
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="font-extrabold text-slate-900 leading-tight">
+                                    <p className="font-semibold text-slate-900 leading-tight">
                                       {ct.label}
                                     </p>
                                     <p className="text-[11px] text-slate-500 truncate leading-tight mt-0.5">
@@ -864,7 +864,7 @@ export default function CulturalContentManagerModal({
                       <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
                         <span>Thời lượng (giây)</span>
                         {duration && (
-                          <span className="text-[10.5px] font-mono text-emerald-600 font-bold">
+                          <span className="text-[11px] font-mono text-emerald-600 font-bold">
                             ≈ {formatDuration(Number(duration))}
                           </span>
                         )}
@@ -886,7 +886,7 @@ export default function CulturalContentManagerModal({
                         <Video size={13} className="text-emerald-600" />
                         Video / audio chính
                       </span>
-                      <span className="text-[10.5px] text-slate-400">
+                      <span className="text-[11px] text-slate-400">
                         Dán link YouTube, video MP4 hoặc âm thanh MP3
                       </span>
                     </label>
@@ -928,11 +928,11 @@ export default function CulturalContentManagerModal({
                       <span className="flex items-center gap-1.5">
                         <ImagePlus size={13} className="text-emerald-600" />
                         Thư viện ảnh
-                        <span className="text-[10.5px] font-semibold text-slate-400">
+                        <span className="text-[11px] font-semibold text-slate-400">
                           ({imageUrls.length}/{IMAGE_MAX_COUNT})
                         </span>
                       </span>
-                      <span className="text-[10.5px] text-slate-400">
+                      <span className="text-[11px] text-slate-400">
                         Chọn nhiều ảnh từ máy, PNG / JPG / WEBP, tối đa 10MB mỗi ảnh
                       </span>
                     </label>
@@ -955,7 +955,7 @@ export default function CulturalContentManagerModal({
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={url} alt={`Ảnh ${idx + 1}`} className="w-full h-full object-cover" />
                           {idx === 0 && (
-                            <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-bold">
+                            <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-emerald-600 text-white text-[11px] font-bold">
                               Ảnh đầu
                             </span>
                           )}
@@ -1085,7 +1085,7 @@ export default function CulturalContentManagerModal({
                     <Headphones size={13} />
                     <span>Nội dung</span>
                     <span
-                      className={`px-1.5 py-0.2 rounded-md text-[10px] ${
+                      className={`px-1.5 py-0.2 rounded-md text-[11px] ${
                         currentTab === "active"
                           ? "bg-white/20 text-white"
                           : "bg-emerald-50 text-emerald-700"
@@ -1108,7 +1108,7 @@ export default function CulturalContentManagerModal({
                     <Trash2 size={13} />
                     <span>Thùng rác</span>
                     <span
-                      className={`px-1.5 py-0.2 rounded-md text-[10px] ${
+                      className={`px-1.5 py-0.2 rounded-md text-[11px] ${
                         currentTab === "trash"
                           ? "bg-white/20 text-white"
                           : "bg-rose-50 text-rose-700"
@@ -1155,7 +1155,7 @@ export default function CulturalContentManagerModal({
                         }}
                         className={`w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
                           filterType === "ALL"
-                            ? "bg-emerald-50 text-emerald-700 font-extrabold"
+                            ? "bg-emerald-50 text-emerald-700 font-semibold"
                             : "hover:bg-slate-50 text-slate-700 font-bold"
                         }`}
                       >
@@ -1163,7 +1163,7 @@ export default function CulturalContentManagerModal({
                           <Filter size={13} className="text-slate-400" />
                           <span>Tất cả loại nội dung</span>
                         </div>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
+                        <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
                           {currentList.length}
                         </span>
                       </button>
@@ -1184,7 +1184,7 @@ export default function CulturalContentManagerModal({
                             }}
                             className={`w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
                               isSelected
-                                ? "bg-emerald-50 text-emerald-700 font-extrabold"
+                                ? "bg-emerald-50 text-emerald-700 font-semibold"
                                 : "hover:bg-slate-50 text-slate-700 font-bold"
                             }`}
                           >
@@ -1195,7 +1195,7 @@ export default function CulturalContentManagerModal({
                               />
                               <span>{ct.label}</span>
                             </div>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
+                            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
                               {count}
                             </span>
                           </button>
@@ -1245,7 +1245,7 @@ export default function CulturalContentManagerModal({
 
                     <div>
                       {/* Tiêu đề Empty State thông minh theo ngữ cảnh */}
-                      <h4 className="font-extrabold text-slate-800 text-sm">
+                      <h4 className="font-semibold text-slate-800 text-sm">
                         {currentTab === "trash"
                           ? "Thùng rác đang trống"
                           : currentList.length === 0
@@ -1321,11 +1321,11 @@ export default function CulturalContentManagerModal({
                           <div>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <span className="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-emerald-100 text-slate-700 group-hover:text-emerald-700 font-mono font-black text-xs flex items-center justify-center shrink-0 border border-slate-200 transition-colors">
+                                <span className="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-emerald-100 text-slate-700 group-hover:text-emerald-700 font-mono font-bold text-xs flex items-center justify-center shrink-0 border border-slate-200 transition-colors">
                                   #{content.sequenceOrder || 0}
                                 </span>
                                 <span
-                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${typeCfg.badgeClass}`}
+                                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${typeCfg.badgeClass}`}
                                 >
                                   <Icon size={11} />
                                   <span>{typeCfg.label}</span>
@@ -1339,7 +1339,7 @@ export default function CulturalContentManagerModal({
                                       ? { label: "Bị từ chối", cls: "bg-rose-50 text-rose-700 border-rose-200" }
                                       : { label: "Đã duyệt", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
                                   return (
-                                    <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.cls}`}>
+                                    <span className={`inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full border ${cfg.cls}`}>
                                       {cfg.label}
                                     </span>
                                   );
@@ -1357,7 +1357,7 @@ export default function CulturalContentManagerModal({
                             </div>
 
                             {/* Title */}
-                            <h4 className="text-base font-extrabold text-slate-900 tracking-tight mt-2.5 line-clamp-1 group-hover:text-emerald-700 transition-colors">
+                            <h4 className="text-base font-semibold text-slate-900 tracking-tight mt-2.5 line-clamp-1 group-hover:text-emerald-700 transition-colors">
                               {content.title}
                             </h4>
 
@@ -1557,7 +1557,7 @@ export default function CulturalContentManagerModal({
                       )}
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-extrabold text-slate-900 truncate">
+                      <h3 className="text-sm font-semibold text-slate-900 truncate">
                         {previewMediaTarget.title}
                       </h3>
                       <p className="text-[11px] text-slate-500 flex items-center gap-2">
@@ -1629,7 +1629,7 @@ export default function CulturalContentManagerModal({
                 <div className="p-5 sm:p-6 bg-white space-y-3">
                   {previewMediaTarget.description && (
                     <div>
-                      <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      <h5 className="text-xs font-bold text-slate-400 mb-1">
                         Mô tả ngắn
                       </h5>
                       <p className="text-xs text-slate-700 leading-relaxed">
@@ -1640,7 +1640,7 @@ export default function CulturalContentManagerModal({
 
                   {previewMediaTarget.contentText && (
                     <div>
-                      <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      <h5 className="text-xs font-bold text-slate-400 mb-1">
                         Nội dung chi tiết
                       </h5>
                       <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200/80 leading-relaxed whitespace-pre-wrap">
@@ -1702,7 +1702,7 @@ export default function CulturalContentManagerModal({
                     )}
                   </div>
                   <div>
-                    <h4 className="text-sm font-extrabold text-slate-900">
+                    <h4 className="text-sm font-semibold text-slate-900">
                       {confirmDialog.type === "delete"
                         ? "Chuyển nội dung vào thùng rác?"
                         : "Khôi phục nội dung?"}
@@ -1773,7 +1773,7 @@ export default function CulturalContentManagerModal({
                       <History size={16} />
                     </div>
                     <div>
-                      <h4 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                      <h4 className="text-sm font-semibold text-slate-900 tracking-tight">
                         Lịch sử kiểm duyệt
                       </h4>
                       <p className="text-xs text-slate-500 truncate max-w-xs mt-0.5">
@@ -1882,7 +1882,7 @@ export default function CulturalContentManagerModal({
                       {/* Dòng thời gian các sự kiện */}
                       {Array.isArray(historyData?.history) && historyData.history.length > 0 && (
                         <div className="space-y-2 pt-1">
-                          <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          <h5 className="text-xs font-bold text-slate-400">
                             Dòng thời gian thẩm định
                           </h5>
                           <div className="space-y-2">
@@ -1899,7 +1899,7 @@ export default function CulturalContentManagerModal({
                                       ? "Đã phê duyệt xuất bản"
                                       : "Đã từ chối hồ sơ"}
                                   </span>
-                                  <span className="text-[10.5px] font-mono text-slate-400">
+                                  <span className="text-[11px] font-mono text-slate-400">
                                     {evt.createdAt ? new Date(evt.createdAt).toLocaleString("vi-VN") : "—"}
                                   </span>
                                 </div>

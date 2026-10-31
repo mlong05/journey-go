@@ -14,12 +14,10 @@ import {
   Check,
   Mail,
   User,
-  Image as ImageIcon,
   Camera,
   Upload,
   Shield,
   Lock,
-  Sparkles,
   Info,
   Clock,
   CheckCircle2,
@@ -153,19 +151,21 @@ export default function UserProfilePill({
 
   const containerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [avatarError, setAvatarError] = useState("");
 
   // Xử lý tải ảnh đại diện từ tệp máy tính (Upload lên Cloudinary qua Backend API, tự động lưu và load lại trang)
   const handleAvatarFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      alert("Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, JPEG, WEBP, GIF).");
+      setAvatarError("Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, JPEG, WEBP, GIF).");
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      alert("Dung lượng ảnh tối đa là 10MB. Vui lòng chọn ảnh nhỏ hơn.");
+      setAvatarError("Dung lượng ảnh tối đa là 10MB. Vui lòng chọn ảnh nhỏ hơn.");
       return;
     }
+    setAvatarError("");
 
     setIsSavingProfile(true);
 
@@ -480,7 +480,7 @@ export default function UserProfilePill({
             {displayName}
           </span>
           <span
-            className={`text-[10px] font-semibold flex items-center gap-1.5 mt-0.5 ${config.roleColor}`}
+            className={`text-[11px] font-semibold flex items-center gap-1.5 mt-0.5 ${config.roleColor}`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${config.dotColor} animate-pulse shrink-0`} />
             <span className="truncate">{currentRoleLabel}</span>
@@ -520,7 +520,7 @@ export default function UserProfilePill({
                 />
               ) : (
                 <div
-                  className={`w-12 h-12 rounded-2xl font-black text-sm text-white flex items-center justify-center shadow-sm shrink-0 ${config.avatarBg}`}
+                  className={`w-12 h-12 rounded-2xl font-bold text-sm text-white flex items-center justify-center shadow-sm shrink-0 ${config.avatarBg}`}
                 >
                   {initials}
                 </div>
@@ -537,18 +537,18 @@ export default function UserProfilePill({
                 <div className="flex items-center justify-between gap-2 mt-2">
                   {/* Badge trạng thái tài khoản */}
                   {isActive ? (
-                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       Đang hoạt động
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">
                       Bị khóa
                     </span>
                   )}
 
                   {/* Mã định danh #ID */}
-                  <span className="text-[11px] font-mono text-slate-400 font-semibold">
+                  <span className="text-[11px] text-slate-400 font-medium tabular-nums">
                     #ID: {currentUser?.id || "01"}
                   </span>
                 </div>
@@ -575,7 +575,7 @@ export default function UserProfilePill({
                 <ShieldCheck size={13} className="text-slate-400 shrink-0" />
                 <span>Vai trò:</span>
               </span>
-              <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold ${config.badgeBg}`}>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${config.badgeBg}`}>
                 {currentRoleLabel}
               </span>
             </div>
@@ -587,11 +587,11 @@ export default function UserProfilePill({
                 <span>Xác thực:</span>
               </span>
               {String(currentUser?.authProvider).toUpperCase() === "GOOGLE" ? (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                   Liên kết Google
                 </span>
               ) : (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                   Tài khoản nội bộ
                 </span>
               )}
@@ -639,7 +639,7 @@ export default function UserProfilePill({
                 <span>Làm mới thông tin phiên</span>
               </div>
               {isRefreshing && (
-                <span className="text-[10px] text-indigo-600 font-bold">Đang tải...</span>
+                <span className="text-[11px] text-indigo-600 font-bold">Đang tải...</span>
               )}
             </button>
           </div>
@@ -647,340 +647,268 @@ export default function UserProfilePill({
       )}
 
       {/* ────────────────────────────────────────────────────────
-          MODAL "HỒ SƠ CÁ NHÂN CHI TIẾT" CỠ LỚN (LARGE PROFILE MODAL)
+          MODAL "HỒ SƠ CÁ NHÂN"
+          Đầu: ảnh + tên + vai trò · Thân: 2 cột cao bằng nhau (sửa được | chỉ xem) · Chân: nút lưu
       ──────────────────────────────────────────────────────── */}
       {isDetailModalOpen && mounted && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200 overflow-y-auto"
+          className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200 font-sans"
           onClick={() => setIsDetailModalOpen(false)}
         >
           <div
-            className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden relative animate-in zoom-in-95 duration-200 my-auto flex flex-col max-h-[90vh]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-modal-title"
+            className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* ── 1. PHẦN HEADER BANNER TRÊN CÙNG (CỐ ĐỊNH) ── */}
-            <div className={`p-6 bg-gradient-to-r ${config.headerGradient} relative overflow-hidden shrink-0 text-white flex items-start justify-between gap-4`}>
-              <div className="relative z-10">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-white/20 backdrop-blur-xs border border-white/30 text-white">
-                    HỒ SƠ TÀI KHOẢN HỆ THỐNG
-                  </span>
+            {/* Dải màu nhận diện vai trò */}
+            <div className={`h-1.5 shrink-0 bg-gradient-to-r ${config.headerGradient}`} />
+
+            {/* ── 1. ĐẦU: ẢNH ĐẠI DIỆN + TÊN + VAI TRÒ ── */}
+            <div className="px-5 sm:px-6 py-5 border-b border-slate-100 flex items-start gap-4 shrink-0">
+              {/* Bấm vào ảnh để tải ảnh mới */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSavingProfile}
+                className="relative shrink-0 rounded-2xl group focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 cursor-pointer disabled:cursor-wait"
+                title="Bấm để đổi ảnh đại diện"
+              >
+                {editAvatarUrl && !modalImgError ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={editAvatarUrl}
+                    alt={displayName}
+                    onError={() => setModalImgError(true)}
+                    className="w-16 h-16 rounded-2xl object-cover ring-1 ring-slate-200 bg-white"
+                  />
+                ) : (
+                  <div
+                    className={`w-16 h-16 rounded-2xl text-lg font-semibold text-white flex items-center justify-center ${config.avatarBg}`}
+                  >
+                    {initials}
+                  </div>
+                )}
+                <span className="absolute inset-0 rounded-2xl bg-black/45 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera size={18} />
+                </span>
+                <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white shadow border border-slate-200 flex items-center justify-center text-slate-600">
+                  <Camera size={12} />
+                </span>
+              </button>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2
+                    id="profile-modal-title"
+                    className="text-lg font-semibold text-slate-900 leading-snug truncate max-w-full"
+                    title={displayName}
+                  >
+                    {displayName}
+                  </h2>
+                  {isActive ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Đang hoạt động
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200">
+                      Bị khóa
+                    </span>
+                  )}
                 </div>
-                <h2 className="text-lg sm:text-2xl font-black tracking-tight text-white mt-1.5">
-                  Hồ Sơ Cá Nhân & Phân Quyền Hệ Thống
-                </h2>
-                <p className="text-xs text-white/85 hidden sm:block mt-1 max-w-xl">
-                  Xem và quản trị toàn diện thông tin liên hệ, dữ liệu xác thực và quyền hạn nghiệp vụ
+                <p className="mt-0.5 text-sm text-slate-500 truncate" title={displayEmail}>
+                  {displayEmail}
                 </p>
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${config.badgeBg}`}>
+                    <ShieldCheck size={13} />
+                    {currentRoleLabel}
+                  </span>
+                  <span className="text-xs text-slate-400 hidden sm:inline truncate">{config.roleDesc}</span>
+                </div>
               </div>
 
-              {/* Nút X Đóng modal */}
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="w-9 h-9 rounded-full bg-black/20 hover:bg-black/35 text-white flex items-center justify-center backdrop-blur-xs transition-all cursor-pointer relative z-10 shrink-0"
-                title="Đóng cửa sổ"
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Đóng"
                 aria-label="Đóng"
               >
                 <X size={18} />
               </button>
-
-              {/* Họa tiết mờ trang trí góc banner */}
-              <div className="absolute right-10 bottom-0 opacity-15 pointer-events-none">
-                <Sparkles size={110} className="text-white" />
-              </div>
             </div>
 
-            {/* ── 2. KHỐI TÓM TẮT ĐỊNH DANH (NẰM TRỌN VẸN DƯỚI BANNER, BỎ HOÀN TOÀN -MT) ── */}
-            <div className="px-6 pt-5 pb-4 bg-white border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10 shrink-0">
-              <div className="flex items-center gap-4 min-w-0">
-                {/* Avatar bấm vào để tải ảnh đại diện lên từ máy tính */}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => fileInputRef.current?.click()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  className="relative shrink-0 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-2xl"
-                  title="Bấm vào để tải ảnh đại diện từ thiết bị"
-                >
-                  {editAvatarUrl && !modalImgError ? (
-                    <img
-                      src={editAvatarUrl}
-                      alt={displayName}
-                      onError={() => setModalImgError(true)}
-                      className="w-16 h-16 rounded-2xl object-cover ring-2 ring-slate-100 shadow-sm bg-white group-hover:brightness-90 transition-all"
-                    />
-                  ) : (
-                    <div
-                      className={`w-16 h-16 rounded-2xl font-black text-xl text-white flex items-center justify-center shadow-sm group-hover:brightness-90 transition-all ${config.avatarBg}`}
-                    >
-                      {initials}
-                    </div>
-                  )}
-
-                  {/* Lớp phủ hover với icon Camera */}
-                  <div className="absolute inset-0 bg-black/45 rounded-2xl flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Camera size={18} className="drop-shadow-sm" />
-                    <span className="text-[10px] font-bold mt-0.5 tracking-tight">Đổi ảnh</span>
-                  </div>
-
-                  {/* Huy hiệu Camera ở góc dưới */}
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white shadow-md border border-slate-200 flex items-center justify-center text-slate-700 group-hover:text-emerald-600 transition-colors">
-                    <Camera size={12} />
-                  </div>
-                </div>
-
-                {/* Tên & Tag phân quyền */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <h3 className="text-base font-black text-slate-900 tracking-tight truncate">
-                      {displayName}
-                    </h3>
-                    {isActive ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Đang hoạt động
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                        Bị khóa
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
-                    <span className="truncate">{displayEmail}</span>
-                    <span className="text-slate-300">•</span>
-                    <span className="font-mono text-slate-400 font-semibold">
-                      Mã định danh: #{currentUser?.id || "01"}
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Badge vai trò bên phải */}
-              <div className="sm:text-right shrink-0">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${config.badgeBg}`}
-                >
-                  <ShieldCheck size={14} />
-                  {currentRoleLabel}
-                </span>
-              </div>
-            </div>
-
-            {/* ── 3. PHẦN THÂN NỘI DUNG CUỘN DỌC (OVERFLOW-Y-AUTO) ── */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-6">
-              {/* Thông báo cập nhật thành công nếu có */}
+            {/* ── 2. THÂN (CUỘN KHI MÀN HÌNH THẤP) ── */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 sm:px-6 py-5 bg-slate-50/60">
               {saveSuccessMsg && (
-                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-semibold flex items-center gap-2.5 animate-in fade-in">
-                  <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center gap-2.5 animate-in fade-in">
+                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
                   <span>{saveSuccessMsg}</span>
                 </div>
               )}
 
-              {/* Form 2 cột lớn chi tiết */}
-              <form onSubmit={handleSaveProfileChanges} id="profileDetailForm" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* CỘT 1: THÔNG TIN CÁ NHÂN & LIÊN HỆ */}
-                  <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-5 space-y-4">
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-                      <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-                        <User size={16} className="text-slate-500" />
-                        <span>Thông tin cá nhân & Liên hệ</span>
-                      </div>
-                      <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
-                        Có thể chỉnh sửa
-                      </span>
-                    </div>
+              <form
+                onSubmit={handleSaveProfileChanges}
+                id="profileDetailForm"
+                className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch"
+              >
+                {/* CỘT TRÁI: THÔNG TIN CÁ NHÂN (SỬA ĐƯỢC) */}
+                <section className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 flex flex-col gap-4">
+                  <header className="flex items-center justify-between gap-2">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                      <User size={15} className="text-slate-400" />
+                      Thông tin cá nhân
+                    </h3>
+                    <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      Có thể chỉnh sửa
+                    </span>
+                  </header>
 
-                    {/* Họ và tên */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Họ và tên đầy đủ <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <User size={15} />
-                        </div>
-                        <input
-                          type="text"
-                          value={editFullName}
-                          onChange={(e) => setEditFullName(e.target.value)}
-                          placeholder="Ví dụ: Nguyễn Văn Long"
-                          className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                          required
-                        />
-                      </div>
-                    </div>
+                  <label className="block">
+                    <span className="block text-xs font-medium text-slate-600 mb-1.5">
+                      Họ và tên <span className="text-rose-500">*</span>
+                    </span>
+                    <span className="relative block">
+                      <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={editFullName}
+                        onChange={(e) => setEditFullName(e.target.value)}
+                        placeholder="Ví dụ: Nguyễn Văn Long"
+                        className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-400 transition"
+                        required
+                      />
+                    </span>
+                  </label>
 
-                    {/* Số điện thoại */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Số điện thoại liên hệ
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <Phone size={15} />
-                        </div>
-                        <input
-                          type="tel"
-                          value={editPhone}
-                          onChange={(e) => setEditPhone(e.target.value)}
-                          placeholder="Ví dụ: 0912 345 678"
-                          className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                    </div>
+                  <label className="block">
+                    <span className="block text-xs font-medium text-slate-600 mb-1.5">Số điện thoại</span>
+                    <span className="relative block">
+                      <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        type="tel"
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value)}
+                        placeholder="Ví dụ: 0912 345 678"
+                        className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 tabular-nums focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-400 transition"
+                      />
+                    </span>
+                  </label>
 
-                    {/* Ảnh đại diện: Tải ảnh từ máy tính hoặc dán URL */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Ảnh đại diện (Avatar)
-                      </label>
-
-                      {/* Nút bấm tải tệp từ máy tính */}
-                      <div className="flex items-center gap-2 mb-2">
+                  <div>
+                    <span className="block text-xs font-medium text-slate-600 mb-1.5">Ảnh đại diện</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isSavingProfile}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+                      >
+                        <Upload size={14} />
+                        Tải ảnh từ thiết bị
+                      </button>
+                      {editAvatarUrl && (
                         <button
                           type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                          onClick={() => {
+                            setEditAvatarUrl("");
+                            setModalImgError(false);
+                          }}
+                          className="px-3.5 py-2 rounded-lg bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 text-xs font-medium transition cursor-pointer"
                         >
-                          <Upload size={14} />
-                          <span>Tải ảnh từ thiết bị</span>
+                          Xóa ảnh
                         </button>
-                        {editAvatarUrl && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditAvatarUrl("");
-                              setModalImgError(false);
-                            }}
-                            className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 text-xs font-bold transition-all cursor-pointer"
-                            title="Xóa ảnh đại diện"
-                          >
-                            Xóa ảnh
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        Bấm trực tiếp vào ảnh đại diện phía trên hoặc nhấn &quot;Tải ảnh từ thiết bị&quot; để chọn file ảnh.
-                      </p>
+                      )}
                     </div>
+                    {avatarError && <p className="mt-1.5 text-xs text-rose-600">{avatarError}</p>}
+                    <p className="mt-1.5 text-[11px] text-slate-400 leading-relaxed">
+                      PNG, JPG hoặc WEBP, tối đa 10MB. Ảnh mới được lưu ngay sau khi tải lên.
+                    </p>
                   </div>
+                </section>
 
-                  {/* CỘT 2: BẢO MẬT & PHÂN QUYỀN HỆ THỐNG */}
-                  <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-5 space-y-4">
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-                      <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-                        <Shield size={16} className="text-slate-500" />
-                        <span>Bảo mật & Phân quyền hệ thống</span>
+                {/* CỘT PHẢI: THÔNG TIN TÀI KHOẢN (CHỈ XEM) */}
+                <section className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 flex flex-col gap-4">
+                  <header className="flex items-center justify-between gap-2">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                      <Shield size={15} className="text-slate-400" />
+                      Tài khoản &amp; bảo mật
+                    </h3>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      <Lock size={10} />
+                      Chỉ xem
+                    </span>
+                  </header>
+
+                  <dl className="divide-y divide-slate-100 text-sm">
+                    {[
+                      { icon: Mail, label: "Email đăng nhập", value: displayEmail },
+                      {
+                        icon: KeyRound,
+                        label: "Phương thức",
+                        value:
+                          String(currentUser?.authProvider).toUpperCase() === "GOOGLE"
+                            ? "Liên kết Google"
+                            : "Tài khoản nội bộ",
+                      },
+                      { icon: Info, label: "Mã tài khoản", value: `#${currentUser?.id ?? "—"}` },
+                      { icon: Calendar, label: "Ngày tạo", value: formatDateVN(currentUser?.createdAt) },
+                    ].map(({ icon: RowIcon, label, value }) => (
+                      <div key={label} className="flex items-center justify-between gap-3 py-2.5 first:pt-0">
+                        <dt className="flex items-center gap-2 text-slate-500 shrink-0">
+                          <RowIcon size={14} className="text-slate-400" />
+                          {label}
+                        </dt>
+                        <dd className="min-w-0 text-right font-medium text-slate-800 truncate tabular-nums" title={String(value)}>
+                          {value}
+                        </dd>
                       </div>
-                      <span className="text-[11px] font-semibold text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Lock size={10} />
-                        Dữ liệu hệ thống
-                      </span>
+                    ))}
+                    <div className="flex items-center justify-between gap-3 pt-2.5">
+                      <dt className="flex items-center gap-2 text-slate-500 shrink-0">
+                        <Clock size={14} className="text-slate-400" />
+                        Phiên hiện tại
+                      </dt>
+                      <dd className="inline-flex items-center gap-1.5 font-medium text-emerald-600">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        Đang trực tuyến
+                      </dd>
                     </div>
-
-                    {/* Email tài khoản */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                        Email định danh tài khoản
-                      </label>
-                      <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-slate-100 border border-slate-200/80 rounded-xl text-xs sm:text-sm text-slate-600 cursor-not-allowed">
-                        <Mail size={15} className="shrink-0 text-slate-400" />
-                        <span className="font-semibold truncate">{displayEmail}</span>
-                        <span className="ml-auto text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          Cố định
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Phương thức xác thực & Mã định danh */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                          Phương thức xác thực
-                        </label>
-                        <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-100 border border-slate-200/80 rounded-xl text-xs text-slate-700">
-                          <KeyRound size={14} className="shrink-0 text-slate-400" />
-                          <span className="font-semibold truncate">
-                            {String(currentUser?.authProvider).toUpperCase() === "GOOGLE"
-                              ? "Liên kết Google"
-                              : "Tài khoản nội bộ"}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                          Mã định danh (User ID)
-                        </label>
-                        <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-100 border border-slate-200/80 rounded-xl text-xs text-slate-700 font-mono font-bold">
-                          <span>#ID-{currentUser?.id || "001"}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ngày tạo tài khoản & Cập nhật gần nhất */}
-                    <div className="p-3.5 rounded-xl bg-white border border-slate-200/70 space-y-2 text-xs">
-                      <div className="flex items-center justify-between text-slate-600">
-                        <span className="flex items-center gap-2">
-                          <Calendar size={13} className="text-slate-400" />
-                          <span>Ngày khởi tạo tài khoản:</span>
-                        </span>
-                        <span className="font-semibold text-slate-800">
-                          {formatDateVN(currentUser?.createdAt)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-slate-600 pt-1.5 border-t border-slate-100">
-                        <span className="flex items-center gap-2">
-                          <Clock size={13} className="text-slate-400" />
-                          <span>Phiên đăng nhập hiện tại:</span>
-                        </span>
-                        <span className="font-semibold text-emerald-600 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          Trực tuyến an toàn
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  </dl>
+                </section>
               </form>
             </div>
 
-            {/* ── 4. FOOTER THAO TÁC CỐ ĐỊNH Ở ĐÁY ── */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-2 text-xs text-slate-500">
+            {/* ── 3. CHÂN: THAO TÁC ── */}
+            <div className="px-5 sm:px-6 py-4 border-t border-slate-200 bg-white flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+              <p className="flex items-center gap-2 text-xs text-slate-500">
                 <Info size={14} className="text-slate-400 shrink-0" />
-                <span>Mọi thay đổi hồ sơ sẽ được đồng bộ ngay tức thì vào phiên làm việc.</span>
-              </div>
-
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+                Thay đổi được áp dụng ngay cho phiên làm việc này.
+              </p>
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => setIsDetailModalOpen(false)}
-                  className="flex-1 sm:flex-none px-5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs"
+                  className="flex-1 sm:flex-none px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-medium transition cursor-pointer"
                 >
                   Đóng
                 </button>
                 <button
                   type="submit"
                   form="profileDetailForm"
-                  className="flex-1 sm:flex-none px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                  disabled={isSavingProfile}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
                 >
                   <Check size={16} />
-                  <span>Lưu thay đổi hồ sơ</span>
+                  Lưu thay đổi
                 </button>
               </div>
             </div>
 
-            {/* Input file ẩn dùng để mở cửa sổ chọn tệp khi bấm vào Avatar */}
+            {/* Ô chọn tệp ẩn, mở khi bấm ảnh đại diện hoặc nút tải ảnh */}
             <input
               ref={fileInputRef}
               type="file"

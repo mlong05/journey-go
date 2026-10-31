@@ -60,14 +60,11 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
   // Form tạo mới
   const [isCreating, setIsCreating] = useState(false);
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [isCustomSlug, setIsCustomSlug] = useState(false);
   const [formError, setFormError] = useState("");
 
   // Form chỉnh sửa
   const [editingRegion, setEditingRegion] = useState(null);
   const [editName, setEditName] = useState("");
-  const [editSlug, setEditSlug] = useState("");
   const [editError, setEditError] = useState("");
 
   // Dialog xác nhận xóa / khôi phục
@@ -107,8 +104,6 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
         setIsCreating(false);
         setEditingRegion(null);
         setName("");
-        setSlug("");
-        setIsCustomSlug(false);
         setFormError("");
         setConfirmDialog(null);
       }
@@ -128,18 +123,9 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
     };
   }, [isOpen]);
 
-  // Tự động sinh slug khi nhập tên
+  // Đường dẫn (slug) không hiển thị: luôn tự tạo từ tên vùng khi lưu
   const handleNameChange = (val) => {
     setName(val);
-    if (!isCustomSlug) {
-      setSlug(toVietnameseSlug(val));
-    }
-    if (formError) setFormError("");
-  };
-
-  const handleSlugChange = (val) => {
-    setIsCustomSlug(true);
-    setSlug(toVietnameseSlug(val));
     if (formError) setFormError("");
   };
 
@@ -151,7 +137,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
       setFormError("Vui lòng nhập tên vùng.");
       return;
     }
-    const cleanSlug = slug.trim() || toVietnameseSlug(cleanName);
+    const cleanSlug = toVietnameseSlug(cleanName);
 
     setActionLoading(true);
     try {
@@ -161,8 +147,6 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
       });
       showToast(`Đã thêm vùng "${created.name || cleanName}".`);
       setName("");
-      setSlug("");
-      setIsCustomSlug(false);
       setIsCreating(false);
       await loadData();
       onUpdated?.();
@@ -180,7 +164,6 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
   const handleStartEdit = (reg) => {
     setEditingRegion(reg);
     setEditName(reg.name || "");
-    setEditSlug(reg.slug || "");
     setEditError("");
   };
 
@@ -193,7 +176,11 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
       setEditError("Vui lòng nhập tên vùng.");
       return;
     }
-    const cleanSlug = editSlug.trim() || toVietnameseSlug(cleanName);
+    // Giữ đường dẫn cũ nếu tên không đổi, để không làm hỏng liên kết đang dùng
+    const cleanSlug =
+      cleanName === (editingRegion.name || "").trim() && editingRegion.slug
+        ? editingRegion.slug
+        : toVietnameseSlug(cleanName);
 
     setActionLoading(true);
     try {
@@ -287,10 +274,10 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 <Globe2 size={22} strokeWidth={2.2} />
               </div>
               <div>
-                <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                <span className="rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80">
                   Trải nghiệm văn hóa
                 </span>
-                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight mt-0.5">
+                <h2 className="text-lg sm:text-xl font-semibold text-slate-900 tracking-tight mt-0.5">
                   Vùng du lịch văn hóa
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -313,7 +300,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
               ======================================================== */}
           {toast.message && (
             <div
-              className={`shrink-0 mx-6 sm:mx-8 mt-3.5 p-3 rounded-2xl text-xs font-bold shadow-lg flex items-center gap-2.5 animate-in slide-in-from-top-2 ${
+              className={`shrink-0 mx-6 sm:mx-8 mt-3.5 p-3 rounded-2xl text-xs font-medium shadow-lg flex items-center gap-2.5 animate-in slide-in-from-top-2 ${
                 toast.tone === "success"
                   ? "bg-emerald-600 text-white"
                   : "bg-rose-600 text-white"
@@ -337,7 +324,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
               <button
                 type="button"
                 onClick={() => setCurrentTab("active")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                   currentTab === "active"
                     ? "bg-emerald-700 text-white shadow-sm"
                     : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
@@ -346,7 +333,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 <MapPin size={13} />
                 <span>Đang sử dụng</span>
                 <span
-                  className={`px-1.5 py-0.2 rounded-md text-[10px] ${
+                  className={`px-1.5 py-0.2 rounded-md text-[11px] ${
                     currentTab === "active"
                       ? "bg-white/20 text-white"
                       : "bg-emerald-50 text-emerald-800"
@@ -360,7 +347,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
               <button
                 type="button"
                 onClick={() => setCurrentTab("trash")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                   currentTab === "trash"
                     ? "bg-rose-600 text-white shadow-sm"
                     : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
@@ -369,7 +356,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 <Trash2 size={13} />
                 <span>Thùng rác</span>
                 <span
-                  className={`px-1.5 py-0.2 rounded-md text-[10px] ${
+                  className={`px-1.5 py-0.2 rounded-md text-[11px] ${
                     currentTab === "trash"
                       ? "bg-white/20 text-white"
                       : "bg-rose-50 text-rose-700"
@@ -388,7 +375,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 setFormError("");
                 setEditingRegion(null);
               }}
-              className={`h-9 px-4 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer transition-all active:scale-95 shadow-sm ${
+              className={`h-9 px-4 rounded-xl text-xs font-medium inline-flex items-center gap-2 cursor-pointer transition-all active:scale-95 shadow-sm ${
                 isCreating
                   ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
                   : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
@@ -414,8 +401,8 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
           {isCreating && (
             <div className="shrink-0 mx-6 sm:mx-8 mt-3.5 p-4 bg-gradient-to-br from-emerald-50/50 via-white to-slate-50 rounded-2xl border-2 border-emerald-200/80 shadow-md animate-in fade-in slide-in-from-top-3 duration-200">
               <div className="flex items-center justify-between pb-2.5 border-b border-emerald-100">
-                <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center font-black text-xs">
+                <h4 className="font-semibold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center font-semibold text-xs">
                     +
                   </span>
                   <span>Thêm vùng du lịch mới</span>
@@ -423,38 +410,23 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
               </div>
 
               <form onSubmit={handleCreate} className="mt-3 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Tên vùng <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={150}
-                      value={name}
-                      onChange={(e) => handleNameChange(e.target.value)}
-                      placeholder="Ví dụ: Tây Bắc, Đồng bằng sông Cửu Long, Tây Nguyên..."
-                      className="w-full px-3.5 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Đường dẫn (tự tạo từ tên vùng)
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={150}
-                      value={slug}
-                      onChange={(e) => handleSlugChange(e.target.value)}
-                      placeholder="tay-bac"
-                      className="w-full px-3.5 py-2 text-xs font-mono font-medium bg-white border border-slate-200 rounded-xl outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all"
-                    />
-                  </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Tên vùng <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={150}
+                    value={name}
+                    autoFocus
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    placeholder="Ví dụ: Tây Bắc, Đồng bằng sông Cửu Long, Tây Nguyên..."
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all"
+                  />
                 </div>
 
                 {formError && (
-                  <p className="text-xs font-bold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 flex items-center gap-2">
+                  <p className="text-xs font-medium text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 flex items-center gap-2">
                     <AlertCircle size={14} className="shrink-0" />
                     <span>{formError}</span>
                   </p>
@@ -467,14 +439,14 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                       setIsCreating(false);
                       setFormError("");
                     }}
-                    className="px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                    className="px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                   >
                     Hủy bỏ
                   </button>
                   <button
                     type="submit"
                     disabled={actionLoading}
-                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-medium inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     {actionLoading ? (
                       <Loader2 size={13} className="animate-spin" />
@@ -494,43 +466,29 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
           {editingRegion && (
             <div className="shrink-0 mx-6 sm:mx-8 mt-3.5 p-4 bg-gradient-to-br from-amber-50/50 via-white to-slate-50 rounded-2xl border-2 border-amber-200/80 shadow-md animate-in fade-in slide-in-from-top-3 duration-200">
               <div className="flex items-center justify-between pb-2.5 border-b border-amber-100">
-                <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
+                <h4 className="font-semibold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
                   <Pencil size={14} className="text-amber-600" />
                   <span>Chỉnh sửa vùng &quot;{editingRegion.name}&quot;</span>
                 </h4>
               </div>
 
               <form onSubmit={handleSaveEdit} className="mt-3 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Tên vùng <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={150}
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="w-full px-3.5 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Đường dẫn (tự tạo từ tên vùng)
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={150}
-                      value={editSlug}
-                      onChange={(e) => setEditSlug(toVietnameseSlug(e.target.value))}
-                      className="w-full px-3.5 py-2 text-xs font-mono font-medium bg-white border border-slate-200 rounded-xl outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 transition-all"
-                    />
-                  </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Tên vùng <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={150}
+                    value={editName}
+                    autoFocus
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl outline-hidden focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 transition-all"
+                  />
                 </div>
 
                 {editError && (
-                  <p className="text-xs font-bold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 flex items-center gap-2">
+                  <p className="text-xs font-medium text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 flex items-center gap-2">
                     <AlertCircle size={14} className="shrink-0" />
                     <span>{editError}</span>
                   </p>
@@ -540,14 +498,14 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                   <button
                     type="button"
                     onClick={() => setEditingRegion(null)}
-                    className="px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                    className="px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                   >
                     Hủy bỏ
                   </button>
                   <button
                     type="submit"
                     disabled={actionLoading}
-                    className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm shadow-amber-600/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl text-xs font-medium inline-flex items-center gap-1.5 shadow-sm shadow-amber-600/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     {actionLoading ? (
                       <Loader2 size={13} className="animate-spin" />
@@ -596,7 +554,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
             {loading ? (
               <div className="h-64 flex flex-col items-center justify-center gap-3 text-slate-400">
                 <Loader2 size={32} className="animate-spin text-emerald-600" />
-                <p className="text-xs font-bold">Đang tải danh sách vùng du lịch...</p>
+                <p className="text-xs font-medium">Đang tải danh sách vùng du lịch...</p>
               </div>
             ) : displayedList.length === 0 ? (
               <div className="py-16 text-center max-w-sm mx-auto space-y-3">
@@ -604,7 +562,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                   <Globe2 size={26} />
                 </div>
                 <div>
-                  <h4 className="font-extrabold text-slate-800 text-sm">
+                  <h4 className="font-semibold text-slate-800 text-sm">
                     {currentTab === "active"
                       ? "Chưa có vùng du lịch nào"
                       : "Thùng rác đang trống"}
@@ -621,47 +579,46 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 {displayedList.map((reg) => (
                   <div
                     key={reg.id}
-                    className={`group bg-white rounded-2xl p-4 sm:p-4.5 border transition-all shadow-2xs hover:shadow-md flex flex-col justify-between gap-3 relative overflow-hidden ${
+                    className={`group bg-white rounded-xl px-4 py-3.5 border transition-all shadow-2xs hover:shadow-sm flex items-center gap-3 min-w-0 ${
                       reg.deleted
                         ? "border-rose-200 bg-rose-50/30"
                         : "border-slate-200 hover:border-emerald-300"
                     }`}
                   >
-                    <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                            reg.deleted ? "bg-rose-50 text-rose-500" : "bg-emerald-50 text-emerald-600"
-                          }`}
-                        >
-                          <MapPin size={17} />
-                        </div>
-                        {reg.deleted ? (
-                          <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
-                            Đã xóa
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                            Đang sử dụng
-                          </span>
-                        )}
-                      </div>
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        reg.deleted ? "bg-rose-50 text-rose-500" : "bg-emerald-50 text-emerald-600"
+                      }`}
+                    >
+                      <MapPin size={18} />
+                    </div>
 
-                      <h4 className="text-base font-extrabold text-slate-900 tracking-tight mt-2">
+                    <div className="min-w-0 flex-1">
+                      <h4
+                        className="text-sm font-semibold text-slate-900 leading-snug truncate"
+                        title={reg.name}
+                      >
                         {reg.name}
                       </h4>
-                      <p className="text-[11px] font-mono text-slate-400 mt-0.5 truncate">
-                        /{reg.slug}
+                      <p
+                        className={`mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium ${
+                          reg.deleted ? "text-rose-600" : "text-emerald-700"
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${reg.deleted ? "bg-rose-500" : "bg-emerald-500"}`}
+                        />
+                        {reg.deleted ? "Đã xóa" : "Đang sử dụng"}
                       </p>
                     </div>
 
-                    {/* Actions bar */}
-                    <div className="pt-2.5 border-t border-slate-100 flex items-center justify-end gap-1.5">
+                    {/* Thao tác */}
+                    <div className="shrink-0 flex items-center gap-1">
                       {reg.deleted ? (
                         <button
                           type="button"
                           onClick={() => setConfirmDialog({ type: "restore", region: reg })}
-                          className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
                           title="Khôi phục vùng này"
                         >
                           <RotateCcw size={12} />
@@ -706,7 +663,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer shadow-2xs"
+              className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium rounded-xl transition-colors cursor-pointer shadow-2xs"
             >
               Đóng
             </button>
@@ -735,7 +692,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 )}
               </div>
               <div>
-                <h3 className="font-extrabold text-slate-900 text-base">
+                <h3 className="font-semibold text-slate-900 text-base">
                   {confirmDialog.type === "delete"
                     ? "Chuyển vùng vào thùng rác?"
                     : "Khôi phục vùng?"}
@@ -753,7 +710,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                 type="button"
                 disabled={actionLoading}
                 onClick={() => setConfirmDialog(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 Hủy bỏ
               </button>
@@ -765,7 +722,7 @@ export default function RegionManagerModal({ isOpen, onClose, onUpdated }) {
                     ? handleExecuteDelete
                     : handleExecuteRestore
                 }
-                className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md transition-all cursor-pointer active:scale-95 disabled:opacity-50 ${
+                className={`px-5 py-2.5 rounded-xl text-white font-medium text-xs inline-flex items-center gap-1.5 shadow-md transition-all cursor-pointer active:scale-95 disabled:opacity-50 ${
                   confirmDialog.type === "delete"
                     ? "bg-rose-600 hover:bg-rose-700 active:bg-rose-800 shadow-rose-600/25"
                     : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 shadow-emerald-600/25"

@@ -13,6 +13,7 @@ import {
   Layers,
 } from "lucide-react";
 import { getDevicePosition, describeGeoError } from "@/lib/geolocation";
+import { geoService } from "@/features/destination/services/geoService";
 
 /**
  * Danh sách các tầng bản đồ mã nguồn mở (100% miễn phí, không cần API Key, máy chủ CDN ổn định tại VN)
@@ -105,8 +106,9 @@ function loadLeaflet() {
  * Modal Chọn Tọa Độ Trên Bản Đồ Thực Địa OpenStreetMap (OSM)
  * - Miễn phí 100% vĩnh viễn, không cần thẻ tín dụng, không cần API Key
  * - Đa tầng bản đồ: Du lịch OSM Voyager, OSM Tiêu chuẩn, Ảnh vệ tinh
- * - Tìm kiếm địa danh Việt Nam qua Photon OpenStreetMap (CORS mở, không bị chặn)
+ * - Tìm kiếm địa chỉ qua Goong (đơn vị hành chính mới); máy chủ chưa cấu hình key thì dùng Photon OSM
  * - Kéo thả hoặc click chuột để chọn tọa độ kinh độ / vĩ độ chuẩn xác
+ * - withAddress: tra địa chỉ tại điểm ghim để điền sẵn form (onSelect nhận thêm `address`)
  * - Hiển thị vòng tròn bán kính quét thực tế (radiusMeters)
  */
 export default function LeafletMapPickerModal({
@@ -118,6 +120,8 @@ export default function LeafletMapPickerModal({
   placeName = "",
   // Ẩn vòng tròn bán kính quét khi chỉ cần chọn tọa độ (vd: tọa độ điểm đến)
   showRadius = true,
+  // Tra địa chỉ tại điểm ghim và trả kèm khi xác nhận (dùng cho form điểm đến)
+  withAddress = false,
   onSelect,
 }) {
   const mapContainerRef = useRef(null);
@@ -142,6 +146,47 @@ export default function LeafletMapPickerModal({
   const [searchResults, setSearchResults] = useState([]);
   const [searchError, setSearchError] = useState("");
 
+  // Địa chỉ tại điểm ghim (Goong): { display, detail, ward, province, lat, lng }
+  const [pickedAddress, setPickedAddress] = useState(null);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressError, setAddressError] = useState("");
+  // Bỏ qua kết quả của lần tra cũ khi người dùng đã ghim chỗ khác
+  const lookupSeqRef = useRef(0);
+  // Máy chủ chưa cấu hình Goong → tìm kiếm bằng Photon, không tra địa chỉ
+  const geoOffRef = useRef(false);
+
+  const lookupAddress = useCallback(
+    async (lat, lng) => {
+      if (!withAddress || geoOffRef.current) return;
+      const seq = ++lookupSeqRef.current;
+      setAddressLoading(true);
+      setAddressError("");
+      try {
+        const addr = await geoService.reverse(lat, lng);
+        if (seq !== lookupSeqRef.current) return;
+        setPickedAddress(addr);
+        if (!addr) setAddressError("Không xác định được địa chỉ tại điểm này. Bạn có thể tự nhập trong form.");
+      } catch (err) {
+        if (seq !== lookupSeqRef.current) return;
+        if (geoService.isGeoNotConfigured(err)) geoOffRef.current = true;
+        setPickedAddress(null);
+        setAddressError(
+          geoService.isGeoNotConfigured(err)
+            ? "Chưa cấu hình Goong trên máy chủ nên không tự lấy được địa chỉ."
+            : err?.message || "Không tra được địa chỉ, vui lòng thử lại."
+        );
+      } finally {
+        if (seq === lookupSeqRef.current) setAddressLoading(false);
+      }
+    },
+    [withAddress]
+  );
+  // Bản đồ Leaflet giữ hàm xử lý cũ, nên gọi qua ref để luôn dùng bản mới nhất
+  const lookupAddressRef = useRef(lookupAddress);
+  useEffect(() => {
+    lookupAddressRef.current = lookupAddress;
+  }, [lookupAddress]);
+
   // Cập nhật tọa độ khi mở modal
   useEffect(() => {
     if (!isOpen) return;
@@ -154,6 +199,10 @@ export default function LeafletMapPickerModal({
         setSearchQuery(placeName || "");
         setSearchResults([]);
         setSearchError("");
+        lookupSeqRef.current += 1;
+        setPickedAddress(null);
+        setAddressLoading(false);
+        setAddressError("");
       }
     });
     return () => {
@@ -280,6 +329,11 @@ export default function LeafletMapPickerModal({
         circle.setLatLng(pos);
         setCurrentPos({ lat: pos.lat, lng: pos.lng });
       });
+      // Thả ghim xong mới tra địa chỉ (tránh gọi API liên tục khi đang kéo)
+      marker.on("dragend", (e) => {
+        const pos = e.target.getLatLng();
+        lookupAddressRef.current(pos.lat, pos.lng);
+      });
 
       // Cập nhật khi click lên bản đồ
       map.on("click", (e) => {
@@ -287,6 +341,7 @@ export default function LeafletMapPickerModal({
         marker.setLatLng([lat, lng]);
         circle.setLatLng([lat, lng]);
         setCurrentPos({ lat, lng });
+        lookupAddressRef.current(lat, lng);
       });
 
       // Khắc phục kích thước render khi Leaflet nằm trong Modal
@@ -322,7 +377,7 @@ export default function LeafletMapPickerModal({
     };
   }, [isOpen, initMap]);
 
-  // Tìm kiếm địa điểm bằng Photon OpenStreetMap (Hoàn toàn miễn phí, CORS mở, không bị chặn tại VN)
+  // Tìm kiếm địa chỉ: Goong trước (đúng đơn vị hành chính mới), lỗi thì dùng Photon OpenStreetMap
   const handleSearchLocation = async (e) => {
     if (e?.preventDefault) e.preventDefault();
     const q = searchQuery.trim();
@@ -331,6 +386,29 @@ export default function LeafletMapPickerModal({
     setSearching(true);
     setSearchError("");
     setSearchResults([]);
+
+    if (!geoOffRef.current) {
+      try {
+        const items = await geoService.autocomplete(q, currentPos);
+        if (items.length > 0) {
+          setSearchResults(
+            items.map((it, idx) => ({
+              id: it.refId || idx,
+              refId: it.refId,
+              title: it.name || it.display || "Địa điểm",
+              subtitle: it.address || "",
+            }))
+          );
+        } else {
+          setSearchError("Không tìm thấy địa chỉ phù hợp. Hãy thử thêm tên phường/xã hoặc tỉnh/thành.");
+        }
+        setSearching(false);
+        return;
+      } catch (err) {
+        if (geoService.isGeoNotConfigured(err)) geoOffRef.current = true;
+        console.warn("[Goong Search] fallback to Photon:", err?.message);
+      }
+    }
 
     try {
       const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=en`;
@@ -374,18 +452,43 @@ export default function LeafletMapPickerModal({
     }
   };
 
-  // Di chuyển bản đồ đến địa điểm tìm được
-  const handleSelectSearchResult = (item) => {
-    const lat = Number(item.lat);
-    const lng = Number(item.lng);
+  const moveMarkerTo = (lat, lng, zoom) => {
     setCurrentPos({ lat, lng });
-    setSearchResults([]);
-
     if (mapInstanceRef.current && markerRef.current && circleRef.current) {
-      mapInstanceRef.current.flyTo([lat, lng], 16, { duration: 1.2 });
+      mapInstanceRef.current.flyTo([lat, lng], zoom, { duration: 1.2 });
       markerRef.current.setLatLng([lat, lng]);
       circleRef.current.setLatLng([lat, lng]);
     }
+  };
+
+  // Di chuyển bản đồ đến địa điểm tìm được
+  const handleSelectSearchResult = async (item) => {
+    setSearchResults([]);
+
+    // Gợi ý Goong chưa có tọa độ: lấy chi tiết (tọa độ + địa chỉ) theo refId
+    if (item.refId) {
+      const seq = ++lookupSeqRef.current;
+      setSearching(true);
+      setAddressError("");
+      try {
+        const place = await geoService.getPlace(item.refId);
+        if (seq !== lookupSeqRef.current) return;
+        if (place?.lat == null || place?.lng == null) throw new Error("Địa điểm không có tọa độ");
+        moveMarkerTo(Number(place.lat), Number(place.lng), 17);
+        setPickedAddress(place);
+        setAddressLoading(false);
+      } catch (err) {
+        setSearchError(err?.message || "Không lấy được vị trí của địa điểm này.");
+      } finally {
+        setSearching(false);
+      }
+      return;
+    }
+
+    const lat = Number(item.lat);
+    const lng = Number(item.lng);
+    moveMarkerTo(lat, lng, 16);
+    lookupAddress(lat, lng);
   };
 
   // Bay về vị trí GPS hiện tại của máy
@@ -393,13 +496,8 @@ export default function LeafletMapPickerModal({
     setSearchError("");
     try {
       const { latitude: lat, longitude: lng } = await getDevicePosition();
-      setCurrentPos({ lat, lng });
-
-      if (mapInstanceRef.current && markerRef.current && circleRef.current) {
-        mapInstanceRef.current.flyTo([lat, lng], 17, { duration: 1 });
-        markerRef.current.setLatLng([lat, lng]);
-        circleRef.current.setLatLng([lat, lng]);
-      }
+      moveMarkerTo(lat, lng, 17);
+      lookupAddress(lat, lng);
     } catch (err) {
       setSearchError(describeGeoError(err));
     }
@@ -418,6 +516,7 @@ export default function LeafletMapPickerModal({
       onSelect({
         latitude: currentPos.lat.toFixed(7),
         longitude: currentPos.lng.toFixed(7),
+        ...(withAddress ? { address: pickedAddress } : {}),
       });
     }
     onClose();
@@ -445,10 +544,10 @@ export default function LeafletMapPickerModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-black text-slate-900 text-sm sm:text-base">
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base">
                   Bản Đồ Định Vị Thực Địa OpenStreetMap
                 </h3>
-                <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                <span className="text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
                   100% Miễn phí
                 </span>
               </div>
@@ -565,7 +664,7 @@ export default function LeafletMapPickerModal({
           <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-xs rounded-xl shadow-md border border-slate-200/90 p-1 flex items-center gap-1">
             <div className="px-2 py-1 text-slate-400 hidden sm:flex items-center gap-1">
               <Layers size={13} />
-              <span className="text-[10px] font-bold uppercase">Kiểu:</span>
+              <span className="text-xs font-bold">Kiểu:</span>
             </div>
             {MAP_LAYERS.map((layer) => (
               <button
@@ -607,16 +706,45 @@ export default function LeafletMapPickerModal({
           </div>
         </div>
 
+        {/* Địa chỉ tại điểm ghim (Goong) sẽ được điền vào form khi xác nhận */}
+        {withAddress && (
+          <div className="shrink-0 px-6 py-2.5 bg-white border-t border-slate-200 flex items-start gap-2.5 min-h-[52px]">
+            <MapPin size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1 text-xs">
+              {addressLoading ? (
+                <span className="inline-flex items-center gap-1.5 text-slate-500">
+                  <Loader2 size={12} className="animate-spin" /> Đang tra địa chỉ tại điểm ghim…
+                </span>
+              ) : pickedAddress ? (
+                <>
+                  <p className="font-medium text-slate-800 truncate" title={pickedAddress.display}>
+                    {pickedAddress.display}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Khi xác nhận, tỉnh/thành, xã/phường và địa chỉ cụ thể sẽ được điền vào form để bạn kiểm tra lại.
+                  </p>
+                </>
+              ) : addressError ? (
+                <span className="text-amber-700">{addressError}</span>
+              ) : (
+                <span className="text-slate-500">
+                  Bấm lên bản đồ, kéo ghim hoặc tìm địa chỉ để tự điền địa chỉ vào form.
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Footer hiển thị tọa độ đã chọn & Nút xác nhận */}
         <div className="shrink-0 px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
             <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl font-mono shadow-2xs">
               <span className="text-slate-400 font-bold">Vĩ độ (Lat):</span>
-              <span className="font-black text-slate-900">{currentPos.lat.toFixed(7)}</span>
+              <span className="font-bold text-slate-900">{currentPos.lat.toFixed(7)}</span>
             </div>
             <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl font-mono shadow-2xs">
               <span className="text-slate-400 font-bold">Kinh độ (Lng):</span>
-              <span className="font-black text-slate-900">{currentPos.lng.toFixed(7)}</span>
+              <span className="font-bold text-slate-900">{currentPos.lng.toFixed(7)}</span>
             </div>
             {showRadius && (
               <span className="text-[11px] text-slate-400 font-medium hidden md:inline">
@@ -636,7 +764,8 @@ export default function LeafletMapPickerModal({
             <button
               type="button"
               onClick={handleConfirm}
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold shadow-sm inline-flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+              disabled={withAddress && addressLoading}
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold shadow-sm inline-flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-60 disabled:cursor-wait"
             >
               <Check size={14} />
               <span>Xác nhận vị trí này</span>

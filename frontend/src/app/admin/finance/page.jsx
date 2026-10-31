@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CircleDollarSign } from "lucide-react";
 import { Pager, formatDateTime, formatMoney } from "@/features/booking";
 import financeService from "@/features/finance/services/financeService";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /**
  * Tài chính (ADMIN): xử lý yêu cầu hoàn tiền và duyệt đợt tất toán cho đối tác.
@@ -121,7 +122,7 @@ function RefundPanel({ refund, onChanged }) {
 
       {refund.status === "PENDING_REVIEW" && (
         <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Duyệt hoàn tiền</h3>
+          <h3 className="text-xs font-bold text-slate-500">Duyệt hoàn tiền</h3>
           <select value={reason} onChange={(e) => setReason(e.target.value)} className={input}>
             {Object.entries(REASONS).map(([k, v]) => (
               <option key={k} value={k}>
@@ -167,7 +168,7 @@ function RefundPanel({ refund, onChanged }) {
 
       {(refund.status === "FAILED" || (refund.status === "APPROVED" && refund.method === "MANUAL_BANK_TRANSFER")) && (
         <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Ghi nhận chuyển khoản thủ công</h3>
+          <h3 className="text-xs font-bold text-slate-500">Ghi nhận chuyển khoản thủ công</h3>
           <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Mã tham chiếu giao dịch" className={input} />
           <input value={evidence} onChange={(e) => setEvidence(e.target.value)} placeholder="Bằng chứng (URL ảnh hoặc mô tả)" className={input} />
           <button
@@ -201,7 +202,7 @@ function RefundPanel({ refund, onChanged }) {
 
       {(refund.auditLogs ?? []).length > 0 && (
         <>
-          <h3 className="mt-5 text-xs font-bold uppercase tracking-wider text-slate-500">Nhật ký kiểm toán</h3>
+          <h3 className="mt-5 text-xs font-bold text-slate-500">Nhật ký kiểm toán</h3>
           <ol className="mt-2 space-y-2 border-l-2 border-slate-200 pl-3 text-xs">
             {refund.auditLogs.map((log) => (
               <li key={log.id}>
@@ -265,7 +266,7 @@ function RefundsTab() {
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <div className={`overflow-x-auto rounded-2xl border border-slate-200 bg-white ${list.loading ? "opacity-60" : ""}`}>
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
                 <th className="px-4 py-3">Mã yêu cầu</th>
                 <th className="px-4 py-3 text-right">Đề xuất</th>
@@ -327,20 +328,38 @@ function SettlementsTab() {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const list = useList(financeService.getSettlements, status, page, reloadKey);
+  const { confirm, confirmDialog } = useConfirm();
 
   async function act(settlement, approve) {
     let reason = null;
     if (!approve) {
-      reason = window.prompt(`Lý do từ chối đợt tất toán ${settlement.settlementCode}:`);
-      if (!reason?.trim()) return;
-    } else if (!window.confirm(`Duyệt chi ${formatMoney(settlement.settlementAmount)} cho ${settlement.partnerName}?`)) {
+      reason = await confirm({
+        tone: "danger",
+        icon: "reject",
+        title: "Từ chối đợt tất toán?",
+        subject: settlement.settlementCode,
+        description: "Đối tác sẽ thấy lý do này. Đợt tất toán không được chi trả.",
+        input: { label: "Lý do từ chối", placeholder: "Ví dụ: số liệu doanh thu chưa khớp…", required: true },
+        confirmLabel: "Từ chối",
+      });
+      if (!reason) return;
+    } else if (
+      !(await confirm({
+        tone: "success",
+        icon: "check",
+        title: "Duyệt chi đợt tất toán?",
+        subject: settlement.partnerName,
+        description: `Chi trả ${formatMoney(settlement.settlementAmount)} cho đối tác.`,
+        confirmLabel: "Duyệt chi",
+      }))
+    ) {
       return;
     }
     setBusyId(settlement.id);
     setError("");
     try {
       if (approve) await financeService.approveSettlement(settlement.id);
-      else await financeService.rejectSettlement(settlement.id, reason.trim());
+      else await financeService.rejectSettlement(settlement.id, reason);
       setReloadKey((k) => k + 1);
     } catch (err) {
       setError(err?.message || "Thao tác thất bại.");
@@ -374,7 +393,7 @@ function SettlementsTab() {
       )}
       <div className={`overflow-x-auto rounded-2xl border border-slate-200 bg-white ${list.loading ? "opacity-60" : ""}`}>
         <table className="w-full min-w-[860px] text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="bg-slate-50 text-xs text-slate-500">
             <tr>
               <th className="px-4 py-3">Mã</th>
               <th className="px-4 py-3">Đối tác</th>
@@ -431,6 +450,7 @@ function SettlementsTab() {
         </table>
       </div>
       <Pager page={page} totalPages={list.totalPages} onChange={setPage} disabled={list.loading} />
+      {confirmDialog}
     </>
   );
 }

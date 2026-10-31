@@ -380,10 +380,10 @@ function TaskManagerDialog({
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                           {t.taskTypeName || t.taskTypeCode || `Loại #${t.taskTypeId}`}
                         </span>
-                        <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
                           Đã xoá
                         </span>
                       </div>
@@ -540,11 +540,11 @@ function TaskManagerDialog({
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                         {t.taskTypeName || t.taskTypeCode || `Loại #${t.taskTypeId}`}
                       </span>
                       {t.status === "INACTIVE" && (
-                        <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
                           Đã xoá
                         </span>
                       )}
@@ -798,7 +798,7 @@ function TaskDetailDialog({ task, position, loading, onClose }) {
           ) : (
             <>
               <div>
-                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                   {task.taskTypeName || task.taskTypeCode}
                 </span>
                 <h4 className="text-base font-bold text-slate-900 mt-1">{task.title}</h4>
@@ -959,7 +959,7 @@ function UnlockConditionDialog({ task, allTasks, checkInPoints, onClose, onSaved
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Loại điều kiện mở khóa
             </label>
             <select
@@ -977,7 +977,7 @@ function UnlockConditionDialog({ task, allTasks, checkInPoints, onClose, onSaved
 
           {conditionType === "SEQUENTIAL" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Nhiệm vụ tiên quyết <span className="text-rose-500">*</span>
               </label>
               <select
@@ -997,7 +997,7 @@ function UnlockConditionDialog({ task, allTasks, checkInPoints, onClose, onSaved
 
           {conditionType === "SCORE_BASED" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Điểm phần trăm tối thiểu (0 - 100%)
               </label>
               <input
@@ -1013,7 +1013,7 @@ function UnlockConditionDialog({ task, allTasks, checkInPoints, onClose, onSaved
 
           {conditionType === "TIME_BASED" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Khoảng thời gian chờ (phút)
               </label>
               <input
@@ -1028,7 +1028,7 @@ function UnlockConditionDialog({ task, allTasks, checkInPoints, onClose, onSaved
 
           {conditionType === "LOCATION_VERIFICATION" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Điểm Check-in yêu cầu
               </label>
               <select
@@ -1047,7 +1047,7 @@ function UnlockConditionDialog({ task, allTasks, checkInPoints, onClose, onSaved
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Mô tả điều kiện (tùy chọn)
             </label>
             <input
@@ -1251,7 +1251,7 @@ function TaskFormDialog({
 
           <div className="grid grid-cols-1 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Loại nhiệm vụ <span className="text-rose-500">*</span>
               </label>
               <select
@@ -1275,7 +1275,7 @@ function TaskFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Tiêu đề <span className="text-rose-500">*</span>
             </label>
             <input
@@ -1293,7 +1293,7 @@ function TaskFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Mô tả
             </label>
             <textarea
@@ -1307,7 +1307,7 @@ function TaskFormDialog({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Điểm thưởng <span className="text-rose-500">*</span>
               </label>
               <input
@@ -1325,7 +1325,7 @@ function TaskFormDialog({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Số lần thử
               </label>
               <input

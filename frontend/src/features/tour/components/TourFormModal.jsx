@@ -336,7 +336,7 @@ export default function TourFormModal({
                 <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-600">
                         Tên tour
                       </p>
                       <p className="text-sm font-bold text-slate-900 truncate">
@@ -350,18 +350,18 @@ export default function TourFormModal({
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200/70">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-600">
                         Tổng giá
                       </p>
                       <p className="text-slate-800 tabular-nums font-bold">
                         {formatVND(savedTour.price)}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
                         Tính tự động từ trải nghiệm các điểm đến
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-600">
                         Thời lượng
                       </p>
                       <p className="text-slate-800 font-bold">
@@ -369,7 +369,7 @@ export default function TourFormModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-600">
                         Loại hình
                       </p>
                       <p className="text-slate-800 font-bold">
@@ -377,7 +377,7 @@ export default function TourFormModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-600">
                         Số điểm đến
                       </p>
                       <p className="text-slate-800 font-bold">
@@ -390,7 +390,7 @@ export default function TourFormModal({
 
               {route.length > 0 && (
                 <div className="rounded-2xl border border-slate-200 p-4 bg-white">
-                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3">
+                  <p className="text-xs font-bold text-slate-600 mb-3">
                     Hành trình đã khai báo
                   </p>
                   <ol className="space-y-2">
@@ -399,7 +399,7 @@ export default function TourFormModal({
                         key={r.destinationId}
                         className="flex items-start gap-3 text-sm"
                       >
-                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
                           {index + 1}
                         </span>
                         <div className="min-w-0">
@@ -433,7 +433,7 @@ export default function TourFormModal({
               {/* ── Khối 1: Thông tin tour ───────────────────── */}
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                     <Route size={13} className={palette.icon} />
                     <span>Tên tour</span>
                     <span className="text-rose-500">*</span>
@@ -457,7 +457,7 @@ export default function TourFormModal({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                       <Compass size={13} className={palette.icon} />
                       <span>Loại hình</span>
                       <span className="text-rose-500">*</span>
@@ -484,7 +484,7 @@ export default function TourFormModal({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                       <CalendarDays size={13} className={palette.icon} />
                       <span>Số ngày</span>
                       <span className="text-rose-500">*</span>
@@ -532,7 +532,7 @@ export default function TourFormModal({
               {/* ── Khối 2: Hành trình ───────────────────────── */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                     <MapPin size={13} className={palette.icon} />
                     <span>Hành trình</span>
                     <span className="text-rose-500">*</span>
@@ -689,7 +689,7 @@ export default function TourFormModal({
                                   </span>
                                 </span>
                                 {picked && (
-                                  <span className="text-[10px] font-bold text-emerald-700 shrink-0">
+                                  <span className="text-[11px] font-bold text-emerald-700 shrink-0">
                                     Đã chọn
                                   </span>
                                 )}

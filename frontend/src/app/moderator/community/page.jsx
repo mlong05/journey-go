@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   MessageSquare,
   Flag,
@@ -127,16 +127,16 @@ function NoteDialog({ config, busy, onClose, onConfirm }) {
             <ToneIcon size={20} />
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-black text-slate-900 tracking-tight">{config.title}</h3>
+            <h3 className="text-base font-semibold text-slate-900 tracking-tight">{config.title}</h3>
             {config.subject && (
-              <p className="text-xs font-bold text-slate-700 mt-1 truncate">{config.subject}</p>
+              <p className="text-xs font-medium text-slate-700 mt-1 truncate">{config.subject}</p>
             )}
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">{config.description}</p>
           </div>
         </div>
 
         <div className="px-6 pb-4 space-y-1.5">
-          <label className="text-xs font-bold text-slate-700 block">
+          <label className="text-xs font-medium text-slate-700 block">
             {config.noteLabel || "Ghi chú"}
             {config.required && <span className="text-rose-500"> *</span>}
           </label>
@@ -153,7 +153,7 @@ function NoteDialog({ config, busy, onClose, onConfirm }) {
               className="w-full px-3.5 pt-2.5 pb-7 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 resize-none leading-relaxed transition-colors"
             />
             <span
-              className={`pointer-events-none absolute right-3 bottom-2 text-[10px] font-mono font-semibold ${
+              className={`pointer-events-none absolute right-3 bottom-2 text-[11px] font-mono font-semibold ${
                 note.length >= NOTE_MAX * 0.9 ? "text-rose-500" : "text-slate-400"
               }`}
             >
@@ -161,7 +161,7 @@ function NoteDialog({ config, busy, onClose, onConfirm }) {
             </span>
           </div>
           {error && (
-            <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1.5">
+            <p className="text-[11px] font-medium text-rose-600 flex items-center gap-1.5">
               <AlertCircle size={13} />
               {error}
             </p>
@@ -173,7 +173,7 @@ function NoteDialog({ config, busy, onClose, onConfirm }) {
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
+            className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
           >
             Hủy bỏ
           </button>
@@ -181,7 +181,7 @@ function NoteDialog({ config, busy, onClose, onConfirm }) {
             type="button"
             onClick={submit}
             disabled={busy}
-            className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 ${tone.button}`}
+            className={`px-5 py-2.5 rounded-xl text-white font-medium text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 ${tone.button}`}
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
             <span>{busy ? "Đang xử lý..." : config.confirmLabel}</span>
@@ -199,8 +199,55 @@ function Avatar({ name, url }) {
     return <img src={url} alt={name || "Tác giả"} className="w-10 h-10 rounded-full object-cover shrink-0" />;
   }
   return (
-    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-sky-600 text-white text-sm font-black flex items-center justify-center shrink-0">
+    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-sky-600 text-white text-sm font-semibold flex items-center justify-center shrink-0">
       {initialOf(name)}
+    </div>
+  );
+}
+
+/**
+ * Đoạn chữ thu gọn tối đa `lines` dòng, có "Xem thêm" / "Thu gọn" như Facebook.
+ * Nút chỉ hiện khi chữ thực sự dài hơn số dòng cho phép (đo bằng ResizeObserver).
+ * `[overflow-wrap:anywhere]` để chuỗi dài không có khoảng trắng (đường dẫn, mã) vẫn xuống dòng.
+ */
+const CLAMP = { 2: "line-clamp-2", 3: "line-clamp-3", 4: "line-clamp-4", 5: "line-clamp-5" };
+
+function ExpandableText({ as: Tag = "p", lines = 4, className = "", children }) {
+  const [expanded, setExpanded] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+  const observerRef = useRef(null);
+
+  // Callback ref: gắn ResizeObserver khi phần tử xuất hiện, đo lại khi đổi kích thước
+  const measureRef = useCallback((el) => {
+    observerRef.current?.disconnect();
+    if (!el) return;
+    const check = () => {
+      if (!el.classList.contains("line-clamp-none")) {
+        setOverflowing(el.scrollHeight - el.clientHeight > 1);
+      }
+    };
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    observerRef.current = ro;
+  }, []);
+
+  return (
+    <div>
+      <Tag
+        ref={measureRef}
+        className={`whitespace-pre-line [overflow-wrap:anywhere] ${expanded ? "line-clamp-none" : CLAMP[lines]} ${className}`}
+      >
+        {children}
+      </Tag>
+      {(overflowing || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-[13px] font-medium text-slate-500 hover:text-slate-800 hover:underline cursor-pointer"
+        >
+          {expanded ? "Thu gọn" : "Xem thêm"}
+        </button>
+      )}
     </div>
   );
 }
@@ -210,15 +257,15 @@ function PlaceLine({ destinationName, tourTitle }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {destinationName && (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 rounded-full px-2.5 py-0.5">
+        <span className="inline-flex items-center gap-1 max-w-full text-[11px] font-medium text-slate-600 bg-slate-100 rounded-full px-2.5 py-0.5">
           <MapPin size={11} />
-          {destinationName}
+          <span className="truncate" title={destinationName}>{destinationName}</span>
         </span>
       )}
       {tourTitle && (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 rounded-full px-2.5 py-0.5">
+        <span className="inline-flex items-center gap-1 max-w-full text-[11px] font-medium text-slate-600 bg-slate-100 rounded-full px-2.5 py-0.5">
           <Route size={11} />
-          {tourTitle}
+          <span className="truncate" title={tourTitle}>{tourTitle}</span>
         </span>
       )}
     </div>
@@ -253,7 +300,7 @@ function EmptyState({ icon: Icon, title, text }) {
       <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
         <Icon size={26} />
       </div>
-      <p className="text-sm font-black text-slate-800 mt-4">{title}</p>
+      <p className="text-sm font-semibold text-slate-800 mt-4">{title}</p>
       {text && <p className="text-xs text-slate-500 mt-1 max-w-sm leading-relaxed">{text}</p>}
     </div>
   );
@@ -282,7 +329,7 @@ function ActionButton({ tone, icon: Icon, children, onClick, disabled }) {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`px-3.5 py-2 rounded-xl border text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 ${styles[tone]}`}
+      className={`px-3.5 py-2 rounded-xl border text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 ${styles[tone]}`}
     >
       <Icon size={14} />
       {children}
@@ -537,11 +584,11 @@ export default function ModeratorCommunityPage() {
       <div className="flex items-start gap-3">
         <Avatar name={post.authorName} url={post.authorAvatarUrl} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-black text-slate-900 truncate">{post.authorName || "Du khách"}</p>
+          <p className="text-sm font-semibold text-slate-900 truncate">{post.authorName || "Du khách"}</p>
           <p className="text-[11px] text-slate-500">Gửi lúc {formatTime(post.createdAt)}</p>
         </div>
         {post.reportCount > 0 && (
-          <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-1">
+          <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-1">
             <Flag size={11} />
             {post.reportCount} báo cáo
           </span>
@@ -550,11 +597,13 @@ export default function ModeratorCommunityPage() {
 
       <PlaceLine destinationName={post.destinationName} tourTitle={post.tourTitle} />
 
-      <div>
-        <h3 className="text-base font-black text-slate-900 leading-snug">{post.title}</h3>
-        <p className="text-[13px] text-slate-700 mt-2 leading-relaxed whitespace-pre-line break-words">
+      <div className="space-y-1.5">
+        <ExpandableText as="h3" lines={2} className="text-base font-semibold text-slate-900 leading-snug">
+          {post.title}
+        </ExpandableText>
+        <ExpandableText lines={4} className="text-sm text-slate-700 leading-relaxed">
           {post.content}
-        </p>
+        </ExpandableText>
       </div>
 
       <PostImages mediaList={post.mediaList} />
@@ -579,44 +628,48 @@ export default function ModeratorCommunityPage() {
     return (
       <article key={report.id} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4 hover:border-slate-300 transition-colors">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-xs font-black text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-3 py-1">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-3 py-1">
             <Flag size={12} />
             {REPORT_REASONS[report.reason] || report.reason}
           </span>
           <span className="text-[11px] text-slate-500">Báo cáo lúc {formatTime(report.createdAt)}</span>
           {report.pendingReportCount > 0 && (
-            <span className="ml-auto text-[11px] font-bold text-slate-600">
+            <span className="ml-auto text-[11px] font-medium text-slate-600">
               Bài này còn {report.pendingReportCount} báo cáo chờ xử lý
             </span>
           )}
         </div>
 
         {report.description && (
-          <p className="text-[13px] text-slate-700 leading-relaxed bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
-            “{report.description}”
-          </p>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+            <ExpandableText lines={3} className="text-sm text-slate-700 leading-relaxed">
+              “{report.description}”
+            </ExpandableText>
+          </div>
         )}
 
         <div className="rounded-2xl border border-slate-200 p-4 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Bài bị báo cáo</span>
+            <span className="text-xs font-semibold text-slate-500">Bài bị báo cáo</span>
             {report.postHidden && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-0.5">
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-0.5">
                 <EyeOff size={11} />
                 Đang ẩn
               </span>
             )}
             {postStatus && (
-              <span className={`text-[11px] font-bold border rounded-full px-2.5 py-0.5 ${postStatus.cls}`}>
+              <span className={`text-[11px] font-medium border rounded-full px-2.5 py-0.5 ${postStatus.cls}`}>
                 {postStatus.label}
               </span>
             )}
           </div>
-          <p className="text-sm font-black text-slate-900">{report.postTitle || `Bài viết #${report.postId}`}</p>
+          <ExpandableText lines={2} className="text-sm font-semibold text-slate-900 leading-snug">
+            {report.postTitle || `Bài viết #${report.postId}`}
+          </ExpandableText>
           {report.postContentPreview && (
-            <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line break-words">
+            <ExpandableText lines={3} className="text-[13px] text-slate-600 leading-relaxed">
               {report.postContentPreview}
-            </p>
+            </ExpandableText>
           )}
           {report.postAuthorName && (
             <p className="text-[11px] text-slate-500">Tác giả: {report.postAuthorName}</p>
@@ -625,7 +678,7 @@ export default function ModeratorCommunityPage() {
 
         {!pending && report.resolutionNote && (
           <p className="text-xs text-slate-600">
-            <span className="font-bold">Ghi chú xử lý:</span> {report.resolutionNote}
+            <span className="font-medium">Ghi chú xử lý:</span> {report.resolutionNote}
           </p>
         )}
 
@@ -660,12 +713,12 @@ export default function ModeratorCommunityPage() {
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 flex items-start gap-3">
           <AlertCircle size={18} className="text-rose-600 mt-0.5 shrink-0" />
           <div className="min-w-0">
-            <p className="text-sm font-black text-rose-800">Không tải được dữ liệu</p>
+            <p className="text-sm font-semibold text-rose-800">Không tải được dữ liệu</p>
             <p className="text-xs text-rose-700 mt-0.5 break-words">{state.error}</p>
             <button
               type="button"
               onClick={onRetry}
-              className="mt-2 text-xs font-bold text-rose-800 underline cursor-pointer"
+              className="mt-2 text-xs font-medium text-rose-800 underline cursor-pointer"
             >
               Thử lại
             </button>
@@ -683,7 +736,7 @@ export default function ModeratorCommunityPage() {
               type="button"
               onClick={onMore}
               disabled={state.more}
-              className="px-5 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 inline-flex items-center gap-2 cursor-pointer disabled:opacity-60"
+              className="px-5 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-xs font-medium text-slate-700 inline-flex items-center gap-2 cursor-pointer disabled:opacity-60"
             >
               {state.more && <Loader2 size={14} className="animate-spin" />}
               {state.more ? "Đang tải..." : "Xem thêm"}
@@ -700,7 +753,6 @@ export default function ModeratorCommunityPage() {
       <div className="shrink-0">
         <PageHeader
           title="Duyệt Bài Viết Cộng Đồng"
-          description="Xem xét bài chia sẻ trải nghiệm của du khách trước khi lên bảng tin, và xử lý các báo cáo vi phạm từ cộng đồng."
         >
           <button
             type="button"
@@ -837,7 +889,7 @@ export default function ModeratorCommunityPage() {
       {toast && (
         <div
           role="status"
-          className={`fixed top-5 right-5 z-[70] max-w-sm px-4 py-3 rounded-2xl shadow-lg text-xs font-bold flex items-start gap-2 ${
+          className={`fixed top-5 right-5 z-[70] max-w-sm px-4 py-3 rounded-2xl shadow-lg text-xs font-medium flex items-start gap-2 ${
             toast.type === "error" ? "bg-rose-700 text-white" : "bg-slate-900 text-white"
           }`}
         >

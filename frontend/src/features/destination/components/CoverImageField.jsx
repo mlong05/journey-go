@@ -56,10 +56,10 @@ export default function CoverImageField({
 
   return (
     <div className="space-y-1.5">
-      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
         <ImageIcon size={13} className={iconClassName} />
         <span>{label}</span>
-        <span className="text-[10px] font-semibold normal-case tracking-normal text-slate-400">
+        <span className="text-[11px] font-semibold normal-case tracking-normal text-slate-400">
           (khuyến nghị)
         </span>
       </label>

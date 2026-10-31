@@ -67,8 +67,10 @@ import RejectTourDialog from "./RejectTourDialog";
 /* Số dòng mỗi trang */
 const SIZE_OPTIONS = [6, 12, 24];
 
-/* Lưới 12 cột dùng chung cho tiêu đề cột và từng dòng để thẳng hàng tuyệt đối */
-const ROW_GRID = "grid grid-cols-12 gap-3 sm:gap-4 items-center";
+/* Lưới dùng chung cho tiêu đề cột và từng dòng để thẳng hàng: STT và Thao tác cố định ở hai mép,
+   cột Tour rộng nhất vì tên dài */
+const ROW_GRID =
+  "grid grid-cols-12 md:grid-cols-[2.5rem_minmax(0,2.4fr)_minmax(0,1.5fr)_minmax(0,1fr)_8.5rem_10rem] gap-3 sm:gap-4 items-center";
 
 /* Vùng cuộn: ổn định scrollbar + chặn cuộn chồng sang vùng cha */
 const LIST_SCROLL =
@@ -86,14 +88,15 @@ function StatusBadge({ status }) {
   const meta = TOUR_STATUS_META[status] || TOUR_STATUS_META.DRAFT;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${meta.cls}`}
+      className={`inline-flex items-center gap-1.5 max-w-full text-[11px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${meta.cls}`}
+      title={meta.label}
     >
       <span
         className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot} ${
           meta.pulse ? "animate-pulse" : ""
         }`}
       />
-      {meta.label}
+      <span className="truncate">{meta.label}</span>
     </span>
   );
 }
@@ -700,7 +703,7 @@ export default function ToursManager({
     const canEdit = EDITABLE_STATUSES.includes(tour.status) && !tour.deleted;
 
     return (
-      <div className="col-span-12 md:col-span-2 flex items-center justify-start gap-1.5 shrink-0">
+      <div className="col-span-12 md:col-span-1 flex items-center justify-start md:justify-end gap-1.5 shrink-0">
         <button
           type="button"
           onClick={() => openDetail(tour.tourId)}
@@ -951,14 +954,14 @@ export default function ToursManager({
         <div className={`${LIST_SCROLL} flex-1 min-h-0`}>
           {/* Tiêu đề cột */}
           <div
-            className={`${ROW_GRID} px-4 sm:px-5 py-3 bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 sticky top-0 z-10`}
+            className={`${ROW_GRID} px-4 sm:px-5 py-3 bg-slate-50 border-b border-slate-200 shadow-[0_1px_0_0_rgb(226_232_240)] text-xs font-semibold text-slate-600 sticky top-0 z-20`}
           >
             <div className="hidden md:block md:col-span-1 text-center">STT</div>
-            <div className="col-span-12 md:col-span-3">Tour</div>
-            <div className="col-span-6 md:col-span-2">Hành trình</div>
-            <div className="col-span-6 md:col-span-2">Tổng giá &amp; thời lượng</div>
-            <div className="col-span-6 md:col-span-2">Trạng thái</div>
-            <div className="col-span-12 md:col-span-2">Thao tác</div>
+            <div className="col-span-12 md:col-span-1">Tour</div>
+            <div className="col-span-6 md:col-span-1">Hành trình</div>
+            <div className="col-span-6 md:col-span-1 truncate" title="Tổng giá &amp; thời lượng">Tổng giá &amp; thời lượng</div>
+            <div className="col-span-6 md:col-span-1">Trạng thái</div>
+            <div className="col-span-12 md:col-span-1 md:text-right">Thao tác</div>
           </div>
 
           {/* Thân danh sách */}
@@ -998,9 +1001,9 @@ export default function ToursManager({
                     </div>
 
                     {/* Cột 1: Tour */}
-                    <div className="col-span-12 md:col-span-3 flex items-center gap-3 min-w-0">
+                    <div className="col-span-12 md:col-span-1 flex items-center gap-3 min-w-0">
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-bold text-slate-900 truncate">
+                        <h3 className="text-sm font-bold text-slate-900 truncate" title={tour.title}>
                           {tour.title}
                         </h3>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-600">
@@ -1020,28 +1023,34 @@ export default function ToursManager({
                     </div>
 
                     {/* Cột 2: Hành trình */}
-                    <div className="col-span-6 md:col-span-2 flex items-center gap-1.5 min-w-0">
+                    <div className="col-span-6 md:col-span-1 flex items-center gap-1.5 min-w-0">
                       <MapPin size={13} className="text-slate-400 shrink-0" />
                       <span className="text-xs font-bold text-slate-700 tabular-nums">
                         {tour.destinationCount}
                       </span>
-                      <span className="text-[10.5px] text-slate-600 truncate">
+                      <span
+                        className="text-[11px] text-slate-600 truncate"
+                        title={tour.destinations.map((d) => d.destinationName).join(" → ") || undefined}
+                      >
                         {tour.destinations[0]?.destinationName || "chưa có"}
                       </span>
                     </div>
 
                     {/* Cột 3: Tổng giá & thời lượng */}
-                    <div className="col-span-6 md:col-span-2 flex flex-col gap-0.5">
-                      <span className="text-xs font-bold text-slate-900 tabular-nums leading-none">
+                    <div
+                      className="col-span-6 md:col-span-1 flex flex-col gap-0.5 min-w-0"
+                      title={`${formatVND(tour.price)} · ${formatDuration(tour.durationDays)}`}
+                    >
+                      <span className="text-xs font-bold text-slate-900 tabular-nums leading-none truncate">
                         {formatVND(tour.price)}
                       </span>
-                      <span className="text-[10.5px] font-bold text-slate-600 tabular-nums">
+                      <span className="text-[11px] font-bold text-slate-600 tabular-nums truncate">
                         {formatDuration(tour.durationDays)}
                       </span>
                     </div>
 
                     {/* Cột 4: Trạng thái */}
-                    <div className="col-span-6 md:col-span-2 flex items-center">
+                    <div className="col-span-6 md:col-span-1 flex items-center min-w-0">
                       <StatusBadge status={tour.status} />
                     </div>
 

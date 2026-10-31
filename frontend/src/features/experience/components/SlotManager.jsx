@@ -345,7 +345,7 @@ function SlotManagerDialog({
             <div className="space-y-4">
               {grouped.map(([month, list]) => (
                 <div key={month}>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  <div className="text-xs font-bold text-slate-500 mb-1.5">
                     Tháng {month}
                   </div>
                   <ul className="space-y-2">
@@ -365,7 +365,7 @@ function SlotManagerDialog({
                           className="rounded-2xl border border-slate-200 bg-white p-3 flex items-center gap-3"
                         >
                           <div className="text-center px-2 shrink-0">
-                            <div className="text-[10px] font-bold text-slate-500 uppercase">
+                            <div className="text-xs font-bold text-slate-500">
                               {String(s.slotDate).slice(8, 10)}
                             </div>
                             <div className="font-mono text-[11px] font-bold text-slate-700">
@@ -379,7 +379,7 @@ function SlotManagerDialog({
                                 #{s.id}
                               </span>
                               <span
-                                className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2 py-0.5 rounded-full border ${meta.cls}`}
+                                className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full border ${meta.cls}`}
                               >
                                 <span
                                   className={`w-1.5 h-1.5 rounded-full ${meta.dot}`}
@@ -695,7 +695,7 @@ function SlotFormDialog({
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Ngày <span className="text-rose-500">*</span>
             </label>
             <input
@@ -721,7 +721,7 @@ function SlotFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Quota tối đa (TOUR/ngày) <span className="text-rose-500">*</span>
             </label>
             <input
@@ -744,7 +744,7 @@ function SlotFormDialog({
 
           {isEdit && (
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Trạng thái
               </label>
               <select

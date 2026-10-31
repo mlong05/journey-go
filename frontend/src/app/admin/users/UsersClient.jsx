@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Users,
   Search,
@@ -149,6 +150,14 @@ export default function AdminUsersClient() {
   const [pageNumber, setPageNumber] = useState(0);
   const [keywordInput, setKeywordInput] = useState("");
   const [keywordApplied, setKeywordApplied] = useState("");
+
+  // Từ khoá gõ ở ô tìm kiếm đầu trang được chuyển tới đây qua ?search= (áp dụng qua bộ trễ 400ms bên dưới)
+  const urlSearch = useSearchParams().get("search") ?? "";
+  const [appliedUrlSearch, setAppliedUrlSearch] = useState(null);
+  if (urlSearch !== appliedUrlSearch) {
+    setAppliedUrlSearch(urlSearch);
+    if (urlSearch) setKeywordInput(urlSearch);
+  }
 
   // Detail modal
   const [detailUser, setDetailUser] = useState(null);
@@ -1747,14 +1756,16 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || user?.avatar || "");
   const [touched, setTouched] = useState(false);
   const editFileInputRef = useRef(null);
+  const [avatarError, setAvatarError] = useState("");
 
   const handleAvatarFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      alert("Vui lòng chọn tệp hình ảnh hợp lệ.");
+      setAvatarError("Vui lòng chọn tệp hình ảnh (JPG, PNG, WebP…).");
       return;
     }
+    setAvatarError("");
     const reader = new FileReader();
     reader.onload = (evt) => {
       if (typeof evt.target?.result === "string") {
@@ -1961,6 +1972,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
                 onChange={handleAvatarFile}
                 className="hidden"
               />
+              {avatarError && <p className="mt-1.5 text-xs text-rose-600">{avatarError}</p>}
             </div>
           </div>
 
@@ -2048,6 +2060,7 @@ function EditModal({ user, onClose, onSave, isMutating = false }) {
    ========================================================================= */
 
 function CreateModal({ onClose, onCreate, isSubmitting = false }) {
+  const [createAvatarError, setCreateAvatarError] = useState("");
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -2065,9 +2078,10 @@ function CreateModal({ onClose, onCreate, isSubmitting = false }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      alert("Vui lòng chọn tệp hình ảnh hợp lệ.");
+      setCreateAvatarError("Vui lòng chọn tệp hình ảnh (JPG, PNG, WebP…).");
       return;
     }
+    setCreateAvatarError("");
     const reader = new FileReader();
     reader.onload = (evt) => {
       if (typeof evt.target?.result === "string") {
@@ -2304,6 +2318,7 @@ function CreateModal({ onClose, onCreate, isSubmitting = false }) {
                 onChange={handleCreateAvatarFile}
                 className="hidden"
               />
+              {createAvatarError && <p className="mt-1.5 text-xs text-rose-600">{createAvatarError}</p>}
             </div>
           </div>
 

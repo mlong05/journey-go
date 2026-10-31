@@ -68,7 +68,7 @@ export default function AdminBookingsPage() {
 
       <div className={`overflow-x-auto rounded-2xl border border-slate-200 bg-white ${loading ? "opacity-60" : ""}`}>
         <table className="w-full min-w-[820px] text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="bg-slate-50 text-xs text-slate-500">
             <tr>
               <th className="px-4 py-3">Mã đơn</th>
               <th className="px-4 py-3">Khách</th>

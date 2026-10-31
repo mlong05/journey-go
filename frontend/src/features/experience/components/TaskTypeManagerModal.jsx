@@ -263,7 +263,7 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <span className="font-mono text-xs font-black uppercase text-violet-700 bg-violet-50 px-2 py-0.5 rounded-lg border border-violet-200">
+                        <span className="font-mono text-xs font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-lg border border-violet-200">
                           {item.code}
                         </span>
                         <div className="flex items-center gap-1">
@@ -289,7 +289,7 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
                         </div>
                       </div>
 
-                      <h4 className="text-sm font-black text-slate-900 mt-2">
+                      <h4 className="text-sm font-bold text-slate-900 mt-2">
                         {item.name}
                       </h4>
                     </div>
@@ -458,7 +458,7 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
         <form onSubmit={handleSubmit} className="space-y-3.5">
           {/* Mã Code (chỉ nhập khi tạo mới, không cho sửa theo thiết kế backend) */}
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Mã code (UNIQUE) <span className="text-rose-500">*</span>
             </label>
             <input
@@ -469,10 +469,10 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
                 setForm({ ...form, code: e.target.value.toUpperCase() })
               }
               placeholder="Vd: AUDIO_CLUE"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:bg-white focus:outline-none uppercase disabled:opacity-60"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:bg-white focus:outline-none disabled:opacity-60"
             />
             {isEdit && (
-              <p className="text-[10.5px] text-slate-400">
+              <p className="text-[11px] text-slate-400">
                 Mã code là khoá định danh cố định, không thể chỉnh sửa.
               </p>
             )}
@@ -480,7 +480,7 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
 
           {/* Tên hiển thị */}
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Tên hiển thị <span className="text-rose-500">*</span>
             </label>
             <input
@@ -495,7 +495,7 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
 
           {/* Phương thức xác minh */}
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Phương thức xác minh
             </label>
             <select
@@ -602,7 +602,7 @@ function TaskTypeDetailDialog({ taskType, loading, onClose }) {
         ) : (
           <div className="space-y-3 text-xs">
             <div>
-              <span className="text-[10px] font-mono font-bold bg-violet-50 text-violet-700 px-2 py-0.5 rounded border border-violet-200">
+              <span className="text-[11px] font-mono font-bold bg-violet-50 text-violet-700 px-2 py-0.5 rounded border border-violet-200">
                 {taskType.code}
               </span>
               <h4 className="text-sm font-bold text-slate-900 mt-1">
