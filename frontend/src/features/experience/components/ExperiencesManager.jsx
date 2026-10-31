@@ -223,7 +223,7 @@ export default function ExperiencesManager({
         <div>
           <div className="flex items-center gap-2">
             <span className={`w-1.5 h-5 rounded-full ${palette.bar}`} />
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               {heading}
             </h1>
           </div>
@@ -405,14 +405,14 @@ export default function ExperiencesManager({
               >
                 <div className="flex items-start justify-end gap-2">
                   <span
-                    className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full border ${meta.cls}`}
+                    className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border ${meta.cls}`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
                     {meta.label}
                   </span>
                 </div>
 
-                <h3 className={`text-base font-black text-slate-900 line-clamp-2 transition-colors ${palette.hoverTitle}`}>
+                <h3 className={`text-base font-bold text-slate-900 line-clamp-2 transition-colors ${palette.hoverTitle}`}>
                   {exp.title}
                 </h3>
 
@@ -637,7 +637,7 @@ export default function ExperiencesManager({
                       EXPERIENCE_STATUS_META.DRAFT;
                     return (
                       <span
-                        className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2 py-0.5 rounded-full border ${meta.cls}`}
+                        className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full border ${meta.cls}`}
                       >
                         <span
                           className={`w-1.5 h-1.5 rounded-full ${meta.dot}`}

@@ -31,6 +31,7 @@ import CheckInStationFields, {
   validateStation,
   persistStation,
 } from "./CheckInStationFields";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const INITIAL_QUESTION_FORM = {
   content: "",
@@ -62,6 +63,7 @@ export default function QuestionManagerModal({
   onQuestionsUpdated,
 }) {
   const [questions, setQuestions] = useState([]);
+  const { confirm, confirmDialog } = useConfirm();
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -378,7 +380,14 @@ export default function QuestionManagerModal({
   // Xóa phương án trả lời
   const handleDeleteAnswer = async (ansId) => {
     if (!allowManage) return;
-    if (!window.confirm("Bạn có chắc chắn muốn xóa phương án này?")) return;
+    const ok = await confirm({
+      tone: "danger",
+      icon: "trash",
+      title: "Xóa phương án trả lời?",
+      description: "Phương án sẽ bị xóa khỏi câu hỏi này.",
+      confirmLabel: "Xóa phương án",
+    });
+    if (!ok) return;
     setActionLoading(true);
     try {
       await answerService.delete(ansId);
@@ -437,18 +446,18 @@ export default function QuestionManagerModal({
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-black text-slate-900 text-sm sm:text-base">
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base">
                   Bộ Câu Hỏi & Thử Thách
                 </h3>
                 <span className="text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
                   {questions.length} câu hỏi
                 </span>
                 {isDraft ? (
-                  <span className="text-[10.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
                     Bản nháp
                   </span>
                 ) : (
-                  <span className="text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
                     Đã xuất bản
                   </span>
                 )}
@@ -667,7 +676,7 @@ export default function QuestionManagerModal({
                         : "border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                     }`}
                   />
-                  <p className="text-[10.5px] text-indigo-700/80">
+                  <p className="text-[11px] text-indigo-700/80">
                     Hệ thống sẽ đối chiếu câu trả lời của du khách mà không phân biệt chữ hoa hay chữ
                     thường.
                   </p>
@@ -725,7 +734,7 @@ export default function QuestionManagerModal({
                               }));
                               setForm({ ...form, initialAnswers: updated });
                             }}
-                            className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
+                            className={`w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
                               ans.isCorrect
                                 ? "bg-emerald-600 text-white shadow-2xs"
                                 : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
@@ -848,7 +857,7 @@ export default function QuestionManagerModal({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">
+                  <h4 className="text-xs font-bold text-slate-400">
                     Danh sách câu hỏi thử thách ({questions.length})
                   </h4>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -887,14 +896,14 @@ export default function QuestionManagerModal({
                         className="p-4 flex items-center justify-between gap-3 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200/80 text-indigo-700 font-mono font-black text-xs flex items-center justify-center shrink-0">
+                          <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200/80 text-indigo-700 font-mono font-bold text-xs flex items-center justify-center shrink-0">
                             #{q.sequenceOrder !== null ? q.sequenceOrder : idx + 1}
                           </div>
 
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
                                   isTextType
                                     ? "bg-purple-50 text-purple-700 border-purple-200"
                                     : "bg-indigo-50 text-indigo-700 border-indigo-200"
@@ -903,7 +912,7 @@ export default function QuestionManagerModal({
                                 {isTextType ? "Tự luận (Text)" : "Trắc nghiệm"}
                               </span>
                               {requiresLocation && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1">
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1">
                                   <MapPin size={10} />
                                   {stationOf(q)?.name || (q.checkInPointId ? `Địa điểm #${q.checkInPointId}` : "Chưa gắn địa điểm")}
                                 </span>
@@ -1108,7 +1117,7 @@ export default function QuestionManagerModal({
                                           type="button"
                                           disabled={!allowManage || actionLoading}
                                           onClick={() => handleSetCorrectAnswer(q, ans)}
-                                          className={`w-6 h-6 rounded-lg font-black text-xs flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                                          className={`w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
                                             ans.isCorrect
                                               ? "bg-emerald-600 text-white shadow-2xs"
                                               : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer"
@@ -1132,7 +1141,7 @@ export default function QuestionManagerModal({
                                               {ans.content}
                                             </p>
                                             {ans.isCorrect && (
-                                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded">
+                                              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded">
                                                 Đáp án đúng
                                               </span>
                                             )}
@@ -1287,6 +1296,7 @@ export default function QuestionManagerModal({
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

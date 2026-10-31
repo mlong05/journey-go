@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { Copy, Download, Printer, QrCode, RefreshCw, X } from "lucide-react";
 import { destinationService } from "../services/destinationService";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const POSTER_WIDTH = 1240; // ~A5 dọc ở 150 dpi, đủ nét để in
 const POSTER_HEIGHT = 1754;
@@ -108,6 +109,7 @@ export default function DestinationQrModal({ destination, onClose }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
     let active = true;
@@ -126,13 +128,15 @@ export default function DestinationQrModal({ destination, onClose }) {
   }, [destination.id, destination.name]);
 
   async function regenerate() {
-    if (
-      !window.confirm(
-        "Tạo mã QR mới? Mã cũ sẽ hết hiệu lực ngay, bạn cần in và dán lại QR mới tại điểm đến.",
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      tone: "warning",
+      icon: "restore",
+      title: "Tạo mã QR mới?",
+      subject: destination.name,
+      description: "Mã cũ sẽ hết hiệu lực ngay, bạn cần in và dán lại QR mới tại điểm đến.",
+      confirmLabel: "Tạo mã mới",
+    });
+    if (!ok) return;
     setBusy(true);
     setError("");
     try {
@@ -215,7 +219,7 @@ export default function DestinationQrModal({ destination, onClose }) {
 
           <div className="space-y-4 text-sm">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Mã nhập tay</p>
+              <p className="text-xs font-bold text-slate-500">Mã nhập tay</p>
               <div className="mt-1 flex items-center gap-2">
                 <code className="flex-1 rounded-lg bg-slate-100 px-3 py-2 font-mono text-sm font-bold text-slate-900">
                   {qr?.qrToken ?? "…"}
@@ -269,6 +273,7 @@ export default function DestinationQrModal({ destination, onClose }) {
           </div>
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

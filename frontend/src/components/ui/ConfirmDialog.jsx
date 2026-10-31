@@ -34,6 +34,8 @@ import {
  *  - title, description (node), subject (tên đối tượng, in đậm)
  *  - confirmLabel, cancelLabel
  *  - icon: "trash" | "check" | "reject" | "restore" | "warning"
+ *  - input (tuỳ chọn): { label, placeholder, required } — thêm ô nhập lý do;
+ *    onConfirm nhận chuỗi đã nhập (thay cho window.prompt)
  *  - onConfirm, onCancel
  */
 const EASE = "ease-[cubic-bezier(0.32,0.72,0,1)]";
@@ -80,6 +82,7 @@ const SNAPSHOT_FIELDS = [
   "subject",
   "confirmLabel",
   "cancelLabel",
+  "input",
 ];
 
 function pickContent(props) {
@@ -105,7 +108,17 @@ export default function ConfirmDialog(props) {
     subject,
     confirmLabel = "Xác nhận",
     cancelLabel = "Hủy bỏ",
+    input,
   } = snapshot;
+
+  // Ô nhập lý do (khi có cấu hình input): xoá trắng mỗi lần mở lại
+  const [text, setText] = useState("");
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setText("");
+  }
+  const inputMissing = Boolean(input?.required) && !text.trim();
 
   // mounted: còn trong DOM · visible: đang ở trạng thái "hiện"
   const [mounted, setMounted] = useState(false);
@@ -154,7 +167,7 @@ export default function ConfirmDialog(props) {
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[80] flex items-center justify-center p-4 ${FONT}`}
+      className={`fixed inset-0 z-[300] flex items-center justify-center p-4 ${FONT}`}
       role="presentation"
     >
       {/* Lớp phủ */}
@@ -229,6 +242,30 @@ export default function ConfirmDialog(props) {
             {description}
           </div>
 
+          {input && (
+            <label
+              className={`mt-4 block text-left transition-all duration-500 delay-200 ${EASE} ${
+                visible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+              }`}
+            >
+              {input.label && (
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  {input.label}
+                  {input.required && <span className="text-rose-500"> *</span>}
+                </span>
+              )}
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                rows={3}
+                maxLength={500}
+                disabled={loading}
+                placeholder={input.placeholder}
+                className={`w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-200/60 ${FONT}`}
+              />
+            </label>
+          )}
+
           {/* Nút */}
           <div
             className={`mt-7 grid grid-cols-2 gap-3 transition-all duration-500 delay-[250ms] ${EASE} ${
@@ -246,8 +283,8 @@ export default function ConfirmDialog(props) {
             </button>
             <button
               type="button"
-              onClick={onConfirm}
-              disabled={loading}
+              onClick={() => onConfirm?.(input ? text.trim() : true)}
+              disabled={loading || inputMissing}
               className={`flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-300 ${EASE} active:scale-[0.98] focus:outline-none focus-visible:ring-4 ${t.focus} ${t.btn} disabled:opacity-60 cursor-pointer ${FONT}`}
             >
               {loading ? (
@@ -269,6 +306,8 @@ export default function ConfirmDialog(props) {
  *
  *   const { confirm, confirmDialog } = useConfirm();
  *   if (!(await confirm({ title, tone: "danger", ... }))) return;
+ *   // Có ô lý do: const reason = await confirm({ ..., input: { label, required: true } });
+ *   // reason là chuỗi đã nhập, hoặc false khi huỷ.
  *   ...
  *   return (<>{...}{confirmDialog}</>);
  */
@@ -293,7 +332,7 @@ export function useConfirm() {
   const confirmDialog = (
     <ConfirmDialog
       {...state}
-      onConfirm={() => settle(true)}
+      onConfirm={(value) => settle(value)}
       onCancel={() => settle(false)}
     />
   );

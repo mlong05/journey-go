@@ -135,7 +135,7 @@ export default function RejectDestinationDialog({
               <ShieldAlert size={20} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-base font-black text-slate-900 tracking-tight">
+              <h3 className="text-base font-bold text-slate-900 tracking-tight">
                 {destination?.revoke ? "Thu hồi duyệt điểm đến" : "Từ chối thẩm định điểm đến"}
               </h3>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">

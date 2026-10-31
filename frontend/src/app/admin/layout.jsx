@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -9,14 +8,13 @@ import {
   MapPin,
   CreditCard,
   Settings,
-  Bell,
   Route,
   Receipt,
   Award,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
-import { Sidebar, DashboardHeader } from "@/components/layout";
+import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout";
 
 // Navigation items được định nghĩa ngoài component để tránh re-create mỗi render
 const ADMIN_NAV_ITEMS = [
@@ -108,7 +106,6 @@ export default function AdminLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarWide, setIsSidebarWide] = useState(true);
   const [topSearch, setTopSearch] = useState("");
-  const [notificationsCount, setNotificationsCount] = useState(0);
 
   // Trang Điểm đến & Trải nghiệm: khóa khung 100vh, cố định header & filter, chỉ danh sách tự cuộn
   const isScrollLockedPage =
@@ -156,16 +153,7 @@ export default function AdminLayout({ children }) {
           onSearchSubmit={handleTopSearchSubmit}
           searchPlaceholder="Tìm tài khoản, đơn hàng..."
         >
-          <Link
-            href="/admin"
-            className="relative w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-colors"
-            title="Thông báo hệ thống"
-          >
-            <Bell size={16} />
-            {notificationsCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
-            )}
-          </Link>
+          <NotificationBell hint="Cảnh báo hệ thống và các yêu cầu cần xử lý sẽ hiện ở đây." />
         </DashboardHeader>
 
         {/* Main Content bên dưới */}

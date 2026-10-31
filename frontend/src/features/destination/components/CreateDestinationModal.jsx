@@ -17,12 +17,13 @@ import {
   Globe2,
 } from "lucide-react";
 import { getDevicePosition, describeGeoError } from "@/lib/geolocation";
+import { geoService } from "../services/geoService";
 import { destinationService } from "../services/destinationService";
 import { regionService } from "../services/regionService";
 import AdministrativeAddressFields from "./AdministrativeAddressFields";
 import CoverImageField from "./CoverImageField";
 import GpsNotice from "./GpsNotice";
-import LeafletMapPickerModal from "@/features/experience/components/LeafletMapPickerModal";
+import GoongMapPickerModal from "./GoongMapPickerModal";
 
 /**
  * Modal "Tạo Điểm Đến Di Sản Mới" — dùng chung cho Provider & Admin.
@@ -85,6 +86,8 @@ export default function CreateDestinationModal({
     wardCode: "",
     street: "",
   });
+  // Địa chỉ lấy từ bản đồ (Goong) để điền sẵn phần địa chỉ hành chính
+  const [addrFill, setAddrFill] = useState(null);
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -110,6 +113,7 @@ export default function CreateDestinationModal({
         setCreatedItem(null);
         setGettingLocation(false);
         setGpsNotice(null);
+        setAddrFill(null);
 
         setRegionsLoading(true);
         regionService
@@ -169,10 +173,25 @@ export default function CreateDestinationModal({
         delete next.longitude;
         return next;
       });
-      setGpsNotice({
-        tone: "success",
-        text: "Đã lấy tọa độ GPS hiện tại.",
-      });
+      // Tra địa chỉ Goong tại vị trí hiện tại → điền sẵn Tỉnh / Xã / Địa chỉ cụ thể
+      let address = null;
+      try {
+        address = await geoService.reverse(pos.latitude, pos.longitude);
+      } catch (geoErr) {
+        console.warn("[Goong reverse] skipped:", geoErr?.message);
+      }
+      if (address) setAddrFill({ ...address, nonce: Date.now() });
+      setGpsNotice(
+        address
+          ? {
+              tone: "success",
+              text: "Đã lấy tọa độ GPS hiện tại và điền địa chỉ tương ứng. Vui lòng kiểm tra lại địa chỉ.",
+            }
+          : {
+              tone: "warning",
+              text: "Đã lấy tọa độ GPS hiện tại nhưng không tự xác định được địa chỉ, vui lòng chọn Tỉnh/Xã thủ công.",
+            }
+      );
     } catch (err) {
       // Không lấy được GPS: không điền gì, chỉ hướng dẫn mở quyền vị trí
       setGpsNotice({
@@ -184,7 +203,9 @@ export default function CreateDestinationModal({
     }
   };
 
-  const handleMapSelect = ({ latitude, longitude }) => {
+  const handleMapSelect = ({ latitude, longitude, address }) => {
+    // Địa chỉ Goong tại điểm ghim → điền sẵn Tỉnh / Xã / Địa chỉ cụ thể
+    if (address) setAddrFill({ ...address, nonce: Date.now() });
     setForm((prev) => ({
       ...prev,
       latitude: Number(latitude).toFixed(6),
@@ -196,7 +217,12 @@ export default function CreateDestinationModal({
       delete next.longitude;
       return next;
     });
-    setGpsNotice({ tone: "success", text: "Đã cập nhật tọa độ theo vị trí chọn trên bản đồ." });
+    setGpsNotice({
+      tone: "success",
+      text: address
+        ? "Đã cập nhật tọa độ và điền địa chỉ theo vị trí chọn trên bản đồ. Vui lòng kiểm tra lại địa chỉ."
+        : "Đã cập nhật tọa độ theo vị trí chọn trên bản đồ.",
+    });
   };
 
   const handleChange = (field, value) => {
@@ -350,10 +376,10 @@ export default function CreateDestinationModal({
                 <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-500">
                         Tên điểm đến
                       </p>
-                      <p className="text-sm font-black text-slate-900 truncate">
+                      <p className="text-sm font-bold text-slate-900 truncate">
                         {createdItem.name || form.name}
                       </p>
                     </div>
@@ -364,7 +390,7 @@ export default function CreateDestinationModal({
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200/70">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-500">
                         Địa chỉ
                       </p>
                       <p className="text-slate-800 font-semibold truncate">
@@ -372,7 +398,7 @@ export default function CreateDestinationModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-500">
                         Sức chứa
                       </p>
                       <p className="text-slate-800 font-semibold">
@@ -380,7 +406,7 @@ export default function CreateDestinationModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-500">
                         Vĩ độ
                       </p>
                       <p className="text-slate-800 font-mono">
@@ -388,7 +414,7 @@ export default function CreateDestinationModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-500">
                         Kinh độ
                       </p>
                       <p className="text-slate-800 font-mono">
@@ -413,7 +439,7 @@ export default function CreateDestinationModal({
 
               {/* ── Trường 1: Tên điểm đến ─────────────────── */}
               <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <Landmark size={13} className={palette.icon} />
                   <span>Tên điểm đến di sản</span>
                   <span className="text-rose-500">*</span>
@@ -435,7 +461,7 @@ export default function CreateDestinationModal({
 
               {/* ── Trường mới: Khu vực / Vùng miền du lịch (Region Master Data) ── */}
               <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <Globe2 size={13} className={palette.icon} />
                   <span>Thuộc Khu vực / Vùng miền du lịch</span>
                   <span className="text-rose-500">*</span>
@@ -471,6 +497,7 @@ export default function CreateDestinationModal({
 
               {/* ── Trường 2: Địa chỉ hành chính (Tỉnh → Xã → Cụ thể) ── */}
               <AdministrativeAddressFields
+                fillFrom={addrFill}
                 disabled={loading}
                 error={errors.address}
                 palette={palette}
@@ -488,7 +515,7 @@ export default function CreateDestinationModal({
               {/* ── Trường 3+4: Tọa độ GPS ────────────────── */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                     <Compass size={13} className={palette.icon} />
                     <span>Tọa độ không gian GPS</span>
                     <span className="text-rose-500">*</span>
@@ -521,7 +548,7 @@ export default function CreateDestinationModal({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                    <label className="text-xs font-bold text-slate-500 block">
                       Vĩ độ (Latitude)
                     </label>
                     <input
@@ -536,13 +563,13 @@ export default function CreateDestinationModal({
                       }`}
                     />
                     {errors.latitude && (
-                      <p className="text-[10.5px] text-rose-600 font-bold">
+                      <p className="text-[11px] text-rose-600 font-bold">
                         {errors.latitude}
                       </p>
                     )}
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                    <label className="text-xs font-bold text-slate-500 block">
                       Kinh độ (Longitude)
                     </label>
                     <input
@@ -557,7 +584,7 @@ export default function CreateDestinationModal({
                       }`}
                     />
                     {errors.longitude && (
-                      <p className="text-[10.5px] text-rose-600 font-bold">
+                      <p className="text-[11px] text-rose-600 font-bold">
                         {errors.longitude}
                       </p>
                     )}
@@ -570,7 +597,7 @@ export default function CreateDestinationModal({
 
               {/* ── Trường 5: Sức chứa ────────────────────── */}
               <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <Users size={13} className={palette.icon} />
                   <span>Sức chứa tối đa</span>
                   <span className="text-rose-500">*</span>
@@ -653,13 +680,12 @@ export default function CreateDestinationModal({
     </div>
 
     {/* Đặt ngoài hộp thoại chính để lớp fixed của bản đồ không bị hiệu ứng transform giới hạn */}
-    <LeafletMapPickerModal
+    <GoongMapPickerModal
       isOpen={mapPickerOpen}
       onClose={() => setMapPickerOpen(false)}
       initialLatitude={form.latitude}
       initialLongitude={form.longitude}
       placeName={form.name}
-      showRadius={false}
       onSelect={handleMapSelect}
     />
     </>

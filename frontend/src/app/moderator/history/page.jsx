@@ -185,7 +185,7 @@ export default function ModeratorHistoryPage() {
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className={`overflow-x-auto rounded-2xl border border-slate-200 bg-white ${loading ? "opacity-60" : ""}`}>
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
                 <th className="px-4 py-3">{cfg.label}</th>
                 <th className="px-4 py-3">Quyết định</th>
@@ -238,7 +238,7 @@ export default function ModeratorHistoryPage() {
                   {selected.decisionNote && <p>Ghi chú: {selected.decisionNote}</p>}
                 </div>
               )}
-              <h3 className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-500">Dòng thời gian</h3>
+              <h3 className="mt-4 text-xs font-bold text-slate-500">Dòng thời gian</h3>
               {timeline === null ? (
                 <p className="mt-2 text-slate-500">Đang tải...</p>
               ) : timeline.length === 0 ? (

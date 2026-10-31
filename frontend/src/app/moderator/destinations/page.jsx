@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { Suspense, useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Search,
   MapPin,
@@ -59,7 +60,9 @@ const STATUS = {
 const SIZE_OPTIONS = [10, 20, 50];
 
 /* Lưới 12 cột dùng chung cho tiêu đề cột và từng dòng để thẳng hàng tuyệt đối */
-const ROW_GRID = "grid grid-cols-12 gap-3 sm:gap-4 items-center";
+/* STT và Thao tác cố định ở hai mép; tên địa điểm rộng nhất */
+const ROW_GRID =
+  "grid grid-cols-12 md:grid-cols-[2.5rem_minmax(0,2.4fr)_minmax(0,1fr)_minmax(0,1fr)_13rem] gap-3 sm:gap-4 items-center";
 
 /* Vùng cuộn của danh sách: khe scrollbar ổn định + chặn cuộn chồng (chain)
    sang vùng cha, để chỉ vùng danh sách là vùng duy nhất được cuộn. */
@@ -349,10 +352,18 @@ function PaginationBar({
   );
 }
 
-export default function ModeratorDestinationsPage() {
+function ModeratorDestinationsContent() {
   /* ── State ────────────────────────────────────────────────── */
   const { confirm, confirmDialog } = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Từ khoá gõ ở ô tìm kiếm đầu trang được chuyển tới đây qua ?search=
+  const urlSearch = useSearchParams().get("search") ?? "";
+  const [appliedUrlSearch, setAppliedUrlSearch] = useState(null);
+  if (urlSearch !== appliedUrlSearch) {
+    setAppliedUrlSearch(urlSearch);
+    if (urlSearch) setSearchQuery(urlSearch);
+  }
   const [statusTab, setStatusTab] = useState("all");
   const [destinations, setDestinations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -782,13 +793,13 @@ export default function ModeratorDestinationsPage() {
 
         {/* ── TIÊU ĐỀ CỘT — shrink-0, cố định ── */}
         <div
-          className={`${ROW_GRID} shrink-0 pl-4 sm:pl-5 ${HEADER_PAD} py-3 bg-slate-50 border-b border-slate-200 text-[11px] font-bold  text-slate-600 `}
+          className={`${ROW_GRID} shrink-0 pl-4 sm:pl-5 pr-4 sm:pr-[35px] py-3 bg-slate-50 border-b border-slate-200 text-[11px] font-bold  text-slate-600 `}
         >
           <div className="hidden md:block md:col-span-1 text-center">STT</div>
-          <div className="col-span-12 md:col-span-3">Tên địa điểm</div>
-          <div className="col-span-6 md:col-span-2">Sức chứa</div>
-          <div className="col-span-6 md:col-span-3">Trạng thái</div>
-          <div className="col-span-12 md:col-span-3">Thao tác</div>
+          <div className="col-span-12 md:col-span-1">Tên địa điểm</div>
+          <div className="col-span-6 md:col-span-1">Sức chứa</div>
+          <div className="col-span-6 md:col-span-1">Trạng thái</div>
+          <div className="col-span-12 md:col-span-1 md:text-right">Thao tác</div>
         </div>
 
         {/* ── THÂN DANH SÁCH — CHỈ VÙNG NÀY CUỘN ── */}
@@ -828,7 +839,7 @@ export default function ModeratorDestinationsPage() {
                 return (
                   <li
                     key={item.id}
-                    className="pl-4 sm:pl-5 py-3.5 hover:bg-slate-50/60 transition-colors"
+                    className="pl-4 sm:pl-5 pr-4 sm:pr-5 py-2.5 hover:bg-slate-50/60 transition-colors"
                   >
                     <div className={ROW_GRID}>
                       {/* Số thứ tự (tính theo trang) */}
@@ -837,25 +848,25 @@ export default function ModeratorDestinationsPage() {
                       </div>
 
                       {/* Cột 1 — Tên địa điểm */}
-                      <div className="col-span-12 md:col-span-3 flex items-center gap-3 min-w-0">
+                      <div className="col-span-12 md:col-span-1 flex items-center gap-3 min-w-0">
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-sm font-bold text-slate-900 truncate">
+                          <h3 className="text-sm font-medium text-slate-900 truncate" title={item.name}>
                             {item.name}
                           </h3>
                         </div>
                       </div>
 
                       {/* Cột 2 — Sức chứa */}
-                      <div className="col-span-6 md:col-span-2 flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                      <div className="col-span-6 md:col-span-1 flex items-center gap-1.5 min-w-0 text-[13px] font-medium text-slate-800 tabular-nums" title={`${item.capacity ?? "—"} du khách/lượt`}>
                         <Users size={13} className="text-slate-400 shrink-0" />
                         <span>{item.capacity ?? "—"}</span>
-                        <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                        <span className="text-[11px] font-normal text-slate-400 truncate">
                           du khách/lượt
                         </span>
                       </div>
 
                       {/* Cột 3 — Trạng thái (rộng hơn cột 2 để badge không bị sát sức chứa) */}
-                      <div className="col-span-6 md:col-span-3 flex items-center">
+                      <div className="col-span-6 md:col-span-1 flex items-center">
                         <StatusBadge status={item.status} />
                       </div>
 
@@ -865,7 +876,7 @@ export default function ModeratorDestinationsPage() {
                           cụm nút [Sửa] / [Chi tiết] của trang Admin Người dùng.
                           Căn lề TRÁI (justify-start) để cụm nút thẳng với
                           tiêu đề cột "Thao tác", thay vì dồn sát mép phải. */}
-                      <div className="col-span-12 md:col-span-3 flex items-center justify-start gap-2 shrink-0">
+                      <div className="col-span-12 md:col-span-1 flex items-center justify-start md:justify-end gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={() => openDetail(item.id)}
@@ -978,5 +989,14 @@ export default function ModeratorDestinationsPage() {
         onUpdated={loadAll}
       />
     </div>
+  );
+}
+
+/** useSearchParams cần nằm trong Suspense để Next.js dựng trang tĩnh. */
+export default function ModeratorDestinationsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ModeratorDestinationsContent />
+    </Suspense>
   );
 }
