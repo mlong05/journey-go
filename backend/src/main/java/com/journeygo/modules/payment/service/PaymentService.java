@@ -7,6 +7,9 @@ import com.journeygo.modules.booking.entity.Booking;
 import com.journeygo.modules.booking.entity.enums.BookingStatus;
 import com.journeygo.modules.booking.repository.BookingRepository;
 import com.journeygo.modules.booking.service.BookingService;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
+import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.partnerrevenue.service.PartnerRevenueService;
 import com.journeygo.modules.payment.config.VnPayProperties;
 import com.journeygo.modules.payment.dto.response.PaymentInitResponse;
@@ -77,6 +80,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
+    private final NotificationPublisher notifications;
     private final VnPayClient vnPayClient;
     private final VnPayProperties vnPayProperties;
     private final PartnerRevenueService partnerRevenueService;
@@ -512,6 +516,7 @@ public class PaymentService {
 
         // Ghi nhận doanh thu Partner — CHỈ ghi nhận một lần cho giao dịch này.
         recordPartnerRevenue(booking, payment);
+        notifyBookingConfirmed(booking, payment);
 
         log.info("[Payment] Đã xác nhận booking {} sau khi xác minh thanh toán (txnRef={}, paidAt={}).",
                 booking.getId(), payment.getTxnRef(), paidAt);
@@ -553,6 +558,7 @@ public class PaymentService {
             booking.confirm(paidAt);
             bookingRepository.save(booking);
             recordPartnerRevenue(booking, payment);
+            notifyBookingConfirmed(booking, payment);
             payment.setNote("Thanh toán đến muộn nhưng vẫn còn chỗ — đã xác nhận lại Booking.");
             paymentRepository.save(payment);
             log.info("[Payment] Thanh toán đến muộn nhưng còn sức chứa — xác nhận lại booking {}.",
@@ -566,7 +572,45 @@ public class PaymentService {
         paymentRepository.save(payment);
         log.warn("[Payment] Thanh toán đến muộn và không còn sức chứa — booking {} chuyển sang quy trình hoàn tiền.",
                 booking.getId());
+        notifications.send(NotificationType.PAYMENT_SUCCESS)
+                .to(booking.getTourist() == null ? null : booking.getTourist().getId())
+                .title("Đã nhận tiền nhưng tour đã hết chỗ")
+                .body("Đơn " + booking.getBookingCode() + ": khoản " + NotificationPublisher.money(payment.getAmount())
+                        + " đến sau hạn giữ chỗ và tour không còn chỗ trống. JourneyGo sẽ liên hệ để hoàn tiền cho bạn.")
+                .ref("BOOKING", booking.getId())
+                .queue(NotificationPublisher.Queue.BOOKINGS)
+                .publish();
         return PaymentOutcome.SUCCESS;
+    }
+
+    /** Booking vừa được xác nhận sau thanh toán: báo du khách, đối tác sở hữu tour và làm mới bảng của Admin. */
+    private void notifyBookingConfirmed(Booking booking, Payment payment) {
+        String tourTitle = booking.getTour() != null ? booking.getTour().getTitle() : "tour";
+        String date = booking.getExperienceDate() == null ? ""
+                : " ngày " + booking.getExperienceDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+        notifications.send(NotificationType.PAYMENT_SUCCESS)
+                .to(booking.getTourist() == null ? null : booking.getTourist().getId())
+                .title("Thanh toán thành công")
+                .body("Đơn " + booking.getBookingCode() + " — " + NotificationPublisher.quote(tourTitle) + date
+                        + " đã được xác nhận. Chúc bạn một hành trình thật đáng nhớ!")
+                .ref("BOOKING", booking.getId())
+                .queue(NotificationPublisher.Queue.BOOKINGS)
+                .publish();
+
+        var owner = booking.getTour() != null ? booking.getTour().getCreatedBy() : null;
+        String touristName = booking.getTourist() != null ? booking.getTourist().getFullName() : "Du khách";
+        notifications.send(NotificationType.BOOKING_RECEIVED)
+                .to(NotificationPublisher.idOf(owner))
+                .title("Có đơn đặt tour mới")
+                .body(touristName + " vừa đặt " + NotificationPublisher.quote(tourTitle) + date + " — "
+                        + NotificationPublisher.money(payment.getAmount()) + ".")
+                .link(NotificationPublisher.dashboardPath(owner, owner != null && owner.getRole() != null
+                        && owner.getRole().isAdmin() ? "/bookings" : ""))
+                .ref("BOOKING", booking.getId())
+                .queue(NotificationPublisher.Queue.BOOKINGS)
+                .publish();
+        notifications.queueChanged(Role.ADMIN, NotificationPublisher.Queue.BOOKINGS);
     }
 
     /**

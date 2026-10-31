@@ -162,7 +162,7 @@ class TourRewardStrip extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: onDark ? Colors.white : const Color(0xFF78350F),
                   ),
                 ),

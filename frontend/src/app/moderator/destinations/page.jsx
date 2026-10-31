@@ -30,6 +30,7 @@ import {
   DestinationAssessmentModal,
   RejectDestinationDialog,
 } from "@/features/destination";
+import { useQueueRefresh } from "@/context/NotificationContext";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { KpiTile } from "@/components/dashboard/DashboardUI";
 
@@ -388,9 +389,11 @@ function ModeratorDestinationsContent() {
     setTimeout(() => setToastMsg(""), 3500);
   }, []);
 
-  const loadAll = useCallback(async () => {
-    setIsLoading(true);
-    setFetchError("");
+  const loadAll = useCallback(async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+      setFetchError("");
+    }
     try {
       // Tải đồng thời hàng chờ PENDING, các điểm đến APPROVED và REJECTED từ Moderation API
       const [pendingRes, approvedRes, rejectedRes] = await Promise.allSettled([
@@ -432,15 +435,19 @@ function ModeratorDestinationsContent() {
       }
     } catch (err) {
       console.error("[Moderator Destinations] Fetch error:", err);
+      if (silent) return; // tải ngầm lỗi thì giữ danh sách đang xem
       setFetchError(
         err?.message ||
           "Không thể tải danh sách điểm đến. Vui lòng kiểm tra kết nối."
       );
       setDestinations([]);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, []);
+
+  // Thời gian thực: đối tác gửi hồ sơ mới / moderator khác vừa duyệt → tải ngầm lại danh sách
+  useQueueRefresh(["destination-review", "content-review", "experience-review"], () => loadAll(true));
 
 
   useEffect(() => {
@@ -645,7 +652,7 @@ function ModeratorDestinationsContent() {
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
             type="button"
-            onClick={loadAll}
+            onClick={() => loadAll()}
             disabled={isLoading}
             className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
@@ -782,7 +789,7 @@ function ModeratorDestinationsContent() {
               <p className="text-[11px] text-rose-700 mt-0.5">{fetchError}</p>
               <button
                 type="button"
-                onClick={loadAll}
+                onClick={() => loadAll()}
                 className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900 cursor-pointer"
               >
                 Thử lại
@@ -986,7 +993,7 @@ function ModeratorDestinationsContent() {
       <RegionManagerModal
         isOpen={isRegionManagerOpen}
         onClose={() => setIsRegionManagerOpen(false)}
-        onUpdated={loadAll}
+        onUpdated={() => loadAll()}
       />
     </div>
   );

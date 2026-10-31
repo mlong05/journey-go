@@ -10,6 +10,7 @@ import {
   formatDateTime,
   formatMoney,
 } from "@/features/booking";
+import { useQueueRefresh } from "@/context/NotificationContext";
 
 /** Admin: toàn bộ booking, lọc theo trạng thái (GET /bookings?status=). */
 export default function AdminBookingsPage() {
@@ -18,6 +19,9 @@ export default function AdminBookingsPage() {
   const [data, setData] = useState({ items: [], totalPages: 1, totalElements: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Có booking vừa thanh toán xong: tải lại danh sách
+  const [reloadKey, setReloadKey] = useState(0);
+  useQueueRefresh(["bookings", "refund-review"], () => setReloadKey((k) => k + 1));
 
   useEffect(() => {
     let active = true;
@@ -33,7 +37,7 @@ export default function AdminBookingsPage() {
     return () => {
       active = false;
     };
-  }, [status, page]);
+  }, [status, page, reloadKey]);
 
   return (
     <div className="space-y-4">

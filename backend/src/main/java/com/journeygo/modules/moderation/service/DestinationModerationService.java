@@ -21,6 +21,8 @@ import com.journeygo.modules.moderation.entity.DestinationReview;
 import com.journeygo.modules.moderation.entity.DestinationReviewHistory;
 import com.journeygo.modules.moderation.repository.DestinationReviewHistoryRepository;
 import com.journeygo.modules.moderation.repository.DestinationReviewRepository;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
@@ -42,6 +44,7 @@ public class DestinationModerationService {
     private final UserRepository userRepository;
     private final ExperienceRepository experienceRepository;
     private final TaskRepository taskRepository;
+    private final NotificationPublisher notifications;
 
     @Transactional
     public DestinationReviewResponse submit(Long id, Long callerId, Role callerRole) {
@@ -76,6 +79,18 @@ public class DestinationModerationService {
         DestinationReview saved = reviewRepository.save(review);
         addHistory(saved, DestinationReviewAction.SUBMITTED, callerId, null, null, null);
         destinationRepository.save(destination);
+
+        String sender = destination.getCreatedBy() == null ? "đối tác" : destination.getCreatedBy().getFullName();
+        notifications.send(NotificationType.DESTINATION_PENDING)
+                .toRole(Role.MODERATOR)
+                .title(edited ? "Điểm đến được gửi lại sau chỉnh sửa" : "Điểm đến mới chờ thẩm định")
+                .body(NotificationPublisher.quote(destination.getName()) + " do " + sender + " gửi, đang chờ bạn thẩm định.")
+                .link("/moderator/destinations/" + id)
+                .ref("DESTINATION", id)
+                .queue(NotificationPublisher.Queue.DESTINATION_REVIEW)
+                .publish();
+        // Gói trải nghiệm đi kèm cũng vừa vào hàng chờ duyệt riêng
+        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.EXPERIENCE_REVIEW);
         return toResponse(saved);
     }
 
@@ -112,6 +127,18 @@ public class DestinationModerationService {
         destinationRepository.save(destination);
         addHistory(review, DestinationReviewAction.APPROVED, reviewerId, note, null, null);
         log.info("Approved destination id={}", id);
+
+        notifications.send(NotificationType.DESTINATION_APPROVED)
+                .to(NotificationPublisher.idOf(destination.getCreatedBy()))
+                .except(reviewerId)
+                .title("Điểm đến đã được phê duyệt")
+                .body(NotificationPublisher.withNote(NotificationPublisher.quote(destination.getName())
+                        + " đã được phát hành, du khách có thể khám phá ngay.", note))
+                .link(NotificationPublisher.dashboardPath(destination.getCreatedBy(), "/destinations"))
+                .ref("DESTINATION", id)
+                .queue(NotificationPublisher.Queue.MY_CONTENT)
+                .publish();
+        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.DESTINATION_REVIEW);
         return toResponse(review);
     }
 
@@ -142,6 +169,19 @@ public class DestinationModerationService {
         destinationRepository.save(destination);
         addHistory(review, DestinationReviewAction.REJECTED, reviewerId, review.getDecisionNote(), review.getReason(), review.getOtherReason());
         log.info(revoking ? "Revoked approval of destination id={}" : "Rejected destination id={}", id);
+
+        notifications.send(NotificationType.DESTINATION_REJECTED)
+                .to(NotificationPublisher.idOf(destination.getCreatedBy()))
+                .except(reviewerId)
+                .title(revoking ? "Điểm đến tạm gỡ khỏi ứng dụng" : "Điểm đến cần chỉnh sửa")
+                .body(NotificationPublisher.withNote(NotificationPublisher.quote(destination.getName())
+                        + (revoking ? " đã bị thu hồi phê duyệt." : " chưa được duyệt.")
+                        + " Vui lòng xem lý do, chỉnh sửa và gửi lại.", review.getDecisionNote()))
+                .link(NotificationPublisher.dashboardPath(destination.getCreatedBy(), "/destinations"))
+                .ref("DESTINATION", id)
+                .queue(NotificationPublisher.Queue.MY_CONTENT)
+                .publish();
+        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.DESTINATION_REVIEW);
         return toResponse(review);
     }
 

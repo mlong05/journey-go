@@ -101,7 +101,7 @@ class _PointsBurstState extends State<_PointsBurst>
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 22,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                                 decoration: TextDecoration.none,
                               ),
                             ),
@@ -257,12 +257,12 @@ class _BadgeUnlockViewState extends State<_BadgeUnlockView>
                 Opacity(
                   opacity: textIn,
                   child: const Text(
-                    'MỞ KHÓA HUY HIỆU MỚI',
+                    'Mở khóa huy hiệu mới',
                     style: TextStyle(
                       color: Color(0xFFFCD34D),
                       fontSize: 13,
-                      letterSpacing: 2.4,
-                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.2,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -311,7 +311,7 @@ class _BadgeUnlockViewState extends State<_BadgeUnlockView>
                               color: Colors.white,
                               fontSize: 24,
                               height: 1.25,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -352,7 +352,7 @@ class _BadgeUnlockViewState extends State<_BadgeUnlockView>
                         widget.buttonLabel,
                         style: const TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),

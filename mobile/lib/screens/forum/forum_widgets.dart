@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/forum_model.dart';
+import '../common/heritage_motion.dart';
 
 /// Màu trái tim khi đã thả tim.
 const Color _heartColor = Color(0xFFE11D48);
@@ -31,7 +32,7 @@ class ForumAvatar extends StatelessWidget {
         style: TextStyle(
           color: Colors.white,
           fontSize: size * 0.42,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -62,12 +63,23 @@ class ForumStatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: status.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
+        color: status.color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
-        status.label,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: status.color),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: status.color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            status.label,
+            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: status.color),
+          ),
+        ],
       ),
     );
   }
@@ -85,7 +97,7 @@ Future<({String reason, String? description})?> askReportReason(BuildContext con
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
           title: const Text(
             'Báo cáo bài viết',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -151,7 +163,7 @@ Future<bool> confirmAction(
     context: context,
     builder: (ctx) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+      title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       content: Text(message, style: const TextStyle(fontSize: 13.5, height: 1.45)),
       actions: [
         TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Hủy')),
@@ -175,7 +187,8 @@ void showForumSnack(BuildContext context, String message) {
 }
 
 /// Thẻ bài viết dùng ở bảng tin và "Bài của tôi".
-class ForumPostCard extends StatelessWidget {
+/// Bài dài được rút gọn, bấm "Xem thêm" để mở hết ngay trên thẻ.
+class ForumPostCard extends StatefulWidget {
   final ForumPost post;
   final VoidCallback onTap;
   final VoidCallback? onLike;
@@ -190,29 +203,74 @@ class ForumPostCard extends StatelessWidget {
   });
 
   @override
+  State<ForumPostCard> createState() => _ForumPostCardState();
+}
+
+class _ForumPostCardState extends State<ForumPostCard> {
+  static const int _titleLines = 2;
+  static const int _contentLines = 4;
+
+  static const _titleStyle = TextStyle(
+    fontSize: 16,
+    height: 1.35,
+    fontWeight: FontWeight.w700,
+    color: AppCultureColors.textDark,
+  );
+  static const _contentStyle = TextStyle(
+    fontSize: 14,
+    height: 1.55,
+    color: Color(0xFF334155),
+  );
+
+  bool _expanded = false;
+
+  /// Đoạn chữ có dài hơn [maxLines] dòng ở bề rộng [width] không.
+  bool _exceeds(BuildContext context, String text, TextStyle style, int maxLines, double width) {
+    if (text.isEmpty) return false;
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      maxLines: maxLines,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: width);
+    return painter.didExceedMaxLines;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final post = widget.post;
+    final status = ForumStatus.of(post.status, hidden: post.hidden);
     final feedback = (post.status == 'REJECTED' || post.status == 'NEEDS_REVISION') &&
         post.moderationNote != null &&
         post.moderationNote!.isNotEmpty;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppCultureColors.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
+    return Pressable(
+      onTap: widget.onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppCultureColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Vạch màu trạng thái ở "Bài của tôi"
+            if (widget.showStatus) Container(height: 3, color: status.color.withValues(alpha: 0.7)),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 14, 14, 0),
               child: Row(
                 children: [
-                  ForumAvatar(name: post.authorName, url: post.authorAvatarUrl),
+                  _AvatarRing(child: ForumAvatar(name: post.authorName, url: post.authorAvatarUrl, size: 40)),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -223,93 +281,143 @@ class ForumPostCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
                             color: AppCultureColors.textDark,
                           ),
                         ),
-                        const SizedBox(height: 1),
-                        Text(
-                          [timeAgo(post.createdAt), if (post.placeLine != null) post.placeLine!]
-                              .where((e) => e.isNotEmpty)
-                              .join(' • '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Icon(Icons.schedule_rounded, size: 12, color: AppCultureColors.textLight),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                timeAgo(post.createdAt),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  if (showStatus) ForumStatusChip(post: post),
+                  if (widget.showStatus) ForumStatusChip(post: post),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    post.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      height: 1.3,
-                      fontWeight: FontWeight.w800,
-                      color: AppCultureColors.textDark,
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  final long = _exceeds(context, post.title, _titleStyle, _titleLines, box.maxWidth) ||
+                      _exceeds(context, post.content, _contentStyle, _contentLines, box.maxWidth);
+                  final open = _expanded || !long;
+                  return AnimatedSize(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (post.title.isNotEmpty)
+                          Text(
+                            post.title,
+                            maxLines: open ? null : _titleLines,
+                            overflow: open ? null : TextOverflow.ellipsis,
+                            style: _titleStyle,
+                          ),
+                        if (post.content.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            post.content,
+                            maxLines: open ? null : _contentLines,
+                            overflow: open ? null : TextOverflow.ellipsis,
+                            style: _contentStyle,
+                          ),
+                        ],
+                        if (long)
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => setState(() => _expanded = !_expanded),
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 6, bottom: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _expanded ? 'Thu gọn' : 'Xem thêm',
+                                    style: const TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppCultureColors.heritageJade,
+                                    ),
+                                  ),
+                                  AnimatedRotation(
+                                    turns: _expanded ? 0.5 : 0,
+                                    duration: const Duration(milliseconds: 260),
+                                    child: const Icon(Icons.keyboard_arrow_down_rounded,
+                                        size: 18, color: AppCultureColors.heritageJade),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    post.content,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      height: 1.5,
-                      color: AppCultureColors.textDark,
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
+            if (post.destinationName?.isNotEmpty == true || post.tourTitle?.isNotEmpty == true)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    if (post.destinationName?.isNotEmpty == true)
+                      _PlaceChip(
+                        icon: Icons.place_rounded,
+                        text: post.destinationName!,
+                        color: AppCultureColors.jadeDark,
+                        background: AppCultureColors.jadeLight,
+                      ),
+                    if (post.tourTitle?.isNotEmpty == true)
+                      _PlaceChip(
+                        icon: Icons.route_rounded,
+                        text: post.tourTitle!,
+                        color: AppCultureColors.oceanDark,
+                        background: AppCultureColors.oceanLight,
+                      ),
+                  ],
+                ),
+              ),
             if (feedback)
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: ForumStatus.of(post.status).color.withValues(alpha: 0.08),
+                  color: status.color.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
+                  border: Border(left: BorderSide(color: status.color, width: 3)),
                 ),
                 child: Text(
                   'Phản hồi từ kiểm duyệt viên: ${post.moderationNote}',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.4,
-                    color: ForumStatus.of(post.status).color,
-                  ),
+                  style: TextStyle(fontSize: 12.5, height: 1.45, color: status.color),
                 ),
               ),
             if (post.imageUrls.isNotEmpty) _ForumImages(urls: post.imageUrls),
-            const SizedBox(height: 4),
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
               child: Row(
                 children: [
+                  _HeartButton(liked: post.isLiked, count: post.likesCount, onTap: widget.onLike),
                   _ActionButton(
-                    onTap: onLike,
-                    leading: Icon(
-                      post.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      size: 21,
-                      color: post.isLiked ? _heartColor : AppCultureColors.textMuted,
-                    ),
-                    label: '${post.likesCount}',
-                    color: post.isLiked ? _heartColor : AppCultureColors.textMuted,
-                  ),
-                  _ActionButton(
-                    onTap: onTap,
+                    onTap: widget.onTap,
                     leading: const Icon(Icons.chat_bubble_outline_rounded,
                         size: 19, color: AppCultureColors.textMuted),
                     label: '${post.commentsCount}',
@@ -321,6 +429,128 @@ class ForumPostCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Viền gradient ngọc quanh ảnh đại diện.
+class _AvatarRing extends StatelessWidget {
+  final Widget child;
+
+  const _AvatarRing({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [AppCultureColors.jadeGradientStart, AppCultureColors.gold],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(1.5),
+        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Nhãn điểm đến / tour gắn với bài; tên dài thì cắt "…".
+class _PlaceChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+  final Color background;
+
+  const _PlaceChip({
+    required this.icon,
+    required this.text,
+    required this.color,
+    required this.background,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 240),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(20)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: color),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Nút tim nảy lên khi thả tim, số đếm trượt khi đổi.
+class _HeartButton extends StatefulWidget {
+  final bool liked;
+  final int count;
+  final VoidCallback? onTap;
+
+  const _HeartButton({required this.liked, required this.count, required this.onTap});
+
+  @override
+  State<_HeartButton> createState() => _HeartButtonState();
+}
+
+class _HeartButtonState extends State<_HeartButton> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  );
+  late final Animation<double> _scale = TweenSequence([
+    TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.4), weight: 40),
+    TweenSequenceItem(tween: Tween(begin: 1.4, end: 0.9), weight: 30),
+    TweenSequenceItem(tween: Tween(begin: 0.9, end: 1.0), weight: 30),
+  ]).animate(CurvedAnimation(parent: _c, curve: Curves.easeOut));
+
+  @override
+  void didUpdateWidget(_HeartButton old) {
+    super.didUpdateWidget(old);
+    if (widget.liked && !old.liked && !reduceMotion(context)) _c.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.liked ? _heartColor : AppCultureColors.textMuted;
+    return _ActionButton(
+      onTap: widget.onTap,
+      leading: ScaleTransition(
+        scale: _scale,
+        child: Icon(
+          widget.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          size: 21,
+          color: color,
+        ),
+      ),
+      label: '${widget.count}',
+      color: color,
     );
   }
 }
@@ -344,14 +574,25 @@ class _ActionButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
             leading,
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SlideTransition(
+                  position: Tween(begin: const Offset(0, 0.4), end: Offset.zero).animate(anim),
+                  child: child,
+                ),
+              ),
+              child: Text(
+                label,
+                key: ValueKey(label),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
+              ),
             ),
           ],
         ),
@@ -387,43 +628,49 @@ class _ForumImages extends StatelessWidget {
   Widget build(BuildContext context) {
     if (urls.length == 1) {
       return Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: _image(urls.first, height: 210),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: _image(urls.first, height: 210),
+        ),
       );
     }
     final shown = urls.take(3).toList();
     final extra = urls.length - shown.length;
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: SizedBox(
-        height: 150,
-        child: Row(
-          children: [
-            for (var i = 0; i < shown.length; i++) ...[
-              if (i > 0) const SizedBox(width: 2),
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _image(shown[i], height: 150),
-                    if (i == shown.length - 1 && extra > 0)
-                      Container(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '+$extra',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          height: 150,
+          child: Row(
+            children: [
+              for (var i = 0; i < shown.length; i++) ...[
+                if (i > 0) const SizedBox(width: 2),
+                Expanded(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _image(shown[i], height: 150),
+                      if (i == shown.length - 1 && extra > 0)
+                        Container(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '+$extra',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -463,7 +710,7 @@ Future<ForumOption?> showForumOptionPicker(
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
                 TextButton(

@@ -49,6 +49,24 @@ class LocationService {
     }
   }
 
+  /// Vị trí hiện tại nếu đã được cấp quyền từ trước; không bật hộp thoại xin quyền.
+  /// Trả về null khi GPS tắt, chưa có quyền hoặc không lấy được vị trí.
+  static Future<Position?> positionIfPermitted() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
+        return null;
+      }
+      return await Geolocator.getLastKnownPosition() ??
+          await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+          ).timeout(const Duration(seconds: 8));
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Theo dõi vị trí liên tục (gọi sau khi đã xin quyền qua [currentPosition]).
   /// Phát khi di chuyển từ 2 m trở lên, đủ mượt để dẫn đường đi bộ mà không tốn pin.
   static Stream<Position> positionStream() => Geolocator.getPositionStream(

@@ -160,7 +160,7 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
                     child: Text(widget.title,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                            color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                            color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
                   ),
                   IconButton(
                     onPressed: _toggleTorch,
@@ -227,7 +227,7 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
             children: [
               const Expanded(
                 child: Text('Nhập mã in dưới QR',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
@@ -264,7 +264,7 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
-            child: const Text('Xác nhận mã', style: TextStyle(fontWeight: FontWeight.w800)),
+            child: const Text('Xác nhận mã', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),

@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/forum_model.dart';
+import '../../core/models/notification_model.dart';
+import '../../core/services/notification_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/forum_service.dart';
@@ -38,14 +41,23 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   bool get _isMine => _myUserId != null && _myUserId == _post.authorId;
   bool get _canInteract => _post.isPublished;
 
+  StreamSubscription<AppNotification>? _notificationSub;
+
   @override
   void initState() {
     super.initState();
     _init();
+    // Thời gian thực: có bình luận mới / bài đổi trạng thái → tải ngầm lại bài và bình luận
+    _notificationSub = NotificationCenter.instance.incoming.listen((n) {
+      if (!mounted || n.refType != 'POST' || n.refId != _post.id) return;
+      _refreshPost();
+      if (n.type == 'POST_COMMENTED') _loadComments(silent: true);
+    });
   }
 
   @override
   void dispose() {
+    _notificationSub?.cancel();
     _commentController.dispose();
     _commentFocus.dispose();
     super.dispose();
@@ -67,11 +79,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  Future<void> _loadComments() async {
-    setState(() {
-      _loadingComments = true;
-      _commentsError = null;
-    });
+  Future<void> _loadComments({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loadingComments = true;
+        _commentsError = null;
+      });
+    }
     try {
       final result = await _service.getComments(_post.id, page: 0);
       if (!mounted) return;
@@ -84,7 +98,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         _loadingComments = false;
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
+      if (!mounted || silent) return; // tải ngầm lỗi thì giữ bình luận đang xem
       setState(() {
         _commentsError = e.message;
         _loadingComments = false;
@@ -295,7 +309,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   children: [
                     Text(
                       _post.authorName,
-                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
                     ),
                     Text(
                       [timeAgo(_post.createdAt), if (_post.placeLine != null) _post.placeLine!]
@@ -315,7 +329,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             style: const TextStyle(
               fontSize: 19,
               height: 1.3,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: AppCultureColors.textDark,
             ),
           ),
@@ -399,7 +413,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   ),
                   label: Text(
                     '${_post.likesCount}',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   style: TextButton.styleFrom(
                     foregroundColor:
@@ -412,7 +426,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   icon: const Icon(Icons.chat_bubble_outline_rounded, size: 19),
                   label: Text(
                     '${_post.commentsCount}',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   style: TextButton.styleFrom(
                     foregroundColor: AppCultureColors.textMuted,
@@ -439,11 +453,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'BÌNH LUẬN (${_post.commentsCount})',
+          'Bình luận (${_post.commentsCount})',
           style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
             color: AppCultureColors.textDark,
           ),
         ),
@@ -509,7 +523,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       Expanded(
                         child: Text(
                           c.authorName,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                         ),
                       ),
                       Text(

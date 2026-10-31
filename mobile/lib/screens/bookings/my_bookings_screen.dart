@@ -87,7 +87,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           elevation: 0,
           centerTitle: true,
           title: const Text('Đơn đặt tour',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppCultureColors.textDark)),
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
           iconTheme: const IconThemeData(color: AppCultureColors.textDark),
           bottom: TabBar(
             labelColor: AppCultureColors.jadeDark,
@@ -179,7 +179,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 ],
               ),
               const SizedBox(height: 4),
-              Text(b.tourTitle, style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(b.tourTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
               Text('Ngày ${formatDay(b.experienceDate)} · ${formatMoney(b.totalAmount)}',
                   style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
@@ -187,7 +187,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               FilledButton.icon(
                 onPressed: () => _startExperience(b),
                 icon: const Icon(Icons.explore_rounded, size: 18),
-                label: const Text('Vào trải nghiệm', style: TextStyle(fontWeight: FontWeight.w800)),
+                label: const Text('Vào trải nghiệm', style: TextStyle(fontWeight: FontWeight.w700)),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppCultureColors.heritageJade,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -202,7 +202,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(b.tourTitle, style: const TextStyle(fontWeight: FontWeight.w800)),
+            Text(b.tourTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
             Text('${formatDay(b.experienceDate)} · ${formatMoney(b.totalAmount)}',
                 style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
@@ -226,7 +226,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(formatMoney(p.amount), style: const TextStyle(fontWeight: FontWeight.w800)),
+                  Text(formatMoney(p.amount), style: const TextStyle(fontWeight: FontWeight.w700)),
                   Text('Đơn ${p.bookingCode} · ${formatDateTime(p.createdAt)}',
                       style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
                   if (p.duplicatePayment)

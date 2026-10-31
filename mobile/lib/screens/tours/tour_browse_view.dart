@@ -5,12 +5,17 @@ import '../../core/services/api_client.dart';
 import '../../core/services/tour_service.dart';
 import '../rewards/rewards_widgets.dart'
     show RewardsMessageView, RewardsSkeletonList;
+import '../../core/models/booking_model.dart' show BookingStatus;
+import '../../core/services/progress_service.dart';
 import 'tour_detail_screen.dart';
 import 'tour_style.dart';
 
 /// Danh sách tour đã xuất bản: tìm kiếm, lọc theo loại hình, mở chi tiết tour.
 class TourBrowseView extends StatefulWidget {
-  const TourBrowseView({super.key});
+  /// Đổi giá trị để tải lại danh sách (khi du khách quay lại tab).
+  final int refreshToken;
+
+  const TourBrowseView({super.key, this.refreshToken = 0});
 
   @override
   State<TourBrowseView> createState() => _TourBrowseViewState();
@@ -21,6 +26,9 @@ class _TourBrowseViewState extends State<TourBrowseView> {
   final TextEditingController _search = TextEditingController();
 
   List<TourModel> _tours = [];
+
+  /// Tour du khách đang có vé chưa dùng (vé nằm ở trang "Tour của tôi").
+  Set<int> _owned = const {};
   bool _loading = true;
   String? _error;
   String _query = '';
@@ -33,21 +41,32 @@ class _TourBrowseViewState extends State<TourBrowseView> {
   }
 
   @override
+  void didUpdateWidget(covariant TourBrowseView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) _load(silent: true);
+  }
+
+  @override
   void dispose() {
     _search.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
+      final owned = _loadOwned();
       final tours = await _service.getPublishedTours();
+      final ownedIds = await owned;
       if (!mounted) return;
       setState(() {
         _tours = tours;
+        _owned = ownedIds;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -57,6 +76,22 @@ class _TourBrowseViewState extends State<TourBrowseView> {
         _loading = false;
       });
     }
+  }
+
+  /// Mã các tour đang có vé chưa dùng; lỗi (chưa đăng nhập, mất mạng) thì coi như chưa có vé.
+  static Future<Set<int>> _loadOwned() async {
+    try {
+      final tickets = await ProgressService().getTickets();
+      return {for (final b in tickets) if (b.status != BookingStatus.completed) b.tourId};
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<void> _openTour(TourModel tour) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TourDetailScreen(tour: tour)));
+    final owned = await _loadOwned();
+    if (mounted) setState(() => _owned = owned);
   }
 
   List<String> get _types {
@@ -231,6 +266,7 @@ class _TourBrowseViewState extends State<TourBrowseView> {
 
   Widget _buildTourCard(TourModel tour) {
     final style = TourStyle.of(tour.tourType);
+    final owned = _owned.contains(tour.id);
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -240,9 +276,7 @@ class _TourBrowseViewState extends State<TourBrowseView> {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => TourDetailScreen(tour: tour))),
+        onTap: () => _openTour(tour),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -285,6 +319,11 @@ class _TourBrowseViewState extends State<TourBrowseView> {
                       dark: true,
                     ),
                   ),
+                  if (owned)
+                    const Align(
+                      alignment: Alignment.bottomRight,
+                      child: _OwnedChip(),
+                    ),
                 ],
               ),
             ),
@@ -300,7 +339,7 @@ class _TourBrowseViewState extends State<TourBrowseView> {
                     style: const TextStyle(
                       fontSize: 17,
                       height: 1.25,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: AppCultureColors.textDark,
                     ),
                   ),
@@ -348,23 +387,20 @@ class _TourBrowseViewState extends State<TourBrowseView> {
                           tour.formattedPrice,
                           style: const TextStyle(
                             fontSize: 19,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             color: AppCultureColors.jadeDark,
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 10),
                   FilledButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => TourDetailScreen(tour: tour),
-                      ),
-                    ),
+                    onPressed: () => _openTour(tour),
                     icon: const Icon(Icons.arrow_forward_rounded, size: 18),
                     label: const Text(
                       'Xem tour',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppCultureColors.heritageJade,
@@ -380,6 +416,33 @@ class _TourBrowseViewState extends State<TourBrowseView> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Nhãn vàng trên ảnh bìa: du khách đã có vé tour này (xem ở "Tour của tôi").
+class _OwnedChip extends StatelessWidget {
+  const _OwnedChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDE68A),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.confirmation_number_rounded, size: 13, color: AppCultureColors.rewardText),
+          SizedBox(width: 5),
+          Text(
+            'Đã có vé',
+            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppCultureColors.rewardText),
+          ),
+        ],
       ),
     );
   }

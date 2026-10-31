@@ -61,6 +61,8 @@ class ApiClient {
     bool auth = true,
     Object? body,
     Duration timeout = const Duration(seconds: 15),
+    // 401 vốn hiểu là hết phiên; một số API dùng 401 cho sai mật khẩu nên giữ câu báo của máy chủ.
+    bool keepUnauthorizedMessage = false,
   }) async {
     final baseUrl = await TokenStorage.getBaseUrl();
     final uri = Uri.parse('$baseUrl$path');
@@ -92,6 +94,12 @@ class ApiClient {
         return decoded is Map ? decoded['data'] : decoded;
       }
 
+      if (response.statusCode == 401 && keepUnauthorizedMessage) {
+        final message = decoded is Map ? decoded['message']?.toString() : null;
+        if (message != null && message.isNotEmpty) {
+          throw ApiException(message, statusCode: 401);
+        }
+      }
       if (response.statusCode == 401) {
         throw const ApiException(
           'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',

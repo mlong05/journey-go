@@ -9,6 +9,8 @@ import com.journeygo.modules.gamification.entity.enums.BadgeType;
 import com.journeygo.modules.gamification.entity.enums.PointTransactionType;
 import com.journeygo.modules.gamification.entity.enums.UserVoucherStatus;
 import com.journeygo.modules.gamification.repository.*;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -35,6 +37,7 @@ public class GamificationService {
     private static final String PLACEHOLDER_ICON_HOST = "https://assets.journeygo.com/";
 
     private final BadgeRepository badgeRepository;
+    private final NotificationPublisher notifications;
     private final UserBadgeRepository userBadgeRepository;
     private final UserPointRepository userPointRepository;
     private final PointTransactionRepository pointTransactionRepository;
@@ -83,6 +86,15 @@ public class GamificationService {
 
         UserBadge saved = userBadgeRepository.save(userBadge);
         log.info("Cấp Badge {} thành công cho user {}", badge.getCode(), userId);
+
+        boolean hasBonus = badge.getBonusPoints() != null && badge.getBonusPoints() > 0;
+        notifications.send(NotificationType.BADGE_AWARDED)
+                .to(userId)
+                .title("Bạn nhận được huy hiệu mới!")
+                .body("Huy hiệu " + NotificationPublisher.quote(badge.getName()) + " đã vào bộ sưu tập di sản của bạn"
+                        + (hasBonus ? ", kèm " + badge.getBonusPoints() + " điểm thưởng." : "."))
+                .ref("BADGE", badge.getId())
+                .publish();
 
         if (badge.getBonusPoints() != null && badge.getBonusPoints() > 0) {
             awardPoints(

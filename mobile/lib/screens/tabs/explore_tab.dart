@@ -1,18 +1,37 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/area_service.dart';
+import '../common/heritage_motion.dart';
+import '../common/tab_refresh.dart';
+import '../tours/my_tours_view.dart';
 import '../tours/tour_browse_view.dart';
 
 class ExploreTab extends StatefulWidget {
-  const ExploreTab({super.key});
+  final ValueListenable<int>? selectedTab;
+
+  const ExploreTab({super.key, this.selectedTab});
 
   @override
   State<ExploreTab> createState() => _ExploreTabState();
 }
 
-class _ExploreTabState extends State<ExploreTab> {
+class _ExploreTabState extends State<ExploreTab> with RefreshOnTabReturn {
+
+  @override
+  ValueListenable<int>? get selectedTab => widget.selectedTab;
+
+  @override
+  int get tabIndex => 1;
+
+  @override
+  void onTabReturn() => setState(() => _refreshToken++);
+
+  /// Tăng mỗi lần quay lại tab để trang Khám phá / Tour của tôi tải lại dữ liệu.
+  int _refreshToken = 0;
   final TextEditingController _aiChatController = TextEditingController();
 
-  // Mode: 'direct' or 'ai'
+  // Trang đang mở: 'direct' (khám phá tour), 'mine' (tour đã mua) hoặc 'ai'
   String _activeMode = 'direct';
 
   // AI chat messages
@@ -34,6 +53,15 @@ class _ExploreTabState extends State<ExploreTab> {
   @override
   void initState() {
     super.initState();
+    _loadArea();
+  }
+
+  /// Tỉnh/thành du khách đang đứng (GPS + Goong); null thì ẩn nhãn vị trí.
+  String? _area;
+
+  Future<void> _loadArea() async {
+    final area = await AreaService.currentProvince();
+    if (mounted && area != null) setState(() => _area = area);
   }
 
   @override
@@ -91,7 +119,27 @@ class _ExploreTabState extends State<ExploreTab> {
 
             // Main Content Area
             Expanded(
-              child: _activeMode == 'direct' ? const TourBrowseView() : _buildAiModeView(),
+              child: AnimatedSwitcher(
+                duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 260),
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: Tween(begin: const Offset(0, 0.03), end: Offset.zero).animate(anim),
+                    child: child,
+                  ),
+                ),
+                child: KeyedSubtree(
+                  key: ValueKey(_activeMode),
+                  child: switch (_activeMode) {
+                    'mine' => MyToursView(
+                      refreshToken: _refreshToken,
+                      onExplore: () => setState(() => _activeMode = 'direct'),
+                    ),
+                    'ai' => _buildAiModeView(),
+                    _ => TourBrowseView(refreshToken: _refreshToken),
+                  },
+                ),
+              ),
             ),
           ],
         ),
@@ -103,162 +151,132 @@ class _ExploreTabState extends State<ExploreTab> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Row(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Lộ Trình Du Lịch Văn Hóa',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppCultureColors.textDark,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Khám phá di sản Việt Nam thông minh',
-                    style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppCultureColors.oceanLight,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppCultureColors.oceanBlue.withOpacity(0.2)),
-            ),
-            child: const Row(
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.location_on_rounded, size: 14, color: AppCultureColors.oceanBlue),
-                SizedBox(width: 4),
-                Text(
-                  'Hà Nội',
+                ShimmerText(
+                  'Lộ Trình Du Lịch Văn Hóa',
+                  shine: AppCultureColors.gold,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: AppCultureColors.oceanBlue,
+                    color: AppCultureColors.textDark,
                   ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Khám phá di sản Việt Nam thông minh',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
                 ),
               ],
             ),
           ),
+          // Tỉnh/thành theo GPS; chưa biết thì không hiện
+          if (_area != null)
+            Container(
+              constraints: const BoxConstraints(maxWidth: 140),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppCultureColors.oceanLight,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppCultureColors.oceanBlue.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.location_on_rounded, size: 14, color: AppCultureColors.oceanBlue),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      _area!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppCultureColors.oceanBlue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
   }
 
+  static const _modes = <({String id, String label, IconData icon, Color color})>[
+    (id: 'direct', label: 'Khám phá', icon: Icons.travel_explore_rounded, color: AppCultureColors.heritageJade),
+    (id: 'mine', label: 'Tour của tôi', icon: Icons.confirmation_number_rounded, color: AppCultureColors.amberDark),
+    (id: 'ai', label: 'AI gợi ý', icon: Icons.auto_awesome_rounded, color: Color(0xFFD946EF)),
+  ];
+
+  /// Ba trang của tab: viên chọn trắng trượt theo mục đang chọn.
   Widget _buildModeSelector() {
+    final index = _modes.indexWhere((m) => m.id == _activeMode);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(4),
+      height: 48,
       decoration: BoxDecoration(
         color: AppCultureColors.surfaceSubtle,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
+      // expand: hàng chữ cao bằng cả khung để chữ nằm giữa theo chiều dọc, khớp với viên chọn
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _activeMode = 'direct'),
+          AnimatedAlign(
+            alignment: Alignment(-1 + index * 1.0, 0),
+            duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+            child: FractionallySizedBox(
+              widthFactor: 1 / _modes.length,
+              heightFactor: 1,
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: _activeMode == 'direct' ? Colors.white : Colors.transparent,
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: _activeMode == 'direct'
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.search_rounded,
-                      size: 18,
-                      color: _activeMode == 'direct' ? AppCultureColors.oceanBlue : AppCultureColors.textMuted,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Tìm trực tiếp',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: _activeMode == 'direct' ? AppCultureColors.oceanBlue : AppCultureColors.textMuted,
-                      ),
-                    ),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 6, offset: const Offset(0, 2)),
                   ],
                 ),
               ),
             ),
           ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _activeMode = 'ai'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: _activeMode == 'ai' ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: _activeMode == 'ai'
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+          Row(
+            children: [
+              for (final m in _modes)
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() => _activeMode = m.id),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(m.icon, size: 17, color: _activeMode == m.id ? m.color : AppCultureColors.textMuted),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 200),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: _activeMode == m.id ? FontWeight.w700 : FontWeight.w500,
+                              color: _activeMode == m.id ? m.color : AppCultureColors.textMuted,
+                            ),
+                            child: Text(m.label, maxLines: 1, overflow: TextOverflow.ellipsis),
                           ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.auto_awesome_rounded,
-                      size: 18,
-                      color: _activeMode == 'ai' ? const Color(0xFFD946EF) : AppCultureColors.textMuted,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'AI Lập Tour',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: _activeMode == 'ai' ? const Color(0xFFD946EF) : AppCultureColors.textMuted,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFDF2F8),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'AI',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFFD946EF),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+            ],
           ),
         ],
       ),
@@ -289,7 +307,7 @@ class _ExploreTabState extends State<ExploreTab> {
                     border: isUser ? null : Border.all(color: AppCultureColors.border),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
+                        color: Colors.black.withValues(alpha: 0.03),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),

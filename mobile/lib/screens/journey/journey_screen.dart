@@ -8,10 +8,12 @@ import '../../core/services/api_client.dart';
 import '../../core/services/destination_service.dart';
 import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
+import '../../core/services/route_service.dart';
 import '../culture/cultural_stories.dart';
 import 'journey_map.dart';
 import 'journey_widgets.dart';
 import 'map_kit.dart';
+import 'navigation.dart';
 import 'qr_scan_screen.dart';
 import 'reward_effects.dart';
 import 'task_screen.dart';
@@ -27,13 +29,8 @@ class JourneyScreen extends StatefulWidget {
   /// Mở màn hình quét QR ngay cho điểm đến hiện tại (nếu chưa check-in).
   final bool autoQr;
 
-  const JourneyScreen({
-    super.key,
-    this.journeyId,
-    this.tourId,
-    this.bookingId,
-    this.autoQr = false,
-  }) : assert(journeyId != null || tourId != null);
+  const JourneyScreen({super.key, this.journeyId, this.tourId, this.bookingId, this.autoQr = false})
+    : assert(journeyId != null || tourId != null);
 
   @override
   State<JourneyScreen> createState() => _JourneyScreenState();
@@ -57,6 +54,20 @@ class _JourneyScreenState extends State<JourneyScreen> {
   bool _satellite = false;
   final GlobalKey<JourneyMapState> _mapKey = GlobalKey<JourneyMapState>();
   final DraggableScrollableController _sheet = DraggableScrollableController();
+
+  // Chỉ đường tới điểm đến: _navDestination != null là đang xem trước hoặc đang dẫn đường.
+  JourneyDestination? _navDestination;
+  RouteModel? _route;
+  RouteTracker? _tracker;
+  RouteProgress? _progress;
+  RouteVehicle _vehicle = RouteVehicle.bike;
+  bool _routeLoading = false;
+  String? _routeError;
+  bool _navActive = false;
+  bool _following = true;
+  bool _rerouting = false;
+  int _offRouteHits = 0;
+  DateTime _lastRouteAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
@@ -92,9 +103,11 @@ class _JourneyScreenState extends State<JourneyScreen> {
           _checkInQr(pending.first);
         } else {
           // Không còn điểm nào cần check-in: báo thay vì mở màn quét QR
-          _showAlreadyCheckedIn(journey.isCompleted
-              ? 'Hành trình này đã kết thúc. Bạn có thể xem lại câu chuyện văn hóa đã mở khóa.'
-              : 'Bạn đã check-in điểm đến hiện tại rồi. Hãy hoàn thành nhiệm vụ để mở điểm đến kế tiếp.');
+          _showAlreadyCheckedIn(
+            journey.isCompleted
+                ? 'Hành trình này đã kết thúc. Bạn có thể xem lại câu chuyện văn hóa đã mở khóa.'
+                : 'Bạn đã check-in điểm đến hiện tại rồi. Hãy hoàn thành nhiệm vụ để mở điểm đến kế tiếp.',
+          );
         }
       }
     } on ApiException catch (e) {
@@ -136,20 +149,13 @@ class _JourneyScreenState extends State<JourneyScreen> {
     final value = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => QrScanScreen(
-          title: 'Check-in bằng QR',
-          hint: 'Quét mã QR tại ${dest.name}',
-        ),
+        builder: (_) => QrScanScreen(title: 'Check-in bằng QR', hint: 'Quét mã QR tại ${dest.name}'),
       ),
     );
     if (value == null || !mounted) return;
     setState(() => _busyDestinationId = dest.destinationId);
     try {
-      final result = await _service.checkInQr(
-        journeyId: journey.id,
-        destinationId: dest.destinationId,
-        qrValue: value,
-      );
+      final result = await _service.checkInQr(journeyId: journey.id, destinationId: dest.destinationId, qrValue: value);
       await _afterCheckIn(result, dest);
     } on ApiException catch (e) {
       if (mounted) await _showCheckInProblem(e.message);
@@ -159,11 +165,11 @@ class _JourneyScreenState extends State<JourneyScreen> {
   }
 
   Future<void> _afterCheckIn(CheckInResult result, JourneyDestination dest) async {
+    if (_navDestination?.destinationId == dest.destinationId) _endNavigation();
     await _load(silent: true);
     if (!mounted) return;
     if (result.alreadyCheckedIn) {
-      await _showAlreadyCheckedIn(
-          result.message.isEmpty ? 'Bạn đã check-in ${dest.name} rồi.' : '${result.message}.');
+      await _showAlreadyCheckedIn(result.message.isEmpty ? 'Bạn đã check-in ${dest.name} rồi.' : '${result.message}.');
       return;
     }
     if (result.badgeAwarded) {
@@ -186,7 +192,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Text('Bỏ qua điểm đến?'),
         content: Text(
-            'Bạn sẽ không nhận huy hiệu và điểm thưởng tại ${dest.name}. Hành trình tiếp tục ở điểm kế tiếp.'),
+          'Bạn sẽ không nhận huy hiệu và điểm thưởng tại ${dest.name}. Hành trình tiếp tục ở điểm kế tiếp.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Ở lại')),
           TextButton(
@@ -237,9 +244,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
   }
 
   void _snack(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), behavior: SnackBarBehavior.floating));
   }
 
   Future<void> _showLocationProblem(LocationException e) {
@@ -284,12 +289,16 @@ class _JourneyScreenState extends State<JourneyScreen> {
                 color: completed ? AppCultureColors.amberDark : AppCultureColors.heritageJade,
               ),
               const SizedBox(height: 12),
-              Text(completed ? 'Bạn đã hoàn thành hành trình' : 'Bạn đã check-in rồi',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              Text(
+                completed ? 'Bạn đã hoàn thành hành trình' : 'Bạn đã check-in rồi',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 8),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(height: 1.45, color: AppCultureColors.textMuted)),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(height: 1.45, color: AppCultureColors.textMuted),
+              ),
               const SizedBox(height: 18),
               PrimaryButton(label: 'Đã hiểu', onPressed: () => Navigator.pop(ctx)),
             ],
@@ -304,9 +313,11 @@ class _JourneyScreenState extends State<JourneyScreen> {
     final journey = _journey;
     if (journey == null) return false;
     if (dest.checkedIn) {
-      _showAlreadyCheckedIn(journey.isCompleted
-          ? 'Bạn đã check-in ${dest.name} và đi trọn hành trình. Không cần check-in thêm.'
-          : 'Bạn đã check-in ${dest.name} rồi. Hãy tiếp tục làm nhiệm vụ tại điểm đến này.');
+      _showAlreadyCheckedIn(
+        journey.isCompleted
+            ? 'Bạn đã check-in ${dest.name} và đi trọn hành trình. Không cần check-in thêm.'
+            : 'Bạn đã check-in ${dest.name} rồi. Hãy tiếp tục làm nhiệm vụ tại điểm đến này.',
+      );
       return true;
     }
     if (journey.isCompleted) {
@@ -329,12 +340,13 @@ class _JourneyScreenState extends State<JourneyScreen> {
             children: [
               const Icon(Icons.wrong_location_rounded, size: 44, color: AppCultureColors.warning),
               const SizedBox(height: 12),
-              const Text('Chưa thể check-in',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              const Text('Chưa thể check-in', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(height: 1.45, color: AppCultureColors.textMuted)),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(height: 1.45, color: AppCultureColors.textMuted),
+              ),
               const SizedBox(height: 18),
               PrimaryButton(label: 'Đã hiểu', onPressed: () => Navigator.pop(ctx)),
             ],
@@ -353,15 +365,17 @@ class _JourneyScreenState extends State<JourneyScreen> {
       if (!_coordsLoaded && mounted) setState(() => _coordsLoaded = true);
       return;
     }
-    final results = await Future.wait(missing.map((d) async {
-      try {
-        final model = await _destinationService.getDestinationById(d.destinationId);
-        if (model.latitude == 0 && model.longitude == 0) return null;
-        return MapEntry(d.destinationId, LatLng(model.latitude, model.longitude));
-      } catch (_) {
-        return null;
-      }
-    }));
+    final results = await Future.wait(
+      missing.map((d) async {
+        try {
+          final model = await _destinationService.getDestinationById(d.destinationId);
+          if (model.latitude == 0 && model.longitude == 0) return null;
+          return MapEntry(d.destinationId, LatLng(model.latitude, model.longitude));
+        } catch (_) {
+          return null;
+        }
+      }),
+    );
     if (!mounted) return;
     setState(() {
       for (final entry in results.whereType<MapEntry<int, LatLng>>()) {
@@ -383,6 +397,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
           _user = LatLng(p.latitude, p.longitude);
           _heading = (p.speed > 0.7 && p.heading >= 0) ? p.heading : null;
         });
+        _onNavPosition();
       }, onError: (_) {});
     } on LocationException {
       // Chưa bật GPS / chưa cấp quyền: nút check-in GPS sẽ hướng dẫn khi du khách bấm.
@@ -403,11 +418,126 @@ class _JourneyScreenState extends State<JourneyScreen> {
             state: d.isDone
                 ? StopState.done
                 : d.isCurrent
-                    ? StopState.current
-                    : StopState.locked,
+                ? StopState.current
+                : StopState.locked,
             skipped: d.status == ProgressStatus.skipped,
           ),
     ];
+  }
+
+  // ── Chỉ đường ────────────────────────────────────────────────────────────────
+
+  /// Bắt đầu chỉ đường tới [dest]: tìm tuyến từ vị trí hiện tại và xem trước toàn tuyến.
+  Future<void> _openDirections(JourneyDestination dest) async {
+    if (_coords[dest.destinationId] == null) return;
+    if (_user == null) await _startLocation();
+    if (!mounted) return;
+    if (_user == null) {
+      _snack('Hãy bật định vị và cho phép truy cập vị trí để chỉ đường.');
+      return;
+    }
+    setState(() {
+      _navDestination = dest;
+      _navActive = false;
+      _following = true;
+    });
+    await _fetchRoute(fit: true);
+  }
+
+  Future<void> _fetchRoute({bool fit = false}) async {
+    final dest = _navDestination;
+    final from = _user;
+    final to = dest == null ? null : _coords[dest.destinationId];
+    if (dest == null || from == null || to == null) return;
+    setState(() {
+      _routeLoading = true;
+      _routeError = null;
+    });
+    _lastRouteAt = DateTime.now();
+    try {
+      final route = await RouteService().direction(from, to, vehicle: _vehicle);
+      if (!mounted || _navDestination?.destinationId != dest.destinationId) return;
+      final user = _user ?? from;
+      setState(() {
+        _route = route;
+        _tracker = route == null ? null : RouteTracker(route);
+        _progress = _tracker?.update(user);
+        _routeError = route == null ? 'Không tìm được đường tới điểm này.' : null;
+        _offRouteHits = 0;
+      });
+      if (route != null && fit && !_navActive) _fitRoute(route);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _routeError = e.message);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _routeLoading = false;
+          _rerouting = false;
+        });
+      }
+    }
+  }
+
+  void _fitRoute(RouteModel route) {
+    final topInset = MediaQuery.paddingOf(context).top;
+    _mapKey.currentState?.fitPoints(route.points, EdgeInsets.fromLTRB(50, topInset + 90, 70, 320));
+  }
+
+  void _beginNavigation() {
+    setState(() {
+      _navActive = true;
+      _following = true;
+    });
+    final user = _user;
+    if (user != null) _mapKey.currentState?.follow(user);
+  }
+
+  void _endNavigation() {
+    setState(() {
+      _navDestination = null;
+      _route = null;
+      _tracker = null;
+      _progress = null;
+      _navActive = false;
+      _rerouting = false;
+      _routeError = null;
+    });
+  }
+
+  /// Mỗi lần vị trí đổi: cập nhật bước rẽ, bám theo du khách, tìm lại đường khi đi lệch.
+  void _onNavPosition() {
+    final tracker = _tracker;
+    final user = _user;
+    if (tracker == null || user == null || _navDestination == null) return;
+    final progress = tracker.update(user);
+    setState(() => _progress = progress);
+    if (_navActive && _following) _mapKey.currentState?.follow(user);
+    if (_arrived) return;
+
+    // Lệch tuyến hơn 45 m ba lần liên tiếp thì tìm đường mới (tối đa mỗi 15 giây)
+    _offRouteHits = progress.offRouteMeters > 45 ? _offRouteHits + 1 : 0;
+    if (_navActive &&
+        _offRouteHits >= 3 &&
+        !_routeLoading &&
+        DateTime.now().difference(_lastRouteAt) > const Duration(seconds: 15)) {
+      setState(() => _rerouting = true);
+      _fetchRoute();
+    }
+  }
+
+  /// Đã vào gần điểm đang chỉ đường (trong bán kính check-in 100 m, chừa sai số GPS).
+  bool get _arrived {
+    final dest = _navDestination;
+    final point = dest == null ? null : _coords[dest.destinationId];
+    return point != null && _user != null && distanceMeters(_user!, point) <= 80;
+  }
+
+  /// Phần đường còn phải đi (từ chỗ du khách đang đứng trên tuyến tới đích).
+  List<LatLng>? get _navRoute {
+    final route = _route;
+    if (route == null) return null;
+    final tracker = _tracker, progress = _progress;
+    return tracker != null && progress != null ? tracker.remainingPath(progress) : route.points;
   }
 
   JourneyDestination? get _currentDestination {
@@ -427,133 +557,220 @@ class _JourneyScreenState extends State<JourneyScreen> {
   Widget _buildMapLayout(TourJourney journey) {
     final topInset = MediaQuery.paddingOf(context).top;
     final screenHeight = MediaQuery.sizeOf(context).height;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: JourneyMap(
-            key: _mapKey,
-            stops: _stops,
-            user: _user,
-            heading: _heading,
-            satellite: _satellite,
-            fitPadding: EdgeInsets.fromLTRB(60, topInset + 110, 60, screenHeight * 0.5 + 24),
-            onStopTap: (stop) => _focusDestination(stop.destinationId),
+    final current = _currentDestination;
+    final directionsTarget = current != null && !current.checkedIn && _coords[current.destinationId] != null
+        ? current
+        : null;
+    // Ép Stack phủ toàn màn hình: khi đang chỉ đường không còn bảng trượt (con không định vị lớn nhất),
+    // Stack sẽ co về chiều cao thanh tiêu đề, bản đồ biến mất và bảng chỉ đường bị đẩy lên đỉnh màn hình.
+    return SizedBox.expand(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: JourneyMap(
+              key: _mapKey,
+              stops: _stops,
+              user: _user,
+              heading: _heading,
+              satellite: _satellite,
+              fitPadding: EdgeInsets.fromLTRB(60, topInset + 110, 60, screenHeight * 0.5 + 24),
+              onStopTap: (stop) => _focusDestination(stop.destinationId),
+              navRoute: _navRoute,
+              onUserGesture: () {
+                if (_navActive && _following) setState(() => _following = false);
+              },
+            ),
           ),
-        ),
-        // Thanh tiêu đề nổi
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-            child: Row(
-              children: [
-                MapRoundButton(
-                  icon: Icons.arrow_back_rounded,
-                  tooltip: 'Quay lại',
-                  onPressed: () => Navigator.of(context).maybePop(),
+          // Thanh tiêu đề nổi (khi đang dẫn đường: thẻ hướng dẫn rẽ)
+          if (_navActive && _route != null)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: NavigationBanner(
+                  route: _route!,
+                  progress: _progress,
+                  destinationName: _navDestination?.name ?? '',
+                  arrived: _arrived,
+                  rerouting: _rerouting,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3))],
+              ),
+            )
+          else
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: Row(
+                  children: [
+                    MapRoundButton(
+                      icon: Icons.arrow_back_rounded,
+                      tooltip: 'Quay lại',
+                      onPressed: () => Navigator.of(context).maybePop(),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          journey.isCompleted ? 'ĐÃ HOÀN THÀNH' : 'ĐANG TRẢI NGHIỆM',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            letterSpacing: 1.1,
-                            fontWeight: FontWeight.w800,
-                            color: journey.isCompleted ? AppCultureColors.jadeDark : AppCultureColors.oceanBlue,
-                          ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3))],
                         ),
-                        Text(journey.tourName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 15.5, fontWeight: FontWeight.w900, color: AppCultureColors.textDark)),
-                      ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              journey.isCompleted ? 'Đã hoàn thành' : 'Đang trải nghiệm',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                letterSpacing: 0.2,
+                                fontWeight: FontWeight.w700,
+                                color: journey.isCompleted ? AppCultureColors.jadeDark : AppCultureColors.oceanBlue,
+                              ),
+                            ),
+                            Text(
+                              journey.tourName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppCultureColors.textDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
+                  ],
+                ),
+              ),
+            ),
+          // Nút điều khiển bản đồ
+          Positioned(
+            right: 12,
+            top: topInset + (_navActive ? 176 : 84),
+            child: Column(
+              children: [
+                if (_navDestination == null && directionsTarget != null) ...[
+                  MapRoundButton(
+                    icon: Icons.directions_rounded,
+                    tooltip: 'Chỉ đường tới ${directionsTarget.name}',
+                    color: AppCultureColors.oceanBlue,
+                    onPressed: () => _openDirections(directionsTarget),
                   ),
+                  const SizedBox(height: 10),
+                ],
+                MapRoundButton(
+                  icon: Icons.route_rounded,
+                  tooltip: _route != null ? 'Xem toàn bộ đường đi' : 'Xem toàn tuyến',
+                  onPressed: () {
+                    if (_route != null) {
+                      setState(() => _following = false);
+                      _fitRoute(_route!);
+                    } else {
+                      _mapKey.currentState?.fitAll();
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                MapRoundButton(
+                  icon: _navActive && !_following ? Icons.navigation_rounded : Icons.my_location_rounded,
+                  tooltip: _navActive ? 'Bám theo vị trí của tôi' : 'Vị trí của tôi',
+                  color: AppCultureColors.oceanBlue,
+                  onPressed: _user == null
+                      ? _startLocation
+                      : () {
+                          if (_navActive) {
+                            setState(() => _following = true);
+                            _mapKey.currentState?.follow(_user!);
+                          } else {
+                            _mapKey.currentState?.focusUser();
+                          }
+                        },
+                ),
+                const SizedBox(height: 10),
+                MapRoundButton(
+                  icon: _satellite ? Icons.map_rounded : Icons.satellite_alt_rounded,
+                  tooltip: _satellite ? 'Bản đồ đường phố' : 'Ảnh vệ tinh',
+                  onPressed: () => setState(() => _satellite = !_satellite),
                 ),
               ],
             ),
           ),
-        ),
-        // Nút điều khiển bản đồ
-        Positioned(
-          right: 12,
-          top: topInset + 84,
-          child: Column(children: [
-            MapRoundButton(
-              icon: Icons.route_rounded,
-              tooltip: 'Xem toàn tuyến',
-              onPressed: () => _mapKey.currentState?.fitAll(),
-            ),
-            const SizedBox(height: 10),
-            MapRoundButton(
-              icon: Icons.my_location_rounded,
-              tooltip: 'Vị trí của tôi',
-              color: AppCultureColors.oceanBlue,
-              onPressed: _user == null ? _startLocation : () => _mapKey.currentState?.focusUser(),
-            ),
-            const SizedBox(height: 10),
-            MapRoundButton(
-              icon: _satellite ? Icons.map_rounded : Icons.satellite_alt_rounded,
-              tooltip: _satellite ? 'Bản đồ đường phố' : 'Ảnh vệ tinh',
-              onPressed: () => setState(() => _satellite = !_satellite),
-            ),
-          ]),
-        ),
-        // Bảng hành trình kéo lên / xuống
-        DraggableScrollableSheet(
-          controller: _sheet,
-          initialChildSize: 0.5,
-          minChildSize: 0.22,
-          maxChildSize: 0.92,
-          snap: true,
-          snapSizes: const [0.22, 0.5, 0.92],
-          builder: (context, scrollController) => Container(
-            decoration: const BoxDecoration(
-              color: AppCultureColors.background,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, -2))],
-            ),
-            child: RefreshIndicator(
-              color: AppCultureColors.heritageJade,
-              onRefresh: () => _load(silent: true),
-              child: CustomScrollView(
-                controller: scrollController,
-                slivers: [
-                  SliverToBoxAdapter(child: _sheetHeader(journey)),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                    sliver: SliverList.list(children: [
-                      for (var i = 0; i < journey.destinations.length; i++)
-                        _buildDestination(
-                          journey.destinations[i],
-                          isLast: i == journey.destinations.length - 1,
+          if (_navDestination != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: NavigationPanel(
+                route: _route,
+                progress: _navActive ? _progress : null,
+                destinationName: _navDestination!.name,
+                vehicle: _vehicle,
+                loading: _routeLoading,
+                active: _navActive,
+                arrived: _navActive && _arrived,
+                error: _routeError,
+                onVehicleChanged: (v) {
+                  setState(() => _vehicle = v);
+                  _fetchRoute(fit: true);
+                },
+                onStart: _beginNavigation,
+                onSteps: () => showRouteSteps(context, _route!, currentIndex: _progress?.nextStepIndex),
+                onExternal: () {
+                  final point = _coords[_navDestination!.destinationId];
+                  if (point != null) openExternalNavigation(point, _vehicle);
+                },
+                onClose: _endNavigation,
+                onCheckIn: () => _checkIn(_navDestination!),
+                onRetry: () => _fetchRoute(fit: true),
+              ),
+            )
+          else
+            // Bảng hành trình kéo lên / xuống
+            DraggableScrollableSheet(
+              controller: _sheet,
+              initialChildSize: 0.5,
+              minChildSize: 0.22,
+              maxChildSize: 0.92,
+              snap: true,
+              snapSizes: const [0.22, 0.5, 0.92],
+              builder: (context, scrollController) => Container(
+                decoration: const BoxDecoration(
+                  color: AppCultureColors.background,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                  boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, -2))],
+                ),
+                child: RefreshIndicator(
+                  color: AppCultureColors.heritageJade,
+                  onRefresh: () => _load(silent: true),
+                  child: CustomScrollView(
+                    controller: scrollController,
+                    slivers: [
+                      SliverToBoxAdapter(child: _sheetHeader(journey)),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                        sliver: SliverList.list(
+                          children: [
+                            for (var i = 0; i < journey.destinations.length; i++)
+                              _buildDestination(journey.destinations[i], isLast: i == journey.destinations.length - 1),
+                          ],
                         ),
-                    ]),
+                      ),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          child: MapAttributionText(satellite: _satellite),
+                        ),
+                      ),
+                    ],
                   ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      child: MapAttributionText(satellite: _satellite),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -585,24 +802,28 @@ class _JourneyScreenState extends State<JourneyScreen> {
                       journey.isCompleted
                           ? 'Bạn đã đi trọn hành trình'
                           : current != null
-                              ? 'Điểm ${current.orderIndex}: ${current.name}'
-                              : 'Hành trình của bạn',
+                          ? 'Điểm ${current.orderIndex}: ${current.name}'
+                          : 'Hành trình của bạn',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 17, height: 1.25, fontWeight: FontWeight.w900, color: AppCultureColors.textDark),
+                        fontSize: 17,
+                        height: 1.25,
+                        fontWeight: FontWeight.w700,
+                        color: AppCultureColors.textDark,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       journey.isCompleted
                           ? '+50 điểm thưởng hoàn thành'
                           : current == null
-                              ? ''
-                              : current.checkedIn
-                                  ? 'Đã check-in · ${current.tasksCompleted}/${current.totalTasks} nhiệm vụ'
-                                  : distance != null
-                                      ? 'Cách bạn ${formatDistance(distance)} · check-in trong bán kính 100 m'
-                                      : 'Đến nơi và check-in để mở nhiệm vụ',
+                          ? ''
+                          : current.checkedIn
+                          ? 'Đã check-in · ${current.tasksCompleted}/${current.totalTasks} nhiệm vụ'
+                          : distance != null
+                          ? 'Cách bạn ${formatDistance(distance)} · check-in trong bán kính 100 m'
+                          : 'Đến nơi và check-in để mở nhiệm vụ',
                       style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
                     ),
                   ],
@@ -612,32 +833,41 @@ class _JourneyScreenState extends State<JourneyScreen> {
               SizedBox(
                 width: 54,
                 height: 54,
-                child: Stack(alignment: Alignment.center, children: [
-                  SizedBox.expand(
-                    child: CircularProgressIndicator(
-                      value: journey.progress,
-                      strokeWidth: 5,
-                      strokeCap: StrokeCap.round,
-                      backgroundColor: AppCultureColors.surfaceSubtle,
-                      color: AppCultureColors.heritageJade,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox.expand(
+                      child: CircularProgressIndicator(
+                        value: journey.progress,
+                        strokeWidth: 5,
+                        strokeCap: StrokeCap.round,
+                        backgroundColor: AppCultureColors.surfaceSubtle,
+                        color: AppCultureColors.heritageJade,
+                      ),
                     ),
-                  ),
-                  Text('${(journey.progress * 100).round()}%',
-                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900)),
-                ]),
+                    Text(
+                      '${(journey.progress * 100).round()}%',
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Wrap(spacing: 8, runSpacing: 6, children: [
-            InfoChip(icon: Icons.place_rounded, text: '${journey.doneCount}/${journey.totalDestinations} điểm đến'),
-            InfoChip(
-              icon: Icons.stars_rounded,
-              text: '${journey.pointsEarned} điểm',
-              background: AppCultureColors.rewardBg,
-              foreground: AppCultureColors.rewardText,
-            ),
-          ]),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              InfoChip(icon: Icons.place_rounded, text: '${journey.doneCount}/${journey.totalDestinations} điểm đến'),
+              InfoChip(
+                icon: Icons.stars_rounded,
+                text: '${journey.pointsEarned} điểm',
+                background: AppCultureColors.rewardBg,
+                foreground: AppCultureColors.rewardText,
+              ),
+            ],
+          ),
           if (_error != null) ...[
             const SizedBox(height: 10),
             Container(
@@ -659,50 +889,51 @@ class _JourneyScreenState extends State<JourneyScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppCultureColors.heritageJade))
           : _journey == null
-              ? _buildError()
-              : (_coordsLoaded && _coords.isNotEmpty)
-                  ? _buildMapLayout(_journey!)
-                  : RefreshIndicator(
-                  color: AppCultureColors.heritageJade,
-                  edgeOffset: 120,
-                  onRefresh: () => _load(silent: true),
-                  child: CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      _buildHeader(_journey!),
-                      if (_error != null)
-                        SliverToBoxAdapter(
-                          child: Container(
-                            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEE2E2),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(_error!,
-                                style: const TextStyle(color: AppCultureColors.error, fontSize: 12.5)),
+          ? _buildError()
+          : (_coordsLoaded && _coords.isNotEmpty)
+          ? _buildMapLayout(_journey!)
+          : RefreshIndicator(
+              color: AppCultureColors.heritageJade,
+              edgeOffset: 120,
+              onRefresh: () => _load(silent: true),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  _buildHeader(_journey!),
+                  if (_error != null)
+                    SliverToBoxAdapter(
+                      child: Container(
+                        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(_error!, style: const TextStyle(color: AppCultureColors.error, fontSize: 12.5)),
+                      ),
+                    ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                    sliver: SliverList.list(
+                      children: [
+                        const Text(
+                          'Hành trình của bạn',
+                          style: TextStyle(
+                            fontSize: 12,
+                            letterSpacing: 0.2,
+                            fontWeight: FontWeight.w700,
+                            color: AppCultureColors.textMuted,
                           ),
                         ),
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-                        sliver: SliverList.list(children: [
-                          const Text('HÀNH TRÌNH CỦA BẠN',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  letterSpacing: 1.2,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppCultureColors.textMuted)),
-                          const SizedBox(height: 12),
-                          for (var i = 0; i < _journey!.destinations.length; i++)
-                            _buildDestination(
-                              _journey!.destinations[i],
-                              isLast: i == _journey!.destinations.length - 1,
-                            ),
-                        ]),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        for (var i = 0; i < _journey!.destinations.length; i++)
+                          _buildDestination(_journey!.destinations[i], isLast: i == _journey!.destinations.length - 1),
+                      ],
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -733,7 +964,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
       expandedHeight: 232,
       backgroundColor: AppCultureColors.jadeDark,
       foregroundColor: Colors.white,
-      title: const Text('Hành trình', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+      title: const Text('Hành trình', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
       flexibleSpace: FlexibleSpaceBar(
         collapseMode: CollapseMode.pin,
         background: Container(
@@ -749,8 +980,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
               Positioned(
                 right: -28,
                 top: 40,
-                child: Icon(Icons.temple_buddhist_rounded,
-                    size: 190, color: Colors.white.withValues(alpha: 0.09)),
+                child: Icon(Icons.temple_buddhist_rounded, size: 190, color: Colors.white.withValues(alpha: 0.09)),
               ),
               SafeArea(
                 child: Padding(
@@ -764,30 +994,38 @@ class _JourneyScreenState extends State<JourneyScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              journey.isCompleted ? 'ĐÃ HOÀN THÀNH' : 'ĐANG TRẢI NGHIỆM',
+                              journey.isCompleted ? 'Đã hoàn thành' : 'Đang trải nghiệm',
                               style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
-                                  letterSpacing: 1.3,
-                                  fontWeight: FontWeight.w800),
+                                color: Colors.white70,
+                                fontSize: 11,
+                                letterSpacing: 0.2,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             const SizedBox(height: 6),
-                            Text(journey.tourName,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    height: 1.2,
-                                    fontWeight: FontWeight.w900)),
+                            Text(
+                              journey.tourName,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                height: 1.2,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                             const SizedBox(height: 12),
-                            Wrap(spacing: 8, runSpacing: 6, children: [
-                              InfoChip.onGradient(
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                InfoChip.onGradient(
                                   icon: Icons.place_rounded,
-                                  text: '${journey.doneCount}/${journey.totalDestinations} điểm đến'),
-                              InfoChip.onGradient(
-                                  icon: Icons.stars_rounded, text: '${journey.pointsEarned} điểm'),
-                            ]),
+                                  text: '${journey.doneCount}/${journey.totalDestinations} điểm đến',
+                                ),
+                                InfoChip.onGradient(icon: Icons.stars_rounded, text: '${journey.pointsEarned} điểm'),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -813,8 +1051,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
     final Color accent = dest.isDone
         ? AppCultureColors.heritageJade
         : dest.isCurrent
-            ? AppCultureColors.oceanBlue
-            : AppCultureColors.textLight;
+        ? AppCultureColors.oceanBlue
+        : AppCultureColors.textLight;
 
     return IntrinsicHeight(
       child: Row(
@@ -835,16 +1073,18 @@ class _JourneyScreenState extends State<JourneyScreen> {
                   child: Center(
                     child: dest.isDone
                         ? Icon(
-                            dest.status == ProgressStatus.skipped
-                                ? Icons.skip_next_rounded
-                                : Icons.check_rounded,
+                            dest.status == ProgressStatus.skipped ? Icons.skip_next_rounded : Icons.check_rounded,
                             size: 18,
-                            color: Colors.white)
-                        : Text('${dest.orderIndex}',
+                            color: Colors.white,
+                          )
+                        : Text(
+                            '${dest.orderIndex}',
                             style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13,
-                                color: dest.isCurrent ? Colors.white : accent)),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: dest.isCurrent ? Colors.white : accent,
+                            ),
+                          ),
                   ),
                 ),
                 if (!isLast)
@@ -874,14 +1114,15 @@ class _JourneyScreenState extends State<JourneyScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: Text(dest.name,
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  height: 1.25,
-                                  fontWeight: FontWeight.w800,
-                                  color: dest.isLocked
-                                      ? AppCultureColors.textMuted
-                                      : AppCultureColors.textDark)),
+                          child: Text(
+                            dest.name,
+                            style: TextStyle(
+                              fontSize: 16,
+                              height: 1.25,
+                              fontWeight: FontWeight.w700,
+                              color: dest.isLocked ? AppCultureColors.textMuted : AppCultureColors.textDark,
+                            ),
+                          ),
                         ),
                         if (_coords[dest.destinationId] != null && _coords.isNotEmpty)
                           InkWell(
@@ -895,8 +1136,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                         if (dest.badgeAwarded)
                           const Padding(
                             padding: EdgeInsets.only(left: 8),
-                            child: Icon(Icons.workspace_premium_rounded,
-                                color: AppCultureColors.gold, size: 24),
+                            child: Icon(Icons.workspace_premium_rounded, color: AppCultureColors.gold, size: 24),
                           ),
                         if (dest.isLocked)
                           const Padding(
@@ -919,13 +1159,17 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
   Widget _buildDestinationBody(JourneyDestination dest, bool busy) {
     if (dest.isLocked) {
-      return const Text('Hoàn thành điểm đến trước để mở khóa.',
-          style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted));
+      return const Text(
+        'Hoàn thành điểm đến trước để mở khóa.',
+        style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
+      );
     }
 
     if (dest.status == ProgressStatus.skipped) {
-      return const Text('Bạn đã bỏ qua điểm đến này.',
-          style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted));
+      return const Text(
+        'Bạn đã bỏ qua điểm đến này.',
+        style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
+      );
     }
 
     if (!dest.checkedIn) {
@@ -937,6 +1181,19 @@ class _JourneyScreenState extends State<JourneyScreen> {
             style: TextStyle(fontSize: 12.5, height: 1.45, color: AppCultureColors.textMuted),
           ),
           const SizedBox(height: 14),
+          if (dest.isCurrent && _coords[dest.destinationId] != null) ...[
+            FilledButton.icon(
+              onPressed: busy ? null : () => _openDirections(dest),
+              icon: const Icon(Icons.directions_rounded),
+              label: const Text('Chỉ đường tới đây', style: TextStyle(fontWeight: FontWeight.w700)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+                backgroundColor: AppCultureColors.oceanBlue,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           PrimaryButton(
             label: 'Check-in bằng GPS',
             icon: Icons.my_location_rounded,
@@ -947,7 +1204,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
           OutlinedButton.icon(
             onPressed: busy ? null : () => _checkInQr(dest),
             icon: const Icon(Icons.qr_code_scanner_rounded),
-            label: const Text('Quét mã QR', style: TextStyle(fontWeight: FontWeight.w800)),
+            label: const Text('Quét mã QR', style: TextStyle(fontWeight: FontWeight.w700)),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
               foregroundColor: AppCultureColors.jadeDark,
@@ -959,8 +1216,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
             alignment: Alignment.center,
             child: TextButton(
               onPressed: busy ? null : () => _skip(dest),
-              child: const Text('Bỏ qua điểm này',
-                  style: TextStyle(color: AppCultureColors.textMuted, fontSize: 12.5)),
+              child: const Text('Bỏ qua điểm này', style: TextStyle(color: AppCultureColors.textMuted, fontSize: 12.5)),
             ),
           ),
           CulturalStoriesSection(destinationId: dest.destinationId, hideWhenEmpty: true),
@@ -971,42 +1227,37 @@ class _JourneyScreenState extends State<JourneyScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          InfoChip(
-            icon: Icons.verified_rounded,
-            text: 'Đã check-in',
-            background: AppCultureColors.jadeLight,
-            foreground: AppCultureColors.jadeDark,
-          ),
-          const SizedBox(width: 8),
-          InfoChip(
-            icon: Icons.task_alt_rounded,
-            text: '${dest.tasksCompleted}/${dest.totalTasks} nhiệm vụ',
-          ),
-        ]),
+        Row(
+          children: [
+            InfoChip(
+              icon: Icons.verified_rounded,
+              text: 'Đã check-in',
+              background: AppCultureColors.jadeLight,
+              foreground: AppCultureColors.jadeDark,
+            ),
+            const SizedBox(width: 8),
+            InfoChip(icon: Icons.task_alt_rounded, text: '${dest.tasksCompleted}/${dest.totalTasks} nhiệm vụ'),
+          ],
+        ),
         const SizedBox(height: 14),
-        _sectionLabel('CÂU CHUYỆN VĂN HÓA'),
+        _sectionLabel('Câu chuyện văn hóa'),
         const SizedBox(height: 8),
         CulturalStoriesSection(destinationId: dest.destinationId, unlocked: true, showTeaser: true),
-        if (dest.tasks.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          _sectionLabel('NHIỆM VỤ'),
-          const SizedBox(height: 8),
-        ],
+        if (dest.tasks.isNotEmpty) ...[const SizedBox(height: 6), _sectionLabel('Nhiệm vụ'), const SizedBox(height: 8)],
         for (final task in dest.tasks) _buildTask(dest, task),
       ],
     );
   }
 
   Widget _sectionLabel(String text) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 11,
-          letterSpacing: 1.1,
-          fontWeight: FontWeight.w800,
-          color: AppCultureColors.textMuted,
-        ),
-      );
+    text,
+    style: const TextStyle(
+      fontSize: 13,
+      letterSpacing: 0.2,
+      fontWeight: FontWeight.w700,
+      color: AppCultureColors.textMuted,
+    ),
+  );
 
   Widget _buildTask(JourneyDestination dest, JourneyTask task) {
     final done = task.isCompleted;
@@ -1019,8 +1270,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
     final Color tone = done
         ? AppCultureColors.heritageJade
         : failed
-            ? AppCultureColors.error
-            : AppCultureColors.oceanBlue;
+        ? AppCultureColors.error
+        : AppCultureColors.oceanBlue;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1029,10 +1280,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
         onTap: () => _openTask(dest, task),
         child: Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: tone.withValues(alpha: 0.07),
-            borderRadius: BorderRadius.circular(16),
-          ),
+          decoration: BoxDecoration(color: tone.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(16)),
           child: Row(
             children: [
               Container(
@@ -1046,20 +1294,23 @@ class _JourneyScreenState extends State<JourneyScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(task.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: AppCultureColors.textDark)),
+                    Text(
+                      task.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppCultureColors.textDark,
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Text(
                       done
                           ? 'Hoàn thành · +${task.pointsEarned} điểm'
                           : failed
-                              ? 'Đã hết lượt làm'
-                              : task.attempts > 0
-                                  ? 'Đã làm ${task.attempts} lượt · làm lại'
-                                  : 'Chạm để bắt đầu',
+                          ? 'Đã hết lượt làm'
+                          : task.attempts > 0
+                          ? 'Đã làm ${task.attempts} lượt · làm lại'
+                          : 'Chạm để bắt đầu',
                       style: TextStyle(fontSize: 12, color: tone, fontWeight: FontWeight.w600),
                     ),
                   ],

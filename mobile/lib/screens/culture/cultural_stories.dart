@@ -222,7 +222,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppCultureColors.amberDark,
                       ),
                     ),
@@ -253,7 +253,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                           audio.durationLabel.isEmpty
                               ? 'Nghe thuyết minh'
                               : 'Nghe · ${audio.durationLabel}',
-                          style: const TextStyle(fontWeight: FontWeight.w800),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         style: FilledButton.styleFrom(
                           backgroundColor: const Color(0xFF4F46E5),
@@ -529,7 +529,7 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
             text,
             style: const TextStyle(
               fontSize: 15,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: AppCultureColors.textDark,
             ),
           ),
@@ -647,7 +647,7 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
                   style: const TextStyle(
                     fontSize: 23,
                     height: 1.25,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     color: AppCultureColors.textDark,
                   ),
                 ),
@@ -703,7 +703,7 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
                           : c.contentType == 'VIDEO'
                           ? 'Xem video'
                           : 'Mở nội dung',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: meta.color,

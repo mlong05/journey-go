@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -35,6 +36,12 @@ class JourneyMap extends StatefulWidget {
   final EdgeInsets fitPadding;
   final ValueChanged<JourneyStop>? onStopTap;
 
+  /// Đường đi theo mặt đường khi đang chỉ đường (phần còn phải đi); null khi không chỉ đường.
+  final List<LatLng>? navRoute;
+
+  /// Du khách tự kéo / phóng bản đồ (để ngừng bám theo vị trí khi dẫn đường).
+  final VoidCallback? onUserGesture;
+
   /// Bán kính check-in điểm đến (backend: DEFAULT_DESTINATION_RADIUS_METERS = 100).
   final double checkInRadiusMeters;
 
@@ -46,6 +53,8 @@ class JourneyMap extends StatefulWidget {
     required this.satellite,
     required this.fitPadding,
     this.onStopTap,
+    this.navRoute,
+    this.onUserGesture,
     this.checkInRadiusMeters = 100,
   });
 
@@ -87,6 +96,18 @@ class JourneyMapState extends State<JourneyMap> {
 
   void focus(LatLng point, {double zoom = 17.5}) => _controller.move(point, zoom);
 
+  /// Căn khung vừa các điểm (xem trước tuyến chỉ đường).
+  void fitPoints(List<LatLng> points, EdgeInsets padding) {
+    if (points.length < 2 || !_ready) return;
+    _controller.fitCamera(CameraFit.coordinates(coordinates: points, padding: padding, maxZoom: 17.5));
+  }
+
+  /// Bám theo du khách khi dẫn đường; giữ mức phóng hiện tại nếu đã đủ gần.
+  void follow(LatLng point) {
+    if (!_ready) return;
+    _controller.move(point, math.max(_controller.camera.zoom, 17));
+  }
+
   void focusUser() {
     final user = widget.user;
     if (user != null) _controller.move(user, 17.5);
@@ -102,6 +123,7 @@ class JourneyMapState extends State<JourneyMap> {
     final doneUntil = current.isEmpty ? stops.length : stops.indexOf(current.first) + 1;
     final walked = route.take(doneUntil).toList();
     final initialPoints = _allPoints;
+    final navRoute = widget.navRoute;
 
     return FlutterMap(
       mapController: _controller,
@@ -114,6 +136,9 @@ class JourneyMapState extends State<JourneyMap> {
         interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
         backgroundColor: mapBackground,
         onMapReady: () => _ready = true,
+        onPositionChanged: (_, hasGesture) {
+          if (hasGesture) widget.onUserGesture?.call();
+        },
       ),
       children: [
         ...baseTileLayers(satellite: widget.satellite),
@@ -135,7 +160,12 @@ class JourneyMapState extends State<JourneyMap> {
             if (walked.length >= 2)
               Polyline(points: walked, strokeWidth: 4, color: AppCultureColors.heritageJade),
           ]),
-        if (user != null && current.isNotEmpty)
+        if (navRoute != null && navRoute.length >= 2)
+          PolylineLayer(polylines: [
+            Polyline(points: navRoute, strokeWidth: 10, color: Colors.white),
+            Polyline(points: navRoute, strokeWidth: 6.5, color: AppCultureColors.oceanBlue),
+          ])
+        else if (user != null && current.isNotEmpty)
           PolylineLayer(polylines: [
             Polyline(
               points: [user, current.first.point],
@@ -177,7 +207,7 @@ class JourneyMapState extends State<JourneyMap> {
                       : Text('${s.order}',
                           style: TextStyle(
                             color: Colors.white,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             fontSize: s.state == StopState.current ? 18 : 14,
                           )),
                 ),

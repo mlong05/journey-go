@@ -5,6 +5,7 @@ import { CircleDollarSign } from "lucide-react";
 import { Pager, formatDateTime, formatMoney } from "@/features/booking";
 import financeService from "@/features/finance/services/financeService";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useQueueRefresh } from "@/context/NotificationContext";
 
 /**
  * Tài chính (ADMIN): xử lý yêu cầu hoàn tiền và duyệt đợt tất toán cho đối tác.
@@ -231,6 +232,8 @@ function RefundsTab() {
   const [reloadKey, setReloadKey] = useState(0);
   const [selected, setSelected] = useState(null);
   const list = useList(financeService.getRefunds, status, page, reloadKey);
+  // Du khách gửi yêu cầu mới / Admin khác vừa xử lý: tải lại danh sách
+  useQueueRefresh(["refund-review"], () => setReloadKey((k) => k + 1));
 
   async function select(refund) {
     setSelected(refund);
@@ -328,6 +331,7 @@ function SettlementsTab() {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const list = useList(financeService.getSettlements, status, page, reloadKey);
+  useQueueRefresh(["settlements", "adjustment-review"], () => setReloadKey((k) => k + 1));
   const { confirm, confirmDialog } = useConfirm();
 
   async function act(settlement, approve) {

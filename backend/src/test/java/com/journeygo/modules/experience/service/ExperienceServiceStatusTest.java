@@ -36,6 +36,10 @@ class ExperienceServiceStatusTest {
     @Mock private UserRepository userRepository;
     @Mock private TaskRepository taskRepository;
     @Mock private CheckInPointRepository checkInPointRepository;
+    @org.mockito.Spy
+    private com.journeygo.modules.notification.service.NotificationPublisher notifications =
+            new com.journeygo.modules.notification.service.NotificationPublisher(
+                    org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
 
     @InjectMocks
     private ExperienceService experienceService;

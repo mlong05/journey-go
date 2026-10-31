@@ -7,7 +7,7 @@ import 'map_kit.dart';
 export 'map_kit.dart' show compassLabel, turnHint, bearingBetween, formatDistance;
 
 /// Bản đồ dẫn đường phủ kín vùng chứa: trạm đích (vòng bán kính nhấp nháy), vị trí du khách
-/// (mũi tên theo hướng đi) và đường nối. Màn cha giữ các nút điều khiển và gọi
+/// (mũi tên theo hướng đi) và đường nối: còn xa thì vẽ tuyến đi bộ [route], gần thì nối thẳng. Màn cha giữ các nút điều khiển và gọi
 /// [StationMapState.fitAll] / [StationMapState.focusUser] qua GlobalKey.
 class StationMap extends StatefulWidget {
   final LatLng station;
@@ -16,6 +16,12 @@ class StationMap extends StatefulWidget {
   final LatLng? user;
   final double? heading;
   final bool satellite;
+
+  /// Tuyến đi bộ khi còn xa trạm; null thì nối thẳng du khách → trạm.
+  final List<LatLng>? route;
+
+  /// Du khách đã ở trong bán kính: vòng tròn đổi sang màu xanh ngọc.
+  final bool inside;
 
   /// Khoảng chừa khi căn khung, để hai điểm không bị thanh trên / bảng trượt che.
   final EdgeInsets fitPadding;
@@ -28,6 +34,8 @@ class StationMap extends StatefulWidget {
     required this.user,
     required this.heading,
     required this.satellite,
+    this.route,
+    this.inside = false,
     this.fitPadding = const EdgeInsets.all(56),
   });
 
@@ -69,6 +77,7 @@ class StationMapState extends State<StationMap> {
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
+    final route = widget.route;
     return FlutterMap(
       mapController: _controller,
       options: MapOptions(
@@ -90,9 +99,21 @@ class StationMapState extends State<StationMap> {
         PulsingRadius(
           center: widget.station,
           radiusMeters: widget.radiusMeters.toDouble(),
-          color: AppCultureColors.heritageJade,
+          color: widget.inside ? AppCultureColors.heritageJade : AppCultureColors.oceanBlue,
         ),
-        if (user != null)
+        if (user != null && route != null) ...[
+          PolylineLayer(polylines: [
+            Polyline(points: route, strokeWidth: 8, color: Colors.white),
+            Polyline(points: route, strokeWidth: 5, color: AppCultureColors.oceanBlue),
+            // Đoạn cuối tuyến (mép đường) vào tới trạm
+            Polyline(
+              points: [route.last, widget.station],
+              strokeWidth: 3,
+              color: AppCultureColors.oceanBlue,
+              pattern: StrokePattern.dashed(segments: const [10, 7]),
+            ),
+          ]),
+        ] else if (user != null)
           PolylineLayer(polylines: [
             Polyline(
               points: [user, widget.station],

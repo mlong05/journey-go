@@ -6,6 +6,8 @@ import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
 import '../../core/services/tour_service.dart';
 import '../bookings/booking_checkout_screen.dart';
+import '../journey/journey_screen.dart';
+import 'tour_progress.dart';
 import '../culture/cultural_stories.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
 import 'tour_route_map.dart';
@@ -36,6 +38,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   final Map<int, List<ExperienceModel>?> _experiences = {};
   bool _loading = true;
 
+  /// Du khách đang đi dở hoặc đã đi xong tour này; null nếu chưa đi.
+  TourProgress? _myProgress;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +49,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    _loadMyProgress();
 
     // Làm mới thông tin tour (giá có thể đã đổi), nếu lỗi thì dùng bản từ danh sách.
     try {
@@ -72,6 +78,18 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         ..addEntries(entries);
       _loading = false;
     });
+  }
+
+  Future<void> _loadMyProgress() async {
+    final byTour = await TourProgress.load();
+    if (mounted) setState(() => _myProgress = byTour[widget.tour.id]);
+  }
+
+  Future<void> _continueJourney(TourProgress progress) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => JourneyScreen(journeyId: progress.journey.id)),
+    );
+    _loadMyProgress();
   }
 
   void _scrollToStop(TourDestinationModel d) {
@@ -136,7 +154,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             _buildHeader(),
             if (_tour.destinations.any((d) => d.hasLocation)) ...[
               const SizedBox(height: 22),
-              _buildSectionTitle('BẢN ĐỒ LỘ TRÌNH'),
+              _buildSectionTitle('Bản đồ lộ trình'),
               const SizedBox(height: 12),
               TourRouteMap(
                 destinations: _tour.destinations,
@@ -144,7 +162,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               ),
             ],
             const SizedBox(height: 22),
-            _buildSectionTitle('CÁC CHẶNG HÀNH TRÌNH'),
+            _buildSectionTitle('Các chặng hành trình'),
             const SizedBox(height: 12),
             if (_tour.destinations.isEmpty)
               const Padding(
@@ -185,9 +203,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         Text(
           text,
           style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
             color: AppCultureColors.textDark,
           ),
         ),
@@ -246,7 +264,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                 style: const TextStyle(
                   fontSize: 22,
                   height: 1.25,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
               ),
@@ -340,12 +358,12 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                     ],
                     Text(
                       isLast && _tour.destinations.length > 1
-                          ? 'CHẶNG CUỐI'
-                          : 'CHẶNG ${d.sequenceOrder}',
+                          ? 'Chặng cuối'
+                          : 'Chặng ${d.sequenceOrder}',
                       style: TextStyle(
                         fontSize: 10.5,
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.2,
+                        fontWeight: FontWeight.w700,
                         color: isLast
                             ? AppCultureColors.amberDark
                             : AppCultureColors.heritageJade,
@@ -356,7 +374,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                       d.name,
                       style: const TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: AppCultureColors.textDark,
                       ),
                     ),
@@ -495,7 +513,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppCultureColors.textDark,
                   ),
                 ),
@@ -538,6 +556,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   );
 
   Widget _buildBookBar() {
+    final progress = _myProgress;
+    final active = progress?.inProgress ?? false;
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -545,45 +565,78 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
           color: Colors.white,
           border: Border(top: BorderSide(color: AppCultureColors.border)),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Tổng thanh toán',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: AppCultureColors.textMuted,
-                    ),
+            if (progress != null) ...[
+              TourProgressBadge(progress: progress),
+              const SizedBox(height: 10),
+            ],
+            // Đang đi dở thì giá không còn quan trọng: nút tiếp tục chiếm cả hàng
+            if (active)
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton.icon(
+                  onPressed: () => _continueJourney(progress!),
+                  icon: const Icon(Icons.navigation_rounded, size: 19),
+                  label: const Text('Tiếp tục hành trình', style: TextStyle(fontWeight: FontWeight.w700)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppCultureColors.oceanBlue,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  Text(
-                    _tour.formattedPrice,
-                    style: const TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w900,
-                      color: AppCultureColors.jadeDark,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: _bookingInProgress ? null : _onBook,
-              icon: const Icon(Icons.confirmation_number_outlined, size: 19),
-              label: Text(
-                _bookingInProgress ? 'Đang giữ chỗ...' : 'Đặt tour',
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppCultureColors.heritageJade,
-                minimumSize: const Size(150, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
                 ),
-              ),
+              )
+            else
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tổng thanh toán',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppCultureColors.textMuted,
+                        ),
+                      ),
+                      Text(
+                        _tour.formattedPrice,
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: AppCultureColors.jadeDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                FilledButton.icon(
+                  onPressed: _bookingInProgress ? null : _onBook,
+                  icon: Icon(
+                    progress != null ? Icons.replay_rounded : Icons.confirmation_number_outlined,
+                    size: 19,
+                  ),
+                  label: Text(
+                    _bookingInProgress
+                        ? 'Đang giữ chỗ...'
+                        : progress != null
+                            ? 'Đặt lại'
+                            : 'Đặt tour',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppCultureColors.heritageJade,
+                    minimumSize: const Size(150, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -640,7 +693,7 @@ class _QuestNode extends StatelessWidget {
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
       ),

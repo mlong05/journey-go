@@ -90,7 +90,11 @@ class ProgressService {
   /// Nhiệm vụ cần làm: các nhiệm vụ chưa xong ở những điểm đã check-in của hành trình đang đi.
   Future<List<JourneyMission>> getMissions() async {
     final journey = await getActiveJourney();
-    if (journey == null) return const [];
+    return journey == null ? const [] : missionsOf(journey);
+  }
+
+  /// Nhiệm vụ cần làm của một hành trình đã tải sẵn (tránh gọi API lần nữa).
+  static List<JourneyMission> missionsOf(TourJourney journey) {
     return [
       for (final d in journey.destinations.where((d) => d.checkedIn && !d.isDone))
         for (final t in d.tasks.where((t) => t.isOpen))

@@ -41,6 +41,7 @@ import {
 import TourFormModal from "./TourFormModal";
 import TourDetailModal from "./TourDetailModal";
 import RejectTourDialog from "./RejectTourDialog";
+import { useQueueRefresh } from "@/context/NotificationContext";
 
 /* =========================================================================
  *  KHU VỰC QUẢN LÝ Tour, dùng chung cho Provider, Moderator & Admin.
@@ -402,6 +403,16 @@ export default function ToursManager({
       active = false;
     };
   }, [fetchTours]);
+
+  // Thời gian thực: có tour mới chờ duyệt (moderator) hoặc tour của mình vừa có kết quả (đối tác)
+  // → tải ngầm danh sách, không hiện trạng thái đang tải.
+  useQueueRefresh(["tour-review", "my-content"], () => {
+    fetchTours()
+      .then(setTours)
+      .catch(() => {
+        /* giữ danh sách đang xem */
+      });
+  });
 
   /* ── Chi tiết ──────────────────────────────────────────────── */
   const openDetail = useCallback(async (id) => {

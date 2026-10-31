@@ -14,6 +14,9 @@ import com.journeygo.modules.settlement.dto.response.FinancialAdjustmentResponse
 import com.journeygo.modules.settlement.entity.FinancialAdjustment;
 import com.journeygo.modules.settlement.entity.enums.FinancialAdjustmentStatus;
 import com.journeygo.modules.settlement.repository.FinancialAdjustmentRepository;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
+import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import com.journeygo.modules.wallet.entity.Wallet;
@@ -59,6 +62,7 @@ public class FinancialAdjustmentService {
     private final WalletRepository walletRepository;
     private final UserRepository userRepository;
     private final WalletService walletService;
+    private final NotificationPublisher notifications;
 
     // ── Create ────────────────────────────────────────────────────────────────
 
@@ -106,6 +110,18 @@ public class FinancialAdjustmentService {
 
         log.info("[FinancialAdjustment] Đã tạo khoản điều chỉnh id={} partner={} amount={}",
                 adjustment.getId(), partner.getId(), request.amount());
+
+        // Người tạo không tự duyệt khoản của mình: báo các Admin còn lại
+        notifications.send(NotificationType.ADJUSTMENT_PENDING)
+                .toRole(Role.ADMIN)
+                .except(adminId)
+                .title("Khoản điều chỉnh tài chính chờ duyệt")
+                .body(NotificationPublisher.money(request.amount()) + " cho đối tác " + partner.getPartnerName()
+                        + (request.reason() == null || request.reason().isBlank() ? "." : " — " + request.reason().trim()))
+                .link("/admin/finance")
+                .ref("ADJUSTMENT", adjustment.getId())
+                .queue(NotificationPublisher.Queue.ADJUSTMENT_REVIEW)
+                .publish();
 
         return FinancialAdjustmentResponse.fromEntity(adjustment);
     }

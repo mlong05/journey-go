@@ -16,6 +16,9 @@ import com.journeygo.modules.destination.entity.Destination;
 import com.journeygo.modules.destination.repository.DestinationRepository;
 import com.journeygo.modules.experience.repository.TaskRepository;
 import com.journeygo.modules.experience.repository.CheckInPointRepository;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
+import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +41,7 @@ public class ExperienceService {
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
     private final CheckInPointRepository checkInPointRepository;
+    private final NotificationPublisher notifications;
 
     @Transactional(readOnly = true)
     public ExperienceResponse getById(Long id) {
@@ -118,6 +122,24 @@ public class ExperienceService {
     }
 
 
+    /**
+     * Báo Kiểm duyệt viên khi trải nghiệm của điểm đến ĐÃ phát hành vào hàng chờ duyệt.
+     * Điểm đến chưa duyệt thì không báo ở đây: lúc gửi duyệt điểm đến, gói trải nghiệm vào hàng chờ cùng lúc.
+     */
+    private void notifyPendingReview(Experience e, boolean edited) {
+        Destination destination = e.getDestination();
+        if (destination == null || !destination.isApproved()) return;
+        notifications.send(NotificationType.EXPERIENCE_PENDING)
+                .toRole(Role.MODERATOR)
+                .title(edited ? "Trải nghiệm được cập nhật, cần duyệt lại" : "Trải nghiệm mới chờ duyệt")
+                .body(NotificationPublisher.quote(e.getTitle()) + " tại " + NotificationPublisher.quote(destination.getName())
+                        + " đang chờ bạn thẩm định.")
+                .link("/moderator/destinations/" + destination.getId())
+                .ref("EXPERIENCE", e.getId())
+                .queue(NotificationPublisher.Queue.EXPERIENCE_REVIEW)
+                .publish();
+    }
+
     private ExperienceResponse toResponseWithCounts(Experience e) {
         int taskCount = (int) taskRepository.countByExperienceId(e.getId());
         int cipCount = (int) checkInPointRepository.countByExperienceId(e.getId());
@@ -148,6 +170,7 @@ public class ExperienceService {
 
         Experience saved = experienceRepository.saveAndFlush(e);
         log.info("Created Experience id={} by user={}", saved.getId(), creatorId);
+        notifyPendingReview(saved, false);
 
         return ExperienceResponse.fromEntity(saved, 0, 0);
     }
@@ -173,6 +196,7 @@ public class ExperienceService {
 
         Experience saved = experienceRepository.save(e);
         log.info("Updated Experience id={}", saved.getId());
+        notifyPendingReview(saved, true);
 
         int taskCount = (int) taskRepository.countByExperienceId(saved.getId());
         int cipCount = (int) checkInPointRepository.countByExperienceId(saved.getId());

@@ -42,6 +42,8 @@ public enum ErrorCode {
     INVALID_CONTENT_REVIEW_STATUS("Trạng thái kiểm duyệt nội dung không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
     CLOUDINARY_NOT_CONFIGURED("Cloudinary chưa được cấu hình trên máy chủ", HttpStatus.SERVICE_UNAVAILABLE),
     INVALID_CLOUDINARY_ASSET("Ảnh Cloudinary không hợp lệ hoặc không thuộc tài khoản hiện tại", HttpStatus.BAD_REQUEST),
+    GEOCODING_NOT_CONFIGURED("Dịch vụ bản đồ Goong chưa được cấu hình trên máy chủ", HttpStatus.SERVICE_UNAVAILABLE),
+    GEOCODING_UNAVAILABLE("Không lấy được dữ liệu bản đồ từ Goong, vui lòng thử lại", HttpStatus.BAD_GATEWAY),
 
     // ── Booking ───────────────────────────────────────────────────────────────
     BOOKING_NOT_FOUND("Booking không tồn tại", HttpStatus.NOT_FOUND),
@@ -89,7 +91,10 @@ public enum ErrorCode {
     SETTLEMENT_NO_ELIGIBLE_REVENUE("Không có khoản doanh thu nào đủ điều kiện để tất toán", HttpStatus.BAD_REQUEST),
     SETTLEMENT_ELIGIBILITY_CHANGED("Điều kiện tất toán đã thay đổi — vui lòng cập nhật lại đợt tất toán", HttpStatus.CONFLICT),
     FINANCIAL_ADJUSTMENT_NOT_FOUND("Khoản điều chỉnh tài chính không tồn tại", HttpStatus.NOT_FOUND),
-    WALLET_INSUFFICIENT_BALANCE("Số dư ví không đủ để thực hiện khoản khấu trừ", HttpStatus.CONFLICT);
+    WALLET_INSUFFICIENT_BALANCE("Số dư ví không đủ để thực hiện khoản khấu trừ", HttpStatus.CONFLICT),
+
+    // ── Notification ──────────────────────────────────────────────────────────
+    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại", HttpStatus.NOT_FOUND);
 
     private final String message;
     private final HttpStatus httpStatus;

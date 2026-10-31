@@ -12,6 +12,8 @@ import {
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
 import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout";
+import { NotificationProvider } from "@/context/NotificationContext";
+import NotificationToaster from "@/components/notifications/NotificationToaster";
 
 
 export default function ProviderLayout({ children }) {
@@ -88,54 +90,57 @@ export default function ProviderLayout({ children }) {
       })?.label || "Tổng quan";
 
   return (
-    <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 font-sans antialiased text-slate-800">
-      <Sidebar
-        role="provider"
-        navItems={navMenuItems}
-        onLogout={performLogout}
-        isOpenMobile={isSidebarOpen}
-        onCloseMobile={() => setIsSidebarOpen(false)}
-        isWide={isSidebarWide}
-        onToggleWide={() => setIsSidebarWide((prev) => !prev)}
-      />
-
-      <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
-        <DashboardHeader
+    <NotificationProvider>
+      <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 font-sans antialiased text-slate-800">
+        <Sidebar
           role="provider"
-          user={authData?.user}
-          section="Đối tác"
-          title={currentTitle}
-          onOpenMenu={() => setIsSidebarOpen(true)}
-        >
-          <NotificationBell hint="Kết quả thẩm định điểm đến và tour của bạn sẽ hiện ở đây." />
-        </DashboardHeader>
+          navItems={navMenuItems}
+          onLogout={performLogout}
+          isOpenMobile={isSidebarOpen}
+          onCloseMobile={() => setIsSidebarOpen(false)}
+          isWide={isSidebarWide}
+          onToggleWide={() => setIsSidebarWide((prev) => !prev)}
+        />
 
-        {/* ── NỘI DUNG TRANG CHÍNH: Cố định toàn khung với các trang danh sách, cho phép con tự cuộn ── */}
-        <main
-          className={
-            isScrollLockedPage
-              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8"
-              : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
-          }
-        >
-          <div
+        <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
+          <DashboardHeader
+            role="provider"
+            user={authData?.user}
+            section="Đối tác"
+            title={currentTitle}
+            onOpenMenu={() => setIsSidebarOpen(true)}
+          >
+            <NotificationBell hint="Kết quả thẩm định điểm đến và tour của bạn sẽ hiện ở đây." />
+          </DashboardHeader>
+
+          {/* ── NỘI DUNG TRANG CHÍNH: Cố định toàn khung với các trang danh sách, cho phép con tự cuộn ── */}
+          <main
             className={
               isScrollLockedPage
-                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
-                : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
+                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8"
+                : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
             }
           >
-            {children}
-          </div>
-        </main>
-      </div>
+            <div
+              className={
+                isScrollLockedPage
+                  ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
+                  : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
+              }
+            >
+              {children}
+            </div>
+          </main>
+        </div>
 
-      {/* Modal đăng xuất cao cấp tích hợp */}
-      <LogoutModal
-        isOpen={logoutModal.isOpen}
-        status={logoutModal.status}
-        message={logoutModal.message}
-      />
-    </div>
+        {/* Modal đăng xuất cao cấp tích hợp */}
+        <LogoutModal
+          isOpen={logoutModal.isOpen}
+          status={logoutModal.status}
+          message={logoutModal.message}
+        />
+      </div>
+      <NotificationToaster />
+    </NotificationProvider>
   );
 }
