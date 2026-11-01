@@ -18,6 +18,9 @@ export default function CoverImageField({
   label = "Ảnh bìa điểm đến",
   folder = "journeygo/destinations",
   hint = "",
+  badge = "(khuyến nghị)",
+  emptyTitle = "Tải ảnh bìa lên",
+  emptyHint = "Ảnh ngang 16:9, tối đa 10MB · hiện trên thẻ tour trong app",
 }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -59,9 +62,11 @@ export default function CoverImageField({
       <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
         <ImageIcon size={13} className={iconClassName} />
         <span>{label}</span>
-        <span className="text-[11px] font-semibold normal-case tracking-normal text-slate-400">
-          (khuyến nghị)
-        </span>
+        {badge && (
+          <span className="text-[11px] font-semibold normal-case tracking-normal text-slate-400">
+            {badge}
+          </span>
+        )}
       </label>
       {hint && <p className="text-[11px] text-slate-500 -mt-0.5">{hint}</p>}
 
@@ -111,8 +116,8 @@ export default function CoverImageField({
           className="w-full aspect-[16/9] max-h-44 rounded-xl border-2 border-dashed border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100/70 flex flex-col items-center justify-center gap-1.5 text-slate-500 transition-colors disabled:opacity-60 cursor-pointer"
         >
           {uploading ? <Loader2 size={22} className="animate-spin" /> : <ImagePlus size={22} />}
-          <span className="text-xs font-bold">{uploading ? "Đang tải ảnh lên…" : "Tải ảnh bìa lên"}</span>
-          <span className="text-[11px] text-slate-400">Ảnh ngang 16:9, tối đa 10MB · hiện trên thẻ tour trong app</span>
+          <span className="text-xs font-bold">{uploading ? "Đang tải ảnh lên…" : emptyTitle}</span>
+          {emptyHint && <span className="text-[11px] text-slate-400">{emptyHint}</span>}
         </button>
       )}
 

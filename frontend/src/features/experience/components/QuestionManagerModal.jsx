@@ -32,16 +32,22 @@ import CheckInStationFields, {
   persistStation,
 } from "./CheckInStationFields";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import CoverImageField from "@/features/destination/components/CoverImageField";
+import AnswerImagePicker from "./AnswerImagePicker";
+
+/** Phương án hợp lệ khi có nội dung chữ hoặc có ảnh (câu hỏi kiểu "chọn ảnh đúng"). */
+const hasAnswerBody = (a) => Boolean(a.content?.trim() || a.imageUrl);
 
 const INITIAL_QUESTION_FORM = {
   content: "",
+  imageUrl: "",
   questionType: "MULTIPLE_CHOICE",
   sequenceOrder: 0,
   expectedText: "",
   // Các phương án trắc nghiệm ban đầu
   initialAnswers: [
-    { content: "", isCorrect: true, explanation: "" },
-    { content: "", isCorrect: false, explanation: "" },
+    { content: "", imageUrl: "", isCorrect: true, explanation: "" },
+    { content: "", imageUrl: "", isCorrect: false, explanation: "" },
   ],
 };
 
@@ -202,7 +208,7 @@ export default function QuestionManagerModal({
         errs.expectedText = "Vui lòng nhập đáp án mẫu mong đợi cho câu tự luận.";
       }
     } else if (form.questionType === "MULTIPLE_CHOICE") {
-      const validAnswers = form.initialAnswers.filter((a) => a.content.trim());
+      const validAnswers = form.initialAnswers.filter(hasAnswerBody);
       if (validAnswers.length < 2) {
         errs.answers = "Cần ít nhất 2 phương án trả lời cho câu trắc nghiệm.";
       } else {
@@ -216,6 +222,14 @@ export default function QuestionManagerModal({
     return Object.keys(errs).length === 0;
   };
 
+  // Sửa một phương án trong form tạo câu hỏi (không sửa trực tiếp object cũ)
+  const updateInitialAnswer = (idx, patch) => {
+    setForm((f) => ({
+      ...f,
+      initialAnswers: f.initialAnswers.map((a, i) => (i === idx ? { ...a, ...patch } : a)),
+    }));
+  };
+
   // Tạo câu hỏi mới
   const handleCreateQuestion = async (e) => {
     e.preventDefault();
@@ -226,6 +240,7 @@ export default function QuestionManagerModal({
     try {
       const qData = {
         content: form.content.trim(),
+        imageUrl: form.imageUrl || null,
         questionType: form.questionType,
         sequenceOrder: Number(form.sequenceOrder) || questions.length,
         expectedText: form.questionType === "TEXT" ? form.expectedText.trim() : null,
@@ -252,11 +267,12 @@ export default function QuestionManagerModal({
 
       // Nếu là trắc nghiệm, tạo các phương án trả lời kèm theo
       if (form.questionType === "MULTIPLE_CHOICE" && createdQ?.id) {
-        const validAnswers = form.initialAnswers.filter((a) => a.content.trim());
+        const validAnswers = form.initialAnswers.filter(hasAnswerBody);
         for (let i = 0; i < validAnswers.length; i++) {
           const ans = validAnswers[i];
           await answerService.create(createdQ.id, {
             content: ans.content.trim(),
+            imageUrl: ans.imageUrl || null,
             isCorrect: ans.isCorrect,
             sequenceOrder: i,
             explanation: ans.explanation?.trim() || null,
@@ -329,21 +345,22 @@ export default function QuestionManagerModal({
 
   // Thêm phương án trả lời mới vào câu hỏi MULTIPLE_CHOICE có sẵn
   const handleAddAnswer = async (qId, currentAnswers = []) => {
-    if (!newAnswerForm.content.trim()) {
-      showToast("Vui lòng nhập nội dung đáp án.");
+    if (!hasAnswerBody(newAnswerForm)) {
+      showToast("Vui lòng nhập nội dung hoặc chọn ảnh cho phương án.");
       return;
     }
     setActionLoading(true);
     try {
       await answerService.create(qId, {
         content: newAnswerForm.content.trim(),
+        imageUrl: newAnswerForm.imageUrl || null,
         isCorrect: Boolean(newAnswerForm.isCorrect),
         sequenceOrder: currentAnswers.length,
         explanation: newAnswerForm.explanation?.trim() || null,
       });
       showToast("Đã thêm phương án trả lời.");
       setAddingAnswerQuestionId(null);
-      setNewAnswerForm({ content: "", isCorrect: false, explanation: "" });
+      setNewAnswerForm({ content: "", imageUrl: "", isCorrect: false, explanation: "" });
       await loadQuestions();
       onQuestionsUpdated?.();
     } catch (err) {
@@ -378,6 +395,26 @@ export default function QuestionManagerModal({
   };
 
   // Xóa phương án trả lời
+  // Đổi hoặc gỡ ảnh của phương án đã lưu (url rỗng = gỡ ảnh)
+  const handleAnswerImageChange = async (ans, url) => {
+    if (!url && !ans.content?.trim()) {
+      showToast("Phương án này chỉ có ảnh, không thể gỡ ảnh. Hãy xoá phương án nếu không dùng nữa.");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await answerService.update(ans.id, { imageUrl: url || "" });
+      showToast(url ? "Đã cập nhật ảnh phương án." : "Đã gỡ ảnh phương án.");
+      await loadQuestions();
+      onQuestionsUpdated?.();
+    } catch (err) {
+      console.error("[QuestionManager] update answer image error", err);
+      showToast(err?.response?.data?.message || err?.message || "Lỗi cập nhật ảnh phương án.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleDeleteAnswer = async (ansId) => {
     if (!allowManage) return;
     const ok = await confirm({
@@ -626,6 +663,20 @@ export default function QuestionManagerModal({
                 )}
               </div>
 
+              {/* Ảnh minh hoạ câu hỏi (không bắt buộc) */}
+              <CoverImageField
+                value={form.imageUrl}
+                onChange={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
+                disabled={actionLoading}
+                iconClassName="text-indigo-600"
+                label="Ảnh minh hoạ câu hỏi"
+                badge="(không bắt buộc)"
+                folder="journeygo/questions"
+                hint="Du khách sẽ thấy ảnh này phía trên câu hỏi, ví dụ ảnh hiện vật hoặc chi tiết kiến trúc cần nhận diện."
+                emptyTitle="Tải ảnh minh hoạ lên"
+                emptyHint="PNG, JPG hoặc WEBP, tối đa 10MB"
+              />
+
               {/* Thứ tự */}
               <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-1.5">
@@ -702,7 +753,7 @@ export default function QuestionManagerModal({
                           ...form,
                           initialAnswers: [
                             ...form.initialAnswers,
-                            { content: "", isCorrect: false, explanation: "" },
+                            { content: "", imageUrl: "", isCorrect: false, explanation: "" },
                           ],
                         })
                       }
@@ -746,26 +797,24 @@ export default function QuestionManagerModal({
                             {ans.isCorrect ? <Check size={14} /> : labelChar}
                           </button>
 
+                          <AnswerImagePicker
+                            value={ans.imageUrl}
+                            onChange={(url) => updateInitialAnswer(idx, { imageUrl: url })}
+                            disabled={actionLoading}
+                          />
+
                           <div className="flex-1 space-y-1">
                             <input
                               type="text"
                               value={ans.content}
-                              onChange={(e) => {
-                                const updated = [...form.initialAnswers];
-                                updated[idx].content = e.target.value;
-                                setForm({ ...form, initialAnswers: updated });
-                              }}
-                              placeholder={`Nội dung phương án ${labelChar}...`}
+                              onChange={(e) => updateInitialAnswer(idx, { content: e.target.value })}
+                              placeholder={ans.imageUrl ? `Chú thích ảnh ${labelChar} (tùy chọn)...` : `Nội dung phương án ${labelChar}...`}
                               className="w-full px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-hidden focus:border-indigo-500"
                             />
                             <input
                               type="text"
                               value={ans.explanation}
-                              onChange={(e) => {
-                                const updated = [...form.initialAnswers];
-                                updated[idx].explanation = e.target.value;
-                                setForm({ ...form, initialAnswers: updated });
-                              }}
+                              onChange={(e) => updateInitialAnswer(idx, { explanation: e.target.value })}
                               placeholder="Lời giải thích vì sao đúng/sai (tùy chọn)..."
                               className="w-full px-3 py-1 text-[11px] text-slate-500 bg-white border border-slate-100 rounded-lg outline-hidden"
                             />
@@ -921,6 +970,16 @@ export default function QuestionManagerModal({
                             <h5 className="font-bold text-slate-900 text-xs sm:text-sm mt-1 truncate max-w-xl">
                               {q.content}
                             </h5>
+                            {q.imageUrl && (
+                              <a href={q.imageUrl} target="_blank" rel="noopener noreferrer" className="block mt-2 w-fit">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={q.imageUrl}
+                                  alt="Ảnh minh hoạ câu hỏi"
+                                  className="h-20 w-auto max-w-[220px] rounded-lg border border-slate-200 object-cover"
+                                />
+                              </a>
+                            )}
                           </div>
                         </div>
 
@@ -1087,6 +1146,7 @@ export default function QuestionManagerModal({
                                       setAddingAnswerQuestionId(q.id);
                                       setNewAnswerForm({
                                         content: "",
+                                        imageUrl: "",
                                         isCorrect: false,
                                         explanation: "",
                                       });
@@ -1131,6 +1191,22 @@ export default function QuestionManagerModal({
                                           {ans.isCorrect ? <Check size={12} /> : labelChar}
                                         </button>
 
+                                        {allowManage ? (
+                                          <AnswerImagePicker
+                                            value={ans.imageUrl}
+                                            onChange={(url) => handleAnswerImageChange(ans, url)}
+                                            disabled={actionLoading}
+                                            size={48}
+                                          />
+                                        ) : (
+                                          ans.imageUrl && (
+                                            <a href={ans.imageUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                                              <img src={ans.imageUrl} alt={`Ảnh phương án ${labelChar}`} className="w-12 h-12 rounded-lg border border-slate-200 object-cover" />
+                                            </a>
+                                          )
+                                        )}
+
                                         <div className="min-w-0">
                                           <div className="flex items-center gap-2">
                                             <p
@@ -1138,7 +1214,7 @@ export default function QuestionManagerModal({
                                                 ans.isCorrect ? "text-emerald-950" : "text-slate-800"
                                               }`}
                                             >
-                                              {ans.content}
+                                              {ans.content || (ans.imageUrl ? <span className="italic text-slate-400">(Phương án bằng ảnh)</span> : "")}
                                             </p>
                                             {ans.isCorrect && (
                                               <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded">
@@ -1182,18 +1258,25 @@ export default function QuestionManagerModal({
                                       <X size={14} />
                                     </button>
                                   </div>
-                                  <input
-                                    type="text"
-                                    value={newAnswerForm.content}
-                                    onChange={(e) =>
-                                      setNewAnswerForm({
-                                        ...newAnswerForm,
-                                        content: e.target.value,
-                                      })
-                                    }
-                                    placeholder="Nội dung phương án..."
-                                    className="w-full px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-hidden"
-                                  />
+                                  <div className="flex items-start gap-2">
+                                    <AnswerImagePicker
+                                      value={newAnswerForm.imageUrl}
+                                      onChange={(url) => setNewAnswerForm((f) => ({ ...f, imageUrl: url }))}
+                                      disabled={actionLoading}
+                                    />
+                                    <input
+                                      type="text"
+                                      value={newAnswerForm.content}
+                                      onChange={(e) =>
+                                        setNewAnswerForm({
+                                          ...newAnswerForm,
+                                          content: e.target.value,
+                                        })
+                                      }
+                                      placeholder={newAnswerForm.imageUrl ? "Chú thích ảnh (tùy chọn)..." : "Nội dung phương án..."}
+                                      className="flex-1 px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-hidden"
+                                    />
+                                  </div>
                                   <input
                                     type="text"
                                     value={newAnswerForm.explanation}

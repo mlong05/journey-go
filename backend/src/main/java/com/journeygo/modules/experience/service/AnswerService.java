@@ -38,11 +38,19 @@ public class AnswerService {
                     "Chỉ tạo Answer khi Task ở trạng thái DRAFT");
         }
 
+        String content = req.content() == null ? "" : req.content().trim();
+        String imageUrl = blankToNull(req.imageUrl());
+        if (content.isEmpty() && imageUrl == null) {
+            throw new BusinessException("BR-A-CONTENT",
+                    "Phương án phải có nội dung hoặc ảnh");
+        }
+
         validateAnswerCorrectness(q, null, Boolean.TRUE.equals(req.isCorrect()));
 
         Answer a = Answer.builder()
                 .question(q)
-                .content(req.content())
+                .content(content)
+                .imageUrl(imageUrl)
                 .isCorrect(Boolean.TRUE.equals(req.isCorrect()))
                 .sequenceOrder(req.sequenceOrder())
                 .explanation(req.explanation())
@@ -68,13 +76,22 @@ public class AnswerService {
             validateAnswerCorrectness(a.getQuestion(), a.getId(), newIsCorrect);
         }
 
-        if (req.content() != null) a.setContent(req.content());
+        if (req.content() != null) a.setContent(req.content().trim());
+        if (req.imageUrl() != null) a.setImageUrl(blankToNull(req.imageUrl()));
+        if ((a.getContent() == null || a.getContent().isBlank()) && a.getImageUrl() == null) {
+            throw new BusinessException("BR-A-CONTENT",
+                    "Phương án phải có nội dung hoặc ảnh");
+        }
         if (req.isCorrect() != null) a.setCorrect(req.isCorrect());
         if (req.sequenceOrder() != null) a.setSequenceOrder(req.sequenceOrder());
         if (req.explanation() != null) a.setExplanation(req.explanation());
 
         Answer saved = answerRepository.save(a);
         return AnswerResponse.fromEntity(saved);
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 
     @Transactional

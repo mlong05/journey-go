@@ -48,6 +48,7 @@ function buildCreatePayload(payload) {
     sequenceOrder: Number(payload.sequenceOrder),
     pointsReward: Number(payload.pointsReward),
     maxAttempts: num(payload.maxAttempts),
+    freeOrder: Boolean(payload.freeOrder),
     checkInPointId: num(payload.checkInPointId),
   };
 }
@@ -68,6 +69,7 @@ function buildUpdatePayload(payload) {
     out.maxAttempts = num(payload.maxAttempts);
   if (payload.checkInPointId !== undefined)
     out.checkInPointId = num(payload.checkInPointId);
+  if (payload.freeOrder !== undefined) out.freeOrder = Boolean(payload.freeOrder);
   return out;
 }
 

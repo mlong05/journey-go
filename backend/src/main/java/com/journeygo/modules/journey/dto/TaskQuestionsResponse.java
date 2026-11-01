@@ -25,6 +25,8 @@ public record TaskQuestionsResponse(
         TaskProgressStatus status,
         boolean requiresLocation,
         boolean sequential,
+        // Thứ tự tự do: mọi trạm đều có tọa độ, tới trạm nào chưa xong cũng mở được câu của trạm đó
+        boolean freeOrder,
         Integer questionIndex,
         Integer totalQuestions,
         boolean unlocked,
@@ -34,9 +36,10 @@ public record TaskQuestionsResponse(
         Integer distanceMeters,
         List<Question> questions
 ) {
-    public record Station(String name, BigDecimal latitude, BigDecimal longitude, Integer radiusMeters) {}
+    public record Station(Long questionId, String name, BigDecimal latitude, BigDecimal longitude, Integer radiusMeters,
+                          boolean done) {}
 
-    public record Question(Long id, String content, String questionType, Integer orderIndex, List<Option> options) {}
+    public record Question(Long id, String content, String imageUrl, String questionType, Integer orderIndex, List<Option> options) {}
 
-    public record Option(Long id, String content, Integer orderIndex) {}
+    public record Option(Long id, String content, String imageUrl, Integer orderIndex) {}
 }

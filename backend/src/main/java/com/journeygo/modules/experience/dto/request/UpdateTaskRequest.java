@@ -25,6 +25,9 @@ public record UpdateTaskRequest(
         @Min(1)
         Integer maxAttempts,
 
+        @Schema(description = "Thứ tự tự do giữa các trạm (nhiệm vụ tương tác ngoài thực tế)")
+        Boolean freeOrder,
+
         @Schema(description = "ID CheckInPoint (nếu task thuộc REAL_WORLD_INTERACTIVE)")
         Long checkInPointId
 ) {}
