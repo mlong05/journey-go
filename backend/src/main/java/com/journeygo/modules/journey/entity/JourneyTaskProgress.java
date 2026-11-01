@@ -65,6 +65,30 @@ public class JourneyTaskProgress {
     @Builder.Default
     private Integer currentQuestionIndex = 0;
 
+    /** Thứ tự tự do: id các câu hỏi đã trả lời đúng, ngăn cách bằng dấu phẩy. Giữ nguyên khi trả lời sai. */
+    @Column(name = "answered_question_ids", length = 2000)
+    private String answeredQuestionIds;
+
+    /** Tập id câu đã đúng (thứ tự tự do). */
+    public java.util.Set<Long> answeredIdSet() {
+        java.util.Set<Long> set = new java.util.LinkedHashSet<>();
+        if (answeredQuestionIds == null || answeredQuestionIds.isBlank()) return set;
+        for (String part : answeredQuestionIds.split(",")) {
+            try {
+                set.add(Long.parseLong(part.trim()));
+            } catch (NumberFormatException ignored) {
+                // bỏ qua phần hỏng
+            }
+        }
+        return set;
+    }
+
+    public void markAnswered(Long questionId) {
+        java.util.Set<Long> set = answeredIdSet();
+        set.add(questionId);
+        answeredQuestionIds = set.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+    }
+
     @Column(name = "user_answer", columnDefinition = "TEXT")
     private String userAnswer;
 

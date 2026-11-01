@@ -26,6 +26,7 @@ import {
   taskService,
   QuestionManagerModal,
 } from "@/features/experience";
+import StationOrderPicker from "@/features/experience/components/StationOrderPicker";
 
 /**
  * Trang Soạn Thảo Nhiệm Vụ — /provider/tasks/create
@@ -45,6 +46,7 @@ const INITIAL_FORM = {
   sequenceOrder: 0,
   pointsReward: 10,
   maxAttempts: 3,
+  freeOrder: false,
   checkInPointId: "",
   // Cấu hình điều kiện mở khóa kèm theo khi tạo
   enableUnlockCondition: false,
@@ -243,6 +245,7 @@ export default function CreateTaskPage() {
         sequenceOrder: Number(form.sequenceOrder) || 0,
         pointsReward: Number(form.pointsReward) || 0,
         maxAttempts: form.maxAttempts ? Number(form.maxAttempts) : 3,
+        freeOrder: Boolean(selectedType?.requiresLocation && form.freeOrder),
       };
 
       const created = await taskService.create(experienceId, payload);
@@ -561,6 +564,14 @@ export default function CreateTaskPage() {
               </div>
 
             </div>
+
+            {selectedType?.requiresLocation && (
+              <StationOrderPicker
+                value={form.freeOrder}
+                onChange={(v) => handleChange("freeOrder", v)}
+                disabled={isSaving}
+              />
+            )}
 
           </div>
 

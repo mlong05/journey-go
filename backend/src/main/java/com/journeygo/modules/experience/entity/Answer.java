@@ -25,6 +25,10 @@ public class Answer {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    /** Ảnh của phương án (câu hỏi kiểu "chọn ảnh đúng"). Có ảnh thì content được phép để trống. */
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
     @Column(name = "is_correct", nullable = false)
     @Builder.Default
     private boolean isCorrect = false;

@@ -15,6 +15,7 @@ public record QuestionResponse(
         @Schema(description = "ID Question") Long id,
         @Schema(description = "ID Task") Long taskId,
         @Schema(description = "Nội dung câu hỏi") String content,
+        @Schema(description = "URL ảnh minh hoạ cho câu hỏi") String imageUrl,
         @Schema(description = "Đáp án cho câu TEXT (ẨN với Tourist — BR-TASK-5)") String expectedText,
         @Schema(description = "Loại câu hỏi") QuestionType questionType,
         @Schema(description = "Thứ tự") Integer sequenceOrder,
@@ -27,6 +28,7 @@ public record QuestionResponse(
                 .id(q.getId())
                 .taskId(q.getTask() != null ? q.getTask().getId() : null)
                 .content(q.getContent())
+                .imageUrl(q.getImageUrl())
                 .expectedText(q.getExpectedText())
                 .questionType(q.getQuestionType())
                 .sequenceOrder(q.getSequenceOrder())
@@ -44,6 +46,7 @@ public record QuestionResponse(
                 .id(q.getId())
                 .taskId(q.getTask() != null ? q.getTask().getId() : null)
                 .content(q.getContent())
+                .imageUrl(q.getImageUrl())
                 .expectedText(null)   // ẨN
                 .questionType(q.getQuestionType())
                 .sequenceOrder(q.getSequenceOrder())

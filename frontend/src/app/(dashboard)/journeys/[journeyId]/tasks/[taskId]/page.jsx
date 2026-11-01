@@ -374,8 +374,10 @@ export default function TaskPage() {
         : choices[question.id] != null;
     const allAnswered = questions.every(answered);
     const isLast = i === questions.length - 1;
-    const shownNumber = task.sequential ? task.questionIndex + 1 : i + 1;
-    const shownTotal = task.sequential ? task.totalQuestions : questions.length;
+    // Nhiệm vụ thực địa (tuần tự hoặc tự do) làm từng câu tại từng trạm
+    const stepwise = task.sequential || task.freeOrder;
+    const shownNumber = stepwise ? task.questionIndex + 1 : i + 1;
+    const shownTotal = stepwise ? task.totalQuestions : questions.length;
 
     return (
       <div className="mx-auto max-w-xl space-y-4">
@@ -399,13 +401,23 @@ export default function TaskPage() {
           </div>
         </div>
 
-        {task.sequential && task.station && (
+        {stepwise && task.station && (
           <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
             <MapPin className="h-4 w-4" /> Tại: {task.station.name}
           </p>
         )}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          {q.imageUrl && (
+            <a href={q.imageUrl} target="_blank" rel="noopener noreferrer" className="mb-4 block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={q.imageUrl}
+                alt="Ảnh minh hoạ câu hỏi"
+                className="max-h-72 w-full rounded-xl object-cover"
+              />
+            </a>
+          )}
           <h1 className="text-lg font-extrabold leading-snug">{q.content}</h1>
         </section>
 
@@ -418,6 +430,44 @@ export default function TaskPage() {
             disabled={busy}
             className="w-full rounded-2xl border border-gray-300 p-4 focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900"
           />
+        ) : q.options.some((o) => o.imageUrl) ? (
+          // Câu hỏi "chọn ảnh đúng": phương án hiện thành lưới ảnh 2 cột
+          <div className="grid grid-cols-2 gap-2.5">
+            {q.options.map((option, n) => {
+              const selected = choices[q.id] === option.id;
+              return (
+                <button
+                  key={option.id}
+                  onClick={() => setChoices((prev) => ({ ...prev, [q.id]: option.id }))}
+                  disabled={busy}
+                  className={`relative overflow-hidden rounded-2xl border-2 text-left transition-colors ${
+                    selected
+                      ? "border-emerald-500 bg-emerald-50"
+                      : "border-gray-200 bg-white hover:border-emerald-300 dark:border-gray-800 dark:bg-gray-900"
+                  }`}
+                >
+                  {option.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={option.imageUrl} alt={`Phương án ${LETTERS[n] ?? n + 1}`} className="aspect-square w-full object-cover" />
+                  ) : (
+                    <div className="flex aspect-square w-full items-center justify-center bg-gray-50 p-3 text-center text-[15px] dark:bg-gray-800">
+                      {option.content}
+                    </div>
+                  )}
+                  <span
+                    className={`absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold shadow ${
+                      selected ? "bg-emerald-500 text-white" : "bg-white/90 text-gray-600"
+                    }`}
+                  >
+                    {selected ? "✓" : (LETTERS[n] ?? n + 1)}
+                  </span>
+                  {option.imageUrl && option.content && (
+                    <span className="block px-3 py-2 text-sm leading-snug">{option.content}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         ) : (
           <div className="space-y-2.5">
             {q.options.map((option, n) => {
@@ -450,7 +500,7 @@ export default function TaskPage() {
         {errorBox}
 
         <div className="flex gap-2 pt-1">
-          {!task.sequential && i > 0 && (
+          {!stepwise && i > 0 && (
             <button
               onClick={() => setIndex(i - 1)}
               disabled={busy}
@@ -459,13 +509,13 @@ export default function TaskPage() {
               ←
             </button>
           )}
-          {task.sequential || isLast ? (
+          {stepwise || isLast ? (
             <button
               onClick={submit}
-              disabled={busy || (task.sequential ? !answered(q) : !allAnswered)}
+              disabled={busy || (stepwise ? !answered(q) : !allAnswered)}
               className="flex-1 rounded-xl bg-emerald-600 py-3.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              {busy ? "Đang gửi..." : task.sequential ? "Xác nhận câu trả lời" : "Nộp bài"}
+              {busy ? "Đang gửi..." : stepwise ? "Xác nhận câu trả lời" : "Nộp bài"}
             </button>
           ) : (
             <button

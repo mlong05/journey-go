@@ -124,6 +124,10 @@ class TourJourney {
   /// Thời điểm đi xong toàn bộ hành trình; null khi chưa xong.
   final DateTime? completedAt;
 
+  /// Bán kính check-in GPS (mét) và điểm thưởng đi trọn hành trình, lấy từ backend.
+  final int checkInRadiusMeters;
+  final int completionBonusPoints;
+
   const TourJourney({
     required this.id,
     required this.tourId,
@@ -134,6 +138,8 @@ class TourJourney {
     required this.totalDestinations,
     required this.destinations,
     this.completedAt,
+    this.checkInRadiusMeters = 100,
+    this.completionBonusPoints = 50,
   });
 
   factory TourJourney.fromJson(Map<String, dynamic> j) {
@@ -149,10 +155,16 @@ class TourJourney {
       totalDestinations: _int(j['totalDestinations'], dests.length),
       destinations: dests,
       completedAt: DateTime.tryParse(_str(j['completedAt']))?.toLocal(),
+      checkInRadiusMeters: _int(j['checkInRadiusMeters'], 100),
+      completionBonusPoints: _int(j['completionBonusPoints'], 50),
     );
   }
 
   bool get isCompleted => status == ProgressStatus.completed;
+
+  /// Điểm đến đang tới lượt (null khi đã xong hoặc chưa có dữ liệu điểm đến).
+  JourneyDestination? get currentDestination =>
+      destinations.where((d) => d.isCurrent).firstOrNull;
   int get doneCount => destinations.where((d) => d.isDone).length;
   double get progress => totalDestinations == 0 ? 0 : doneCount / totalDestinations;
   int get pointsEarned =>
@@ -195,22 +207,28 @@ class CheckInResult {
 class QuestionOption {
   final int id;
   final String content;
+  final String? imageUrl; // phương án bằng ảnh (câu hỏi "chọn ảnh đúng")
 
-  const QuestionOption({required this.id, required this.content});
+  const QuestionOption({required this.id, required this.content, this.imageUrl});
 
-  factory QuestionOption.fromJson(Map<String, dynamic> j) =>
-      QuestionOption(id: _int(j['id']), content: _str(j['content']));
+  factory QuestionOption.fromJson(Map<String, dynamic> j) => QuestionOption(
+        id: _int(j['id']),
+        content: _str(j['content']),
+        imageUrl: _str(j['imageUrl']).trim().isEmpty ? null : _str(j['imageUrl']).trim(),
+      );
 }
 
 class TaskQuestion {
   final int id;
   final String content;
+  final String? imageUrl; // ảnh minh hoạ do provider tải lên (có thể không có)
   final String type; // MULTIPLE_CHOICE | TEXT
   final List<QuestionOption> options;
 
   const TaskQuestion({
     required this.id,
     required this.content,
+    this.imageUrl,
     required this.type,
     required this.options,
   });
@@ -221,6 +239,7 @@ class TaskQuestion {
     return TaskQuestion(
       id: _int(j['id']),
       content: _str(j['content']),
+      imageUrl: _str(j['imageUrl']).trim().isEmpty ? null : _str(j['imageUrl']).trim(),
       type: _str(j['questionType'], 'MULTIPLE_CHOICE'),
       options: opts.map(QuestionOption.fromJson).toList(),
     );
@@ -230,24 +249,34 @@ class TaskQuestion {
 }
 
 class TaskStation {
+  final int? questionId;
   final String name;
   final double? latitude;
   final double? longitude;
   final int? radiusMeters;
 
+  /// Đã trả lời đúng câu hỏi của trạm này.
+  final bool done;
+
   const TaskStation({
+    this.questionId,
     required this.name,
     required this.latitude,
     required this.longitude,
     required this.radiusMeters,
+    this.done = false,
   });
 
   factory TaskStation.fromJson(Map<String, dynamic> j) => TaskStation(
+        questionId: _intOrNull(j['questionId']),
         name: _str(j['name'], 'Trạm kế tiếp'),
         latitude: _doubleOrNull(j['latitude']),
         longitude: _doubleOrNull(j['longitude']),
         radiusMeters: _intOrNull(j['radiusMeters']),
+        done: j['done'] == true,
       );
+
+  bool get hasCoords => latitude != null && longitude != null;
 }
 
 /// Nội dung một nhiệm vụ cho du khách (không bao giờ có đáp án đúng).
@@ -263,6 +292,9 @@ class TaskContent {
   final String status;
   final bool requiresLocation;
   final bool sequential;
+
+  /// Thứ tự tự do: mọi trạm có tọa độ, tới trạm nào chưa xong cũng mở được câu của trạm đó.
+  final bool freeOrder;
   final int questionIndex;
   final int totalQuestions;
   final bool unlocked;
@@ -285,6 +317,7 @@ class TaskContent {
     required this.status,
     required this.requiresLocation,
     required this.sequential,
+    this.freeOrder = false,
     required this.questionIndex,
     required this.totalQuestions,
     required this.unlocked,
@@ -308,6 +341,7 @@ class TaskContent {
       status: _str(j['status'], ProgressStatus.notStarted),
       requiresLocation: j['requiresLocation'] == true,
       sequential: j['sequential'] == true,
+      freeOrder: j['freeOrder'] == true,
       questionIndex: _int(j['questionIndex']),
       totalQuestions: _int(j['totalQuestions']),
       unlocked: j['unlocked'] == true,
@@ -321,6 +355,9 @@ class TaskContent {
   bool get isCompleted => status == ProgressStatus.completed;
   bool get isFailed => status == ProgressStatus.failed;
   bool get isFinished => isCompleted || isFailed;
+
+  /// Số trạm đã xong (thứ tự tự do đếm theo cờ done; tuần tự là vị trí câu hiện tại).
+  int get stationsDone => freeOrder ? stations.where((s) => s.done).length : questionIndex;
 }
 
 /// Một câu trả lời gửi lên: trắc nghiệm dùng [answerId], tự luận dùng [text].

@@ -11,6 +11,11 @@ public record CreateQuestionRequest(
         @NotBlank(message = "Nội dung câu hỏi không được để trống")
         String content,
 
+        @Schema(description = "URL ảnh minh hoạ cho câu hỏi (tải lên qua /api/v1/upload/image). Không bắt buộc")
+        @Size(max = 1000)
+        @Pattern(regexp = "^https://.*", message = "URL ảnh phải bắt đầu bằng https://")
+        String imageUrl,
+
         @Schema(description = "Loại câu hỏi (MULTIPLE_CHOICE / TEXT)")
         @NotNull(message = "Question type không được để trống")
         QuestionType questionType,

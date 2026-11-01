@@ -41,6 +41,7 @@ export async function getQuestionById(id, forTourist = false) {
 export async function createQuestion(taskId, payload) {
   const body = {
     content: (payload.content || "").trim(),
+    imageUrl: payload.imageUrl ? String(payload.imageUrl).trim() : null,
     questionType: payload.questionType || "MULTIPLE_CHOICE",
     sequenceOrder: Number(payload.sequenceOrder) || 0,
     expectedText: payload.expectedText ? String(payload.expectedText).trim() : null,

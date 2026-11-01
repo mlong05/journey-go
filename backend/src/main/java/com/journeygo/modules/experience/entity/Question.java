@@ -29,6 +29,10 @@ public class Question {
     private String content;
 
 
+    /** Ảnh minh hoạ cho câu hỏi (URL https tải lên qua /upload/image). Không bắt buộc. */
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
     @Column(name = "expected_text", length = 500)
     private String expectedText;
 

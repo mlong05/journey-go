@@ -21,6 +21,7 @@ public record TaskResponse(
         @Schema(description = "Thứ tự") Integer sequenceOrder,
         @Schema(description = "Điểm thưởng") Integer pointsReward,
         @Schema(description = "Số lần thử tối đa") Integer maxAttempts,
+        @Schema(description = "Thứ tự tự do giữa các trạm") boolean freeOrder,
         @Schema(description = "ID CheckInPoint") Long checkInPointId,
         @Schema(description = "Trạng thái") TaskStatus status,
         @Schema(description = "Ngày tạo") Instant createdAt,
@@ -38,6 +39,7 @@ public record TaskResponse(
                 .sequenceOrder(t.getSequenceOrder())
                 .pointsReward(t.getPointsReward())
                 .maxAttempts(t.getMaxAttempts())
+                .freeOrder(Boolean.TRUE.equals(t.getFreeOrder()))
                 .checkInPointId(t.getCheckInPoint() != null ? t.getCheckInPoint().getId() : null)
                 .status(t.getStatus())
                 .createdAt(t.getCreatedAt())

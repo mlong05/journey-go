@@ -40,6 +40,7 @@ public record TourInfo(
             Integer maxAttempts,
             String clue,
             boolean requiresLocation,
+            boolean freeOrder,
             List<QuestionInfo> questions
     ) {}
 
@@ -55,13 +56,15 @@ public record TourInfo(
             BigDecimal stationLongitude,
             Integer stationRadiusMeters,
             String stationQrToken,
-            List<AnswerInfo> answers
+            List<AnswerInfo> answers,
+            String imageUrl
     ) {}
 
     public record AnswerInfo(
             Long answerId,
             String content,
             boolean correct,
-            Integer orderIndex
+            Integer orderIndex,
+            String imageUrl
     ) {}
 }

@@ -9,6 +9,11 @@ public record UpdateAnswerRequest(
         @Schema(description = "Nội dung đáp án")
         String content,
 
+        @Schema(description = "URL ảnh của phương án; null = giữ nguyên, chuỗi rỗng = gỡ ảnh")
+        @Size(max = 1000)
+        @Pattern(regexp = "^$|^https://.*", message = "URL ảnh phải bắt đầu bằng https://")
+        String imageUrl,
+
         @Schema(description = "Đáp án đúng?")
         Boolean isCorrect,
 

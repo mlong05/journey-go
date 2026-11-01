@@ -47,6 +47,13 @@ public class Task {
     @Builder.Default
     private Integer maxAttempts = 3;
 
+    /**
+     * Nhiệm vụ tương tác ngoài thực tế: true = du khách tới trạm nào trước cũng được (thứ tự tự do);
+     * false/null = đi lần lượt theo thứ tự câu hỏi.
+     */
+    @Column(name = "free_order")
+    private Boolean freeOrder;
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "check_in_point_id")

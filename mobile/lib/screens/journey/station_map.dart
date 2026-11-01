@@ -6,6 +6,16 @@ import 'map_kit.dart';
 
 export 'map_kit.dart' show compassLabel, turnHint, bearingBetween, formatDistance;
 
+/// Một trạm phụ hiện trên bản đồ (nhiệm vụ thứ tự tự do): chạm để chọn làm đích đến.
+class StationMarker {
+  final LatLng point;
+  final String label;
+  final bool done;
+  final VoidCallback? onTap;
+
+  const StationMarker({required this.point, required this.label, required this.done, this.onTap});
+}
+
 /// Bản đồ dẫn đường phủ kín vùng chứa: trạm đích (vòng bán kính nhấp nháy), vị trí du khách
 /// (mũi tên theo hướng đi) và đường nối: còn xa thì vẽ tuyến đi bộ [route], gần thì nối thẳng. Màn cha giữ các nút điều khiển và gọi
 /// [StationMapState.fitAll] / [StationMapState.focusUser] qua GlobalKey.
@@ -26,6 +36,9 @@ class StationMap extends StatefulWidget {
   /// Khoảng chừa khi căn khung, để hai điểm không bị thanh trên / bảng trượt che.
   final EdgeInsets fitPadding;
 
+  /// Các trạm khác của nhiệm vụ (thứ tự tự do); trạm đã xong màu ngọc, chưa xong màu cát.
+  final List<StationMarker> others;
+
   const StationMap({
     super.key,
     required this.station,
@@ -37,6 +50,7 @@ class StationMap extends StatefulWidget {
     this.route,
     this.inside = false,
     this.fitPadding = const EdgeInsets.all(56),
+    this.others = const [],
   });
 
   @override
@@ -66,6 +80,16 @@ class StationMapState extends State<StationMap> {
       padding: widget.fitPadding,
       maxZoom: 18.5,
     ));
+  }
+
+  /// Căn khung thấy mọi trạm (và du khách nếu có).
+  void fitStations() {
+    final points = [widget.station, ...widget.others.map((o) => o.point), ?widget.user];
+    if (points.length < 2) {
+      _controller.move(widget.station, 18);
+      return;
+    }
+    _controller.fitCamera(CameraFit.coordinates(coordinates: points, padding: widget.fitPadding, maxZoom: 18.5));
   }
 
   /// Đưa bản đồ về vị trí du khách.
@@ -129,6 +153,29 @@ class StationMapState extends State<StationMap> {
             ),
           ]),
         MarkerLayer(markers: [
+          for (final o in widget.others)
+            Marker(
+              point: o.point,
+              width: PlacePin.markerWidth,
+              height: PlacePin.markerHeight,
+              alignment: Marker.computePixelAlignment(
+                width: PlacePin.markerWidth,
+                height: PlacePin.markerHeight,
+                left: PlacePin.markerWidth / 2,
+                top: 18,
+              ),
+              child: GestureDetector(
+                onTap: o.onTap,
+                child: Opacity(
+                  opacity: o.done ? 0.8 : 1,
+                  child: PlacePin(
+                    color: o.done ? AppCultureColors.heritageJade : AppCultureColors.amberDark,
+                    label: o.label,
+                    child: Icon(o.done ? Icons.check_rounded : Icons.flag_outlined, color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+            ),
           Marker(
             point: widget.station,
             width: PlacePin.markerWidth,

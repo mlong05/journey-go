@@ -10,6 +10,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/route_service.dart';
+import '../common/heritage_motion.dart' show DrumMotif, SlowSpin;
 import 'journey_widgets.dart';
 import 'qr_scan_screen.dart';
 import 'map_kit.dart' show MapRoundButton, MapAttributionText, formatDistance;
@@ -81,6 +82,9 @@ class _TaskScreenState extends State<TaskScreen> {
   final GlobalKey<StationMapState> _mapKey = GlobalKey<StationMapState>();
   bool _satellite = false;
 
+  /// Thứ tự tự do: trạm du khách chọn để dẫn đường tới (id câu hỏi của trạm); null = trạm gần nhất.
+  int? _targetQuestionId;
+
   int _index = 0;
   final Map<int, int> _choices = {};
   final Map<int, TextEditingController> _texts = {};
@@ -106,10 +110,40 @@ class _TaskScreenState extends State<TaskScreen> {
   /// Bước dẫn đường có tọa độ trạm: bản đồ phủ kín màn hình, không có AppBar.
   bool get _fullScreenMap => _phase == _Phase.locked && _stationPoint != null;
 
+  /// Trạm đang dẫn đường tới: thứ tự tự do thì trạm du khách chọn (nếu còn mở), không thì trạm backend gợi ý.
+  TaskStation? get _navStation {
+    final task = _content;
+    if (task == null) return null;
+    if (task.freeOrder && _targetQuestionId != null) {
+      final picked = task.stations.where((s) => s.questionId == _targetQuestionId && !s.done && s.hasCoords);
+      if (picked.isNotEmpty) return picked.first;
+    }
+    return task.station;
+  }
+
   LatLng? get _stationPoint {
-    final s = _content?.station;
-    if (s == null || s.latitude == null || s.longitude == null) return null;
+    final s = _navStation;
+    if (s == null || !s.hasCoords) return null;
     return LatLng(s.latitude!, s.longitude!);
+  }
+
+  /// Khoảng cách từ du khách tới một trạm bất kỳ (null khi chưa có vị trí hoặc trạm không có tọa độ).
+  int? _distanceTo(TaskStation s) {
+    final user = _userPoint;
+    if (user == null || !s.hasCoords) return null;
+    return LocationService.distanceMeters(user.latitude, user.longitude, s.latitude!, s.longitude!).round();
+  }
+
+  /// Thứ tự tự do: du khách đang đứng trong bán kính của một trạm chưa xong nào đó.
+  bool get _insideAnyOpenStation {
+    final task = _content;
+    if (task == null) return false;
+    for (final s in task.stations) {
+      if (s.done) continue;
+      final d = _distanceTo(s);
+      if (d != null && d <= (s.radiusMeters ?? 50)) return true;
+    }
+    return false;
   }
 
   LatLng? get _userPoint =>
@@ -207,13 +241,16 @@ class _TaskScreenState extends State<TaskScreen> {
     _refreshWalkRoute();
     // Vào trong bán kính: tự hỏi backend để mở câu hỏi (backend vẫn là nơi xác nhận).
     final distance = _liveDistance;
-    final radius = _content?.station?.radiusMeters ?? 50;
+    final radius = _navStation?.radiusMeters ?? 50;
     final now = DateTime.now();
     final cooledDown =
         _lastAutoCheck == null ||
         now.difference(_lastAutoCheck!) > const Duration(seconds: 8);
-    if (distance != null &&
-        distance <= radius &&
+    // Thứ tự tự do: vào bán kính của bất kỳ trạm chưa xong nào cũng tự mở câu hỏi của trạm đó
+    final inside = _content?.freeOrder == true
+        ? _insideAnyOpenStation
+        : (distance != null && distance <= radius);
+    if (inside &&
         !_busy &&
         cooledDown &&
         _phase == _Phase.locked) {
@@ -279,8 +316,11 @@ class _TaskScreenState extends State<TaskScreen> {
       if (!mounted) return;
       _qr = (qr != null && content.unlocked) ? qr : null;
       if (qr != null && !content.unlocked && !content.isFinished) {
-        _snack('Mã QR không khớp với trạm này. Hãy thử lại.');
+        _snack(content.freeOrder
+            ? 'Mã QR không khớp với trạm nào chưa hoàn thành.'
+            : 'Mã QR không khớp với trạm này. Hãy thử lại.');
       }
+      if (content.freeOrder && content.unlocked) _targetQuestionId = content.station?.questionId;
       setState(() {
         _content = content;
         _phase = content.isFinished
@@ -309,7 +349,9 @@ class _TaskScreenState extends State<TaskScreen> {
         fullscreenDialog: true,
         builder: (_) => QrScanScreen(
           title: 'Quét QR tại trạm',
-          hint: _task.station != null
+          hint: _task.freeOrder
+              ? 'Quét mã QR tại bất kỳ trạm nào chưa hoàn thành'
+              : _task.station != null
               ? 'Quét mã QR tại ${_task.station!.name}'
               : 'Quét mã QR tại trạm kế tiếp',
         ),
@@ -410,7 +452,46 @@ class _TaskScreenState extends State<TaskScreen> {
     }
     _result = null;
     _qr = null;
+    _targetQuestionId = null;
     await _locateAndOpen();
+  }
+
+  /// Thứ tự tự do, trả lời sai: làm lại đúng trạm vừa sai (các trạm đã xong vẫn giữ).
+  Future<void> _retryStation() async {
+    final questions = _content?.questions ?? const <TaskQuestion>[];
+    _choices.clear();
+    for (final c in _texts.values) {
+      c.clear();
+    }
+    _result = null;
+    _qr = null;
+    if (questions.isNotEmpty) _targetQuestionId = questions.first.id;
+    await _locateAndOpen();
+  }
+
+  /// Thứ tự tự do: chọn một trạm để dẫn đường tới.
+  void _openStation(TaskStation s) {
+    if (s.done || s.questionId == null) return;
+    setState(() {
+      _targetQuestionId = s.questionId;
+      _walkRoute = null;
+      _walkRouteOrigin = null;
+    });
+    _locateAndOpen();
+  }
+
+  /// Đổi trạm đích ngay trên bản đồ dẫn đường.
+  void _switchTarget(TaskStation s) {
+    if (s.done) return;
+    setState(() {
+      _targetQuestionId = s.questionId;
+      _walkRoute = null;
+      _walkRouteOrigin = null;
+      _walkRouteAt = null;
+    });
+    _snack('Đang dẫn đường tới ${s.name}');
+    WidgetsBinding.instance.addPostFrameCallback((_) => _mapKey.currentState?.fitAll());
+    _refreshWalkRoute();
   }
 
   Future<void> _showClue() async {
@@ -613,148 +694,24 @@ class _TaskScreenState extends State<TaskScreen> {
   Widget _buildIntro() {
     final task = _task;
     final stations = task.requiresLocation ? _stations : const <TaskStation>[];
-    final radius = task.station?.radiusMeters ?? 50;
+    final radius = _navStation?.radiusMeters ?? 50;
     final distance = _liveDistance;
-    final atStation = distance != null && distance <= radius;
+    final atStation = task.freeOrder ? _insideAnyOpenStation : (distance != null && distance <= radius);
     // Cần đi tới trạm trước: nhiệm vụ theo vị trí, trạm hiện tại có tọa độ và chưa vào bán kính
-    final needsTravel =
-        task.requiresLocation && _stationPoint != null && !atStation;
+    final needsTravel = task.requiresLocation && _stationPoint != null && !atStation;
     final showDescription =
-        task.description.trim().length > 3 &&
-        task.description.trim() != task.name.trim();
+        task.description.trim().length > 3 && task.description.trim() != task.name.trim();
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       children: [
-        SoftCard(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      AppCultureColors.jadeGradientStart,
-                      AppCultureColors.jadeGradientEnd,
-                    ],
-                  ),
-                ),
-                child: Icon(
-                  task.requiresLocation
-                      ? Icons.explore_rounded
-                      : Icons.quiz_rounded,
-                  color: Colors.white,
-                  size: 26,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      task.requiresLocation
-                          ? 'Nhiệm vụ thực địa'
-                          : 'Đố vui di sản',
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        letterSpacing: 0.2,
-                        fontWeight: FontWeight.w700,
-                        color: AppCultureColors.heritageJade,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      task.name,
-                      style: const TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
-                      ),
-                    ),
-                    if (showDescription) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        task.description,
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          height: 1.5,
-                          color: AppCultureColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
+        _hero(task, showDescription),
+        const SizedBox(height: 16),
         if (stations.isNotEmpty) ...[
-          _buildStationList(task, stations, distance: distance, radius: radius),
-          const SizedBox(height: 14),
+          _buildStationList(task, stations),
+          const SizedBox(height: 16),
         ],
-        Row(
-          children: [
-            Expanded(
-              child: _stat(
-                Icons.help_outline_rounded,
-                '${task.totalQuestions}',
-                'câu hỏi',
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _stat(
-                Icons.stars_rounded,
-                '+${task.pointsReward}',
-                'điểm thưởng',
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _stat(
-                Icons.replay_rounded,
-                '${task.attemptsRemaining}/${task.maxAttempts}',
-                'lượt còn lại',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        SoftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Thể lệ',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
-              ),
-              const SizedBox(height: 10),
-              _rule(
-                Icons.check_circle_outline_rounded,
-                'Trả lời đúng tất cả câu hỏi để nhận trọn điểm thưởng (chỉ một lần).',
-              ),
-              if (task.requiresLocation) ...[
-                _rule(
-                  Icons.place_outlined,
-                  'Mỗi câu hỏi gắn với một địa điểm. Bạn cần đứng trong bán kính của trạm để mở câu hỏi.',
-                ),
-                _rule(
-                  Icons.refresh_rounded,
-                  'Trả lời sai một câu, bạn sẽ phải làm lại từ câu đầu.',
-                ),
-              ] else
-                _rule(
-                  Icons.refresh_rounded,
-                  'Chưa đúng hết, bạn có thể làm lại nếu còn lượt (tối đa ${task.maxAttempts} lượt).',
-                ),
-            ],
-          ),
-        ),
+        _rulesCard(task),
         const SizedBox(height: 20),
         if (task.isCompleted)
           _banner(
@@ -776,13 +733,9 @@ class _TaskScreenState extends State<TaskScreen> {
               Expanded(
                 child: PrimaryButton(
                   label: needsTravel
-                      ? 'Chỉ đường tới trạm'
-                      : (task.attempts > 0
-                            ? 'Làm lại nhiệm vụ'
-                            : 'Bắt đầu nhiệm vụ'),
-                  icon: needsTravel
-                      ? Icons.near_me_rounded
-                      : Icons.play_arrow_rounded,
+                      ? (task.freeOrder ? 'Đến trạm gần nhất' : 'Chỉ đường tới trạm')
+                      : (task.attempts > 0 && !task.freeOrder ? 'Làm lại nhiệm vụ' : 'Bắt đầu nhiệm vụ'),
+                  icon: needsTravel ? Icons.near_me_rounded : Icons.play_arrow_rounded,
                   loading: _busy,
                   onPressed: _start,
                 ),
@@ -797,23 +750,15 @@ class _TaskScreenState extends State<TaskScreen> {
                       minimumSize: const Size(56, 52),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       foregroundColor: AppCultureColors.amberDark,
-                      side: const BorderSide(
-                        color: AppCultureColors.rewardBorder,
-                        width: 1.5,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                      side: const BorderSide(color: AppCultureColors.rewardBorder, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.lightbulb_outline_rounded, size: 20),
                         SizedBox(width: 6),
-                        Text(
-                          'Manh mối',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                        Text('Manh mối', style: TextStyle(fontWeight: FontWeight.w700)),
                       ],
                     ),
                   ),
@@ -825,45 +770,220 @@ class _TaskScreenState extends State<TaskScreen> {
     );
   }
 
-  /// Các chặng của nhiệm vụ thực địa: đã qua (✓), đang mở (kèm khoảng cách), chưa tới lượt (khóa).
-  Widget _buildStationList(
-    TaskContent task,
-    List<TaskStation> stations, {
-    required int? distance,
-    required int radius,
-  }) {
-    final current = task.isCompleted ? stations.length : task.questionIndex;
+  /// Thẻ mở đầu: nền ngọc chuyển sắc, hoa văn trống đồng xoay chậm, nhãn loại nhiệm vụ, tên lớn
+  /// và dải ba con số (trạm/câu hỏi, điểm thưởng, lượt còn lại).
+  Widget _hero(TaskContent task, bool showDescription) {
+    final field = task.requiresLocation;
+    final eyebrow = !field
+        ? 'ĐỐ VUI DI SẢN'
+        : task.freeOrder
+        ? 'NHIỆM VỤ THỰC ĐỊA · TỰ DO KHÁM PHÁ'
+        : 'NHIỆM VỤ THỰC ĐỊA · THEO LỘ TRÌNH';
+
+    Widget stat(String value, String label) => Column(
+          children: [
+            Text(value, style: _Type.statValue),
+            const SizedBox(height: 3),
+            Text(label, style: _Type.statLabel, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ],
+        );
+    Widget divider() => Container(width: 1, height: 28, color: Colors.white.withValues(alpha: 0.22));
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: const LinearGradient(
+          colors: [AppCultureColors.jadeGradientStart, AppCultureColors.jadeGradientEnd],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppCultureColors.heritageJade.withValues(alpha: 0.28),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -54,
+            top: -54,
+            child: SlowSpin(child: DrumMotif(size: 200, color: Colors.white.withValues(alpha: 0.12))),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.18),
+                      ),
+                      child: Icon(
+                        field ? (task.freeOrder ? Icons.travel_explore_rounded : Icons.route_rounded) : Icons.quiz_rounded,
+                        color: Colors.white,
+                        size: 19,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        eyebrow,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _Type.eyebrow.copyWith(color: Colors.white.withValues(alpha: 0.88)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(task.name, style: _Type.display.copyWith(color: Colors.white)),
+                if (showDescription) ...[
+                  const SizedBox(height: 8),
+                  Text(task.description, style: _Type.body.copyWith(color: Colors.white.withValues(alpha: 0.88))),
+                ],
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(child: stat('${task.totalQuestions}', field ? 'trạm' : 'câu hỏi')),
+                      divider(),
+                      Expanded(child: stat('+${task.pointsReward}', 'điểm thưởng')),
+                      divider(),
+                      Expanded(child: stat('${task.attemptsRemaining}/${task.maxAttempts}', 'lượt còn lại')),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rulesCard(TaskContent task) {
     return SoftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Thể lệ', style: _Type.section),
+          const SizedBox(height: 12),
+          _rule(
+            Icons.workspace_premium_outlined,
+            'Trả lời đúng tất cả câu hỏi để nhận trọn điểm thưởng (chỉ một lần).',
+          ),
+          if (task.requiresLocation && task.freeOrder) ...[
+            _rule(
+              Icons.map_outlined,
+              'Mọi trạm đều hiện trên bản đồ. Tới trạm nào trước cũng được: đứng trong bán kính hoặc quét mã QR tại trạm để mở câu hỏi.',
+            ),
+            _rule(
+              Icons.shield_outlined,
+              'Trả lời sai ở một trạm chỉ mất một lượt. Các trạm đã đúng vẫn được giữ.',
+            ),
+          ] else if (task.requiresLocation) ...[
+            _rule(
+              Icons.place_outlined,
+              'Mỗi câu hỏi gắn với một trạm, mở lần lượt theo thứ tự. Đứng trong bán kính trạm để mở câu hỏi.',
+            ),
+            _rule(Icons.refresh_rounded, 'Trả lời sai một câu, bạn sẽ phải làm lại từ trạm đầu.'),
+          ] else
+            _rule(
+              Icons.refresh_rounded,
+              'Chưa đúng hết, bạn có thể làm lại nếu còn lượt (tối đa ${task.maxAttempts} lượt).',
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Danh sách trạm: tuần tự là dòng thời gian khóa dần; tự do là các thẻ trạm, chạm để chỉ đường.
+  Widget _buildStationList(TaskContent task, List<TaskStation> stations) {
+    final free = task.freeOrder;
+    final doneCount = (task.isCompleted ? stations.length : task.stationsDone).clamp(0, stations.length);
+    final current = task.isCompleted ? stations.length : task.questionIndex;
+    final canLocate = !task.isFinished && _stationPoint != null;
+
+    return SoftCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 12, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text(
-                'Các chặng',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
-              ),
-              const Spacer(),
-              Text(
-                '${current.clamp(0, stations.length)}/${stations.length} hoàn thành',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppCultureColors.textMuted,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(free ? 'Các trạm khám phá' : 'Lộ trình các trạm', style: _Type.section),
+                    const SizedBox(height: 2),
+                    Text(
+                      free ? 'Tới trạm nào trước cũng được · chạm để chỉ đường' : 'Đi lần lượt theo thứ tự',
+                      style: _Type.caption,
+                    ),
+                  ],
                 ),
               ),
+              if (canLocate)
+                IconButton(
+                  tooltip: 'Cập nhật khoảng cách',
+                  onPressed: _locatingIntro ? null : _refreshIntroDistance,
+                  icon: _locatingIntro
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.my_location_rounded, size: 20, color: AppCultureColors.oceanBlue),
+                ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: stations.isEmpty ? 0 : doneCount / stations.length),
+                    duration: const Duration(milliseconds: 700),
+                    curve: Curves.easeOutCubic,
+                    builder: (_, v, _) => LinearProgressIndicator(
+                      value: v,
+                      minHeight: 6,
+                      backgroundColor: AppCultureColors.surfaceSubtle,
+                      color: AppCultureColors.heritageJade,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '$doneCount/${stations.length}',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppCultureColors.jadeDark),
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
+          const SizedBox(height: 14),
           for (var i = 0; i < stations.length; i++)
             _stationRow(
               index: i,
               station: stations[i],
-              done: i < current,
-              active: i == current && !task.isFinished,
+              done: free ? (stations[i].done || task.isCompleted) : i < current,
+              active: !task.isFinished && (free ? !stations[i].done : i == current),
               isLast: i == stations.length - 1,
-              distance: distance,
-              radius: radius,
+              free: free,
             ),
         ],
       ),
@@ -876,29 +996,136 @@ class _TaskScreenState extends State<TaskScreen> {
     required bool done,
     required bool active,
     required bool isLast,
-    required int? distance,
-    required int radius,
+    required bool free,
   }) {
-    final arrived = active && distance != null && distance <= radius;
+    final radius = station.radiusMeters ?? 50;
+    final distance = active ? _distanceTo(station) : null;
+    final arrived = distance != null && distance <= radius;
     final Color tone = done
         ? AppCultureColors.heritageJade
-        : active
-        ? (arrived ? AppCultureColors.heritageJade : AppCultureColors.oceanBlue)
-        : AppCultureColors.textLight;
+        : !active
+        ? AppCultureColors.textLight
+        : arrived
+        ? AppCultureColors.heritageJade
+        : (free ? AppCultureColors.amberDark : AppCultureColors.oceanBlue);
 
     late final String status;
     if (done) {
       status = 'Đã hoàn thành';
     } else if (!active) {
-      status = 'Mở khóa sau chặng $index';
+      status = 'Mở khóa sau trạm $index';
     } else if (_locatingIntro && distance == null) {
-      status = 'Đang xác định vị trí...';
+      status = 'Đang xác định vị trí…';
     } else if (distance == null) {
-      status = _introLocationError ?? 'Chưa có vị trí của bạn';
+      status = station.hasCoords ? (_introLocationError ?? 'Chưa có vị trí của bạn') : 'Quét mã QR tại trạm';
     } else if (arrived) {
-      status = 'Bạn đã tới trạm, sẵn sàng mở câu hỏi';
+      status = 'Bạn đang ở đây · sẵn sàng mở câu hỏi';
     } else {
       status = 'Cách ${formatDistance(distance)} · bán kính $radius m';
+    }
+
+    final medallion = Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: done || active ? tone : AppCultureColors.surfaceSubtle,
+        border: active && !done ? Border.all(color: tone.withValues(alpha: 0.28), width: 4) : null,
+      ),
+      alignment: Alignment.center,
+      child: done
+          ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
+          : active
+          ? Text(
+              '${index + 1}',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+            )
+          : const Icon(Icons.lock_rounded, size: 15, color: AppCultureColors.textLight),
+    );
+
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'TRẠM ${index + 1}',
+          style: _Type.eyebrow.copyWith(fontSize: 10, color: done || active ? tone : AppCultureColors.textLight),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          station.name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 14.5,
+            height: 1.3,
+            fontWeight: FontWeight.w700,
+            color: done || active ? AppCultureColors.textDark : AppCultureColors.textMuted,
+            decoration: done && free ? TextDecoration.lineThrough : null,
+            decorationColor: AppCultureColors.textLight,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          status,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+            color: active ? tone : AppCultureColors.textMuted,
+          ),
+        ),
+      ],
+    );
+
+    // Thứ tự tự do: mỗi trạm là một thẻ chạm được, không có đường nối
+    if (free) {
+      final tappable = active && station.questionId != null;
+      return Padding(
+        padding: EdgeInsets.only(bottom: isLast ? 4 : 10, right: 4),
+        child: Material(
+          color: done ? AppCultureColors.jadeLight.withValues(alpha: 0.55) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: tappable && !_busy ? () => _openStation(station) : null,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: arrived ? AppCultureColors.heritageJade : AppCultureColors.border,
+                  width: arrived ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  medallion,
+                  const SizedBox(width: 12),
+                  Expanded(child: text),
+                  if (tappable)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: tone.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(arrived ? Icons.lock_open_rounded : Icons.near_me_rounded, size: 15, color: tone),
+                          const SizedBox(width: 4),
+                          Text(
+                            arrived ? 'Mở' : 'Đi',
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: tone),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     return IntrinsicHeight(
@@ -906,54 +1133,16 @@ class _TaskScreenState extends State<TaskScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            width: 34,
+            width: 36,
             child: Column(
               children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: done || active
-                        ? tone
-                        : AppCultureColors.surfaceSubtle,
-                    border: active
-                        ? Border.all(
-                            color: tone.withValues(alpha: 0.3),
-                            width: 4,
-                          )
-                        : null,
-                  ),
-                  alignment: Alignment.center,
-                  child: done
-                      ? const Icon(
-                          Icons.check_rounded,
-                          size: 16,
-                          color: Colors.white,
-                        )
-                      : active
-                      ? Text(
-                          '${index + 1}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.lock_rounded,
-                          size: 14,
-                          color: AppCultureColors.textLight,
-                        ),
-                ),
+                medallion,
                 if (!isLast)
                   Expanded(
                     child: Container(
                       width: 2,
                       margin: const EdgeInsets.symmetric(vertical: 3),
-                      color: done
-                          ? AppCultureColors.heritageJade
-                          : AppCultureColors.border,
+                      color: done ? AppCultureColors.heritageJade : AppCultureColors.border,
                     ),
                   ),
               ],
@@ -962,70 +1151,8 @@ class _TaskScreenState extends State<TaskScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 14, top: 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Chặng ${index + 1} · ${station.name}',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: done || active
-                          ? AppCultureColors.textDark
-                          : AppCultureColors.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    status,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                      color: active ? tone : AppCultureColors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (active && !arrived && _stationPoint != null)
-            IconButton(
-              tooltip: 'Cập nhật khoảng cách',
-              onPressed: _locatingIntro ? null : _refreshIntroDistance,
-              icon: _locatingIntro
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(
-                      Icons.my_location_rounded,
-                      size: 20,
-                      color: AppCultureColors.oceanBlue,
-                    ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _stat(IconData icon, String value, String label) {
-    return SoftCard(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-      child: Column(
-        children: [
-          Icon(icon, color: AppCultureColors.heritageJade, size: 22),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppCultureColors.textMuted,
+              padding: EdgeInsets.only(bottom: isLast ? 4 : 16, top: 2),
+              child: text,
             ),
           ),
         ],
@@ -1035,20 +1162,21 @@ class _TaskScreenState extends State<TaskScreen> {
 
   Widget _rule(IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AppCultureColors.heritageJade),
-          const SizedBox(width: 10),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: AppCultureColors.jadeLight),
+            child: Icon(icon, size: 16, color: AppCultureColors.heritageJade),
+          ),
+          const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.45,
-                color: AppCultureColors.textMuted,
-              ),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(text, style: _Type.body.copyWith(fontSize: 13.5)),
             ),
           ),
         ],
@@ -1090,8 +1218,21 @@ class _TaskScreenState extends State<TaskScreen> {
     if (stationPoint == null) return _buildLockedWithoutMap();
 
     final task = _task;
-    final station = task.station!;
+    final station = _navStation!;
     final radius = station.radiusMeters ?? 50;
+    // Thứ tự tự do: vẽ cả các trạm khác, chạm để đổi trạm đích
+    final others = task.freeOrder
+        ? [
+            for (final s in task.stations)
+              if (s.hasCoords && s.questionId != station.questionId)
+                StationMarker(
+                  point: LatLng(s.latitude!, s.longitude!),
+                  label: s.name,
+                  done: s.done,
+                  onTap: s.done ? null : () => _switchTarget(s),
+                ),
+          ]
+        : const <StationMarker>[];
     final userPoint = _userPoint;
     final distance = _liveDistance ?? task.distanceMeters;
     final bearing = userPoint == null
@@ -1116,6 +1257,7 @@ class _TaskScreenState extends State<TaskScreen> {
             satellite: _satellite,
             route: distance != null && distance > _compassRangeMeters ? _walkRoute?.points : null,
             inside: arrived,
+            others: others,
             fitPadding: EdgeInsets.fromLTRB(64, topInset + 120, 64, 360),
           ),
         ),
@@ -1151,6 +1293,15 @@ class _TaskScreenState extends State<TaskScreen> {
                 onPressed: () => _mapKey.currentState?.fitAll(),
               ),
               const SizedBox(height: 10),
+              if (others.isNotEmpty) ...[
+                MapRoundButton(
+                  icon: Icons.scatter_plot_rounded,
+                  tooltip: 'Xem mọi trạm',
+                  color: AppCultureColors.amberDark,
+                  onPressed: () => _mapKey.currentState?.fitStations(),
+                ),
+                const SizedBox(height: 10),
+              ],
               MapRoundButton(
                 icon: Icons.my_location_rounded,
                 tooltip: 'Vị trí của tôi',
@@ -1231,7 +1382,7 @@ class _TaskScreenState extends State<TaskScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    'Trạm ${task.questionIndex + 1}/$total',
+                    task.freeOrder ? 'Xong ${task.stationsDone}/$total' : 'Trạm ${task.questionIndex + 1}/$total',
                     style: const TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
@@ -1261,11 +1412,7 @@ class _TaskScreenState extends State<TaskScreen> {
                       height: 5,
                       margin: EdgeInsets.only(right: i == total - 1 ? 0 : 4),
                       decoration: BoxDecoration(
-                        color: i < task.questionIndex
-                            ? AppCultureColors.heritageJade
-                            : i == task.questionIndex
-                            ? AppCultureColors.oceanBlue
-                            : AppCultureColors.surfaceSubtle,
+                        color: _segmentColor(task, i),
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -1276,6 +1423,24 @@ class _TaskScreenState extends State<TaskScreen> {
         ],
       ),
     );
+  }
+
+  /// Màu từng đoạn trên thanh tiến độ trạm: xanh ngọc = đã xong, xanh dương = đang tới, xám = chưa.
+  Color _segmentColor(TaskContent task, int i) {
+    if (task.freeOrder) {
+      final stations = _stations;
+      if (i < stations.length && stations[i].done) return AppCultureColors.heritageJade;
+      final target = _navStation;
+      if (i < stations.length && target != null && stations[i].questionId == target.questionId) {
+        return AppCultureColors.oceanBlue;
+      }
+      return AppCultureColors.surfaceSubtle;
+    }
+    return i < task.questionIndex
+        ? AppCultureColors.heritageJade
+        : i == task.questionIndex
+        ? AppCultureColors.oceanBlue
+        : AppCultureColors.surfaceSubtle;
   }
 
   Widget _navPanel({
@@ -1548,9 +1713,11 @@ class _TaskScreenState extends State<TaskScreen> {
               ),
               const SizedBox(height: 14),
               Text(
-                task.totalQuestions > 0
-                    ? 'Trạm ${task.questionIndex + 1}/${task.totalQuestions}'
-                    : 'Trạm kế tiếp',
+                task.totalQuestions <= 0
+                    ? 'Trạm kế tiếp'
+                    : task.freeOrder
+                    ? 'Đã xong ${task.stationsDone}/${task.totalQuestions} trạm'
+                    : 'Trạm ${task.questionIndex + 1}/${task.totalQuestions}',
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppCultureColors.textMuted,
@@ -1711,14 +1878,23 @@ class _TaskScreenState extends State<TaskScreen> {
                   ),
                 SoftCard(
                   padding: const EdgeInsets.all(20),
-                  child: Text(
-                    question.content,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      height: 1.4,
-                      fontWeight: FontWeight.w700,
-                      color: AppCultureColors.textDark,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (question.imageUrl != null) ...[
+                        _buildQuestionImage(question.imageUrl!),
+                        const SizedBox(height: 14),
+                      ],
+                      Text(
+                        question.content,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          height: 1.4,
+                          fontWeight: FontWeight.w700,
+                          color: AppCultureColors.textDark,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -1781,7 +1957,162 @@ class _TaskScreenState extends State<TaskScreen> {
     );
   }
 
+  /// Ảnh minh hoạ của câu hỏi; chạm để xem toàn màn hình và phóng to.
+  Widget _buildQuestionImage(String url) {
+    return GestureDetector(
+      onTap: () => _showImageFullscreen(url),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: AspectRatio(aspectRatio: 16 / 10, child: _networkImage(url)),
+      ),
+    );
+  }
+
+  void _showImageFullscreen(String url) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => GestureDetector(
+        onTap: () => Navigator.of(ctx).pop(),
+        child: InteractiveViewer(
+          maxScale: 5,
+          child: Center(child: Image.network(url, fit: BoxFit.contain)),
+        ),
+      ),
+    );
+  }
+
+  Widget _networkImage(String url) {
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      loadingBuilder: (_, child, progress) => progress == null
+          ? child
+          : Container(
+              color: Colors.black12,
+              alignment: Alignment.center,
+              child: const CircularProgressIndicator(strokeWidth: 2),
+            ),
+      errorBuilder: (_, _, _) => Container(
+        color: Colors.black12,
+        alignment: Alignment.center,
+        child: const Icon(Icons.broken_image_outlined, color: Colors.black38),
+      ),
+    );
+  }
+
+  /// Câu hỏi "chọn ảnh đúng": lưới ảnh 2 cột; chạm để chọn, nút kính lúp để xem ảnh lớn.
+  Widget _buildImageOptionGrid(TaskQuestion question) {
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    final selected = _choices[question.id];
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 0.82,
+      children: [
+        for (var i = 0; i < question.options.length; i++)
+          Builder(builder: (_) {
+            final option = question.options[i];
+            final isSelected = selected == option.id;
+            return InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: _busy ? null : () => setState(() => _choices[question.id] = option.id),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: isSelected ? AppCultureColors.jadeLight : Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isSelected ? AppCultureColors.heritageJade : AppCultureColors.border,
+                    width: isSelected ? 2.5 : 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (option.imageUrl != null)
+                            _networkImage(option.imageUrl!)
+                          else
+                            Container(
+                              color: AppCultureColors.surfaceSubtle,
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.all(10),
+                              child: Text(
+                                option.content,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 15, color: AppCultureColors.textDark),
+                              ),
+                            ),
+                          Positioned(
+                            left: 8,
+                            top: 8,
+                            child: CircleAvatar(
+                              radius: 15,
+                              backgroundColor: isSelected
+                                  ? AppCultureColors.heritageJade
+                                  : Colors.white.withValues(alpha: 0.92),
+                              child: isSelected
+                                  ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
+                                  : Text(
+                                      i < letters.length ? letters[i] : '${i + 1}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: AppCultureColors.textMuted,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          if (option.imageUrl != null)
+                            Positioned(
+                              right: 6,
+                              top: 6,
+                              child: Material(
+                                color: Colors.black45,
+                                shape: const CircleBorder(),
+                                child: IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  iconSize: 18,
+                                  color: Colors.white,
+                                  tooltip: 'Xem ảnh lớn',
+                                  icon: const Icon(Icons.zoom_in_rounded),
+                                  onPressed: () => _showImageFullscreen(option.imageUrl!),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (option.imageUrl != null && option.content.trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                        child: Text(
+                          option.content,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13.5, color: AppCultureColors.textDark),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
   List<Widget> _buildOptions(TaskQuestion question) {
+    if (question.options.any((o) => o.imageUrl != null)) {
+      return [_buildImageOptionGrid(question)];
+    }
     const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
     final selected = _choices[question.id];
     return [
@@ -1912,15 +2243,20 @@ class _TaskScreenState extends State<TaskScreen> {
       icon = Icons.check_circle_rounded;
       tone = AppCultureColors.heritageJade;
       title = 'Chính xác!';
-      body =
-          'Bạn đã trả lời đúng ${result.questionIndex}/${result.totalQuestions} câu. '
-          'Hãy đến địa điểm kế tiếp để mở câu hỏi tiếp theo.';
+      body = task.freeOrder
+          ? 'Bạn đã xong ${result.correctCount}/${result.totalQuestions} trạm. '
+                'Chọn một trạm còn lại trên bản đồ để đi tiếp.'
+          : 'Bạn đã trả lời đúng ${result.questionIndex}/${result.totalQuestions} câu. '
+                'Hãy đến địa điểm kế tiếp để mở câu hỏi tiếp theo.';
     } else {
       icon = Icons.sentiment_dissatisfied_rounded;
       tone = AppCultureColors.error;
       title = 'Chưa chính xác';
       body = result.exhausted
           ? 'Bạn đã hết lượt làm nhiệm vụ này.'
+          : task.freeOrder
+          ? 'Câu trả lời ở trạm này chưa đúng. Các trạm đã xong (${result.correctCount}/${result.totalQuestions}) '
+                'vẫn được giữ. Còn ${result.attemptsRemaining} lượt.'
           : 'Bạn đúng ${result.correctCount}/${result.totalQuestions} câu. '
                 'Cần đúng tất cả để nhận điểm. Còn ${result.attemptsRemaining} lượt làm lại.';
     }
@@ -1951,11 +2287,7 @@ class _TaskScreenState extends State<TaskScreen> {
           ),
         ),
         const SizedBox(height: 22),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
-        ),
+        Text(title, textAlign: TextAlign.center, style: _Type.display.copyWith(fontSize: 28)),
         const SizedBox(height: 10),
         Text(
           body,
@@ -1978,19 +2310,33 @@ class _TaskScreenState extends State<TaskScreen> {
           ),
         ],
         const SizedBox(height: 32),
+        if (task.requiresLocation && _stations.length > 1) ...[
+          _resultStationDots(result),
+          const SizedBox(height: 24),
+        ],
         if (stepCorrect)
           PrimaryButton(
-            label: 'Đến địa điểm kế tiếp',
+            label: task.freeOrder ? 'Chọn trạm tiếp theo' : 'Đến địa điểm kế tiếp',
             icon: Icons.near_me_rounded,
             loading: _busy,
             onPressed: _continueNextStation,
           )
-        else if (!success && !result.exhausted)
+        else if (!success && !result.exhausted) ...[
           PrimaryButton(
-            label: 'Làm lại',
+            label: task.freeOrder ? 'Thử lại trạm này' : 'Làm lại',
             icon: Icons.replay_rounded,
-            onPressed: _retry,
+            loading: _busy,
+            onPressed: task.freeOrder ? _retryStation : _retry,
           ),
+          if (task.freeOrder)
+            Center(
+              child: TextButton.icon(
+                onPressed: _busy ? null : _continueNextStation,
+                icon: const Icon(Icons.alt_route_rounded, size: 18),
+                label: const Text('Chọn trạm khác', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+        ],
         const SizedBox(height: 10),
         OutlinedButton(
           onPressed: () => Navigator.of(context).pop(_changed),
@@ -2005,4 +2351,72 @@ class _TaskScreenState extends State<TaskScreen> {
       ],
     );
   }
+
+  /// Hàng chấm trạm ở màn kết quả: đã xong (ngọc, có dấu tích) / chưa xong (xám).
+  Widget _resultStationDots(TaskSubmitResult result) {
+    final stations = _stations;
+    final free = _task.freeOrder;
+    final doneCount = result.completed ? stations.length : result.correctCount;
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < stations.length; i++) ...[
+              if (i > 0)
+                Container(
+                  width: 18,
+                  height: 2,
+                  color: AppCultureColors.border,
+                ),
+              Builder(builder: (_) {
+                final done = result.completed ||
+                    (free ? (stations[i].done || (result.lastAnswerCorrect == true && stations[i].questionId == _targetQuestionId)) : i < result.questionIndex);
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: done ? AppCultureColors.heritageJade : AppCultureColors.surfaceSubtle,
+                  ),
+                  alignment: Alignment.center,
+                  child: done
+                      ? const Icon(Icons.check_rounded, size: 15, color: Colors.white)
+                      : Text('${i + 1}',
+                          style: const TextStyle(
+                              fontSize: 11.5, fontWeight: FontWeight.w800, color: AppCultureColors.textMuted)),
+                );
+              }),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text('$doneCount/${stations.length} trạm đã xong', style: _Type.caption),
+      ],
+    );
+  }
+}
+
+/// Thang chữ thống nhất cho màn nhiệm vụ: nhãn nhỏ in hoa giãn chữ, tiêu đề đậm co chữ nhẹ,
+/// thân chữ dễ đọc ngoài trời (cỡ 14, giãn dòng 1.5).
+abstract final class _Type {
+  static const eyebrow = TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.3, height: 1.2);
+  static const display = TextStyle(
+    fontSize: 24,
+    fontWeight: FontWeight.w800,
+    height: 1.18,
+    letterSpacing: -0.3,
+    color: AppCultureColors.textDark,
+  );
+  static const section = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w800,
+    letterSpacing: -0.1,
+    color: AppCultureColors.textDark,
+  );
+  static const body = TextStyle(fontSize: 14, height: 1.5, color: AppCultureColors.textMuted);
+  static const caption = TextStyle(fontSize: 12, height: 1.35, color: AppCultureColors.textMuted);
+  static const statValue = TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: Colors.white, height: 1.1);
+  static const statLabel = TextStyle(fontSize: 11, color: Color(0xD9FFFFFF));
 }

@@ -232,25 +232,30 @@ class JourneyServiceTest {
     private TourInfo.TourTaskInfo quizTask() {
         TourInfo.QuestionInfo mc = new TourInfo.QuestionInfo(11L, "Chùa Thiên Mụ nằm bên sông nào?", "MULTIPLE_CHOICE", 0, null,
                 null, null, null, null, null,
-                List.of(new TourInfo.AnswerInfo(13L, "Sông Hồng", false, 0),
-                        new TourInfo.AnswerInfo(12L, "Sông Hương", true, 1)));
+                List.of(new TourInfo.AnswerInfo(13L, "Sông Hồng", false, 0, null),
+                        new TourInfo.AnswerInfo(12L, "Sông Hương", true, 1, null)), null);
         TourInfo.QuestionInfo text = new TourInfo.QuestionInfo(21L, "Tên ngôi chùa là gì?", "TEXT", 1, "Thiên Mụ",
-                null, null, null, null, null, List.of());
+                null, null, null, null, null, List.of(), null);
         return new TourInfo.TourTaskInfo(
                 1001L, "Quiz Chùa Thiên Mụ", "QUIZ", 1, 10, 2,
-                null, false,
+                null, false, false,
                 List.of(mc, text));
     }
 
     /** Nhiệm vụ tương tác ngoài thực tế: câu 1 ở địa điểm A, câu 2 ở địa điểm B (mỗi nơi bán kính 50m). */
     private TourInfo.TourTaskInfo fieldTask() {
+        return fieldTask(false);
+    }
+
+    /** Như {@link #fieldTask()} nhưng có thể bật thứ tự tự do (tới A hay B trước cũng được). */
+    private TourInfo.TourTaskInfo fieldTask(boolean freeOrder) {
         TourInfo.QuestionInfo atA = new TourInfo.QuestionInfo(31L, "Mật mã trên chuông là gì?", "TEXT", 0, "Phuoc Duyen",
-                "Địa điểm A", new BigDecimal("16.4526000"), new BigDecimal("107.5458000"), 50, "QR_A", List.of());
+                "Địa điểm A", new BigDecimal("16.4526000"), new BigDecimal("107.5458000"), 50, "QR_A", List.of(), null);
         TourInfo.QuestionInfo atB = new TourInfo.QuestionInfo(32L, "Tên vị vua xây tháp là gì?", "TEXT", 1, "Truong Thi",
-                "Địa điểm B", new BigDecimal("16.4600000"), new BigDecimal("107.5500000"), 50, "QR_B", List.of());
+                "Địa điểm B", new BigDecimal("16.4600000"), new BigDecimal("107.5500000"), 50, "QR_B", List.of(), null);
         return new TourInfo.TourTaskInfo(
                 1002L, "Mật mã chuông đồng", "REAL_WORLD_INTERACTIVE", 2, 20, 3,
-                "Giải mật mã", true,
+                "Giải mật mã", true, freeOrder,
                 List.of(atA, atB));
     }
 
@@ -501,6 +506,92 @@ class JourneyServiceTest {
                 journeyService.submitTask(50L, 1002L, fieldAnswer(31L, "Phuoc Duyen", null, null, "QR_B"), 10L));
 
         assertEquals("QR-INVALID", ex.getCode());
+    }
+
+    // ── Thứ tự tự do: tới trạm nào trước cũng được, sai trạm nào chỉ mất lượt ở trạm đó ──────
+
+    @Test
+    void freeOrder_getTaskQuestions_ShouldShowAllStationsWithCoordinates() {
+        tourWith(fieldTask(true));
+        sampleDestProgress.setCheckedIn(true);
+        stubJourney(fieldProgress());
+
+        // Đứng xa cả hai trạm
+        TaskQuestionsResponse response = journeyService.getTaskQuestions(
+                50L, 1002L, 10L, new BigDecimal("21.0277000"), new BigDecimal("105.8351000"), null);
+
+        assertFalse(response.sequential());
+        assertTrue(response.freeOrder());
+        assertFalse(response.unlocked());
+        assertEquals(2, response.stations().size());
+        assertNotNull(response.stations().get(1).latitude());
+        assertFalse(response.stations().get(0).done());
+    }
+
+    @Test
+    void freeOrder_whenStandingAtPlaceB_ShouldUnlockQuestionOfB() {
+        tourWith(fieldTask(true));
+        sampleDestProgress.setCheckedIn(true);
+        stubJourney(fieldProgress());
+
+        TaskQuestionsResponse response = journeyService.getTaskQuestions(
+                50L, 1002L, 10L, new BigDecimal("16.4600000"), new BigDecimal("107.5500000"), null);
+
+        assertTrue(response.unlocked());
+        assertEquals(32L, response.questions().get(0).id());
+        assertEquals("Địa điểm B", response.station().name());
+    }
+
+    @Test
+    void freeOrder_whenScanningQrOfB_ShouldUnlockQuestionOfB() {
+        tourWith(fieldTask(true));
+        sampleDestProgress.setCheckedIn(true);
+        stubJourney(fieldProgress());
+
+        TaskQuestionsResponse response = journeyService.getTaskQuestions(50L, 1002L, 10L, null, null, "qr_b");
+
+        assertTrue(response.unlocked());
+        assertEquals(32L, response.questions().get(0).id());
+    }
+
+    @Test
+    void freeOrder_answeringBThenA_ShouldCompleteAndAwardPointsOnce() {
+        tourWith(fieldTask(true));
+        sampleDestProgress.setCheckedIn(true);
+        stubJourney(fieldProgress());
+
+        JourneyTaskProgressResponse first = journeyService.submitTask(
+                50L, 1002L, fieldAnswer(32L, "Truong Thi", "16.4600000", "107.5500000", null), 10L);
+        assertTrue(first.lastAnswerCorrect());
+        assertEquals(1, first.correctCount());
+
+        JourneyTaskProgressResponse done = journeyService.submitTask(
+                50L, 1002L, fieldAnswer(31L, "Phuoc Duyen", "16.4526000", "107.5458000", null), 10L);
+
+        assertEquals(TaskProgressStatus.COMPLETED, done.status());
+        verify(gamificationService, times(1)).awardPoints(eq(10L), eq(20), any(), anyString(), anyString());
+    }
+
+    @Test
+    void freeOrder_wrongAtA_ShouldKeepBAndCostOneAttempt() {
+        tourWith(fieldTask(true));
+        sampleDestProgress.setCheckedIn(true);
+        JourneyTaskProgress progress = fieldProgress();
+        stubJourney(progress);
+
+        journeyService.submitTask(50L, 1002L, fieldAnswer(32L, "Truong Thi", "16.4600000", "107.5500000", null), 10L);
+        JourneyTaskProgressResponse wrong = journeyService.submitTask(
+                50L, 1002L, fieldAnswer(31L, "sai", "16.4526000", "107.5458000", null), 10L);
+
+        assertFalse(wrong.lastAnswerCorrect());
+        assertEquals(1, wrong.correctCount());
+        assertEquals(1, wrong.attempts());
+        assertTrue(progress.answeredIdSet().contains(32L));
+
+        // Quay lại A trả lời đúng: hoàn thành, không phải làm lại B
+        JourneyTaskProgressResponse done = journeyService.submitTask(
+                50L, 1002L, fieldAnswer(31L, "Phuoc Duyen", "16.4526000", "107.5458000", null), 10L);
+        assertEquals(TaskProgressStatus.COMPLETED, done.status());
     }
 
     @Test

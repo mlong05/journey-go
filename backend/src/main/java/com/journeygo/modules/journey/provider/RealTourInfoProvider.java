@@ -1,5 +1,6 @@
 package com.journeygo.modules.journey.provider;
 
+import com.journeygo.modules.journey.JourneyRules;
 import com.journeygo.modules.destination.entity.Destination;
 import com.journeygo.modules.experience.entity.Answer;
 import com.journeygo.modules.experience.entity.CheckInPoint;
@@ -34,7 +35,7 @@ import java.util.List;
 public class RealTourInfoProvider implements TourInfoProvider {
 
     /** Bán kính check-in mặc định tại điểm đến khi điểm đến chưa cấu hình riêng. */
-    private static final int DEFAULT_DESTINATION_RADIUS_METERS = 100;
+    private static final int DEFAULT_DESTINATION_RADIUS_METERS = JourneyRules.DEFAULT_CHECK_IN_RADIUS_METERS;
 
     private final TourRepository tourRepository;
     private final ExperienceRepository experienceRepository;
@@ -97,7 +98,7 @@ public class RealTourInfoProvider implements TourInfoProvider {
             for (Question q : questionRepository.findByTaskIdOrderBySequenceOrderAsc(task.getId())) {
                 List<TourInfo.AnswerInfo> answers = q.getAnswers().stream()
                         .sorted(Comparator.comparing(Answer::getSequenceOrder))
-                        .map(a -> new TourInfo.AnswerInfo(a.getId(), a.getContent(), a.isCorrect(), a.getSequenceOrder()))
+                        .map(a -> new TourInfo.AnswerInfo(a.getId(), a.getContent(), a.isCorrect(), a.getSequenceOrder(), a.getImageUrl()))
                         .toList();
                 CheckInPoint station = q.getCheckInPoint();
                 questions.add(new TourInfo.QuestionInfo(
@@ -108,7 +109,8 @@ public class RealTourInfoProvider implements TourInfoProvider {
                         station == null ? null : station.getLongitude(),
                         station == null ? null : station.getRadiusMeters(),
                         station == null ? null : station.getQrToken(),
-                        answers));
+                        answers,
+                        q.getImageUrl()));
             }
 
             result.add(new TourInfo.TourTaskInfo(
@@ -120,6 +122,7 @@ public class RealTourInfoProvider implements TourInfoProvider {
                     task.getMaxAttempts() == null ? 3 : task.getMaxAttempts(),
                     task.getDescription(),
                     requiresLocation,
+                    requiresLocation && Boolean.TRUE.equals(task.getFreeOrder()),
                     questions
             ));
         }

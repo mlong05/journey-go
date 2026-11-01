@@ -32,6 +32,9 @@ public record CreateTaskRequest(
         @Min(value = 1, message = "Max attempts phải >= 1")
         Integer maxAttempts,
 
+        @Schema(description = "Nhiệm vụ tương tác ngoài thực tế: true = tới trạm nào trước cũng được; false = đi theo thứ tự câu hỏi")
+        Boolean freeOrder,
+
         @Schema(description = "ID CheckInPoint (bắt buộc với task GPS/QR/FIELD — BR-TASK-4)")
         Long checkInPointId
 ) {}

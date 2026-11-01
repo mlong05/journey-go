@@ -75,6 +75,7 @@ public class QuestionService {
                 .task(task)
                 .checkInPoint(station)
                 .content(req.content())
+                .imageUrl(blankToNull(req.imageUrl()))
                 .questionType(req.questionType())
                 .sequenceOrder(req.sequenceOrder())
                 .expectedText(req.expectedText())
@@ -122,6 +123,10 @@ public class QuestionService {
                 log.info("Deleted CheckInPoint id={} cùng Question id={}", stationId, id);
             }
         }
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 
     private Question findOrThrow(Long id) {
