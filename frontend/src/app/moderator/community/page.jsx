@@ -17,9 +17,12 @@ import {
   X,
   AlertCircle,
   ShieldAlert,
+  ChevronLeft,
+  ChevronRight,
+  Image as ImageIcon,
+  Clock,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { communityModerationService as api } from "@/features/community/services/communityModerationService";
 import { useQueueRefresh } from "@/context/NotificationContext";
 
@@ -273,24 +276,157 @@ function PlaceLine({ destinationName, tourTitle }) {
   );
 }
 
-function PostImages({ mediaList }) {
-  const images = (mediaList || []).filter((m) => m?.mediaType !== "VIDEO" && m?.mediaUrl);
-  if (images.length === 0) return null;
+function timeAgo(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const diff = Math.max(0, (Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return "Vừa xong";
+  if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)} ngày trước`;
+  return date.toLocaleDateString("vi-VN");
+}
+
+function mediaOf(post) {
+  return (post?.mediaList || []).filter((m) => m?.mediaUrl);
+}
+
+/* ── Mục trong danh sách bài chờ duyệt (cột trái) ─────────────────────── */
+/* Chỉ hiện tác giả, thời gian, tiêu đề, số ảnh; nội dung xem ở khung bên phải */
+function PostListItem({ post, active, onSelect }) {
+  const mediaCount = mediaOf(post).length;
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-      {images.slice(0, 8).map((m) => (
-        <a
-          key={m.id ?? m.mediaUrl}
-          href={m.mediaUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="block aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200"
-          title="Mở ảnh gốc"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={m.mediaUrl} alt="Ảnh đính kèm bài viết" className="w-full h-full object-cover" />
-        </a>
-      ))}
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={active ? "true" : undefined}
+      className={`w-full text-left px-4 py-3 border-l-[3px] transition-colors cursor-pointer space-y-1 ${
+        active ? "bg-teal-50/70 border-teal-600" : "border-transparent hover:bg-slate-50"
+      }`}
+    >
+      <div className="flex items-center gap-2 text-[11px] text-slate-500">
+        <span className="font-semibold text-slate-700 truncate">{post.authorName || "Du khách"}</span>
+        <span className="shrink-0">· {timeAgo(post.createdAt)}</span>
+        <span className="ml-auto shrink-0 flex items-center gap-2">
+          {post.reportCount > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-rose-600 font-semibold">
+              <Flag size={10} />
+              {post.reportCount}
+            </span>
+          )}
+          {mediaCount > 0 && (
+            <span className="inline-flex items-center gap-1" title={`${mediaCount} ảnh/video`}>
+              <ImageIcon size={11} />
+              {mediaCount}
+            </span>
+          )}
+        </span>
+      </div>
+      <p className="text-sm font-semibold text-slate-900 leading-snug line-clamp-1 [overflow-wrap:anywhere]">
+        {post.title}
+      </p>
+    </button>
+  );
+}
+
+/* ── Bộ ảnh/video đầy đủ trong khung chi tiết ─────────────────────────── */
+function MediaGallery({ media, onOpen }) {
+  if (media.length === 0) return null;
+  const cols = media.length === 1 ? "grid-cols-1" : "grid-cols-2";
+  return (
+    <div className={`grid ${cols} gap-2`}>
+      {media.map((m, i) =>
+        m.mediaType === "VIDEO" ? (
+          <video
+            key={m.id ?? m.mediaUrl}
+            src={m.mediaUrl}
+            controls
+            className="w-full max-h-[420px] rounded-xl bg-black border border-slate-200"
+          />
+        ) : (
+          <button
+            key={m.id ?? m.mediaUrl}
+            type="button"
+            onClick={() => onOpen(m)}
+            className={`block rounded-xl overflow-hidden bg-slate-100 border border-slate-200 cursor-zoom-in ${
+              media.length === 1 ? "" : "aspect-[4/3]"
+            }`}
+            title="Phóng to ảnh"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={m.mediaUrl}
+              alt={`Ảnh đính kèm ${i + 1}`}
+              className={media.length === 1 ? "w-full max-h-[480px] object-contain" : "w-full h-full object-cover"}
+            />
+          </button>
+        )
+      )}
+    </div>
+  );
+}
+
+/* ── Xem ảnh phóng to, chuyển ảnh bằng phím ← → ─────────────────────── */
+function Lightbox({ images, index, onClose, onChange }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") onChange((index + 1) % images.length);
+      if (e.key === "ArrowLeft") onChange((index - 1 + images.length) % images.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, images.length, onClose, onChange]);
+
+  const current = images[index];
+  if (!current) return null;
+  return (
+    <div className="fixed inset-0 z-[80] bg-slate-950/90 flex items-center justify-center p-4" onClick={onClose}>
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
+        aria-label="Đóng"
+      >
+        <X size={20} />
+      </button>
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange((index - 1 + images.length) % images.length);
+            }}
+            className="absolute left-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
+            aria-label="Ảnh trước"
+          >
+            <ChevronLeft size={22} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange((index + 1) % images.length);
+            }}
+            className="absolute right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
+            aria-label="Ảnh sau"
+          >
+            <ChevronRight size={22} />
+          </button>
+        </>
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={current.mediaUrl}
+        alt={`Ảnh ${index + 1}`}
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-full max-h-[85vh] rounded-lg object-contain"
+      />
+      <span className="absolute bottom-5 text-xs font-medium text-white/80">
+        {index + 1} / {images.length}
+      </span>
     </div>
   );
 }
@@ -349,6 +485,11 @@ export default function ModeratorCommunityPage() {
 
   const [posts, setPosts] = useState({ items: [], total: 0, hasMore: false, page: 0 });
   const [postsState, setPostsState] = useState({ loading: true, more: false, error: "" });
+  // Bài đang xem ở khung chi tiết; null = bài đầu tiên (mới nhất)
+  const [selectedId, setSelectedId] = useState(null);
+  // Trên màn hình hẹp chỉ hiện một khung: danh sách hoặc chi tiết
+  const [mobileDetail, setMobileDetail] = useState(false);
+  const [lightbox, setLightbox] = useState(null); // { images, index }
 
   const [reportStatus, setReportStatus] = useState("PENDING");
   const [reports, setReports] = useState({ items: [], total: 0, hasMore: false, page: 0 });
@@ -366,7 +507,10 @@ export default function ModeratorCommunityPage() {
     try {
       const result = await api.getPendingPosts({ page, size: PAGE_SIZE });
       setPosts((prev) => ({
-        items: page === 0 ? result.items : [...prev.items, ...result.items],
+        // Luôn xếp bài mới nhất lên đầu
+        items: (page === 0 ? result.items : [...prev.items, ...result.items])
+          .slice()
+          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)),
         total: result.total,
         hasMore: result.hasMore,
         page,
@@ -482,6 +626,11 @@ export default function ModeratorCommunityPage() {
     setBusy(true);
     try {
       await api.moderatePost(post.id, { action, note });
+      // Chuyển sang bài kế tiếp trong danh sách (hoặc bài trước nếu đã là bài cuối)
+      const idx = posts.items.findIndex((p) => p.id === post.id);
+      const next = posts.items[idx + 1] ?? posts.items[idx - 1] ?? null;
+      setSelectedId(next ? next.id : null);
+      if (!next) setMobileDetail(false);
       setPosts((prev) => ({
         ...prev,
         items: prev.items.filter((p) => p.id !== post.id),
@@ -588,48 +737,149 @@ export default function ModeratorCommunityPage() {
   };
 
   /* ── Hiển thị ───────────────────────────────────────────────────────── */
-  const renderPostCard = (post) => (
-    <article key={post.id} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4 hover:border-slate-300 transition-colors">
-      <div className="flex items-start gap-3">
-        <Avatar name={post.authorName} url={post.authorAvatarUrl} />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-slate-900 truncate">{post.authorName || "Du khách"}</p>
-          <p className="text-[11px] text-slate-500">Gửi lúc {formatTime(post.createdAt)}</p>
-        </div>
-        {post.reportCount > 0 && (
-          <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-1">
-            <Flag size={11} />
-            {post.reportCount} báo cáo
+  const selectedPost = posts.items.find((p) => p.id === selectedId) || posts.items[0] || null;
+
+  const selectPost = (id) => {
+    setSelectedId(id);
+    setMobileDetail(true);
+  };
+
+  /* Khung chi tiết: hiện toàn bộ nội dung bài, thanh hành động luôn ở đáy */
+  const renderPostDetail = (post) => {
+    const media = mediaOf(post);
+    const images = media.filter((m) => m.mediaType !== "VIDEO");
+    const position = posts.items.findIndex((p) => p.id === post.id) + 1;
+    return (
+      <div className="flex-1 min-h-0 flex flex-col">
+        <div className="shrink-0 px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setMobileDetail(false)}
+            className="lg:hidden -ml-1 w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center cursor-pointer"
+            aria-label="Quay lại danh sách"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <Avatar name={post.authorName} url={post.authorAvatarUrl} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-900 truncate">{post.authorName || "Du khách"}</p>
+            <p className="text-[11px] text-slate-500 inline-flex items-center gap-1">
+              <Clock size={11} />
+              Gửi lúc {formatTime(post.createdAt)} · {timeAgo(post.createdAt)}
+            </p>
+          </div>
+          {post.reportCount > 0 && (
+            <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-1">
+              <Flag size={11} />
+              {post.reportCount} báo cáo
+            </span>
+          )}
+          <span className="hidden sm:inline shrink-0 text-[11px] font-medium text-slate-400">
+            {position}/{posts.total}
           </span>
-        )}
+        </div>
+
+        {/* key theo bài để mỗi lần đổi bài khung cuộn quay về đầu */}
+        <div key={post.id} className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          <article className="max-w-3xl mx-auto px-5 sm:px-8 py-6 space-y-5">
+            <PlaceLine destinationName={post.destinationName} tourTitle={post.tourTitle} />
+            <h2 className="text-xl font-bold text-slate-900 leading-snug [overflow-wrap:anywhere]">
+              {post.title}
+            </h2>
+            <p className="text-[15px] text-slate-700 leading-relaxed whitespace-pre-line [overflow-wrap:anywhere]">
+              {post.content}
+            </p>
+            <MediaGallery
+              media={media}
+              onOpen={(m) => setLightbox({ images, index: Math.max(0, images.indexOf(m)) })}
+            />
+          </article>
+        </div>
+
+        <div className="shrink-0 px-5 py-3 border-t border-slate-100 bg-slate-50/70 flex flex-wrap items-center gap-2">
+          <ActionButton tone="success" icon={CheckCircle2} onClick={() => openPostDecision(post, "APPROVE")}>
+            Duyệt bài
+          </ActionButton>
+          <ActionButton tone="warning" icon={PencilLine} onClick={() => openPostDecision(post, "REQUEST_REVISION")}>
+            Yêu cầu chỉnh sửa
+          </ActionButton>
+          <ActionButton tone="danger" icon={XCircle} onClick={() => openPostDecision(post, "REJECT")}>
+            Từ chối
+          </ActionButton>
+        </div>
       </div>
+    );
+  };
 
-      <PlaceLine destinationName={post.destinationName} tourTitle={post.tourTitle} />
+  /* Tab bài chờ duyệt: danh sách (trái) + chi tiết (phải) */
+  const renderPostsTab = () => {
+    if (postsState.loading) {
+      return (
+        <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 p-5">
+          <Skeleton />
+        </div>
+      );
+    }
+    if (postsState.error && posts.items.length === 0) {
+      return (
+        <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 p-5">
+          {renderList({ state: postsState, data: posts, onRetry: () => loadPosts(0) })}
+        </div>
+      );
+    }
+    if (posts.items.length === 0) {
+      return (
+        <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 flex items-center justify-center">
+          <EmptyState
+            icon={Inbox}
+            title="Không có bài nào đang chờ duyệt"
+            text="Bài chia sẻ trải nghiệm mới của du khách sẽ xuất hiện tại đây để bạn xem xét."
+          />
+        </div>
+      );
+    }
+    return (
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(300px,380px)_1fr] gap-4">
+        <aside
+          className={`${mobileDetail ? "hidden lg:flex" : "flex"} min-h-0 flex-col bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden`}
+        >
+          <div className="shrink-0 px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-700">{posts.total} bài chờ duyệt</span>
+            <span className="text-[11px] text-slate-400">Mới nhất trước</span>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain divide-y divide-slate-100">
+            {posts.items.map((post) => (
+              <PostListItem
+                key={post.id}
+                post={post}
+                active={selectedPost?.id === post.id}
+                onSelect={() => selectPost(post.id)}
+              />
+            ))}
+            {posts.hasMore && (
+              <div className="p-3 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => loadPosts(posts.page + 1)}
+                  disabled={postsState.more}
+                  className="px-4 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-xs font-medium text-slate-700 inline-flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  {postsState.more && <Loader2 size={14} className="animate-spin" />}
+                  {postsState.more ? "Đang tải..." : "Tải thêm bài"}
+                </button>
+              </div>
+            )}
+          </div>
+        </aside>
 
-      <div className="space-y-1.5">
-        <ExpandableText as="h3" lines={2} className="text-base font-semibold text-slate-900 leading-snug">
-          {post.title}
-        </ExpandableText>
-        <ExpandableText lines={4} className="text-sm text-slate-700 leading-relaxed">
-          {post.content}
-        </ExpandableText>
+        <section
+          className={`${mobileDetail ? "flex" : "hidden lg:flex"} min-h-0 flex-col bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden`}
+        >
+          {selectedPost && renderPostDetail(selectedPost)}
+        </section>
       </div>
-
-      <PostImages mediaList={post.mediaList} />
-
-      <div className="pt-3 border-t border-slate-100 flex flex-wrap gap-2">
-        <ActionButton tone="success" icon={CheckCircle2} onClick={() => openPostDecision(post, "APPROVE")}>
-          Duyệt bài
-        </ActionButton>
-        <ActionButton tone="warning" icon={PencilLine} onClick={() => openPostDecision(post, "REQUEST_REVISION")}>
-          Yêu cầu chỉnh sửa
-        </ActionButton>
-        <ActionButton tone="danger" icon={XCircle} onClick={() => openPostDecision(post, "REJECT")}>
-          Từ chối
-        </ActionButton>
-      </div>
-    </article>
-  );
+    );
+  };
 
   const renderReportCard = (report) => {
     const pending = report.status === "PENDING";
@@ -758,11 +1008,54 @@ export default function ModeratorCommunityPage() {
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-4 overflow-hidden animate-in fade-in-50 duration-200">
-      {/* ── TIÊU ĐỀ ───────────────────────────────────────────── */}
-      <div className="shrink-0">
-        <PageHeader
-          title="Duyệt Bài Viết Cộng Đồng"
-        >
+      {/* ── TIÊU ĐỀ + TAB trên cùng một hàng để nhường chỗ cho khung bài viết ── */}
+      <div className="shrink-0 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+            Duyệt Bài Viết Cộng Đồng
+          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: "posts", icon: MessageSquare, label: `Bài chờ duyệt (${posts.total})` },
+              { id: "reports", icon: Flag, label: `Báo cáo vi phạm (${pendingReportTotal})` },
+            ].map(({ id, icon: Icon, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                  activeTab === id
+                    ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <Icon size={13} />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Trạng thái báo cáo chỉ hiện ở tab báo cáo */}
+          {activeTab === "reports" && (
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-lg w-fit">
+              {REPORT_STATUS_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => changeReportStatus(tab.id)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all ${
+                    reportStatus === tab.id
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             type="button"
             onClick={refreshAll}
@@ -776,91 +1069,17 @@ export default function ModeratorCommunityPage() {
             />
             <span className="hidden sm:inline">Làm mới</span>
           </button>
-        </PageHeader>
-      </div>
-
-      {/* ── KPI: bấm để chuyển nhanh giữa hai việc ───────────── */}
-      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiTile
-          icon={MessageSquare}
-          label="Bài chờ duyệt"
-          value={posts.total}
-          unit="bài viết"
-          tone="amber"
-        />
-        <KpiTile
-          icon={Flag}
-          label="Báo cáo chờ xử lý"
-          value={pendingReportTotal}
-          unit="báo cáo"
-          tone="rose"
-        />
-      </section>
-
-      {/* ── THANH LỌC ─────────────────────────────────────────── */}
-      <div className="shrink-0 bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {[
-            { id: "posts", icon: MessageSquare, label: `Bài chờ duyệt (${posts.total})` },
-            { id: "reports", icon: Flag, label: `Báo cáo vi phạm (${pendingReportTotal})` },
-          ].map(({ id, icon: Icon, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActiveTab(id)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                activeTab === id
-                  ? "bg-slate-900 text-white border-slate-900 shadow-xs"
-                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              <Icon size={13} />
-              {label}
-            </button>
-          ))}
         </div>
-
-        {/* Trạng thái báo cáo chỉ hiện ở tab báo cáo */}
-        {activeTab === "reports" && (
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-lg w-fit">
-            {REPORT_STATUS_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => changeReportStatus(tab.id)}
-                className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all ${
-                  reportStatus === tab.id
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* ── DANH SÁCH (chỉ vùng này cuộn) ─────────────────────── */}
+      {/* ── BÀI CHỜ DUYỆT: danh sách + chi tiết ─────────────────── */}
+      {activeTab === "posts" && renderPostsTab()}
+
+      {/* ── BÁO CÁO (chỉ vùng này cuộn) ───────────────────────── */}
+      {activeTab === "reports" && (
       <section className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] p-4 sm:p-5">
-          {activeTab === "posts" &&
-            renderList({
-              state: postsState,
-              data: posts,
-              render: renderPostCard,
-              onRetry: () => loadPosts(0),
-              onMore: () => loadPosts(posts.page + 1),
-              empty: (
-                <EmptyState
-                  icon={Inbox}
-                  title="Không có bài nào đang chờ duyệt"
-                  text="Bài chia sẻ trải nghiệm mới của du khách sẽ xuất hiện tại đây để bạn xem xét."
-                />
-              ),
-            })}
-
-          {activeTab === "reports" &&
+          {
             renderList({
               state: reportsState,
               data: reports,
@@ -885,6 +1104,16 @@ export default function ModeratorCommunityPage() {
             })}
         </div>
       </section>
+      )}
+
+      {lightbox && (
+        <Lightbox
+          images={lightbox.images}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onChange={(index) => setLightbox((lb) => ({ ...lb, index }))}
+        />
+      )}
 
       <NoteDialog
         key={dialog ? `${dialog.kind}-${dialog.post?.id ?? dialog.report?.id}-${dialog.action ?? dialog.mode}` : "closed"}
