@@ -672,9 +672,9 @@ export default function QuestionManagerModal({
                 label="Ảnh minh hoạ câu hỏi"
                 badge="(không bắt buộc)"
                 folder="journeygo/questions"
-                hint="Du khách sẽ thấy ảnh này phía trên câu hỏi, ví dụ ảnh hiện vật hoặc chi tiết kiến trúc cần nhận diện."
+                hint="Hiện phía trên câu hỏi · PNG, JPG, WEBP, tối đa 10MB"
                 emptyTitle="Tải ảnh minh hoạ lên"
-                emptyHint="PNG, JPG hoặc WEBP, tối đa 10MB"
+                compact
               />
 
               {/* Thứ tự */}

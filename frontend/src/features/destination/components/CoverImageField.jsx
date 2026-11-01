@@ -21,6 +21,8 @@ export default function CoverImageField({
   badge = "(khuyến nghị)",
   emptyTitle = "Tải ảnh bìa lên",
   emptyHint = "Ảnh ngang 16:9, tối đa 10MB · hiện trên thẻ tour trong app",
+  // compact: một hàng gọn (ảnh nhỏ + nút) thay cho khung 16:9 lớn, dùng trong form nhiều trường
+  compact = false,
 }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -56,6 +58,77 @@ export default function CoverImageField({
   };
 
   const busy = disabled || uploading;
+
+  if (compact) {
+    return (
+      <div className="space-y-1.5">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          hidden
+          onChange={handleFile}
+        />
+        <div className="flex items-center gap-3 p-2 rounded-xl border border-slate-200 bg-white">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+            title={value ? "Đổi ảnh" : emptyTitle}
+            className={`relative shrink-0 w-24 h-16 rounded-lg overflow-hidden flex items-center justify-center cursor-pointer disabled:opacity-60 ${
+              value
+                ? "border border-slate-200 bg-slate-100"
+                : "border-2 border-dashed border-slate-200 hover:border-slate-300 bg-slate-50 text-slate-400"
+            }`}
+          >
+            {value ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={value} alt={label} className="w-full h-full object-cover" />
+            ) : (
+              !uploading && <ImagePlus size={18} />
+            )}
+            {uploading && (
+              <span className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                <Loader2 size={16} className="animate-spin text-slate-600" />
+              </span>
+            )}
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <ImageIcon size={13} className={`shrink-0 ${iconClassName}`} />
+              <span className="truncate">{label}</span>
+              {badge && <span className="text-[11px] font-semibold text-slate-400 shrink-0">{badge}</span>}
+            </p>
+            <p className="text-[11px] text-slate-500 truncate mt-0.5" title={hint || emptyHint}>
+              {uploading ? "Đang tải ảnh lên…" : value ? "Bấm vào ảnh để đổi" : hint || emptyHint}
+            </p>
+          </div>
+          {value ? (
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              disabled={busy}
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 text-[11px] font-bold disabled:opacity-60 cursor-pointer"
+            >
+              <Trash2 size={12} />
+              Bỏ ảnh
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={busy}
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold disabled:opacity-60 cursor-pointer"
+            >
+              <ImagePlus size={12} />
+              Chọn ảnh
+            </button>
+          )}
+        </div>
+        {error && <p className="text-[11px] text-rose-600 font-bold">{error}</p>}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1.5">
