@@ -27,7 +27,7 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
 
     Page<CommunityPost> findByAuthorIdOrderByCreatedAtDesc(Long authorId, Pageable pageable);
 
-    Page<CommunityPost> findByStatusOrderByCreatedAtAsc(PostStatus status, Pageable pageable);
+    Page<CommunityPost> findByStatusOrderByCreatedAtDesc(PostStatus status, Pageable pageable);
 
     @Query("SELECT p FROM CommunityPost p LEFT JOIN FETCH p.mediaList WHERE p.id = :id")
     Optional<CommunityPost> findByIdWithMedia(@Param("id") Long id);
