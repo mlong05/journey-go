@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../../core/constants/app_colors.dart';
@@ -521,57 +524,117 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
     }
   }
 
-  Widget _sectionTitle(IconData icon, String text) => Row(
-        children: [
-          Icon(icon, size: 18, color: AppCultureColors.heritageJade),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppCultureColors.textDark,
-            ),
-          ),
-        ],
-      );
+  void _openViewer(List<String> images, int index) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _ImageViewerScreen(images: images, initialIndex: index),
+      ),
+    );
+  }
+
+  /// Tách câu chuyện thành các đoạn để xen ảnh vào giữa.
+  /// Đoạn quá dài (tác giả không xuống dòng) được cắt theo ranh giới câu,
+  /// để ảnh không bị dồn hết xuống cuối bài.
+  List<String> _paragraphs(String text) {
+    const maxLen = 450;
+    const targetLen = 300;
+    final result = <String>[];
+    for (final raw in text.split(RegExp(r'\n+'))) {
+      final p = raw.trim();
+      if (p.isEmpty) continue;
+      if (p.length <= maxLen) {
+        result.add(p);
+        continue;
+      }
+      final sentences = p.split(RegExp(r'(?<=[.!?…])\s+'));
+      var chunk = StringBuffer();
+      for (final s in sentences) {
+        if (chunk.isNotEmpty) chunk.write(' ');
+        chunk.write(s);
+        if (chunk.length >= targetLen) {
+          result.add(chunk.toString());
+          chunk = StringBuffer();
+        }
+      }
+      if (chunk.isNotEmpty) {
+        // Phần đuôi quá ngắn thì nối vào đoạn trước cho tự nhiên
+        if (chunk.length < 120 && result.isNotEmpty) {
+          result[result.length - 1] = '${result.last} $chunk';
+        } else {
+          result.add(chunk.toString());
+        }
+      }
+    }
+    return result;
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = _content;
     final meta = contentTypeMeta(c.contentType);
+    final videoHero = c.hasPlayableMedia && c.isVideo;
+
+    final content = <Widget>[
+      _header(c, meta),
+      ..._storyWithImages(c, meta),
+    ];
+
+    // Nội dung có video: video ghim ở đầu màn (thay ảnh nền), phần đọc cuộn bên dưới
+    if (videoHero) {
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light,
+        child: Scaffold(
+          backgroundColor: Colors.white,
+          body: Column(
+            children: [
+              _videoHero(c, meta),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                  children: content,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final cover = c.coverImage;
-    final gallery = c.galleryImages;
     return Scaffold(
-      backgroundColor: AppCultureColors.background,
+      backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: cover != null ? 260 : 150,
+            expandedHeight: cover != null ? 240 : 140,
             backgroundColor: meta.color,
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
               background: cover != null
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(
-                          cover,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              Container(color: meta.color),
-                        ),
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Colors.transparent, Colors.black54],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
+                  ? GestureDetector(
+                      onTap: () => _openViewer([cover], 0),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.network(
+                            cover,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                Container(color: meta.color),
+                          ),
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.black38, Colors.transparent],
+                                begin: Alignment.topCenter,
+                                end: Alignment.center,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     )
                   : Container(
                       decoration: BoxDecoration(
@@ -600,198 +663,365 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-            sliver: SliverList.list(
+            sliver: SliverList.list(children: content),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Khung video đầu màn: nền đen, nút quay lại, trình phát 16:9.
+  Widget _videoHero(CulturalContentModel c, ({String label, IconData icon, Color color}) meta) {
+    return Container(
+      color: Colors.black,
+      padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 48,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: meta.color.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(meta.icon, size: 14, color: meta.color),
-                          const SizedBox(width: 5),
-                          Text(
-                            meta.label,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: meta.color,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (c.durationLabel.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        c.durationLabel,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppCultureColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ],
+                IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  color: Colors.white,
+                  tooltip: 'Quay lại',
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  c.title,
-                  style: const TextStyle(
-                    fontSize: 23,
-                    height: 1.25,
-                    fontWeight: FontWeight.w700,
-                    color: AppCultureColors.textDark,
-                  ),
-                ),
-                if (c.destinationName.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.place_rounded,
-                        size: 15,
-                        color: AppCultureColors.heritageJade,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        c.destinationName,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppCultureColors.jadeDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                // Video chính: YouTube phát ngay trong app, video khác mở trình phát của máy
-                if (c.hasPlayableMedia && c.isVideo) ...[
-                  const SizedBox(height: 18),
-                  _sectionTitle(Icons.smart_display_rounded, 'Video'),
-                  const SizedBox(height: 8),
-                  if (_youTube != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: YoutubePlayer(controller: _youTube!),
-                    )
-                  else
-                    _VideoCard(
-                      thumbnail: c.videoThumbnail,
-                      color: meta.color,
-                      durationLabel: c.durationLabel,
-                      onTap: c.youTubeId != null ? _startYouTube : _playMedia,
-                    ),
-                ] else if (c.hasPlayableMedia) ...[
-                  const SizedBox(height: 18),
-                  FilledButton.icon(
-                    onPressed: _playMedia,
-                    icon: Icon(
-                      c.contentType == 'AUDIO'
-                          ? Icons.play_circle_fill_rounded
-                          : Icons.open_in_new_rounded,
-                    ),
-                    label: Text(
-                      c.contentType == 'AUDIO'
-                          ? 'Nghe thuyết minh'
-                          : c.contentType == 'VIDEO'
-                          ? 'Xem video'
-                          : 'Mở nội dung',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: meta.color,
-                      minimumSize: const Size.fromHeight(52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                  ),
-                ],
-                if (c.description.isNotEmpty) ...[
-                  const SizedBox(height: 18),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppCultureColors.rewardBg,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      c.description,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        height: 1.55,
-                        fontStyle: FontStyle.italic,
-                        color: AppCultureColors.rewardText,
-                      ),
-                    ),
-                  ),
-                ],
-                // Thư viện ảnh: vuốt ngang, chạm để xem toàn màn hình
-                if (gallery.isNotEmpty) ...[
-                  const SizedBox(height: 22),
-                  _sectionTitle(
-                    Icons.photo_library_rounded,
-                    'Hình ảnh (${gallery.length})',
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 170,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: gallery.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 10),
-                      itemBuilder: (context, i) => GestureDetector(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            fullscreenDialog: true,
-                            builder: (_) => _ImageViewerScreen(
-                              images: gallery,
-                              initialIndex: i,
-                            ),
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: AspectRatio(
-                            aspectRatio: 4 / 3,
-                            child: Image.network(
-                              gallery[i],
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Container(
-                                color: AppCultureColors.border,
-                                child: const Icon(
-                                  Icons.broken_image_rounded,
-                                  color: AppCultureColors.textLight,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-                if (c.contentText.isNotEmpty) ...[
-                  const SizedBox(height: 22),
-                  _sectionTitle(Icons.menu_book_rounded, 'Câu chuyện'),
-                  const SizedBox(height: 8),
-                  Text(
-                    c.contentText,
+                Icon(meta.icon, size: 16, color: Colors.white70),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    c.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 16,
-                      height: 1.75,
-                      color: AppCultureColors.textDark,
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
+            ),
+          ),
+          if (_youTube != null)
+            YoutubePlayer(controller: _youTube!)
+          else
+            _VideoCard(
+              thumbnail: c.videoThumbnail,
+              color: meta.color,
+              durationLabel: c.durationLabel,
+              radius: 0,
+              onTap: c.youTubeId != null ? _startYouTube : _playMedia,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Nhãn loại, tiêu đề, điểm đến, đoạn giới thiệu và nút nghe/mở media (nếu không phải video).
+  Widget _header(CulturalContentModel c, ({String label, IconData icon, Color color}) meta) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: meta.color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(meta.icon, size: 14, color: meta.color),
+                  const SizedBox(width: 5),
+                  Text(
+                    meta.label,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: meta.color,
                     ),
                   ),
                 ],
-              ],
+              ),
+            ),
+            if (c.durationLabel.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.schedule_rounded,
+                size: 13,
+                color: AppCultureColors.textMuted,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                c.durationLabel,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppCultureColors.textMuted,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          c.title,
+          style: const TextStyle(
+            fontSize: 24,
+            height: 1.25,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+            color: AppCultureColors.textDark,
+          ),
+        ),
+        if (c.destinationName.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(
+                Icons.place_rounded,
+                size: 15,
+                color: AppCultureColors.heritageJade,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  c.destinationName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppCultureColors.jadeDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+        // Audio / media khác: nút mở trình phát (video đã nằm ở đầu màn)
+        if (c.hasPlayableMedia && !c.isVideo) ...[
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _playMedia,
+            icon: Icon(
+              c.contentType == 'AUDIO'
+                  ? Icons.play_circle_fill_rounded
+                  : Icons.open_in_new_rounded,
+            ),
+            label: Text(
+              c.contentType == 'AUDIO' ? 'Nghe thuyết minh' : 'Mở nội dung',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: meta.color,
+              minimumSize: const Size.fromHeight(50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ],
+        // Đoạn giới thiệu dạng trích dẫn, vạch màu bên trái
+        if (c.description.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.only(left: 14),
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: meta.color, width: 3)),
+            ),
+            child: Text(
+              c.description,
+              style: const TextStyle(
+                fontSize: 15.5,
+                height: 1.6,
+                fontStyle: FontStyle.italic,
+                color: AppCultureColors.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Câu chuyện chia đoạn, ảnh xen đều giữa các đoạn; ảnh còn lại xếp lưới nhỏ ở cuối.
+  List<Widget> _storyWithImages(
+    CulturalContentModel c,
+    ({String label, IconData icon, Color color}) meta,
+  ) {
+    final gallery = c.galleryImages;
+    final paragraphs = _paragraphs(c.contentText);
+    // Số ảnh xen được = số khoảng trống giữa các đoạn
+    final inlineCount = min(gallery.length, max(0, paragraphs.length - 1));
+    final imageAfter = <int, int>{}; // vị trí đoạn -> chỉ số ảnh
+    for (var i = 0; i < inlineCount; i++) {
+      final at = ((i + 1) * paragraphs.length / (inlineCount + 1)).ceil() - 1;
+      var slot = at.clamp(0, paragraphs.length - 2);
+      while (imageAfter.containsKey(slot) && slot < paragraphs.length - 2) {
+        slot++;
+      }
+      imageAfter[slot] = i;
+    }
+    final rest = gallery.length - inlineCount;
+
+    Widget heading(String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: meta.color,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppCultureColors.textDark,
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return [
+      if (paragraphs.isNotEmpty) ...[
+        const SizedBox(height: 24),
+        heading('Câu chuyện'),
+        for (var p = 0; p < paragraphs.length; p++) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Text(
+              paragraphs[p],
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.75,
+                color: AppCultureColors.textDark,
+              ),
+            ),
+          ),
+          if (imageAfter.containsKey(p))
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 18),
+              child: _InlineImage(
+                url: gallery[imageAfter[p]!],
+                caption: 'Ảnh ${imageAfter[p]! + 1}/${gallery.length}',
+                onTap: () => _openViewer(gallery, imageAfter[p]!),
+              ),
+            ),
+        ],
+      ],
+      if (rest > 0) ...[
+        const SizedBox(height: 16),
+        heading(inlineCount > 0 ? 'Thêm hình ảnh ($rest)' : 'Hình ảnh ($rest)'),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+          ),
+          itemCount: rest,
+          itemBuilder: (_, i) {
+            final index = inlineCount + i;
+            return GestureDetector(
+              onTap: () => _openViewer(gallery, index),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  gallery[index],
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    color: AppCultureColors.border,
+                    child: const Icon(
+                      Icons.broken_image_rounded,
+                      color: AppCultureColors.textLight,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    ];
+  }
+}
+
+/// Ảnh xen trong câu chuyện: khổ vừa phải, chạm để xem toàn màn hình.
+class _InlineImage extends StatelessWidget {
+  final String url;
+  final String caption;
+  final VoidCallback onTap;
+
+  const _InlineImage({
+    required this.url,
+    required this.caption,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              height: 190,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    url,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      color: AppCultureColors.border,
+                      child: const Icon(
+                        Icons.broken_image_rounded,
+                        color: AppCultureColors.textLight,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: Colors.black45,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.zoom_out_map_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            caption,
+            style: const TextStyle(
+              fontSize: 11.5,
+              color: AppCultureColors.textLight,
             ),
           ),
         ],
@@ -806,12 +1036,14 @@ class _VideoCard extends StatelessWidget {
   final Color color;
   final String durationLabel;
   final VoidCallback onTap;
+  final double radius;
 
   const _VideoCard({
     required this.thumbnail,
     required this.color,
     required this.durationLabel,
     required this.onTap,
+    this.radius = 18,
   });
 
   @override
@@ -819,7 +1051,7 @@ class _VideoCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(radius),
         child: AspectRatio(
           aspectRatio: 16 / 9,
           child: Stack(
