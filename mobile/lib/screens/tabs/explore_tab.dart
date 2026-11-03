@@ -132,7 +132,7 @@ class _ExploreTabState extends State<ExploreTab> {
             decoration: BoxDecoration(
               color: AppCultureColors.oceanLight,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppCultureColors.oceanBlue.withOpacity(0.2)),
+              border: Border.all(color: AppCultureColors.oceanBlue.withValues(alpha: 0.2)),
             ),
             child: const Row(
               children: [
@@ -175,7 +175,7 @@ class _ExploreTabState extends State<ExploreTab> {
                   boxShadow: _activeMode == 'direct'
                       ? [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
+                            color: Colors.black.withValues(alpha: 0.06),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -215,7 +215,7 @@ class _ExploreTabState extends State<ExploreTab> {
                   boxShadow: _activeMode == 'ai'
                       ? [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
+                            color: Colors.black.withValues(alpha: 0.06),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -289,7 +289,7 @@ class _ExploreTabState extends State<ExploreTab> {
                     border: isUser ? null : Border.all(color: AppCultureColors.border),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
+                        color: Colors.black.withValues(alpha: 0.03),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),

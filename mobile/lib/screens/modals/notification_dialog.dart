@@ -119,10 +119,10 @@ class _NotificationDialogState extends State<NotificationDialog> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isUnread ? AppCultureColors.jadeLight.withOpacity(0.35) : AppCultureColors.surfaceSubtle,
+                color: isUnread ? AppCultureColors.jadeLight.withValues(alpha: 0.35) : AppCultureColors.surfaceSubtle,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isUnread ? AppCultureColors.heritageJade.withOpacity(0.3) : AppCultureColors.border,
+                  color: isUnread ? AppCultureColors.heritageJade.withValues(alpha: 0.3) : AppCultureColors.border,
                 ),
               ),
               child: Column(
@@ -134,7 +134,7 @@ class _NotificationDialogState extends State<NotificationDialog> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: (n['tagColor'] as Color).withOpacity(0.12),
+                          color: (n['tagColor'] as Color).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(

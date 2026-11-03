@@ -170,7 +170,7 @@ class _MissionModalState extends State<MissionModal> {
               }
             } else if (isSelected) {
               borderColor = AppCultureColors.heritageJade;
-              bgColor = AppCultureColors.jadeLight.withOpacity(0.5);
+              bgColor = AppCultureColors.jadeLight.withValues(alpha: 0.5);
               textColor = AppCultureColors.jadeDark;
             }
 

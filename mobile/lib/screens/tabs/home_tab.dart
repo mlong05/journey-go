@@ -10,7 +10,6 @@ import '../../core/services/user_data_service.dart';
 import '../modals/checkin_modal.dart';
 import '../modals/mission_modal.dart';
 import '../modals/notification_dialog.dart';
-import '../modals/payment_modal.dart';
 
 class HomeTab extends StatefulWidget {
   final UserModel currentUser;
@@ -93,28 +92,11 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  void _openPaymentModal(DestinationModel route) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => PaymentModal(
-        route: route,
-        onPaymentSuccess: _loadAllData,
-      ),
-    );
-  }
-
-  void _openExperiencePaymentModal(ExperienceModel exp) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => PaymentModal(
-        experience: exp,
-        onPaymentSuccess: _loadAllData,
-      ),
-    );
+  /// Điểm đến / trải nghiệm chưa gắn trực tiếp với một tour, nên không tạo booking riêng.
+  /// Đưa người dùng sang tab "Lộ trình" để chọn tour rồi đặt qua luồng booking thật.
+  void _openTourBookingFlow() {
+    _loadAllData();
+    widget.onNavigateToTab(1);
   }
 
   void _openNotificationDialog() {
@@ -206,9 +188,9 @@ class _HomeTabState extends State<HomeTab> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.black.withOpacity(0.55),
+                  Colors.black.withValues(alpha: 0.55),
                   Colors.transparent,
-                  Colors.black.withOpacity(0.4),
+                  Colors.black.withValues(alpha: 0.4),
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -228,7 +210,7 @@ class _HomeTabState extends State<HomeTab> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.45),
+                    color: Colors.black.withValues(alpha: 0.45),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Colors.white24),
                   ),
@@ -256,7 +238,7 @@ class _HomeTabState extends State<HomeTab> {
                       Container(
                         padding: const EdgeInsets.all(9),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.45),
+                          color: Colors.black.withValues(alpha: 0.45),
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white24),
                         ),
@@ -294,11 +276,11 @@ class _HomeTabState extends State<HomeTab> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.92),
+                color: Colors.white.withValues(alpha: 0.92),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
+                    color: Colors.black.withValues(alpha: 0.12),
                     blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
@@ -343,7 +325,7 @@ class _HomeTabState extends State<HomeTab> {
         border: Border.all(color: AppCultureColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -451,7 +433,7 @@ class _HomeTabState extends State<HomeTab> {
                 decoration: BoxDecoration(
                   color: AppCultureColors.oceanLight,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppCultureColors.oceanBlue.withOpacity(0.25)),
+                  border: Border.all(color: AppCultureColors.oceanBlue.withValues(alpha: 0.25)),
                 ),
                 child: Row(
                   children: [
@@ -525,7 +507,7 @@ class _HomeTabState extends State<HomeTab> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0288D1).withOpacity(0.25),
+                          color: const Color(0xFF0288D1).withValues(alpha: 0.25),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
@@ -566,7 +548,7 @@ class _HomeTabState extends State<HomeTab> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00A86B).withOpacity(0.25),
+                          color: const Color(0xFF00A86B).withValues(alpha: 0.25),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
@@ -636,7 +618,7 @@ class _HomeTabState extends State<HomeTab> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFECFDF5),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppCultureColors.heritageJade.withOpacity(0.2)),
+                    border: Border.all(color: AppCultureColors.heritageJade.withValues(alpha: 0.2)),
                   ),
                   child: const Row(
                     children: [
@@ -693,7 +675,7 @@ class _HomeTabState extends State<HomeTab> {
         border: Border.all(color: AppCultureColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -718,9 +700,9 @@ class _HomeTabState extends State<HomeTab> {
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
                     gradient: LinearGradient(
                       colors: [
-                        Colors.black.withOpacity(0.3),
+                        Colors.black.withValues(alpha: 0.3),
                         Colors.transparent,
-                        Colors.black.withOpacity(0.65),
+                        Colors.black.withValues(alpha: 0.65),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -754,7 +736,7 @@ class _HomeTabState extends State<HomeTab> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.65),
+                      color: Colors.black.withValues(alpha: 0.65),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -776,7 +758,7 @@ class _HomeTabState extends State<HomeTab> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
+                      color: Colors.black.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
@@ -866,7 +848,7 @@ class _HomeTabState extends State<HomeTab> {
                       ],
                     ),
                     InkWell(
-                      onTap: () => _openExperiencePaymentModal(exp),
+                      onTap: _openTourBookingFlow,
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -875,7 +857,7 @@ class _HomeTabState extends State<HomeTab> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Text(
-                          'Đặt vé',
+                          'Xem tour',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -930,7 +912,7 @@ class _HomeTabState extends State<HomeTab> {
                 decoration: BoxDecoration(
                   color: AppCultureColors.oceanLight,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppCultureColors.oceanBlue.withOpacity(0.2)),
+                  border: Border.all(color: AppCultureColors.oceanBlue.withValues(alpha: 0.2)),
                 ),
                 child: const Row(
                   children: [
@@ -971,7 +953,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _buildRouteHorizontalCard(DestinationModel route) {
     return GestureDetector(
-      onTap: () => _openPaymentModal(route),
+      onTap: _openTourBookingFlow,
       child: Container(
         width: 220,
         margin: const EdgeInsets.only(right: 14),
@@ -981,7 +963,7 @@ class _HomeTabState extends State<HomeTab> {
           border: Border.all(color: AppCultureColors.border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -1007,7 +989,7 @@ class _HomeTabState extends State<HomeTab> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.92),
+                        color: Colors.white.withValues(alpha: 0.92),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -1028,7 +1010,7 @@ class _HomeTabState extends State<HomeTab> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.65),
+                        color: Colors.black.withValues(alpha: 0.65),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -1175,7 +1157,7 @@ class _HomeTabState extends State<HomeTab> {
                 border: Border.all(color: AppCultureColors.border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
+                    color: Colors.black.withValues(alpha: 0.02),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -1223,7 +1205,7 @@ class _HomeTabState extends State<HomeTab> {
                       color: m.isCompleted ? AppCultureColors.jadeLight : AppCultureColors.rewardBg,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: m.isCompleted ? AppCultureColors.heritageJade.withOpacity(0.3) : AppCultureColors.rewardBorder,
+                        color: m.isCompleted ? AppCultureColors.heritageJade.withValues(alpha: 0.3) : AppCultureColors.rewardBorder,
                       ),
                     ),
                     child: Text(

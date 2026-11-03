@@ -278,7 +278,7 @@ class _CheckInModalState extends State<CheckInModal>
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -368,7 +368,7 @@ class _CheckInModalState extends State<CheckInModal>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
+                      color: Colors.black.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Row(
@@ -470,7 +470,6 @@ class _CheckInModalState extends State<CheckInModal>
 
   Widget _buildGpsTab() {
     final destName = _selectedDestination?.name ?? 'Văn Miếu – Quốc Tử Giám';
-    final destAddress = _selectedDestination?.address ?? '58 Quốc Tử Giám, Đống Đa, Hà Nội';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -488,7 +487,7 @@ class _CheckInModalState extends State<CheckInModal>
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppCultureColors.oceanBlue.withOpacity(0.3)),
+              border: Border.all(color: AppCultureColors.oceanBlue.withValues(alpha: 0.3)),
             ),
             child: Column(
               children: [
@@ -497,7 +496,7 @@ class _CheckInModalState extends State<CheckInModal>
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppCultureColors.oceanBlue.withOpacity(0.12),
+                        color: AppCultureColors.oceanBlue.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.location_on_rounded, color: AppCultureColors.oceanBlue, size: 28),
