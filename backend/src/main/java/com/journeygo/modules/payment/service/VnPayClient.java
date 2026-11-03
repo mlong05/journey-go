@@ -104,7 +104,7 @@ public class VnPayClient {
      *       khi khách hàng cần nhiều lựa chọn.</li>
      *   <li>Gửi {@code vnp_BankCode=VNPAYQR} → mở thẳng màn hình quét mã QR.</li>
      *   <li>Gửi {@code vnp_BankCode=VNBANK} → mở thẳng thẻ ATM / tài khoản nội địa.</li>
-     *   <li>Gửi {@code vnp_BankCode=INTCARD} → mở thẳng thẻ quốc tế.</li>
+     *   <li>Gửi {@code vnp_BankCode=VISA} → mở thẳng form thẻ quốc tế (nhận cả Visa/MC/JCB).</li>
      *   <li>Gửi mã ngân hàng cụ thể (VD {@code MB}, {@code VCB}) → mở thẳng ngân hàng đó.
      *       Danh sách mã lấy từ API {@code get_bank_list}.</li>
      * </ul>
@@ -115,6 +115,31 @@ public class VnPayClient {
     public String buildPaymentUrl(String txnRef, BigDecimal amount, String orderInfo,
                                   LocalDateTime createDate, LocalDateTime expireDate, String clientIp,
                                   String bankCode) {
+        return buildPaymentUrl(txnRef, amount, orderInfo, createDate, expireDate, clientIp,
+                bankCode, false);
+    }
+
+    /**
+     * Tạo URL thanh toán VNPay — bản mở rộng cho phép gắn cờ chuyển hướng về app.
+     *
+     * <p>{@code vnp_ReturnUrl} được dựng RIÊNG cho từng giao dịch ⇒ có thể cho WEB và
+     * MOBILE dùng hai Return URL khác nhau mà không cần đổi cấu hình toàn cục:
+     * <ul>
+     *   <li>WEB: Return URL thường → trình duyệt hiển thị trang kết quả.</li>
+     *   <li>MOBILE: Return URL + {@code app_redirect=1} → trang
+     *       {@code /payments/return-page} tự chuyển hướng về scheme của app
+     *       ({@code journeygo://payment/return?...}) ⇒ app mở lại và hiện màn kết quả.</li>
+     * </ul>
+     *
+     * <p>⚠️ Tham số {@code app_redirect} KHÔNG nằm trong chuỗi hash của VNPay (chỉ
+     * {@code vnp_*} mới được hash) ⇒ thêm sau khi ký vẫn an toàn. Backend cũng phải
+     * bỏ qua mọi tham số không phải {@code vnp_*} khi xác minh chữ ký.
+     *
+     * @param appRedirect true = gắn {@code app_redirect=1} vào Return URL (deep link về app)
+     */
+    public String buildPaymentUrl(String txnRef, BigDecimal amount, String orderInfo,
+                                  LocalDateTime createDate, LocalDateTime expireDate, String clientIp,
+                                  String bankCode, boolean appRedirect) {
         requireConfigured();
 
         Map<String, String> params = new LinkedHashMap<>();
@@ -127,7 +152,7 @@ public class VnPayClient {
         params.put("vnp_OrderInfo", orderInfo);
         params.put("vnp_OrderType", properties.getOrderType());
         params.put("vnp_Locale", properties.getLocale());
-        params.put("vnp_ReturnUrl", properties.getReturnUrl());
+        params.put("vnp_ReturnUrl", buildReturnUrl(appRedirect));
         params.put("vnp_IpAddr", clientIp != null && !clientIp.isBlank() ? clientIp : properties.getIpAddr());
         params.put("vnp_CreateDate", formatDate(createDate));
         params.put("vnp_ExpireDate", formatDate(expireDate));
@@ -151,10 +176,65 @@ public class VnPayClient {
     // ── Signature verification ────────────────────────────────────────────────
 
     /**
+     * Return URL gửi lên VNPay.
+     *
+     * <p>3 chế độ (theo thứ tự ưu tiên):
+     * <ul>
+     *   <li><b>MOBILE</b> ({@code appRedirect=true}) + {@code appReturnUrl} được cấu hình
+     *       → Return URL là CUSTOM SCHEME ({@code journeygo://payment/return}).
+     *       VNPay chuyển hướng trình duyệt thẳng về app, kèm TOÀN BỘ tham số kết quả
+     *       ĐÃ KÝ ({@code vnp_SecureHash}) ⇒ app nhận kết quả ngay, KHÔNG CẦN tunnel.</li>
+     *   <li><b>MOBILE</b> ({@code appRedirect=true}) không có {@code appReturnUrl}
+     *       → Return URL của backend ({@code /payments/return-page}) + {@code app_redirect=1}
+     *       → trang kết quả tự chuyển hướng trình duyệt về app (CẦN tunnel còn sống).</li>
+     *   <li><b>WEB</b> ({@code appRedirect=false}) nếu {@code webReturnUrl} được cấu hình
+     *       → redirect thẳng về trang kết quả của frontend.</li>
+     *   <li><b>WEB</b> (mặc định) → Return URL của backend ({@code /payments/return-page}),
+     *       hiển thị trang kết quả tĩnh, không chuyển hướng về app.</li>
+     * </ul>
+     *
+     * <p>⚠️ Tham số {@code app_redirect} KHÔNG nằm trong chuỗi hash của VNPay (chỉ
+     * {@code vnp_*} mới được hash) ⇒ thêm/sửa sau khi ký vẫn an toàn. Xem
+     * {@link #isValidSignature(Map)}.
+     */
+    private String buildReturnUrl(boolean appRedirect) {
+        if (appRedirect) {
+            // Ưu tiên custom scheme ⇒ app nhận kết quả đã ký, không cần tunnel.
+            String appSchemeUrl = properties.getAppReturnUrl();
+            if (appSchemeUrl != null && !appSchemeUrl.isBlank()) {
+                return appSchemeUrl;
+            }
+        }
+
+        if (!appRedirect) {
+            String web = properties.getWebReturnUrl();
+            if (web != null && !web.isBlank()) {
+                return web;
+            }
+        }
+
+        String base = properties.getReturnUrl();
+        if (base == null || base.isBlank()) {
+            return base;
+        }
+        if (!appRedirect) {
+            return base;
+        }
+        String separator = base.contains("?") ? "&" : "?";
+        return base + separator + "app_redirect=1";
+    }
+
+    /**
      * Kiểm tra chữ ký của IPN / Return URL.
      *
      * <p>Loại {@code vnp_SecureHash} và {@code vnp_SecureHashType} khỏi tập tham số, sắp xếp
      * key tăng dần, dựng lại hashData theo quy tắc 2.1.0 rồi so sánh constant-time.
+     *
+     * <p>⚠️ CHỈ lấy các tham số có tiền tố {@code vnp_} khi dựng hashData — đúng như
+     * quy định của VNPay 2.1.0. Nếu lấy cả tham số không phải {@code vnp_} (VD
+     * {@code app_redirect} mà ta tự thêm vào Return URL) thì hash tính ra KHÔNG khớp
+     * với {@code vnp_SecureHash} của VNPay ⇒ mọi lần trả kết quả sẽ bị coi là chữ ký
+     * không hợp lệ.
      *
      * @return true nếu chữ ký hợp lệ
      */
@@ -176,6 +256,10 @@ public class VnPayClient {
             String key = entry.getKey();
             String value = entry.getValue();
             if (key == null || "vnp_SecureHash".equals(key) || "vnp_SecureHashType".equals(key)) {
+                continue;
+            }
+            // Chỉ tham số vnp_ mới nằm trong chuỗi hash của VNPay.
+            if (!key.startsWith("vnp_")) {
                 continue;
             }
             if (value == null || value.isEmpty()) {
@@ -384,8 +468,13 @@ public class VnPayClient {
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
-                    .onStatus(status -> true, (request, response) -> {
-                        log.warn("[VNPay] Merchant API trả HTTP {}", response.getStatusCode());
+                    .onStatus(status -> status.isError(), (request, response) -> {
+                        // Chỉ cảnh báo khi HTTP thực sự lỗi (4xx/5xx).
+                        // HTTP 200 là trạng thái BÌNH THƯỜNG của merchant API — trước đây
+                        // điều kiện `status -> true` khiến mọi lần gọi thành công đều bị
+                        // ghi ở mức WARN, gây nhiễu log.
+                        log.warn("[VNPay] Merchant API trả HTTP {} (lỗi) cho command={} txnRef={}",
+                                response.getStatusCode(), params.get("vnp_Command"), params.get("vnp_TxnRef"));
                     })
                     .body(String.class);
 
@@ -416,7 +505,10 @@ public class VnPayClient {
     private void verifyMerchantResponseSignature(Map<String, String> response) {
         String received = response.get("vnp_SecureHash");
         if (received == null || received.isBlank()) {
-            log.warn("[VNPay] Phản hồi merchant API không kèm vnp_SecureHash — bỏ qua kiểm tra chữ ký.");
+            // Sandbox thường KHÔNG trả vnp_SecureHash cho merchant API ⇒ đây là hành vi
+            // bình thường, chỉ ghi ở mức DEBUG để không làm nhiễu log (trước đây mỗi lần
+            // gọi đều in 1 dòng WARN).
+            log.debug("[VNPay] Phản hồi merchant API không kèm vnp_SecureHash — bỏ qua kiểm tra chữ ký.");
             return;
         }
         String data = String.join("|",
