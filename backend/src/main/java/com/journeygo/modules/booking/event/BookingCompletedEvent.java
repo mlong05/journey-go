@@ -9,7 +9,7 @@ import java.time.Instant;
  * Admin xác nhận hoàn thành thủ công.
  *
  * <p>Ý nghĩa nghiệp vụ: từ thời điểm này, doanh thu Partner phát sinh từ Booking đó bắt đầu
- * được xét điều kiện tất toán (Mục 5 tài liệu — 8 điều kiện lọc).
+ * được xét điều kiện tất toán (Mục 5 tài liệu — 9 điều kiện lọc).
  *
  * @param bookingId   ID Booking
  * @param completedAt Thời điểm hoàn thành trải nghiệm

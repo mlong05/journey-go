@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Tác vụ nền quét các Booking quá hạn thanh toán 10 phút (UC-01).
  *
@@ -27,8 +29,16 @@ public class BookingExpiryScheduler {
     private final BookingService bookingService;
     private final FinanceProperties financeProperties;
 
+    /**
+     * Quét Booking quá hạn thanh toán.
+     *
+     * <p>⚠️ Bắt buộc chỉ rõ {@code timeUnit = TimeUnit.SECONDS}. Nếu để mặc định,
+     * Spring hiểu giá trị số thuần của {@code fixedDelayString} là **MILI-GIÂY**
+     * ⇒ 60 nghĩa là 60ms ⇒ quét toàn bộ bảng booking liên tục, gây tải DB.
+     */
     @Scheduled(fixedDelayString = "${app.finance.booking-expiry-scan-interval-seconds:60}",
-            initialDelayString = "${app.finance.booking-expiry-scan-interval-seconds:60}")
+            initialDelayString = "${app.finance.booking-expiry-scan-interval-seconds:60}",
+            timeUnit = TimeUnit.SECONDS)
     public void expireOverdueBookings() {
         try {
             int expired = bookingService.expireOverdueBookings();

@@ -4,6 +4,7 @@ import com.journeygo.modules.booking.entity.BookingSlotHold;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -14,6 +15,8 @@ public record SlotHoldResponse(
         @Schema(description = "ID bản ghi giữ chỗ") Long id,
         @Schema(description = "ID ExperienceSlot") Long experienceSlotId,
         @Schema(description = "ID Experience") Long experienceId,
+        @Schema(description = "Tên trải nghiệm") String experienceTitle,
+        @Schema(description = "Giá trải nghiệm (VND)") BigDecimal experiencePrice,
         @Schema(description = "Ngày của slot") LocalDate slotDate,
         @Schema(description = "Đã giải phóng chưa") boolean released,
         @Schema(description = "Thời điểm giữ chỗ") Instant heldAt,
@@ -21,10 +24,22 @@ public record SlotHoldResponse(
 ) {
     public static SlotHoldResponse fromEntity(BookingSlotHold h) {
         if (h == null) return null;
+
+        // Tên + giá lấy từ ExperienceSlot → Experience (lazy load trong transaction).
+        String title = null;
+        BigDecimal price = null;
+        if (h.getExperienceSlot() != null && h.getExperienceSlot().getExperience() != null) {
+            var experience = h.getExperienceSlot().getExperience();
+            title = experience.getTitle();
+            price = experience.getPrice();
+        }
+
         return SlotHoldResponse.builder()
                 .id(h.getId())
                 .experienceSlotId(h.getExperienceSlot() != null ? h.getExperienceSlot().getId() : null)
                 .experienceId(h.getExperienceId())
+                .experienceTitle(title)
+                .experiencePrice(price)
                 .slotDate(h.getSlotDate())
                 .released(h.isReleased())
                 .heldAt(h.getHeldAt())
