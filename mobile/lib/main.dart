@@ -5,6 +5,7 @@ import 'core/constants/app_colors.dart';
 import 'core/models/auth_models.dart';
 import 'core/services/google_auth_service.dart';
 import 'core/services/token_storage.dart';
+import 'screens/booking/pending_payment_host.dart';
 import 'screens/tourist_home_screen.dart';
 import 'tourist_auth_screen.dart';
 
@@ -76,7 +77,9 @@ class JourneyGoTouristApp extends StatelessWidget {
         ),
       ),
       home: initialUser != null
-          ? TouristHomeScreen(initialUser: initialUser!)
+          ? PendingPaymentHost(
+              child: TouristHomeScreen(initialUser: initialUser!),
+            )
           : const TouristAuthScreen(),
     );
   }
