@@ -43,4 +43,25 @@ public interface SettlementRepository extends JpaRepository<Settlement, Long> {
               AND s.revenuePeriod = :period
             """)
     List<Settlement> findByPartnerAndPeriod(@Param("partnerId") Long partnerId, @Param("period") String period);
+
+    /**
+     * Tổng hợp số tiền theo kỳ doanh thu cho các đợt đã duyệt.
+     *
+     * <p>Gom theo {@code revenuePeriod} để dựng bảng "Doanh thu nền tảng" theo tháng.
+     * Chỉ lấy {@code APPROVED} — đó là lúc tiền thực sự được ghi vào ví đối tác.
+     */
+    @Query("""
+            SELECT s.revenuePeriod AS revenuePeriod,
+                   SUM(s.grossAmount) AS grossAmount,
+                   SUM(s.refundAmount) AS refundAmount,
+                   SUM(s.commissionAmount) AS commissionAmount,
+                   SUM(s.adjustmentAmount) AS adjustmentAmount,
+                   SUM(s.settlementAmount) AS settlementAmount,
+                   COUNT(s) AS settlementCount
+            FROM Settlement s
+            WHERE s.status = com.journeygo.modules.settlement.entity.enums.SettlementStatus.APPROVED
+            GROUP BY s.revenuePeriod
+            ORDER BY s.revenuePeriod DESC
+            """)
+    List<ApprovedSettlementAggregate> aggregateApprovedByPeriod();
 }
