@@ -9,6 +9,10 @@ import java.math.BigDecimal;
 @Schema(description = "Kết quả xác minh/thanh toán trả về cho người dùng")
 public record PaymentVerificationResponse(
 
+        @Schema(description = "ID giao dịch thanh toán (để frontend tra cứu tiếp)")
+        Long paymentId,
+        @Schema(description = "ID booking liên quan") Long bookingId,
+        @Schema(description = "Mã đơn (mã người dùng thấy)") String bookingCode,
         @Schema(description = "Trạng thái thanh toán cuối cùng") String status,
         @Schema(description = "Mã tham chiếu giao dịch") String txnRef,
         @Schema(description = "Số tiền (VND)") BigDecimal amount,
