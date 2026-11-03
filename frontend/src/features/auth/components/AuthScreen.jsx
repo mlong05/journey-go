@@ -134,6 +134,11 @@ export default function AuthScreen({ initialTab = "login" }) {
         targetPath = ROUTES.PROVIDER || "/provider";
         roleTitle = "Đối tác Điểm đến";
         roleScope = "Quản lý di tích & tour";
+      } else if (roleStr === "PARTNER") {
+        // Đối tác tài chính — theo dõi doanh thu, ví, tất toán.
+        targetPath = ROUTES.PARTNER || "/partner";
+        roleTitle = "Đối tác tài chính";
+        roleScope = "Doanh thu, ví & tất toán";
       } else {
         targetPath = ROUTES.HOME || "/";
         roleTitle = "Du khách khám phá";
@@ -263,6 +268,9 @@ export default function AuthScreen({ initialTab = "login" }) {
       } else if (roleStr === "PROVIDER") {
         targetPath = ROUTES.PROVIDER || "/provider";
         roleTitle = "Đối tác Điểm đến";
+      } else if (roleStr === "PARTNER") {
+        targetPath = ROUTES.PARTNER || "/partner";
+        roleTitle = "Đối tác tài chính";
       } else {
         targetPath = ROUTES.HOME || "/";
         roleTitle = "Du khách khám phá";
