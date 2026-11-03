@@ -1,7 +1,25 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ROUTES } from "@/constants/routes";
 
+/**
+ * Navbar cho các trang public (`/tours`, `/bookings`, `/checkout`, `/payment/return`).
+ *
+ * Giữ `/trips` (khám phá chuyến đi) như yêu cầu, đồng thời thêm `/tours` (đặt tour)
+ * và `/bookings` (đơn của tôi).
+ */
 export default function Navbar() {
+  const pathname = usePathname();
+
+  const links = [
+    { href: ROUTES.HOME, label: "Trang chủ" },
+    { href: ROUTES.TRIPS, label: "Chuyến đi" },
+    { href: ROUTES.TOURS, label: "Đặt tour" },
+    { href: ROUTES.BOOKINGS, label: "Đơn của tôi" },
+  ];
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -10,12 +28,25 @@ export default function Navbar() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-700 dark:text-gray-300">
-          <Link href={ROUTES.HOME} className="hover:text-blue-600 transition-colors">
-            Trang chủ
-          </Link>
-          <Link href={ROUTES.TRIPS} className="hover:text-blue-600 transition-colors">
-            Chuyến đi
-          </Link>
+          {links.map((link) => {
+            const active =
+              link.href === ROUTES.HOME
+                ? pathname === ROUTES.HOME
+                : pathname?.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={
+                  active
+                    ? "text-blue-600 transition-colors"
+                    : "hover:text-blue-600 transition-colors"
+                }
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-3">

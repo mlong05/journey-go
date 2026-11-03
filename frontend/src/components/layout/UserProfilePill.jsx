@@ -68,6 +68,18 @@ const ROLE_CONFIG = {
     defaultName: "Đối tác Điểm đến",
     defaultInitials: "ĐT",
   },
+  // Đối tác tài chính (PARTNER) — theo dõi doanh thu, ví, tất toán.
+  partner: {
+    roleLabel: "Đối tác tài chính",
+    roleDesc: "Theo dõi doanh thu, số dư ví và lịch sử tất toán của đơn vị đối tác.",
+    roleColor: "text-sky-600",
+    dotColor: "bg-sky-500",
+    avatarBg: "bg-gradient-to-tr from-sky-600 to-cyan-500",
+    headerGradient: "from-sky-700 via-sky-600 to-cyan-500",
+    badgeBg: "bg-sky-50 text-sky-700 border border-sky-200/80",
+    defaultName: "Đối tác tài chính",
+    defaultInitials: "ĐT",
+  },
 };
 
 /**
@@ -89,11 +101,13 @@ function getRoleLabel(role, fallbackRole = "admin") {
     if (fallbackRole === "admin") return "Quản trị viên hệ thống";
     if (fallbackRole === "moderator") return "Kiểm duyệt viên";
     if (fallbackRole === "provider") return "Đối tác Điểm đến";
+    if (fallbackRole === "partner") return "Đối tác tài chính";
     return "Người dùng hệ thống";
   }
   const r = String(role).toUpperCase();
   if (r.includes("ADMIN")) return "Quản trị viên hệ thống";
   if (r.includes("MODERATOR")) return "Kiểm duyệt viên";
+  if (r.includes("PARTNER")) return "Đối tác tài chính";
   if (r.includes("DESTINATION") || r.includes("PROVIDER")) return "Đối tác Điểm đến";
   if (r.includes("TOURIST")) return "Khách du lịch";
   return role;
