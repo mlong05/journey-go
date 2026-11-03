@@ -4,8 +4,11 @@ import '../../core/models/experience_model.dart';
 import '../../core/models/gamification_model.dart' show formatThousands;
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
+import '../../core/services/booking_service.dart';
+import '../../core/services/tour_availability_service.dart';
 import '../../core/services/tour_service.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
+import '../booking/payment_screen.dart';
 import 'tour_style.dart';
 
 /// Chi tiết tour: hành trình theo thứ tự điểm đến, trải nghiệm của từng điểm và giá trọn gói.
@@ -20,11 +23,22 @@ class TourDetailScreen extends StatefulWidget {
 
 class _TourDetailScreenState extends State<TourDetailScreen> {
   final TourService _service = TourService();
+  final BookingService _bookingService = BookingService();
+  final TourAvailabilityService _availabilityService = TourAvailabilityService();
 
   late TourModel _tour = widget.tour;
   // Trải nghiệm theo destinationId; null nghĩa là điểm đó tải lỗi.
   final Map<int, List<ExperienceModel>?> _experiences = {};
   bool _loading = true;
+
+  // ── Chọn ngày trải nghiệm ────────────────────────────────────────────────
+  List<TourAvailableDate> _availableDates = [];
+  String? _selectedDate;
+  bool _loadingDates = false;
+
+  // ── Đặt tour ─────────────────────────────────────────────────────────────
+  bool _booking = false;
+  String _bookingError = '';
 
   @override
   void initState() {
@@ -60,19 +74,99 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         ..addEntries(entries);
       _loading = false;
     });
+
+    _loadAvailableDates();
+  }
+
+  /// Tải các ngày còn chỗ (mọi experience của tour đều phải còn slot).
+  Future<void> _loadAvailableDates() async {
+    setState(() => _loadingDates = true);
+    try {
+      final dates = await _availabilityService.getTourAvailableDates(_tour);
+      if (!mounted) return;
+      setState(() {
+        _availableDates = dates;
+        // Mặc định chọn ngày đầu tiên còn chỗ.
+        final firstAvailable =
+            dates.where((d) => d.available).toList(growable: false);
+        _selectedDate =
+            firstAvailable.isEmpty ? null : firstAvailable.first.date;
+        _loadingDates = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _availableDates = [];
+        _loadingDates = false;
+      });
+    }
   }
 
   int get _totalExperiences =>
       _experiences.values.fold(0, (sum, list) => sum + (list?.length ?? 0));
 
-  void _onBook() {
-    // Thanh toán được nối ở bước tiếp theo của lộ trình làm app.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Tính năng đặt tour và thanh toán sẽ sớm được mở.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  /// Đặt tour: tạo booking → mở màn thanh toán VNPay.
+  Future<void> _onBook() async {
+    final date = _selectedDate;
+    if (date == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn ngày trải nghiệm còn chỗ.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _booking = true;
+      _bookingError = '';
+    });
+
+    try {
+      final booking = await _bookingService.createBooking(
+        tourId: _tour.id,
+        experienceDate: date,
+      );
+
+      if (!mounted) return;
+      setState(() => _booking = false);
+
+      final paid = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => PaymentScreen(
+            bookingId: booking.id,
+            booking: booking,
+          ),
+        ),
+      );
+
+      if (paid == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đặt tour thành công!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _booking = false;
+        _bookingError = e.message;
+      });
+      // Lỗi hết chỗ / không mở bán → tải lại lịch ngày còn chỗ.
+      if (e.code == 'BOOKING_SLOT_FULL' ||
+          e.code == 'BOOKING_SLOT_NOT_FOUND') {
+        _loadAvailableDates();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _booking = false;
+        _bookingError = 'Không thể tạo đơn đặt tour. Vui lòng thử lại.';
+      });
+    }
   }
 
   @override
@@ -110,11 +204,359 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   ),
             const SizedBox(height: 10),
             _buildPriceSummary(),
+            const SizedBox(height: 16),
+            _buildDatePicker(),
+            if (_bookingError.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.error_outline_rounded,
+                        size: 16, color: AppCultureColors.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _bookingError,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: Color(0xFF991B1B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
       bottomNavigationBar: _buildBookBar(),
     );
+  }
+
+  /// Bộ chọn ngày trải nghiệm — chỉ hiện ngày còn chỗ.
+  Widget _buildDatePicker() {
+    final available =
+        _availableDates.where((d) => d.available).toList(growable: false);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppCultureColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.event_available_rounded,
+                  size: 17, color: AppCultureColors.heritageJade),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Chọn ngày trải nghiệm',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppCultureColors.textDark,
+                  ),
+                ),
+              ),
+              if (available.isNotEmpty)
+                Text(
+                  '${available.length} ngày còn chỗ',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppCultureColors.textMuted,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_loadingDates)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppCultureColors.heritageJade,
+                  ),
+                ),
+              ),
+            )
+          else if (available.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppCultureColors.rewardBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.event_busy_rounded,
+                      size: 16, color: AppCultureColors.rewardText),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Hiện chưa có ngày nào còn chỗ cho tour này. Vui lòng quay lại sau.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: AppCultureColors.rewardText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            // Lưới ngày dạng card: dễ đọc, dễ bấm, hiện rõ số chỗ còn.
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const spacing = 10.0;
+                final cardWidth = (constraints.maxWidth - spacing) / 2;
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: available.map((d) {
+                    return SizedBox(
+                      width: cardWidth,
+                      child: _buildDateCard(d),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildSelectedDateSummary(available),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Một thẻ ngày: ngày/tháng, thứ, và số chỗ còn.
+  Widget _buildDateCard(TourAvailableDate d) {
+    final isSelected = _selectedDate == d.date;
+    final parts = _parseDate(d.date);
+    final isLow = d.remaining <= 3;
+
+    return InkWell(
+      onTap: () => setState(() => _selectedDate = d.date),
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppCultureColors.heritageJade
+              : AppCultureColors.surfaceSubtle,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected
+                ? AppCultureColors.heritageJade
+                : AppCultureColors.border,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  parts.weekdayShort,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: isSelected
+                        ? Colors.white70
+                        : AppCultureColors.textMuted,
+                  ),
+                ),
+                const Spacer(),
+                if (isSelected)
+                  const Icon(Icons.check_circle_rounded,
+                      size: 14, color: Colors.white)
+                else if (isLow)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppCultureColors.warning.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'Sắp hết',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppCultureColors.amberDark,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              parts.dayMonth,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: isSelected ? Colors.white : AppCultureColors.textDark,
+              ),
+            ),
+            Text(
+              'Năm ${parts.year}',
+              style: TextStyle(
+                fontSize: 10.5,
+                color: isSelected
+                    ? Colors.white70
+                    : AppCultureColors.textLight,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.event_seat_rounded,
+                  size: 12,
+                  color: isSelected
+                      ? Colors.white70
+                      : AppCultureColors.heritageJade,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'Còn ${d.remaining} chỗ',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: isSelected
+                          ? Colors.white
+                          : AppCultureColors.heritageJade,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Tóm tắt ngày đang chọn + nhắc rõ điều kiện đặt tour.
+  Widget _buildSelectedDateSummary(List<TourAvailableDate> available) {
+    final selected = available.where((d) => d.date == _selectedDate);
+    if (selected.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppCultureColors.surfaceSubtle,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text(
+          'Vui lòng chọn một ngày để tiếp tục.',
+          style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+        ),
+      );
+    }
+
+    final d = selected.first;
+    final parts = _parseDate(d.date);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppCultureColors.jadeLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: AppCultureColors.heritageJade.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.event_available_rounded,
+                  size: 16, color: AppCultureColors.jadeDark),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'Ngày đã chọn: ${parts.fullLabel}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppCultureColors.textDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Tour gồm $_totalExperiences trải nghiệm — mỗi trải nghiệm chiếm 1 chỗ '
+            'trong ngày này. Số chỗ còn nhỏ nhất hiện là ${d.remaining}.',
+            style: const TextStyle(
+              fontSize: 11.5,
+              height: 1.4,
+              color: AppCultureColors.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tách `YYYY-MM-DD` thành (thứ, ngày/tháng, năm, nhãn đầy đủ).
+  ({String weekdayShort, String dayMonth, String year, String fullLabel})
+      _parseDate(String date) {
+    try {
+      final d = DateTime.parse(date);
+      const weekdays = [
+        'Thứ 2',
+        'Thứ 3',
+        'Thứ 4',
+        'Thứ 5',
+        'Thứ 6',
+        'Thứ 7',
+        'Chủ Nhật',
+      ];
+      final wd = weekdays[d.weekday - 1];
+      final dd = d.day.toString().padLeft(2, '0');
+      final mm = d.month.toString().padLeft(2, '0');
+      return (
+        weekdayShort: wd,
+        dayMonth: '$dd/$mm',
+        year: '${d.year}',
+        fullLabel: '$dd/$mm/${d.year} ($wd)',
+      );
+    } catch (_) {
+      return (
+        weekdayShort: '',
+        dayMonth: date,
+        year: '',
+        fullLabel: date,
+      );
+    }
   }
 
   Widget _buildSectionTitle(String text) {
@@ -482,11 +924,25 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               ),
             ),
             FilledButton.icon(
-              onPressed: _onBook,
-              icon: const Icon(Icons.confirmation_number_outlined, size: 19),
-              label: const Text('Đặt tour', style: TextStyle(fontWeight: FontWeight.w800)),
+              onPressed: (_booking || _selectedDate == null) ? null : _onBook,
+              icon: _booking
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.confirmation_number_outlined, size: 19),
+              label: Text(
+                _booking ? 'Đang đặt...' : 'Đặt tour',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: AppCultureColors.heritageJade,
+                disabledBackgroundColor: AppCultureColors.border,
+                disabledForegroundColor: AppCultureColors.textMuted,
                 minimumSize: const Size(150, 50),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),

@@ -11,7 +11,8 @@ import '../../tourist_auth_screen.dart' show TouristAuthScreen;
 import '../modals/edit_profile_modal.dart';
 import '../modals/notification_dialog.dart';
 import '../rewards/wallet_screen.dart';
-import '../tickets_screen.dart';
+import '../booking/bookings_screen.dart';
+import '../booking/refund_history_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   final UserModel currentUser;
@@ -286,7 +287,7 @@ class _ProfileTabState extends State<ProfileTab> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00A86B).withOpacity(0.3),
+            color: const Color(0xFF00A86B).withValues(alpha: 0.3),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -336,7 +337,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Row(
@@ -374,7 +375,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.edit_outlined, color: Colors.white, size: 18),
@@ -389,7 +390,7 @@ class _ProfileTabState extends State<ProfileTab> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Row(
@@ -532,7 +533,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 border: Border.all(color: AppCultureColors.gold, width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: AppCultureColors.gold.withOpacity(0.2),
+                    color: AppCultureColors.gold.withValues(alpha: 0.2),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -656,7 +657,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       Expanded(
                         child: Container(
                           width: 2,
-                          color: AppCultureColors.heritageJade.withOpacity(0.4),
+                          color: AppCultureColors.heritageJade.withValues(alpha: 0.4),
                         ),
                       ),
                   ],
@@ -675,7 +676,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       border: Border.all(color: AppCultureColors.border),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
+                          color: Colors.black.withValues(alpha: 0.02),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -871,11 +872,11 @@ class _ProfileTabState extends State<ProfileTab> {
           ),
         ),
 
-        // Card 1: Ví vé & Chi phí du lịch
+        // Card 1: Đơn đặt tour của tôi
         GestureDetector(
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const TicketsScreen()),
+              MaterialPageRoute(builder: (_) => const BookingsScreen()),
             );
           },
           child: Container(
@@ -902,26 +903,15 @@ class _ProfileTabState extends State<ProfileTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Ví vé & Chi phí du lịch',
+                        'Đơn Đặt Tour Của Tôi',
                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${_tickets.length} vé • Hóa đơn, mã QR & lịch sử chi phí',
+                        'Theo dõi đơn, thanh toán & mã QR trải nghiệm',
                         style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
                       ),
                     ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppCultureColors.jadeLight,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$activeCount khả dụng',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppCultureColors.jadeDark),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -931,55 +921,52 @@ class _ProfileTabState extends State<ProfileTab> {
           ),
         ),
 
-        // Card 2: Hỗ trợ & Khiếu nại đơn hàng
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppCultureColors.border),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1F2),
-                  borderRadius: BorderRadius.circular(14),
+        // Card 2: Lịch sử hoàn tiền
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RefundHistoryScreen()),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppCultureColors.border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF1F2),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.assignment_return_outlined,
+                      color: Color(0xFFE11D48), size: 22),
                 ),
-                child: const Icon(Icons.shield_outlined, color: Color(0xFFE11D48), size: 22),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Hỗ trợ & Khiếu nại đơn hàng',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Theo dõi tiến độ hoàn tiền & xử lý sự cố vé',
-                      style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
-                    ),
-                  ],
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Lịch Sử Hoàn Tiền',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Theo dõi tiến độ xử lý yêu cầu hoàn tiền',
+                        style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppCultureColors.rewardBg,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  '1 đang xử lý',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppCultureColors.rewardText),
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Icon(Icons.chevron_right_rounded, color: AppCultureColors.textMuted, size: 18),
-            ],
+                const SizedBox(width: 6),
+                const Icon(Icons.chevron_right_rounded, color: AppCultureColors.textMuted, size: 18),
+              ],
+            ),
           ),
         ),
       ],

@@ -96,7 +96,7 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00A86B).withOpacity(0.35),
+            color: const Color(0xFF00A86B).withValues(alpha: 0.35),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -134,7 +134,7 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> {
         border: const Border(top: BorderSide(color: AppCultureColors.border, width: 0.8)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
