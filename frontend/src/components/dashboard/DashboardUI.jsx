@@ -53,6 +53,32 @@ export function StatusChip({ tone = "emerald", children }) {
   );
 }
 
+/**
+ * Ô số liệu tĩnh trên đầu các trang danh sách: chỉ để xem, không bấm được,
+ * mọi ô dùng chung một màu viền để thống nhất.
+ */
+export function KpiTile({ icon: Icon, label, value, unit, tone = "slate" }) {
+  const t = TONES[tone] || TONES.slate;
+  return (
+    <div className="bg-white border border-slate-400 rounded-xl px-3.5 py-3 flex items-center gap-3">
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${t.chip}`}>
+        {Icon && <Icon size={16} strokeWidth={2} />}
+      </div>
+      <div className="flex flex-col min-w-0">
+        <p className="text-xs font-semibold text-slate-500 truncate">{label}</p>
+        <div className="mt-0.5 flex items-baseline gap-1">
+          <span className="text-lg font-bold tracking-tight text-slate-900 tabular-nums leading-none">
+            {value}
+          </span>
+          {unit && (
+            <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">{unit}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function StatCard({
   title,
   value,

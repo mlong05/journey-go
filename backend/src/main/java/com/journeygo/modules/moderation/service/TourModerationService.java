@@ -11,6 +11,8 @@ import com.journeygo.modules.moderation.entity.enums.TourReviewAction;
 import com.journeygo.modules.moderation.entity.enums.TourReviewStatus;
 import com.journeygo.modules.moderation.repository.TourReviewHistoryRepository;
 import com.journeygo.modules.moderation.repository.TourReviewRepository;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
 import com.journeygo.modules.tour.dto.TourResponse;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
@@ -36,6 +38,7 @@ public class TourModerationService {
     private final com.journeygo.modules.tour.service.TourPricingService pricingService;
     private final TourReviewHistoryRepository historyRepository;
     private final UserRepository userRepository;
+    private final NotificationPublisher notifications;
 
     @Transactional
     public TourReviewResponse submit(Long tourId, Long actorId, Role role) {
@@ -70,6 +73,16 @@ public class TourModerationService {
         TourReview saved = reviewRepository.save(review);
         tourRepository.save(tour);
         addHistory(saved, TourReviewAction.SUBMITTED, actorId, null, null, null);
+
+        String sender = tour.getCreatedBy() == null ? "đối tác" : tour.getCreatedBy().getFullName();
+        notifications.send(NotificationType.TOUR_PENDING)
+                .toRole(Role.MODERATOR)
+                .title(edited ? "Tour được gửi lại sau chỉnh sửa" : "Tour mới chờ thẩm định")
+                .body(NotificationPublisher.quote(tour.getTitle()) + " do " + sender + " gửi, đang chờ bạn thẩm định.")
+                .link("/moderator/tours")
+                .ref("TOUR", tourId)
+                .queue(NotificationPublisher.Queue.TOUR_REVIEW)
+                .publish();
         return toResponse(saved);
     }
 
@@ -107,6 +120,18 @@ public class TourModerationService {
         reviewRepository.save(review);
         tourRepository.save(tour);
         addHistory(review, TourReviewAction.APPROVED, reviewerId, review.getDecisionNote(), null, null);
+
+        notifications.send(NotificationType.TOUR_APPROVED)
+                .to(NotificationPublisher.idOf(tour.getCreatedBy()))
+                .except(reviewerId)
+                .title("Tour đã được phê duyệt")
+                .body(NotificationPublisher.withNote(NotificationPublisher.quote(tour.getTitle())
+                        + " đã mở bán, du khách có thể đặt chỗ ngay.", review.getDecisionNote()))
+                .link(NotificationPublisher.dashboardPath(tour.getCreatedBy(), "/tours"))
+                .ref("TOUR", tourId)
+                .queue(NotificationPublisher.Queue.MY_CONTENT)
+                .publish();
+        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.TOUR_REVIEW);
         return toResponse(review);
     }
 
@@ -135,6 +160,18 @@ public class TourModerationService {
         reviewRepository.save(review);
         tourRepository.save(tour);
         addHistory(review, TourReviewAction.REJECTED, reviewerId, review.getDecisionNote(), review.getReason(), review.getOtherReason());
+
+        notifications.send(NotificationType.TOUR_REJECTED)
+                .to(NotificationPublisher.idOf(tour.getCreatedBy()))
+                .except(reviewerId)
+                .title("Tour cần chỉnh sửa")
+                .body(NotificationPublisher.withNote(NotificationPublisher.quote(tour.getTitle())
+                        + " chưa được duyệt. Vui lòng xem lý do, chỉnh sửa và gửi lại.", review.getDecisionNote()))
+                .link(NotificationPublisher.dashboardPath(tour.getCreatedBy(), "/tours"))
+                .ref("TOUR", tourId)
+                .queue(NotificationPublisher.Queue.MY_CONTENT)
+                .publish();
+        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.TOUR_REVIEW);
         return toResponse(review);
     }
 

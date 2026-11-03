@@ -84,6 +84,9 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Luồng SSE (/notifications/stream) đã xác thực ở request đầu; các lần gửi sau là
+                        // async dispatch không mang lại JWT — nếu chặn, luồng bị ngắt sau sự kiện đầu tiên.
+                        .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC).permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/destinations/**").permitAll()

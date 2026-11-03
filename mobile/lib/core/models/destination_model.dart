@@ -12,6 +12,9 @@ class DestinationModel {
   final String? createdAt;
   final String? updatedAt;
 
+  /// Ảnh bìa thật do admin/provider tải lên; null thì dùng ảnh minh hoạ [coverImage].
+  final String? coverImageUrl;
+
   // Thuộc tính hiển thị mở rộng cho giao diện Lộ trình & Trang chủ
   final String coverImage;
   final String duration;
@@ -37,6 +40,7 @@ class DestinationModel {
     this.createdBy,
     this.createdAt,
     this.updatedAt,
+    this.coverImageUrl,
     String? coverImage,
     String? duration,
     String? ticketPrice,
@@ -71,8 +75,17 @@ class DestinationModel {
     } else if (lower.contains('bảo tàng') || lower.contains('lịch sử')) {
       return 'assets/images/baotang.png';
     }
-    return 'assets/images/vanmieu.png';
+    // Tên không khớp di tích nào: chọn ảnh cố định theo tên để các thẻ không trùng một ảnh.
+    return _fallbackCovers[name.codeUnits.fold<int>(0, (a, c) => a + c) % _fallbackCovers.length];
   }
+
+  static const _fallbackCovers = [
+    'assets/images/vanmieu.png',
+    'assets/images/thanglong.png',
+    'assets/images/trangan.png',
+    'assets/images/gomsu.png',
+    'assets/images/baotang.png',
+  ];
 
   static String _defaultDurationFor(String name) {
     final lower = name.toLowerCase();
@@ -157,6 +170,9 @@ class DestinationModel {
       createdBy: json['createdBy']?.toString(),
       createdAt: json['createdAt']?.toString(),
       updatedAt: json['updatedAt']?.toString(),
+      coverImageUrl: (json['coverImageUrl']?.toString().startsWith('http') ?? false)
+          ? json['coverImageUrl'].toString()
+          : null,
     );
   }
 
@@ -174,6 +190,7 @@ class DestinationModel {
       'createdBy': createdBy,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+      'coverImageUrl': coverImageUrl,
     };
   }
 }

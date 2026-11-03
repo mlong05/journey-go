@@ -12,7 +12,9 @@ import com.journeygo.modules.booking.event.BookingCompletedEvent;
 import com.journeygo.modules.booking.repository.BookingRepository;
 import com.journeygo.modules.booking.repository.BookingSlotHoldRepository;
 import com.journeygo.modules.experience.entity.ExperienceSlot;
+import com.journeygo.modules.experience.repository.ExperienceRepository;
 import com.journeygo.modules.experience.repository.ExperienceSlotRepository;
+import com.journeygo.modules.finance.config.FinanceProperties;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
 import com.journeygo.modules.tour.repository.TourRepository;
@@ -61,6 +63,8 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final BookingSlotHoldRepository slotHoldRepository;
     private final ExperienceSlotRepository experienceSlotRepository;
+    private final ExperienceRepository experienceRepository;
+    private final FinanceProperties financeProperties;
     private final TourRepository tourRepository;
     private final UserRepository userRepository;
     private final TourBookingCatalogService catalogService;
@@ -100,8 +104,13 @@ public class BookingService {
         List<ExperienceSlot> slotsToReserve = new java.util.ArrayList<>();
         for (TourBookingCatalogService.ExperienceQuote quote : quotes) {
             if (quote.slot() == null) {
-                throw new AppException(ErrorCode.BOOKING_SLOT_NOT_FOUND,
-                        "Trải nghiệm '" + quote.title() + "' chưa mở bán ngày " + request.experienceDate());
+                // Provider chưa mở bán ngày này: tự mở slot nếu được cấu hình, không thì báo như cũ.
+                if (!financeProperties.isAutoOpenSlots()) {
+                    throw new AppException(ErrorCode.BOOKING_SLOT_NOT_FOUND,
+                            "Trải nghiệm '" + quote.title() + "' chưa mở bán ngày " + request.experienceDate());
+                }
+                slotsToReserve.add(openSlot(quote.experienceId(), request.experienceDate()));
+                continue;
             }
             if (!quote.hasCapacity()) {
                 throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
@@ -149,6 +158,22 @@ public class BookingService {
         log.info("Đã tạo booking id={} code={} tourist={} tour={} amount={} giữ {} slot",
                 saved.getId(), saved.getBookingCode(), touristId, tour.getTourId(), totalAmount, slotsToReserve.size());
         return BookingResponse.fromEntity(saved);
+    }
+
+    /**
+     * Tự mở slot cho ngày Provider chưa cấu hình (app.finance.auto-open-slots). Slot mở theo sức chứa
+     * mặc định và vẫn đi qua atomicReserveSlot như slot thường, nên không vượt quá sức chứa đó.
+     */
+    private ExperienceSlot openSlot(Long experienceId, LocalDate date) {
+        ExperienceSlot slot = experienceSlotRepository.saveAndFlush(ExperienceSlot.builder()
+                .experience(experienceRepository.getReferenceById(experienceId))
+                .slotDate(date)
+                .maxTourPerDay(financeProperties.getAutoOpenSlotCapacity())
+                .bookedTourCount(0)
+                .build());
+        log.info("Tự mở slot id={} cho experience={} ngày {} (sức chứa {})",
+                slot.getId(), experienceId, date, slot.getMaxTourPerDay());
+        return slot;
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────

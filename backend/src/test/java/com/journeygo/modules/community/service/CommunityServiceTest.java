@@ -14,8 +14,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.journeygo.modules.notification.event.NotificationEvent;
+import com.journeygo.modules.notification.service.NotificationPublisher;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
@@ -52,6 +56,12 @@ class CommunityServiceTest {
 
     @Mock
     private TourRepository tourRepository;
+
+    /** Publisher thật với ApplicationEventPublisher giả: thông báo được tạo nhưng không gửi đi đâu. */
+    private final ApplicationEventPublisher eventPublisher = org.mockito.Mockito.mock(ApplicationEventPublisher.class);
+
+    @Spy
+    private NotificationPublisher notifications = new NotificationPublisher(eventPublisher);
 
     @InjectMocks
     private CommunityService communityService;
@@ -231,6 +241,31 @@ class CommunityServiceTest {
     }
 
     @Test
+    @DisplayName("Người khác bình luận thì tác giả nhận thông báo POST_COMMENTED")
+    void testAddComment_NotifiesAuthor() {
+        when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(sampleUser));
+        when(commentRepository.save(any(PostComment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        communityService.addComment(100L, 2L, new PostCommentRequest("Cảnh đẹp quá!"));
+
+        NotificationEvent sent = lastNotification();
+        assertEquals(com.journeygo.modules.notification.entity.enums.NotificationType.POST_COMMENTED, sent.type());
+        assertEquals(java.util.Set.of(samplePublishedPost.getAuthorId()), sent.recipientIds());
+        // Người bình luận bị loại trừ: tự bình luận bài của mình sẽ không có ai nhận
+        assertEquals(2L, sent.excludeUserId());
+        assertEquals("POST", sent.refType());
+    }
+
+    private NotificationEvent lastNotification() {
+        org.mockito.ArgumentCaptor<Object> events = org.mockito.ArgumentCaptor.forClass(Object.class);
+        org.mockito.Mockito.verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(events.capture());
+        return events.getAllValues().stream()
+                .filter(NotificationEvent.class::isInstance).map(NotificationEvent.class::cast)
+                .reduce((a, b) -> b).orElseThrow();
+    }
+
+    @Test
     @DisplayName("Thả tim mới lần đầu tăng likesCount")
     void testToggleReaction_NewReaction() {
         when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
@@ -330,6 +365,15 @@ class CommunityServiceTest {
         assertNotNull(res);
         assertEquals(PostStatus.PUBLISHED, res.status());
         assertEquals(888L, samplePublishedPost.getModeratedBy());
+
+        // Tác giả nhận thông báo "bài viết đã được đăng"
+        org.mockito.ArgumentCaptor<Object> events = org.mockito.ArgumentCaptor.forClass(Object.class);
+        org.mockito.Mockito.verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(events.capture());
+        NotificationEvent sent = events.getAllValues().stream()
+                .filter(NotificationEvent.class::isInstance).map(NotificationEvent.class::cast)
+                .findFirst().orElseThrow();
+        assertEquals(com.journeygo.modules.notification.entity.enums.NotificationType.POST_APPROVED, sent.type());
+        assertEquals(java.util.Set.of(samplePublishedPost.getAuthorId()), sent.recipientIds());
     }
 
     @Test
@@ -381,5 +425,37 @@ class CommunityServiceTest {
         assertEquals(ReportStatus.RESOLVED, res.status());
         assertTrue(samplePublishedPost.isHidden());
         verify(postRepository).save(samplePublishedPost);
+
+        // Tác giả được báo bài bị ẩn, người báo cáo được cảm ơn
+        org.mockito.ArgumentCaptor<Object> events = org.mockito.ArgumentCaptor.forClass(Object.class);
+        org.mockito.Mockito.verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(events.capture());
+        var sent = events.getAllValues().stream()
+                .filter(NotificationEvent.class::isInstance).map(NotificationEvent.class::cast).toList();
+        var hidden = sent.stream()
+                .filter(e -> e.type() == com.journeygo.modules.notification.entity.enums.NotificationType.POST_HIDDEN)
+                .findFirst().orElseThrow();
+        assertEquals(java.util.Set.of(samplePublishedPost.getAuthorId()), hidden.recipientIds());
+        var thanks = sent.stream()
+                .filter(e -> e.type() == com.journeygo.modules.notification.entity.enums.NotificationType.REPORT_RESOLVED)
+                .findFirst().orElseThrow();
+        assertEquals(java.util.Set.of(2L), thanks.recipientIds());
+    }
+
+    @Test
+    @DisplayName("Bác bỏ báo cáo thì người báo cáo nhận kết quả REPORT_DISMISSED")
+    void testDismissReport_NotifiesReporter() {
+        PostReport report = PostReport.builder()
+                .id(802L).postId(100L).reporterId(3L)
+                .reason(ReportReason.SPAM).status(ReportStatus.PENDING).build();
+        when(reportRepository.findById(802L)).thenReturn(Optional.of(report));
+        when(postRepository.findById(100L)).thenReturn(Optional.of(samplePublishedPost));
+        when(reportRepository.save(any(PostReport.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        communityService.dismissReport(802L, 999L, null);
+
+        NotificationEvent sent = lastNotification();
+        assertEquals(com.journeygo.modules.notification.entity.enums.NotificationType.REPORT_DISMISSED, sent.type());
+        assertEquals(java.util.Set.of(3L), sent.recipientIds());
+        assertFalse(samplePublishedPost.isHidden());
     }
 }

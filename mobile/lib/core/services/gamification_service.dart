@@ -100,6 +100,18 @@ class GamificationService {
     );
   }
 
+  /// GET /gamification/badges (danh mục mọi huy hiệu đang mở)
+  Future<List<BadgeModel>> getAllBadges() async {
+    final data = await _request('GET', '/badges');
+    return _asList(data).map(BadgeModel.fromJson).toList();
+  }
+
+  /// GET /gamification/badges/my
+  Future<List<UserBadgeModel>> getMyBadges() async {
+    final data = await _request('GET', '/badges/my');
+    return _asList(data).map(UserBadgeModel.fromJson).toList();
+  }
+
   /// GET /gamification/points/history (trả về Page của Spring, lấy `content`)
   Future<List<PointTransactionModel>> getPointHistory({
     int page = 0,

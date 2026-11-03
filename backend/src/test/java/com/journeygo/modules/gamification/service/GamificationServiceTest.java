@@ -43,6 +43,12 @@ class GamificationServiceTest {
     @Mock
     private UserVoucherRepository userVoucherRepository;
 
+    /** Publisher thật với ApplicationEventPublisher giả: thông báo được tạo nhưng không gửi đi đâu. */
+    @org.mockito.Spy
+    private com.journeygo.modules.notification.service.NotificationPublisher notifications =
+            new com.journeygo.modules.notification.service.NotificationPublisher(
+                    org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
+
     @InjectMocks
     private GamificationService gamificationService;
 

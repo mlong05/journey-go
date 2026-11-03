@@ -127,22 +127,25 @@ String paymentStatusLabel(String? status) {
 }
 
 /// Nhãn tiếng Việt cho trạng thái refund.
+///
+/// Lưu ý: backend dùng `PENDING_REVIEW` (không phải `PENDING`) cho yêu cầu
+/// đang chờ duyệt — xem `RefundStatus` trong backend.
 String refundStatusLabel(String? status) {
   switch (status) {
-    case 'PENDING':
-      return 'Chờ xử lý';
+    case 'PENDING_REVIEW':
+      return 'Chờ duyệt';
     case 'APPROVED':
       return 'Đã duyệt';
-    case 'REJECTED':
-      return 'Đã từ chối';
     case 'REFUND_PROCESSING':
       return 'Đang hoàn tiền';
     case 'REFUNDED':
       return 'Đã hoàn tiền';
-    case 'MANUAL_TRANSFER_PENDING':
-      return 'Chờ chuyển khoản thủ công';
+    case 'REJECTED':
+      return 'Đã từ chối';
     case 'FAILED':
       return 'Thất bại';
+    case 'CANCELLED':
+      return 'Đã hủy';
     default:
       return status ?? 'Không rõ';
   }

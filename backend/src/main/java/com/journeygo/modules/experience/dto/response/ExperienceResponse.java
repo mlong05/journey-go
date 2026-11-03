@@ -2,6 +2,7 @@ package com.journeygo.modules.experience.dto.response;
 
 import com.journeygo.modules.experience.entity.Experience;
 import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
+import com.journeygo.modules.experience.entity.enums.ExperienceReviewStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
@@ -20,6 +21,9 @@ public record ExperienceResponse(
         @Schema(description = "Currency") String currency,
         @Schema(description = "Thời lượng (phút)") Integer durationMinutes,
         @Schema(description = "Trạng thái") ExperienceStatus status,
+        @Schema(description = "Kết quả kiểm duyệt riêng (PENDING, APPROVED, REJECTED); null với dữ liệu cũ") ExperienceReviewStatus reviewStatus,
+        @Schema(description = "Ghi chú / lý do từ chối của Kiểm duyệt viên") String reviewNote,
+        @Schema(description = "Thời điểm kiểm duyệt") Instant reviewedAt,
         @Schema(description = "ID người tạo") Long createdById,
         @Schema(description = "Người tạo") String createdBy,
         @Schema(description = "Số Task con") Integer taskCount,
@@ -38,6 +42,9 @@ public record ExperienceResponse(
                 .currency(e.getCurrency())
                 .durationMinutes(e.getDurationMinutes())
                 .status(e.getStatus())
+                .reviewStatus(e.getReviewStatus())
+                .reviewNote(e.getReviewNote())
+                .reviewedAt(e.getReviewedAt())
                 .createdById(e.getCreatedBy() != null ? e.getCreatedBy().getId() : null)
                 .createdBy(e.getCreatedBy() != null ? e.getCreatedBy().getFullName() : null)
                 .taskCount(taskCount)
@@ -58,6 +65,9 @@ public record ExperienceResponse(
                 .currency(e.getCurrency())
                 .durationMinutes(e.getDurationMinutes())
                 .status(e.getStatus())
+                .reviewStatus(e.getReviewStatus())
+                .reviewNote(e.getReviewNote())
+                .reviewedAt(e.getReviewedAt())
                 .createdById(e.getCreatedBy() != null ? e.getCreatedBy().getId() : null)
                 .createdBy(e.getCreatedBy() != null ? e.getCreatedBy().getFullName() : null)
                 .taskCount(e.getTasks() != null ? e.getTasks().size() : 0)

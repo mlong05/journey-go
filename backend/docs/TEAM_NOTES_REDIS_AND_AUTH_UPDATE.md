@@ -1,3 +1,4 @@
+
 # Lưu Ý Quan Trọng Cho Team Khi Pull Code Mới Nhất
 > **Phân hệ cập nhật:** Tích hợp Redis Auth, Google OAuth2 Deep Link cho Mobile & Rate Limiter  
 > **Áp dụng cho:** Toàn bộ thành viên (Backend 1-2, Frontend, Mobile, QA)

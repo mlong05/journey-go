@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/models/gamification_model.dart';
 
 /// AppBar dùng chung cho các màn hình điểm thưởng & voucher.
-AppBar buildRewardsAppBar(BuildContext context, String title, {List<Widget>? actions}) {
+AppBar buildRewardsAppBar(
+  BuildContext context,
+  String title, {
+  List<Widget>? actions,
+}) {
   return AppBar(
     backgroundColor: Colors.white,
     elevation: 0,
     centerTitle: true,
     leading: IconButton(
-      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppCultureColors.textDark),
+      icon: const Icon(
+        Icons.arrow_back_ios_new_rounded,
+        size: 18,
+        color: AppCultureColors.textDark,
+      ),
       onPressed: () => Navigator.of(context).maybePop(),
       tooltip: 'Quay lại',
     ),
@@ -16,7 +25,7 @@ AppBar buildRewardsAppBar(BuildContext context, String title, {List<Widget>? act
       title,
       style: const TextStyle(
         fontSize: 16,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w700,
         color: AppCultureColors.textDark,
       ),
     ),
@@ -66,7 +75,7 @@ class RewardsMessageView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: AppCultureColors.textDark,
               ),
             ),
@@ -91,7 +100,9 @@ class RewardsMessageView extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppCultureColors.heritageJade,
                   side: const BorderSide(color: AppCultureColors.heritageJade),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],
@@ -138,13 +149,22 @@ Future<void> showCopyableCodeDialog(
     context: context,
     builder: (ctx) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (subtitle != null) ...[
-            Text(subtitle, style: const TextStyle(fontSize: 13, color: AppCultureColors.textMuted)),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppCultureColors.textMuted,
+              ),
+            ),
             const SizedBox(height: 12),
           ],
           Container(
@@ -153,14 +173,16 @@ Future<void> showCopyableCodeDialog(
             decoration: BoxDecoration(
               color: AppCultureColors.jadeLight,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppCultureColors.heritageJade.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: AppCultureColors.heritageJade.withValues(alpha: 0.3),
+              ),
             ),
             child: SelectableText(
               code,
               style: const TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 15,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0.6,
                 color: AppCultureColors.jadeDark,
               ),
@@ -176,4 +198,191 @@ Future<void> showCopyableCodeDialog(
       ],
     ),
   );
+}
+
+/// Một dòng trong lịch sử điểm: nội dung, loại giao dịch, số điểm cộng/trừ và số dư sau giao dịch.
+class PointTransactionTile extends StatelessWidget {
+  final PointTransactionModel tx;
+
+  const PointTransactionTile({super.key, required this.tx});
+
+  @override
+  Widget build(BuildContext context) {
+    final earning = tx.isEarning;
+    final color = earning ? AppCultureColors.success : AppCultureColors.error;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppCultureColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              earning ? Icons.add_rounded : Icons.remove_rounded,
+              color: color,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tx.description.isNotEmpty ? tx.description : tx.typeLabel,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppCultureColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${tx.typeLabel} • ${formatDateTime(tx.createdAt)}',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AppCultureColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${earning ? '+' : '-'}${formatThousands(tx.amount.abs())}',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Còn ${formatThousands(tx.balanceAfter)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppCultureColors.textLight,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Biểu tượng huy hiệu tròn. Chưa đạt thì chuyển xám và gắn ổ khóa; không có ảnh thì dùng biểu tượng mặc định.
+class BadgeIcon extends StatelessWidget {
+  final String iconUrl;
+  final bool earned;
+  final double size;
+
+  const BadgeIcon({
+    super.key,
+    required this.iconUrl,
+    required this.earned,
+    this.size = 58,
+  });
+
+  static const _greyscale = ColorFilter.matrix([
+    0.2126,
+    0.7152,
+    0.0722,
+    0,
+    0,
+    0.2126,
+    0.7152,
+    0.0722,
+    0,
+    0,
+    0.2126,
+    0.7152,
+    0.0722,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0.55,
+    0,
+  ]);
+
+  Widget _placeholder() => Container(
+    color: AppCultureColors.rewardBg,
+    child: Icon(
+      Icons.workspace_premium_rounded,
+      color: AppCultureColors.gold,
+      size: size * 0.52,
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    Widget image = iconUrl.startsWith('http')
+        ? Image.network(
+            iconUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => _placeholder(),
+          )
+        : _placeholder();
+    if (!earned) image = ColorFiltered(colorFilter: _greyscale, child: image);
+
+    final markSize = size * 0.32;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        children: [
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: earned ? AppCultureColors.gold : AppCultureColors.border,
+                width: 2,
+              ),
+            ),
+            child: ClipOval(child: image),
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              width: markSize,
+              height: markSize,
+              decoration: BoxDecoration(
+                color: earned
+                    ? AppCultureColors.heritageJade
+                    : AppCultureColors.textLight,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Icon(
+                earned ? Icons.check : Icons.lock_rounded,
+                size: markSize * 0.62,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -1,2 +1,11 @@
-// Re-export sang Client component để tránh lỗi hydration khi render bảng có animation.
-export { default } from "./UsersClient";
+import { Suspense } from "react";
+import AdminUsersClient from "./UsersClient";
+
+// Client component đọc ?search= từ ô tìm kiếm đầu trang; useSearchParams cần nằm trong Suspense.
+export default function AdminUsersPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminUsersClient />
+    </Suspense>
+  );
+}

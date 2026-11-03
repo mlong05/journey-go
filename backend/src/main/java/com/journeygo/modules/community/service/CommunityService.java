@@ -10,6 +10,9 @@ import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
+import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +47,7 @@ public class CommunityService {
     private final UserRepository userRepository;
     private final DestinationRepository destinationRepository;
     private final TourRepository tourRepository;
+    private final NotificationPublisher notifications;
 
     private static final int MAX_MEDIA_PER_POST = 10;
     private static final int MAX_MEDIA_URL_LENGTH = 1000;
@@ -89,6 +93,7 @@ public class CommunityService {
 
         CommunityPost saved = postRepository.save(post);
         log.info("Du khách {} tạo bài viết mới id={}, status={}", userId, saved.getId(), initialStatus);
+        if (initialStatus == PostStatus.PENDING_REVIEW) notifyPostPending(saved, false);
         return withNames(PostResponse.fromEntity(saved, null));
     }
 
@@ -106,10 +111,12 @@ public class CommunityService {
 
         // QUY TẮC AN TOÀN: Nếu bài viết đã PUBLISHED mà bị chỉnh sửa nội dung
         // Bắt buộc quay lại PENDING_REVIEW để kiểm duyệt lại, chống đổi nội dung vi phạm!
-        if (post.getStatus() == PostStatus.PUBLISHED) {
+        boolean backToReview = post.getStatus() == PostStatus.PUBLISHED;
+        if (backToReview) {
             post.setStatus(PostStatus.PENDING_REVIEW);
             post.setModerationNote("Bài viết đã được chỉnh sửa bởi tác giả, chờ kiểm duyệt lại");
             log.info("Bài viết id={} đã chuyển lại PENDING_REVIEW do tác giả chỉnh sửa nội dung", postId);
+            notifyPostPending(post, true);
         }
 
         if (request.mediaUrls() != null) {
@@ -150,7 +157,32 @@ public class CommunityService {
         post.setModeratedAt(null);
         CommunityPost saved = postRepository.save(post);
         log.info("Tác giả {} gửi duyệt bài viết id={}", userId, postId);
+        notifyPostPending(saved, status != PostStatus.DRAFT);
         return withNames(PostResponse.fromEntity(saved, null));
+    }
+
+    private void notifyPostPending(CommunityPost post, boolean resubmitted) {
+        String author = post.getAuthorName() != null && !post.getAuthorName().isBlank() ? post.getAuthorName() : "du khách";
+        notifications.send(NotificationType.POST_PENDING)
+                .toRole(Role.MODERATOR)
+                .title(resubmitted ? "Bài viết được gửi lại chờ duyệt" : "Bài viết cộng đồng mới chờ duyệt")
+                .body(NotificationPublisher.quote(post.getTitle()) + " của " + author + " đang chờ bạn kiểm duyệt.")
+                .link("/moderator/community")
+                .ref("POST", post.getId())
+                .queue(NotificationPublisher.Queue.POST_REVIEW)
+                .publish();
+    }
+
+    private static String reportReasonLabel(ReportReason reason) {
+        if (reason == null) return "khác";
+        return switch (reason) {
+            case SPAM -> "spam, quảng cáo";
+            case INAPPROPRIATE_CONTENT -> "nội dung không phù hợp";
+            case HATE_SPEECH -> "ngôn từ thù ghét";
+            case FALSE_INFORMATION -> "thông tin sai lệch";
+            case COPYRIGHT_VIOLATION -> "vi phạm bản quyền";
+            case OTHER -> "khác";
+        };
     }
 
     /** Tác giả xóa bài của mình; không cho xóa khi còn báo cáo chờ xử lý để tránh né kiểm duyệt. */
@@ -245,6 +277,15 @@ public class CommunityService {
         postRepository.save(post);
 
         log.info("User {} đã bình luận vào bài viết id={}", userId, postId);
+
+        // Báo tác giả có bình luận mới (tự bình luận bài mình thì không báo)
+        notifications.send(NotificationType.POST_COMMENTED)
+                .to(post.getAuthorId())
+                .except(userId)
+                .title(author.getFullName() + " đã bình luận về bài viết của bạn")
+                .body("“" + excerpt(saved.getContent(), 120) + "” — trong bài " + NotificationPublisher.quote(post.getTitle()))
+                .ref("POST", postId)
+                .publish();
         return CommentResponse.fromEntity(saved);
     }
 
@@ -360,6 +401,18 @@ public class CommunityService {
             postRepository.save(reported);
             log.warn("Bài viết id={} tự động bị ẩn vì có {} báo cáo chờ xử lý", postId, pending);
         }
+
+        notifications.send(NotificationType.POST_REPORTED)
+                .toRole(Role.MODERATOR)
+                .title(reported.isHidden() && pending >= autoHideReportThreshold
+                        ? "Bài viết bị tạm ẩn do nhiều báo cáo"
+                        : "Có báo cáo vi phạm mới")
+                .body(NotificationPublisher.quote(reported.getTitle()) + " — lý do: " + reportReasonLabel(request.reason())
+                        + " (" + pending + " báo cáo chờ xử lý).")
+                .link("/moderator/community")
+                .ref("POST", postId)
+                .queue(NotificationPublisher.Queue.POST_REPORT)
+                .publish();
         return ReportResponse.fromEntity(saved);
     }
 
@@ -394,6 +447,30 @@ public class CommunityService {
 
         CommunityPost saved = postRepository.save(post);
         log.info("Moderator {} đã kiểm duyệt bài viết id={}, trạng thái mới: {}", moderatorId, postId, newStatus);
+
+        NotificationType type = switch (newStatus) {
+            case PUBLISHED -> NotificationType.POST_APPROVED;
+            case REJECTED -> NotificationType.POST_REJECTED;
+            default -> NotificationType.POST_NEEDS_REVISION;
+        };
+        String sentence = switch (newStatus) {
+            case PUBLISHED -> " đã được đăng lên cộng đồng JourneyGo. Cảm ơn bạn đã chia sẻ hành trình!";
+            case REJECTED -> " chưa phù hợp để đăng lên cộng đồng.";
+            default -> " cần chỉnh sửa thêm trước khi đăng. Bạn sửa rồi gửi lại nhé.";
+        };
+        notifications.send(type)
+                .to(post.getAuthorId())
+                .except(moderatorId)
+                .title(switch (newStatus) {
+                    case PUBLISHED -> "Bài viết của bạn đã được đăng";
+                    case REJECTED -> "Bài viết chưa được duyệt";
+                    default -> "Bài viết cần chỉnh sửa";
+                })
+                .body(NotificationPublisher.withNote(NotificationPublisher.quote(post.getTitle()) + sentence,
+                        post.getModerationNote()))
+                .ref("POST", postId)
+                .publish();
+        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.POST_REVIEW);
         return withNames(PostResponse.fromEntity(saved, null).toBuilder()
                 .reportCount((int) reportRepository.countByPostIdAndStatus(postId, ReportStatus.PENDING))
                 .build());
@@ -408,6 +485,7 @@ public class CommunityService {
             post.setHidden(hidden);
             postRepository.save(post);
             log.info("Moderator {} {} bài viết id={}", moderatorId, hidden ? "đã ẩn" : "đã hiện lại", postId);
+            notifyAuthorVisibility(post, hidden, moderatorId, null);
         }
         return withNames(PostResponse.fromEntity(post, null).toBuilder()
                 .reportCount((int) reportRepository.countByPostIdAndStatus(postId, ReportStatus.PENDING))
@@ -432,17 +510,35 @@ public class CommunityService {
     public ReportResponse resolveReport(Long reportId, Long moderatorId, boolean hidePost, String note) {
         PostReport report = requirePendingReport(reportId);
         markHandled(report, ReportStatus.RESOLVED, moderatorId, note);
+        CommunityPost post = postRepository.findById(report.getPostId()).orElse(null);
 
+        List<Long> reporters = new java.util.ArrayList<>(List.of(report.getReporterId()));
         if (hidePost) {
-            postRepository.findById(report.getPostId()).ifPresent(p -> {
-                p.setHidden(true);
-                postRepository.save(p);
-                log.info("Moderator {} đã ẩn bài viết vi phạm id={}", moderatorId, p.getId());
-            });
+            if (post != null) {
+                post.setHidden(true);
+                postRepository.save(post);
+                log.info("Moderator {} đã ẩn bài viết vi phạm id={}", moderatorId, post.getId());
+                // Kể cả bài đã bị tự ẩn trước đó: lúc này mới là kết luận chính thức gửi tác giả
+                notifyAuthorVisibility(post, true, moderatorId, note);
+            }
             for (PostReport sibling : reportRepository.findByPostIdAndStatus(report.getPostId(), ReportStatus.PENDING)) {
                 markHandled(sibling, ReportStatus.RESOLVED, moderatorId, note);
+                reporters.add(sibling.getReporterId());
             }
         }
+
+        // Cảm ơn những người đã báo cáo (khi ẩn bài thì mọi báo cáo chờ của bài đều được xử lý cùng lúc)
+        String title = post == null ? "" : " " + NotificationPublisher.quote(post.getTitle());
+        var thanks = notifications.send(NotificationType.REPORT_RESOLVED)
+                .title("Báo cáo của bạn đã được xử lý")
+                .body(hidePost
+                        ? "Cảm ơn bạn! Bài viết" + title + " đã được gỡ khỏi cộng đồng vì vi phạm quy định."
+                        : "Cảm ơn bạn! Kiểm duyệt viên đã ghi nhận vi phạm ở bài viết" + title + ".")
+                .ref("REPORT", report.getPostId());
+        reporters.forEach(thanks::to);
+        thanks.publish();
+
+        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.POST_REPORT);
         return toReportResponse(report);
     }
 
@@ -451,7 +547,38 @@ public class CommunityService {
     public ReportResponse dismissReport(Long reportId, Long moderatorId, String note) {
         PostReport report = requirePendingReport(reportId);
         markHandled(report, ReportStatus.DISMISSED, moderatorId, note);
+
+        String title = postRepository.findById(report.getPostId())
+                .map(p -> NotificationPublisher.quote(p.getTitle())).orElse("bạn báo cáo");
+        notifications.send(NotificationType.REPORT_DISMISSED)
+                .to(report.getReporterId())
+                .title("Kết quả xem xét báo cáo")
+                .body(NotificationPublisher.withNote("Sau khi xem xét, bài viết " + title
+                        + " chưa vi phạm quy định cộng đồng. Cảm ơn bạn đã góp phần giữ cộng đồng lành mạnh.", note))
+                .ref("REPORT", report.getPostId())
+                .publish();
+
+        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.POST_REPORT);
         return toReportResponse(report);
+    }
+
+    /** Báo tác giả khi bài bị ẩn khỏi cộng đồng hoặc được hiện lại. */
+    private void notifyAuthorVisibility(CommunityPost post, boolean hidden, Long moderatorId, String note) {
+        notifications.send(hidden ? NotificationType.POST_HIDDEN : NotificationType.POST_RESTORED)
+                .to(post.getAuthorId())
+                .except(moderatorId)
+                .title(hidden ? "Bài viết của bạn đã bị ẩn" : "Bài viết của bạn đã hiển thị lại")
+                .body(NotificationPublisher.withNote(NotificationPublisher.quote(post.getTitle()) + (hidden
+                        ? " tạm thời không hiển thị trên cộng đồng do vi phạm quy định. Bạn có thể chỉnh sửa và gửi duyệt lại."
+                        : " đã được hiển thị lại trên cộng đồng JourneyGo."), note))
+                .ref("POST", post.getId())
+                .publish();
+    }
+
+    private static String excerpt(String text, int max) {
+        if (text == null) return "";
+        String oneLine = text.replaceAll("\\s+", " ").trim();
+        return oneLine.length() <= max ? oneLine : oneLine.substring(0, max - 1) + "…";
     }
 
     /** Bổ sung tên điểm đến và tên tour (bài viết chỉ lưu id) bằng hai truy vấn cho cả danh sách. */

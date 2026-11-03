@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "cultural_contents", indexes = {
@@ -47,6 +49,14 @@ public class CulturalContent {
 
     @Column(name = "duration")
     private Integer duration; // Duration in seconds for audio/video
+
+    /** Thư viện ảnh kèm theo nội dung, giữ đúng thứ tự người tạo sắp xếp */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "cultural_content_images", joinColumns = @JoinColumn(name = "content_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "image_url", length = 1000, nullable = false)
+    @Builder.Default
+    private List<String> imageUrls = new ArrayList<>();
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)

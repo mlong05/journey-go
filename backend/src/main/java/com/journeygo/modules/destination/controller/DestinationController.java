@@ -2,6 +2,7 @@ package com.journeygo.modules.destination.controller;
 
 import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
+import com.journeygo.modules.destination.dto.DestinationQrResponse;
 import com.journeygo.modules.destination.dto.DestinationRequest;
 import com.journeygo.modules.destination.dto.DestinationResponse;
 import com.journeygo.modules.destination.service.DestinationService;
@@ -134,6 +135,31 @@ public class DestinationController {
         Role callerRole = extractRole(userPrincipal);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật điểm đến thành công",
                 destinationService.update(id, request, userPrincipal.getId(), callerRole)));
+    }
+
+    @GetMapping("/{id}/qr")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Lấy mã QR check-in của điểm đến",
+            description = "Mã dùng để in QR dán tại cổng; du khách quét để check-in thay GPS. "
+                    + "PROVIDER chỉ xem được điểm đến của chính mình. Mã không xuất hiện ở API công khai.")
+    public ResponseEntity<ApiResponse<DestinationQrResponse>> getQr(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy mã QR điểm đến thành công",
+                destinationService.getQr(id, userPrincipal.getId(), extractRole(userPrincipal))));
+    }
+
+    @PostMapping("/{id}/qr/regenerate")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Tạo lại mã QR check-in của điểm đến",
+            description = "Dùng khi mã cũ bị lộ. Mã cũ hết hiệu lực ngay, cần in lại QR.")
+    public ResponseEntity<ApiResponse<DestinationQrResponse>> regenerateQr(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return ResponseEntity.ok(ApiResponse.success("Đã tạo mã QR mới cho điểm đến",
+                destinationService.regenerateQr(id, userPrincipal.getId(), extractRole(userPrincipal))));
     }
 
     private Role extractRole(UserPrincipal userPrincipal) {

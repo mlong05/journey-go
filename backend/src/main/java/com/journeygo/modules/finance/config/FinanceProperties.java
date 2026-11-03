@@ -59,6 +59,15 @@ public class FinanceProperties {
     private boolean allowOpenPeriodSettlement = false;
 
     /**
+     * Đặt tour vào ngày Provider chưa mở slot: true = tự mở slot với sức chứa
+     * {@link #autoOpenSlotCapacity}; false = báo "chưa mở bán" như quy trình chặt chẽ.
+     */
+    private boolean autoOpenSlots = true;
+
+    /** Sức chứa (số tour mỗi ngày) của slot được tự mở. */
+    private int autoOpenSlotCapacity = 50;
+
+    /**
      * Số giây giữa các lần quét hết hạn Booking (giây).
      */
     private long bookingExpiryScanIntervalSeconds = 60;

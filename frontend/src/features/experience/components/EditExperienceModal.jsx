@@ -341,10 +341,10 @@ function EditExperienceDialog({
             <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <p className="text-xs font-bold text-slate-500">
                     Tiêu đề
                   </p>
-                  <p className="text-sm font-black text-slate-900 truncate">
+                  <p className="text-sm font-bold text-slate-900 truncate">
                     {updatedItem.title || form.title}
                   </p>
                 </div>
@@ -355,7 +355,7 @@ function EditExperienceDialog({
               </div>
               <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200/70 text-xs">
                 <div>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <p className="text-xs font-bold text-slate-500">
                     Giá
                   </p>
                   <p className="text-slate-800 font-semibold">
@@ -366,7 +366,7 @@ function EditExperienceDialog({
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <p className="text-xs font-bold text-slate-500">
                     Thời lượng
                   </p>
                   <p className="text-slate-800 font-semibold">
@@ -393,7 +393,7 @@ function EditExperienceDialog({
 
               {/* Điểm đến — khoá, chỉ hiển thị */}
               <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <span>Điểm đến</span>
                 </label>
                 <input
@@ -418,7 +418,7 @@ function EditExperienceDialog({
               <div className="space-y-1.5">
                 <label
                   htmlFor="edit-exp-title"
-                  className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider"
+                  className="flex items-center gap-1.5 text-xs font-bold text-slate-700"
                 >
                   <Type size={13} className={palette.icon} />
                   <span>Tiêu đề</span>
@@ -445,7 +445,7 @@ function EditExperienceDialog({
               <div className="space-y-1.5">
                 <label
                   htmlFor="edit-exp-description"
-                  className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider"
+                  className="flex items-center gap-1.5 text-xs font-bold text-slate-700"
                 >
                   <AlignLeft size={13} className={palette.icon} />
                   <span>Mô tả</span>
@@ -470,7 +470,7 @@ function EditExperienceDialog({
                 <div className="space-y-1.5">
                   <label
                     htmlFor="edit-exp-price"
-                    className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider"
+                    className="flex items-center gap-1.5 text-xs font-bold text-slate-700"
                   >
                     <Banknote size={13} className={palette.icon} />
                     <span>Giá</span>
@@ -496,7 +496,7 @@ function EditExperienceDialog({
                 <div className="space-y-1.5">
                   <label
                     htmlFor="edit-exp-currency"
-                    className="text-xs font-bold text-slate-700 uppercase tracking-wider block"
+                    className="text-xs font-bold text-slate-700 block"
                   >
                     Tiền tệ <span className="text-rose-500">*</span>
                   </label>
@@ -525,7 +525,7 @@ function EditExperienceDialog({
                 <div className="space-y-1.5">
                   <label
                     htmlFor="edit-exp-duration"
-                    className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider"
+                    className="flex items-center gap-1.5 text-xs font-bold text-slate-700"
                   >
                     <Clock size={13} className={palette.icon} />
                     <span>Thời lượng (phút)</span>

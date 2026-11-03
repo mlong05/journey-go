@@ -1,0 +1,8 @@
+Changing current working directory to: E:\Kì 9\journey-go\mobile
+00:00 +0: loading E:/Kì 9/journey-go/mobile/lib/screens/tabs/test/selector_test.dart
+00:00 +0 -1: loading E:/Kì 9/journey-go/mobile/lib/screens/tabs/test/selector_test.dart [E]
+  Failed to load "E:/Kì 9/journey-go/mobile/lib/screens/tabs/test/selector_test.dart": Does not exist.
+00:00 +0 -1: Some tests failed.
+
+Failing tests:
+  E:/Kì 9/journey-go/mobile/lib/screens/tabs/test/selector_test.dart: loading E:/Kì 9/journey-go/mobile/lib/screens/tabs/test/selector_test.dart

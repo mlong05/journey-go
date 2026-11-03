@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Users,
@@ -10,230 +10,178 @@ import {
   CreditCard,
   CheckCircle2,
   Clock,
-  AlertTriangle,
+  XCircle,
   ChevronRight,
   ShieldAlert,
-  X,
   ArrowUpRight,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
-import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { SURFACE, TABLE, BADGE, BUTTON, MODAL } from "./dashboard.tokens";
-import { PageHeader, StatusChip, StatCard } from "@/components/dashboard/DashboardUI";
+import { SURFACE, TABLE, BADGE, BUTTON } from "./dashboard.tokens";
+import { PageHeader, StatCard } from "@/components/dashboard/DashboardUI";
+import { dashboardService } from "@/features/dashboard";
+import { useQueueRefresh } from "@/context/NotificationContext";
 
-// Màu nhấn & liên kết của từng thẻ KPI
-const KPI_META = {
-  users: { tone: "sky", href: "/admin/users" },
-  destinations: { tone: "emerald", href: "/admin/destinations" },
-  checkins: { tone: "amber", href: "/admin/analytics" },
-  gmv: { tone: "rose", href: "/admin/finance" },
+// Màu nhấn của từng thẻ KPI
+const KPI_TONE = {
+  users: "sky",
+  destinations: "emerald",
+  checkins: "amber",
+  gmv: "rose",
 };
+
+const PAYMENT_STATUS = {
+  SUCCESS: { label: "Thành công", badge: BADGE.success, icon: CheckCircle2 },
+  PENDING: { label: "Chờ thanh toán", badge: BADGE.warning, icon: Clock },
+  PROCESSING: { label: "Đang xử lý", badge: BADGE.warning, icon: Clock },
+  FAILED: { label: "Thất bại", badge: BADGE.danger, icon: XCircle },
+  EXPIRED: { label: "Hết hạn", badge: BADGE.neutral, icon: XCircle },
+  CANCELLED: { label: "Đã hủy", badge: BADGE.neutral, icon: XCircle },
+};
+
+const TASK_BADGE = {
+  REFUND: "Hoàn tiền",
+  DESTINATION: "Thẩm định điểm đến",
+  TOUR: "Thẩm định tour",
+};
+
+const fmtNumber = (n) => Number(n || 0).toLocaleString("vi-VN");
+
+const fmtDateTime = (iso) =>
+  iso
+    ? new Date(iso).toLocaleString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : "—";
 
 /**
  * Trang Tổng Quan Vận Hành & Tăng Trưởng Toàn Sàn - JourneyGo
- * - Redesign theo phong cách Metis: sạch, phẳng, ít gradient
- * - Giữ nguyên 100% state, props, hàm xử lý và API placeholders
+ * Số liệu lấy từ GET /api/v1/dashboard/admin
  */
 export default function AdminDashboardPage() {
-  // State phản hồi Toast & Modal xử lý tác vụ
-  const [toastMsg, setToastMsg] = useState("");
-  const [selectedTask, setSelectedTask] = useState(null);
-  const { confirm, confirmDialog } = useConfirm();
-  const [isLoading, setIsLoading] = useState(false);
+  const [data, setData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // 1. Dữ liệu 4 thẻ KPI chỉ số vĩ mô (sẵn sàng gắn API)
-  const [kpiStats, setKpiStats] = useState({
-    totalUsers: {
-      count: "0",
-      unit: "tài khoản",
-      subBreakdown: "Du khách • Đối tác • Kiểm duyệt viên",
-      trend: "Cập nhật thời gian thực",
-    },
-    destinations: {
-      count: "0",
-      unit: "điểm",
-      subBreakdown: "Tuyến tour di sản đã kích hoạt",
-      trend: "Theo dõi hệ thống",
-    },
-    checkins: {
-      count: "0",
-      unit: "lượt",
-      subBreakdown: "Lượt kích hoạt thực địa GPS / QR Code",
-      trend: "Dữ liệu định vị",
-    },
-    gmv: {
-      count: "0",
-      unit: "đ",
-      subBreakdown: "Doanh số giao dịch vé toàn sàn",
-      trend: "Cổng thanh toán",
-    },
-  });
+  const loadDashboard = useCallback(async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+      setError("");
+    }
+    try {
+      setData(await dashboardService.getAdmin());
+    } catch (err) {
+      console.error("Lỗi tải dữ liệu dashboard:", err);
+      if (!silent) setError(err?.message || "Không tải được số liệu tổng quan.");
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  }, []);
 
-  // 2. Dữ liệu giao dịch vé trải nghiệm mới nhất
-  const [recentTransactions, setRecentTransactions] = useState([]);
+  useEffect(() => {
+    queueMicrotask(loadDashboard);
+  }, [loadDashboard]);
 
-  // 3. Dữ liệu yêu cầu cần phê duyệt cấp Quản trị
-  const [approvalTasks, setApprovalTasks] = useState([]);
+  // Thời gian thực: yêu cầu hoàn tiền, giao dịch, đối soát mới thì tự cập nhật thẻ và bảng (không cần bấm "Làm mới")
+  useQueueRefresh(
+    ["refund-review", "adjustment-review", "bookings", "settlements", "destination-review", "tour-review"],
+    () => loadDashboard(true),
+  );
 
-  // Toast thông báo
-  const showToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 3500);
-  };
-
-  /**
-   * ── [API INTEGRATION] GẮN API TẠI ĐÂY ──────────────────────────────
-   * useEffect(() => {
-   *   async function fetchDashboardData() {
-   *     setIsLoading(true);
-   *     try {
-   *       const kpiRes = await apiClient.get('/api/v1/admin/stats');
-   *       const txRes = await apiClient.get('/api/v1/admin/transactions/recent');
-   *       const taskRes = await apiClient.get('/api/v1/admin/approvals/pending');
-   *       setKpiStats(kpiRes.data);
-   *       setRecentTransactions(txRes.data);
-   *       setApprovalTasks(taskRes.data);
-   *     } catch (err) {
-   *       console.error("Lỗi tải dữ liệu dashboard:", err);
-   *     } finally {
-   *       setIsLoading(false);
-   *     }
-   *   }
-   *   fetchDashboardData();
-   * }, []);
-   * ───────────────────────────────────────────────────────────────────
-   */
+  const users = data?.users;
+  const destinations = data?.destinations;
+  const checkIns = data?.checkIns;
+  const revenue = data?.revenue;
+  const recentPayments = data?.recentPayments ?? [];
+  const approvalTasks = data?.pendingTasks ?? [];
+  const pendingTaskTotal = data?.pendingTaskTotal ?? 0;
+  const placeholder = isLoading && !data ? "…" : "0";
 
   // 4 Thẻ KPI cấu hình theo giao diện
   const kpiCards = [
     {
       id: "users",
       title: "Tổng Người dùng Hoạt động",
-      count: kpiStats.totalUsers.count,
-      unit: kpiStats.totalUsers.unit,
-      subBreakdown: kpiStats.totalUsers.subBreakdown,
-      trend: kpiStats.totalUsers.trend,
+      count: users ? fmtNumber(users.active) : placeholder,
+      unit: "tài khoản",
+      trend: users ? `+${fmtNumber(users.newThisMonth)} tháng này` : "Đang tải",
       icon: Users,
     },
     {
       id: "destinations",
       title: "Điểm di tích & Lộ trình xuất bản",
-      count: kpiStats.destinations.count,
-      unit: kpiStats.destinations.unit,
-      subBreakdown: kpiStats.destinations.subBreakdown,
-      trend: kpiStats.destinations.trend,
+      count: destinations ? fmtNumber(destinations.published) : placeholder,
+      unit: "điểm",
+      trend: "Đã xuất bản",
       icon: MapPin,
     },
     {
       id: "checkins",
       title: "Lượt Kích hoạt Thực tế",
-      count: kpiStats.checkins.count,
-      unit: kpiStats.checkins.unit,
-      subBreakdown: kpiStats.checkins.subBreakdown,
-      trend: kpiStats.checkins.trend,
+      count: checkIns ? fmtNumber(checkIns.total) : placeholder,
+      unit: "lượt",
+      trend: checkIns ? `Hôm nay: ${fmtNumber(checkIns.today)}` : "Đang tải",
       icon: QrCode,
     },
     {
       id: "gmv",
       title: "Tổng Doanh số Toàn Sàn",
-      count: kpiStats.gmv.count,
-      unit: kpiStats.gmv.unit,
-      subBreakdown: kpiStats.gmv.subBreakdown,
-      trend: kpiStats.gmv.trend,
+      count: revenue ? fmtNumber(revenue.gross) : placeholder,
+      unit: "đ",
+      trend: revenue ? `Tháng này: ${fmtNumber(revenue.thisMonth)} đ` : "Đang tải",
       icon: DollarSign,
     },
   ];
 
-  // Xử lý mở modal phê duyệt tác vụ
-  const handleProcessTask = (task) => {
-    setSelectedTask(task);
-  };
-
-  // Xác nhận xử lý tác vụ (Duyệt hoặc Từ chối)
-  const handleConfirmTaskAction = async (action) => {
-    if (!selectedTask) return;
-
-    const isApprove = action === "approve";
-    const ok = await confirm({
-      tone: isApprove ? "success" : "warning",
-      icon: isApprove ? "check" : "warning",
-      title: isApprove ? "Phê duyệt chính thức yêu cầu này?" : "Yêu cầu bổ sung hồ sơ?",
-      subject: selectedTask.title,
-      description: isApprove
-        ? "Quyết định sẽ được cập nhật vào hệ thống và thông báo tới người gửi yêu cầu."
-        : "Yêu cầu sẽ được trả về để người gửi bổ sung hồ sơ.",
-      confirmLabel: isApprove ? "Phê duyệt" : "Yêu cầu bổ sung",
-    });
-    if (!ok) return;
-
-    // TODO: Gắn API xử lý duyệt:
-    // await apiClient.patch(`/api/v1/admin/approvals/${selectedTask.id}`, { action });
-
-    if (action === "approve") {
-      showToast(`Đã duyệt thành công: ${selectedTask.title}`);
-      setApprovalTasks((prev) => prev.filter((t) => t.id !== selectedTask.id));
-    } else {
-      showToast(`Đã từ chối hoặc chuyển tiếp xem xét: ${selectedTask.title}`);
-      setApprovalTasks((prev) => prev.filter((t) => t.id !== selectedTask.id));
-    }
-    setSelectedTask(null);
-  };
-
   return (
     <div className={SURFACE.page}>
-      {/* Toast thông báo nhanh */}
-      {toastMsg && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg border border-slate-700 text-xs font-bold flex items-center gap-2.5 max-w-md">
-          <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-          <span>{toastMsg}</span>
-        </div>
-      )}
-
       <PageHeader
         eyebrow="Quản trị"
         title="Tổng quan vận hành"
         description="Theo dõi người dùng, điểm đến, lượt kích hoạt và doanh số toàn sàn JourneyGo."
-        meta={
-          <>
-            <StatusChip tone="emerald">Cổng thanh toán: ổn định</StatusChip>
-            <StatusChip tone="sky">Bản đồ &amp; GPS: 99.98% uptime</StatusChip>
-            <StatusChip tone="amber">Kiểm toán &amp; phân quyền: kích hoạt</StatusChip>
-          </>
-        }
       >
-        <Link href="/admin/analytics" className={BUTTON.secondary}>
-          Báo cáo tăng trưởng
-        </Link>
-        <Link href="/admin/finance" className={BUTTON.primary}>
-          Tài chính &amp; thanh toán
-        </Link>
+        <button
+          type="button"
+          onClick={() => loadDashboard()}
+          disabled={isLoading}
+          className={`${BUTTON.secondary} disabled:opacity-60`}
+        >
+          <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
+          Làm mới
+        </button>
       </PageHeader>
 
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+          <AlertTriangle size={15} className="shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {kpiCards.map((card) => {
-          const meta = KPI_META[card.id];
-          return (
-            <StatCard
-              key={card.id}
-              title={card.title}
-              value={card.count}
-              unit={card.unit}
-              hint={card.subBreakdown}
-              icon={card.icon}
-              tone={meta.tone}
-              badge={{ text: card.trend }}
-              href={meta.href}
-            />
-          );
-        })}
+        {kpiCards.map((card) => (
+          <StatCard
+            key={card.id}
+            title={card.title}
+            value={card.count}
+            unit={card.unit}
+            icon={card.icon}
+            tone={KPI_TONE[card.id]}
+            badge={{ text: card.trend }}
+          />
+        ))}
       </section>
 
       {/* ────────────────────────────────────────────────────────
-          3. KHỐI 2 CỘT GIÁM SÁT THỜI GIAN THỰC
+          3. KHỐI 2 CỘT GIÁM SÁT
       ──────────────────────────────────────────────────────── */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        {/* CỘT TRÁI (8/12): Giao Dịch Vé Trải Nghiệm Mới Nhất */}
+        {/* CỘT TRÁI (8/12): Giao Dịch Mới Nhất */}
         <div className={`lg:col-span-8 ${SURFACE.card} overflow-hidden`}>
-          {/* Header bảng giao dịch */}
           <div className={SURFACE.cardHeader}>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center">
@@ -244,7 +192,7 @@ export default function AdminDashboardPage() {
                   Giao dịch vé trải nghiệm mới nhất
                 </h2>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Các đơn hàng vé di tích vừa hoàn tất thanh toán trên toàn sàn
+                  Các lượt thanh toán vé tour gần nhất trên toàn sàn
                 </p>
               </div>
             </div>
@@ -258,7 +206,6 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
 
-          {/* Bảng dữ liệu giao dịch */}
           <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
             <table className={TABLE.base}>
               <thead className="sticky top-0 z-10">
@@ -271,65 +218,75 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className={TABLE.tbody}>
-                {recentTransactions.length === 0 ? (
+                {recentPayments.length === 0 ? (
                   <tr>
                     <td colSpan={5} className={TABLE.emptyCell}>
                       <CreditCard size={28} className="mx-auto text-slate-300 mb-2" />
                       <p className="text-sm font-bold text-slate-600">
-                        Chưa có giao dịch phát sinh
+                        {isLoading ? "Đang tải giao dịch…" : "Chưa có giao dịch phát sinh"}
                       </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Dữ liệu giao dịch sẽ tự động hiển thị khi kết nối API thanh toán
-                      </p>
+                      {!isLoading && (
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Giao dịch sẽ hiển thị tại đây khi du khách thanh toán vé tour.
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ) : (
-                  recentTransactions.map((tx) => (
-                    <tr key={tx.id} className={TABLE.tr}>
-                      <td className={TABLE.td}>
-                        <div className="font-bold text-slate-900">{tx.customer}</div>
-                        <div className="text-[11px] font-mono text-slate-400 mt-0.5">{tx.id}</div>
-                      </td>
-                      <td className="py-3.5 px-4 max-w-[200px]">
-                        <p className="font-semibold text-slate-800 truncate" title={tx.routeName}>
-                          {tx.routeName}
-                        </p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">{tx.time}</p>
-                      </td>
-                      <td className={TABLE.td}>
-                        <span className={`${BADGE.base} ${BADGE.info}`}>
-                          {tx.gateway}
-                        </span>
-                      </td>
-                      <td className={TABLE.td}>
-                        <span className="font-bold text-slate-900 tabular-nums">
-                          {tx.amount}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <span className={`${BADGE.base} ${tx.status === "SUCCESS" ? BADGE.success : BADGE.warning}`}>
-                          {tx.status === "SUCCESS" ? (
-                            <CheckCircle2 size={11} />
-                          ) : (
-                            <Clock size={11} />
-                          )}
-                          <span>{tx.statusLabel || tx.status}</span>
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  recentPayments.map((tx) => {
+                    const status = PAYMENT_STATUS[tx.status] ?? {
+                      label: tx.status,
+                      badge: BADGE.neutral,
+                      icon: Clock,
+                    };
+                    const StatusIcon = status.icon;
+                    return (
+                      <tr key={tx.paymentId} className={TABLE.tr}>
+                        <td className={TABLE.td}>
+                          <div className="font-bold text-slate-900">{tx.touristName || "Du khách"}</div>
+                          <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                            {tx.bookingCode || tx.txnRef}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 max-w-[200px]">
+                          <p className="font-semibold text-slate-800 truncate" title={tx.tourTitle}>
+                            {tx.tourTitle}
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {fmtDateTime(tx.paidAt || tx.createdAt)}
+                          </p>
+                        </td>
+                        <td className={TABLE.td}>
+                          <span className={`${BADGE.base} ${BADGE.info}`}>
+                            {tx.method}
+                            {tx.bankCode ? ` · ${tx.bankCode}` : ""}
+                          </span>
+                        </td>
+                        <td className={TABLE.td}>
+                          <span className="font-bold text-slate-900 tabular-nums">
+                            {fmtNumber(tx.amount)} đ
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <span className={`${BADGE.base} ${status.badge}`}>
+                            <StatusIcon size={11} />
+                            <span>{status.label}</span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* Chân khối giao dịch */}
           <div className={`${SURFACE.cardFooter} flex items-center justify-between`}>
             <span className="inline-flex items-center gap-1.5 font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Đồng bộ dữ liệu thời gian thực
+              <span className={`w-1.5 h-1.5 rounded-full ${error ? "bg-rose-500" : "bg-emerald-500"}`} />
+              {error ? "Mất kết nối máy chủ" : `${recentPayments.length} giao dịch gần nhất`}
             </span>
-            <span className="font-semibold text-slate-600">Đã kết nối máy chủ</span>
+            <span className="font-semibold text-slate-600">Nguồn: cổng thanh toán VNPay</span>
           </div>
         </div>
 
@@ -346,13 +303,13 @@ export default function AdminDashboardPage() {
                     Yêu cầu cần phê duyệt
                   </h2>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    {approvalTasks.length} tác vụ cấp thiết chờ bạn ra quyết định
+                    {pendingTaskTotal} tác vụ chờ bạn ra quyết định
                   </p>
                 </div>
               </div>
 
               <span className={`${BADGE.base} ${BADGE.danger}`}>
-                {approvalTasks.length} chờ
+                {pendingTaskTotal} chờ
               </span>
             </div>
 
@@ -361,33 +318,33 @@ export default function AdminDashboardPage() {
                 <div className={TABLE.emptyCell}>
                   <CheckCircle2 size={28} className="mx-auto text-emerald-500 mb-2" />
                   <p className="text-sm font-bold text-slate-700">
-                    Tất cả tác vụ đã được xử lý xong
+                    {isLoading ? "Đang tải tác vụ…" : "Tất cả tác vụ đã được xử lý xong"}
                   </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Không còn hồ sơ tồn đọng cấp quản trị. Sẵn sàng nhận yêu cầu mới từ API.
-                  </p>
+                  {!isLoading && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Không còn yêu cầu hoàn tiền hay hồ sơ thẩm định nào tồn đọng.
+                    </p>
+                  )}
                 </div>
               ) : (
                 approvalTasks.map((task) => (
                   <div
-                    key={task.id}
+                    key={`${task.type}-${task.id}`}
                     className="p-4 rounded-lg bg-white border border-slate-200 hover:border-slate-300 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div>
+                      <div className="min-w-0">
                         <span className={`${BADGE.base} ${BADGE.warning} mb-1.5`}>
-                          {task.badge}
+                          {TASK_BADGE[task.type] ?? task.type}
                         </span>
                         <h3 className="text-sm font-bold text-slate-900 leading-snug">
                           {task.title}
                         </h3>
-                        <p className="text-xs text-slate-600 mt-0.5">
-                          {task.subtitle}
-                        </p>
+                        <p className="text-xs text-slate-600 mt-0.5">{task.subtitle}</p>
                       </div>
 
                       <span className="text-[11px] text-slate-400 whitespace-nowrap font-mono">
-                        {task.time}
+                        {fmtDateTime(task.submittedAt)}
                       </span>
                     </div>
 
@@ -396,17 +353,11 @@ export default function AdminDashboardPage() {
                     </p>
 
                     <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-100">
-                      <span className="text-[11px] font-mono text-slate-400">
-                        Mã tác vụ: {task.id}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleProcessTask(task)}
-                        className={BUTTON.primary}
-                      >
+                      <span className="text-[11px] font-mono text-slate-400">Mã: {task.code}</span>
+                      <Link href={task.href} className={BUTTON.primary}>
                         <span>Xử lý ngay</span>
                         <ArrowUpRight size={13} />
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 ))
@@ -418,71 +369,14 @@ export default function AdminDashboardPage() {
             <span className="font-bold text-rose-700">
               Cam kết SLA duyệt đối tác: &lt; 24h
             </span>
-            <span className="text-slate-400">Quyền: Quản trị viên</span>
+            <span className="text-slate-400">
+              {pendingTaskTotal > approvalTasks.length
+                ? `Hiển thị ${approvalTasks.length} cũ nhất`
+                : "Quyền: Quản trị viên"}
+            </span>
           </div>
         </div>
       </section>
-
-      {/* ────────────────────────────────────────────────────────
-          4. MODAL XỬ LÝ NHANH TÁC VỤ PHÊ DUYỆT
-      ──────────────────────────────────────────────────────── */}
-      {selectedTask && (
-        <div className={MODAL.overlay} onClick={() => setSelectedTask(null)}>
-          <div className={MODAL.panel} onClick={(e) => e.stopPropagation()}>
-            <div className={MODAL.headerRow}>
-              <div>
-                <span className={`${BADGE.base} ${BADGE.warning}`}>
-                  {selectedTask.category}
-                </span>
-                <h3 className="text-base font-bold text-slate-900 mt-2">
-                  {selectedTask.title}
-                </h3>
-                <p className="text-xs text-slate-600 mt-0.5">{selectedTask.subtitle}</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedTask(null)}
-                className={MODAL.closeBtn}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 leading-relaxed">
-              <p className="font-bold text-slate-800 mb-1">Chi tiết yêu cầu đệ trình:</p>
-              <p>{selectedTask.description}</p>
-            </div>
-
-            <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-800 text-xs">
-              <AlertTriangle size={16} className="shrink-0 text-amber-600" />
-              <span>
-                Quyết định này sẽ tự động cập nhật trạng thái trong hệ thống và thông báo đến người gửi yêu cầu.
-              </span>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => handleConfirmTaskAction("reject")}
-                className={BUTTON.secondary}
-              >
-                Yêu cầu bổ sung hồ sơ
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleConfirmTaskAction("approve")}
-                className={BUTTON.danger}
-              >
-                Phê duyệt chính thức
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {confirmDialog}
     </div>
   );
 }

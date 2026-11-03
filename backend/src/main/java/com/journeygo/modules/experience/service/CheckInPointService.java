@@ -10,6 +10,7 @@ import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
 import com.journeygo.modules.experience.repository.CheckInPointRepository;
 import com.journeygo.modules.experience.repository.ExperienceRepository;
+import com.journeygo.modules.experience.security.ExperienceSecurity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,16 +25,27 @@ public class CheckInPointService {
 
     private final CheckInPointRepository checkInPointRepository;
     private final ExperienceRepository experienceRepository;
+    private final ExperienceSecurity experienceSecurity;
+
+    // Hai endpoint đọc dưới đây là công khai: mã QR chỉ trả cho chủ trải nghiệm / ADMIN / MODERATOR,
+    // nếu không ai cũng lấy được mã để mở câu hỏi mà không cần tới trạm.
 
     @Transactional(readOnly = true)
     public CheckInPointResponse getById(Long id) {
-        return CheckInPointResponse.fromEntity(findOrThrow(id));
+        CheckInPointResponse response = CheckInPointResponse.fromEntity(findOrThrow(id));
+        return experienceSecurity.canViewCheckInSecrets(response.experienceId())
+                ? response
+                : response.withoutQrToken();
     }
 
     @Transactional(readOnly = true)
     public List<CheckInPointResponse> listByExperience(Long experienceId) {
+        boolean withQr = experienceSecurity.canViewCheckInSecrets(experienceId);
         return checkInPointRepository.findByExperienceIdOrderBySequenceOrderAsc(experienceId)
-                .stream().map(CheckInPointResponse::fromEntity).toList();
+                .stream()
+                .map(CheckInPointResponse::fromEntity)
+                .map(r -> withQr ? r : r.withoutQrToken())
+                .toList();
     }
 
     @Transactional
@@ -88,6 +100,28 @@ public class CheckInPointService {
         CheckInPoint saved = checkInPointRepository.saveAndFlush(c);
         log.info("Updated CheckInPoint id={}", saved.getId());
         return CheckInPointResponse.fromEntity(saved);
+    }
+
+    /**
+     * Sinh mã QR mới cho trạm (khi mã cũ bị lộ); mã cũ hết hiệu lực ngay, cần in lại.
+     * Khác update(): được phép cả khi Experience đã PUBLISHED vì chỉ đổi mã, không đổi nội dung trạm.
+     */
+    @Transactional
+    public CheckInPointResponse regenerateQr(Long id) {
+        CheckInPoint c = findOrThrow(id);
+        String token;
+        do {
+            token = newQrToken();
+        } while (checkInPointRepository.existsByQrToken(token));
+        c.setQrToken(token);
+        CheckInPoint saved = checkInPointRepository.saveAndFlush(c);
+        log.info("Đã tạo lại mã QR cho CheckInPoint id={}", saved.getId());
+        return CheckInPointResponse.fromEntity(saved);
+    }
+
+    /** Mã ngẫu nhiên không đoán được (64 bit), dễ nhập tay: JGS-XXXXXXXXXXXXXXXX. */
+    static String newQrToken() {
+        return "JGS-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
     }
 
     @Transactional

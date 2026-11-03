@@ -12,7 +12,7 @@ function CharCounter({ value, max, className = "" }) {
   const length = value.length;
   return (
     <span
-      className={`pointer-events-none absolute right-3 text-[10px] tabular-nums font-bold ${
+      className={`pointer-events-none absolute right-3 text-[11px] tabular-nums font-bold ${
         length >= max * 0.9 ? "text-rose-500" : "text-slate-400"
       } ${className}`}
     >

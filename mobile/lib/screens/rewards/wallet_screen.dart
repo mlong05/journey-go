@@ -81,7 +81,10 @@ class _WalletScreenState extends State<WalletScreen> {
     if (_loading || _loadingMore || !_hasMore) return;
     setState(() => _loadingMore = true);
     try {
-      final next = await _service.getPointHistory(page: _page + 1, size: _pageSize);
+      final next = await _service.getPointHistory(
+        page: _page + 1,
+        size: _pageSize,
+      );
       if (!mounted) return;
       setState(() {
         _history.addAll(next);
@@ -97,16 +100,16 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _openShop() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const VoucherShopScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const VoucherShopScreen()));
     if (mounted) _load(); // số dư có thể đã thay đổi sau khi đổi voucher
   }
 
   void _openMyVouchers() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const MyVouchersScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const MyVouchersScreen()));
   }
 
   @override
@@ -156,7 +159,8 @@ class _WalletScreenState extends State<WalletScreen> {
             child: RewardsMessageView(
               icon: Icons.receipt_long_outlined,
               title: 'Chưa có giao dịch điểm',
-              message: 'Check-in điểm đến và hoàn thành nhiệm vụ để bắt đầu tích điểm.',
+              message:
+                  'Check-in điểm đến và hoàn thành nhiệm vụ để bắt đầu tích điểm.',
             ),
           );
         }
@@ -165,11 +169,13 @@ class _WalletScreenState extends State<WalletScreen> {
           return _loadingMore
               ? const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
+                  child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2.4),
+                  ),
                 )
               : const SizedBox.shrink();
         }
-        return _buildTransactionTile(_history[i]);
+        return PointTransactionTile(tx: _history[i]);
       },
     );
   }
@@ -180,7 +186,10 @@ class _WalletScreenState extends State<WalletScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppCultureColors.jadeGradientStart, AppCultureColors.jadeGradientEnd],
+          colors: [
+            AppCultureColors.jadeGradientStart,
+            AppCultureColors.jadeGradientEnd,
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -198,13 +207,21 @@ class _WalletScreenState extends State<WalletScreen> {
         children: [
           const Text(
             'Số dư hiện tại',
-            style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Icon(Icons.star_rounded, color: Colors.amberAccent, size: 30),
+              const Icon(
+                Icons.star_rounded,
+                color: Colors.amberAccent,
+                size: 30,
+              ),
               const SizedBox(width: 6),
               Text(
                 formatThousands(p?.currentBalance ?? 0),
@@ -212,13 +229,16 @@ class _WalletScreenState extends State<WalletScreen> {
                   color: Colors.white,
                   fontSize: 38,
                   height: 1,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(width: 6),
               const Padding(
                 padding: EdgeInsets.only(bottom: 4),
-                child: Text('điểm', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                child: Text(
+                  'điểm',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
               ),
             ],
           ),
@@ -231,7 +251,9 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
             child: Row(
               children: [
-                Expanded(child: _statCell('Đã tích lũy', p?.lifetimeEarned ?? 0)),
+                Expanded(
+                  child: _statCell('Đã tích lũy', p?.lifetimeEarned ?? 0),
+                ),
                 Container(width: 1, height: 28, color: Colors.white24),
                 Expanded(child: _statCell('Đã tiêu', p?.lifetimeSpent ?? 0)),
               ],
@@ -247,16 +269,28 @@ class _WalletScreenState extends State<WalletScreen> {
       children: [
         Text(
           formatThousands(value),
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 11.5),
+        ),
       ],
     );
   }
 
   Widget _buildActions() {
-    Widget action(IconData icon, String label, VoidCallback onTap, {bool primary = false}) {
+    Widget action(
+      IconData icon,
+      String label,
+      VoidCallback onTap, {
+      bool primary = false,
+    }) {
       return Expanded(
         child: Material(
           color: primary ? AppCultureColors.heritageJade : Colors.white,
@@ -269,19 +303,27 @@ class _WalletScreenState extends State<WalletScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: primary ? AppCultureColors.heritageJade : AppCultureColors.border,
+                  color: primary
+                      ? AppCultureColors.heritageJade
+                      : AppCultureColors.border,
                 ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(icon, size: 19, color: primary ? Colors.white : AppCultureColors.heritageJade),
+                  Icon(
+                    icon,
+                    size: 19,
+                    color: primary
+                        ? Colors.white
+                        : AppCultureColors.heritageJade,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     label,
                     style: TextStyle(
                       fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: primary ? Colors.white : AppCultureColors.textDark,
                     ),
                   ),
@@ -297,9 +339,18 @@ class _WalletScreenState extends State<WalletScreen> {
       padding: const EdgeInsets.only(top: 14),
       child: Row(
         children: [
-          action(Icons.card_giftcard_rounded, 'Đổi thưởng', _openShop, primary: true),
+          action(
+            Icons.card_giftcard_rounded,
+            'Đổi thưởng',
+            _openShop,
+            primary: true,
+          ),
           const SizedBox(width: 10),
-          action(Icons.local_activity_outlined, 'Voucher của tôi', _openMyVouchers),
+          action(
+            Icons.local_activity_outlined,
+            'Voucher của tôi',
+            _openMyVouchers,
+          ),
         ],
       ),
     );
@@ -309,82 +360,13 @@ class _WalletScreenState extends State<WalletScreen> {
     return const Padding(
       padding: EdgeInsets.only(top: 24, bottom: 10),
       child: Text(
-        'LỊCH SỬ ĐIỂM',
+        'Lịch sử điểm',
         style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.8,
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
           color: AppCultureColors.textDark,
         ),
-      ),
-    );
-  }
-
-  Widget _buildTransactionTile(PointTransactionModel tx) {
-    final earning = tx.isEarning;
-    final color = earning ? AppCultureColors.success : AppCultureColors.error;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppCultureColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              earning ? Icons.add_rounded : Icons.remove_rounded,
-              color: color,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tx.description.isNotEmpty ? tx.description : tx.typeLabel,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppCultureColors.textDark,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${tx.typeLabel} • ${formatDateTime(tx.createdAt)}',
-                  style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${earning ? '+' : '-'}${formatThousands(tx.amount.abs())}',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: color),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Còn ${formatThousands(tx.balanceAfter)}',
-                style: const TextStyle(fontSize: 11, color: AppCultureColors.textLight),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

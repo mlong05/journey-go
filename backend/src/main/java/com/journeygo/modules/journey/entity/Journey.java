@@ -82,5 +82,8 @@ public class Journey {
     public void addDestination(JourneyDestinationProgress dest) {
         destinations.add(dest);
         dest.setJourney(this);
+        // Nhiệm vụ thường được thêm vào điểm đến TRƯỚC khi điểm đến gắn vào hành trình,
+        // lúc đó addTask chưa biết journey: gắn lại ở đây để journey_id không bị null.
+        dest.getTasks().forEach(task -> task.setJourney(this));
     }
 }

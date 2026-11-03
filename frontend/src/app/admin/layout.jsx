@@ -1,23 +1,24 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
   MapPin,
   CreditCard,
-  BarChart3,
-  ShieldAlert,
   Settings,
-  Bell,
   Route,
+  Receipt,
+  Award,
   HandCoins,
+  ShieldAlert,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
-import { Sidebar, DashboardHeader } from "@/components/layout";
+import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout";
+import { NotificationProvider } from "@/context/NotificationContext";
+import NotificationToaster from "@/components/notifications/NotificationToaster";
 
 // Navigation items được định nghĩa ngoài component để tránh re-create mỗi render
 const ADMIN_NAV_ITEMS = [
@@ -49,6 +50,13 @@ const ADMIN_NAV_ITEMS = [
     icon: MapPin,
     badge: null,
   },
+  {
+    id: "badges",
+    label: "Huy hiệu di sản",
+    href: "/admin/badges",
+    icon: Award,
+    badge: null,
+  },
 
   {
     id: "finance",
@@ -65,10 +73,10 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
-    id: "analytics",
-    label: "Báo cáo tăng trưởng",
-    href: "/admin/analytics",
-    icon: BarChart3,
+    id: "bookings",
+    label: "Đơn đặt tour",
+    href: "/admin/bookings",
+    icon: Receipt,
     badge: null,
   },
   {
@@ -116,27 +124,12 @@ export default function AdminLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarWide, setIsSidebarWide] = useState(true);
   const [topSearch, setTopSearch] = useState("");
-  const [notificationsCount, setNotificationsCount] = useState(0);
 
-  // Trang Điểm đến & Trải nghiệm: khóa khung 100vh, cố định header & filter, chỉ danh sách tự cuộn.
-  // Trang Tài chính & Tất toán: khóa khung 100vh — bảng cuộn riêng trong panel,
-  // trang KHÔNG cuộn theo window (giống "Quản lý người dùng").
-  //
-  // ⚠️ "Quản lý người dùng" CŨNG phải nằm trong danh sách này. Trước đây trang đó tự ép
-  // `className` của <main> bằng DOM và khôi phục lại class cũ khi unmount ⇒ khi điều hướng
-  // SPA sang Tài chính / Tất toán, cleanup ghi đè class mới của layout bằng class cũ
-  // (`overflow-y-auto`) ⇒ trang quay về cuộn toàn màn hình, mất thanh cuộn nhỏ bên trong.
-  // Nay layout quản lý chung ⇒ chuyển trang nào cũng giữ đúng khung 1 màn hình.
+  // Trang Điểm đến & Trải nghiệm: khóa khung 100vh, cố định header & filter, chỉ danh sách tự cuộn
   const isScrollLockedPage =
     pathname?.startsWith("/admin/destinations") ||
     pathname?.startsWith("/admin/experiences") ||
-    pathname?.startsWith("/admin/tours") ||
-    pathname?.startsWith("/admin/users") ||
-    pathname?.startsWith("/admin/finance") ||
-    pathname?.startsWith("/admin/settlements");
-
-  // Trang "Quản lý người dùng" dùng bố cục riêng (full-width, padding đều 4).
-  const isUsersPage = pathname?.startsWith("/admin/users");
+    pathname?.startsWith("/admin/tours");
 
   // Xử lý tìm kiếm nhanh từ Topbar
   const handleTopSearchSubmit = (e) => {
@@ -155,71 +148,61 @@ export default function AdminLayout({ children }) {
       })?.label || "Tổng quan vận hành";
 
   return (
-    <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
-      <Sidebar
-        role="admin"
-        navItems={ADMIN_NAV_ITEMS}
-        onLogout={performLogout}
-        isOpenMobile={isSidebarOpen}
-        onCloseMobile={() => setIsSidebarOpen(false)}
-        isWide={isSidebarWide}
-        onToggleWide={() => setIsSidebarWide((prev) => !prev)}
-      />
-
-      <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
-        <DashboardHeader
+    <NotificationProvider>
+      <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
+        <Sidebar
           role="admin"
-          user={authData?.user}
-          section="Quản trị"
-          title={currentTitle}
-          onOpenMenu={() => setIsSidebarOpen(true)}
-          searchValue={topSearch}
-          onSearchChange={setTopSearch}
-          onSearchSubmit={handleTopSearchSubmit}
-          searchPlaceholder="Tìm tài khoản, đơn hàng..."
-        >
-          <Link
-            href="/admin"
-            className="relative w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-colors"
-            title="Thông báo hệ thống"
-          >
-            <Bell size={16} />
-            {notificationsCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
-            )}
-          </Link>
-        </DashboardHeader>
+          navItems={ADMIN_NAV_ITEMS}
+          onLogout={performLogout}
+          isOpenMobile={isSidebarOpen}
+          onCloseMobile={() => setIsSidebarOpen(false)}
+          isWide={isSidebarWide}
+          onToggleWide={() => setIsSidebarWide((prev) => !prev)}
+        />
 
-        {/* Main Content bên dưới */}
-        <main
-          className={
-            isScrollLockedPage
-              ? `flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col bg-slate-50 ${
-                  isUsersPage ? "p-4" : "p-4 sm:p-6 lg:p-8"
-                }`
-              : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-slate-50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
-          }
-        >
-          <div
+        <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
+          <DashboardHeader
+            role="admin"
+            user={authData?.user}
+            section="Quản trị"
+            title={currentTitle}
+            onOpenMenu={() => setIsSidebarOpen(true)}
+            searchValue={topSearch}
+            onSearchChange={setTopSearch}
+            onSearchSubmit={handleTopSearchSubmit}
+            searchPlaceholder="Tìm tài khoản, đơn hàng..."
+          >
+            <NotificationBell hint="Cảnh báo hệ thống và các yêu cầu cần xử lý sẽ hiện ở đây." />
+          </DashboardHeader>
+
+          {/* Main Content bên dưới */}
+          <main
             className={
               isScrollLockedPage
-                ? `w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden ${
-                    isUsersPage ? "" : "gap-4"
-                  }`
-                : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
+                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 bg-slate-50"
+                : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-slate-50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
             }
           >
-            {children}
-          </div>
-        </main>
-      </div>
+            <div
+              className={
+                isScrollLockedPage
+                  ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
+                  : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
+              }
+            >
+              {children}
+            </div>
+          </main>
+        </div>
 
-      {/* Modal đăng xuất cao cấp tích hợp */}
-      <LogoutModal
-        isOpen={logoutModal.isOpen}
-        status={logoutModal.status}
-        message={logoutModal.message}
-      />
-    </div>
+        {/* Modal đăng xuất cao cấp tích hợp */}
+        <LogoutModal
+          isOpen={logoutModal.isOpen}
+          status={logoutModal.status}
+          message={logoutModal.message}
+        />
+      </div>
+      <NotificationToaster />
+    </NotificationProvider>
   );
 }

@@ -102,6 +102,7 @@ public class TourService {
                 .durationDays(request.durationDays())
                 .startDate(request.startDate())
                 .endDate(request.endDate())
+                .coverImageUrl(cleanCoverUrl(request.coverImageUrl()))
                 .approved(false)
                 .deleted(false)
                 .createdBy(creator)
@@ -133,6 +134,7 @@ public class TourService {
         existing.setDurationDays(request.durationDays());
         existing.setStartDate(request.startDate());
         existing.setEndDate(request.endDate());
+        existing.setCoverImageUrl(cleanCoverUrl(request.coverImageUrl()));
 
         // Replace destinations
         existing.getTourDestinations().clear();
@@ -173,6 +175,16 @@ public class TourService {
         return PageResponse.from(page, pricingService.mapperFor(page.getContent()));
     }
 
+    /** Ảnh bìa tour: bỏ trống thì lưu null (dùng ảnh điểm đến), chỉ nhận đường dẫn https. */
+    private String cleanCoverUrl(String url) {
+        if (url == null || url.isBlank()) return null;
+        String trimmed = url.trim();
+        if (!trimmed.regionMatches(true, 0, "https://", 0, 8)) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "Ảnh bìa tour phải là đường dẫn https hợp lệ");
+        }
+        return trimmed;
+    }
+
     private void validateDateRange(TourRequest request) {
         if (request.startDate() != null && request.endDate() != null
                 && request.endDate().isBefore(request.startDate())) {
@@ -200,6 +212,11 @@ public class TourService {
         for (TourDestinationRequest dr : destRequests) {
             Destination destination = destinationRepository.findByIdAndDeletedFalse(dr.destinationId())
                     .orElseThrow(() -> new AppException(ErrorCode.DESTINATION_NOT_FOUND));
+            // Tour chỉ được gắn điểm đến đã qua thẩm định
+            if (!destination.isApproved()) {
+                throw new AppException(ErrorCode.VALIDATION_ERROR,
+                        "Điểm đến \"" + destination.getName() + "\" chưa được duyệt, không thể thêm vào tour");
+            }
             tourDestinations.add(TourDestination.builder()
                     .tour(tour)
                     .destination(destination)

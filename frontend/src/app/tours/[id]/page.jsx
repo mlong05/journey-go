@@ -108,7 +108,7 @@ export default function TourDetailPage() {
 
     try {
       const booking = await create({ tourId, experienceDate: selectedDate });
-      router.push(ROUTES.CHECKOUT(booking.id));
+      router.push(ROUTES.CHECKOUT_STANDALONE(booking.id));
     } catch (err) {
       // Message từ backend đã viết sẵn theo ngữ cảnh nghiệp vụ — hiển thị nguyên văn.
       setSubmitError(err?.message || "Không thể tạo đơn đặt tour.");

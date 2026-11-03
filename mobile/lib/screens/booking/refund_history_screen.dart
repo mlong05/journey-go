@@ -31,7 +31,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
 
   static const List<String> _filters = [
     'ALL',
-    'PENDING',
+    'PENDING_REVIEW',
     'APPROVED',
     'REFUNDED',
     'REJECTED',
@@ -386,7 +386,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
     switch (status) {
       case 'ALL':
         return 'Tất cả';
-      case 'PENDING':
+      case 'PENDING_REVIEW':
         return 'Chờ xử lý';
       case 'APPROVED':
         return 'Đang xử lý';
@@ -406,7 +406,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
       case 'REJECTED':
       case 'FAILED':
         return (bg: const Color(0xFFFEF2F2), fg: const Color(0xFF991B1B));
-      case 'PENDING':
+      case 'PENDING_REVIEW':
         return (bg: AppCultureColors.rewardBg, fg: AppCultureColors.rewardText);
       default:
         return (bg: AppCultureColors.oceanLight, fg: AppCultureColors.oceanDark);

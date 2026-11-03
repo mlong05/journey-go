@@ -10,7 +10,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Route,
   MapPin,
   Send,
   Pencil,
@@ -25,7 +24,7 @@ import {
   ChevronsRight,
   Layers,
 } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/DashboardUI";
+import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { tourService } from "../services/tourService";
 import {
   getTourTheme,
@@ -42,6 +41,7 @@ import {
 import TourFormModal from "./TourFormModal";
 import TourDetailModal from "./TourDetailModal";
 import RejectTourDialog from "./RejectTourDialog";
+import { useQueueRefresh } from "@/context/NotificationContext";
 
 /* =========================================================================
  *  KHU VỰC QUẢN LÝ Tour, dùng chung cho Provider, Moderator & Admin.
@@ -68,8 +68,10 @@ import RejectTourDialog from "./RejectTourDialog";
 /* Số dòng mỗi trang */
 const SIZE_OPTIONS = [6, 12, 24];
 
-/* Lưới 12 cột dùng chung cho tiêu đề cột và từng dòng để thẳng hàng tuyệt đối */
-const ROW_GRID = "grid grid-cols-12 gap-3 sm:gap-4 items-center";
+/* Lưới dùng chung cho tiêu đề cột và từng dòng để thẳng hàng: STT và Thao tác cố định ở hai mép,
+   cột Tour rộng nhất vì tên dài */
+const ROW_GRID =
+  "grid grid-cols-12 md:grid-cols-[2.5rem_minmax(0,2.4fr)_minmax(0,1.5fr)_minmax(0,1fr)_8.5rem_10rem] gap-3 sm:gap-4 items-center";
 
 /* Vùng cuộn: ổn định scrollbar + chặn cuộn chồng sang vùng cha */
 const LIST_SCROLL =
@@ -87,14 +89,15 @@ function StatusBadge({ status }) {
   const meta = TOUR_STATUS_META[status] || TOUR_STATUS_META.DRAFT;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${meta.cls}`}
+      className={`inline-flex items-center gap-1.5 max-w-full text-[11px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${meta.cls}`}
+      title={meta.label}
     >
       <span
         className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot} ${
           meta.pulse ? "animate-pulse" : ""
         }`}
       />
-      {meta.label}
+      <span className="truncate">{meta.label}</span>
     </span>
   );
 }
@@ -117,45 +120,6 @@ function Toast({ msg, tone }) {
   );
 }
 
-/* ── Ô KPI bấm để lọc nhanh ──────────────────────────────────── */
-const KPI_TONES = {
-  slate: { icon: "bg-slate-100 text-slate-600", ring: "ring-slate-300" },
-  amber: { icon: "bg-amber-50 text-amber-600", ring: "ring-amber-300" },
-  emerald: { icon: "bg-emerald-50 text-emerald-600", ring: "ring-emerald-300" },
-  rose: { icon: "bg-rose-50 text-rose-600", ring: "ring-rose-300" },
-};
-
-function KpiCard({ icon: Icon, label, value, unit, tone = "slate", active, onClick }) {
-  const t = KPI_TONES[tone] || KPI_TONES.slate;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      title={`Lọc theo: ${label}`}
-      className={`bg-white border rounded-xl p-4 shadow-xs flex items-center justify-between gap-3 transition-all hover:border-slate-300 cursor-pointer text-left w-full ${
-        active ? `border-transparent ring-2 ${t.ring}` : "border-slate-200"
-      }`}
-    >
-      <div className="flex flex-col text-left min-w-0">
-        <p className="text-[13px] font-semibold text-slate-600 truncate">{label}</p>
-        <div className="mt-1 flex items-baseline gap-1.5">
-          <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums leading-none">
-            {value}
-          </span>
-          <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">
-            {unit}
-          </span>
-        </div>
-      </div>
-      <div
-        className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${t.icon}`}
-      >
-        <Icon size={18} strokeWidth={2} />
-      </div>
-    </button>
-  );
-}
 
 /* ── Thanh phân trang ────────────────────────────────────────── */
 function PaginationBar({
@@ -439,6 +403,16 @@ export default function ToursManager({
       active = false;
     };
   }, [fetchTours]);
+
+  // Thời gian thực: có tour mới chờ duyệt (moderator) hoặc tour của mình vừa có kết quả (đối tác)
+  // → tải ngầm danh sách, không hiện trạng thái đang tải.
+  useQueueRefresh(["tour-review", "my-content"], () => {
+    fetchTours()
+      .then(setTours)
+      .catch(() => {
+        /* giữ danh sách đang xem */
+      });
+  });
 
   /* ── Chi tiết ──────────────────────────────────────────────── */
   const openDetail = useCallback(async (id) => {
@@ -740,7 +714,7 @@ export default function ToursManager({
     const canEdit = EDITABLE_STATUSES.includes(tour.status) && !tour.deleted;
 
     return (
-      <div className="col-span-12 md:col-span-2 flex items-center justify-start gap-1.5 shrink-0">
+      <div className="col-span-12 md:col-span-1 flex items-center justify-start md:justify-end gap-1.5 shrink-0">
         <button
           type="button"
           onClick={() => openDetail(tour.tourId)}
@@ -882,54 +856,44 @@ export default function ToursManager({
       <div className="shrink-0">{renderHeader()}</div>
 
       {/* ── KPI ───────────────────────────────────────────────── */}
-      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KpiCard
+      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiTile
           icon={Layers}
           label="Tổng tour"
           value={counts.all}
           unit="tour"
           tone="slate"
-          active={statusTab === "all"}
-          onClick={() => handleStatusChange("all")}
         />
         {source === "mine" && (
-          <KpiCard
+          <KpiTile
             icon={Pencil}
             label="Bản nháp"
             value={counts.DRAFT}
             unit="tour"
             tone="slate"
-            active={statusTab === "DRAFT"}
-            onClick={() => handleStatusChange("DRAFT")}
           />
         )}
-        <KpiCard
+        <KpiTile
           icon={Clock}
           label="Chờ duyệt"
           value={counts.PENDING}
           unit="tour"
           tone="amber"
-          active={statusTab === "PENDING"}
-          onClick={() => handleStatusChange("PENDING")}
         />
-        <KpiCard
+        <KpiTile
           icon={CheckCircle2}
           label="Đã xuất bản"
           value={counts.PUBLISHED}
           unit="tour"
           tone="emerald"
-          active={statusTab === "PUBLISHED"}
-          onClick={() => handleStatusChange("PUBLISHED")}
         />
         {source !== "mine" && (
-          <KpiCard
+          <KpiTile
             icon={Ban}
             label="Bị từ chối"
             value={counts.REJECTED}
             unit="tour"
             tone="rose"
-            active={statusTab === "REJECTED"}
-            onClick={() => handleStatusChange("REJECTED")}
           />
         )}
       </section>
@@ -1001,13 +965,14 @@ export default function ToursManager({
         <div className={`${LIST_SCROLL} flex-1 min-h-0`}>
           {/* Tiêu đề cột */}
           <div
-            className={`${ROW_GRID} px-4 sm:px-5 py-3 bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 sticky top-0 z-10`}
+            className={`${ROW_GRID} px-4 sm:px-5 py-3 bg-slate-50 border-b border-slate-200 shadow-[0_1px_0_0_rgb(226_232_240)] text-xs font-semibold text-slate-600 sticky top-0 z-20`}
           >
-            <div className="col-span-12 md:col-span-4">Tour</div>
-            <div className="col-span-6 md:col-span-2">Hành trình</div>
-            <div className="col-span-6 md:col-span-2">Tổng giá &amp; thời lượng</div>
-            <div className="col-span-6 md:col-span-2">Trạng thái</div>
-            <div className="col-span-12 md:col-span-2">Thao tác</div>
+            <div className="hidden md:block md:col-span-1 text-center">STT</div>
+            <div className="col-span-12 md:col-span-1">Tour</div>
+            <div className="col-span-6 md:col-span-1">Hành trình</div>
+            <div className="col-span-6 md:col-span-1 truncate" title="Tổng giá &amp; thời lượng">Tổng giá &amp; thời lượng</div>
+            <div className="col-span-6 md:col-span-1">Trạng thái</div>
+            <div className="col-span-12 md:col-span-1 md:text-right">Thao tác</div>
           </div>
 
           {/* Thân danh sách */}
@@ -1035,26 +1000,26 @@ export default function ToursManager({
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {pagedItems.map((tour) => (
+              {pagedItems.map((tour, idx) => (
                 <li
                   key={tour.tourId}
                   className="px-4 sm:px-5 py-3.5 hover:bg-slate-50/60 transition-colors"
                 >
                   <div className={ROW_GRID}>
+                    {/* Số thứ tự (tính theo trang) */}
+                    <div className="hidden md:block md:col-span-1 text-center text-xs font-bold text-slate-500 tabular-nums">
+                      {safePageNumber * pageSize + idx + 1}
+                    </div>
+
                     {/* Cột 1: Tour */}
-                    <div className="col-span-12 md:col-span-4 flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-slate-900/5 text-slate-700 border border-slate-200/80 flex items-center justify-center shrink-0">
-                        <Route size={18} />
-                      </div>
+                    <div className="col-span-12 md:col-span-1 flex items-center gap-3 min-w-0">
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-bold text-slate-900 truncate">
+                        <h3 className="text-sm font-bold text-slate-900 truncate" title={tour.title}>
                           {tour.title}
                         </h3>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-600">
                           <span className="font-semibold text-slate-600 truncate">
-                            {source === "mine"
-                              ? TOUR_TYPE_META[tour.tourType] || "Khác"
-                              : tour.createdBy || "Đơn vị không xác định"}
+                            {TOUR_TYPE_META[tour.tourType] || "Khác"}
                           </span>
                         </div>
                         {tour.status === "REJECTED" && tour.rejectionReason && (
@@ -1069,28 +1034,34 @@ export default function ToursManager({
                     </div>
 
                     {/* Cột 2: Hành trình */}
-                    <div className="col-span-6 md:col-span-2 flex items-center gap-1.5 min-w-0">
+                    <div className="col-span-6 md:col-span-1 flex items-center gap-1.5 min-w-0">
                       <MapPin size={13} className="text-slate-400 shrink-0" />
                       <span className="text-xs font-bold text-slate-700 tabular-nums">
                         {tour.destinationCount}
                       </span>
-                      <span className="text-[10.5px] text-slate-600 truncate">
+                      <span
+                        className="text-[11px] text-slate-600 truncate"
+                        title={tour.destinations.map((d) => d.destinationName).join(" → ") || undefined}
+                      >
                         {tour.destinations[0]?.destinationName || "chưa có"}
                       </span>
                     </div>
 
                     {/* Cột 3: Tổng giá & thời lượng */}
-                    <div className="col-span-6 md:col-span-2 flex flex-col gap-0.5">
-                      <span className="text-xs font-bold text-slate-900 tabular-nums leading-none">
+                    <div
+                      className="col-span-6 md:col-span-1 flex flex-col gap-0.5 min-w-0"
+                      title={`${formatVND(tour.price)} · ${formatDuration(tour.durationDays)}`}
+                    >
+                      <span className="text-xs font-bold text-slate-900 tabular-nums leading-none truncate">
                         {formatVND(tour.price)}
                       </span>
-                      <span className="text-[10.5px] font-bold text-slate-600 tabular-nums">
+                      <span className="text-[11px] font-bold text-slate-600 tabular-nums truncate">
                         {formatDuration(tour.durationDays)}
                       </span>
                     </div>
 
                     {/* Cột 4: Trạng thái */}
-                    <div className="col-span-6 md:col-span-2 flex items-center">
+                    <div className="col-span-6 md:col-span-1 flex items-center min-w-0">
                       <StatusBadge status={tour.status} />
                     </div>
 

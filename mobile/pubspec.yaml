@@ -35,16 +35,23 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   http: ^1.6.0
+  http_parser: ^4.1.2
   shared_preferences: ^2.5.6
   google_sign_in: ^6.2.1
   flutter_dotenv: ^5.2.1
   image_picker: ^1.1.2
+  url_launcher: ^6.3.1
+  geolocator: ^14.1.2
+  mobile_scanner: ^7.4.2
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  flutter_compass: ^0.8.1
+  youtube_player_iframe: ^6.0.2
 
   # ── Booking / Payment / Refund ────────────────────────────────────────────
   # Lưu trữ token trong Keychain (iOS) / EncryptedSharedPreferences (Android).
-  flutter_secure_storage: ^9.2.4
-  # Mở trang thanh toán VNPay bằng trình duyệt ngoài (LaunchMode.externalApplication).
-  url_launcher: ^6.3.1
+  # Bản 11.x là bắt buộc để tương thích với win32 6.x (geolocator 14.x).
+  flutter_secure_storage: ^11.2.0
   # Hiển thị mã QR thanh toán VNPay ngay trong app.
   qr_flutter: ^4.1.0
   app_links: ^7.2.2
