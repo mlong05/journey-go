@@ -41,6 +41,9 @@ public class SecurityConfig {
             // VNPay callback — endpoint server-to-server, KHÔNG có JWT.
             "/api/v1/payments/ipn",
             "/api/v1/payments/return",
+            "/api/v1/payments/return-result",
+            // Trang kết quả thanh toán cho TRÌNH DUYỘT (web + mobile deep link).
+            "/api/v1/payments/return-page",
             "/oauth2/**",
             "/login/oauth2/**",
             "/v3/api-docs/**",
