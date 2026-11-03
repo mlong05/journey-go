@@ -22,11 +22,32 @@ import java.util.stream.Collectors;
  * <ol>
  *   <li><b>Ứng dụng Ngân hàng và Ví điện tử</b> — {@code vnp_BankCode=VNPAYQR} (quét mã QR).</li>
  *   <li><b>Thẻ nội địa và tài khoản ngân hàng</b> — {@code vnp_BankCode=VNBANK} (ATM nội địa).</li>
- *   <li><b>Thẻ thanh toán quốc tế</b> — {@code vnp_BankCode=INTCARD} (Visa/Master/JCB/UnionPay).</li>
+ *   <li><b>Thẻ thanh toán quốc tế</b> — {@code vnp_BankCode=VISA} (Visa/Master/JCB/UnionPay).</li>
  * </ol>
  *
  * <p>Đây là các mã cố định do VNPay quy định. Danh sách ngân hàng / ví điện tử cụ thể lấy
  * động từ API chính thức {@code get_bank_list} — KHÔNG hardcode.
+ *
+ * <p>⚠️ Về {@code INTCARD}: mã này được nhiều tài liệu nhắc tới nhưng **VNPay Sandbox
+ * KHÔNG chấp nhận** — URL chứa {@code vnp_BankCode=INTCARD} bị fallback về trang chọn
+ * phương thức, không mở form nhập thẻ. Mã hợp lệ cho nhóm thẻ quốc tế lấy từ
+ * {@code get_bank_list} (bank_type = 3): {@code VISA}, {@code MASTERCARD}, {@code JCB},
+ * {@code UPI}, {@code AMEX}. Ta dùng {@code VISA} vì trang đó nhận đủ cả 3 loại thẻ
+ * phổ biến (Visa/Mastercard/JCB), còn {@code MASTERCARD}/{@code JCB} chỉ nhận đúng
+ * loại thẻ tương ứng.
+ *
+ * <p>⚠️ Về lỗi "Có lỗi xảy ra trong quá trình xử lý" khi thanh toán THẺ QUỐC TẾ:
+ * đã kiểm chứng bằng A/B test trên Sandbox (cùng thẻ test {@code 5200000000001005},
+ * cùng số tiền, cùng payload, chỉ khác {@code vnp_TmnCode}):
+ * <ul>
+ *   <li>{@code CTTVNP01} (merchant DEMO chính thức của VNPay) → {@code code=00},
+ *       có {@code notifyUrl} 3DS2 ⇒ giao dịch thành công.</li>
+ *   <li>{@code G46V3SQ0} (merchant của dự án) → {@code code=01} "Có lỗi xảy ra...".</li>
+ * </ul>
+ * ⇒ Đây là lỗi phía VNPay Sandbox với merchant này, KHÔNG phải lỗi tích hợp của ta
+ * (hashSecret đã được chứng minh đúng: hash sai → lỗi 70 "Sai chữ ký" ngay ở bước
+ * mở form; hash đúng → form thẻ mở bình thường).
+ * ⇒ Hành động: báo VNPay Sandbox. Trong lúc chờ, dùng thẻ nội địa / QR để test.
  *
  * <p>Về {@code bank_type}: tài liệu chính thức "Danh sách ứng dụng, ngân hàng liên kết" chia
  * thành 4 mục (QR, deep-link, ATM nội địa, thẻ quốc tế) nhưng KHÔNG nêu rõ mã số tương ứng.
