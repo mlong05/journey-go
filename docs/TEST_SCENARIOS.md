@@ -1,4 +1,4 @@
-﻿# Kịch bản Test trên Swagger — Booking → Payment → Refund → Settlement
+# Kịch bản Test trên Swagger — Booking → Payment → Refund → Settlement
 
 > **Cách chạy:** mở `http://localhost:8088/swagger-ui.html` → chọn tag → **Try it out** → dán JSON → **Execute**.
 > **Mọi JSON trong tài liệu này đều copy-paste được.** Thứ tự bước đã tối ưu để chạy liền nhau.
@@ -499,7 +499,7 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
       {
         "bankCode": "VNPAYQR",
         "code": "QR_APP_WALLET",
-        "label": "Ứng dụng Ngân hàng và Ví điện tử",
+        "label": "App ngân hàng và Ví điện tử (VNPay QR)",
         "description": "Quét mã QR bằng ứng dụng Mobile Banking hoặc ví điện tử liên kết VNPay-QR (MoMo, ZingPay, VNPay, Viettel Pay, VCB Digibank…)",
         "cardType": "QRCODE",
         "displayOrder": 1
@@ -513,7 +513,7 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
         "displayOrder": 2
       },
       {
-        "bankCode": "INTCARD",
+        "bankCode": "VISA",
         "code": "INTERNATIONAL_CARD",
         "label": "Thẻ thanh toán quốc tế",
         "description": "Thanh toán bằng thẻ quốc tế Visa, Mastercard, JCB, UnionPay",
@@ -524,7 +524,7 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
     "bankGroups": [
       {
         "methodCode": "QR_APP_WALLET",
-        "label": "Ứng dụng Ngân hàng và Ví điện tử",
+        "label": "App ngân hàng và Ví điện tử (VNPay QR)",
         "banks": [
           { "bankCode": "MOMO", "bankName": "MoMo", "logoLink": "https://sandbox.vnpayment.vn/...", "bankType": 1, "displayOrder": 1 },
           { "bankCode": "ZINGPAY", "bankName": "ZingPay", "logoLink": "https://sandbox.vnpayment.vn/...", "bankType": 1, "displayOrder": 2 }
@@ -542,7 +542,7 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
         "methodCode": "INTERNATIONAL_CARD",
         "label": "Thẻ thanh toán quốc tế",
         "banks": [
-          { "bankCode": "INTCARD", "bankName": "Thẻ quốc tế", "logoLink": "https://sandbox.vnpayment.vn/...", "bankType": 3, "displayOrder": 1 }
+          { "bankCode": "VISA", "bankName": "Thẻ quốc tế", "logoLink": "https://sandbox.vnpayment.vn/...", "bankType": 3, "displayOrder": 1 }
         ]
       }
     ],
@@ -721,9 +721,9 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
     "expiresAt": "2026-11-20T02:10:00Z",
     "selectedBankCode": null,
     "availableMethods": [
-      { "bankCode": "VNPAYQR", "code": "QR_APP_WALLET", "label": "Ứng dụng Ngân hàng và Ví điện tử", "description": "Quét mã QR...", "cardType": "QRCODE", "displayOrder": 1 },
+      { "bankCode": "VNPAYQR", "code": "QR_APP_WALLET", "label": "App ngân hàng và Ví điện tử (VNPay QR)", "description": "Quét mã QR...", "cardType": "QRCODE", "displayOrder": 1 },
       { "bankCode": "VNBANK", "code": "DOMESTIC_CARD", "label": "Thẻ nội địa và tài khoản ngân hàng", "description": "Thanh toán bằng thẻ ATM...", "cardType": "ATM", "displayOrder": 2 },
-      { "bankCode": "INTCARD", "code": "INTERNATIONAL_CARD", "label": "Thẻ thanh toán quốc tế", "description": "Thanh toán bằng thẻ quốc tế...", "cardType": null, "displayOrder": 3 }
+      { "bankCode": "VISA", "code": "INTERNATIONAL_CARD", "label": "Thẻ thanh toán quốc tế", "description": "Thanh toán bằng thẻ quốc tế...", "cardType": null, "displayOrder": 3 }
     ],
     "message": "Chọn phương thức thanh toán (Ứng dụng ngân hàng & ví điện tử / Thẻ nội địa & tài khoản ngân hàng / Thẻ thanh toán quốc tế) trên trang VNPay. Số tiền: 1500000 VND — Mã đơn: JG9F3A2B1C4D5E6F708"
   },
@@ -788,7 +788,7 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
 | *(trống)* | Trang chọn phương thức (3 lựa chọn) |
 | `VNPAYQR` | Quét mã QR |
 | `VNBANK` | Thẻ ATM / tài khoản ngân hàng |
-| `INTCARD` | Thẻ quốc tế |
+| `VISA` | Thẻ quốc tế (Visa/Mastercard/JCB) |
 | `MOMO`, `ZINGPAY`, `NCB`, `MB`… | Ngân hàng / ví cụ thể (xem `bankGroups` ở A.3) |
 
 ---
@@ -803,13 +803,41 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
 |---|---|
 | **Ứng dụng Ngân hàng & Ví điện tử** | Chọn ví (MoMo / ZingPay) trong app giả lập → xác nhận thanh toán |
 | **Thẻ nội địa & tài khoản ngân hàng** | **NCB** · Số thẻ `9704198526191432198` · Hạn `07/15` · OTP `123456` |
-| **Thẻ thanh toán quốc tế** | Số thẻ `4111111111111111` · Hạn `12/25` · CVV `123` |
+| **Thẻ thanh toán quốc tế** | Số thẻ `4456530000001005` (VISA) · Hạn `12/26` · CVV `123` · Email `test@gmail.com` · Địa chỉ `22 Lang Ha, Ha Noi` |
 
 > 🧪 **Thẻ test chính thức từ VNPAY (Sandbox):**
 >
 > | Ngân hàng | Số thẻ | Tên chủ thẻ | Ngày phát hành | Mật khẩu OTP |
 > |---|---|---|---|---|
 > | NCB | `9704198526191432198` | NGUYEN VAN A | 07/15 | `123456` |
+>
+> 💳 **Thẻ quốc tế (Sandbox chỉ nhận các số thẻ dưới đây):**
+>
+> | Loại thẻ | Số thẻ | CVC | Hạn | Ghi chú |
+> |---|---|---|---|---|
+> | VISA (No 3DS) | `4456530000001005` | `123` | `12/26` | Thành công |
+> | VISA (3DS) | `4456530000001096` | `123` | `12/26` | Thành công |
+> | MASTERCARD (No 3DS) | `5200000000001005` | `123` | `12/26` | Thành công |
+> | MASTERCARD (3DS) | `5200000000001096` | `123` | `12/26` | Thành công |
+> | JCB (No 3DS) | `3337000000000008` | `123` | `12/26` | Thành công |
+> | JCB (3DS) | `3337000000200004` | `123` | `12/24` | Thành công |
+>
+> Thẻ quốc tế điền thêm: Tên chủ thẻ `NGUYEN VAN A` · Email `test@gmail.com` ·
+> Địa chỉ `22 Lang Ha` · Thành phố `Ha Noi`.
+>
+> ⚠️ **Lưu ý:** `4111111111111111` (số thẻ Visa test phổ biến) **KHÔNG nằm trong
+> allow-list của VNPay Sandbox** → sẽ báo lỗi. Phải dùng đúng số thẻ trong bảng trên.
+>
+> 📌 `vnp_BankCode=VISA` là mã **đang dùng** cho nhóm "Thẻ thanh toán quốc tế".
+> ⚠️ `INTCARD` **KHÔNG được VNPay Sandbox chấp nhận** (đã kiểm chứng: URL bị fallback
+> về trang chọn phương thức ⇒ không mở form nhập thẻ ⇒ báo lỗi). Các mã hợp lệ lấy
+> từ API `get_bank_list` (bank_type = 3): `VISA` / `MASTERCARD` / `JCB` / `UPI` / `AMEX`.
+> Ta dùng `VISA` vì trang đó nhận ĐẦY ĐỦ cả Visa/Mastercard/JCB.
+>
+> ⚠️ **Return URL PHẢI là URL public (ngrok)** — trình duyệt trên điện thoại mở
+> `localhost` là chính điện thoại ⇒ không tới được backend ⇒ mobile không quay lại
+> được app. Dùng `/payments/return-page` (trang HTML) + `app_redirect=1` để
+> trình duyệt chuyển hướng về app qua deep link `journeygo://payment/return`.
 >
 > 📌 **Merchant Sandbox đang dùng:**
 > - `vnp_TmnCode` = `G46V3SQ0`
@@ -826,8 +854,41 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
 > Cấu hình hiện tại trong `backend/.env`:
 > ```bash
 > VNPAY_IPN_URL=https://favorite-pointing-crunching.ngrok-free.dev/api/v1/payments/ipn
-> VNPAY_RETURN_URL=https://favorite-pointing-crunching.ngrok-free.dev/api/v1/payments/return
+> VNPAY_RETURN_URL=https://favorite-pointing-crunching.ngrok-free.dev/api/v1/payments/return-page
+> VNPAY_APP_RETURN_URL=journeygo://payment/return   # ← deep link trực tiếp (không cần tunnel)
+> VNPAY_APP_REDIRECT_ENABLED=false   # mobile tự gửi `appRedirect=true` theo từng giao dịch
+> VNPAY_APP_SCHEME=journeygo
 > ```
+>
+> ### ✅ ĐÃ KIỂM CHỨNG — Deep link trực tiếp (KHÔNG cần tunnel)
+>
+> **Phát hiện quan trọng:** nếu `vnp_ReturnUrl` là **CUSTOM SCHEME**
+> (`journeygo://payment/return`) thì VNPay Sandbox chuyển hướng trình duyệt
+> **thẳng về app**, kèm **TOÀN BỘ tham số kết quả ĐÃ KÝ**:
+> ```
+> journeygo://payment/return?vnp_Amount=…&vnp_ResponseCode=00
+>   &vnp_TransactionStatus=00&vnp_TransactionNo=…&vnp_PayDate=…
+>   &vnp_SecureHash=…            ← chữ ký HMACSHA512 của VNPay
+> ```
+> ⇒ App gửi lại các tham số đó cho `POST /api/v1/payments/return-result`
+> ⇒ backend kiểm tra chữ ký rồi áp dụng ⇒ **khách thấy "thanh toán thành công" NGAY**.
+>
+> **Lợi ích:** app **KHÔNG cần** ngrok/tunnel còn sống, và **KHÔNG phụ thuộc** lệnh
+> `querydr` (lệnh này đang trả `vnp_ResponseCode=99` "Unexpected error" cho **MỌI**
+> giao dịch trên Sandbox — đã kiểm chứng với >20 hình thức request, kể cả giao dịch
+> đã thanh toán thành công).
+>
+> **Bật bằng cách đặt trong `backend/.env`:**
+> ```bash
+> VNPAY_APP_RETURN_URL=journeygo://payment/return
+> ```
+> (`VNPAY_IPN_URL` vẫn nên để trỏ ngrok — IPN là nguồn xác minh server-to-server
+> đáng tin cậy, giúp backend tự cập nhật trạng thái ngay cả khi app bị kill.)
+>
+> **Cơ chế chạy song song (không xung đột):**
+> 1. **Deep link có chữ ký** → app POST `/payments/return-result` → backend áp dụng → ✅
+> 2. **Deep link không có chữ ký / app bị kill** → fallback polling `GET /payments/{id}`
+>    + `POST /payments/{id}/query` (QueryDR) qua `PendingPaymentGuard`.
 >
 > 📌 **Sau khi đổi `VNPAY_IPN_URL` / `VNPAY_RETURN_URL` phải restart app** — cấu hình được
 > đọc lúc khởi động, không hot-reload.
