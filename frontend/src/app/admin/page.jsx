@@ -261,7 +261,7 @@ export default function AdminDashboardPage() {
           {/* Bảng dữ liệu giao dịch */}
           <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
             <table className={TABLE.base}>
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className={TABLE.theadRow}>
                   <th className={TABLE.th}>Mã đơn &amp; khách</th>
                   <th className={TABLE.th}>Tên lộ trình di tích</th>
