@@ -13,6 +13,7 @@ import {
   Settings,
   Bell,
   Route,
+  HandCoins,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -54,6 +55,13 @@ const ADMIN_NAV_ITEMS = [
     label: "Tài chính & Thanh toán",
     href: "/admin/finance",
     icon: CreditCard,
+    badge: null,
+  },
+  {
+    id: "settlements",
+    label: "Tất toán doanh thu",
+    href: "/admin/settlements",
+    icon: HandCoins,
     badge: null,
   },
   {
@@ -110,11 +118,25 @@ export default function AdminLayout({ children }) {
   const [topSearch, setTopSearch] = useState("");
   const [notificationsCount, setNotificationsCount] = useState(0);
 
-  // Trang Điểm đến & Trải nghiệm: khóa khung 100vh, cố định header & filter, chỉ danh sách tự cuộn
+  // Trang Điểm đến & Trải nghiệm: khóa khung 100vh, cố định header & filter, chỉ danh sách tự cuộn.
+  // Trang Tài chính & Tất toán: khóa khung 100vh — bảng cuộn riêng trong panel,
+  // trang KHÔNG cuộn theo window (giống "Quản lý người dùng").
+  //
+  // ⚠️ "Quản lý người dùng" CŨNG phải nằm trong danh sách này. Trước đây trang đó tự ép
+  // `className` của <main> bằng DOM và khôi phục lại class cũ khi unmount ⇒ khi điều hướng
+  // SPA sang Tài chính / Tất toán, cleanup ghi đè class mới của layout bằng class cũ
+  // (`overflow-y-auto`) ⇒ trang quay về cuộn toàn màn hình, mất thanh cuộn nhỏ bên trong.
+  // Nay layout quản lý chung ⇒ chuyển trang nào cũng giữ đúng khung 1 màn hình.
   const isScrollLockedPage =
     pathname?.startsWith("/admin/destinations") ||
     pathname?.startsWith("/admin/experiences") ||
-    pathname?.startsWith("/admin/tours");
+    pathname?.startsWith("/admin/tours") ||
+    pathname?.startsWith("/admin/users") ||
+    pathname?.startsWith("/admin/finance") ||
+    pathname?.startsWith("/admin/settlements");
+
+  // Trang "Quản lý người dùng" dùng bố cục riêng (full-width, padding đều 4).
+  const isUsersPage = pathname?.startsWith("/admin/users");
 
   // Xử lý tìm kiếm nhanh từ Topbar
   const handleTopSearchSubmit = (e) => {
@@ -172,14 +194,18 @@ export default function AdminLayout({ children }) {
         <main
           className={
             isScrollLockedPage
-              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 bg-slate-50"
+              ? `flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col bg-slate-50 ${
+                  isUsersPage ? "p-4" : "p-4 sm:p-6 lg:p-8"
+                }`
               : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-slate-50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
           }
         >
           <div
             className={
               isScrollLockedPage
-                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
+                ? `w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden ${
+                    isUsersPage ? "" : "gap-4"
+                  }`
                 : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
             }
           >

@@ -339,33 +339,15 @@ export default function AdminUsersClient() {
   }, [keywordInput]);
 
   /* ----------------------------------------------------------------
-     LAYOUT FULL-SCREEN: Ép <main> của layout cha thành
-     flex-col + overflow-hidden + padding p-0 để trang này
-     có thể tự quản lý chiều cao 100% mà không bị cuộn toàn trang.
-     Cleanup khi unmount để không ảnh hưởng các trang admin khác.
+     LAYOUT FULL-SCREEN:
+     Trước đây trang này tự ép `className` của <main> bằng DOM rồi khôi phục lại
+     class cũ khi unmount. Cách làm đó gây bug: khi điều hướng SPA sang
+     "Tài chính & thanh toán" / "Tất toán doanh thu", cleanup ghi đè class mới
+     của layout bằng class cũ (`overflow-y-auto`) ⇒ trang quay về cuộn toàn màn
+     hình và mất thanh cuộn nhỏ bên trong (chỉ reload web mới hết lỗi).
+     Nay AdminLayout quản lý chung khung 1 màn hình cho MỌI trang admin
+     (xem `isScrollLockedPage` trong `admin/layout.jsx`) ⇒ không cần ép DOM ở đây.
      ---------------------------------------------------------------- */
-  useEffect(() => {
-    const main = document.querySelector("main");
-    const wrapper = main?.firstElementChild;
-    if (!main) return undefined;
-
-    const prevMainClass = main.className;
-    const prevWrapperClass = wrapper ? wrapper.className : "";
-    const prevMainStyle = main.getAttribute("style") || "";
-
-    main.className =
-      "flex-1 w-full h-full overflow-hidden bg-slate-50";
-    if (wrapper) {
-      wrapper.className = "h-full w-full flex flex-col p-4 overflow-hidden";
-    }
-
-    return () => {
-      main.className = prevMainClass;
-      if (wrapper) wrapper.className = prevWrapperClass;
-      if (prevMainStyle) main.setAttribute("style", prevMainStyle);
-      else main.removeAttribute("style");
-    };
-  }, []);
 
   /* --------------------------- HANDLERS --------------------------- */
   const handleRefresh = () => {

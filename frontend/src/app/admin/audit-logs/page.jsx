@@ -55,9 +55,10 @@ export default function AdminAuditLogsPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-[520px] overflow-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
           <table className="w-full text-left text-xs border-collapse">
-            <thead>
+            {/* Sticky header — tiêu đề cột luôn nhìn thấy khi cuộn danh sách */}
+            <thead className="sticky top-0 z-10">
               <tr className="bg-slate-50/80 border-b border-slate-200 text-[10.5px] font-bold uppercase text-slate-500 tracking-wider">
                 <th className="py-3 px-4">THỜI GIAN</th>
                 <th className="py-3 px-3">TÀI KHOẢN THỰC HIỆN</th>
