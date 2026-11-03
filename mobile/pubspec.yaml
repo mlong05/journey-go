@@ -40,6 +40,15 @@ dependencies:
   flutter_dotenv: ^5.2.1
   image_picker: ^1.1.2
 
+  # ── Booking / Payment / Refund ────────────────────────────────────────────
+  # Lưu trữ token trong Keychain (iOS) / EncryptedSharedPreferences (Android).
+  flutter_secure_storage: ^9.2.4
+  # Mở trang thanh toán VNPay bằng trình duyệt ngoài (LaunchMode.externalApplication).
+  url_launcher: ^6.3.1
+  # Hiển thị mã QR thanh toán VNPay ngay trong app.
+  qr_flutter: ^4.1.0
+  app_links: ^7.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
