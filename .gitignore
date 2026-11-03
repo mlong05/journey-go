@@ -30,4 +30,4 @@ replay_pid*
 .env
 .env.*
 !.env.example
-*.env
+*.envmobile/android/build/
