@@ -39,6 +39,10 @@ export function useAuth() {
         targetPath = ROUTES.PROVIDER || "/provider";
         roleTitle = "Đối tác Điểm đến";
         roleScope = "Quản lý di tích & tour";
+      } else if (roleStr === "PARTNER") {
+        targetPath = ROUTES.PARTNER || "/partner";
+        roleTitle = "Đối tác tài chính";
+        roleScope = "Doanh thu, ví & tất toán";
       }
 
       if (typeof window !== "undefined") {
@@ -107,6 +111,10 @@ export function useAuth() {
         targetPath = ROUTES.PROVIDER || "/provider";
         roleTitle = "Đối tác Điểm đến";
         roleScope = "Quản lý di tích & tour";
+      } else if (roleStr === "PARTNER") {
+        targetPath = ROUTES.PARTNER || "/partner";
+        roleTitle = "Đối tác tài chính";
+        roleScope = "Doanh thu, ví & tất toán";
       }
 
       if (typeof window !== "undefined") {
