@@ -7,6 +7,8 @@ import com.journeygo.modules.experience.dto.request.UpdateExperienceRequest;
 import com.journeygo.modules.experience.dto.response.ExperienceResponse;
 import com.journeygo.modules.experience.entity.Experience;
 import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
+import com.journeygo.modules.experience.entity.enums.ExperienceReviewStatus;
+import com.journeygo.modules.experience.entity.enums.TaskStatus;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
 import com.journeygo.modules.experience.repository.ExperienceRepository;
@@ -14,6 +16,9 @@ import com.journeygo.modules.destination.entity.Destination;
 import com.journeygo.modules.destination.repository.DestinationRepository;
 import com.journeygo.modules.experience.repository.TaskRepository;
 import com.journeygo.modules.experience.repository.CheckInPointRepository;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
+import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +41,7 @@ public class ExperienceService {
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
     private final CheckInPointRepository checkInPointRepository;
+    private final NotificationPublisher notifications;
 
     @Transactional(readOnly = true)
     public ExperienceResponse getById(Long id) {
@@ -116,6 +122,24 @@ public class ExperienceService {
     }
 
 
+    /**
+     * Báo Kiểm duyệt viên khi trải nghiệm của điểm đến ĐÃ phát hành vào hàng chờ duyệt.
+     * Điểm đến chưa duyệt thì không báo ở đây: lúc gửi duyệt điểm đến, gói trải nghiệm vào hàng chờ cùng lúc.
+     */
+    private void notifyPendingReview(Experience e, boolean edited) {
+        Destination destination = e.getDestination();
+        if (destination == null || !destination.isApproved()) return;
+        notifications.send(NotificationType.EXPERIENCE_PENDING)
+                .toRole(Role.MODERATOR)
+                .title(edited ? "Trải nghiệm được cập nhật, cần duyệt lại" : "Trải nghiệm mới chờ duyệt")
+                .body(NotificationPublisher.quote(e.getTitle()) + " tại " + NotificationPublisher.quote(destination.getName())
+                        + " đang chờ bạn thẩm định.")
+                .link("/moderator/destinations/" + destination.getId())
+                .ref("EXPERIENCE", e.getId())
+                .queue(NotificationPublisher.Queue.EXPERIENCE_REVIEW)
+                .publish();
+    }
+
     private ExperienceResponse toResponseWithCounts(Experience e) {
         int taskCount = (int) taskRepository.countByExperienceId(e.getId());
         int cipCount = (int) checkInPointRepository.countByExperienceId(e.getId());
@@ -140,11 +164,13 @@ public class ExperienceService {
                 .currency(req.currency() != null ? req.currency() : "VND")
                 .durationMinutes(req.durationMinutes())
                 .status(ExperienceStatus.DRAFT)   // mặc định DRAFT
+                .reviewStatus(ExperienceReviewStatus.PENDING) // chờ Kiểm duyệt viên duyệt riêng
                 .createdBy(creator)
                 .build();
 
         Experience saved = experienceRepository.saveAndFlush(e);
         log.info("Created Experience id={} by user={}", saved.getId(), creatorId);
+        notifyPendingReview(saved, false);
 
         return ExperienceResponse.fromEntity(saved, 0, 0);
     }
@@ -163,9 +189,14 @@ public class ExperienceService {
         if (req.price() != null) e.setPrice(req.price());
         if (req.currency() != null) e.setCurrency(req.currency());
         if (req.durationMinutes() != null) e.setDurationMinutes(req.durationMinutes());
+        // Sửa nội dung thì phải được duyệt lại
+        e.setReviewStatus(ExperienceReviewStatus.PENDING);
+        e.setReviewNote(null);
+        e.setReviewedAt(null);
 
         Experience saved = experienceRepository.save(e);
         log.info("Updated Experience id={}", saved.getId());
+        notifyPendingReview(saved, true);
 
         int taskCount = (int) taskRepository.countByExperienceId(saved.getId());
         int cipCount = (int) checkInPointRepository.countByExperienceId(saved.getId());
@@ -210,6 +241,14 @@ public class ExperienceService {
                     "Chỉ có thể chuyển sang DRAFT hoặc PUBLISHED. INACTIVE là xoá mềm.");
         }
 
+        // Phát hành cần được Kiểm duyệt viên duyệt riêng (dữ liệu cũ chưa có kết quả kiểm duyệt thì vẫn cho)
+        if (newStatus == ExperienceStatus.PUBLISHED
+                && (e.getReviewStatus() == ExperienceReviewStatus.PENDING
+                    || e.getReviewStatus() == ExperienceReviewStatus.REJECTED)) {
+            throw new BusinessException("BR-EXP-REVIEW",
+                    "Trải nghiệm cần được Kiểm duyệt viên duyệt trước khi phát hành.");
+        }
+
         // Idempotent: nếu trùng status hiện tại thì trả về luôn
         if (e.getStatus() == newStatus) {
             log.info("Experience id={} đã ở trạng thái {}, bỏ qua changeStatus", id, newStatus);
@@ -218,6 +257,16 @@ public class ExperienceService {
             e.setStatus(newStatus);
             experienceRepository.save(e);
             log.info("Experience id={} status: {} → {}", id, old, newStatus);
+        }
+
+        // Nhiệm vụ đi theo trạng thái của Experience: hành trình của du khách chỉ dùng Task PUBLISHED,
+        // còn sửa nhiệm vụ / câu hỏi / đáp án cần Task DRAFT. Chạy cả khi trùng status để sửa dữ liệu lệch.
+        int synced = newStatus == ExperienceStatus.PUBLISHED
+                ? taskRepository.updateStatusByExperience(e.getId(), TaskStatus.DRAFT, TaskStatus.PUBLISHED)
+                : taskRepository.updateStatusByExperience(e.getId(), TaskStatus.PUBLISHED, TaskStatus.DRAFT);
+        if (synced > 0) {
+            log.info("Experience id={}: chuyển {} nhiệm vụ sang {}", id, synced,
+                    newStatus == ExperienceStatus.PUBLISHED ? TaskStatus.PUBLISHED : TaskStatus.DRAFT);
         }
 
         int taskCount = (int) taskRepository.countByExperienceId(e.getId());

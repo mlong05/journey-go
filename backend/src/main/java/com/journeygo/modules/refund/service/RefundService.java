@@ -20,6 +20,9 @@ import com.journeygo.modules.refund.entity.enums.RefundStatus;
 import com.journeygo.modules.refund.event.RefundCompletedEvent;
 import com.journeygo.modules.refund.repository.RefundAuditLogRepository;
 import com.journeygo.modules.refund.repository.RefundRequestRepository;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
+import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -87,6 +90,7 @@ public class RefundService {
     private final VnPayClient vnPayClient;
     private final FinanceProperties financeProperties;
     private final ApplicationEventPublisher eventPublisher;
+    private final NotificationPublisher notifications;
 
     // ── Create (Tourist) ──────────────────────────────────────────────────────
 
@@ -190,6 +194,17 @@ public class RefundService {
         log.info("[Refund] Đã tạo yêu cầu hoàn tiền id={} code={} payment={} amount={}",
                 saved.getId(), saved.getRefundCode(), payment.getId(), proposed);
 
+        String bookingCode = payment.getBooking() != null ? payment.getBooking().getBookingCode() : "";
+        notifications.send(NotificationType.REFUND_REQUESTED)
+                .toRole(Role.ADMIN)
+                .title("Yêu cầu hoàn tiền mới")
+                .body(tourist.getFullName() + " yêu cầu hoàn " + NotificationPublisher.money(proposed)
+                        + " cho đơn " + bookingCode + " (mã " + saved.getRefundCode() + "). Cần duyệt trong 24 giờ.")
+                .link("/admin/finance")
+                .ref("REFUND", saved.getId())
+                .queue(NotificationPublisher.Queue.REFUND_REVIEW)
+                .publish();
+
         return RefundResponse.fromEntity(saved);
     }
 
@@ -251,6 +266,14 @@ public class RefundService {
             audit(refund, RefundAuditLog.Action.REJECTED, fromStatus, RefundStatus.REJECTED, admin,
                     null, null, "Quản trị viên từ chối yêu cầu hoàn tiền. Lý do: " + reason);
             log.info("[Refund] Admin {} từ chối yêu cầu hoàn tiền id={}", adminId, refundId);
+            notifications.send(NotificationType.REFUND_REJECTED)
+                    .to(refund.getTourist() == null ? null : refund.getTourist().getId())
+                    .title("Yêu cầu hoàn tiền chưa được chấp nhận")
+                    .body("Yêu cầu " + refund.getRefundCode() + " đã bị từ chối. Lý do: " + reason.trim())
+                    .ref("REFUND", refund.getId())
+                    .queue(NotificationPublisher.Queue.REFUNDS)
+                    .publish();
+            notifications.queueChanged(Role.ADMIN, NotificationPublisher.Queue.REFUND_REVIEW);
             return RefundResponse.fromEntity(refund);
         }
 
@@ -293,6 +316,16 @@ public class RefundService {
 
         log.info("[Refund] Admin {} duyệt hoàn tiền id={} amount={} method={}",
                 adminId, refundId, policyAmount, method);
+
+        notifications.send(NotificationType.REFUND_APPROVED)
+                .to(refund.getTourist() == null ? null : refund.getTourist().getId())
+                .title("Yêu cầu hoàn tiền đã được duyệt")
+                .body("JourneyGo đang hoàn " + NotificationPublisher.money(policyAmount) + " cho yêu cầu "
+                        + refund.getRefundCode() + ". Chúng tôi sẽ báo ngay khi tiền về tài khoản của bạn.")
+                .ref("REFUND", refund.getId())
+                .queue(NotificationPublisher.Queue.REFUNDS)
+                .publish();
+        notifications.queueChanged(Role.ADMIN, NotificationPublisher.Queue.REFUND_REVIEW);
 
         // ── Thực hiện hoàn tiền theo phương thức được chọn ─────────────────────
         if (method == RefundMethod.VNPAY_API) {
@@ -682,6 +715,17 @@ public class RefundService {
                 bookingId,
                 refund.getRefundedAmount(),
                 resolvedAt));
+
+        // Một điểm chung cho cả VNPay xác nhận, chuyển khoản thủ công và RefundStatusScheduler
+        notifications.send(NotificationType.REFUND_COMPLETED)
+                .to(refund.getTourist() == null ? null : refund.getTourist().getId())
+                .title("Đã hoàn tiền thành công")
+                .body(NotificationPublisher.money(refund.getRefundedAmount()) + " của yêu cầu " + refund.getRefundCode()
+                        + " đã được hoàn. Thời gian tiền về tài khoản tùy theo ngân hàng của bạn.")
+                .ref("REFUND", refund.getId())
+                .queue(NotificationPublisher.Queue.REFUNDS)
+                .publish();
+        notifications.queueChanged(Role.ADMIN, NotificationPublisher.Queue.REFUND_REVIEW);
     }
 
     private RefundResponse withAuditLogs(RefundResponse response, Long refundId) {

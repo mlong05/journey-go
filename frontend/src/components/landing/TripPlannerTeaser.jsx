@@ -1,204 +1,113 @@
-"use client";
-
 import Link from "next/link";
-import {
-  Calendar,
-  Sparkles,
-  MapPin,
-  Clock,
-  Users,
-  CheckCircle2,
-  ArrowRight,
-  Plus,
-} from "lucide-react";
+import { CalendarDays, MapPin, Clock, Users, CheckCircle2, ArrowRight, Plus, Route } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+
+const FEATURES = [
+  {
+    title: "Sắp xếp trải nghiệm theo từng ngày",
+    desc: "Bố trí hoạt động sáng, chiều, tối một cách trực quan.",
+  },
+  {
+    title: "Tự động ước tính thời gian và ngân sách",
+    desc: "Kiểm soát chi phí minh bạch cho cả nhóm.",
+  },
+  {
+    title: "Mời bạn bè cùng lên kế hoạch",
+    desc: "Cùng bình chọn trải nghiệm và chia việc trong chuyến đi.",
+  },
+];
+
+const DAYS = [
+  { day: "N1", title: "Cột cờ Lũng Cú & phố cổ Đồng Văn", meta: "08:30 - 17:00 · Host A Páo" },
+  { day: "N2", title: "Chèo thuyền hẻm Tu Sản & đèo Mã Pí Lèng", meta: "09:00 - 15:30 · Hoạt động dưới nước" },
+  { day: "N3", title: "Thăm bản dệt lanh Lùng Tám", meta: "09:30 - 14:00 · Workshop" },
+];
 
 export default function TripPlannerTeaser() {
   return (
-    <section id="lich-trinh" className="py-20 bg-slate-900 text-white relative overflow-hidden">
-      {/* Vệt sáng trang trí background */}
-      <div className="absolute top-1/4 -left-48 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 -right-48 w-96 h-96 bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
+    <section id="lich-trinh" className="py-20 bg-slate-50/70 border-y border-slate-100 scroll-mt-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div>
+          <p className="text-sm font-medium text-emerald-700 mb-2">Độc quyền trên JourneyGo</p>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-slate-900 leading-tight">
+            Tự tay thiết kế kế hoạch chuyến đi chỉ trong vài phút.
+          </h2>
+          <p className="mt-4 text-base text-slate-600 leading-relaxed">
+            Không còn gò bó trong tour đại lý cứng nhắc. Kết nối các trải nghiệm yêu thích
+            thành một lịch trình tối ưu cung đường và cùng bạn bè tận hưởng trọn vẹn.
+          </p>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          {/* Cột trái: Giới thiệu tính năng */}
-          <div className="lg:col-span-6 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Độc quyền trên Journey Go</span>
-            </div>
-
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight font-jakarta leading-tight">
-              Tự tay thiết kế{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">
-                kế hoạch chuyến đi
-              </span>{" "}
-              trong vài phút.
-            </h2>
-
-            <p className="text-slate-300 text-base sm:text-lg leading-relaxed">
-              Không còn phải gò bó trong các tour đại lý cứng nhắc. Hãy kết nối các
-              trải nghiệm yêu thích thành một lịch trình thông minh, tối ưu cung đường
-              và cùng bạn bè tận hưởng trọn vẹn chuyến đi.
-            </p>
-
-            {/* Các điểm nổi bật */}
-            <div className="space-y-4 pt-2">
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
+          <ul className="mt-8 space-y-4">
+            {FEATURES.map((f) => (
+              <li key={f.title} className="flex items-start gap-3">
+                <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <CheckCircle2 size={16} />
+                </span>
                 <div>
-                  <h4 className="font-semibold text-white text-sm sm:text-base">
-                    Kéo thả trải nghiệm theo từng ngày
-                  </h4>
-                  <p className="text-xs sm:text-sm text-slate-400">
-                    Sắp xếp thứ tự các hoạt động sáng, chiều, tối một cách trực quan.
-                  </p>
+                  <p className="text-sm sm:text-base font-semibold text-slate-900">{f.title}</p>
+                  <p className="text-sm text-slate-500 mt-0.5">{f.desc}</p>
                 </div>
+              </li>
+            ))}
+          </ul>
+
+          <Link
+            href={ROUTES.REGISTER}
+            className="mt-8 inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold shadow-xs transition-colors"
+          >
+            Tạo lịch trình miễn phí
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+
+        {/* Mô phỏng giao diện lịch trình — cùng phong cách bảng điều khiển */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                <CalendarDays size={17} />
               </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-white text-sm sm:text-base">
-                    Tự động ước tính thời gian & ngân sách
-                  </h4>
-                  <p className="text-xs sm:text-sm text-slate-400">
-                    Kiểm soát chi phí minh bạch cho cả nhóm mà không sợ phát sinh.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-white text-sm sm:text-base">
-                    Mời bạn bè cùng lên kế hoạch
-                  </h4>
-                  <p className="text-xs sm:text-sm text-slate-400">
-                    Cùng bình chọn trải nghiệm và phân chia công việc trong chuyến đi.
-                  </p>
-                </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-900 truncate">
+                  Hành trình mùa hoa tam giác mạch
+                </p>
+                <p className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                  <span className="flex items-center gap-1"><MapPin size={12} /> Hà Giang · 3N2Đ</span>
+                  <span className="flex items-center gap-1"><Users size={12} /> 4 thành viên</span>
+                </p>
               </div>
             </div>
-
-            {/* CTA Button */}
-            <div className="pt-4">
-              <Link
-                href={ROUTES.REGISTER || "/register"}
-                className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold text-sm sm:text-base shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/30 group"
-              >
-                <span>Bắt đầu tạo lịch trình miễn phí</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-            </div>
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Đã xác nhận
+            </span>
           </div>
 
-          {/* Cột phải: Mockup giao diện chuyến đi sinh động */}
-          <div className="lg:col-span-6">
-            <div className="bg-slate-800/80 backdrop-blur-xl border border-slate-700/80 rounded-3xl p-5 sm:p-7 shadow-2xl relative">
-              {/* Header của Mockup */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-700">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-base text-white">
-                      Hành Trình Mùa Hoa Tam Giác Mạch
-                    </h3>
-                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                      <MapPin className="w-3 h-3 text-emerald-400" />
-                      <span>Hà Giang • 3 Ngày 2 Đêm</span>
-                      <span>•</span>
-                      <Users className="w-3 h-3 text-teal-400" />
-                      <span>4 thành viên</span>
-                    </div>
-                  </div>
-                </div>
-
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Lịch trình mẫu
+          <ul className="divide-y divide-slate-100">
+            {DAYS.map((d) => (
+              <li key={d.day} className="px-5 py-3.5 flex items-center gap-3">
+                <span className="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold flex items-center justify-center shrink-0">
+                  {d.day}
                 </span>
-              </div>
-
-              {/* Lịch trình các ngày */}
-              <div className="mt-5 space-y-3">
-                {/* Ngày 1 */}
-                <div className="p-3.5 rounded-xl bg-slate-900/70 border border-slate-700/50 flex items-center justify-between hover:border-emerald-500/40 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-600/30 text-emerald-300 flex items-center justify-center font-bold text-xs">
-                      N1
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm text-slate-100">
-                        Check-in Cột Cờ Lũng Cú & Phố Cổ Đồng Văn
-                      </p>
-                      <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                        <Clock className="w-3 h-3" /> 08:30 - 17:00 • Host A Páo
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-semibold text-emerald-400">
-                    Đã xác nhận
-                  </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-900 truncate">{d.title}</p>
+                  <p className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                    <Clock size={12} /> {d.meta}
+                  </p>
                 </div>
+                <Route size={15} className="text-slate-300 shrink-0" />
+              </li>
+            ))}
+          </ul>
 
-                {/* Ngày 2 */}
-                <div className="p-3.5 rounded-xl bg-slate-900/70 border border-slate-700/50 flex items-center justify-between hover:border-emerald-500/40 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-teal-600/30 text-teal-300 flex items-center justify-center font-bold text-xs">
-                      N2
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm text-slate-100">
-                        Chèo thuyền hẻm Tu Sản & Đèo Mã Pí Lèng
-                      </p>
-                      <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                        <Clock className="w-3 h-3" /> 09:00 - 15:30 • Hoạt động dưới nước
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-semibold text-emerald-400">
-                    Đã xác nhận
-                  </span>
-                </div>
-
-                {/* Ngày 3 */}
-                <div className="p-3.5 rounded-xl bg-slate-900/70 border border-slate-700/50 flex items-center justify-between hover:border-emerald-500/40 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-600/30 text-amber-300 flex items-center justify-center font-bold text-xs">
-                      N3
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm text-slate-100">
-                        Thăm bản dệt lanh Lùng Tám & Trở về
-                      </p>
-                      <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                        <Clock className="w-3 h-3" /> 09:30 - 14:00 • Workshop
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-semibold text-emerald-400">
-                    Đã xác nhận
-                  </span>
-                </div>
-              </div>
-
-              {/* Nút thêm trải nghiệm vào mockup */}
-              <div className="mt-4 pt-4 border-t border-slate-700/80 flex items-center justify-between text-xs text-slate-400">
-                <span>Tổng chi phí dự tính: <strong className="text-white text-sm">1.890.000₫</strong> / người</span>
-                <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold cursor-pointer">
-                  <Plus className="w-3.5 h-3.5" /> Thêm điểm đến
-                </span>
-              </div>
-            </div>
+          <div className="px-5 py-3.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>
+              Chi phí dự tính{" "}
+              <strong className="text-sm font-semibold text-slate-900 tabular-nums">1.890.000₫</strong> / người
+            </span>
+            <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
+              <Plus size={13} /> Thêm điểm đến
+            </span>
           </div>
         </div>
       </div>

@@ -201,7 +201,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                 maxLines: 2,
                 minLines: 1,
                 onChanged: () => setState(() {}),
-                weight: FontWeight.w800,
+                weight: FontWeight.w700,
               ),
               const SizedBox(height: 16),
               _label('Nội dung'),
@@ -333,7 +333,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                   ),
                   child: Text(
                     _isEditing ? 'Lưu thay đổi' : 'Lưu nháp',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -343,7 +343,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                   child: FilledButton.icon(
                     onPressed: _busy ? null : () => _save(submit: true),
                     icon: const Icon(Icons.send_rounded, size: 18),
-                    label: const Text('Gửi duyệt', style: TextStyle(fontWeight: FontWeight.w800)),
+                    label: const Text('Gửi duyệt', style: TextStyle(fontWeight: FontWeight.w700)),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppCultureColors.heritageJade,
                       minimumSize: const Size(0, 50),
@@ -365,7 +365,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
           text,
           style: const TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: AppCultureColors.textDark,
           ),
         ),

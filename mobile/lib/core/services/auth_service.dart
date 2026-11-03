@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:http/http.dart' as http;
 import '../constants/api_constants.dart';
 import '../models/auth_models.dart';
+import 'api_client.dart';
 import 'token_storage.dart';
 
 class AuthService {
@@ -45,7 +47,9 @@ class AuthService {
       );
     } on TimeoutException {
       throw Exception(
-        'Kết nối đến máy chủ quá hạn (timeout). Vui lòng thử lại sau.',
+        kDebugMode
+            ? 'Không kết nối được máy chủ. Kiểm tra địa chỉ ở nút "API" góc trên (điện thoại thật cần IP Wi-Fi của máy tính).'
+            : 'Kết nối đến máy chủ quá hạn (timeout). Vui lòng thử lại sau.',
       );
     } catch (e) {
       throw Exception('Lỗi kết nối mạng: $e');
@@ -465,4 +469,40 @@ class AuthService {
       throw Exception(_extractErrorMessage(response));
     }
   }
+
+  // ── Mật khẩu (lỗi ném ApiException kèm thông báo tiếng Việt của máy chủ) ──
+
+  /// Gửi mã OTP 6 số tới email để đặt lại mật khẩu.
+  Future<void> forgotPassword(String email) =>
+      ApiClient.request('POST', '/auth/forgot-password', auth: false, body: {'email': email.trim()});
+
+  /// Kiểm tra mã OTP còn hiệu lực trước khi cho nhập mật khẩu mới.
+  Future<void> verifyOtp({required String email, required String otp}) =>
+      ApiClient.request('POST', '/auth/verify-otp', auth: false, body: {'email': email.trim(), 'otp': otp});
+
+  /// Đặt mật khẩu mới bằng OTP (không cần đăng nhập).
+  Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+    required String confirmPassword,
+  }) =>
+      ApiClient.request('POST', '/auth/reset-password', auth: false, body: {
+        'email': email.trim(),
+        'otp': otp,
+        'newPassword': newPassword,
+        'confirmPassword': confirmPassword,
+      });
+
+  /// Đổi mật khẩu khi đang đăng nhập; tài khoản Google chưa từng đặt mật khẩu thì bỏ trống [currentPassword].
+  Future<void> changePassword({
+    String? currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) =>
+      ApiClient.request('POST', '/auth/change-password', keepUnauthorizedMessage: true, body: {
+        if (currentPassword != null && currentPassword.isNotEmpty) 'currentPassword': currentPassword,
+        'newPassword': newPassword,
+        'confirmPassword': confirmPassword,
+      });
 }

@@ -23,12 +23,13 @@ import {
 import { SURFACE, TABLE, BADGE, BUTTON, INPUT } from "../admin/dashboard.tokens";
 import {
   PageHeader,
-  StatusChip,
   StatCard,
   Panel,
   StackedBar,
 } from "@/components/dashboard/DashboardUI";
 import { moderationService } from "@/features/destination";
+import { dashboardService } from "@/features/dashboard";
+import { useQueueRefresh } from "@/context/NotificationContext";
 
 /**
  * Trang Bảng Điều Khiển Ban Kiểm Định & Chuẩn Hóa Di Sản - JourneyGo
@@ -39,7 +40,7 @@ import { moderationService } from "@/features/destination";
 const QUICK_LINKS = [
   { href: "/moderator/tours", label: "Thẩm định tour", icon: Compass },
   { href: "/moderator/destinations", label: "Duyệt điểm đến & lộ trình", icon: MapPin },
-  { href: "/moderator/ai-auditing", label: "Chuẩn hóa thuyết minh di sản", icon: BookOpen },
+  { href: "/moderator/destinations", label: "Duyệt thuyết minh di sản", icon: BookOpen },
   { href: "/moderator/community", label: "Duyệt bài cộng đồng", icon: MessageSquare },
   { href: "/moderator/history", label: "Nhật ký & lịch sử duyệt", icon: History },
 ];
@@ -58,24 +59,30 @@ export default function ModeratorDashboardPage() {
     revisionCount: 0,
     revisionTrend: "Đang kiểm tra...",
     alertsCount: 0,
-    alertsTrend: "Hệ thống giám sát ổn định",
+    alertsTrend: "Đang kiểm tra...",
   });
 
   // Dynamic Priority Queue Data
   const [queueData, setQueueData] = useState([]);
 
+  // Thời gian thực: hồ sơ mới gửi duyệt hoặc moderator khác vừa xử lý → tải ngầm lại hàng chờ
+  const [reloadKey, setReloadKey] = useState(0);
+  useQueueRefresh(
+    ["destination-review", "tour-review", "content-review", "experience-review", "post-review", "post-report"],
+    () => setReloadKey((k) => k + 1),
+  );
+
   useEffect(() => {
     let isMounted = true;
     async function fetchDashboardData() {
-      setIsLoading(true);
+      if (reloadKey === 0) setIsLoading(true);
       try {
-        const [destQueueRes, contentQueueRes, tourQueueRes, publishedDestsRes, rejectedDestsRes] =
+        const [destQueueRes, contentQueueRes, tourQueueRes, statsRes] =
           await Promise.allSettled([
             moderationService.getDestinationQueue({ size: 500 }),
             moderationService.getContentQueue({ size: 500 }),
             moderationService.getTourQueue({ size: 500 }),
-            moderationService.getDestinationsByStatus("PUBLISHED"),
-            moderationService.getDestinationsByStatus("REJECTED"),
+            dashboardService.getModerator(),
           ]);
 
         if (!isMounted) return;
@@ -91,23 +98,33 @@ export default function ModeratorDashboardPage() {
         const destQueue = extractQueueArray(destQueueRes);
         const contentQueue = extractQueueArray(contentQueueRes);
         const tourQueue = extractQueueArray(tourQueueRes);
-        const publishedDests = extractQueueArray(publishedDestsRes);
-        const rejectedDests = extractQueueArray(rejectedDestsRes);
+        const stats = statsRes.status === "fulfilled" ? statsRes.value : null;
+        if (!stats) console.error("[Moderator Dashboard] Stats error:", statsRes.reason);
 
-        const totalPending = destQueue.length + contentQueue.length + tourQueue.length;
+        // Số đếm lấy từ API thống kê (không bị giới hạn kích thước trang); hàng chờ chỉ dùng làm dự phòng
+        const pending = stats?.pending ?? {
+          destinations: destQueue.length,
+          tours: tourQueue.length,
+          contents: contentQueue.length,
+        };
+        const totalPending = pending.destinations + pending.tours + pending.contents;
 
         setKpiMetrics({
           pendingCount: totalPending,
           pendingTrend:
             totalPending > 0
-              ? `${destQueue.length} điểm đến, ${tourQueue.length} tour, ${contentQueue.length} thuyết minh`
+              ? `${pending.destinations} điểm đến, ${pending.tours} tour, ${pending.contents} thuyết minh`
               : "Hàng chờ hiện đang trống",
-          publishedCount: publishedDests.length,
-          publishedTrend: "Điểm đến đã chuẩn hóa & phát hành",
-          revisionCount: rejectedDests.length,
-          revisionTrend: "Hồ sơ yêu cầu đối tác hiệu đính",
-          alertsCount: 0,
-          alertsTrend: "Hệ thống giám sát ổn định",
+          publishedCount: stats?.approvedToday ?? 0,
+          publishedTrend: stats
+            ? `Đã ra ${stats.decidedToday} quyết định trong hôm nay`
+            : "Không tải được số liệu",
+          revisionCount: stats?.rejectedTotal ?? 0,
+          revisionTrend: "Hồ sơ đang chờ đối tác hiệu đính",
+          alertsCount: stats?.pendingReports ?? 0,
+          alertsTrend: stats
+            ? `Báo cáo vi phạm chờ xử lý • ${stats.pendingPosts} bài cộng đồng chờ duyệt`
+            : "Không tải được số liệu",
         });
 
         // Xây dựng danh sách hàng chờ ưu tiên từ API thực tế
@@ -174,7 +191,7 @@ export default function ModeratorDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const kpiStats = [
     {
@@ -219,7 +236,7 @@ export default function ModeratorDashboardPage() {
       icon: ShieldAlert,
       tone: "rose",
       linkText: "Chi tiết →",
-      linkHref: "/moderator/ai-auditing",
+      linkHref: "/moderator/community",
     },
   ];
 
@@ -249,21 +266,7 @@ export default function ModeratorDashboardPage() {
         eyebrow="Thẩm định"
         title="Bàn làm việc tổng quan"
         description="Đảm bảo dữ liệu lịch sử, tọa độ thực địa và bài thuyết minh đạt chuẩn di sản Việt Nam trước khi tiếp cận du khách."
-        meta={
-          <>
-            <StatusChip tone="emerald">Giám sát thẩm định: sẵn sàng</StatusChip>
-            <StatusChip tone="indigo">Xử lý trung bình: &lt; 2 giờ</StatusChip>
-          </>
-        }
-      >
-        <Link href="/moderator/history" className={BUTTON.secondary}>
-          Lịch sử duyệt
-        </Link>
-        <Link href="/moderator/destinations" className={BUTTON.primary}>
-          Duyệt điểm đến
-          <ArrowUpRight size={13} />
-        </Link>
-      </PageHeader>
+      />
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpiStats.map((stat) => (
@@ -272,7 +275,6 @@ export default function ModeratorDashboardPage() {
             title={stat.title}
             value={stat.count}
             unit={stat.unit}
-            hint={stat.trend}
             icon={stat.icon}
             tone={stat.tone}
             href={stat.linkHref}
@@ -363,8 +365,6 @@ export default function ModeratorDashboardPage() {
               <option value="destination">Điểm đến và di tích</option>
               <option value="tour">Tuyến hành trình &amp; Tour</option>
               <option value="cultural">Thuyết minh &amp; Di sản</option>
-              <option value="route">Lộ trình và vé</option>
-              <option value="quiz">Thử thách đố vui</option>
             </select>
 
           </div>

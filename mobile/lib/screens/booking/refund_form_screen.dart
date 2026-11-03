@@ -21,7 +21,7 @@ import '../../core/utils/formatters.dart';
 class RefundFormScreen extends StatefulWidget {
   final int paymentId;
   final BookingModel? booking;
-  final double amount;
+  final num amount;
 
   const RefundFormScreen({
     super.key,
@@ -68,7 +68,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
 
   /// Số tiền dự kiến hoàn — hệ thống tính, không phải người dùng.
   double get _estimatedRefund =>
-      _reason == 'PLATFORM_FAULT' ? widget.amount : widget.amount * 0.5;
+      _reason == 'PLATFORM_FAULT' ? widget.amount.toDouble() : widget.amount * 0.5;
 
   bool get _canSubmit {
     return _detailController.text.trim().isNotEmpty &&

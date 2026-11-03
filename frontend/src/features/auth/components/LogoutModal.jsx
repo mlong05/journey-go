@@ -22,7 +22,7 @@ export function LogoutModal({ isOpen, status = "success", message }) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.25 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md bg-slate-950/50 select-none font-jakarta font-sans antialiased"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md bg-slate-950/50 select-none font-sans antialiased"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 18 }}
@@ -36,7 +36,7 @@ export function LogoutModal({ isOpen, status = "success", message }) {
           <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-blue-100/40 rounded-full blur-3xl pointer-events-none" />
 
           {/* Logo Thương hiệu JourneyGo nhỏ gọn tinh tế */}
-          <div className="flex items-center justify-center gap-1.5 pb-4 text-[11px] font-bold tracking-wider uppercase text-slate-400">
+          <div className="flex items-center justify-center gap-1.5 pb-4 text-xs font-bold text-slate-400">
             <Compass className="w-3.5 h-3.5 text-[#009fe3]" />
             <span>JourneyGo • Hành Trình Di Sản</span>
           </div>
@@ -85,7 +85,7 @@ export function LogoutModal({ isOpen, status = "success", message }) {
 
           {/* Nội dung thông báo tinh gọn */}
           <div className="space-y-1.5 relative z-10">
-            <h3 className="text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
+            <h3 className="text-xl font-semibold text-slate-900 tracking-tight leading-tight">
               {isLoading ? "Đang Kết Thúc Phiên..." : "Tạm Biệt & Hẹn Gặp Lại!"}
             </h3>
 

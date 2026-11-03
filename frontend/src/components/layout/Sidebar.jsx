@@ -13,7 +13,6 @@ import { ChevronsLeft, ChevronsRight, LogOut, X } from "lucide-react";
  */
 const ROLE_THEMES = {
   admin: {
-    badgeText: "Quản trị viên",
     groupLabel: "Quản trị",
     homeHref: "/admin",
     chip: "bg-rose-50 text-rose-700 ring-rose-200/70",
@@ -22,7 +21,6 @@ const ROLE_THEMES = {
     dot: "bg-rose-500",
   },
   provider: {
-    badgeText: "Đối tác điểm đến",
     groupLabel: "Đối tác",
     homeHref: "/provider",
     chip: "bg-emerald-50 text-emerald-700 ring-emerald-200/70",
@@ -31,7 +29,6 @@ const ROLE_THEMES = {
     dot: "bg-emerald-500",
   },
   moderator: {
-    badgeText: "Kiểm duyệt viên",
     groupLabel: "Thẩm định",
     homeHref: "/moderator",
     chip: "bg-indigo-50 text-indigo-700 ring-indigo-200/70",
@@ -105,24 +102,27 @@ export default function Sidebar({
           <Link
             href={theme.homeHref}
             onClick={onCloseMobile}
-            className="flex items-center gap-2.5 min-w-0 text-inherit no-underline"
+            className="flex items-center gap-1.5 min-w-0 text-inherit no-underline"
             title="Về trang tổng quan"
           >
+            {/* Logo thương hiệu: biểu tượng tròn + chữ "JourneyGo!" kèm khẩu hiệu (thu gọn: chỉ biểu tượng) */}
             <Image
-              src="/image/logo-mark.png"
+              src="/image/logo-emblem.png"
               alt="JourneyGo"
-              width={96}
-              height={96}
+              width={372}
+              height={380}
               priority
-              className="w-9 h-9 rounded-[22%] shrink-0"
+              className="h-11 w-auto shrink-0"
             />
             {isWide && (
-              <div className="min-w-0 leading-tight">
-                <p className="text-[15px] font-semibold tracking-tight text-slate-900">
-                  Journey<span className="text-rose-600">Go</span>
-                </p>
-                <p className="text-[11px] text-slate-500 truncate">{theme.badgeText}</p>
-              </div>
+              <Image
+                src="/image/logo-wordmark.png"
+                alt="JourneyGo - đồng hành cùng bạn trong chuyến đi"
+                width={424}
+                height={104}
+                priority
+                className="h-[34px] w-auto min-w-0"
+              />
             )}
           </Link>
 
@@ -209,7 +209,7 @@ export default function Sidebar({
 
                     {item.badge && isWide && (
                       <span
-                        className={`ml-auto shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-semibold ring-1 ring-inset ${
+                        className={`ml-auto shrink-0 px-1.5 py-0.5 rounded-md text-[11px] font-semibold ring-1 ring-inset ${
                           item.badge.color || theme.chip
                         }`}
                       >

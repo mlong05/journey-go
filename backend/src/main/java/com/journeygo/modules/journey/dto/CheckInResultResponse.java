@@ -15,6 +15,8 @@ public record CheckInResultResponse(
         Long badgeId,
         String badgeName,
         String badgeIconUrl,
-        Instant checkedInAt
+        Instant checkedInAt,
+        /** true khi điểm đến đã được check-in từ trước: không check-in lại, chỉ báo cho du khách */
+        boolean alreadyCheckedIn
 ) {
 }

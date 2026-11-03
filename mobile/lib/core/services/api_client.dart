@@ -3,8 +3,40 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
-
+import 'package:http_parser/http_parser.dart';
 import 'token_storage.dart';
+
+const _imageSubtypesByExtension = {
+  'jpg': 'jpeg',
+  'jpeg': 'jpeg',
+  'png': 'png',
+  'webp': 'webp',
+  'gif': 'gif',
+  'heic': 'heic',
+  'heif': 'heif',
+};
+
+/// MultipartFile.fromPath không tự đoán loại tệp (mặc định application/octet-stream) nên backend
+/// từ chối. Đoán theo đuôi tệp, nếu đường dẫn không có đuôi thì đọc chữ ký đầu tệp.
+Future<MediaType> _imageMediaType(String filePath) async {
+  final dot = filePath.lastIndexOf('.');
+  final ext = dot >= 0 ? filePath.substring(dot + 1).toLowerCase() : '';
+  final byExt = _imageSubtypesByExtension[ext];
+  if (byExt != null) return MediaType('image', byExt);
+
+  final file = await File(filePath).open();
+  final head = await file.read(12);
+  await file.close();
+  bool startsWith(List<int> sig, [int offset = 0]) =>
+      head.length >= offset + sig.length &&
+      List.generate(sig.length, (i) => head[offset + i] == sig[i]).every((ok) => ok);
+  if (startsWith([0x89, 0x50, 0x4E, 0x47])) return MediaType('image', 'png');
+  if (startsWith([0x47, 0x49, 0x46])) return MediaType('image', 'gif');
+  if (startsWith([0x52, 0x49, 0x46, 0x46]) && startsWith([0x57, 0x45, 0x42, 0x50], 8)) {
+    return MediaType('image', 'webp');
+  }
+  return MediaType('image', 'jpeg');
+}
 
 /// Lỗi gọi API, `message` đã là tiếng Việt để hiển thị trực tiếp cho người dùng.
 class ApiException implements Exception {
@@ -86,6 +118,8 @@ class ApiClient {
     Object? body,
     Duration timeout = const Duration(seconds: 15),
     bool isRetry = false,
+    // 401 vốn hiểu là hết phiên; một số API dùng 401 cho sai mật khẩu nên giữ câu báo của máy chủ.
+    bool keepUnauthorizedMessage = false,
   }) async {
     final baseUrl = await TokenStorage.getBaseUrl();
     final uri = Uri.parse('$baseUrl$path');
@@ -117,6 +151,15 @@ class ApiClient {
         return decoded is Map ? decoded['data'] : decoded;
       }
 
+      // 401 với câu báo riêng của máy chủ (VD. sai mật khẩu) → giữ nguyên câu báo,
+      // KHÔNG refresh (refresh cũng không giúp được).
+      if (response.statusCode == 401 && keepUnauthorizedMessage) {
+        final message = decoded is Map ? decoded['message']?.toString() : null;
+        if (message != null && message.isNotEmpty) {
+          throw ApiException(message, statusCode: 401);
+        }
+      }
+
       // ── 401: thử refresh rồi retry đúng 1 lần ────────────────────────────
       if (response.statusCode == 401 && auth && !isRetry) {
         final refreshed = await _ensureFreshToken();
@@ -128,6 +171,7 @@ class ApiClient {
             body: body,
             timeout: timeout,
             isRetry: true,
+            keepUnauthorizedMessage: keepUnauthorizedMessage,
           );
         }
         await TokenStorage.clear();
@@ -176,7 +220,11 @@ class ApiClient {
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Accept'] = 'application/json'
         ..fields['folder'] = folder
-        ..files.add(await http.MultipartFile.fromPath('file', filePath));
+        ..files.add(await http.MultipartFile.fromPath(
+          'file',
+          filePath,
+          contentType: await _imageMediaType(filePath),
+        ));
       final streamed = await request.send().timeout(const Duration(seconds: 60));
       final response = await http.Response.fromStream(streamed);
       final text = utf8.decode(response.bodyBytes);

@@ -20,6 +20,7 @@
  */
 import { apiClient } from "@/services/apiClient";
 import { normalizePage, paymentMatchesKeyword } from "@/lib/money";
+import { toPage } from "@/features/booking/services/bookingService";
 
 const ENDPOINT = "/payments";
 
@@ -217,3 +218,25 @@ export function isPaymentFinal(status) {
 export function isRetryable(status) {
   return ["FAILED", "CANCELLED", "EXPIRED"].includes(status);
 }
+
+/**
+ * Service dạng object (default export) — dùng bởi code gọi `paymentService.xxx`.
+ *
+ * Lưu ý: `getMine` / `getByBooking` trả về dạng chuẩn hoá `{ items, page, totalPages,
+ * totalElements }` (qua `toPage`) để tương thích với code đang dùng
+ * `paymentService.getByBooking(...).items`.
+ */
+const paymentService = {
+  getMethods: getPaymentMethods,
+  init: initiatePayment,
+  getById: getPaymentById,
+  getMine: (options) => toPage(getMyPayments(options)),
+  getByBooking: (bookingId, options) => toPage(getPaymentsByBooking(bookingId, options)),
+  query: queryPayment,
+  processReturn: verifyPaymentReturn,
+  getAll: (options) => toPage(getAllPayments(options)),
+  search: searchPayments,
+  summary: getPaymentSummary,
+};
+
+export default paymentService;

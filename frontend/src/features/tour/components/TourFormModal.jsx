@@ -19,6 +19,7 @@ import {
   Compass,
 } from "lucide-react";
 import { destinationService } from "@/features/destination";
+import CoverImageField from "@/features/destination/components/CoverImageField";
 import { tourService } from "../services/tourService";
 import {
   getTourTheme,
@@ -70,6 +71,8 @@ export default function TourFormModal({
     tourType: tour?.tourType || "CULTURAL",
     durationDays:
       tour?.durationDays != null ? String(tour.durationDays) : "",
+    // Chỉ ảnh riêng của tour (không lấy ảnh điểm đến đang dùng thay)
+    coverImageUrl: tour?.tourCoverImageUrl || "",
   }));
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState("");
@@ -108,7 +111,8 @@ export default function TourFormModal({
         const arr = Array.isArray(list) ? list : [];
         setDestinationOptions(
           arr
-            .filter((d) => d && d.deleted !== true && d.id != null)
+            // Tour chỉ được gắn điểm đến đã qua thẩm định (backend cũng chặn)
+            .filter((d) => d && d.deleted !== true && d.id != null && d.approved === true)
             .map((d) => ({
               destinationId: Number(d.id),
               name: d.name || "",
@@ -233,6 +237,7 @@ export default function TourFormModal({
         title: form.title.trim(),
         tourType: form.tourType,
         durationDays: parseInt(form.durationDays, 10),
+        coverImageUrl: form.coverImageUrl || null,
         destinations: route.map((r, index) => ({
           destinationId: r.destinationId,
           sequenceOrder: index + 1,
@@ -331,7 +336,7 @@ export default function TourFormModal({
                 <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-600">
                         Tên tour
                       </p>
                       <p className="text-sm font-bold text-slate-900 truncate">
@@ -345,18 +350,18 @@ export default function TourFormModal({
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200/70">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-600">
                         Tổng giá
                       </p>
                       <p className="text-slate-800 tabular-nums font-bold">
                         {formatVND(savedTour.price)}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
                         Tính tự động từ trải nghiệm các điểm đến
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-600">
                         Thời lượng
                       </p>
                       <p className="text-slate-800 font-bold">
@@ -364,7 +369,7 @@ export default function TourFormModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-600">
                         Loại hình
                       </p>
                       <p className="text-slate-800 font-bold">
@@ -372,7 +377,7 @@ export default function TourFormModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                      <p className="text-xs font-bold text-slate-600">
                         Số điểm đến
                       </p>
                       <p className="text-slate-800 font-bold">
@@ -385,7 +390,7 @@ export default function TourFormModal({
 
               {route.length > 0 && (
                 <div className="rounded-2xl border border-slate-200 p-4 bg-white">
-                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3">
+                  <p className="text-xs font-bold text-slate-600 mb-3">
                     Hành trình đã khai báo
                   </p>
                   <ol className="space-y-2">
@@ -394,7 +399,7 @@ export default function TourFormModal({
                         key={r.destinationId}
                         className="flex items-start gap-3 text-sm"
                       >
-                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
                           {index + 1}
                         </span>
                         <div className="min-w-0">
@@ -428,7 +433,7 @@ export default function TourFormModal({
               {/* ── Khối 1: Thông tin tour ───────────────────── */}
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                     <Route size={13} className={palette.icon} />
                     <span>Tên tour</span>
                     <span className="text-rose-500">*</span>
@@ -452,7 +457,7 @@ export default function TourFormModal({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                       <Compass size={13} className={palette.icon} />
                       <span>Loại hình</span>
                       <span className="text-rose-500">*</span>
@@ -479,7 +484,7 @@ export default function TourFormModal({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                       <CalendarDays size={13} className={palette.icon} />
                       <span>Số ngày</span>
                       <span className="text-rose-500">*</span>
@@ -512,12 +517,22 @@ export default function TourFormModal({
                     )}
                   </div>
                 </div>
+
+                {/* Ảnh bìa riêng của tour: hiện trên thẻ tour và trang chi tiết trong app du khách */}
+                <CoverImageField
+                  value={form.coverImageUrl}
+                  onChange={(url) => handleChange("coverImageUrl", url)}
+                  disabled={loading}
+                  label="Ảnh bìa tour"
+                  folder="journeygo/tours"
+                  hint="Hiện trên thẻ tour và trang chi tiết tour trong app du khách. Bỏ trống thì dùng ảnh bìa của điểm đến đầu tiên."
+                />
               </div>
 
               {/* ── Khối 2: Hành trình ───────────────────────── */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                     <MapPin size={13} className={palette.icon} />
                     <span>Hành trình</span>
                     <span className="text-rose-500">*</span>
@@ -601,7 +616,7 @@ export default function TourFormModal({
                       Chưa chọn điểm đến nào
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Tìm và chọn tối thiểu 1 điểm đến từ danh sách bên dưới.
+                      Tìm và chọn tối thiểu 1 điểm đến đã được duyệt từ danh sách bên dưới.
                     </p>
                   </div>
                 )}
@@ -638,7 +653,7 @@ export default function TourFormModal({
                       </div>
                     ) : filteredDestinations.length === 0 ? (
                       <p className="py-8 text-center text-[11px] font-bold text-slate-400">
-                        Không tìm thấy điểm đến phù hợp
+                        Không có điểm đến đã duyệt nào phù hợp
                       </p>
                     ) : (
                       <ul className="divide-y divide-slate-100">
@@ -674,7 +689,7 @@ export default function TourFormModal({
                                   </span>
                                 </span>
                                 {picked && (
-                                  <span className="text-[10px] font-bold text-emerald-700 shrink-0">
+                                  <span className="text-[11px] font-bold text-emerald-700 shrink-0">
                                     Đã chọn
                                   </span>
                                 )}

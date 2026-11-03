@@ -18,11 +18,19 @@ function buildLabel(unit) {
   return `${type} ${name}`;
 }
 
+// Tiền tố đơn vị hành chính, bỏ đi khi so tên ("Thành Phố Hồ Chí Minh" ↔ "Hồ Chí Minh")
+const UNIT_PREFIX = /^(thanh pho|tinh|phuong|xa|dac khu|thi tran)\s+/;
+
+function coreName(text) {
+  return normalizeForSearch(text).replace(UNIT_PREFIX, "");
+}
+
 function matchesLabel(unit, text) {
   const t = normalizeForSearch(text);
   return (
     t === normalizeForSearch(buildLabel(unit)) ||
-    t === normalizeForSearch(unit.name)
+    t === normalizeForSearch(unit.name) ||
+    coreName(text) === coreName(unit.name)
   );
 }
 
@@ -37,6 +45,8 @@ const FONT = "font-sans [font-family:inherit]";
  * Props:
  *  - initialAddress: chuỗi "Số nhà, Xã/Phường, Tỉnh/TP" để tự điền (màn sửa)
  *  - resetKey: đổi giá trị để áp dụng lại initialAddress
+ *  - fillFrom: { province, ward, detail, nonce } — địa chỉ lấy từ bản đồ (Goong) để điền sẵn;
+ *      mỗi lần điền mới đổi `nonce`.
  *  - onChange({ address, provinceCode, wardCode, street })
  *      address chỉ khác rỗng khi đã chọn đủ 3 phần.
  *  - error: string | undefined
@@ -45,6 +55,7 @@ const FONT = "font-sans [font-family:inherit]";
 export default function AdministrativeAddressFields({
   initialAddress = "",
   resetKey = 0,
+  fillFrom = null,
   disabled = false,
   error = "",
   onChange,
@@ -60,8 +71,12 @@ export default function AdministrativeAddressFields({
   const [wardCode, setWardCode] = useState("");
   const [street, setStreet] = useState("");
   const [legacyNote, setLegacyNote] = useState(false);
+  // Ghi chú khi địa chỉ từ bản đồ không khớp hết danh sách (để người dùng tự chọn phần còn thiếu)
+  const [fillNote, setFillNote] = useState("");
 
   const pendingWardLabel = useRef(null);
+  // Xã/phường đang chờ khớp đến từ bản đồ (khác với địa chỉ cũ ở màn sửa)
+  const pendingFromMap = useRef(false);
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -153,7 +168,10 @@ export default function AdministrativeAddressFields({
             pendingWardLabel.current = null;
             const found = list.find((w) => matchesLabel(w, pending));
             if (found) setWardCode(found.code);
+            else if (pendingFromMap.current)
+              setFillNote(`Không tìm thấy "${pending}" trong danh sách, vui lòng chọn Xã/Phường.`);
             else setLegacyNote(true);
+            pendingFromMap.current = false;
           }
         })
         .catch((err) => {
@@ -169,6 +187,47 @@ export default function AdministrativeAddressFields({
       controller.abort();
     };
   }, [provinceCode]);
+
+  // ── 3b. Điền sẵn từ địa chỉ chọn trên bản đồ ─────────────────
+  const appliedFillNonce = useRef(null);
+  useEffect(() => {
+    if (!fillFrom || appliedFillNonce.current === fillFrom.nonce) return;
+    if (provinces.length === 0) return; // chờ danh sách tỉnh
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      appliedFillNonce.current = fillFrom.nonce;
+      setLegacyNote(false);
+      setFillNote("");
+      if (fillFrom.detail) setStreet(fillFrom.detail);
+
+      const province = fillFrom.province
+        ? provinces.find((p) => matchesLabel(p, fillFrom.province))
+        : null;
+      if (!province) {
+        setFillNote(
+          fillFrom.province
+            ? `Không tìm thấy "${fillFrom.province}" trong danh sách, vui lòng chọn Tỉnh/Thành phố và Xã/Phường.`
+            : "Bản đồ không trả về tỉnh/thành, vui lòng chọn Tỉnh/Thành phố và Xã/Phường."
+        );
+        return;
+      }
+      if (province.code === provinceCode && wards.length > 0) {
+        // Cùng tỉnh, danh sách xã đã có: khớp ngay
+        const found = fillFrom.ward ? wards.find((w) => matchesLabel(w, fillFrom.ward)) : null;
+        setWardCode(found ? found.code : "");
+        if (!found) setFillNote("Vui lòng chọn Xã/Phường cho địa chỉ này.");
+        return;
+      }
+      pendingWardLabel.current = fillFrom.ward || null;
+      pendingFromMap.current = Boolean(fillFrom.ward);
+      setProvinceCode(province.code);
+      setWardCode("");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fillFrom, provinces, provinceCode, wards]);
 
   // ── 4. Báo kết quả lên form cha ──────────────────────────────
   useEffect(() => {
@@ -188,12 +247,12 @@ export default function AdministrativeAddressFields({
     }`;
 
   const subLabel =
-    "text-[10.5px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1";
+    "text-xs font-bold text-slate-500 flex items-center gap-1";
 
   return (
     <div className="space-y-2">
       <label
-        className={`flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider ${FONT}`}
+        className={`flex items-center gap-1.5 text-xs font-bold text-slate-700 ${FONT}`}
       >
         <MapPin size={13} className={palette.icon} />
         <span>Địa chỉ hành chính</span>
@@ -204,6 +263,12 @@ export default function AdministrativeAddressFields({
         <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 font-semibold leading-relaxed">
           Địa chỉ hiện tại theo cấu trúc cũ. Vui lòng chọn lại Tỉnh/Thành phố và
           Xã/Phường theo bản đồ hành chính mới.
+        </p>
+      )}
+
+      {fillNote && (
+        <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 font-semibold leading-relaxed">
+          {fillNote}
         </p>
       )}
 
@@ -221,6 +286,7 @@ export default function AdministrativeAddressFields({
               onChange={(e) => {
                 pendingWardLabel.current = null;
                 setLegacyNote(false);
+                setFillNote("");
                 setProvinceCode(e.target.value);
                 setWardCode("");
               }}
@@ -241,7 +307,7 @@ export default function AdministrativeAddressFields({
             />
           </div>
           {provError && (
-            <p className="text-[10.5px] text-rose-600 font-bold">{provError}</p>
+            <p className="text-[11px] text-rose-600 font-bold">{provError}</p>
           )}
         </div>
 
@@ -257,6 +323,7 @@ export default function AdministrativeAddressFields({
               disabled={disabled || !provinceCode || wardLoading}
               onChange={(e) => {
                 setLegacyNote(false);
+                setFillNote("");
                 setWardCode(e.target.value);
               }}
               className={selectCls(error && provinceCode && !wardCode)}
@@ -280,7 +347,7 @@ export default function AdministrativeAddressFields({
             />
           </div>
           {wardError && (
-            <p className="text-[10.5px] text-rose-600 font-bold">{wardError}</p>
+            <p className="text-[11px] text-rose-600 font-bold">{wardError}</p>
           )}
         </div>
       </div>

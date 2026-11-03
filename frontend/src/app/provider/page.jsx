@@ -7,28 +7,23 @@ import {
   MapPin,
   Compass,
   Trophy,
-  ArrowUpRight,
-  ArrowDownRight,
   Coins,
   CheckCircle2,
   Clock,
-  Edit3,
-  Eye,
+  XCircle,
+  Send,
   ChevronRight,
-  QrCode,
   Inbox,
-  Plus,
   FileCheck,
-  Landmark,
-  Sparkles,
   PhoneCall,
   Navigation,
-  ExternalLink,
-  ShieldCheck,
   Layers,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
-import { destinationService } from "@/features/destination";
+import { tourService, TOUR_STATUS_META } from "@/features/tour";
+import { dashboardService, percentChange } from "@/features/dashboard";
+import { useQueueRefresh } from "@/context/NotificationContext";
 import {
   PageHeader,
   StatusChip,
@@ -38,12 +33,51 @@ import {
   EmptyBlock,
 } from "@/components/dashboard/DashboardUI";
 
+const RANGE_OPTIONS = [
+  { id: "today", label: "Hôm nay", previous: "hôm qua" },
+  { id: "week", label: "7 ngày", previous: "7 ngày trước" },
+  { id: "month", label: "Tháng này", previous: "cùng kỳ tháng trước" },
+];
+
+const DEST_STATUS = {
+  PUBLISHED: { label: "Đang hoạt động", cls: "bg-emerald-50 text-emerald-700 border-emerald-200/80", dot: "bg-emerald-500" },
+  PENDING: { label: "Chờ phê duyệt", cls: "bg-amber-50 text-amber-700 border-amber-200/80", dot: "bg-amber-500" },
+  REJECTED: { label: "Cần chỉnh sửa", cls: "bg-rose-50 text-rose-700 border-rose-200/80", dot: "bg-rose-500" },
+  DRAFT: { label: "Bản nháp", cls: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
+};
+
+const REVIEW_ACTION = {
+  SUBMITTED: { label: "Đã gửi thẩm định", icon: Send, cls: "bg-amber-50/70 border-amber-200/80", iconCls: "text-amber-600" },
+  APPROVED: { label: "Đã được phê duyệt", icon: CheckCircle2, cls: "bg-emerald-50/70 border-emerald-200/80", iconCls: "text-emerald-600" },
+  REJECTED: { label: "Bị yêu cầu chỉnh sửa", icon: XCircle, cls: "bg-rose-50/70 border-rose-200/80", iconCls: "text-rose-600" },
+};
+
+const fmtNumber = (n) => Number(n || 0).toLocaleString("vi-VN");
+
+const fmtDateTime = (iso) =>
+  iso
+    ? new Date(iso).toLocaleString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "";
+
+/** Badge % so với kỳ trước; không hiển thị khi kỳ trước chưa có số liệu để so. */
+function changeBadge(current, previous) {
+  const pct = percentChange(current, previous);
+  if (pct === null) return undefined;
+  return {
+    text: `${pct >= 0 ? "+" : ""}${pct.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`,
+    positive: pct >= 0,
+  };
+}
+
 /**
  * Trang Tổng Quan Đối Tác Điểm Đến - JourneyGo
  * Đường dẫn: /provider
- * - Tích hợp đồng bộ dữ liệu điểm đến thực tế từ destinationService
- * - Giao diện cao cấp theo nguyên tắc High-End Visual Design
- * - Đảm bảo cuộn mượt mà bên trong, không sinh double scrollbar
+ * Số liệu lấy từ GET /api/v1/dashboard/provider và GET /api/v1/tours/my
  */
 export default function ProviderOverviewPage() {
   const authData = useAuthSession();
@@ -53,60 +87,40 @@ export default function ProviderOverviewPage() {
 
   // Tab lọc danh sách điểm đến: 'all' | 'published' | 'pending'
   const [destinationFilter, setDestinationFilter] = useState("all");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [stats, setStats] = useState(null);
 
-  // Dynamic Danh sách điểm đến do đối tác quản lý
-  const [managedDestinations, setManagedDestinations] = useState([]);
+  // Tour do đối tác tạo (GET /tours/my)
+  const [myTours, setMyTours] = useState([]);
 
-  // Dynamic Danh sách lộ trình văn hóa
-  const [activeRoutes, setActiveRoutes] = useState([]);
+  // Thời gian thực: booking mới, đối soát, kết quả duyệt → tải ngầm lại số liệu
+  const [reloadKey, setReloadKey] = useState(0);
+  const lastRange = React.useRef(timeRange);
+  useQueueRefresh(["bookings", "settlements", "my-content"], () => setReloadKey((k) => k + 1));
 
-  // Dynamic Tiến độ kiểm duyệt nội dung
-  const [moderationUpdates, setModerationUpdates] = useState([]);
-
-  // Tải dữ liệu điểm đến thực tế để hiển thị KPI chính xác
   useEffect(() => {
     let isSubscribed = true;
+    // Chỉ hiện trạng thái đang tải khi đổi khoảng thời gian, không hiện khi tải ngầm
+    const silent = lastRange.current === timeRange && reloadKey > 0;
+    lastRange.current = timeRange;
     queueMicrotask(() => {
-      if (isSubscribed) setIsLoading(true);
+      if (isSubscribed && !silent) setIsLoading(true);
     });
 
     async function loadData() {
       try {
-        const dests = await destinationService.getAll();
+        const [dashboard, tours] = await Promise.all([
+          dashboardService.getProvider(timeRange),
+          tourService.getMy().catch(() => []),
+        ]);
         if (!isSubscribed) return;
-
-        const list = Array.isArray(dests) ? dests : [];
-        const formatted = list.map((d) => ({
-          id: d.id,
-          name: d.name || "Điểm đến chưa đặt tên",
-          address: d.address || "Chưa cập nhật địa chỉ",
-          status: d.approved ? "published" : "pending",
-          statusLabel: d.approved ? "Đang hoạt động" : "Chờ phê duyệt",
-          capacity: d.capacity || 500,
-          latitude: d.latitude,
-          longitude: d.longitude,
-          checkinsToday: Math.floor(Math.random() * 45) + (d.approved ? 80 : 0),
-          rating: (4.8 + Math.random() * 0.2).toFixed(1),
-          image: d.image || "/image/vanmieu.png",
-        }));
-
-        setManagedDestinations(formatted);
-
-        // Tạo thông báo duyệt dựa trên hồ sơ thực
-        const pendingList = formatted.filter((d) => d.status === "pending");
-        if (pendingList.length > 0) {
-          setModerationUpdates([
-            {
-              title: "Hồ sơ đang chờ Thẩm định",
-              message: `${pendingList[0].name} đang được Hội đồng Thẩm định văn hóa xem xét.`,
-              time: "Vừa xong",
-              status: "pending",
-            },
-          ]);
-        }
+        setStats(dashboard);
+        setMyTours(Array.isArray(tours) ? tours : []);
+        setError("");
       } catch (err) {
         console.error("[Provider Overview] Load error:", err);
+        if (isSubscribed) setError(err?.message || "Không tải được số liệu tổng quan.");
       } finally {
         if (isSubscribed) setIsLoading(false);
       }
@@ -116,92 +130,74 @@ export default function ProviderOverviewPage() {
     return () => {
       isSubscribed = false;
     };
-  }, [timeRange]);
+  }, [timeRange, reloadKey]);
 
-  const partnerName =
-    authData?.user?.fullName ||
-    authData?.user?.name ||
-    "Ban Quản Lý Di Tích Văn Miếu - Quốc Tử Giám";
+  const partnerName = authData?.user?.fullName || authData?.user?.name || "Đối tác điểm đến";
+  const range = RANGE_OPTIONS.find((r) => r.id === timeRange) ?? RANGE_OPTIONS[2];
 
-  const totalDestinations = managedDestinations.length;
-  const publishedDestinations = managedDestinations.filter(
-    (d) => d.status === "published"
-  ).length;
-  const pendingDestinations = managedDestinations.filter(
-    (d) => d.status === "pending"
-  ).length;
+  const destStats = stats?.destinations ?? { total: 0, published: 0, pending: 0, rejected: 0, draft: 0 };
+  const checkIns = stats?.checkIns ?? { current: 0, previous: 0, allTime: 0 };
+  const revenue = stats?.revenue ?? { current: 0, previous: 0, allTime: 0, currentBookings: 0 };
+  const missions = stats?.missions ?? { tasks: 0, answered: 0, correct: 0 };
+  const managedDestinations = stats?.destinationRows ?? [];
+  const moderationUpdates = stats?.moderationUpdates ?? [];
 
-  const totalVisitorsEstimate = (
-    publishedDestinations * 650 +
-    180
-  ).toLocaleString("vi-VN");
-
-  const totalRevenueEstimate = (
-    (publishedDestinations * 420 + 85) *
-    30000
-  ).toLocaleString("vi-VN");
+  const withCoordinates = managedDestinations.filter((d) => d.latitude != null && d.longitude != null).length;
+  const correctRate = missions.answered > 0 ? (missions.correct / missions.answered) * 100 : null;
+  const loadingValue = isLoading && !stats;
 
   const kpiStats = [
     {
       id: "visitors",
-      title: "Lượt khách Check-in",
-      value: totalVisitorsEstimate,
-      subValue: `Hôm nay: ~${(publishedDestinations * 45 + 12).toLocaleString("vi-VN")} lượt`,
-      change: "+14.2%",
-      isPositive: true,
+      title: `Lượt khách check-in · ${range.label}`,
+      value: loadingValue ? "…" : fmtNumber(checkIns.current),
+      subValue: `Tổng từ trước tới nay: ${fmtNumber(checkIns.allTime)} lượt`,
+      badge: changeBadge(checkIns.current, checkIns.previous),
       icon: Users,
-      iconColor: "text-emerald-600 bg-emerald-50 border-emerald-100",
       accent: "emerald",
     },
     {
       id: "destinations",
       title: "Điểm đến di tích quản lý",
-      value: `${publishedDestinations} / ${totalDestinations}`,
-      subValue: `${publishedDestinations} hoạt động • ${pendingDestinations} chờ duyệt`,
-      change: "100% Tọa độ",
-      isPositive: true,
+      value: loadingValue ? "…" : `${destStats.published} / ${destStats.total}`,
+      subValue: `${destStats.published} hoạt động • ${destStats.pending} chờ duyệt • ${destStats.rejected} cần sửa`,
+      badge: destStats.total > 0 ? { text: `${withCoordinates}/${destStats.total} có tọa độ` } : undefined,
       icon: MapPin,
-      iconColor: "text-indigo-600 bg-indigo-50 border-indigo-100",
       accent: "indigo",
     },
     {
       id: "revenue",
-      title: "Doanh thu ước tính",
-      value: `${totalRevenueEstimate} ₫`,
-      subValue: "Vé điện tử & dịch vụ di sản",
-      change: "+8.6%",
-      isPositive: true,
+      title: `Doanh thu tour · ${range.label}`,
+      value: loadingValue ? "…" : `${fmtNumber(revenue.current)} ₫`,
+      subValue: `${fmtNumber(revenue.currentBookings)} đơn đã thanh toán • Tổng: ${fmtNumber(revenue.allTime)} ₫`,
+      badge: changeBadge(revenue.current, revenue.previous),
       icon: Coins,
-      iconColor: "text-amber-600 bg-amber-50 border-amber-100",
       accent: "amber",
     },
     {
       id: "missions",
       title: "Nhiệm vụ & đố vui di sản",
-      value: `${publishedDestinations * 3}`,
-      subValue: "Tỷ lệ trả lời đúng: 92.4%",
-      change: "+18.5%",
-      isPositive: true,
+      value: loadingValue ? "…" : fmtNumber(missions.tasks),
+      subValue:
+        correctRate === null
+          ? "Chưa có lượt trả lời đố vui"
+          : `Tỷ lệ trả lời đúng: ${correctRate.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}% (${fmtNumber(missions.answered)} lượt)`,
       icon: Trophy,
-      iconColor: "text-violet-600 bg-violet-50 border-violet-100",
       accent: "violet",
     },
   ];
 
   // Lọc điểm đến theo tab
   const filteredDestinations = managedDestinations.filter((dest) => {
-    if (destinationFilter === "published") return dest.status === "published";
-    if (destinationFilter === "pending") return dest.status === "pending";
+    if (destinationFilter === "published") return dest.status === "PUBLISHED";
+    if (destinationFilter === "pending") return dest.status === "PENDING";
+    if (destinationFilter === "rejected") return dest.status === "REJECTED";
     return true;
   });
 
   const rangeTabs = (
     <div className="flex items-center gap-0.5 bg-slate-100 p-1 rounded-lg">
-      {[
-        { id: "today", label: "Hôm nay" },
-        { id: "week", label: "7 ngày" },
-        { id: "month", label: "Tháng này" },
-      ].map((opt) => (
+      {RANGE_OPTIONS.map((opt) => (
         <button
           key={opt.id}
           type="button"
@@ -219,9 +215,10 @@ export default function ProviderOverviewPage() {
   );
 
   const filterTabs = [
-    { id: "all", label: "Tất cả", count: managedDestinations.length },
-    { id: "published", label: "Hoạt động", count: publishedDestinations },
-    { id: "pending", label: "Chờ duyệt", count: pendingDestinations },
+    { id: "all", label: "Tất cả", count: destStats.total },
+    { id: "published", label: "Hoạt động", count: destStats.published },
+    { id: "pending", label: "Chờ duyệt", count: destStats.pending },
+    { id: "rejected", label: "Cần sửa", count: destStats.rejected },
   ];
 
   return (
@@ -232,20 +229,26 @@ export default function ProviderOverviewPage() {
         description="Theo dõi lượt check-in, quản lý tọa độ di tích và đồng hành cùng Hội đồng Thẩm định văn hóa."
         meta={
           <>
-            <StatusChip tone="emerald">Đang mở cửa đón khách</StatusChip>
-            <StatusChip tone="sky">GPS &amp; check-in: sẵn sàng</StatusChip>
+            <StatusChip tone={destStats.published > 0 ? "emerald" : "slate"}>
+              {destStats.published > 0
+                ? `${destStats.published} điểm đang đón khách`
+                : "Chưa có điểm đến được xuất bản"}
+            </StatusChip>
+            {destStats.pending > 0 && (
+              <StatusChip tone="amber">{destStats.pending} hồ sơ chờ thẩm định</StatusChip>
+            )}
           </>
         }
       >
         {rangeTabs}
-        <Link
-          href="/provider/destinations"
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors"
-        >
-          <Plus size={14} strokeWidth={2.5} />
-          Khai báo điểm mới
-        </Link>
       </PageHeader>
+
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+          <AlertTriangle size={15} className="shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       <section aria-label="Thống kê chỉ số KPI" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpiStats.map((kpi) => (
@@ -256,10 +259,13 @@ export default function ProviderOverviewPage() {
             hint={kpi.subValue}
             icon={kpi.icon}
             tone={kpi.accent}
-            badge={{ text: kpi.change, positive: kpi.isPositive }}
+            badge={kpi.badge}
           />
         ))}
       </section>
+      <p className="-mt-3 text-[11px] text-slate-400">
+        Phần trăm tăng/giảm so với {range.previous}; không hiển thị khi kỳ trước chưa có số liệu.
+      </p>
 
       <Panel
         id="destinations"
@@ -303,7 +309,7 @@ export default function ProviderOverviewPage() {
               <tr className="bg-slate-50/70 border-b border-slate-200 text-xs font-semibold text-slate-600">
                 <th className="py-3 px-5">Điểm đến</th>
                 <th className="py-3 px-4">Tọa độ GPS</th>
-                <th className="py-3 px-4">Check-in</th>
+                <th className="py-3 px-4">Lượt check-in</th>
                 <th className="py-3 px-4">Trạng thái</th>
                 <th className="py-3 px-5 text-right">Thao tác</th>
               </tr>
@@ -314,63 +320,56 @@ export default function ProviderOverviewPage() {
                   <td colSpan={5}>
                     <EmptyBlock
                       icon={Inbox}
-                      title="Chưa có điểm đến di tích nào trong danh sách."
-                      description="Bấm Khai báo điểm mới để nhập tọa độ thực địa và gửi hồ sơ thẩm định."
+                      title={isLoading ? "Đang tải điểm đến…" : "Chưa có điểm đến di tích nào trong danh sách."}
+                      description="Vào Quản lý Điểm đến để khai báo điểm mới và gửi hồ sơ thẩm định."
                     />
                   </td>
                 </tr>
               ) : (
-                filteredDestinations.map((dest) => (
-                  <tr key={dest.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3.5 px-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 font-mono font-bold text-[11px]">
-                          #{dest.id}
+                filteredDestinations.map((dest) => {
+                  const status = DEST_STATUS[dest.status] ?? DEST_STATUS.DRAFT;
+                  return (
+                    <tr key={dest.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-3.5 px-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 font-mono font-bold text-[11px]">
+                            #{dest.id}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 truncate">{dest.name || "Điểm đến chưa đặt tên"}</p>
+                            <p className="text-xs text-slate-600 line-clamp-1 max-w-xs mt-0.5">
+                              {dest.address || "Chưa cập nhật địa chỉ"}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-900 truncate">{dest.name}</p>
-                          <p className="text-xs text-slate-600 line-clamp-1 max-w-xs mt-0.5">
-                            {dest.address}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center gap-1.5 font-mono text-xs text-slate-600">
-                        <Navigation size={12} className="text-slate-400 shrink-0" />
-                        {dest.latitude ?? "—"}, {dest.longitude ?? "—"}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center gap-1.5 font-bold text-slate-800 tabular-nums">
-                        <QrCode size={14} className="text-slate-400" />
-                        {(dest.checkinsToday || 0).toLocaleString()} lượt
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {dest.status === "published" ? (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Đang hoạt động
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center gap-1.5 font-mono text-xs text-slate-600">
+                          <Navigation size={12} className="text-slate-400 shrink-0" />
+                          {dest.latitude ?? "—"}, {dest.longitude ?? "—"}
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                          Chờ phê duyệt
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-slate-900 tabular-nums">
+                        {fmtNumber(dest.checkIns)}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-md border ${status.cls}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                          {status.label}
                         </span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-5 text-right">
-                      <Link
-                        href="/provider/destinations"
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors"
-                      >
-                        Quản lý
-                        <ChevronRight size={13} />
-                      </Link>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="py-3.5 px-5 text-right">
+                        <Link
+                          href="/provider/destinations"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors"
+                        >
+                          Quản lý
+                          <ChevronRight size={13} />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -379,32 +378,56 @@ export default function ProviderOverviewPage() {
 
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 pb-6">
         <Panel
-          id="routes"
+          id="tours"
           className="lg:col-span-7"
-          title="Lộ trình văn hóa đang kích hoạt"
-          description="Liên kết các điểm di tích thành tour chuyên đề"
+          title="Tour của bạn"
+          description="Hành trình nối các điểm di tích, du khách đặt và trải nghiệm"
           icon={Compass}
           tone="indigo"
           action={
             <Link
-              href="/provider/routes/builder"
+              href="/provider/tours"
               className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900"
             >
-              Tạo lộ trình mới <ChevronRight size={13} />
+              Quản lý tour <ChevronRight size={13} />
             </Link>
           }
           footer={
             <div className="flex items-center justify-between">
-              <span>Đồng bộ lộ trình qua GPS</span>
-              <span className="font-semibold text-slate-600">Đã kết nối bản đồ số</span>
+              <span>Hiển thị {Math.min(myTours.length, 6)} / {myTours.length} tour</span>
+              <span className="font-semibold text-slate-600">
+                {myTours.filter((t) => t.status === "PUBLISHED").length} tour đang mở bán
+              </span>
             </div>
           }
         >
-          <EmptyBlock
-            icon={Compass}
-            title="Chưa có lộ trình văn hóa nào được tạo."
-            description="Dùng công cụ thiết kế lộ trình để liên kết các điểm di tích thành tour chuyên đề số hóa."
-          />
+          {myTours.length === 0 ? (
+            <EmptyBlock
+              icon={Compass}
+              title="Bạn chưa có tour nào."
+              description="Vào Quản lý tour để nối các điểm đến thành hành trình và gửi duyệt."
+            />
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {myTours.slice(0, 6).map((t) => {
+                const meta = TOUR_STATUS_META[t.status] ?? TOUR_STATUS_META.DRAFT;
+                return (
+                  <li key={t.tourId ?? t.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-slate-900">{t.title || "Tour chưa đặt tên"}</p>
+                      <p className="text-xs text-slate-500">
+                        {(t.destinations?.length ?? t.destinationCount ?? 0)} điểm đến
+                        {t.durationDays ? ` · ${t.durationDays} ngày` : ""}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-bold ${meta.cls}`}>
+                      {meta.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Panel>
 
         <div className="lg:col-span-5 flex flex-col gap-5">
@@ -417,8 +440,10 @@ export default function ProviderOverviewPage() {
           >
             <StackedBar
               segments={[
-                { label: "Hoạt động", value: publishedDestinations, tone: "emerald" },
-                { label: "Chờ duyệt", value: pendingDestinations, tone: "amber" },
+                { label: "Hoạt động", value: destStats.published, tone: "emerald" },
+                { label: "Chờ duyệt", value: destStats.pending, tone: "amber" },
+                { label: "Cần sửa", value: destStats.rejected, tone: "rose" },
+                { label: "Bản nháp", value: destStats.draft, tone: "slate" },
               ]}
               emptyText="Chưa có điểm đến nào để thống kê."
             />
@@ -427,7 +452,7 @@ export default function ProviderOverviewPage() {
           <Panel
             id="reviews"
             title="Tiến độ thẩm định nội dung"
-            description="Hội đồng thẩm định di sản"
+            description="Hoạt động gần nhất của Hội đồng thẩm định"
             icon={FileCheck}
             tone="amber"
             bodyClassName="p-4 space-y-3"
@@ -446,25 +471,34 @@ export default function ProviderOverviewPage() {
             {moderationUpdates.length === 0 ? (
               <EmptyBlock
                 icon={FileCheck}
-                title="Mọi hồ sơ đã được xử lý"
-                description="Khi bạn gửi điểm đến mới, tiến độ duyệt sẽ cập nhật tại đây."
+                title="Chưa có hoạt động thẩm định"
+                description="Khi bạn gửi điểm đến hoặc tour đi duyệt, tiến độ sẽ cập nhật tại đây."
               />
             ) : (
-              moderationUpdates.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-lg bg-amber-50/70 border border-amber-200/80 flex items-start gap-3"
-                >
-                  <Clock size={16} className="text-amber-600 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{item.title}</p>
-                    <p className="text-xs text-slate-600 mt-0.5">{item.message}</p>
-                    <span className="text-[11px] text-amber-700 font-semibold mt-1 inline-block">
-                      {item.time}
-                    </span>
+              moderationUpdates.map((item) => {
+                const action = REVIEW_ACTION[item.action] ?? REVIEW_ACTION.SUBMITTED;
+                const ActionIcon = action.icon ?? Clock;
+                return (
+                  <div
+                    key={`${item.type}-${item.targetId}-${item.createdAt}`}
+                    className={`p-3.5 rounded-lg border flex items-start gap-3 ${action.cls}`}
+                  >
+                    <ActionIcon size={16} className={`mt-0.5 shrink-0 ${action.iconCls}`} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900">
+                        {item.type === "TOUR" ? "Tour" : "Điểm đến"} {item.targetName}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {action.label}
+                        {item.note || item.reason ? ` — ${item.note || item.reason}` : ""}
+                      </p>
+                      <span className="text-[11px] text-slate-500 font-semibold mt-1 inline-block">
+                        {fmtDateTime(item.createdAt)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </Panel>
         </div>

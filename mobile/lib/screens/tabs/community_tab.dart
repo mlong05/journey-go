@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/auth_models.dart';
@@ -6,6 +7,8 @@ import '../../core/services/api_client.dart';
 import '../../core/services/destination_service.dart';
 import '../../core/services/forum_service.dart';
 import '../../core/services/tour_service.dart';
+import '../common/heritage_motion.dart';
+import '../common/tab_refresh.dart';
 import '../forum/compose_post_screen.dart';
 import '../forum/forum_widgets.dart';
 import '../forum/my_posts_screen.dart';
@@ -16,13 +19,24 @@ import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeleto
 class CommunityTab extends StatefulWidget {
   final UserModel currentUser;
 
-  const CommunityTab({super.key, required this.currentUser});
+  final ValueListenable<int>? selectedTab;
+
+  const CommunityTab({super.key, required this.currentUser, this.selectedTab});
 
   @override
   State<CommunityTab> createState() => _CommunityTabState();
 }
 
-class _CommunityTabState extends State<CommunityTab> {
+class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
+
+  @override
+  ValueListenable<int>? get selectedTab => widget.selectedTab;
+
+  @override
+  int get tabIndex => 2;
+
+  @override
+  void onTabReturn() => _load(silent: true);
   static const int _pageSize = 10;
 
   final ForumService _service = ForumService();
@@ -55,11 +69,14 @@ class _CommunityTabState extends State<CommunityTab> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  /// [silent]: làm mới khi quay lại tab, giữ bài đang hiện thay vì vòng chờ.
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final result = await _service.getFeed(
         page: 0,
@@ -187,47 +204,81 @@ class _CommunityTabState extends State<CommunityTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppCultureColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(child: _buildBody()),
-          ],
-        ),
-      ),
+      body: SafeArea(bottom: false, child: _buildBody()),
     );
   }
 
+  /// Băng đầu trang kiểu di sản: nền ngọc, hoa văn trống đồng xoay chậm, nút "Bài của tôi".
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
-      child: Row(
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [AppCultureColors.jadeDark, AppCultureColors.oceanBlue],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppCultureColors.heritageJade.withValues(alpha: 0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
         children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Positioned(
+            right: -50,
+            top: -60,
+            child: SlowSpin(child: DrumMotif(size: 180, color: Colors.white.withValues(alpha: 0.12))),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+            child: Row(
               children: [
-                Text(
-                  'Diễn đàn',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: AppCultureColors.textDark,
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Diễn đàn di sản',
+                        style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'Chia sẻ trải nghiệm văn hoá cùng cộng đồng',
+                        style: TextStyle(fontSize: 12.5, color: Colors.white70, height: 1.35),
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(height: 2),
-                Text(
-                  'Chia sẻ trải nghiệm di sản cùng cộng đồng',
-                  style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                const SizedBox(width: 10),
+                Material(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.3))),
+                  child: InkWell(
+                    customBorder: const StadiumBorder(),
+                    onTap: _openMyPosts,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.article_outlined, size: 16, color: Colors.white),
+                          SizedBox(width: 5),
+                          Text(
+                            'Bài của tôi',
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-          TextButton.icon(
-            onPressed: _openMyPosts,
-            icon: const Icon(Icons.folder_open_rounded, size: 19),
-            label: const Text('Bài của tôi', style: TextStyle(fontWeight: FontWeight.w800)),
-            style: TextButton.styleFrom(foregroundColor: AppCultureColors.heritageJade),
           ),
         ],
       ),
@@ -235,16 +286,21 @@ class _CommunityTabState extends State<CommunityTab> {
   }
 
   Widget _buildBody() {
-    if (_loading && _posts.isEmpty) {
-      return const RewardsSkeletonList(count: 3, itemHeight: 200);
-    }
-
-    if (_error != null && _posts.isEmpty) {
-      return RewardsMessageView(
-        icon: Icons.cloud_off_rounded,
-        title: 'Không tải được Diễn đàn',
-        message: _error,
-        onRetry: _load,
+    if ((_loading || _error != null) && _posts.isEmpty) {
+      return Column(
+        children: [
+          Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 0), child: _buildHeader()),
+          Expanded(
+            child: _loading
+                ? const RewardsSkeletonList(count: 3, itemHeight: 200)
+                : RewardsMessageView(
+                    icon: Icons.cloud_off_rounded,
+                    title: 'Không tải được Diễn đàn',
+                    message: _error,
+                    onRetry: _load,
+                  ),
+          ),
+        ],
       );
     }
 
@@ -255,8 +311,11 @@ class _CommunityTabState extends State<CommunityTab> {
       child: ListView(
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 110),
         children: [
+          _buildHeader(),
+          const SizedBox(height: 14),
           _buildComposeCard(),
           const SizedBox(height: 12),
           _buildFilters(),
@@ -278,13 +337,16 @@ class _CommunityTabState extends State<CommunityTab> {
               ),
             )
           else ...[
-            ..._posts.map(
-              (p) => ForumPostCard(
-                post: p,
-                onTap: () => _open(p),
-                onLike: () => _toggleHeart(p),
+            for (final (i, p) in _posts.indexed)
+              Reveal(
+                key: ValueKey(p.id),
+                order: i < 4 ? i : 0,
+                child: ForumPostCard(
+                  post: p,
+                  onTap: () => _open(p),
+                  onLike: () => _toggleHeart(p),
+                ),
               ),
-            ),
             if (_loadingMore)
               const Padding(
                 padding: EdgeInsets.all(12),
@@ -366,7 +428,7 @@ class _CommunityTabState extends State<CommunityTab> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       color: selected ? AppCultureColors.jadeDark : AppCultureColors.textDark,
                     ),
                   ),

@@ -64,6 +64,10 @@ class RefundService {
     return ApiClient.asList(data).map(RefundModel.fromJson).toList();
   }
 
+  /// Danh sách yêu cầu hoàn tiền của tôi (alias theo kiểu gọi của màn lịch sử).
+  Future<List<RefundModel>> getMine({int page = 0, int size = 50}) =>
+      getMyRefunds(page: page, size: size);
+
   /// Metadata phân trang của `getMyRefunds`.
   Future<Map<String, dynamic>> getMyRefundsPage({int page = 0, int size = 20}) async {
     final data = await ApiClient.request('GET', '$_endpoint/my?page=$page&size=$size');

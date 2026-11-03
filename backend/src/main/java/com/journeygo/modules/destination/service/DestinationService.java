@@ -3,6 +3,7 @@ package com.journeygo.modules.destination.service;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
+import com.journeygo.modules.destination.dto.DestinationQrResponse;
 import com.journeygo.modules.destination.dto.DestinationRequest;
 import com.journeygo.modules.destination.dto.DestinationResponse;
 import com.journeygo.modules.destination.entity.Destination;
@@ -174,6 +175,7 @@ public class DestinationService {
                 .latitude(request.latitude())
                 .longitude(request.longitude())
                 .capacity(request.capacity())
+                .coverImageUrl(blankToNull(request.coverImageUrl()))
                 .booked(0)
                 .approved(false)
                 .region(region)
@@ -218,6 +220,10 @@ public class DestinationService {
         existing.setLatitude(request.latitude());
         existing.setLongitude(request.longitude());
         existing.setCapacity(request.capacity());
+        // null = client không gửi ảnh bìa (giữ nguyên); chuỗi rỗng = bỏ ảnh
+        if (request.coverImageUrl() != null) {
+            existing.setCoverImageUrl(blankToNull(request.coverImageUrl()));
+        }
         existing.setRegion(region);
         existing.setThemes(themes);
 
@@ -225,6 +231,10 @@ public class DestinationService {
         moderationService.submitAfterEdit(saved.getId(), callerId, callerRole);
         log.info("Updated destination id={} by userId={}", saved.getId(), callerId);
         return DestinationResponse.fromEntity(saved);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     /** Soft-delete a destination by id (cascades soft-delete to contents). */
@@ -259,6 +269,33 @@ public class DestinationService {
     private Destination findOrThrow(Long id) {
         return destinationRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new AppException(ErrorCode.DESTINATION_NOT_FOUND));
+    }
+
+    /** Mã QR check-in của điểm đến. Điểm đến cũ chưa có mã thì sinh ngay. PROVIDER chỉ xem điểm đến của mình. */
+    @Transactional
+    public DestinationQrResponse getQr(Long id, Long callerId, Role callerRole) {
+        Destination destination = findOrThrow(id);
+        checkOwnership(destination, callerId, callerRole);
+        if (destination.getQrToken() == null) {
+            destination.setQrToken(Destination.newQrToken());
+            destinationRepository.save(destination);
+        }
+        return toQrResponse(destination);
+    }
+
+    /** Sinh mã QR mới (khi mã cũ bị lộ); mã cũ hết hiệu lực ngay, cần in lại QR. */
+    @Transactional
+    public DestinationQrResponse regenerateQr(Long id, Long callerId, Role callerRole) {
+        Destination destination = findOrThrow(id);
+        checkOwnership(destination, callerId, callerRole);
+        destination.setQrToken(Destination.newQrToken());
+        destinationRepository.save(destination);
+        log.info("Đã tạo lại mã QR check-in cho điểm đến id={}", id);
+        return toQrResponse(destination);
+    }
+
+    private DestinationQrResponse toQrResponse(Destination destination) {
+        return new DestinationQrResponse(destination.getId(), destination.getName(), destination.getQrToken());
     }
 
     private void checkOwnership(Destination destination, Long callerId, Role callerRole) {

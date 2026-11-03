@@ -29,50 +29,133 @@ import {
   History,
   ShieldCheck,
   AlertTriangle,
+  ImagePlus,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import { apiClient } from "@/services/apiClient";
 import { culturalContentService } from "../services/culturalContentService";
+import BronzeDrumMotif from "@/components/ui/BronzeDrumMotif";
+
+const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+// Khớp giới hạn CulturalContentRequest.MAX_IMAGES ở backend
+const IMAGE_MAX_COUNT = 20;
+
+/* Thư viện ảnh trong trình xem: ảnh lớn đang chọn + dải ảnh nhỏ để chuyển ảnh */
+function PreviewGallery({ images, title }) {
+  const [active, setActive] = useState(0);
+  if (!Array.isArray(images) || images.length === 0) return null;
+  const index = Math.min(active, images.length - 1);
+  const go = (delta) => setActive((index + delta + images.length) % images.length);
+
+  return (
+    <div className="px-5 sm:px-6 pt-5 bg-white space-y-2.5">
+      <h5 className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+        <ImagePlus size={12} />
+        Thư viện ảnh ({index + 1}/{images.length})
+      </h5>
+      <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={images[index]} alt={`${title} - ảnh ${index + 1}`} className="w-full h-full object-contain" />
+        {images.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => go(-1)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-slate-700 shadow flex items-center justify-center cursor-pointer"
+              aria-label="Ảnh trước"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={() => go(1)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-slate-700 shadow flex items-center justify-center cursor-pointer"
+              aria-label="Ảnh sau"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </>
+        )}
+      </div>
+      {images.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {images.map((url, i) => (
+            <button
+              key={url}
+              type="button"
+              onClick={() => setActive(i)}
+              className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
+                i === index ? "border-emerald-500" : "border-transparent opacity-70 hover:opacity-100"
+              }`}
+              aria-label={`Xem ảnh ${i + 1}`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* Cấu hình các định dạng nội dung văn hóa đa phương tiện */
 const CONTENT_TYPES = [
   {
     type: "AUDIO",
-    label: "Audio Thuyết minh",
-    desc: "Bản ghi âm giọng đọc dẫn chuyện, hướng dẫn viên ảo tại thực địa",
+    label: "Audio thuyết minh",
+    desc: "Giọng đọc dẫn chuyện để du khách nghe khi tham quan điểm đến",
     icon: Headphones,
-    badgeClass: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    bgGradient: "from-indigo-600 to-violet-700",
+    badgeClass: "bg-sky-50 text-sky-700 border-sky-200",
+    bgGradient: "from-sky-600 to-cyan-700",
+    // Thẻ chọn loại trong form: viền/nền khi được chọn và màu ô biểu tượng
+    tileActive: "border-sky-400 bg-sky-50 ring-sky-400/30",
+    iconBg: "bg-sky-600",
   },
   {
     type: "VIDEO",
-    label: "Video Tư liệu",
-    desc: "Phim tài liệu ngắn, clip phỏng vấn nhân chứng lịch sử hoặc flycam",
+    label: "Video tư liệu",
+    desc: "Video giới thiệu, phim tư liệu ngắn hoặc cảnh quay flycam",
     icon: Video,
     badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
     bgGradient: "from-rose-600 to-pink-700",
+    // Thẻ chọn loại trong form: viền/nền khi được chọn và màu ô biểu tượng
+    tileActive: "border-rose-400 bg-rose-50 ring-rose-400/30",
+    iconBg: "bg-rose-600",
   },
   {
     type: "STORY",
     label: "Truyền thuyết / Sự tích",
-    desc: "Giai thoại dân gian, câu chuyện lịch sử gắn liền với danh thắng",
+    desc: "Giai thoại dân gian, câu chuyện lịch sử gắn với điểm đến",
     icon: BookOpen,
     badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
     bgGradient: "from-amber-600 to-orange-700",
+    // Thẻ chọn loại trong form: viền/nền khi được chọn và màu ô biểu tượng
+    tileActive: "border-amber-400 bg-amber-50 ring-amber-400/30",
+    iconBg: "bg-amber-600",
   },
   {
     type: "ARTICLE",
-    label: "Bài viết Di sản",
-    desc: "Bài khảo cứu kiến trúc, bia ký, niên đại khảo cổ chi tiết",
+    label: "Bài viết văn hóa",
+    desc: "Giới thiệu lịch sử, kiến trúc, phong tục và lễ hội của điểm đến",
     icon: FileText,
     badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
     bgGradient: "from-emerald-600 to-teal-700",
+    // Thẻ chọn loại trong form: viền/nền khi được chọn và màu ô biểu tượng
+    tileActive: "border-emerald-400 bg-emerald-50 ring-emerald-400/30",
+    iconBg: "bg-emerald-600",
   },
   {
     type: "3D_VR",
     label: "Mô hình 3D / VR",
-    desc: "Tái hiện không gian ảo, tương tác cổ vật đa chiều",
+    desc: "Tham quan không gian ảo, khám phá hiện vật đa chiều",
     icon: Globe,
     badgeClass: "bg-violet-50 text-violet-700 border-violet-200",
     bgGradient: "from-violet-600 to-purple-700",
+    // Thẻ chọn loại trong form: viền/nền khi được chọn và màu ô biểu tượng
+    tileActive: "border-violet-400 bg-violet-50 ring-violet-400/30",
+    iconBg: "bg-violet-600",
   },
 ];
 
@@ -124,12 +207,33 @@ function CharCounter({ value, max, className = "bottom-2" }) {
   const nearLimit = length >= max * 0.9;
   return (
     <span
-      className={`pointer-events-none absolute right-3 ${className} text-[10px] font-mono font-semibold ${
+      className={`pointer-events-none absolute right-3 ${className} text-[11px] font-mono font-semibold ${
         nearLimit ? "text-rose-500" : "text-slate-400"
       }`}
     >
       {length}/{max}
     </span>
+  );
+}
+
+/* Khung và nhãn dùng chung cho các phần của form */
+const FORM_SECTION = "rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-3.5";
+const FORM_LABEL = "text-xs font-semibold text-slate-700 block";
+const FORM_INPUT =
+  "w-full px-3.5 py-2.5 text-[13px] text-slate-900 bg-white border border-slate-200 rounded-xl outline-hidden placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all";
+
+function SectionTitle({ step, title, hint, required = false }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 text-[11px] font-bold flex items-center justify-center shrink-0">
+        {step}
+      </span>
+      <h4 className="text-[13.5px] font-semibold text-slate-900">
+        {title}
+        {required && <span className="text-rose-500"> *</span>}
+      </h4>
+      {hint && <span className="ml-auto text-[11.5px] text-slate-400 text-right">{hint}</span>}
+    </div>
   );
 }
 
@@ -151,11 +255,9 @@ export default function CulturalContentManagerModal({
 
   // Trạng thái Dropdown pop-up bấm xổ xuống
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
-  const [isFormatDropdownOpen, setIsFormatDropdownOpen] = useState(false);
 
   // Refs để bắt sự kiện click outside đóng dropdown
   const filterDropdownRef = useRef(null);
-  const formatDropdownRef = useRef(null);
 
   // Trạng thái phát audio trực tiếp (Player Preview)
   const [playingId, setPlayingId] = useState(null);
@@ -177,6 +279,51 @@ export default function CulturalContentManagerModal({
   const [description, setDescription] = useState("");
   const [contentText, setContentText] = useState("");
   const [formError, setFormError] = useState("");
+  // Thư viện ảnh: chọn nhiều ảnh từ máy tính, tải lần lượt lên Cloudinary rồi lưu danh sách URL
+  const [imageUrls, setImageUrls] = useState([]);
+  const imageInputRef = useRef(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState("");
+
+  const handleImageFiles = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (files.length === 0) return;
+
+    const remaining = IMAGE_MAX_COUNT - imageUrls.length;
+    if (remaining <= 0) {
+      setImageError(`Mỗi nội dung tối đa ${IMAGE_MAX_COUNT} ảnh.`);
+      return;
+    }
+    const valid = files.filter((f) => f.type.startsWith("image/") && f.size <= IMAGE_MAX_BYTES);
+    const problems = [];
+    if (valid.length < files.length) problems.push("Bỏ qua tệp không phải ảnh hoặc lớn hơn 10MB.");
+    if (valid.length > remaining) problems.push(`Chỉ thêm được ${remaining} ảnh nữa.`);
+
+    setImageError("");
+    setUploadingImage(true);
+    try {
+      for (const file of valid.slice(0, remaining)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("folder", "journeygo/cultural-contents");
+        const res = await apiClient.upload("/upload/image", formData);
+        const url = res?.data?.url || res?.url;
+        if (!url) throw new Error("Máy chủ không trả về đường dẫn ảnh.");
+        // Thêm từng ảnh ngay khi tải xong để người dùng thấy tiến độ
+        setImageUrls((prev) => [...prev, url]);
+      }
+    } catch (err) {
+      problems.push(err?.message || "Tải ảnh lên thất bại.");
+    } finally {
+      setUploadingImage(false);
+      if (problems.length) setImageError(problems.join(" "));
+    }
+  };
+
+  const handleRemoveImage = (url) => {
+    setImageUrls((prev) => prev.filter((u) => u !== url));
+  };
 
   // Confirmation dialog (xóa mềm / khôi phục)
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -224,10 +371,11 @@ export default function CulturalContentManagerModal({
     setSequenceOrder(activeContents.length + 1);
     setDuration("");
     setMediaUrl("");
+    setImageUrls([]);
+    setImageError("");
     setDescription("");
     setContentText("");
     setFormError("");
-    setIsFormatDropdownOpen(false);
   }, [activeContents.length]);
 
   // Tải danh sách nội dung văn hóa của điểm đến
@@ -243,7 +391,7 @@ export default function CulturalContentManagerModal({
       setDeletedContents(deleteds || []);
     } catch (err) {
       console.error("[CulturalContentModal] load error:", err);
-      showToast("Không thể tải danh sách nội dung thuyết minh.", "error");
+      showToast("Không thể tải danh sách nội dung văn hóa.", "error");
     } finally {
       setLoading(false);
     }
@@ -317,12 +465,6 @@ export default function CulturalContentManagerModal({
       ) {
         setIsFilterDropdownOpen(false);
       }
-      if (
-        formatDropdownRef.current &&
-        !formatDropdownRef.current.contains(e.target)
-      ) {
-        setIsFormatDropdownOpen(false);
-      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
@@ -344,10 +486,11 @@ export default function CulturalContentManagerModal({
     setSequenceOrder(content.sequenceOrder ?? 1);
     setDuration(content.duration != null ? String(content.duration) : "");
     setMediaUrl(content.mediaUrl || "");
+    setImageUrls(Array.isArray(content.imageUrls) ? content.imageUrls : []);
+    setImageError("");
     setDescription(content.description || "");
     setContentText(content.contentText || "");
     setFormError("");
-    setIsFormatDropdownOpen(false);
     setIsFormOpen(true);
   };
 
@@ -356,7 +499,7 @@ export default function CulturalContentManagerModal({
     e.preventDefault();
     const cleanTitle = title.trim();
     if (!cleanTitle) {
-      setFormError("Tiêu đề nội dung thuyết minh không được để trống.");
+      setFormError("Vui lòng nhập tiêu đề.");
       return;
     }
 
@@ -366,6 +509,7 @@ export default function CulturalContentManagerModal({
       sequenceOrder: Number(sequenceOrder) || 0,
       duration: duration !== "" && !Number.isNaN(Number(duration)) ? Number(duration) : null,
       mediaUrl: mediaUrl.trim() || null,
+      imageUrls,
       description: description.trim() || null,
       contentText: contentText.trim() || null,
     };
@@ -534,40 +678,59 @@ export default function CulturalContentManagerModal({
       />
 
       {/* Double-Bezel Container */}
-      <div className="w-full max-w-5xl p-1.5 sm:p-2 bg-slate-900/10 dark:bg-white/10 rounded-[2.25rem] ring-1 ring-slate-900/15 shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="bg-white rounded-[2rem] overflow-hidden flex flex-col h-[760px] max-h-[94vh] shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] border border-slate-200/80">
+      <div className="w-full max-w-5xl animate-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-2xl overflow-hidden flex flex-col h-[760px] max-h-[94vh] shadow-2xl border border-slate-200/80">
           {/* ========================================================
               HEADER MODAL
               ======================================================== */}
-          <div className="shrink-0 px-6 sm:px-8 py-4.5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-indigo-50/50 via-white to-violet-50/40">
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 text-white flex items-center justify-center shadow-md shadow-indigo-600/25 ring-4 ring-indigo-50 shrink-0">
-                <Headphones size={22} strokeWidth={2.2} />
+          <div className="relative shrink-0 overflow-hidden px-6 sm:px-8 py-4.5 flex items-center justify-between gap-4 bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-800 text-white">
+            <BronzeDrumMotif className="pointer-events-none absolute -right-20 -top-32 w-[320px] h-[320px] text-amber-200/[0.12] motion-safe:animate-[spin_90s_linear_infinite]" />
+            <div className="relative flex items-center gap-3.5 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 text-white flex items-center justify-center shadow-md shadow-black/20 ring-4 ring-white/10 shrink-0">
+                <Headphones size={21} strokeWidth={2.2} />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full px-2.5 py-0.5 text-[10px] uppercase tracking-[0.2em] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
-                    Thuyết Minh Di Sản Đa Phương Tiện
-                  </span>
-                  <span className="text-xs font-bold text-slate-400">&bull;</span>
-                  <span className="text-xs font-bold text-slate-600 truncate max-w-xs">
-                    {destination.name}
-                  </span>
-                </div>
-                <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight mt-0.5 truncate">
-                  Kho Nội Dung Văn Hóa &amp; Câu Chuyện Di Tích
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-200/90 truncate">
+                  Kho tư liệu văn hóa · {destination.name}
+                </p>
+                <h2 className="text-base sm:text-lg font-semibold tracking-tight mt-0.5 truncate">
+                  {isFormOpen
+                    ? editingContent
+                      ? `Chỉnh sửa “${editingContent.title}”`
+                      : "Thêm nội dung văn hóa mới"
+                    : "Thuyết minh & câu chuyện văn hóa"}
                 </h2>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-10 h-10 rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              aria-label="Đóng modal"
-            >
-              <X size={20} />
-            </button>
+            <div className="relative flex items-center gap-2 shrink-0">
+              {!isFormOpen && (
+                <div className="hidden md:flex items-center gap-1.5">
+                  {[
+                    ["Đã duyệt", activeContents.filter((c) => c.reviewStatus === "APPROVED" || !c.reviewStatus).length, "bg-emerald-400"],
+                    ["Chờ duyệt", activeContents.filter((c) => c.reviewStatus === "PENDING").length, "bg-amber-400"],
+                    ["Cần sửa", activeContents.filter((c) => c.reviewStatus === "REJECTED").length, "bg-rose-400"],
+                  ].map(([label, count, dot]) => (
+                    <span
+                      key={label}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11.5px] font-medium text-emerald-50 ring-1 ring-inset ring-white/15"
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                      {label}
+                      <span className="font-semibold text-white tabular-nums">{count}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           {/* Toast */}
@@ -592,269 +755,259 @@ export default function CulturalContentManagerModal({
               VIEW 1: MÀN HÌNH FORM TẠO MỚI / CHỈNH SỬA
               ======================================================== */}
           {isFormOpen ? (
-            <div className="flex-1 min-h-0 flex flex-col bg-slate-50/50 animate-in fade-in duration-150">
-              {/* Form Action Header */}
-              <div className="shrink-0 px-6 sm:px-8 py-3.5 bg-white border-b border-slate-200/80 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsFormOpen(false)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+            <div className="flex-1 min-h-0 flex flex-col bg-slate-50/60 animate-in fade-in duration-150">
+              {/* Nội dung form (cuộn riêng) */}
+              <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+                <form
+                  id="cultural-content-form"
+                  onSubmit={handleSubmitForm}
+                  className="px-6 sm:px-8 py-6 space-y-5"
                 >
-                  <ArrowLeft size={14} />
-                  <span>Quay lại danh sách</span>
-                </button>
-
-                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-lg bg-indigo-600 text-white text-[11px] font-black inline-flex items-center justify-center">
-                    {editingContent ? "✏" : "+"}
-                  </span>
-                  <span>
-                    {editingContent
-                      ? `Chỉnh Sửa Thuyết Minh #${editingContent.id}`
-                      : "Tạo Nội Dung Văn Hóa Mới Cho Điểm Đến"}
-                  </span>
-                </h3>
-
-                <button
-                  type="button"
-                  onClick={() => setIsFormOpen(false)}
-                  className="text-slate-400 hover:text-slate-700 cursor-pointer p-1"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Form Content Fields (Cuộn riêng biệt) */}
-              <div className="flex-1 overflow-y-auto p-6 sm:p-8 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-                <form id="cultural-content-form" onSubmit={handleSubmitForm} className="max-w-3xl mx-auto space-y-4">
-                  {/* 1. Chọn loại định dạng bằng Pop-up xổ xuống */}
-                  <div className="space-y-1.5" ref={formatDropdownRef}>
-                    <label className="text-xs font-bold text-slate-700 block">
-                      1. Định dạng tư liệu đa phương tiện <span className="text-rose-500">*</span>
-                    </label>
-
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setIsFormatDropdownOpen((prev) => !prev)}
-                        className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-400 text-left text-xs font-bold flex items-center justify-between transition-all cursor-pointer shadow-2xs"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-200">
-                            <SelectedFormFormatIcon size={15} />
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-slate-900 font-extrabold block">
-                              {selectedFormFormat.label}
+                  {/* 1. Loại nội dung: thẻ chọn trực quan */}
+                  <section className={FORM_SECTION}>
+                    <SectionTitle
+                      step="1"
+                      title="Hình thức kể chuyện"
+                      hint="Chọn loại phù hợp với tư liệu bạn có"
+                      required
+                    />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                      {CONTENT_TYPES.map((ct) => {
+                        const Icon = ct.icon;
+                        const selected = contentType === ct.type;
+                        return (
+                          <button
+                            key={ct.type}
+                            type="button"
+                            onClick={() => setContentType(ct.type)}
+                            aria-pressed={selected}
+                            className={`relative rounded-xl border p-3 text-left transition-all cursor-pointer ${
+                              selected
+                                ? `${ct.tileActive} ring-2`
+                                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                            }`}
+                          >
+                            <span
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                selected ? `${ct.iconBg} text-white` : "bg-slate-100 text-slate-500"
+                              }`}
+                            >
+                              <Icon size={16} />
                             </span>
-                            <span className="text-[11px] text-slate-500 font-normal truncate block">
-                              {selectedFormFormat.desc}
+                            <span className="mt-2 block text-[12.5px] font-semibold leading-snug text-slate-900">
+                              {ct.label}
                             </span>
-                          </div>
-                        </div>
-
-                        <ChevronDown
-                          size={16}
-                          className={`text-slate-400 shrink-0 transition-transform ${
-                            isFormatDropdownOpen ? "rotate-180" : ""
-                          }`}
-                        />
-                      </button>
-
-                      {/* Dropdown Menu xổ xuống */}
-                      {isFormatDropdownOpen && (
-                        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
-                          {CONTENT_TYPES.map((ct) => {
-                            const Icon = ct.icon;
-                            const isSelected = contentType === ct.type;
-                            return (
-                              <button
-                                key={ct.type}
-                                type="button"
-                                onClick={() => {
-                                  setContentType(ct.type);
-                                  setIsFormatDropdownOpen(false);
-                                }}
-                                className={`w-full px-4 py-2.5 text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                                  isSelected
-                                    ? "bg-indigo-50/80 text-indigo-900 font-extrabold"
-                                    : "hover:bg-slate-50 text-slate-700 font-medium"
-                                }`}
-                              >
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <div
-                                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                                      isSelected
-                                        ? "bg-indigo-600 text-white"
-                                        : "bg-slate-100 text-slate-600"
-                                    }`}
-                                  >
-                                    <Icon size={14} />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="font-extrabold text-slate-900 leading-tight">
-                                      {ct.label}
-                                    </p>
-                                    <p className="text-[11px] text-slate-500 truncate leading-tight mt-0.5">
-                                      {ct.desc}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {isSelected && (
-                                  <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                            {selected && (
+                              <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-slate-900/80 text-white flex items-center justify-center">
+                                <Check size={10} strokeWidth={3} />
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
-                  </div>
+                    <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                      <SelectedFormFormatIcon size={13} className="text-slate-400 shrink-0" />
+                      {selectedFormFormat.desc}
+                    </p>
+                  </section>
 
-                  {/* 2. Tiêu đề + Thứ tự + Thời lượng */}
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                    <div className="sm:col-span-6 space-y-1">
-                      <label className="text-xs font-bold text-slate-700 block">
-                        Tiêu đề thuyết minh / câu chuyện <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          maxLength={TITLE_MAX}
-                          value={title}
-                          onChange={(e) => setTitle(e.target.value)}
-                          className="w-full pl-3.5 pr-14 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
-                        />
-                        <CharCounter value={title} max={TITLE_MAX} className="top-1/2 -translate-y-1/2" />
+                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+                    {/* Cột trái: câu chuyện */}
+                    <section className={`${FORM_SECTION} lg:col-span-3`}>
+                      <SectionTitle step="2" title="Câu chuyện" hint="Phần du khách đọc và nghe tại điểm đến" />
+
+                      <div className="space-y-1.5">
+                        <label className={FORM_LABEL}>
+                          Tiêu đề <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            maxLength={TITLE_MAX}
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Ví dụ: Sự tích Hồ Gươm và thanh gươm thần"
+                            className={`${FORM_INPUT} pr-16 font-semibold`}
+                          />
+                          <CharCounter value={title} max={TITLE_MAX} className="top-1/2 -translate-y-1/2" />
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="sm:col-span-3 space-y-1">
-                      <label className="text-xs font-bold text-slate-700 block">
-                        Thứ tự phát (Order)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={sequenceOrder}
-                        onChange={(e) => setSequenceOrder(e.target.value)}
-                        className="w-full px-3.5 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
-                      />
-                    </div>
+                      <div className="space-y-1.5">
+                        <label className={FORM_LABEL}>Mô tả ngắn</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            maxLength={DESCRIPTION_MAX}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Một câu giới thiệu hiện trên thẻ nội dung"
+                            className={`${FORM_INPUT} pr-16`}
+                          />
+                          <CharCounter value={description} max={DESCRIPTION_MAX} className="top-1/2 -translate-y-1/2" />
+                        </div>
+                      </div>
 
-                    <div className="sm:col-span-3 space-y-1">
-                      <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                        <span>Thời lượng (Giây)</span>
-                        {duration && (
-                          <span className="text-[10.5px] font-mono text-indigo-600 font-bold">
-                            ≈ {formatDuration(Number(duration))}
-                          </span>
+                      <div className="space-y-1.5">
+                        <label className={FORM_LABEL}>Lời thuyết minh / nội dung câu chuyện</label>
+                        <div className="relative">
+                          <textarea
+                            rows={10}
+                            maxLength={CONTENT_TEXT_MAX}
+                            value={contentText}
+                            onChange={(e) => setContentText(e.target.value)}
+                            placeholder="Kể lại lịch sử, truyền thuyết, phong tục gắn với điểm đến…"
+                            className={`${FORM_INPUT} pb-7 leading-relaxed resize-y`}
+                          />
+                          <CharCounter value={contentText} max={CONTENT_TEXT_MAX} className="bottom-2.5" />
+                        </div>
+                      </div>
+                    </section>
+
+                    {/* Cột phải: phương tiện và hình ảnh */}
+                    <div className="lg:col-span-2 space-y-5">
+                      <section className={FORM_SECTION}>
+                        <SectionTitle step="3" title="Âm thanh / video" hint="Link YouTube, MP4 hoặc MP3" />
+                        <div className="relative">
+                          <input
+                            type="url"
+                            maxLength={MEDIA_URL_MAX}
+                            value={mediaUrl}
+                            onChange={(e) => setMediaUrl(e.target.value)}
+                            placeholder="https://www.youtube.com/watch?v=…"
+                            className={`${FORM_INPUT} pr-20 font-mono text-xs`}
+                          />
+                          <CharCounter value={mediaUrl} max={MEDIA_URL_MAX} className="top-1/2 -translate-y-1/2" />
+                        </div>
+
+                        {getYouTubeEmbedUrl(mediaUrl) ? (
+                          <div className="w-full aspect-video rounded-xl overflow-hidden border border-slate-200 bg-black">
+                            <iframe
+                              src={getYouTubeEmbedUrl(mediaUrl)}
+                              title="Xem trước video"
+                              className="w-full h-full"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              allowFullScreen
+                            />
+                          </div>
+                        ) : isDirectVideoUrl(mediaUrl) ? (
+                          <video
+                            src={mediaUrl}
+                            controls
+                            className="w-full aspect-video rounded-xl border border-slate-200 bg-black"
+                          />
+                        ) : mediaUrl.trim() ? (
+                          <audio src={mediaUrl} controls className="w-full" />
+                        ) : (
+                          <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">
+                            Dán link để xem / nghe thử ngay tại đây
+                          </p>
                         )}
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={duration}
-                        onChange={(e) => setDuration(e.target.value)}
-                        className="w-full px-3.5 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
-                      />
-                    </div>
-                  </div>
 
-                  {/* 3. Media URL (Audio / Video link CDN / YouTube) */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                      <span>Đường dẫn tệp Media (YouTube / CDN / MP3 / MP4 / Ảnh)</span>
-                      <span className="text-[10.5px] text-slate-400">
-                        Hỗ trợ link YouTube, video MP4 và file âm thanh MP3
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="url"
-                        maxLength={MEDIA_URL_MAX}
-                        value={mediaUrl}
-                        onChange={(e) => setMediaUrl(e.target.value)}
-                        className="w-full pl-3.5 pr-20 py-2 text-xs font-mono font-medium bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
-                      />
-                      <CharCounter value={mediaUrl} max={MEDIA_URL_MAX} className="top-1/2 -translate-y-1/2" />
-                    </div>
+                        <div className="space-y-1.5">
+                          <label className={FORM_LABEL}>Thứ tự phát</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={sequenceOrder}
+                            onChange={(e) => setSequenceOrder(e.target.value)}
+                            className={FORM_INPUT}
+                          />
+                        </div>
+                      </section>
 
-                    {/* Huy hiệu nhận diện YouTube thông minh */}
-                    {getYouTubeEmbedUrl(mediaUrl) && (
-                      <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1.5 mt-1 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 w-fit">
-                        <Video size={13} className="shrink-0" />
-                        <span>Đã nhận diện video YouTube hợp lệ &bull; Du khách và Kiểm duyệt viên sẽ được xem video trực tiếp</span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* 4. Mô tả ngắn gọn */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 block">
-                      Tóm tắt dẫn nhập (Description)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        maxLength={DESCRIPTION_MAX}
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        className="w-full pl-3.5 pr-16 py-2 text-xs bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all"
-                      />
-                      <CharCounter value={description} max={DESCRIPTION_MAX} className="top-1/2 -translate-y-1/2" />
-                    </div>
-                  </div>
-
-                  {/* 5. Kịch bản chi tiết / Lời bình thuyết minh */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 block">
-                      Lời bình thuyết minh chi tiết / Kịch bản câu chuyện (Script / Content text)
-                    </label>
-                    <div className="relative">
-                      <textarea
-                        rows={5}
-                        maxLength={CONTENT_TEXT_MAX}
-                        value={contentText}
-                        onChange={(e) => setContentText(e.target.value)}
-                        className="w-full px-3.5 pt-2 pb-6 text-xs bg-white border border-slate-200 rounded-xl outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all leading-relaxed"
-                      />
-                      <CharCounter value={contentText} max={CONTENT_TEXT_MAX} className="bottom-2" />
+                      <section className={FORM_SECTION}>
+                        <SectionTitle
+                          step="4"
+                          title="Thư viện ảnh"
+                          hint={`${imageUrls.length}/${IMAGE_MAX_COUNT} · PNG, JPG, WEBP ≤ 10MB`}
+                        />
+                        <input
+                          ref={imageInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          multiple
+                          hidden
+                          onChange={handleImageFiles}
+                        />
+                        <div className="grid grid-cols-3 gap-2">
+                          {imageUrls.map((url, idx) => (
+                            <div
+                              key={url}
+                              className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt={`Ảnh ${idx + 1}`} className="w-full h-full object-cover" />
+                              {idx === 0 && (
+                                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-md bg-emerald-600 text-white text-[10.5px] font-semibold">
+                                  Ảnh bìa
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveImage(url)}
+                                disabled={uploadingImage || actionLoading}
+                                className="absolute top-1 right-1 w-6 h-6 rounded-md bg-white/90 hover:bg-white text-rose-600 shadow-sm flex items-center justify-center cursor-pointer disabled:opacity-60"
+                                title="Bỏ ảnh này"
+                                aria-label={`Bỏ ảnh ${idx + 1}`}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ))}
+                          {imageUrls.length < IMAGE_MAX_COUNT && (
+                            <button
+                              type="button"
+                              onClick={() => imageInputRef.current?.click()}
+                              disabled={uploadingImage || actionLoading}
+                              className="aspect-square rounded-xl border-2 border-dashed border-emerald-200 hover:border-emerald-400 bg-emerald-50/40 hover:bg-emerald-50 text-emerald-700 flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-60"
+                              title="Chọn ảnh từ máy tính"
+                            >
+                              {uploadingImage ? <Loader2 size={18} className="animate-spin" /> : <ImagePlus size={18} />}
+                              <span className="text-[11px] font-semibold">{uploadingImage ? "Đang tải…" : "Thêm ảnh"}</span>
+                            </button>
+                          )}
+                        </div>
+                        {imageError && <p className="text-[11.5px] font-semibold text-rose-600">{imageError}</p>}
+                      </section>
                     </div>
                   </div>
 
                   {formError && (
-                    <p className="text-xs font-bold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 flex items-center gap-2">
-                      <AlertCircle size={14} className="shrink-0" />
+                    <p className="text-xs font-semibold text-rose-700 bg-rose-50 p-3 rounded-xl border border-rose-200 flex items-center gap-2">
+                      <AlertCircle size={15} className="shrink-0" />
                       <span>{formError}</span>
                     </p>
                   )}
                 </form>
               </div>
 
-              {/* Form Footer Actions */}
-              <div className="shrink-0 px-6 sm:px-8 py-3.5 bg-white border-t border-slate-200/80 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsFormOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  form="cultural-content-form"
-                  disabled={actionLoading}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm shadow-indigo-600/25 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                >
-                  {actionLoading ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <Check size={14} />
-                  )}
-                  <span>{editingContent ? "Cập nhật thuyết minh" : "Lưu thuyết minh mới"}</span>
-                </button>
+              {/* Chân form cố định */}
+              <div className="shrink-0 px-6 sm:px-8 py-3.5 bg-white border-t border-slate-200 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-[11.5px] text-slate-500 flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+                  Sau khi lưu, nội dung được gửi Ban Thẩm định; du khách chỉ thấy khi đã được duyệt.
+                </p>
+                <div className="flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsFormOpen(false)}
+                    className="h-9 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft size={14} />
+                    Quay lại danh sách
+                  </button>
+                  <button
+                    type="submit"
+                    form="cultural-content-form"
+                    disabled={actionLoading || uploadingImage}
+                    className="h-9 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-xs inline-flex items-center gap-2 shadow-sm shadow-emerald-600/25 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {actionLoading ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />}
+                    {editingContent ? "Lưu thay đổi" : "Lưu & gửi duyệt"}
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -862,162 +1015,115 @@ export default function CulturalContentManagerModal({
                 VIEW 2: MÀN HÌNH DANH SÁCH THUYẾT MINH
                 ======================================================== */
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              {/* Action Bar (Tabs Đang phát hành / Thùng rác + Nút Thêm mới) */}
-              <div className="shrink-0 px-6 sm:px-8 py-3.5 bg-slate-50/70 border-b border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* Tab Đang hoạt động */}
-                  <button
-                    type="button"
-                    onClick={() => setCurrentTab("active")}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      currentTab === "active"
-                        ? "bg-indigo-600 text-white shadow-xs"
-                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
-                    }`}
-                  >
-                    <Headphones size={13} />
-                    <span>Đang phát hành</span>
-                    <span
-                      className={`px-1.5 py-0.2 rounded-md text-[10px] ${
-                        currentTab === "active"
-                          ? "bg-white/20 text-white"
-                          : "bg-indigo-50 text-indigo-700"
+              {/* Thanh công cụ: tab · lọc loại · tìm kiếm · thêm mới */}
+              <div className="shrink-0 px-6 sm:px-8 py-3 bg-white border-b border-slate-200 flex flex-col lg:flex-row lg:items-center gap-2.5">
+                <div className="inline-flex p-0.5 rounded-xl bg-slate-100 text-xs font-semibold self-start">
+                  {[
+                    ["active", "Nội dung", activeContents.length, Headphones],
+                    ["trash", "Thùng rác", deletedContents.length, Trash2],
+                  ].map(([key, label, count, Icon]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setCurrentTab(key)}
+                      className={`h-8 px-3 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                        currentTab === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                       }`}
                     >
-                      {activeContents.length}
-                    </span>
-                  </button>
-
-                  {/* Tab Thùng rác */}
-                  <button
-                    type="button"
-                    onClick={() => setCurrentTab("trash")}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      currentTab === "trash"
-                        ? "bg-rose-600 text-white shadow-xs"
-                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
-                    }`}
-                  >
-                    <Trash2 size={13} />
-                    <span>Thùng rác</span>
-                    <span
-                      className={`px-1.5 py-0.2 rounded-md text-[10px] ${
-                        currentTab === "trash"
-                          ? "bg-white/20 text-white"
-                          : "bg-rose-50 text-rose-700"
-                      }`}
-                    >
-                      {deletedContents.length}
-                    </span>
-                  </button>
-                </div>
-
-              </div>
-
-              {/* BỘ LỌC ĐỊNH DẠNG (POP-UP BẤM XỔ XUỐNG) & TÌM KIẾM */}
-              <div className="shrink-0 px-6 sm:px-8 py-3 border-b border-slate-100 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                {/* Pop-up bấm xổ xuống chọn định dạng */}
-                <div className="relative" ref={filterDropdownRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsFilterDropdownOpen((prev) => !prev)}
-                    className="h-9 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold inline-flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
-                  >
-                    <ActiveFilterIcon size={14} className="text-indigo-600" />
-                    <span>
-                      {activeFilterConfig
-                        ? activeFilterConfig.label
-                        : `Tất cả định dạng (${currentList.length})`}
-                    </span>
-                    <ChevronDown
-                      size={14}
-                      className={`text-slate-400 transition-transform ${
-                        isFilterDropdownOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {/* Dropdown Menu Xổ Xuống */}
-                  {isFilterDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 w-64 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilterType("ALL");
-                          setIsFilterDropdownOpen(false);
-                        }}
-                        className={`w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                          filterType === "ALL"
-                            ? "bg-indigo-50 text-indigo-700 font-extrabold"
-                            : "hover:bg-slate-50 text-slate-700 font-bold"
+                      <Icon size={13} className={currentTab === key && key === "trash" ? "text-rose-600" : ""} />
+                      {label}
+                      <span
+                        className={`min-w-5 px-1 rounded-md text-[11px] tabular-nums ${
+                          currentTab === key ? "bg-slate-100 text-slate-700" : "bg-slate-200/70 text-slate-500"
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          <Filter size={13} className="text-slate-400" />
-                          <span>Tất cả định dạng</span>
-                        </div>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
-                          {currentList.length}
-                        </span>
-                      </button>
-
-                      <div className="my-1 border-t border-slate-100" />
-
-                      {CONTENT_TYPES.map((ct) => {
-                        const Icon = ct.icon;
-                        const count = currentList.filter((c) => c.contentType === ct.type).length;
-                        const isSelected = filterType === ct.type;
-                        return (
-                          <button
-                            key={ct.type}
-                            type="button"
-                            onClick={() => {
-                              setFilterType(ct.type);
-                              setIsFilterDropdownOpen(false);
-                            }}
-                            className={`w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                              isSelected
-                                ? "bg-indigo-50 text-indigo-700 font-extrabold"
-                                : "hover:bg-slate-50 text-slate-700 font-bold"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Icon
-                                size={13}
-                                className={isSelected ? "text-indigo-600" : "text-slate-400"}
-                              />
-                              <span>{ct.label}</span>
-                            </div>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
-                              {count}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                        {count}
+                      </span>
+                    </button>
+                  ))}
                 </div>
 
-                {/* Ô tìm kiếm từ khóa */}
-                <div className="relative sm:w-64">
-                  <Search
-                    size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Tìm thuyết minh, câu chuyện..."
-                    className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-hidden focus:bg-white focus:border-indigo-500 transition-all font-medium"
-                  />
-                  {searchQuery && (
+                <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2.5">
+                  {/* Lọc theo loại nội dung */}
+                  <div className="relative" ref={filterDropdownRef}>
                     <button
                       type="button"
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      onClick={() => setIsFilterDropdownOpen((prev) => !prev)}
+                      className="h-9 w-full sm:w-auto px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer"
                     >
-                      <X size={12} />
+                      <ActiveFilterIcon size={14} className="text-emerald-600" />
+                      <span>{activeFilterConfig ? activeFilterConfig.label : "Tất cả loại"}</span>
+                      <ChevronDown
+                        size={14}
+                        className={`ml-auto text-slate-400 transition-transform ${isFilterDropdownOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {isFilterDropdownOpen && (
+                      <div className="absolute left-0 top-full mt-1.5 w-64 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
+                        {[{ type: "ALL", label: "Tất cả loại nội dung", icon: Filter }, ...CONTENT_TYPES].map((ct) => {
+                          const Icon = ct.icon;
+                          const isSelected = filterType === ct.type;
+                          const count =
+                            ct.type === "ALL"
+                              ? currentList.length
+                              : currentList.filter((c) => c.contentType === ct.type).length;
+                          return (
+                            <button
+                              key={ct.type}
+                              type="button"
+                              onClick={() => {
+                                setFilterType(ct.type);
+                                setIsFilterDropdownOpen(false);
+                              }}
+                              className={`w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                                isSelected ? "bg-emerald-50 text-emerald-800 font-semibold" : "hover:bg-slate-50 text-slate-700 font-medium"
+                              }`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <Icon size={13} className={isSelected ? "text-emerald-600" : "text-slate-400"} />
+                                {ct.label}
+                              </span>
+                              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
+                                {count}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tìm kiếm */}
+                  <div className="relative flex-1 sm:max-w-xs">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Tìm theo tiêu đề, mô tả…"
+                      className="h-9 w-full pl-8 pr-7 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-hidden focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery("")}
+                        aria-label="Xóa tìm kiếm"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {currentTab === "active" && (
+                    <button
+                      type="button"
+                      onClick={handleOpenCreate}
+                      className="sm:ml-auto h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-colors cursor-pointer"
+                    >
+                      <Plus size={14} strokeWidth={2.4} />
+                      Thêm nội dung
                     </button>
                   )}
                 </div>
@@ -1027,58 +1133,48 @@ export default function CulturalContentManagerModal({
               <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-3 bg-slate-50/40 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
                 {loading ? (
                   <div className="h-64 flex flex-col items-center justify-center gap-3 text-slate-400">
-                    <Loader2 size={32} className="animate-spin text-indigo-600" />
-                    <p className="text-xs font-bold">Đang tải danh sách thuyết minh di sản...</p>
+                    <Loader2 size={32} className="animate-spin text-emerald-600" />
+                    <p className="text-xs font-bold">Đang tải danh sách nội dung...</p>
                   </div>
                 ) : displayedContents.length === 0 ? (
                   <div className="py-16 text-center max-w-md mx-auto space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600">
                       <Headphones size={26} />
                     </div>
 
                     <div>
                       {/* Tiêu đề Empty State thông minh theo ngữ cảnh */}
-                      <h4 className="font-extrabold text-slate-800 text-sm">
+                      <h4 className="font-semibold text-slate-800 text-sm">
                         {currentTab === "trash"
                           ? "Thùng rác đang trống"
                           : currentList.length === 0
-                          ? "Chưa có thuyết minh nào cho điểm đến này"
+                          ? "Điểm đến này chưa có nội dung văn hóa nào"
                           : "Không tìm thấy nội dung phù hợp với bộ lọc"}
                       </h4>
 
                       <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                         {currentTab === "trash"
-                          ? "Không có tư liệu nào ở trạng thái xóa mềm."
+                          ? "Chưa có nội dung nào bị xóa."
                           : currentList.length === 0
-                          ? "Hãy bắt đầu tạo bài thuyết minh audio, video hoặc câu chuyện di sản đầu tiên cho điểm đến này."
+                          ? "Thêm audio thuyết minh, video hoặc câu chuyện đầu tiên để du khách khám phá điểm đến này."
                           : `Đang lọc theo "${activeFilterConfig?.label || "Bộ lọc"}". Hiện có ${currentList.length} nội dung ở các danh mục khác.`}
                       </p>
                     </div>
 
-                    {/* Nút hành động trong Empty State */}
-                    {currentTab === "active" && (
+                    {/* Danh sách trống: chỉ dùng nút "Thêm nội dung" trên thanh công cụ.
+                        Đang lọc mà không có kết quả thì cho bỏ lọc nhanh. */}
+                    {currentTab === "active" && currentList.length > 0 && (
                       <div className="pt-2">
-                        {currentList.length === 0 ? (
-                          <button
-                            type="button"
-                            onClick={handleOpenCreate}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-all active:scale-95 cursor-pointer"
-                          >
-                            <Plus size={14} />
-                            <span>Thêm thuyết minh mới ngay</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFilterType("ALL");
-                              setSearchQuery("");
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs shadow-2xs transition-all cursor-pointer"
-                          >
-                            <span>Xem tất cả ({currentList.length}) nội dung</span>
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterType("ALL");
+                            setSearchQuery("");
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                        >
+                          <span>Xem tất cả ({currentList.length}) nội dung</span>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1104,21 +1200,21 @@ export default function CulturalContentManagerModal({
                           key={content.id}
                           className={`group bg-white rounded-2xl p-4 sm:p-5 border transition-all shadow-2xs hover:shadow-md flex flex-col justify-between gap-3 relative overflow-hidden ${
                             isPlaying
-                              ? "border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/20"
+                              ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20"
                               : content.deleted
                               ? "border-rose-200 bg-rose-50/30"
-                              : "border-slate-200 hover:border-indigo-300"
+                              : "border-slate-200 hover:border-emerald-300"
                           }`}
                         >
                           {/* Top: Sequence Order + Badge + PlayCount */}
                           <div>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <span className="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-indigo-100 text-slate-700 group-hover:text-indigo-700 font-mono font-black text-xs flex items-center justify-center shrink-0 border border-slate-200 transition-colors">
+                                <span className="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-emerald-100 text-slate-700 group-hover:text-emerald-700 font-mono font-bold text-xs flex items-center justify-center shrink-0 border border-slate-200 transition-colors">
                                   #{content.sequenceOrder || 0}
                                 </span>
                                 <span
-                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${typeCfg.badgeClass}`}
+                                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${typeCfg.badgeClass}`}
                                 >
                                   <Icon size={11} />
                                   <span>{typeCfg.label}</span>
@@ -1132,7 +1228,7 @@ export default function CulturalContentManagerModal({
                                       ? { label: "Bị từ chối", cls: "bg-rose-50 text-rose-700 border-rose-200" }
                                       : { label: "Đã duyệt", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
                                   return (
-                                    <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.cls}`}>
+                                    <span className={`inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full border ${cfg.cls}`}>
                                       {cfg.label}
                                     </span>
                                   );
@@ -1142,15 +1238,15 @@ export default function CulturalContentManagerModal({
                               {/* Số lượt nghe/xem playCount */}
                               <div
                                 className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/80"
-                                title="Số lượt du khách đã thưởng thức"
+                                title="Số lượt du khách đã nghe / xem"
                               >
-                                <Volume2 size={11} className="text-indigo-600" />
-                                <span>{content.playCount || 0} lượt nghe</span>
+                                <Volume2 size={11} className="text-emerald-600" />
+                                <span>{content.playCount || 0} lượt xem</span>
                               </div>
                             </div>
 
                             {/* Title */}
-                            <h4 className="text-base font-extrabold text-slate-900 tracking-tight mt-2.5 line-clamp-1 group-hover:text-indigo-700 transition-colors">
+                            <h4 className="text-base font-semibold text-slate-900 tracking-tight mt-2.5 line-clamp-1 group-hover:text-emerald-700 transition-colors">
                               {content.title}
                             </h4>
 
@@ -1158,18 +1254,26 @@ export default function CulturalContentManagerModal({
                             <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
                               {content.description ||
                                 content.contentText ||
-                                "Chưa có tóm tắt nội dung thuyết minh."}
+                                "Chưa có mô tả ngắn."}
                             </p>
                           </div>
 
                           {/* Bottom Info & Action Buttons */}
                           <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                            {/* Thời lượng */}
-                            <div className="flex items-center gap-1.5 text-slate-500 font-medium text-[11px]">
-                              <Clock size={12} className="text-slate-400" />
-                              <span>
-                                {content.duration ? formatDuration(content.duration) : "Không giới hạn"}
-                              </span>
+                            {/* Thời lượng (chỉ nội dung cũ đã có) + số ảnh */}
+                            <div className="flex items-center gap-3 text-slate-500 font-medium text-[11px]">
+                              {content.duration > 0 && (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Clock size={12} className="text-slate-400" />
+                                  <span>{formatDuration(content.duration)}</span>
+                                </span>
+                              )}
+                              {Array.isArray(content.imageUrls) && content.imageUrls.length > 0 && (
+                                <span className="inline-flex items-center gap-1">
+                                  <ImagePlus size={12} className="text-slate-400" />
+                                  <span>{content.imageUrls.length} ảnh</span>
+                                </span>
+                              )}
                             </div>
 
                             {/* Actions */}
@@ -1184,7 +1288,7 @@ export default function CulturalContentManagerModal({
                                       ? "bg-rose-600 hover:bg-rose-700 text-white animate-pulse"
                                       : isVideo
                                       ? "bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200"
-                                      : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200"
+                                      : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
                                   }`}
                                   title={
                                     isPlaying
@@ -1213,6 +1317,20 @@ export default function CulturalContentManagerModal({
                                 </button>
                               )}
 
+                              {/* Chỉ có ảnh, không có video/audio: mở trình xem thư viện ảnh */}
+                              {!content.mediaUrl && !content.deleted && content.imageUrls?.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewMediaTarget(content)}
+                                  className="px-3 py-1 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-95 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                  title="Xem thư viện ảnh"
+                                >
+                                  <ImagePlus size={12} />
+                                  <span>Xem ảnh</span>
+                                </button>
+                              )}
+
+
                               {content.deleted ? (
                                 <button
                                   type="button"
@@ -1231,7 +1349,7 @@ export default function CulturalContentManagerModal({
                                       onClick={() => handleSubmitForModeration(content)}
                                       disabled={actionLoading}
                                       className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/90 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs disabled:opacity-50"
-                                      title="Gửi bài thuyết minh này vào hàng chờ kiểm duyệt di sản"
+                                      title="Gửi nội dung này cho Ban Thẩm định duyệt"
                                     >
                                       <Send size={11} className="text-amber-700" />
                                       <span>Gửi duyệt</span>
@@ -1241,7 +1359,7 @@ export default function CulturalContentManagerModal({
                                   <button
                                     type="button"
                                     onClick={() => handleOpenHistory(content)}
-                                    className="p-1.5 text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                    className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
                                     title="Xem lịch sử thẩm định & phản hồi"
                                   >
                                     <History size={14} />
@@ -1250,8 +1368,8 @@ export default function CulturalContentManagerModal({
                                   <button
                                     type="button"
                                     onClick={() => handleOpenEdit(content)}
-                                    className="p-1.5 text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                                    title="Chỉnh sửa thuyết minh"
+                                    className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Chỉnh sửa nội dung"
                                   >
                                     <Pencil size={14} />
                                   </button>
@@ -1271,16 +1389,6 @@ export default function CulturalContentManagerModal({
                       );
                     })}
                   </div>
-                  {currentTab === "active" && (
-                    <button
-                      type="button"
-                      onClick={handleOpenCreate}
-                      className="w-full py-3 rounded-2xl border-2 border-dashed border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/50 text-indigo-700 font-bold text-xs inline-flex items-center justify-center gap-2 transition-all cursor-pointer"
-                    >
-                      <Plus size={14} strokeWidth={2.4} />
-                      <span>Thêm thuyết minh mới</span>
-                    </button>
-                  )}
                   </div>
                 )}
               </div>
@@ -1288,7 +1396,7 @@ export default function CulturalContentManagerModal({
               {/* FOOTER MODAL */}
               <div className="shrink-0 px-6 sm:px-8 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>
-                  Tổng cộng <strong>{activeContents.length} tài liệu thuyết minh</strong> ({deletedContents.length} trong thùng rác).
+                  Tổng cộng <strong>{activeContents.length} nội dung văn hóa</strong> ({deletedContents.length} trong thùng rác).
                 </span>
 
                 <button
@@ -1319,7 +1427,7 @@ export default function CulturalContentManagerModal({
                 {/* Header Trình phát */}
                 <div className="shrink-0 px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
                       {getYouTubeEmbedUrl(previewMediaTarget.mediaUrl) ||
                       previewMediaTarget.contentType === "VIDEO" ? (
                         <Video size={16} />
@@ -1328,11 +1436,11 @@ export default function CulturalContentManagerModal({
                       )}
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-extrabold text-slate-900 truncate">
+                      <h3 className="text-sm font-semibold text-slate-900 truncate">
                         {previewMediaTarget.title}
                       </h3>
                       <p className="text-[11px] text-slate-500 flex items-center gap-2">
-                        <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200/70">
+                        <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/70">
                           #{previewMediaTarget.sequenceOrder || 1}
                         </span>
                         <span>{previewMediaTarget.playCount || 0} lượt xem/nghe</span>
@@ -1350,7 +1458,10 @@ export default function CulturalContentManagerModal({
                   </button>
                 </div>
 
+                {/* Vùng cuộn chung: video chính, thư viện ảnh, mô tả */}
+                <div className="flex-1 min-h-0 overflow-y-auto">
                 {/* Player Frame: YouTube iFrame hoặc Video Player */}
+                {previewMediaTarget.mediaUrl && (
                 <div className="p-4 sm:p-6 bg-slate-950 flex items-center justify-center overflow-hidden">
                   {getYouTubeEmbedUrl(previewMediaTarget.mediaUrl) ? (
                     <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/10">
@@ -1372,13 +1483,13 @@ export default function CulturalContentManagerModal({
                       />
                     </div>
                   ) : (
-                    <div className="w-full py-8 px-6 rounded-2xl bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white flex flex-col items-center gap-4 text-center border border-white/10">
-                      <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center border border-indigo-400/20">
+                    <div className="w-full py-8 px-6 rounded-2xl bg-gradient-to-br from-emerald-900 via-slate-900 to-slate-950 text-white flex flex-col items-center gap-4 text-center border border-white/10">
+                      <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-400/20">
                         <Headphones size={32} />
                       </div>
                       <div>
                         <p className="text-sm font-bold text-white">{previewMediaTarget.title}</p>
-                        <p className="text-xs text-slate-400 mt-1">Trình phát audio di sản</p>
+                        <p className="text-xs text-slate-400 mt-1">Audio thuyết minh</p>
                       </div>
                       <audio
                         src={previewMediaTarget.mediaUrl}
@@ -1389,13 +1500,16 @@ export default function CulturalContentManagerModal({
                     </div>
                   )}
                 </div>
+                )}
+
+                <PreviewGallery key={previewMediaTarget.id} images={previewMediaTarget.imageUrls} title={previewMediaTarget.title} />
 
                 {/* Thông tin mô tả & Kịch bản */}
-                <div className="p-5 sm:p-6 overflow-y-auto max-h-[30vh] bg-white space-y-3">
+                <div className="p-5 sm:p-6 bg-white space-y-3">
                   {previewMediaTarget.description && (
                     <div>
-                      <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                        Tóm tắt dẫn nhập
+                      <h5 className="text-xs font-bold text-slate-400 mb-1">
+                        Mô tả ngắn
                       </h5>
                       <p className="text-xs text-slate-700 leading-relaxed">
                         {previewMediaTarget.description}
@@ -1405,8 +1519,8 @@ export default function CulturalContentManagerModal({
 
                   {previewMediaTarget.contentText && (
                     <div>
-                      <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                        Kịch bản / Lời bình chi tiết
+                      <h5 className="text-xs font-bold text-slate-400 mb-1">
+                        Nội dung chi tiết
                       </h5>
                       <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200/80 leading-relaxed whitespace-pre-wrap">
                         {previewMediaTarget.contentText}
@@ -1415,15 +1529,17 @@ export default function CulturalContentManagerModal({
                   )}
 
                   <div className="pt-2 flex items-center justify-between border-t border-slate-100 text-xs">
+                    {previewMediaTarget.mediaUrl ? (
                     <a
                       href={previewMediaTarget.mediaUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1.5"
+                      className="text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1.5"
                     >
                       <span>Mở liên kết media trong tab mới</span>
                       <ExternalLink size={12} />
                     </a>
+                    ) : <span />}
                     <button
                       type="button"
                       onClick={() => setPreviewMediaTarget(null)}
@@ -1432,6 +1548,7 @@ export default function CulturalContentManagerModal({
                       Đóng
                     </button>
                   </div>
+                </div>
                 </div>
               </div>
             </div>
@@ -1464,10 +1581,10 @@ export default function CulturalContentManagerModal({
                     )}
                   </div>
                   <div>
-                    <h4 className="text-sm font-extrabold text-slate-900">
+                    <h4 className="text-sm font-semibold text-slate-900">
                       {confirmDialog.type === "delete"
-                        ? "Xóa mềm thuyết minh?"
-                        : "Khôi phục thuyết minh?"}
+                        ? "Chuyển nội dung vào thùng rác?"
+                        : "Khôi phục nội dung?"}
                     </h4>
                     <p className="text-xs text-slate-500 mt-0.5">
                       {confirmDialog.content?.title}
@@ -1477,8 +1594,8 @@ export default function CulturalContentManagerModal({
 
                 <p className="text-xs text-slate-600 leading-relaxed">
                   {confirmDialog.type === "delete"
-                    ? "Nội dung này sẽ được chuyển vào thùng rác và tạm ngưng phát cho du khách. Bạn có thể khôi phục lại bất kỳ lúc nào."
-                    : "Nội dung này sẽ được khôi phục trở lại danh sách đang phát hành cho du khách thưởng thức."}
+                    ? "Nội dung này sẽ được chuyển vào thùng rác và tạm ẩn với du khách. Bạn có thể khôi phục lại bất kỳ lúc nào."
+                    : "Nội dung này sẽ trở lại danh sách và tiếp tục hiển thị cho du khách."}
                 </p>
 
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -1531,12 +1648,12 @@ export default function CulturalContentManagerModal({
                 {/* Header */}
                 <div className="flex items-start justify-between pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-100">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
                       <History size={16} />
                     </div>
                     <div>
-                      <h4 className="text-sm font-extrabold text-slate-900 tracking-tight">
-                        Lịch sử kiểm duyệt di sản
+                      <h4 className="text-sm font-semibold text-slate-900 tracking-tight">
+                        Lịch sử kiểm duyệt
                       </h4>
                       <p className="text-xs text-slate-500 truncate max-w-xs mt-0.5">
                         {historyTarget.title}
@@ -1556,7 +1673,7 @@ export default function CulturalContentManagerModal({
                 <div className="flex-1 overflow-y-auto py-4 space-y-3.5 [scrollbar-width:thin]">
                   {historyLoading ? (
                     <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
-                      <Loader2 size={24} className="animate-spin text-indigo-600" />
+                      <Loader2 size={24} className="animate-spin text-emerald-600" />
                       <p className="text-xs font-bold">Đang tải lịch sử thẩm định...</p>
                     </div>
                   ) : historyError ? (
@@ -1644,7 +1761,7 @@ export default function CulturalContentManagerModal({
                       {/* Dòng thời gian các sự kiện */}
                       {Array.isArray(historyData?.history) && historyData.history.length > 0 && (
                         <div className="space-y-2 pt-1">
-                          <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          <h5 className="text-xs font-bold text-slate-400">
                             Dòng thời gian thẩm định
                           </h5>
                           <div className="space-y-2">
@@ -1661,7 +1778,7 @@ export default function CulturalContentManagerModal({
                                       ? "Đã phê duyệt xuất bản"
                                       : "Đã từ chối hồ sơ"}
                                   </span>
-                                  <span className="text-[10.5px] font-mono text-slate-400">
+                                  <span className="text-[11px] font-mono text-slate-400">
                                     {evt.createdAt ? new Date(evt.createdAt).toLocaleString("vi-VN") : "—"}
                                   </span>
                                 </div>

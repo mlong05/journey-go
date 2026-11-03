@@ -101,6 +101,9 @@ app:
     cloud-name: ${CLOUDINARY_CLOUD_NAME:}
     api-key: ${CLOUDINARY_API_KEY:}
     api-secret: ${CLOUDINARY_API_SECRET:}
+  goong:
+    # API key Goong (https://account.goong.io) cho tìm địa chỉ / lấy địa chỉ từ tọa độ. Trống = tắt.
+    api-key: ${GOONG_API_KEY:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
   oauth2:
@@ -123,6 +126,10 @@ app:
     settlement-grace-minutes: ${SETTLEMENT_GRACE_MINUTES:0}
     # Cho phép tạo settlement cho kỳ chưa kết thúc hay không (mặc định false).
     allow-open-period-settlement: ${ALLOW_OPEN_PERIOD_SETTLEMENT:false}
+    # Đặt tour vào ngày Provider chưa mở slot: true = tự mở slot (sức chứa bên dưới),
+    # false = báo "chưa mở bán". Bật để du khách đặt được ngay khi Provider chưa cấu hình lịch.
+    auto-open-slots: ${BOOKING_AUTO_OPEN_SLOTS:true}
+    auto-open-slot-capacity: ${BOOKING_AUTO_OPEN_SLOT_CAPACITY:50}
     # Số giây giữa các lần quét Booking quá hạn thanh toán.
     booking-expiry-scan-interval-seconds: ${BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS:60}
     # Số giây giữa các lần kiểm tra trạng thái Refund đang chờ kết quả từ VNPay.

@@ -390,7 +390,7 @@ export default function CreateTaskPage() {
           </Link>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-5 bg-violet-600 rounded-full" />
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Soạn Thảo Nhiệm Vụ Trải Nghiệm
             </h1>
           </div>
@@ -424,7 +424,7 @@ export default function CreateTaskPage() {
           <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
               <span className="w-1.5 h-4 bg-violet-600 rounded-full" />
-              <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+              <h2 className="text-sm font-bold text-slate-900">
                 1. Thông tin cơ bản nhiệm vụ
               </h2>
             </div>
@@ -438,7 +438,7 @@ export default function CreateTaskPage() {
 
             {/* Chọn trải nghiệm */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Gắn vào Trải nghiệm <span className="text-rose-500">*</span>
               </label>
               <select
@@ -464,7 +464,7 @@ export default function CreateTaskPage() {
             {/* Loại nhiệm vụ & Thứ tự */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-slate-700">
                   Loại nhiệm vụ <span className="text-rose-500">*</span>
                 </label>
                 <select
@@ -483,7 +483,7 @@ export default function CreateTaskPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-slate-700">
                   Thứ tự thực hiện <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -500,7 +500,7 @@ export default function CreateTaskPage() {
 
             {/* Tiêu đề */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Tiêu đề nhiệm vụ <span className="text-rose-500">*</span>
               </label>
               <input
@@ -516,7 +516,7 @@ export default function CreateTaskPage() {
 
             {/* Mô tả */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700">
                 Mô tả / Hướng dẫn thực hiện
               </label>
               <textarea
@@ -531,7 +531,7 @@ export default function CreateTaskPage() {
             {/* Điểm thưởng, Số lần thử, Điểm CheckIn */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-slate-700">
                   Điểm thưởng <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -546,7 +546,7 @@ export default function CreateTaskPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-slate-700">
                   Số lần thử
                 </label>
                 <input
@@ -569,7 +569,7 @@ export default function CreateTaskPage() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-4 bg-emerald-600 rounded-full" />
-                <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                <h2 className="text-sm font-bold text-slate-900">
                   2. Điều kiện mở khóa nhiệm vụ (Tùy chọn)
                 </h2>
               </div>
@@ -587,7 +587,7 @@ export default function CreateTaskPage() {
             {form.enableUnlockCondition && (
               <div className="space-y-3 pt-1 animate-in fade-in-50 duration-200">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="text-xs font-bold text-slate-700">
                     Loại điều kiện
                   </label>
                   <select
@@ -607,7 +607,7 @@ export default function CreateTaskPage() {
 
                 {form.conditionType === "SEQUENTIAL" && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="text-xs font-bold text-slate-700">
                       Nhiệm vụ tiên quyết <span className="text-rose-500">*</span>
                     </label>
                     <select
@@ -628,7 +628,7 @@ export default function CreateTaskPage() {
 
                 {form.conditionType === "SCORE_BASED" && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="text-xs font-bold text-slate-700">
                       Điểm phần trăm tối thiểu (%)
                     </label>
                     <input
@@ -644,7 +644,7 @@ export default function CreateTaskPage() {
 
                 {form.conditionType === "TIME_BASED" && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="text-xs font-bold text-slate-700">
                       Thời gian chờ sau khi mở màn (phút)
                     </label>
                     <input
@@ -659,7 +659,7 @@ export default function CreateTaskPage() {
 
                 {form.conditionType === "LOCATION_VERIFICATION" && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="text-xs font-bold text-slate-700">
                       Điểm Check-in yêu cầu xác thực
                     </label>
                     <select
@@ -679,7 +679,7 @@ export default function CreateTaskPage() {
                 )}
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="text-xs font-bold text-slate-700">
                     Ghi chú điều kiện
                   </label>
                   <input
@@ -700,7 +700,7 @@ export default function CreateTaskPage() {
           {/* Danh sách các nhiệm vụ hiện có trong Experience */}
           <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+              <h2 className="text-sm font-bold text-slate-900">
                 Nhiệm vụ đã tạo ({tasks.length})
               </h2>
               <button
@@ -745,7 +745,7 @@ export default function CreateTaskPage() {
                       >
                         <ArrowUp size={12} />
                       </button>
-                      <span className="text-[10px] font-mono font-bold text-slate-600 my-0.5">
+                      <span className="text-[11px] font-mono font-bold text-slate-600 my-0.5">
                         {t.sequenceOrder}
                       </span>
                       <button
@@ -761,11 +761,11 @@ export default function CreateTaskPage() {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                           {t.taskTypeName || t.taskTypeCode || `Loại #${t.taskTypeId}`}
                         </span>
                         {t.checkInPointId != null && (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                             <MapPin size={9} /> #{t.checkInPointId}
                           </span>
                         )}
@@ -785,7 +785,7 @@ export default function CreateTaskPage() {
                         <button
                           type="button"
                           onClick={() => handleViewDetail(t.id)}
-                          className="h-6 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10.5px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                          className="h-6 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
                         >
                           <Eye size={10} /> Xem
                         </button>
@@ -797,7 +797,7 @@ export default function CreateTaskPage() {
                             <button
                               type="button"
                               onClick={() => setUnlockModalTask(t)}
-                              className="h-6 px-2 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-800 text-[10.5px] font-bold inline-flex items-center gap-1 cursor-pointer border border-violet-200"
+                              className="h-6 px-2 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer border border-violet-200"
                             >
                               <Lock size={10} /> Điều kiện
                             </button>
@@ -806,7 +806,7 @@ export default function CreateTaskPage() {
                             <button
                               type="button"
                               onClick={() => setQuestionModalTask(t)}
-                              className="h-6 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[10.5px] font-bold inline-flex items-center gap-1 cursor-pointer border border-indigo-200"
+                              className="h-6 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer border border-indigo-200"
                             >
                               <FileQuestion size={10} className="text-indigo-600" /> Câu hỏi
                             </button>
@@ -816,7 +816,7 @@ export default function CreateTaskPage() {
                               type="button"
                               onClick={() => handleDelete(t)}
                               disabled={deletingId === t.id}
-                              className="h-6 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10.5px] font-bold inline-flex items-center gap-1 cursor-pointer border border-rose-200 disabled:opacity-50"
+                              className="h-6 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer border border-rose-200 disabled:opacity-50"
                             >
                               {deletingId === t.id ? (
                                 <Loader2 size={10} className="animate-spin" />
@@ -846,10 +846,10 @@ export default function CreateTaskPage() {
                   </span>
                   <span className="font-bold text-amber-700">+{Number(form.pointsReward) || 0} pts</span>
                 </div>
-                <span className="text-[10px] font-black uppercase text-violet-700 bg-violet-100 px-2 py-0.5 rounded">
+                <span className="text-xs font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded">
                   {selectedType?.name || "Nhiệm vụ trải nghiệm"}
                 </span>
-                <h4 className="text-xs font-black text-slate-900 leading-snug">
+                <h4 className="text-xs font-bold text-slate-900 leading-snug">
                   {form.title || "Tiêu đề nhiệm vụ..."}
                 </h4>
                 <p className="text-[11px] text-slate-600 leading-relaxed">
@@ -888,7 +888,7 @@ export default function CreateTaskPage() {
             ) : (
               <div className="space-y-3 text-xs">
                 <div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                     {detailTask.taskTypeName || detailTask.taskTypeCode}
                   </span>
                   <h4 className="text-sm font-bold text-slate-900 mt-1">{detailTask.title}</h4>
@@ -900,19 +900,19 @@ export default function CreateTaskPage() {
                 )}
                 <div className="grid grid-cols-2 gap-2 font-semibold">
                   <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">Thứ tự</span>
+                    <span className="text-slate-400 block text-[11px]">Thứ tự</span>
                     <span className="text-slate-900">{detailTask.sequenceOrder}</span>
                   </div>
                   <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">Điểm thưởng</span>
+                    <span className="text-slate-400 block text-[11px]">Điểm thưởng</span>
                     <span className="text-amber-700 font-bold">{detailTask.pointsReward} điểm</span>
                   </div>
                   <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">Số lần thử</span>
+                    <span className="text-slate-400 block text-[11px]">Số lần thử</span>
                     <span className="text-slate-900">{detailTask.maxAttempts} lần</span>
                   </div>
                   <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">Điểm Check-in</span>
+                    <span className="text-slate-400 block text-[11px]">Điểm Check-in</span>
                     <span className="text-slate-900">
                       {detailTask.checkInPointId ? `#${detailTask.checkInPointId}` : "Chưa có"}
                     </span>
@@ -1065,7 +1065,7 @@ function UnlockModal({ task, allTasks, checkInPoints, onClose, onSaved }) {
         )}
 
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+          <label className="text-xs font-bold text-slate-700">
             Loại điều kiện
           </label>
           <select
@@ -1083,7 +1083,7 @@ function UnlockModal({ task, allTasks, checkInPoints, onClose, onSaved }) {
 
         {conditionType === "SEQUENTIAL" && (
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Nhiệm vụ tiên quyết
             </label>
             <select
@@ -1103,7 +1103,7 @@ function UnlockModal({ task, allTasks, checkInPoints, onClose, onSaved }) {
 
         {conditionType === "SCORE_BASED" && (
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Điểm phần trăm tối thiểu (%)
             </label>
             <input
@@ -1119,7 +1119,7 @@ function UnlockModal({ task, allTasks, checkInPoints, onClose, onSaved }) {
 
         {conditionType === "TIME_BASED" && (
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Khoảng thời gian (phút)
             </label>
             <input
@@ -1134,7 +1134,7 @@ function UnlockModal({ task, allTasks, checkInPoints, onClose, onSaved }) {
 
         {conditionType === "LOCATION_VERIFICATION" && (
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <label className="text-xs font-bold text-slate-700">
               Điểm Check-in
             </label>
             <select
@@ -1153,7 +1153,7 @@ function UnlockModal({ task, allTasks, checkInPoints, onClose, onSaved }) {
         )}
 
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+          <label className="text-xs font-bold text-slate-700">
             Mô tả điều kiện
           </label>
           <input

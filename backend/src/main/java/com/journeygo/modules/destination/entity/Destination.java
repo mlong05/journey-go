@@ -43,6 +43,10 @@ public class Destination {
     @Column(nullable = false)
     private Integer capacity;
 
+    /** Ảnh bìa (URL https trên Cloudinary) hiển thị trên thẻ tour và chi tiết hành trình của app. */
+    @Column(name = "cover_image_url", length = 500)
+    private String coverImageUrl;
+
     @Column(nullable = false, columnDefinition = "integer default 0 not null")
     @Builder.Default
     private Integer booked = 0;
@@ -59,6 +63,13 @@ public class Destination {
     @Column(nullable = false)
     @Builder.Default
     private boolean deleted = false;
+
+    /**
+     * Mã in trên QR dán tại cổng điểm đến; du khách quét để check-in thay cho GPS.
+     * Bí mật nghiệp vụ: không trả qua API công khai, chỉ chủ điểm đến / ADMIN / MODERATOR xem được.
+     */
+    @Column(name = "qr_token", unique = true, length = 64)
+    private String qrToken;
 
     @Column(name = "region_id", insertable = false, updatable = false)
     private Long regionId;
@@ -104,6 +115,14 @@ public class Destination {
         if (this.status == null) {
             this.status = this.approved ? DestinationStatus.PUBLISHED : DestinationStatus.DRAFT;
         }
+        if (this.qrToken == null) {
+            this.qrToken = newQrToken();
+        }
+    }
+
+    /** Sinh mã QR ngẫu nhiên, dễ đọc để nhập tay khi camera không dùng được: JGD-XXXXXXXXXXXXXXXX. */
+    public static String newQrToken() {
+        return "JGD-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
     }
 
     @PreUpdate

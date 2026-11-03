@@ -27,6 +27,8 @@ import {
   Copy,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Compass,
   Trophy,
   Banknote,
@@ -41,9 +43,11 @@ import {
 } from "lucide-react";
 import { culturalContentService } from "../services/culturalContentService";
 import { moderationService } from "../services/moderationService";
+import { destinationService } from "../services/destinationService";
 import { experienceService } from "@/features/experience/services/experienceService";
 import { taskService } from "@/features/experience/services/taskService";
 import { slotService } from "@/features/experience/services/slotService";
+import BronzeDrumMotif from "@/components/ui/BronzeDrumMotif";
 
 /* Cấu hình các định dạng nội dung văn hóa */
 const CONTENT_TYPES = [
@@ -88,6 +92,22 @@ const DEST_REASON_LABELS = {
   OTHER: "Lý do khác",
 };
 
+/* Quy trình thẩm định theo bước: duyệt điểm đến → nội dung văn hóa → gói trải nghiệm → quyết định cuối */
+const REVIEW_STEPS = [
+  { id: "general", label: "Điểm đến", icon: MapPin },
+  { id: "contents", label: "Nội dung văn hóa", icon: Headphones },
+  { id: "experience", label: "Trải nghiệm", icon: Compass },
+  { id: "decision", label: "Quyết định", icon: ShieldCheck },
+];
+
+/* Trạng thái duyệt riêng của gói trải nghiệm (LEGACY = dữ liệu cũ chưa qua duyệt riêng) */
+const EXP_REVIEW_META = {
+  PENDING: { label: "Chờ duyệt", short: "Chờ duyệt", cls: "bg-amber-50 text-amber-800 border-amber-200" },
+  APPROVED: { label: "Đã duyệt", short: "Đã duyệt", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  REJECTED: { label: "Bị từ chối", short: "Từ chối", cls: "bg-rose-50 text-rose-700 border-rose-200" },
+  LEGACY: { label: "Chưa duyệt riêng", short: "Chưa duyệt", cls: "bg-slate-100 text-slate-600 border-slate-200" },
+};
+
 function formatDuration(sec) {
 
   if (!sec || Number.isNaN(sec) || sec <= 0) return "—";
@@ -116,6 +136,7 @@ export default function DestinationAssessmentModal({
   error = "",
   onClose,
   onApprove,
+  onCompleted,
   onEdit,
   isActionLoading = false,
   theme = "emerald", // "emerald" | "slate"
@@ -195,9 +216,29 @@ export default function DestinationAssessmentModal({
   const [historyData, setHistoryData] = useState(null);
   const [historyError, setHistoryError] = useState("");
 
+  /*
+   * Kết quả thẩm định NHÁP theo từng bước: chọn Duyệt / Không duyệt ở bước 2, 3 chỉ ghi lại tại đây,
+   * tới bước 4 mới gửi tất cả lên máy chủ trong một lần xác nhận.
+   *  - contentDecisions: { [contentId]: { approve, reason, otherReason, note } }
+   *  - expDecision:      { approve, note } | null
+   *  - destDecision:     { approve, reasons: [], otherReason, note } | null
+   */
+  const [contentDecisions, setContentDecisions] = useState({});
+  const [expDecision, setExpDecision] = useState(null);
+  const [destDecision, setDestDecision] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
   const handleOpenApproveContent = useCallback((content) => {
-    setApproveTarget(content);
-    setApproveNote("");
+    setContentDecisions((prev) => ({ ...prev, [content.id]: { approve: true } }));
+  }, []);
+
+  const clearContentDecision = useCallback((contentId) => {
+    setContentDecisions((prev) => {
+      const next = { ...prev };
+      delete next[contentId];
+      return next;
+    });
   }, []);
 
   const handleConfirmApproveContent = useCallback(async () => {
@@ -257,24 +298,22 @@ export default function DestinationAssessmentModal({
       setRejectError("Khi chọn 'Lý do khác', bạn bắt buộc phải nhập mô tả chi tiết.");
       return;
     }
-    setIsRejectingContent(true);
+    // Chỉ ghi lại kết quả "Không duyệt"; gửi lên máy chủ ở bước 4
     setRejectError("");
-    try {
-      await moderationService.rejectContent(rejectTarget.id, {
+    setContentDecisions((prev) => ({
+      ...prev,
+      [rejectTarget.id]: {
+        approve: false,
         reason: selectedReasons.join(","),
         otherReason: otherReason.trim(),
         note: rejectNote.trim(),
-      });
-      showContentToast(`Đã gửi phản hồi từ chối bài thuyết minh "${rejectTarget.title}".`);
-      setRejectTarget(null);
-      await loadCulturalContents();
-    } catch (err) {
-      console.error("[Reject Content error]:", err);
-      setRejectError(err?.message || "Không thể từ chối nội dung này.");
-    } finally {
-      setIsRejectingContent(false);
-    }
-  }, [rejectTarget, selectedReasons, otherReason, rejectNote, loadCulturalContents, showContentToast]);
+        reasonLabels: selectedReasons.map(
+          (code) => rejectionReasons.find((r) => r.code === code)?.label || code
+        ),
+      },
+    }));
+    setRejectTarget(null);
+  }, [rejectTarget, selectedReasons, otherReason, rejectNote, rejectionReasons]);
 
   const handleOpenContentHistory = useCallback(async (content) => {
     setHistoryTarget(content);
@@ -299,6 +338,74 @@ export default function DestinationAssessmentModal({
   const [expTasks, setExpTasks] = useState([]);
   const [expSlots, setExpSlots] = useState([]);
   const [expDescExpanded, setExpDescExpanded] = useState(false);
+
+  // Duyệt riêng gói trải nghiệm (bước 3)
+  const [expRejecting, setExpRejecting] = useState(false);
+  const [expNote, setExpNote] = useState("");
+  const [expNoteError, setExpNoteError] = useState("");
+
+  // Ghi lại kết quả Duyệt / Không duyệt cho gói trải nghiệm (gửi ở bước 4)
+  const handleExperienceDecision = useCallback(
+    (approve) => {
+      if (!experience?.id) return;
+      if (!approve && !expNote.trim()) {
+        setExpNoteError("Vui lòng nhập lý do để đối tác biết cần sửa gì.");
+        return;
+      }
+      setExpDecision(approve ? { approve: true } : { approve: false, note: expNote.trim() });
+      setExpRejecting(false);
+      setExpNoteError("");
+    },
+    [experience, expNote]
+  );
+
+  /* Bước 4: gửi lần lượt kết quả nội dung → trải nghiệm → điểm đến (điểm đến sau cùng để
+     khi phê duyệt, các trải nghiệm đã duyệt được phát hành cùng lúc). */
+  const handleSubmitAll = useCallback(async () => {
+    if (!destination?.id || !destDecision) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      for (const [id, d] of Object.entries(contentDecisions)) {
+        if (d.approve) await moderationService.approveContent(Number(id), d.note || null);
+        else
+          await moderationService.rejectContent(Number(id), {
+            reason: d.reason,
+            otherReason: d.otherReason,
+            note: d.note,
+          });
+      }
+      if (experience?.id && expDecision) {
+        if (expDecision.approve) await moderationService.approveExperience(experience.id);
+        else await moderationService.rejectExperience(experience.id, expDecision.note);
+      }
+      const alreadyApproved = destination.approved === true;
+      if (!destDecision.approve) {
+        await destinationService.setApproval(destination.id, false, {
+          reason: destDecision.reasons.join(","),
+          otherReason: destDecision.reasons.includes("OTHER") ? destDecision.otherReason : null,
+          note: destDecision.note,
+        });
+      } else if (!alreadyApproved) {
+        await destinationService.setApproval(destination.id, true, { note: destDecision.note });
+      }
+      onCompleted?.({
+        destinationId: destination.id,
+        approved: destDecision.approve,
+        revoked: alreadyApproved && !destDecision.approve,
+        name: destination.name,
+      });
+    } catch (err) {
+      console.error("[AssessmentModal] Submit review error:", err);
+      setSubmitError(
+        err?.message || "Không thể gửi kết quả thẩm định. Một số mục có thể đã được lưu, vui lòng kiểm tra lại."
+      );
+      // Đồng bộ lại trạng thái thật để không gửi trùng mục đã lưu
+      loadCulturalContents();
+    } finally {
+      setSubmitting(false);
+    }
+  }, [destination, destDecision, contentDecisions, experience, expDecision, onCompleted, loadCulturalContents]);
 
   // Tải thông tin gói trải nghiệm (vé, nhiệm vụ, check-in, slots)
   const loadExperienceData = useCallback(async () => {
@@ -349,6 +456,13 @@ export default function DestinationAssessmentModal({
         setReviewedItems({});
         setExpandedScriptIds({});
         setExpDescExpanded(false);
+        setExpRejecting(false);
+        setExpNote("");
+        setExpNoteError("");
+        setContentDecisions({});
+        setExpDecision(null);
+        setDestDecision(null);
+        setSubmitError("");
         loadCulturalContents();
         loadExperienceData();
       }
@@ -474,6 +588,45 @@ export default function DestinationAssessmentModal({
 
   const isApproved = destination?.approved === true || destination?.status === "approved";
 
+  const stepIndex = Math.max(0, REVIEW_STEPS.findIndex((s) => s.id === activeTab));
+  const isLastStep = stepIndex === REVIEW_STEPS.length - 1;
+  const goStep = (delta) => {
+    const next = REVIEW_STEPS[stepIndex + delta];
+    if (next) setActiveTab(next.id);
+  };
+
+  // Tổng hợp kết quả duyệt nội dung văn hóa cho thanh bước và bước Quyết định
+  const contentStats = {
+    approved: contents.filter((c) => c.reviewStatus === "APPROVED").length,
+    rejected: contents.filter((c) => c.reviewStatus === "REJECTED").length,
+    pending: contents.filter((c) => c.reviewStatus === "PENDING").length,
+  };
+  contentStats.decided = contentStats.approved + contentStats.rejected;
+  const expReview = experience ? experience.reviewStatus || "LEGACY" : null;
+
+  // Điều kiện qua bước: mọi nội dung đang chờ và gói trải nghiệm đang chờ đều phải có kết quả Duyệt / Không duyệt
+  const pendingContents = contents.filter((c) => c.reviewStatus === "PENDING");
+  const undecidedContents = pendingContents.filter((c) => !contentDecisions[c.id]).length;
+  const contentsReady = !contentsLoading && undecidedContents === 0;
+  const expNeedsDecision = Boolean(experience) && expReview === "PENDING";
+  const expReady = !expLoading && (!expNeedsDecision || Boolean(expDecision));
+  const stepReady = { general: true, contents: contentsReady, experience: expReady };
+  // Chỉ mở được bước khi các bước trước đã xong
+  const canReach = (idx) => REVIEW_STEPS.slice(0, idx).every((s) => stepReady[s.id] !== false);
+  const canProceed = stepReady[activeTab] !== false;
+  const blockReason =
+    activeTab === "contents" && !contentsReady
+      ? `Còn ${undecidedContents} nội dung chưa chọn Duyệt / Không duyệt`
+      : activeTab === "experience" && !expReady
+      ? "Chưa chọn kết quả cho gói trải nghiệm"
+      : "";
+  const destReady =
+    Boolean(destDecision) &&
+    (destDecision.approve ||
+      (destDecision.reasons.length > 0 &&
+        (!destDecision.reasons.includes("OTHER") || destDecision.otherReason.trim())));
+  const decidedContentList = pendingContents.filter((c) => contentDecisions[c.id]);
+
   return (
     <div
       role="dialog"
@@ -494,40 +647,46 @@ export default function DestinationAssessmentModal({
 
       {/* Double-Bezel Container */}
       <div
-        className="w-full max-w-3xl p-1.5 sm:p-2 bg-slate-900/10 dark:bg-white/10 rounded-[2.25rem] ring-1 ring-slate-900/15 shadow-2xl animate-in zoom-in-95 duration-200"
+        className="w-full max-w-3xl animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="bg-white rounded-[2rem] overflow-hidden flex flex-col h-[720px] max-h-[92vh] border border-slate-200/90 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+        <div className="relative bg-[#faf7f0] rounded-2xl overflow-hidden flex flex-col h-[720px] max-h-[92vh] border border-stone-200/90 shadow-2xl">
+          {/* Nền trang trí: mặt trống đồng mờ phía sau nội dung */}
+          <BronzeDrumMotif className="pointer-events-none absolute -right-40 -bottom-40 w-[560px] h-[560px] text-amber-800/[0.07]" />
+
           {/* ========================================================
-              HEADER MODAL
+              HEADER MODAL (ảnh phong cảnh di sản mờ dần về bên trái)
               ======================================================== */}
-          <div className="shrink-0 px-6 sm:px-8 py-5 border-b border-slate-100 flex items-start justify-between gap-3 bg-gradient-to-r from-slate-50 via-white to-amber-50/40">
-            <div className="min-w-0 flex-1">
+          <div className="relative shrink-0 px-6 sm:px-8 py-5 border-b border-stone-200/70 flex items-start justify-between gap-3 overflow-hidden">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: "url('/image/trangan.jpg')" }}
+            />
+            <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-[#faf7f0] via-[#faf7f0]/90 to-[#faf7f0]/35" />
+            <div className="relative min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="font-mono text-[11px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/80">
-                  #{destination?.id ?? "—"}
-                </span>
 
                 {isApproved ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     Đã phê duyệt &amp; Phát hành
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                    Chờ thẩm định nội dung
+                    Chờ thẩm định
                   </span>
                 )}
 
                 <span className="text-slate-300">&bull;</span>
-                <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
                   <ShieldCheck size={13} className="text-indigo-600" />
-                  Hội đồng Thẩm định Di sản
+                  Thẩm định theo 4 bước
                 </span>
               </div>
 
-              <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight truncate">
+              <h3 className="text-lg sm:text-xl font-semibold text-slate-900 tracking-tight truncate">
                 {destination?.name || "Chi tiết Hồ sơ Điểm đến"}
               </h3>
 
@@ -542,7 +701,7 @@ export default function DestinationAssessmentModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="relative w-9 h-9 rounded-full bg-white/80 hover:bg-white text-slate-600 flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-xs"
               aria-label="Đóng modal"
             >
               <X size={16} />
@@ -550,71 +709,78 @@ export default function DestinationAssessmentModal({
           </div>
 
           {/* ========================================================
-              TAB NAVIGATION: THỰC ĐỊA & HỒ SƠ THUYẾT MINH
+              THANH BƯỚC THẨM ĐỊNH: Điểm đến → Nội dung → Trải nghiệm → Quyết định
               ======================================================== */}
-          <div className="shrink-0 px-6 sm:px-8 border-b border-slate-100 bg-white flex items-center gap-2 overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => setActiveTab("general")}
-              className={`py-3.5 px-3 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
-                activeTab === "general"
-                  ? "border-emerald-600 text-emerald-700"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              <Navigation size={14} />
-              <span>Tọa độ Thực địa &amp; Sức chứa</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("contents")}
-              className={`py-3.5 px-3 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
-                activeTab === "contents"
-                  ? "border-indigo-600 text-indigo-700"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              <Headphones size={14} />
-              <span>Hồ sơ Thuyết minh &amp; Văn hóa</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                  activeTab === "contents"
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {contentsLoading ? "…" : contents.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("experience")}
-              className={`py-3.5 px-3 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
-                activeTab === "experience"
-                  ? "border-amber-600 text-amber-700"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              <Compass size={14} />
-              <span>Gói Trải Nghiệm &amp; Đố Vui</span>
-              {experience ? (
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-              ) : expLoading ? (
-                <span className="text-[10px] text-slate-400">…</span>
-              ) : null}
-            </button>
+          <div className="relative shrink-0 px-6 sm:px-8 py-3.5 border-b border-stone-200/70 bg-white/70 backdrop-blur-sm">
+            <ol className="flex items-center gap-1.5 sm:gap-2">
+              {REVIEW_STEPS.map((step, idx) => {
+                const isCurrent = idx === stepIndex;
+                const isDone = idx < stepIndex;
+                const Icon = step.icon;
+                const badge =
+                  step.id === "contents"
+                    ? contentsLoading
+                      ? "…"
+                      : `${contentStats.decided + decidedContentList.length}/${contents.length}`
+                    : step.id === "experience" && experience
+                    ? EXP_REVIEW_META[experience.reviewStatus || "LEGACY"].short
+                    : null;
+                return (
+                  <li key={step.id} className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 last:flex-none">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab(step.id)}
+                      disabled={!canReach(idx)}
+                      title={!canReach(idx) ? "Hoàn thành các bước trước để mở bước này" : undefined}
+                      className={`flex items-center gap-2 min-w-0 rounded-xl px-2 py-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isCurrent ? "bg-emerald-50" : "hover:bg-slate-50"
+                      }`}
+                      aria-current={isCurrent ? "step" : undefined}
+                    >
+                      <span
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 border ${
+                          isCurrent
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : isDone
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-white text-slate-500 border-slate-200"
+                        }`}
+                      >
+                        {isDone ? <Check size={14} /> : idx + 1}
+                      </span>
+                      <span className="hidden md:flex flex-col items-start min-w-0">
+                        <span
+                          className={`text-xs font-medium truncate flex items-center gap-1 ${
+                            isCurrent ? "text-emerald-800" : "text-slate-600"
+                          }`}
+                        >
+                          <Icon size={12} className="shrink-0" />
+                          {step.label}
+                        </span>
+                        {badge && (
+                          <span className="text-[11px] font-semibold text-slate-400">{badge}</span>
+                        )}
+                      </span>
+                    </button>
+                    {idx < REVIEW_STEPS.length - 1 && (
+                      <span
+                        className={`h-px flex-1 min-w-3 ${isDone ? "bg-emerald-300" : "bg-slate-200"}`}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
           </div>
 
           {/* ========================================================
               MODAL BODY (Scrollable Viewport)
               ======================================================== */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 sm:px-8 py-5 bg-slate-50/50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+          <div className="relative flex-1 min-h-0 overflow-y-auto px-6 sm:px-8 py-5 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
             {isLoading ? (
               <div className="h-64 flex flex-col items-center justify-center gap-3 text-slate-400">
                 <Loader2 size={32} className="animate-spin text-emerald-600" />
-                <p className="text-xs font-bold text-slate-600">
+                <p className="text-xs font-medium text-slate-600">
                   Đang tải hồ sơ điểm đến di sản…
                 </p>
               </div>
@@ -622,7 +788,7 @@ export default function DestinationAssessmentModal({
               <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-800">
                 <AlertCircle size={18} className="shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-black">Lỗi tải dữ liệu</h4>
+                  <h4 className="text-xs font-semibold">Lỗi tải dữ liệu</h4>
                   <p className="text-xs mt-0.5">{error}</p>
                 </div>
               </div>
@@ -634,7 +800,7 @@ export default function DestinationAssessmentModal({
                   <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 space-y-2.5">
                     <div className="flex items-center gap-1.5 text-rose-700">
                       <AlertCircle size={14} className="shrink-0" />
-                      <p className="text-[11px] font-black uppercase tracking-wider">
+                      <p className="text-xs font-semibold">
                         Ý kiến &amp; Lý do từ chối kiểm duyệt điểm đến
                       </p>
                     </div>
@@ -649,7 +815,7 @@ export default function DestinationAssessmentModal({
                             return (
                               <span
                                 key={trimmed}
-                                className="inline-flex items-center px-2.5 py-1 rounded-xl bg-rose-100/90 text-rose-900 text-xs font-bold border border-rose-200/80 shadow-2xs"
+                                className="inline-flex items-center px-2.5 py-1 rounded-xl bg-rose-100/90 text-rose-900 text-xs font-medium border border-rose-200/80 shadow-2xs"
                               >
                                 {label}
                               </span>
@@ -660,14 +826,14 @@ export default function DestinationAssessmentModal({
 
                     {destination.otherReason && (
                       <div className="bg-white/80 p-3 rounded-xl border border-rose-200/70 text-xs">
-                        <span className="font-bold text-rose-950 block mb-0.5">Chi tiết lý do khác:</span>
+                        <span className="font-medium text-rose-950 block mb-0.5">Chi tiết lý do khác:</span>
                         <p className="text-rose-900 leading-relaxed font-medium">{destination.otherReason}</p>
                       </div>
                     )}
 
                     {destination.decisionNote && (
                       <div className="bg-white/80 p-3 rounded-xl border border-rose-200/70 text-xs">
-                        <span className="font-bold text-slate-900 block mb-0.5">Ghi chú từ Người thẩm định:</span>
+                        <span className="font-medium text-slate-900 block mb-0.5">Ghi chú từ Người thẩm định:</span>
                         <p className="text-slate-700 leading-relaxed">{destination.decisionNote}</p>
                       </div>
                     )}
@@ -676,28 +842,28 @@ export default function DestinationAssessmentModal({
 
                 <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs">
 
-                  <p className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <p className="text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
                     <MapPin size={12} className="text-emerald-600" />
                     Địa chỉ hành chính thực địa
                   </p>
-                  <p className="text-sm font-bold text-slate-800 leading-relaxed">
+                  <p className="text-sm font-medium text-slate-800 leading-relaxed">
                     {destination?.address || "Chưa cập nhật địa chỉ"}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Tọa độ GPS */}
-                  <div className="rounded-2xl bg-sky-50/80 border border-sky-200/90 p-4">
+                  <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10.5px] font-black text-sky-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <Navigation size={12} /> Tọa độ GPS Thực tế
+                      <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                        <Navigation size={12} className="text-emerald-600" /> Tọa độ GPS Thực tế
                       </p>
                       {destination?.latitude && destination?.longitude && (
                         <a
                           href={`https://www.google.com/maps?q=${destination.latitude},${destination.longitude}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[10.5px] font-bold text-sky-700 hover:text-sky-900 underline flex items-center gap-1"
+                          className="text-[11px] font-medium text-emerald-700 hover:text-emerald-900 underline flex items-center gap-1"
                         >
                           <span>Mở Maps</span>
                           <ExternalLink size={10} />
@@ -705,15 +871,15 @@ export default function DestinationAssessmentModal({
                       )}
                     </div>
                     <div className="space-y-1.5 text-xs font-mono">
-                      <div className="flex justify-between items-center py-1 border-b border-sky-100">
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
                         <span className="text-slate-500">Vĩ độ (LAT):</span>
-                        <span className="font-black text-slate-900">
+                        <span className="font-semibold text-slate-900">
                           {destination?.latitude?.toFixed(6) ?? "—"}
                         </span>
                       </div>
                       <div className="flex justify-between items-center py-1">
                         <span className="text-slate-500">Kinh độ (LNG):</span>
-                        <span className="font-black text-slate-900">
+                        <span className="font-semibold text-slate-900">
                           {destination?.longitude?.toFixed(6) ?? "—"}
                         </span>
                       </div>
@@ -721,17 +887,17 @@ export default function DestinationAssessmentModal({
                   </div>
 
                   {/* Sức chứa */}
-                  <div className="rounded-2xl bg-emerald-50/80 border border-emerald-200/90 p-4 flex flex-col justify-between">
-                    <p className="text-[10.5px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                      <Users size={12} /> Sức chứa đón tiếp tối đa
+                  <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs flex flex-col justify-between">
+                    <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 mb-2">
+                      <Users size={12} className="text-emerald-600" /> Sức chứa đón tiếp tối đa
                     </p>
                     <div className="mt-auto">
-                      <span className="text-2xl font-black text-slate-900">
+                      <span className="text-2xl font-semibold text-slate-900">
                         {destination?.capacity
                           ? Number(destination.capacity).toLocaleString("vi-VN")
                           : "—"}
                       </span>
-                      <span className="text-xs font-bold text-slate-500 ml-1.5">
+                      <span className="text-xs font-medium text-slate-500 ml-1.5">
                         du khách / lượt
                       </span>
                     </div>
@@ -739,20 +905,20 @@ export default function DestinationAssessmentModal({
 
                   {/* Đơn vị khởi tạo */}
                   <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs">
-                    <p className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                      <Building2 size={12} /> Đơn vị / Đối tác phụ trách
+                    <p className="text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                      <Building2 size={12} className="text-emerald-600" /> Đơn vị / Đối tác phụ trách
                     </p>
-                    <p className="text-xs font-bold text-slate-800">
+                    <p className="text-xs font-medium text-slate-800">
                       {destination?.createdBy || "Hệ thống quản trị"}
                     </p>
                   </div>
 
                   {/* Ngày gửi hồ sơ */}
                   <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs">
-                    <p className="text-[10.5px] font-black text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                      <Clock size={12} /> Thời gian lập hồ sơ
+                    <p className="text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                      <Clock size={12} className="text-emerald-600" /> Thời gian lập hồ sơ
                     </p>
-                    <p className="text-xs font-bold text-slate-800 font-mono">
+                    <p className="text-xs font-medium text-slate-800 font-mono">
                       {destination?.createdAt
                         ? new Date(destination.createdAt).toLocaleString("vi-VN")
                         : "—"}
@@ -764,7 +930,7 @@ export default function DestinationAssessmentModal({
                 <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-900 flex items-start gap-2.5">
                   <ShieldCheck size={16} className="text-amber-700 shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
-                    <strong>Lưu ý thẩm định:</strong> Hãy chuyển sang tab <strong>&ldquo;Hồ sơ Thuyết minh &amp; Văn hóa&rdquo;</strong> để kiểm tra các file giọng đọc Audio, phim tư liệu và kịch bản di tích trước khi đưa ra quyết định phê duyệt.
+                    <strong>Bước 1/4:</strong> Kiểm tra địa chỉ, tọa độ và sức chứa của điểm đến. Bấm <strong>&ldquo;Tiếp tục&rdquo;</strong> để duyệt nội dung văn hóa, sau đó tới gói trải nghiệm và quyết định cuối cùng.
                   </p>
                 </div>
               </div>
@@ -772,45 +938,26 @@ export default function DestinationAssessmentModal({
               /* ── TAB 2: HỒ SƠ THUYẾT MINH & VĂN HÓA ── */
               <div className="space-y-4">
                 {/* Banner tóm tắt thẩm định */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-900 via-slate-900 to-slate-900 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-white/20 uppercase tracking-wider">
-                        Thẩm định Thuyết minh Đa phương tiện
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/20">
+                        Bước 2 · Nội dung văn hóa
                       </span>
-                      <span className="text-xs text-indigo-300">
-                        {stats.totalCount} tư liệu
+                      <span className="text-xs text-emerald-300">
+                        {stats.totalCount} nội dung
                       </span>
                     </div>
-                    <p className="text-xs text-slate-200 mt-1 max-w-lg leading-relaxed">
-                      Nghe thử audio thuyết minh để rà soát bản quyền, tính chính xác lịch sử và độ rõ ràng của giọng dẫn trước khi cho phép xuất bản tới du khách.
+                    <p className="text-xs text-slate-200 mt-1 max-w-2xl leading-relaxed">
+                      Xem, nghe từng nội dung (audio, video, câu chuyện, bài viết) để kiểm tra tính chính xác lịch sử, bản quyền và chất lượng trình bày, rồi chọn Duyệt hoặc Không duyệt cho từng nội dung.
                     </p>
-                  </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-center px-3 py-1.5 rounded-xl bg-white/10 border border-white/10">
-                      <span className="block text-[10px] uppercase font-bold text-slate-300">
-                        Thời lượng
-                      </span>
-                      <span className="font-mono text-xs font-black text-emerald-300">
-                        {formatDuration(stats.totalDuration)}
-                      </span>
-                    </div>
-                    <div className="text-center px-3 py-1.5 rounded-xl bg-white/10 border border-white/10">
-                      <span className="block text-[10px] uppercase font-bold text-slate-300">
-                        Loại Audio
-                      </span>
-                      <span className="font-mono text-xs font-black text-amber-300">
-                        {stats.audioCount} bản
-                      </span>
-                    </div>
                   </div>
                 </div>
 
                 {contentsLoading ? (
                   <div className="py-16 flex flex-col items-center justify-center gap-2 text-slate-400">
                     <Loader2 size={28} className="animate-spin text-indigo-600" />
-                    <p className="text-xs font-bold">Đang tải các bài thuyết minh văn hóa…</p>
+                    <p className="text-xs font-medium">Đang tải các bài thuyết minh văn hóa…</p>
                   </div>
                 ) : contentsError ? (
                   <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center justify-between gap-3">
@@ -818,7 +965,7 @@ export default function DestinationAssessmentModal({
                     <button
                       type="button"
                       onClick={loadCulturalContents}
-                      className="px-3 py-1 bg-rose-600 text-white font-bold rounded-lg text-xs"
+                      className="px-3 py-1 bg-rose-600 text-white font-medium rounded-lg text-xs"
                     >
                       Thử lại
                     </button>
@@ -828,7 +975,7 @@ export default function DestinationAssessmentModal({
                     <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
                       <Headphones size={24} />
                     </div>
-                    <h4 className="font-bold text-slate-800 text-sm">
+                    <h4 className="font-medium text-slate-800 text-sm">
                       Chưa có hồ sơ thuyết minh văn hóa
                     </h4>
                     <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
@@ -860,11 +1007,11 @@ export default function DestinationAssessmentModal({
                           {/* Hàng 1: Thứ tự + Badge + Lượt nghe + Trạng thái đã xem */}
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <div className="flex items-center gap-2">
-                              <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-mono font-black text-xs flex items-center justify-center shrink-0 border border-slate-200">
+                              <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-mono font-semibold text-xs flex items-center justify-center shrink-0 border border-slate-200">
                                 #{item.sequenceOrder ?? 0}
                               </span>
                               <span
-                                className={`inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full border ${typeCfg.badgeClass}`}
+                                className={`inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${typeCfg.badgeClass}`}
                               >
                                 <Icon size={11} />
                                 <span>{typeCfg.label}</span>
@@ -888,13 +1035,39 @@ export default function DestinationAssessmentModal({
 
                               {/* Nút hành động Thẩm định: chỉ khi bài đang chờ duyệt */}
                               <div className="flex items-center gap-1.5">
-                                {item.reviewStatus === "PENDING" ? (
+                                {item.reviewStatus === "PENDING" && contentDecisions[item.id] ? (
+                                  /* Đã chọn kết quả (nháp), gửi ở bước 4 */
+                                  <>
+                                    <span
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border ${
+                                        contentDecisions[item.id].approve
+                                          ? "bg-emerald-600 text-white border-emerald-600"
+                                          : "bg-rose-600 text-white border-rose-600"
+                                      }`}
+                                    >
+                                      {contentDecisions[item.id].approve ? (
+                                        <CheckCircle2 size={12} />
+                                      ) : (
+                                        <XCircle size={12} />
+                                      )}
+                                      {contentDecisions[item.id].approve ? "Duyệt" : "Không duyệt"}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => clearContentDecision(item.id)}
+                                      className="px-2 py-1 rounded-lg text-[11px] font-medium text-slate-600 hover:bg-slate-100 border border-slate-200 cursor-pointer"
+                                      title="Chọn lại kết quả cho nội dung này"
+                                    >
+                                      Đổi
+                                    </button>
+                                  </>
+                                ) : item.reviewStatus === "PENDING" ? (
                                   <>
                                     <button
                                       type="button"
                                       onClick={() => handleOpenApproveContent(item)}
-                                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 active:scale-95 shadow-2xs"
-                                      title="Phê duyệt bài thuyết minh này"
+                                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1 transition-all cursor-pointer bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 active:scale-95 shadow-2xs"
+                                      title="Duyệt nội dung này"
                                     >
                                       <CheckCircle2 size={12} className="text-emerald-600" />
                                       <span>Duyệt</span>
@@ -903,25 +1076,25 @@ export default function DestinationAssessmentModal({
                                     <button
                                       type="button"
                                       onClick={() => handleOpenRejectContent(item)}
-                                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 active:scale-95 shadow-2xs"
-                                      title="Từ chối và yêu cầu đính chính"
+                                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1 transition-all cursor-pointer bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 active:scale-95 shadow-2xs"
+                                      title="Không duyệt, chọn lý do để đối tác chỉnh sửa"
                                     >
                                       <XCircle size={12} className="text-rose-600" />
-                                      <span>Từ chối</span>
+                                      <span>Không duyệt</span>
                                     </button>
                                   </>
                                 ) : item.reviewStatus === "APPROVED" ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
                                     <CheckCircle2 size={12} className="text-emerald-600" />
                                     Đã duyệt
                                   </span>
                                 ) : item.reviewStatus === "REJECTED" ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-rose-50 text-rose-800 border border-rose-200">
                                     <XCircle size={12} className="text-rose-600" />
                                     Đã từ chối, chờ đối tác sửa
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
                                     Chưa gửi kiểm duyệt
                                   </span>
                                 )}
@@ -942,7 +1115,7 @@ export default function DestinationAssessmentModal({
 
                           {/* Tiêu đề & Tóm tắt */}
                           <div className="mt-2.5">
-                            <h4 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                            <h4 className="text-sm font-semibold text-slate-900 tracking-tight">
                               {item.title}
                             </h4>
                             {item.description && (
@@ -967,7 +1140,7 @@ export default function DestinationAssessmentModal({
                                     <button
                                       type="button"
                                       onClick={() => handleTogglePlay(item)}
-                                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 ${
+                                      className={`px-3.5 py-1.5 rounded-xl text-xs font-medium inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 ${
                                         isPlaying
                                           ? "bg-rose-600 hover:bg-rose-700 text-white animate-pulse"
                                           : isVideo
@@ -1012,7 +1185,7 @@ export default function DestinationAssessmentModal({
                                   href={item.mediaUrl}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 underline flex items-center gap-1 p-1"
+                                  className="text-[11px] font-medium text-indigo-700 hover:text-indigo-900 underline flex items-center gap-1 p-1"
                                   title="Mở tệp media CDN trong tab mới"
                                 >
                                   <span>Mở link CDN</span>
@@ -1026,7 +1199,7 @@ export default function DestinationAssessmentModal({
                               <button
                                 type="button"
                                 onClick={() => toggleExpandScript(item.id)}
-                                className="text-xs font-bold text-slate-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
+                                className="text-xs font-medium text-slate-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
                               >
                                 <span>{isExpanded ? "Thu gọn kịch bản" : "Xem kịch bản lời dẫn"}</span>
                                 {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -1038,13 +1211,13 @@ export default function DestinationAssessmentModal({
                           {item.contentText && isExpanded && (
                             <div className="mt-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200/90 animate-in fade-in duration-150">
                               <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-200/80">
-                                <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
+                                <span className="text-xs font-medium text-slate-500">
                                   Toàn văn kịch bản thuyết minh
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyScript(item.id, item.contentText)}
-                                  className="text-[10.5px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                                  className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
                                 >
                                   {copiedScriptId === item.id ? (
                                     <>
@@ -1076,7 +1249,7 @@ export default function DestinationAssessmentModal({
                 {expLoading ? (
                   <div className="h-64 flex flex-col items-center justify-center gap-3 text-slate-400">
                     <Loader2 size={32} className="animate-spin text-amber-600" />
-                    <p className="text-xs font-bold text-slate-600">
+                    <p className="text-xs font-medium text-slate-600">
                       Đang tải thông tin gói trải nghiệm &amp; đố vui…
                     </p>
                   </div>
@@ -1084,7 +1257,7 @@ export default function DestinationAssessmentModal({
                   <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-800">
                     <AlertCircle size={18} className="shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="text-xs font-black">Lỗi tải gói trải nghiệm</h4>
+                      <h4 className="text-xs font-semibold">Lỗi tải gói trải nghiệm</h4>
                       <p className="text-xs mt-0.5">{expError}</p>
                     </div>
                   </div>
@@ -1093,7 +1266,7 @@ export default function DestinationAssessmentModal({
                     <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
                       <Inbox size={24} />
                     </div>
-                    <h4 className="text-sm font-bold text-slate-800">
+                    <h4 className="text-sm font-medium text-slate-800">
                       Điểm đến chưa thiết lập gói trải nghiệm
                     </h4>
                     <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
@@ -1102,17 +1275,131 @@ export default function DestinationAssessmentModal({
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    {/* Kết quả duyệt riêng gói trải nghiệm (bước 3) */}
+                    <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-slate-800 flex items-center gap-2">
+                            <ShieldCheck size={14} className="text-emerald-600" />
+                            Kết quả duyệt gói trải nghiệm
+                            <span
+                              className={`px-2 py-0.5 rounded-full border text-[11px] font-medium ${
+                                EXP_REVIEW_META[expReview].cls
+                              }`}
+                            >
+                              {EXP_REVIEW_META[expReview].label}
+                            </span>
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            Gói trải nghiệm được duyệt riêng. Chỉ gói đã duyệt mới mở cho du khách khi điểm đến được phát hành.
+                          </p>
+                          {experience.reviewNote && (
+                            <p className="text-[11px] text-slate-600 mt-1.5 bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1.5">
+                              <span className="font-medium">Ghi chú:</span> {experience.reviewNote}
+                            </p>
+                          )}
+                        </div>
+                        {!expRejecting && expDecision ? (
+                          /* Đã chọn kết quả (nháp), gửi ở bước 4 */
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${
+                                expDecision.approve ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+                              }`}
+                            >
+                              {expDecision.approve ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+                              {expDecision.approve ? "Duyệt" : "Không duyệt"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setExpDecision(null)}
+                              className="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 border border-slate-200 cursor-pointer"
+                            >
+                              Đổi
+                            </button>
+                          </div>
+                        ) : !expRejecting ? (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExpRejecting(true);
+                                setExpNoteError("");
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-medium text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <XCircle size={13} />
+                              Không duyệt
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleExperienceDecision(true)}
+                              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <CheckCircle2 size={13} />
+                              Duyệt
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {expRejecting && (
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                          <label className="text-xs font-medium text-slate-700 block">
+                            Lý do không duyệt gửi đối tác <span className="text-rose-500">*</span>
+                          </label>
+                          <textarea
+                            value={expNote}
+                            onChange={(e) => {
+                              setExpNote(e.target.value);
+                              if (expNoteError) setExpNoteError("");
+                            }}
+                            rows={3}
+                            maxLength={1000}
+                            placeholder="Ví dụ: Câu hỏi số 2 chưa có đáp án đúng, giá vé chưa hợp lý…"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 resize-none"
+                          />
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExpRejecting(false);
+                                setExpNoteError("");
+                              }}
+                              className="px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-100 font-medium text-xs cursor-pointer"
+                            >
+                              Hủy
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleExperienceDecision(false)}
+                              className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              Ghi nhận không duyệt
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {expNoteError && (
+                        <p className="text-[11px] font-medium text-rose-600 flex items-center gap-1.5">
+                          <AlertCircle size={13} />
+                          {expNoteError}
+                        </p>
+                      )}
+                    </div>
+
                     {/* Thẻ tổng quan gói trải nghiệm */}
                     <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-4">
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-amber-500" />
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <p className="text-xs font-medium text-slate-400">
                               Gói Trải Nghiệm Thực Địa
                             </p>
                           </div>
-                          <h4 className="text-base font-bold text-slate-900 mt-1">
+                          <h4 className="text-base font-medium text-slate-900 mt-1">
                             {experience.title}
                           </h4>
                           {experience.description && (
@@ -1129,7 +1416,7 @@ export default function DestinationAssessmentModal({
                                 <button
                                   type="button"
                                   onClick={() => setExpDescExpanded((prev) => !prev)}
-                                  className="mt-1 text-[11.5px] font-bold text-amber-700 hover:text-amber-800 hover:underline inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                  className="mt-1 text-[11.5px] font-medium text-amber-700 hover:text-amber-800 hover:underline inline-flex items-center gap-1 cursor-pointer transition-colors"
                                 >
                                   <span>
                                     {expDescExpanded
@@ -1151,11 +1438,11 @@ export default function DestinationAssessmentModal({
                       {/* 3 chỉ số tài chính & quy mô */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100">
                         <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/70">
-                          <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                          <p className="text-xs font-medium text-slate-400 flex items-center gap-1 mb-1">
                             <Banknote size={12} className="text-emerald-600" />
                             Giá vé tham quan
                           </p>
-                          <p className="text-base font-extrabold text-slate-900">
+                          <p className="text-base font-semibold text-slate-900">
                             {Number(experience.price).toLocaleString("vi-VN")}{" "}
                             <span className="text-xs font-semibold text-slate-500">
                               {experience.currency || "VND"}
@@ -1164,11 +1451,11 @@ export default function DestinationAssessmentModal({
                         </div>
 
                         <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/70">
-                          <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                          <p className="text-xs font-medium text-slate-400 flex items-center gap-1 mb-1">
                             <Clock size={12} className="text-sky-600" />
                             Thời lượng trải nghiệm
                           </p>
-                          <p className="text-base font-extrabold text-slate-900">
+                          <p className="text-base font-semibold text-slate-900">
                             {experience.durationMinutes
                               ? `${experience.durationMinutes} phút`
                               : "Chưa đặt"}
@@ -1176,11 +1463,11 @@ export default function DestinationAssessmentModal({
                         </div>
 
                         <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/70">
-                          <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                          <p className="text-xs font-medium text-slate-400 flex items-center gap-1 mb-1">
                             <Trophy size={12} className="text-amber-600" />
                             Nhiệm vụ &amp; Đố vui
                           </p>
-                          <p className="text-base font-extrabold text-slate-900">
+                          <p className="text-base font-semibold text-slate-900">
                             {expTasks.length}{" "}
                             <span className="text-xs font-semibold text-slate-500">
                               nhiệm vụ
@@ -1195,7 +1482,7 @@ export default function DestinationAssessmentModal({
                       <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                         <div className="flex items-center gap-2">
                           <Trophy size={16} className="text-amber-600" />
-                          <h5 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                          <h5 className="text-xs font-medium text-slate-800">
                             Nhiệm Vụ &amp; Câu Hỏi Đố Vui ({expTasks.length})
                           </h5>
                         </div>
@@ -1215,21 +1502,21 @@ export default function DestinationAssessmentModal({
                               key={t.id || idx}
                               className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3 text-xs"
                             >
-                              <span className="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-700 flex items-center justify-center font-bold text-[11px] shrink-0 font-mono">
+                              <span className="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-700 flex items-center justify-center font-medium text-[11px] shrink-0 font-mono">
                                 {t.sequenceOrder !== undefined ? t.sequenceOrder + 1 : idx + 1}
                               </span>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-bold text-slate-900">
+                                  <span className="font-medium text-slate-900">
                                     {t.name || t.title || "Nhiệm vụ không tên"}
                                   </span>
                                   {t.typeName && (
-                                    <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                                    <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-medium">
                                       {t.typeName}
                                     </span>
                                   )}
                                   {t.pointsReward > 0 && (
-                                    <span className="text-[10.5px] font-bold text-emerald-700">
+                                    <span className="text-[11px] font-medium text-emerald-700">
                                       +{t.pointsReward} điểm
                                     </span>
                                   )}
@@ -1252,7 +1539,7 @@ export default function DestinationAssessmentModal({
                       <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-2.5">
                         <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                           <Calendar size={14} className="text-sky-600" />
-                          <h6 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                          <h6 className="text-xs font-medium text-slate-800">
                             Khung Giờ Đón Tiếp ({expSlots.length})
                           </h6>
                         </div>
@@ -1267,10 +1554,10 @@ export default function DestinationAssessmentModal({
                                 key={s.id || i}
                                 className="p-2 rounded-lg bg-slate-50 border border-slate-200/60 text-xs flex items-center justify-between gap-2"
                               >
-                                <span className="font-bold text-slate-800 font-mono">
+                                <span className="font-medium text-slate-800 font-mono">
                                   {s.slotDate}
                                 </span>
-                                <span className="text-[10px] text-slate-500 shrink-0 bg-white px-1.5 py-0.5 rounded border border-slate-200 font-semibold">
+                                <span className="text-[11px] text-slate-500 shrink-0 bg-white px-1.5 py-0.5 rounded border border-slate-200 font-semibold">
                                   Tối đa: {s.maxTourPerDay} lượt
                                 </span>
                               </div>
@@ -1282,24 +1569,275 @@ export default function DestinationAssessmentModal({
                   </div>
                 )}
               </div>
+            ) : activeTab === "decision" ? (
+              /* ── BƯỚC 4: TỔNG HỢP KẾT QUẢ & QUYẾT ĐỊNH CUỐI ── */
+              <div className="space-y-4">
+                {/* Phần 1–3: kết quả đã chọn ở các bước trước */}
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-slate-100">
+                    <h4 className="text-sm font-medium text-slate-900">Tổng hợp kết quả thẩm định</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Kết quả bên dưới chưa được gửi. Bấm &ldquo;Xác nhận kết quả&rdquo; để gửi tất cả cùng lúc.
+                    </p>
+                  </div>
+
+                  {/* 1. Điểm đến */}
+                  <div className="px-5 py-3 flex items-center gap-3 border-b border-slate-100">
+                    <span className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <MapPin size={15} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium text-slate-400">1 · Điểm đến</p>
+                      <p className="text-xs font-medium text-slate-800 truncate">
+                        {destination?.name}
+                        <span className="font-normal text-slate-500">
+                          {destination?.capacity ? ` · ${destination.capacity} du khách/lượt` : ""}
+                        </span>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("general")}
+                      className="w-20 shrink-0 inline-flex items-center justify-center px-2.5 py-1 rounded-lg border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 text-[11px] font-medium cursor-pointer transition-colors"
+                    >
+                      Xem lại
+                    </button>
+                  </div>
+
+                  {/* 2. Nội dung văn hóa */}
+                  <div className="px-5 py-3 border-b border-slate-100 space-y-2.5">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                        <Headphones size={15} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-medium text-slate-400">2 · Nội dung văn hóa</p>
+                        <p className="text-xs font-medium text-slate-800">
+                          {contents.length === 0
+                            ? "Điểm đến chưa có nội dung văn hóa"
+                            : `${contents.length} nội dung`}
+                        </p>
+                      </div>
+                      {decidedContentList.length > 0 && (
+                        <span className="shrink-0 px-2 py-0.5 rounded-full border text-[11px] font-medium bg-slate-50 text-slate-600 border-slate-200">
+                          {decidedContentList.filter((c) => contentDecisions[c.id].approve).length} duyệt ·{" "}
+                          {decidedContentList.filter((c) => !contentDecisions[c.id].approve).length} không duyệt
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("contents")}
+                        className="w-20 shrink-0 inline-flex items-center justify-center px-2.5 py-1 rounded-lg border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 text-[11px] font-medium cursor-pointer transition-colors"
+                      >
+                        Xem lại
+                      </button>
+                    </div>
+                    {/* Danh sách từng nội dung nằm trong khung riêng: tên dài thì cắt gọn, rê chuột để xem đủ */}
+                    {contents.length > 0 && (
+                      <ul className="ml-11 rounded-xl border border-slate-200/80 bg-slate-50/70 divide-y divide-slate-200/70">
+                        {contents.map((c) => {
+                          const d = contentDecisions[c.id];
+                          const tone = d
+                            ? d.approve
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-rose-50 text-rose-700 border-rose-200"
+                            : "bg-white text-slate-600 border-slate-200";
+                          const label = d
+                            ? d.approve
+                              ? "Duyệt"
+                              : "Không duyệt"
+                            : c.reviewStatus === "APPROVED"
+                            ? "Đã duyệt trước đó"
+                            : c.reviewStatus === "REJECTED"
+                            ? "Đã từ chối trước đó"
+                            : "Chưa gửi duyệt";
+                          const rejectText = d && !d.approve
+                            ? `${(d.reasonLabels || []).join(" · ")}${d.note ? ` — ${d.note}` : ""}`
+                            : "";
+                          return (
+                            <li key={c.id} className="flex items-center gap-3 px-3 py-2 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-slate-700 font-medium truncate" title={c.title}>
+                                  {c.title}
+                                </p>
+                                {rejectText && (
+                                  <p className="text-[11px] text-rose-600 line-clamp-2 break-words" title={rejectText}>
+                                    {rejectText}
+                                  </p>
+                                )}
+                              </div>
+                              <span className={`shrink-0 px-2 py-0.5 rounded-full border text-[11px] font-medium ${tone}`}>
+                                {label}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* 3. Gói trải nghiệm */}
+                  <div className="px-5 py-3 flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                      <Compass size={15} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium text-slate-400">3 · Gói trải nghiệm</p>
+                      <p className="text-xs font-medium text-slate-800 truncate" title={experience?.title || undefined}>
+                        {experience ? experience.title : "Điểm đến chưa thiết lập gói trải nghiệm"}
+                      </p>
+                      {expDecision && !expDecision.approve && (
+                        <p className="text-[11px] text-rose-600 mt-0.5 line-clamp-2 break-words" title={expDecision.note}>
+                          {expDecision.note}
+                        </p>
+                      )}
+                    </div>
+                    {experience && (
+                      <span
+                        className={`shrink-0 px-2 py-0.5 rounded-full border text-[11px] font-medium ${
+                          expDecision
+                            ? expDecision.approve
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-rose-50 text-rose-700 border-rose-200"
+                            : EXP_REVIEW_META[expReview].cls
+                        }`}
+                      >
+                        {expDecision
+                          ? expDecision.approve
+                            ? "Duyệt"
+                            : "Không duyệt"
+                          : EXP_REVIEW_META[expReview].label}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("experience")}
+                      className="w-20 shrink-0 inline-flex items-center justify-center px-2.5 py-1 rounded-lg border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 text-[11px] font-medium cursor-pointer transition-colors"
+                    >
+                      Xem lại
+                    </button>
+                  </div>
+                </div>
+
+                {/* Phần 4: quyết định cho điểm đến */}
+                <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-3">
+                  <h4 className="text-sm font-medium text-slate-900">4 · Quyết định cho điểm đến</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setDestDecision({ approve: true, reasons: [], otherReason: "", note: "" })}
+                      className={`text-left p-4 rounded-xl border-2 transition-colors cursor-pointer ${
+                        destDecision?.approve
+                          ? "border-emerald-500 bg-emerald-50"
+                          : "border-slate-200 hover:border-emerald-300"
+                      }`}
+                    >
+                      <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
+                        <CheckCircle2 size={16} className="text-emerald-600" />
+                        {isApproved ? "Giữ phát hành" : "Phê duyệt & phát hành"}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                        Điểm đến hiển thị cho du khách và được thêm vào tour. Chỉ nội dung, trải nghiệm được duyệt mới được mở.
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDestDecision((prev) =>
+                          prev && !prev.approve ? prev : { approve: false, reasons: [], otherReason: "", note: "" }
+                        )
+                      }
+                      className={`text-left p-4 rounded-xl border-2 transition-colors cursor-pointer ${
+                        destDecision && !destDecision.approve
+                          ? "border-rose-500 bg-rose-50"
+                          : "border-slate-200 hover:border-rose-300"
+                      }`}
+                    >
+                      <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
+                        <XCircle size={16} className="text-rose-600" />
+                        {isApproved ? "Thu hồi duyệt" : "Từ chối"}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                        Gửi lý do để đối tác chỉnh sửa và gửi duyệt lại. Điểm đến không hiển thị cho du khách.
+                      </p>
+                    </button>
+                  </div>
+
+                  {destDecision && !destDecision.approve && (
+                    <div className="space-y-2.5 pt-1">
+                      <p className="text-xs font-medium text-slate-700">
+                        Lý do <span className="text-rose-500">*</span>{" "}
+                        <span className="font-normal text-slate-400">(chọn một hoặc nhiều)</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(DEST_REASON_LABELS).map(([code, label]) => {
+                          const on = destDecision.reasons.includes(code);
+                          return (
+                            <button
+                              key={code}
+                              type="button"
+                              onClick={() =>
+                                setDestDecision((prev) => ({
+                                  ...prev,
+                                  reasons: on ? prev.reasons.filter((r) => r !== code) : [...prev.reasons, code],
+                                }))
+                              }
+                              className={`px-3 py-1.5 rounded-full border text-xs font-semibold cursor-pointer transition-colors ${
+                                on
+                                  ? "bg-rose-600 text-white border-rose-600"
+                                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {destDecision.reasons.includes("OTHER") && (
+                        <input
+                          value={destDecision.otherReason}
+                          onChange={(e) => setDestDecision((prev) => ({ ...prev, otherReason: e.target.value }))}
+                          maxLength={500}
+                          placeholder="Mô tả lý do khác *"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {destDecision && (
+                    <textarea
+                      value={destDecision.note}
+                      onChange={(e) => setDestDecision((prev) => ({ ...prev, note: e.target.value }))}
+                      rows={2}
+                      maxLength={1000}
+                      placeholder="Ghi chú gửi đối tác (không bắt buộc)"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none"
+                    />
+                  )}
+
+                  {submitError && (
+                    <p className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 flex items-start gap-2">
+                      <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                      {submitError}
+                    </p>
+                  )}
+                </div>
+              </div>
             ) : null}
           </div>
 
           {/* ========================================================
               FOOTER MODAL (Action Buttons)
               ======================================================== */}
-          <div className="shrink-0 px-6 sm:px-8 py-4 border-t border-slate-100 flex items-center justify-between gap-3 bg-slate-50/80">
-            <div className="text-xs text-slate-500 hidden sm:block">
-              {activeTab === "contents" && contents.length > 0 && (
-                <span>
-                  Đã xem:{" "}
-                  <strong>
-                    {Object.values(reviewedItems).filter(Boolean).length}/
-                    {contents.length}
-                  </strong>{" "}
-                  tư liệu
-                </span>
-              )}
+          <div className="relative shrink-0 px-6 sm:px-8 py-4 border-t border-stone-200/70 flex items-center justify-between gap-3 bg-white/70 backdrop-blur-sm">
+            <div className="text-xs text-slate-500 hidden sm:block min-w-0">
+              Bước <strong className="text-slate-800">{stepIndex + 1}</strong>/{REVIEW_STEPS.length}
+              {blockReason ? (
+                <span className="text-amber-700 font-semibold"> · {blockReason}</span>
+              ) : isLastStep && !destDecision ? (
+                <span className="text-amber-700 font-semibold"> · Chọn quyết định cho điểm đến</span>
+              ) : null}
             </div>
 
             <div className="flex items-center justify-end gap-2.5 w-full sm:w-auto">
@@ -1307,67 +1845,63 @@ export default function DestinationAssessmentModal({
                 <button
                   type="button"
                   onClick={() => onEdit(destination)}
-                  className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-medium text-xs inline-flex items-center gap-1.5 cursor-pointer"
                 >
                   <Edit3 size={13} />
                   <span>Sửa thông tin</span>
                 </button>
               )}
-
-              {destination && !isApproved && onApprove && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onApprove(destination.id, false, destination.name)}
-                    disabled={isActionLoading}
-                    className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                    title="Từ chối điểm đến và yêu cầu chỉnh sửa"
-                  >
-                    <Ban size={14} />
-                    <span>Từ chối</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onApprove(destination.id, true, destination.name)}
-                    disabled={isActionLoading}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                    title="Phê duyệt điểm đến và phát hành cho du khách"
-                  >
-                    {isActionLoading ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <CheckCircle2 size={14} />
-                    )}
-                    <span>Phê duyệt điểm đến</span>
-                  </button>
-                </>
-              )}
-
-
-              {destination && isApproved && onApprove && (
-                <button
-                  type="button"
-                  onClick={() => onApprove(destination.id, false, destination.name)}
-                  disabled={isActionLoading}
-                  className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                  title="Thu hồi phê duyệt và đưa về trạng thái chờ thẩm định"
-                >
-                  {isActionLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Ban size={14} />
-                  )}
-                  <span>Hủy phê duyệt</span>
-                </button>
-              )}
-
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                disabled={submitting}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs transition-colors cursor-pointer disabled:opacity-50"
               >
                 Đóng
               </button>
+              {stepIndex > 0 && (
+                <button
+                  type="button"
+                  onClick={() => goStep(-1)}
+                  disabled={submitting}
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-medium text-xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <ChevronLeft size={14} />
+                  Quay lại
+                </button>
+              )}
+              {!isLastStep ? (
+                <button
+                  type="button"
+                  onClick={() => goStep(1)}
+                  disabled={isLoading || Boolean(error) || !canProceed}
+                  title={blockReason || undefined}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/25 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Tiếp tục
+                  <ChevronRight size={14} />
+                </button>
+              ) : (
+                (onCompleted || onApprove) && (
+                  <button
+                    type="button"
+                    onClick={handleSubmitAll}
+                    disabled={!destReady || submitting || isActionLoading}
+                    className={`px-5 py-2 rounded-xl text-white font-medium text-xs inline-flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                      destDecision && !destDecision.approve
+                        ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/25"
+                        : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/25"
+                    }`}
+                  >
+                    {submitting ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <ShieldCheck size={14} />
+                    )}
+                    {submitting ? "Đang gửi kết quả…" : "Xác nhận kết quả"}
+                  </button>
+                )
+              )}
             </div>
           </div>
         </div>
@@ -1397,11 +1931,11 @@ export default function DestinationAssessmentModal({
                   )}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-extrabold text-slate-900 truncate">
+                  <h3 className="text-sm font-semibold text-slate-900 truncate">
                     {previewMediaTarget.title}
                   </h3>
                   <p className="text-[11px] text-slate-500 flex items-center gap-2">
-                    <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200/70">
+                    <span className="font-mono font-medium text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200/70">
                       #{previewMediaTarget.sequenceOrder || 1}
                     </span>
                     <span>{previewMediaTarget.playCount || 0} lượt xem/nghe</span>
@@ -1446,7 +1980,7 @@ export default function DestinationAssessmentModal({
                     <Headphones size={32} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-white">{previewMediaTarget.title}</p>
+                    <p className="text-sm font-medium text-white">{previewMediaTarget.title}</p>
                     <p className="text-xs text-slate-400 mt-1">Trình phát audio di sản</p>
                   </div>
                   <audio
@@ -1463,7 +1997,7 @@ export default function DestinationAssessmentModal({
             <div className="p-5 sm:p-6 overflow-y-auto max-h-[30vh] bg-white space-y-3">
               {previewMediaTarget.description && (
                 <div>
-                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  <h5 className="text-xs font-medium text-slate-400 mb-1">
                     Tóm tắt dẫn nhập
                   </h5>
                   <p className="text-xs text-slate-700 leading-relaxed">
@@ -1474,7 +2008,7 @@ export default function DestinationAssessmentModal({
 
               {previewMediaTarget.contentText && (
                 <div>
-                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  <h5 className="text-xs font-medium text-slate-400 mb-1">
                     Kịch bản / Lời bình chi tiết
                   </h5>
                   <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200/80 leading-relaxed whitespace-pre-wrap">
@@ -1488,7 +2022,7 @@ export default function DestinationAssessmentModal({
                   href={previewMediaTarget.mediaUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1.5"
+                  className="text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1.5"
                 >
                   <span>Mở liên kết media trong tab mới</span>
                   <ExternalLink size={12} />
@@ -1496,7 +2030,7 @@ export default function DestinationAssessmentModal({
                 <button
                   type="button"
                   onClick={() => setPreviewMediaTarget(null)}
-                  className="px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer"
+                  className="px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer"
                 >
                   Đóng
                 </button>
@@ -1510,7 +2044,7 @@ export default function DestinationAssessmentModal({
           TOAST THÔNG BÁO THẨM ĐỊNH CONTENT
           ======================================================== */}
       {contentToast && (
-        <div className="fixed top-5 right-5 z-100 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3">
+        <div className="fixed top-5 right-5 z-100 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-2xl text-xs font-medium flex items-center gap-2 max-w-md animate-in slide-in-from-top-3">
           <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
           <span>{contentToast}</span>
         </div>
@@ -1533,7 +2067,7 @@ export default function DestinationAssessmentModal({
                 <CheckCircle2 size={20} />
               </div>
               <div>
-                <h4 className="text-sm font-extrabold text-slate-900">
+                <h4 className="text-sm font-semibold text-slate-900">
                   Phê duyệt bài thuyết minh?
                 </h4>
                 <p className="text-xs text-slate-500 truncate max-w-xs mt-0.5">
@@ -1547,7 +2081,7 @@ export default function DestinationAssessmentModal({
             </p>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">
+              <label className="text-xs font-medium text-slate-700 block">
                 Ghi chú phê duyệt (không bắt buộc)
               </label>
               <textarea
@@ -1563,7 +2097,7 @@ export default function DestinationAssessmentModal({
               <button
                 type="button"
                 onClick={() => setApproveTarget(null)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
               >
                 Hủy
               </button>
@@ -1571,7 +2105,7 @@ export default function DestinationAssessmentModal({
                 type="button"
                 disabled={isApprovingContent}
                 onClick={handleConfirmApproveContent}
-                className="px-4 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-medium rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
               >
                 {isApprovingContent && <Loader2 size={13} className="animate-spin" />}
                 <span>Xác nhận phê duyệt</span>
@@ -1599,8 +2133,8 @@ export default function DestinationAssessmentModal({
                   <XCircle size={18} />
                 </div>
                 <div>
-                  <h4 className="text-sm font-extrabold text-slate-900 tracking-tight">
-                    Từ chối tiếp nhận bài thuyết minh
+                  <h4 className="text-sm font-semibold text-slate-900 tracking-tight">
+                    Không duyệt nội dung
                   </h4>
                   <p className="text-xs text-slate-500 truncate max-w-xs mt-0.5">
                     {rejectTarget.title}
@@ -1618,8 +2152,8 @@ export default function DestinationAssessmentModal({
 
             <div className="flex-1 overflow-y-auto py-4 space-y-3.5 [scrollbar-width:thin]">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 block">
-                  Chọn các lý do từ chối (có thể chọn nhiều):
+                <label className="text-xs font-medium text-slate-700 block">
+                  Chọn lý do không duyệt (có thể chọn nhiều):
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                   {rejectionReasons.map((r) => {
@@ -1629,7 +2163,7 @@ export default function DestinationAssessmentModal({
                         key={r.code}
                         type="button"
                         onClick={() => handleToggleReason(r.code)}
-                        className={`p-2.5 rounded-xl border text-left text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                        className={`p-2.5 rounded-xl border text-left text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
                           isChecked
                             ? "bg-rose-50 border-rose-300 text-rose-800 shadow-2xs"
                             : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
@@ -1653,7 +2187,7 @@ export default function DestinationAssessmentModal({
 
               {selectedReasons.includes("OTHER") && (
                 <div className="space-y-1 pt-1">
-                  <label className="text-xs font-bold text-rose-700 block">
+                  <label className="text-xs font-medium text-rose-700 block">
                     Mô tả chi tiết lý do khác (Bắt buộc khi chọn &quot;Lý do khác&quot;):
                   </label>
                   <input
@@ -1667,7 +2201,7 @@ export default function DestinationAssessmentModal({
               )}
 
               <div className="space-y-1 pt-1">
-                <label className="text-xs font-bold text-slate-700 block">
+                <label className="text-xs font-medium text-slate-700 block">
                   Ý kiến thẩm định &amp; Hướng dẫn chỉnh sửa gửi Đối tác:
                 </label>
                 <textarea
@@ -1680,7 +2214,7 @@ export default function DestinationAssessmentModal({
               </div>
 
               {rejectError && (
-                <p className="text-xs font-bold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 flex items-center gap-2">
+                <p className="text-xs font-medium text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 flex items-center gap-2">
                   <AlertCircle size={14} className="shrink-0" />
                   <span>{rejectError}</span>
                 </p>
@@ -1691,7 +2225,7 @@ export default function DestinationAssessmentModal({
               <button
                 type="button"
                 onClick={() => setRejectTarget(null)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
               >
                 Hủy
               </button>
@@ -1699,10 +2233,10 @@ export default function DestinationAssessmentModal({
                 type="button"
                 disabled={isRejectingContent}
                 onClick={handleConfirmRejectContent}
-                className="px-4 py-2 text-xs font-bold rounded-xl text-white bg-rose-600 hover:bg-rose-700 transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm shadow-rose-600/20"
+                className="px-4 py-2 text-xs font-medium rounded-xl text-white bg-rose-600 hover:bg-rose-700 transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm shadow-rose-600/20"
               >
                 {isRejectingContent && <Loader2 size={13} className="animate-spin" />}
-                <span>Gửi từ chối hồ sơ</span>
+                <span>Ghi nhận không duyệt</span>
               </button>
             </div>
           </div>
@@ -1727,7 +2261,7 @@ export default function DestinationAssessmentModal({
                   <History size={16} />
                 </div>
                 <div>
-                  <h4 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                  <h4 className="text-sm font-semibold text-slate-900 tracking-tight">
                     Lịch sử thẩm định thuyết minh
                   </h4>
                   <p className="text-xs text-slate-500 truncate max-w-xs mt-0.5">
@@ -1748,11 +2282,11 @@ export default function DestinationAssessmentModal({
               {historyLoading ? (
                 <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
                   <Loader2 size={24} className="animate-spin text-indigo-600" />
-                  <p className="text-xs font-bold">Đang tải lịch sử kiểm duyệt...</p>
+                  <p className="text-xs font-medium">Đang tải lịch sử kiểm duyệt...</p>
                 </div>
               ) : historyError ? (
                 <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
-                  <p className="font-bold flex items-center gap-1.5">
+                  <p className="font-medium flex items-center gap-1.5">
                     <AlertCircle size={14} className="text-amber-600" />
                     <span>Chưa có biên bản thẩm định</span>
                   </p>
@@ -1763,9 +2297,9 @@ export default function DestinationAssessmentModal({
               ) : (
                 <>
                   <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-600">Trạng thái:</span>
+                    <span className="text-xs font-medium text-slate-600">Trạng thái:</span>
                     <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${
+                      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${
                         historyData?.status === "APPROVED"
                           ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                           : historyData?.status === "REJECTED"
@@ -1794,7 +2328,7 @@ export default function DestinationAssessmentModal({
 
                   {historyData?.status === "REJECTED" && (historyData.reason || historyData.decisionNote) && (
                     <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-2">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-rose-900">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-rose-900">
                         <AlertTriangle size={14} className="text-rose-600" />
                         <span>Lý do từ chối:</span>
                       </div>
@@ -1812,7 +2346,7 @@ export default function DestinationAssessmentModal({
                       )}
                       {historyData.otherReason && (
                         <p className="text-xs text-rose-800 bg-white/80 p-2 rounded-lg border border-rose-150 leading-relaxed font-medium">
-                          <span className="font-bold">Lý do khác:</span> {historyData.otherReason}
+                          <span className="font-medium">Lý do khác:</span> {historyData.otherReason}
                         </p>
                       )}
                       {historyData.decisionNote && (
@@ -1825,7 +2359,7 @@ export default function DestinationAssessmentModal({
 
                   {Array.isArray(historyData?.history) && historyData.history.length > 0 && (
                     <div className="space-y-2 pt-1">
-                      <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      <h5 className="text-xs font-medium text-slate-400">
                         Dòng thời gian sự kiện
                       </h5>
                       <div className="space-y-2">
@@ -1835,14 +2369,14 @@ export default function DestinationAssessmentModal({
                             className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 text-xs space-y-1"
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-slate-800">
+                              <span className="font-medium text-slate-800">
                                 {evt.action === "SUBMITTED"
                                   ? "Đã gửi hồ sơ thẩm định"
                                   : evt.action === "APPROVED"
                                   ? "Đã duyệt và xuất bản"
                                   : "Đã từ chối hồ sơ"}
                               </span>
-                              <span className="text-[10.5px] font-mono text-slate-400">
+                              <span className="text-[11px] font-mono text-slate-400">
                                 {evt.createdAt ? new Date(evt.createdAt).toLocaleString("vi-VN") : "—"}
                               </span>
                             </div>
@@ -1869,7 +2403,7 @@ export default function DestinationAssessmentModal({
               <button
                 type="button"
                 onClick={() => setHistoryTarget(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors cursor-pointer"
               >
                 Đóng
               </button>

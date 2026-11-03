@@ -9,16 +9,24 @@ import com.journeygo.modules.gamification.entity.enums.BadgeType;
 import com.journeygo.modules.gamification.entity.enums.PointTransactionType;
 import com.journeygo.modules.gamification.entity.enums.UserVoucherStatus;
 import com.journeygo.modules.gamification.repository.*;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -26,7 +34,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class GamificationService {
 
+    private static final String PLACEHOLDER_ICON_HOST = "https://assets.journeygo.com/";
+
     private final BadgeRepository badgeRepository;
+    private final NotificationPublisher notifications;
     private final UserBadgeRepository userBadgeRepository;
     private final UserPointRepository userPointRepository;
     private final PointTransactionRepository pointTransactionRepository;
@@ -35,8 +46,14 @@ public class GamificationService {
 
     // ── BADGE OPERATIONS ────────────────────────────────────────────────────────
 
+    /** Trả về null khi quản trị viên đã tắt huy hiệu của điểm đến này (check-in vẫn hợp lệ, chỉ không cấp huy hiệu). */
     @Transactional
     public UserBadge awardCheckInBadge(Long userId, Long destinationId, String destinationName, Long journeyId) {
+        var disabled = badgeRepository.findByCode("BADGE_DEST_" + destinationId).filter(b -> !b.isActive());
+        if (disabled.isPresent()) {
+            log.info("Huy hiệu {} đang tắt, bỏ qua cấp cho user {}", disabled.get().getCode(), userId);
+            return null;
+        }
         Badge badge = badgeRepository.findByDestinationIdAndActiveTrue(destinationId)
                 .orElseGet(() -> {
                     String cleanName = (destinationName != null && !destinationName.isBlank())
@@ -45,7 +62,7 @@ public class GamificationService {
                             .code("BADGE_DEST_" + destinationId)
                             .name("Dấu chân " + cleanName)
                             .description("Đã đặt chân và khám phá thành công " + cleanName)
-                            .iconUrl("https://assets.journeygo.com/badges/destination_pin.png")
+                            // Chưa có ảnh riêng: để trống, quản trị viên tải ảnh lên sau ở trang Huy hiệu
                             .destinationId(destinationId)
                             .badgeType(BadgeType.DESTINATION_CHECKIN)
                             .bonusPoints(10)
@@ -70,6 +87,15 @@ public class GamificationService {
         UserBadge saved = userBadgeRepository.save(userBadge);
         log.info("Cấp Badge {} thành công cho user {}", badge.getCode(), userId);
 
+        boolean hasBonus = badge.getBonusPoints() != null && badge.getBonusPoints() > 0;
+        notifications.send(NotificationType.BADGE_AWARDED)
+                .to(userId)
+                .title("Bạn nhận được huy hiệu mới!")
+                .body("Huy hiệu " + NotificationPublisher.quote(badge.getName()) + " đã vào bộ sưu tập di sản của bạn"
+                        + (hasBonus ? ", kèm " + badge.getBonusPoints() + " điểm thưởng." : "."))
+                .ref("BADGE", badge.getId())
+                .publish();
+
         if (badge.getBonusPoints() != null && badge.getBonusPoints() > 0) {
             awardPoints(
                     userId,
@@ -93,6 +119,41 @@ public class GamificationService {
     public List<BadgeResponse> getAllBadges() {
         return badgeRepository.findByActiveTrue()
                 .stream().map(BadgeResponse::fromEntity).toList();
+    }
+
+    /** Mọi huy hiệu (kể cả đã tắt) kèm số du khách đã đạt, dành cho trang quản trị. */
+    @Transactional(readOnly = true)
+    public List<AdminBadgeResponse> getAllBadgesForAdmin() {
+        Map<Long, Long> earned = new HashMap<>();
+        for (Object[] row : userBadgeRepository.countEarnedByBadge()) {
+            earned.put((Long) row[0], (Long) row[1]);
+        }
+        return badgeRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).stream()
+                .map(b -> AdminBadgeResponse.fromEntity(b, earned.getOrDefault(b.getId(), 0L)))
+                .toList();
+    }
+
+    @Transactional
+    public AdminBadgeResponse updateBadge(Long badgeId, BadgeUpdateRequest request) {
+        Badge badge = badgeRepository.findById(badgeId)
+                .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR, "Không tìm thấy huy hiệu #" + badgeId));
+        badge.setName(request.name().trim());
+        badge.setDescription(StringUtils.hasText(request.description()) ? request.description().trim() : null);
+        badge.setIconUrl(StringUtils.hasText(request.iconUrl()) ? request.iconUrl().trim() : null);
+        if (request.bonusPoints() != null) badge.setBonusPoints(request.bonusPoints());
+        if (request.active() != null) badge.setActive(request.active());
+        Badge saved = badgeRepository.save(badge);
+        long earnedCount = userBadgeRepository.countEarnedByBadge().stream()
+                .filter(row -> badgeId.equals(row[0])).mapToLong(row -> (Long) row[1]).findFirst().orElse(0L);
+        log.info("Cập nhật huy hiệu {} (ảnh: {})", saved.getCode(), saved.getIconUrl());
+        return AdminBadgeResponse.fromEntity(saved, earnedCount);
+    }
+
+    /** Dọn đường dẫn ảnh giả do bản cũ gán khi tự tạo huy hiệu check-in; chạy mỗi lần khởi động, không làm gì nếu đã sạch. */
+    @EventListener(ApplicationReadyEvent.class)
+    public void clearPlaceholderBadgeIcons() {
+        int cleared = badgeRepository.clearIconUrlsStartingWith(PLACEHOLDER_ICON_HOST + "%");
+        if (cleared > 0) log.info("Đã gỡ ảnh giả khỏi {} huy hiệu", cleared);
     }
 
     // ── POINT OPERATIONS ────────────────────────────────────────────────────────

@@ -1,19 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { Suspense, useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Search,
   MapPin,
   CheckCircle2,
   Eye,
   X,
-  Compass,
   Inbox,
   Loader2,
   Users,
   Navigation,
   AlertCircle,
-  Building2,
   RefreshCw,
   Layers,
   Clock,
@@ -31,7 +30,9 @@ import {
   DestinationAssessmentModal,
   RejectDestinationDialog,
 } from "@/features/destination";
+import { useQueueRefresh } from "@/context/NotificationContext";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { KpiTile } from "@/components/dashboard/DashboardUI";
 
 /* =========================================================================
  *  TRANG: Thẩm định điểm đến di sản (Moderator)
@@ -60,7 +61,9 @@ const STATUS = {
 const SIZE_OPTIONS = [10, 20, 50];
 
 /* Lưới 12 cột dùng chung cho tiêu đề cột và từng dòng để thẳng hàng tuyệt đối */
-const ROW_GRID = "grid grid-cols-12 gap-3 sm:gap-4 items-center";
+/* STT và Thao tác cố định ở hai mép; tên địa điểm rộng nhất */
+const ROW_GRID =
+  "grid grid-cols-12 md:grid-cols-[2.5rem_minmax(0,2.4fr)_minmax(0,1fr)_minmax(0,1fr)_13rem] gap-3 sm:gap-4 items-center";
 
 /* Vùng cuộn của danh sách: khe scrollbar ổn định + chặn cuộn chồng (chain)
    sang vùng cha, để chỉ vùng danh sách là vùng duy nhất được cuộn. */
@@ -122,7 +125,7 @@ function Toast({ msg, tone }) {
   const Icon = tone === "error" ? AlertCircle : CheckCircle2;
   return (
     <div
-      className={`fixed top-5 right-5 z-50 ${palette} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3`}
+      className={`fixed top-5 right-5 z-[200] ${palette} px-4 py-3 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-md animate-in slide-in-from-top-3`}
     >
       <Icon size={16} className="shrink-0" />
       <span>{msg}</span>
@@ -138,94 +141,6 @@ function Toast({ msg, tone }) {
  *  • Toàn bộ số liệu dùng chung slate-900 (đen tuyền), KHÔNG số vàng/số xanh
  *  • Màu nhấn chỉ nằm ở khung icon góc phải
  * ---------------------------------------------------------------------- */
-/* Bộ tông màu KPI.
-   Mỗi tone cung cấp 3 nhóm class ĐỘC LẬP — dùng THỐNG NHẤT giữa 3 ô để
-   dù bấm vào ô nào, layout cũng giống nhau 100%:
-     • icon       — chỉ dùng khi KHÔNG active
-     • activeIcon — chỉ dùng khi CÓ active (icon đậm hơn, đồng tone với nền)
-     • activeBg   — nền ô khi active (thay cho nền trắng cố định)
-     • activeBorder — viền tone khi active (thay cho viền slate-200 cố định)
-
-   LƯU Ý: KHÔNG dùng ring-NUMBER hoặc tăng độ dày shadow/border làm active — chỉ đổi màu —
-   để kích thước ô bất biến 1 pixel khi nhấn. */
-const KPI_TONES = {
-  slate: {
-    icon: "bg-slate-100 text-slate-600 border-slate-200/80",
-    activeIcon: "bg-slate-900/10 text-slate-900 border-slate-300",
-    activeBg: "bg-slate-50",
-    activeBorder: "border-slate-300",
-  },
-  amber: {
-    icon: "bg-amber-50 text-amber-600 border-amber-200/70",
-    activeIcon: "bg-amber-100 text-amber-700 border-amber-300",
-    activeBg: "bg-amber-50",
-    activeBorder: "border-amber-300",
-  },
-  emerald: {
-    icon: "bg-emerald-50 text-emerald-600 border-emerald-200/70",
-    activeIcon: "bg-emerald-100 text-emerald-700 border-emerald-300",
-    activeBg: "bg-emerald-50",
-    activeBorder: "border-emerald-300",
-  },
-};
-
-/* Ô thống kê — bấm để lọc nhanh danh sách bên dưới (đồng bộ trang Admin) */
-function KpiCard({
-  icon: Icon,
-  label,
-  value,
-  unit,
-  tone = "slate",
-  dot = false,
-  active = false,
-  onClick,
-}) {
-  const t = KPI_TONES[tone] || KPI_TONES.slate;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      title={`Lọc theo: ${label}`}
-      /* Ô KPI hoàn toàn TĨNH: KHÔNG dùng ring/border đổi độ dày (gây lệch khi
-         bấm), cũng không animate nội dung. Mọi thay đổi khi active chỉ đổi
-         MÀU nền/màu chữ/icon đã được khai báo cố định trong t.activeBg —
-         kích thước khung không đổi 1 pixel. */
-      className={`bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex items-center justify-between transition-colors hover:border-slate-300 cursor-pointer text-left w-full ${
-        active
-          ? `${t.activeBg} ${t.activeBorder}`
-          : "bg-white border-slate-200/90"
-      }`}
-    >
-      {/* Cột chữ bên trái */}
-      <div className="flex flex-col text-left min-w-0">
-        <p className="text-[11px] font-bold text-slate-400 truncate">
-          {label}
-        </p>
-        <div className="mt-1 flex items-baseline gap-1.5">
-          <span className="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums leading-none">
-            {value}
-          </span>
-          <span className="text-xs font-bold text-slate-600 whitespace-nowrap">
-            {unit}
-          </span>
-          {dot && (
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse inline-block ml-1 shrink-0" />
-          )}
-        </div>
-      </div>
-
-      {/* Icon góc phải — đổi sang activeIcon khi active (cùng 10x10 cố định) */}
-      <div
-        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-          active ? t.activeIcon : t.icon
-        }`}
-      >
-        <Icon size={18} strokeWidth={2.2} />
-      </div>
-    </button>
-  );
-}
 
 /* Segmented Tab filter */
 function StatusTab({ active, onClick, children, accent = "slate" }) {
@@ -438,10 +353,18 @@ function PaginationBar({
   );
 }
 
-export default function ModeratorDestinationsPage() {
+function ModeratorDestinationsContent() {
   /* ── State ────────────────────────────────────────────────── */
   const { confirm, confirmDialog } = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Từ khoá gõ ở ô tìm kiếm đầu trang được chuyển tới đây qua ?search=
+  const urlSearch = useSearchParams().get("search") ?? "";
+  const [appliedUrlSearch, setAppliedUrlSearch] = useState(null);
+  if (urlSearch !== appliedUrlSearch) {
+    setAppliedUrlSearch(urlSearch);
+    if (urlSearch) setSearchQuery(urlSearch);
+  }
   const [statusTab, setStatusTab] = useState("all");
   const [destinations, setDestinations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -466,9 +389,11 @@ export default function ModeratorDestinationsPage() {
     setTimeout(() => setToastMsg(""), 3500);
   }, []);
 
-  const loadAll = useCallback(async () => {
-    setIsLoading(true);
-    setFetchError("");
+  const loadAll = useCallback(async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+      setFetchError("");
+    }
     try {
       // Tải đồng thời hàng chờ PENDING, các điểm đến APPROVED và REJECTED từ Moderation API
       const [pendingRes, approvedRes, rejectedRes] = await Promise.allSettled([
@@ -510,15 +435,19 @@ export default function ModeratorDestinationsPage() {
       }
     } catch (err) {
       console.error("[Moderator Destinations] Fetch error:", err);
+      if (silent) return; // tải ngầm lỗi thì giữ danh sách đang xem
       setFetchError(
         err?.message ||
           "Không thể tải danh sách điểm đến. Vui lòng kiểm tra kết nối."
       );
       setDestinations([]);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, []);
+
+  // Thời gian thực: đối tác gửi hồ sơ mới / moderator khác vừa duyệt → tải ngầm lại danh sách
+  useQueueRefresh(["destination-review", "content-review", "experience-review"], () => loadAll(true));
 
 
   useEffect(() => {
@@ -563,7 +492,9 @@ export default function ModeratorDestinationsPage() {
   const handleApprove = useCallback(
     async (id, approved, displayName) => {
       if (!approved) {
-        setRejectDestTarget({ id, name: displayName });
+        // Điểm đến đang phát hành thì đây là thu hồi duyệt (cùng API từ chối)
+        const current = destinations.find((d) => d.id === id) || (detailTarget?.id === id ? detailTarget : null);
+        setRejectDestTarget({ id, name: displayName, revoke: current?.approved === true });
         return;
       }
       const ok = await confirm({
@@ -597,7 +528,7 @@ export default function ModeratorDestinationsPage() {
         setActionLoadingId(null);
       }
     },
-    [detailTarget, showToast, confirm]
+    [destinations, detailTarget, showToast, confirm]
   );
 
   const handleRejectDestConfirm = useCallback(
@@ -620,7 +551,11 @@ export default function ModeratorDestinationsPage() {
           if (detailTarget?.id === rejectDestTarget.id)
             setDetailTarget(updatedNorm);
         }
-        showToast(`Đã từ chối điểm đến "${rejectDestTarget.name}".`);
+        showToast(
+          rejectDestTarget.revoke
+            ? `Đã thu hồi duyệt điểm đến "${rejectDestTarget.name}". Đối tác sẽ nhận phản hồi để chỉnh sửa.`
+            : `Đã từ chối điểm đến "${rejectDestTarget.name}".`
+        );
         setRejectDestTarget(null);
       } catch (err) {
         console.error("[Moderator Reject] error:", err);
@@ -717,7 +652,7 @@ export default function ModeratorDestinationsPage() {
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
             type="button"
-            onClick={loadAll}
+            onClick={() => loadAll()}
             disabled={isLoading}
             className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
@@ -740,33 +675,26 @@ export default function ModeratorDestinationsPage() {
           TẦNG 2 — 3 KPI (shrink-0, không cuộn) — bấm để lọc nhanh
          ══════════════════════════════════════════════════════════ */}
       <section className="shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 mt-4">
-        <KpiCard
+        <KpiTile
           icon={Layers}
-          label="TỔNG HỒ SƠ HỆ THỐNG"
+          label="Tổng hồ sơ"
           value={counts.all}
           unit="hồ sơ"
           tone="slate"
-          active={statusTab === "all"}
-          onClick={() => handleTabChange("all")}
         />
-        <KpiCard
+        <KpiTile
           icon={Clock}
-          label="HỒ SƠ CHỜ THẨM ĐỊNH"
+          label="Chờ thẩm định"
           value={counts.pending}
           unit="chờ duyệt"
           tone="amber"
-          dot={counts.pending > 0}
-          active={statusTab === "pending"}
-          onClick={() => handleTabChange("pending")}
         />
-        <KpiCard
+        <KpiTile
           icon={CheckCircle2}
-          label="ĐIỂM ĐẾN ĐANG LƯU HÀNH"
+          label="Đang lưu hành"
           value={counts.published}
           unit="đã duyệt"
           tone="emerald"
-          active={statusTab === "published"}
-          onClick={() => handleTabChange("published")}
         />
       </section>
 
@@ -861,7 +789,7 @@ export default function ModeratorDestinationsPage() {
               <p className="text-[11px] text-rose-700 mt-0.5">{fetchError}</p>
               <button
                 type="button"
-                onClick={loadAll}
+                onClick={() => loadAll()}
                 className="mt-2 text-[11px] font-bold text-rose-700 underline hover:text-rose-900 cursor-pointer"
               >
                 Thử lại
@@ -872,12 +800,13 @@ export default function ModeratorDestinationsPage() {
 
         {/* ── TIÊU ĐỀ CỘT — shrink-0, cố định ── */}
         <div
-          className={`${ROW_GRID} shrink-0 pl-4 sm:pl-5 ${HEADER_PAD} py-3 bg-slate-50 border-b border-slate-200 text-[11px] font-bold  text-slate-600 `}
+          className={`${ROW_GRID} shrink-0 pl-4 sm:pl-5 pr-4 sm:pr-[35px] py-3 bg-slate-50 border-b border-slate-200 text-[11px] font-bold  text-slate-600 `}
         >
-          <div className="col-span-12 md:col-span-4">Tên địa điểm</div>
-          <div className="col-span-6 md:col-span-2">Sức chứa</div>
-          <div className="col-span-6 md:col-span-3">Trạng thái</div>
-          <div className="col-span-12 md:col-span-3">Thao tác</div>
+          <div className="hidden md:block md:col-span-1 text-center">STT</div>
+          <div className="col-span-12 md:col-span-1">Tên địa điểm</div>
+          <div className="col-span-6 md:col-span-1">Sức chứa</div>
+          <div className="col-span-6 md:col-span-1">Trạng thái</div>
+          <div className="col-span-12 md:col-span-1 md:text-right">Thao tác</div>
         </div>
 
         {/* ── THÂN DANH SÁCH — CHỈ VÙNG NÀY CUỘN ── */}
@@ -910,53 +839,41 @@ export default function ModeratorDestinationsPage() {
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {pagedItems.map((item) => {
+              {pagedItems.map((item, idx) => {
                 const isApproved =
                   item.status === STATUS.PUBLISHED || item.approved === true;
                 const isLoadingAction = actionLoadingId === item.id;
                 return (
                   <li
                     key={item.id}
-                    className="pl-4 sm:pl-5 py-3.5 hover:bg-slate-50/60 transition-colors"
+                    className="pl-4 sm:pl-5 pr-4 sm:pr-5 py-2.5 hover:bg-slate-50/60 transition-colors"
                   >
                     <div className={ROW_GRID}>
+                      {/* Số thứ tự (tính theo trang) */}
+                      <div className="hidden md:block md:col-span-1 text-center text-xs font-bold text-slate-500 tabular-nums">
+                        {safePageNumber * pageSize + idx + 1}
+                      </div>
+
                       {/* Cột 1 — Tên địa điểm */}
-                      <div className="col-span-12 md:col-span-4 flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
-                          <Compass size={18} />
-                        </div>
+                      <div className="col-span-12 md:col-span-1 flex items-center gap-3 min-w-0">
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-sm font-bold text-slate-900 truncate">
+                          <h3 className="text-sm font-medium text-slate-900 truncate" title={item.name}>
                             {item.name}
                           </h3>
-                          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-600">
-                            <span className="tabular-nums font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
-                              #{item.id}
-                            </span>
-                            <span className="flex items-center gap-1 font-bold text-slate-600 truncate">
-                              <Building2
-                                size={11}
-                                className="text-slate-400 shrink-0"
-                              />
-                              <span className="truncate">
-                                {item.createdBy || "Đơn vị không xác định"}
-                              </span>
-                            </span>
-                          </div>
                         </div>
                       </div>
 
                       {/* Cột 2 — Sức chứa */}
-                      <div className="col-span-6 md:col-span-2 flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                      <div className="col-span-6 md:col-span-1 flex items-center gap-1.5 min-w-0 text-[13px] font-medium text-slate-800 tabular-nums" title={`${item.capacity ?? "—"} du khách/lượt`}>
                         <Users size={13} className="text-slate-400 shrink-0" />
                         <span>{item.capacity ?? "—"}</span>
-                        <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                        <span className="text-[11px] font-normal text-slate-400 truncate">
                           du khách/lượt
                         </span>
                       </div>
 
                       {/* Cột 3 — Trạng thái (rộng hơn cột 2 để badge không bị sát sức chứa) */}
-                      <div className="col-span-6 md:col-span-3 flex items-center">
+                      <div className="col-span-6 md:col-span-1 flex items-center">
                         <StatusBadge status={item.status} />
                       </div>
 
@@ -966,7 +883,7 @@ export default function ModeratorDestinationsPage() {
                           cụm nút [Sửa] / [Chi tiết] của trang Admin Người dùng.
                           Căn lề TRÁI (justify-start) để cụm nút thẳng với
                           tiêu đề cột "Thao tác", thay vì dồn sát mép phải. */}
-                      <div className="col-span-12 md:col-span-3 flex items-center justify-start gap-2 shrink-0">
+                      <div className="col-span-12 md:col-span-1 flex items-center justify-start md:justify-end gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={() => openDetail(item.id)}
@@ -1047,6 +964,17 @@ export default function ModeratorDestinationsPage() {
         error={detailError}
         onClose={closeDetail}
         onApprove={(id, approve, name) => handleApprove(id, approve, name)}
+        onCompleted={({ approved, revoked, name }) => {
+          closeDetail();
+          loadAll();
+          showToast(
+            revoked
+              ? `Đã thu hồi duyệt điểm đến "${name}". Đối tác sẽ nhận phản hồi để chỉnh sửa.`
+              : approved
+              ? `Đã gửi kết quả thẩm định và phát hành điểm đến "${name}".`
+              : `Đã gửi kết quả thẩm định: điểm đến "${name}" bị từ chối.`
+          );
+        }}
         isActionLoading={actionLoadingId === detailTarget?.id}
         theme="emerald"
       />
@@ -1065,8 +993,17 @@ export default function ModeratorDestinationsPage() {
       <RegionManagerModal
         isOpen={isRegionManagerOpen}
         onClose={() => setIsRegionManagerOpen(false)}
-        onUpdated={loadAll}
+        onUpdated={() => loadAll()}
       />
     </div>
+  );
+}
+
+/** useSearchParams cần nằm trong Suspense để Next.js dựng trang tĩnh. */
+export default function ModeratorDestinationsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ModeratorDestinationsContent />
+    </Suspense>
   );
 }

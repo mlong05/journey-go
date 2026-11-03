@@ -13,6 +13,25 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/*
+ * Tailwind v4 bỏ cursor: pointer mặc định của nút, nên nút trông như chữ thường khi rê chuột.
+ * Khôi phục con trỏ bàn tay cho mọi phần tử bấm được; nút đang khoá thì hiện "không cho phép".
+ */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
 .font-script {
   font-family: 'Dancing Script', cursive, sans-serif;
 }
@@ -75,6 +94,16 @@ pre {
    khai báo giá trị mặc định cho các biến CSS, còn keyframe đọc chúng ở
    frame `from` và trả về trạng thái chuẩn ở frame `to`.
    ========================================================================= */
+
+/* Chuông rung nhẹ khi có thông báo mới (NotificationBell) */
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-5deg); }
+  75% { transform: rotate(2deg); }
+}
 
 @keyframes jg-enter {
   from {

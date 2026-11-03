@@ -122,8 +122,8 @@ export default function ChangeStatusDialog({
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
               {isPublish
-                ? "Trải nghiệm sẽ được hiển thị công khai. Sau khi đăng, BR-EXP-2 sẽ chặn không cho chỉnh sửa nội dung."
-                : "Trải nghiệm sẽ quay về Bản nháp và ngừng hiển thị công khai."}
+                ? "Trải nghiệm và toàn bộ nhiệm vụ của nó sẽ được hiển thị cho du khách. Sau khi đăng, nội dung, nhiệm vụ và câu hỏi bị khóa chỉnh sửa."
+                : "Trải nghiệm và các nhiệm vụ sẽ quay về Bản nháp để chỉnh sửa, du khách không còn thấy nhiệm vụ trong hành trình."}
             </p>
           </div>
           <button

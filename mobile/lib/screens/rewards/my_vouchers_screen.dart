@@ -83,7 +83,7 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
             'Voucher của tôi',
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: AppCultureColors.textDark,
             ),
           ),
@@ -91,7 +91,7 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
             labelColor: AppCultureColors.heritageJade,
             unselectedLabelColor: AppCultureColors.textMuted,
             indicatorColor: AppCultureColors.heritageJade,
-            labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
             tabs: [
               Tab(text: 'Còn dùng (${usable.length})'),
               Tab(text: 'Đã dùng (${used.length})'),
@@ -193,7 +193,7 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
                   v.voucherTitle,
                   style: TextStyle(
                     fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     height: 1.3,
                     color: usable ? AppCultureColors.textDark : AppCultureColors.textMuted,
                   ),
@@ -208,7 +208,7 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
                 ),
                 child: Text(
                   statusText,
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: accent),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: accent),
                 ),
               ),
             ],
@@ -228,7 +228,7 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 14,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
                       color: usable ? AppCultureColors.jadeDark : AppCultureColors.textMuted,
                       decoration: usable ? null : TextDecoration.lineThrough,

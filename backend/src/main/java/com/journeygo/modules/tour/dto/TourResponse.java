@@ -31,6 +31,11 @@ public record TourResponse(
         @Schema(description = "Thời điểm xóa mềm (null nếu còn hoạt động)") Instant deletedAt,
         @Schema(description = "Số lượng điểm đến") int destinationCount,
         @Schema(description = "Danh sách điểm đến theo thứ tự hành trình") List<TourDestinationResponse> destinations,
+        @Schema(description = "Ảnh bìa hiển thị: ảnh riêng của tour, nếu chưa có thì lấy ảnh điểm đến đầu tiên có ảnh") String coverImageUrl,
+        @Schema(description = "Ảnh bìa riêng do người tạo tour tải lên (null nếu chưa có)") String tourCoverImageUrl,
+        @Schema(description = "Số nhiệm vụ đang mở trong các trải nghiệm của tour") int taskCount,
+        @Schema(description = "Tổng điểm thưởng tối đa từ các nhiệm vụ") int totalTaskPoints,
+        @Schema(description = "Số huy hiệu check-in có thể nhận (mỗi điểm đến một huy hiệu, trừ huy hiệu đã tắt)") int badgeCount,
         @Schema(description = "Người tạo") String createdBy,
         @Schema(description = "Thời gian tạo") Instant createdAt,
         @Schema(description = "Thời gian cập nhật") Instant updatedAt
@@ -58,6 +63,12 @@ public record TourResponse(
                 .deletedAt(t.getDeletedAt())
                 .destinationCount(t.getDestinationCount())
                 .destinations(destResponses)
+                .tourCoverImageUrl(t.getCoverImageUrl())
+                .coverImageUrl(t.getCoverImageUrl() != null && !t.getCoverImageUrl().isBlank() ? t.getCoverImageUrl() : destResponses.stream()
+                        .sorted(java.util.Comparator.comparingInt(TourDestinationResponse::sequenceOrder))
+                        .map(TourDestinationResponse::coverImageUrl)
+                        .filter(url -> url != null && !url.isBlank())
+                        .findFirst().orElse(null))
                 .createdBy(t.getCreatedBy() != null ? t.getCreatedBy().getFullName() : null)
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())

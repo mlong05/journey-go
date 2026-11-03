@@ -30,6 +30,10 @@ public record TourRequest(
         @Schema(description = "Ngày kết thúc tour (yyyy-MM-dd, tùy chọn)", example = "2026-12-03")
         LocalDate endDate,
 
+        @Schema(description = "Ảnh bìa tour (URL https). Bỏ trống thì dùng ảnh bìa của điểm đến đầu tiên")
+        @Size(max = 1000, message = "Đường dẫn ảnh bìa không được quá 1000 ký tự")
+        String coverImageUrl,
+
         @Schema(description = "Danh sách điểm đến theo thứ tự hành trình (ít nhất 1 điểm đến)")
         @NotNull(message = "Danh sách điểm đến không được để trống")
         @Size(min = 1, message = "Tour phải có ít nhất 1 điểm đến")

@@ -342,7 +342,32 @@ export async function rejectTour(tourId, payload = {}) {
 }
 
 
+/**
+ * Duyệt gói trải nghiệm (ADMIN, MODERATOR). Phát hành ngay nếu điểm đến đã được duyệt.
+ * PATCH /api/v1/moderation/experiences/{experienceId}/approve
+ */
+export async function approveExperience(experienceId, note = null) {
+  const payload = note ? { note: String(note).trim() } : {};
+  const res = await apiClient.patch(`/moderation/experiences/${experienceId}/approve`, payload);
+  return unwrap(res);
+}
+
+/**
+ * Từ chối gói trải nghiệm, ghi chú là bắt buộc (ADMIN, MODERATOR).
+ * PATCH /api/v1/moderation/experiences/{experienceId}/reject
+ */
+export async function rejectExperience(experienceId, note) {
+  const res = await apiClient.patch(`/moderation/experiences/${experienceId}/reject`, {
+    note: String(note || "").trim(),
+  });
+  return unwrap(res);
+}
+
 export const moderationService = {
+  // Experiences
+  approveExperience,
+  rejectExperience,
+
   // Contents
   submitContent,
   getContentQueue,

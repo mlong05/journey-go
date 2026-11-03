@@ -197,6 +197,9 @@ export function normalizeTour(raw) {
     deletedAt: inner.deletedAt || raw.deletedAt || null,
     destinationCount: Number(inner.destinationCount ?? (inner.destinations?.length || 0)),
     destinations: Array.isArray(inner.destinations) ? inner.destinations : [],
+    // Ảnh hiển thị (riêng của tour hoặc ảnh điểm đến) và ảnh riêng do người tạo tải lên
+    coverImageUrl: inner.coverImageUrl || null,
+    tourCoverImageUrl: inner.tourCoverImageUrl || null,
     createdBy: inner.createdBy || raw.reviewerName || "",
     createdAt: inner.createdAt || raw.submittedAt || null,
     updatedAt: inner.updatedAt || raw.reviewedAt || null,

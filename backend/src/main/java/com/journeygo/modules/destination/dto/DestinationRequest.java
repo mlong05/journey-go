@@ -38,5 +38,10 @@ public record DestinationRequest(
         Long regionId,
 
         @Schema(description = "Danh sách ID chủ đề", example = "[1, 2]")
-        Set<Long> themeIds
+        Set<Long> themeIds,
+
+        @Schema(description = "Ảnh bìa (URL https). Khi cập nhật: không gửi = giữ ảnh cũ, chuỗi rỗng = bỏ ảnh")
+        @Pattern(regexp = "^$|^https://.+", message = "Ảnh bìa phải là đường dẫn https")
+        @Size(max = 500, message = "Đường dẫn ảnh bìa tối đa 500 ký tự")
+        String coverImageUrl
 ) {}

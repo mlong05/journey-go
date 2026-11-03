@@ -17,6 +17,18 @@ import { apiClient } from "@/services/apiClient";
 
 const ENDPOINT = "/bookings";
 
+/** Chuẩn hóa Page của Spring Data về { items, page, totalPages, totalElements }. */
+export function toPage(payload) {
+  const data = payload ?? {};
+  const items = Array.isArray(data) ? data : Array.isArray(data.content) ? data.content : [];
+  return {
+    items,
+    page: Number(data.page ?? data.number ?? 0),
+    totalPages: Number(data.totalPages ?? 1),
+    totalElements: Number(data.totalElements ?? items.length),
+  };
+}
+
 /** Tạo booking mới. Trả về booking kèm `paymentDeadline` để đếm ngược 10 phút. */
 export async function createBooking({ tourId, experienceDate }) {
   const res = await apiClient.post(ENDPOINT, { tourId, experienceDate });
@@ -67,3 +79,18 @@ export async function expireBookingIfNeeded(bookingId) {
   }
   return booking;
 }
+
+/**
+ * Service dạng object (default export) — dùng bởi code gọi `bookingService.xxx`.
+ * Cùng contract với các hàm named export ở trên.
+ */
+const bookingService = {
+  create: createBooking,
+  getMine: getMyBookings,
+  getById: getBookingById,
+  cancel: cancelBooking,
+  getAll: getAllBookings,
+  expireBookingIfNeeded,
+};
+
+export default bookingService;

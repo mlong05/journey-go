@@ -187,7 +187,7 @@ export default function CheckoutPage() {
 
   if (!authData?.token) {
     router.push(
-      `${ROUTES.LOGIN}?redirect=${encodeURIComponent(ROUTES.CHECKOUT(bookingId))}`,
+      `${ROUTES.LOGIN}?redirect=${encodeURIComponent(ROUTES.CHECKOUT_STANDALONE(bookingId))}`,
     );
     return null;
   }

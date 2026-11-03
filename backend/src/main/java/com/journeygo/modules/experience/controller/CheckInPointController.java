@@ -79,6 +79,17 @@ public class CheckInPointController {
         return ResponseEntity.ok(ApiResponse.success(checkInPointService.update(id, request)));
     }
 
+    @PostMapping("/check-in-points/{id}/qr/regenerate")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfCheckInPoint(#id)")
+    @Operation(summary = "Tạo lại mã QR của trạm check-in (chỉ owner)",
+            description = "Dùng khi mã cũ bị lộ. Được phép cả khi Experience đã PUBLISHED vì chỉ đổi mã. "
+                    + "Mã cũ hết hiệu lực ngay, cần in lại QR.")
+    public ResponseEntity<ApiResponse<CheckInPointResponse>> regenerateQr(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Đã tạo mã QR mới cho trạm",
+                checkInPointService.regenerateQr(id)));
+    }
+
     @DeleteMapping("/check-in-points/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfCheckInPoint(#id)")

@@ -9,6 +9,16 @@ library;
 
 import '../utils/formatters.dart';
 
+num _asNum(dynamic value) {
+  if (value is num) return value;
+  return num.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+DateTime? _asDate(dynamic value) {
+  if (value == null) return null;
+  return DateTime.tryParse(value.toString())?.toLocal();
+}
+
 class PaymentModel {
   final int id;
   final int? bookingId;
@@ -19,7 +29,7 @@ class PaymentModel {
   final String? bankCode;
   final String? cardType;
   final String status;
-  final double amount;
+  final num amount;
   final String currency;
   final DateTime? createdAt;
   final DateTime? expiresAt;
@@ -41,12 +51,12 @@ class PaymentModel {
     this.method,
     this.bankCode,
     this.cardType,
-    this.status = 'PENDING',
-    this.amount = 0,
+    required this.status,
+    required this.amount,
     this.currency = 'VND',
-    this.createdAt,
+    required this.createdAt,
+    required this.paidAt,
     this.expiresAt,
-    this.paidAt,
     this.paymentUrl,
     this.duplicatePayment = false,
     this.ipnCount = 0,
@@ -55,6 +65,30 @@ class PaymentModel {
     this.vnpMessage,
     this.note,
   });
+
+  factory PaymentModel.fromJson(Map<String, dynamic> json) => PaymentModel(
+        id: _asNum(json['id']).toInt(),
+        bookingId: json['bookingId'] == null ? null : _asNum(json['bookingId']).toInt(),
+        bookingCode: json['bookingCode']?.toString(),
+        txnRef: json['txnRef']?.toString(),
+        vnpTransactionNo: json['vnpTransactionNo']?.toString(),
+        method: json['method']?.toString(),
+        bankCode: json['bankCode']?.toString(),
+        cardType: json['cardType']?.toString(),
+        status: json['status']?.toString() ?? '',
+        amount: _asNum(json['amount']),
+        currency: json['currency']?.toString() ?? 'VND',
+        createdAt: _asDate(json['createdAt']),
+        paidAt: _asDate(json['paidAt']),
+        expiresAt: _asDate(json['expiresAt']),
+        paymentUrl: json['paymentUrl']?.toString(),
+        duplicatePayment: json['duplicatePayment'] == true,
+        ipnCount: _asNum(json['ipnCount']).toInt(),
+        vnpResponseCode: json['vnpResponseCode']?.toString(),
+        vnpTransactionStatus: json['vnpTransactionStatus']?.toString(),
+        vnpMessage: json['vnpMessage']?.toString(),
+        note: json['note']?.toString(),
+      );
 
   bool get isSuccess => status == 'SUCCESS';
   bool get isFailed => status == 'FAILED';
@@ -73,32 +107,6 @@ class PaymentModel {
   String get statusLabel => paymentStatusLabel(status);
 
   String get formattedAmount => formatVndAmount(amount);
-
-  factory PaymentModel.fromJson(Map<String, dynamic> json) {
-    return PaymentModel(
-      id: _toInt(json['id']),
-      bookingId: _toNullableInt(json['bookingId']),
-      bookingCode: json['bookingCode']?.toString(),
-      txnRef: json['txnRef']?.toString(),
-      vnpTransactionNo: json['vnpTransactionNo']?.toString(),
-      method: json['method']?.toString(),
-      bankCode: json['bankCode']?.toString(),
-      cardType: json['cardType']?.toString(),
-      status: json['status']?.toString() ?? 'PENDING',
-      amount: _toDouble(json['amount']),
-      currency: json['currency']?.toString() ?? 'VND',
-      createdAt: _toDate(json['createdAt']),
-      expiresAt: _toDate(json['expiresAt']),
-      paidAt: _toDate(json['paidAt']),
-      paymentUrl: json['paymentUrl']?.toString(),
-      duplicatePayment: json['duplicatePayment'] == true,
-      ipnCount: _toInt(json['ipnCount']),
-      vnpResponseCode: json['vnpResponseCode']?.toString(),
-      vnpTransactionStatus: json['vnpTransactionStatus']?.toString(),
-      vnpMessage: json['vnpMessage']?.toString(),
-      note: json['note']?.toString(),
-    );
-  }
 }
 
 /// Kết quả khởi tạo thanh toán (POST /payments/bookings/{id}/init).
@@ -107,50 +115,37 @@ class PaymentInitModel {
   final int? bookingId;
   final String? bookingCode;
   final String? txnRef;
-  final double amount;
+  final num amount;
   final String currency;
   final String? paymentUrl;
   final DateTime? expiresAt;
   final String? selectedBankCode;
-  final List<PaymentMethodOption> availableMethods;
-  final String? message;
 
   const PaymentInitModel({
     required this.paymentId,
     this.bookingId,
     this.bookingCode,
     this.txnRef,
-    this.amount = 0,
+    required this.amount,
     this.currency = 'VND',
-    this.paymentUrl,
-    this.expiresAt,
+    required this.paymentUrl,
+    required this.expiresAt,
     this.selectedBankCode,
-    this.availableMethods = const [],
-    this.message,
   });
 
-  String get formattedAmount => formatVndAmount(amount);
+  factory PaymentInitModel.fromJson(Map<String, dynamic> json) => PaymentInitModel(
+        paymentId: _asNum(json['paymentId']).toInt(),
+        bookingId: json['bookingId'] == null ? null : _asNum(json['bookingId']).toInt(),
+        bookingCode: json['bookingCode']?.toString(),
+        txnRef: json['txnRef']?.toString(),
+        amount: _asNum(json['amount']),
+        currency: json['currency']?.toString() ?? 'VND',
+        paymentUrl: json['paymentUrl']?.toString() ?? '',
+        expiresAt: _asDate(json['expiresAt']),
+        selectedBankCode: json['selectedBankCode']?.toString(),
+      );
 
-  factory PaymentInitModel.fromJson(Map<String, dynamic> json) {
-    return PaymentInitModel(
-      paymentId: _toInt(json['paymentId']),
-      bookingId: _toNullableInt(json['bookingId']),
-      bookingCode: json['bookingCode']?.toString(),
-      txnRef: json['txnRef']?.toString(),
-      amount: _toDouble(json['amount']),
-      currency: json['currency']?.toString() ?? 'VND',
-      paymentUrl: json['paymentUrl']?.toString(),
-      expiresAt: _toDate(json['expiresAt']),
-      selectedBankCode: json['selectedBankCode']?.toString(),
-      availableMethods: (json['availableMethods'] is List)
-          ? (json['availableMethods'] as List)
-              .whereType<Map<String, dynamic>>()
-              .map(PaymentMethodOption.fromJson)
-              .toList()
-          : const [],
-      message: json['message']?.toString(),
-    );
-  }
+  String get formattedAmount => formatVndAmount(amount);
 }
 
 /// Một phương thức thanh toán (3 nhóm VNPay).
@@ -178,9 +173,33 @@ class PaymentMethodOption {
       label: json['label']?.toString() ?? '',
       description: json['description']?.toString(),
       cardType: json['cardType']?.toString(),
-      displayOrder: _toInt(json['displayOrder']),
+      displayOrder: _asNum(json['displayOrder']).toInt(),
     );
   }
+}
+
+/// Dạng rút gọn của một phương thức thanh toán — dùng bởi luồng checkout
+/// (chỉ cần bankCode + nhãn để hiển thị và gửi lên khi init).
+class PaymentMethodModel {
+  /// vnp_BankCode gửi lên khi init; null nghĩa là để khách tự chọn trên trang VNPay.
+  final String? bankCode;
+  final String label;
+  final String description;
+  final int displayOrder;
+
+  const PaymentMethodModel({
+    required this.bankCode,
+    required this.label,
+    required this.description,
+    required this.displayOrder,
+  });
+
+  factory PaymentMethodModel.fromJson(Map<String, dynamic> json) => PaymentMethodModel(
+        bankCode: json['bankCode']?.toString(),
+        label: json['label']?.toString() ?? '',
+        description: json['description']?.toString() ?? '',
+        displayOrder: _asNum(json['displayOrder']).toInt(),
+      );
 }
 
 /// Danh sách phương thức thanh toán (GET /payments/methods).
@@ -320,9 +339,7 @@ class PaymentReturnResult {
   });
 
   bool get isSuccess => status == 'SUCCESS';
-
   bool get isFailed => status == 'FAILED';
-
   bool get isCancelled => status == 'CANCELLED';
 
   /// Đã có kết quả cuối (không còn "chờ").
@@ -330,36 +347,12 @@ class PaymentReturnResult {
 
   factory PaymentReturnResult.fromJson(Map<String, dynamic> json) {
     return PaymentReturnResult(
-      paymentId: json['paymentId'] == null ? null : _toNullableInt(json['paymentId']),
-      bookingId: json['bookingId'] == null ? null : _toNullableInt(json['bookingId']),
+      paymentId: json['paymentId'] == null ? null : _asNum(json['paymentId']).toInt(),
+      bookingId: json['bookingId'] == null ? null : _asNum(json['bookingId']).toInt(),
       bookingCode: json['bookingCode']?.toString(),
       txnRef: json['txnRef']?.toString(),
       status: json['status']?.toString() ?? 'UNKNOWN',
       message: json['message']?.toString() ?? '',
     );
   }
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-int _toInt(dynamic v) {
-  if (v is num) return v.toInt();
-  return int.tryParse(v?.toString() ?? '') ?? 0;
-}
-
-int? _toNullableInt(dynamic v) {
-  if (v is num) return v.toInt();
-  return int.tryParse(v?.toString() ?? '');
-}
-
-double _toDouble(dynamic v) {
-  if (v is num) return v.toDouble();
-  return double.tryParse(v?.toString() ?? '') ?? 0;
-}
-
-DateTime? _toDate(dynamic v) {
-  if (v == null) return null;
-  final raw = v.toString();
-  if (raw.isEmpty) return null;
-  return DateTime.tryParse(raw)?.toLocal();
 }

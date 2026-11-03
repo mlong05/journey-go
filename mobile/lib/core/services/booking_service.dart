@@ -22,18 +22,36 @@ class BookingService {
 
   static const String _endpoint = '/bookings';
 
+  /// Định dạng `DateTime` thành `YYYY-MM-DD` (backend nhận `LocalDate`).
+  static String _formatDate(DateTime value) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${value.year}-${two(value.month)}-${two(value.day)}';
+  }
+
   /// Tạo booking mới. Trả về booking kèm `paymentDeadline` để đếm ngược 10 phút.
+  ///
+  /// [experienceDate] nhận cả `String` (`YYYY-MM-DD`) lẫn `DateTime`.
   Future<BookingModel> createBooking({
     required int tourId,
-    required String experienceDate,
+    required Object experienceDate,
   }) async {
+    final date = experienceDate is DateTime
+        ? _formatDate(experienceDate)
+        : experienceDate.toString();
     final data = await ApiClient.request(
       'POST',
       _endpoint,
-      body: {'tourId': tourId, 'experienceDate': experienceDate},
+      body: {'tourId': tourId, 'experienceDate': date},
     );
     return BookingModel.fromJson(data as Map<String, dynamic>);
   }
+
+  /// Tạo booking mới (alias theo kiểu gọi của màn checkout).
+  Future<BookingModel> create({
+    required int tourId,
+    required DateTime experienceDate,
+  }) =>
+      createBooking(tourId: tourId, experienceDate: experienceDate);
 
   /// Danh sách booking của tôi.
   Future<List<BookingModel>> getMyBookings({int page = 0, int size = 20}) async {
@@ -45,6 +63,10 @@ class BookingService {
         .map(BookingModel.fromJson)
         .toList();
   }
+
+  /// Danh sách booking của tôi (alias theo kiểu gọi của màn danh sách).
+  Future<List<BookingModel>> getMine({int page = 0, int size = 50}) =>
+      getMyBookings(page: page, size: size);
 
   /// Metadata phân trang của `getMyBookings`.
   Future<Map<String, dynamic>> getMyBookingsPage({int page = 0, int size = 20}) async {
@@ -61,6 +83,9 @@ class BookingService {
     return BookingModel.fromJson(data as Map<String, dynamic>);
   }
 
+  /// Chi tiết một booking (alias theo kiểu gọi của màn checkout).
+  Future<BookingModel> getById(int id) => getBookingById(id);
+
   /// Hủy booking (chỉ được khi chưa thanh toán). Slot đã giữ được giải phóng.
   Future<BookingModel> cancelBooking(int bookingId, {String? reason}) async {
     final data = await ApiClient.request(
@@ -70,6 +95,10 @@ class BookingService {
     );
     return BookingModel.fromJson(data as Map<String, dynamic>);
   }
+
+  /// Hủy booking (alias theo kiểu gọi của màn checkout).
+  Future<BookingModel> cancel(int id, {String? reason}) =>
+      cancelBooking(id, reason: reason);
 
   /// Tự động hủy booking khi hết hạn thanh toán (10 phút).
   ///
