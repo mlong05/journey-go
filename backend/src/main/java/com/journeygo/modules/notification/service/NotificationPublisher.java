@@ -31,6 +31,9 @@ public class NotificationPublisher {
     /** Tên hàng chờ dùng chung giữa backend, web và app. */
     public static final class Queue {
         public static final String DESTINATION_REVIEW = "destination-review";
+        public static final String DESTINATION_REQUEST_REVIEW = "destination-request-review";
+        public static final String DESTINATION_REQUEST_ASSIGNMENT = "destination-request-assignment";
+        public static final String DESTINATION_REQUEST_CONTENT = "destination-request-content";
         public static final String TOUR_REVIEW = "tour-review";
         public static final String CONTENT_REVIEW = "content-review";
         public static final String EXPERIENCE_REVIEW = "experience-review";
