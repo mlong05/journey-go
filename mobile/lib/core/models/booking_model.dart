@@ -1,17 +1,17 @@
-﻿/// Model Booking (Ä‘áº·t tour) + cÃ¡c model Payment dÃ¹ng chung.
+﻿/// Model Booking (đặt tour) + các model Payment dùng chung.
 ///
-/// â”€â”€ Quy Æ°á»›c â”€â”€
-///  â€¢ Tiá»n VND lÃ  sá»‘ nguyÃªn â€” backend tráº£ `BigDecimal` dáº¡ng JSON number.
-///    TUYá»†T Äá»I khÃ´ng chia/nhÃ¢n 100 khi gá»i API.
-///  â€¢ `experienceDate` lÃ  `LocalDate` â†’ chuá»—i `YYYY-MM-DD` (KHÃ”NG cÃ³ pháº§n giá»).
-///  â€¢ `createdAt`, `paymentDeadline`, `paidAt`... lÃ  `Instant` ISO-8601 UTC.
+/// ── Quy ước ──
+///  • Tiền VND là số nguyên — backend trả `BigDecimal` dạng JSON number.
+///    TUYỆT ĐỐI không chia/nhân 100 khi gọi API.
+///  • `experienceDate` là `LocalDate` chuỗi `YYYY-MM-DD` (KHÔNG có phần giờ).
+///  • `createdAt`, `paymentDeadline`, `paidAt`... là `Instant` ISO-8601 UTC.
 library;
 
 import '../utils/formatters.dart';
 import 'gamification_model.dart' show formatThousands;
 
-/// Các model Payment được định nghĩa trong `payment_model.dart` nhưng vẫn được
-/// export lại từ đây để tương thích với code đang import từ `booking_model.dart`.
+// Các model Payment được định nghĩa trong `payment_model.dart` nhưng vẫn được
+// export lại từ đây để tương thích với code đang import từ `booking_model.dart`.
 export 'payment_model.dart'
     show
         PaymentModel,
@@ -44,21 +44,21 @@ DateTime? _asLocalDate(dynamic value) {
   return DateTime(parsed.year, parsed.month, parsed.day);
 }
 
-String formatMoney(num value) => '${formatThousands(value)} Ä‘';
+String formatMoney(num value) => '${formatThousands(value)} đ';
 
 String formatDateTime(DateTime? value) {
-  if (value == null) return 'â€”';
+  if (value == null) return '—';
   String two(int n) => n.toString().padLeft(2, '0');
   return '${two(value.hour)}:${two(value.minute)} ${two(value.day)}/${two(value.month)}/${value.year}';
 }
 
 String formatDay(DateTime? value) {
-  if (value == null) return 'â€”';
+  if (value == null) return '—';
   String two(int n) => n.toString().padLeft(2, '0');
   return '${two(value.day)}/${two(value.month)}/${value.year}';
 }
 
-/// Tráº¡ng thÃ¡i booking theo backend (BookingStatus).
+/// Trạng thái booking theo backend (BookingStatus).
 class BookingStatus {
   static const pendingPayment = 'PENDING_PAYMENT';
   static const confirmed = 'CONFIRMED';
@@ -67,16 +67,16 @@ class BookingStatus {
   static const cancelled = 'CANCELLED';
 
   static String label(String status) => switch (status) {
-        pendingPayment => 'Chá» thanh toÃ¡n',
-        confirmed => 'ÄÃ£ xÃ¡c nháº­n',
-        completed => 'ÄÃ£ hoÃ n thÃ nh',
-        expired => 'Háº¿t háº¡n thanh toÃ¡n',
-        cancelled => 'ÄÃ£ há»§y',
-        _ => status,
-      };
+    pendingPayment => 'Chờ thanh toán',
+    confirmed => 'Đã xác nhận',
+    completed => 'Đã hoàn thành',
+    expired => 'Hết hạn thanh toán',
+    cancelled => 'Đã hủy',
+    _ => status,
+  };
 }
 
-/// Tráº¡ng thÃ¡i má»™t láº§n thanh toÃ¡n (PaymentStatus).
+/// Trạng thái một lần thanh toán (PaymentStatus).
 class PaymentStatus {
   static const pending = 'PENDING';
   static const processing = 'PROCESSING';
@@ -85,19 +85,19 @@ class PaymentStatus {
   static const expired = 'EXPIRED';
   static const cancelled = 'CANCELLED';
 
-  /// ÄÃ£ cÃ³ káº¿t quáº£ cuá»‘i. PENDING / PROCESSING nghÄ©a lÃ  CHÆ¯A rÃµ, khÃ´ng Ä‘Æ°á»£c coi lÃ  tháº¥t báº¡i.
+  /// Đã có kết quả cuối. PENDING / PROCESSING nghĩa là CHƯA rõ, KHÔNG được coi là thất bại.
   static bool isFinal(String status) =>
       status == success || status == failed || status == cancelled || status == expired;
 
   static String label(String status) => switch (status) {
-        pending => 'Chá» thanh toÃ¡n',
-        processing => 'Äang xÃ¡c minh',
-        success => 'ThÃ nh cÃ´ng',
-        failed => 'Tháº¥t báº¡i',
-        cancelled => 'KhÃ¡ch Ä‘Ã£ há»§y',
-        expired => 'Háº¿t háº¡n',
-        _ => status,
-      };
+    pending => 'Chờ thanh toán',
+    processing => 'Đang xác minh',
+    success => 'Thành công',
+    failed => 'Thất bại',
+    cancelled => 'Khách đã hủy',
+    expired => 'Hết hạn',
+    _ => status,
+  };
 }
 
 class BookingModel {
@@ -129,7 +129,7 @@ class BookingModel {
     this.touristName,
     required this.tourId,
     required this.tourTitle,
-    required this.experienceDate,
+    this.experienceDate,
     required this.totalAmount,
     this.currency = 'VND',
     required this.status,
@@ -169,14 +169,14 @@ class BookingModel {
 
   bool get isPaid => status == BookingStatus.confirmed || status == BookingStatus.completed;
 
-  /// CÃ²n cÃ³ thá»ƒ thanh toÃ¡n: Ä‘ang chá» vÃ  chÆ°a quÃ¡ háº¡n.
+  /// Còn có thể thanh toán: đang chờ và chưa quá hạn.
   bool get canPay {
     if (status != BookingStatus.pendingPayment) return false;
     final deadline = paymentDeadline;
     return deadline != null && deadline.isAfter(DateTime.now());
   }
 
-  // â”€â”€ Tráº¡ng thÃ¡i â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Trạng thái ────────────────────────────────────────────────────────────
 
   bool get isPendingPayment => status == BookingStatus.pendingPayment;
   bool get isConfirmed => status == BookingStatus.confirmed;
@@ -184,21 +184,21 @@ class BookingModel {
   bool get isExpired => status == BookingStatus.expired;
   bool get isCancelled => status == BookingStatus.cancelled;
 
-  /// CÃ²n trong thá»i gian thanh toÃ¡n (10 phÃºt) hay chÆ°a.
+  /// Còn trong thời gian thanh toán (10 phút) hay chưa.
   bool get isPaymentWindowOpen {
     if (!isPendingPayment) return false;
     if (paymentDeadline == null) return true;
     return paymentDeadline!.isAfter(DateTime.now());
   }
 
-  /// Sá»‘ giÃ¢y cÃ²n láº¡i Ä‘á»ƒ thanh toÃ¡n (0 náº¿u Ä‘Ã£ háº¿t háº¡n).
+  /// Số giây còn lại để thanh toán (0 nếu đã hết hạn).
   int get remainingSeconds {
     if (paymentDeadline == null) return 0;
     final diff = paymentDeadline!.difference(DateTime.now()).inSeconds;
     return diff > 0 ? diff : 0;
   }
 
-  /// Äáº¿m ngÆ°á»£c dáº¡ng mm:ss.
+  /// Đồng hồ đếm ngược dạng mm:ss.
   String get countdownText {
     final total = remainingSeconds;
     final minutes = (total ~/ 60).toString().padLeft(2, '0');
@@ -206,7 +206,7 @@ class BookingModel {
     return '$minutes:$seconds';
   }
 
-  // â”€â”€ NhÃ£n hiá»ƒn thá»‹ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Nhãn hiển thị ─────────────────────────────────────────────────────────
 
   String get statusLabel => bookingStatusLabel(status);
 
@@ -218,27 +218,27 @@ class BookingModel {
 
   String get formattedPaidAt => formatDateTimeVn(paidAt);
 
-  /// Chá»‰ hiá»ƒn thá»‹ nÃºt há»§y khi chÆ°a thanh toÃ¡n.
+  /// Chỉ hiện thị nút hủy khi chưa thanh toán.
   bool get canCancel => isPendingPayment;
 
-  // â”€â”€ Tráº£i nghiá»‡m Ä‘Ã£ Ä‘áº·t (slot holds) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Trải nghiệm đã đặt (slot holds) ───────────────────────────────────────
 
-  /// Sá»‘ tráº£i nghiá»‡m trong tour Ä‘Ã£ Ä‘Æ°á»£c giá»¯ chá»— cho Ä‘Æ¡n nÃ y.
-  /// KHÃ”NG pháº£i sá»‘ vÃ© â€” má»—i tráº£i nghiá»‡m trong tour chiáº¿m 1 slot/ngÃ y.
+  /// Số trải nghiệm trong tour đã được giữ chỗ cho đơn này.
+  /// KHÔNG phải số vé — mỗi trải nghiệm trong tour chiếm 1 slot/ngày.
   int get experienceCount => slotHolds.length;
 
-  /// Tá»•ng giÃ¡ cá»§a cÃ¡c tráº£i nghiá»‡m Ä‘Ã£ Ä‘áº·t (tá»« chi tiáº¿t slot hold).
-  /// TrÃ¹ng `totalAmount` khi backend Ä‘Ã£ tráº£ Ä‘á»§ giÃ¡ theo tá»«ng tráº£i nghiá»‡m.
+  /// Tổng giá của các trải nghiệm đã đặt (từ chi tiết slot hold).
+  /// Trùng `totalAmount` khi backend đã trả đúng giá theo từng trải nghiệm.
   double get experiencesTotalAmount => slotHolds.fold<double>(
         0,
         (sum, h) => sum + h.experiencePrice,
       );
 
-  /// Slot Ä‘ang thá»±c sá»± cÃ²n giá»¯ (chÆ°a giáº£i phÃ³ng).
+  /// Slot thực sự còn giữ (chưa giải phóng).
   List<SlotHoldModel> get activeSlotHolds =>
       slotHolds.where((h) => !h.released).toList(growable: false);
 
-  /// Slot Ä‘Ã£ Ä‘Æ°á»£c giáº£i phÃ³ng (Ä‘Æ¡n há»§y / háº¿t háº¡n).
+  /// Slot đã được giải phóng (đơn hủy / hết hạn).
   List<SlotHoldModel> get releasedSlotHolds =>
       slotHolds.where((h) => h.released).toList(growable: false);
 
@@ -264,12 +264,12 @@ class BookingModel {
       };
 }
 
-/// Má»™t láº§n giá»¯ chá»— (slot) trong booking.
+/// Một lần giữ chỗ (slot) trong booking.
 ///
-/// â”€â”€ Ã nghÄ©a â”€â”€
-///  Má»—i Booking giá»¯ **má»™t slot cho Má»ŒI tráº£i nghiá»‡m** thuá»™c tour (má»—i tráº£i nghiá»‡m 1 slot/ngÃ y).
-///  VÃ¬ váº­y sá»‘ lÆ°á»£ng `slotHolds` = sá»‘ tráº£i nghiá»‡m trong tour, KHÃ”NG pháº£i sá»‘ lÆ°á»£ng vÃ© cá»§a khÃ¡ch.
-///  Do Ä‘Ã³ UI pháº£i hiá»ƒn thá»‹ theo danh sÃ¡ch "tráº£i nghiá»‡m Ä‘Ã£ Ä‘áº·t", khÃ´ng pháº£i "x chá»— Ä‘Ã£ giá»¯".
+/// ── Ý nghĩa ──
+///  Mỗi Booking giữ **một slot cho MỌI trải nghiệm** thuộc tour (mỗi trải nghiệm 1 slot/ngày).
+///  Vì vậy số lượng `slotHolds` = số trải nghiệm trong tour, KHÔNG phải số lượng vé của khách.
+///  Do đó UI phải hiển thị theo danh sách "trải nghiệm đã đặt", không phải "x chỗ đã giữ".
 class SlotHoldModel {
   final int id;
   final int? experienceSlotId;
