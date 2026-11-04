@@ -78,6 +78,18 @@ public class FinanceProperties {
     private long refundStatusCheckIntervalSeconds = 300;
 
     /**
+     * Số giây giữa các lần đối soát lại giao dịch thanh toán còn "kẹt" (PENDING / PROCESSING).
+     *
+     * <p>Xem {@code PaymentReconciliationScheduler}. Mặc định 300 giây (5 phút).
+     */
+    private long paymentReconcileIntervalSeconds = 300;
+
+    /**
+     * Số giao dịch tối đa xử lý trong một lượt đối soát — giới hạn tải lên VNPay merchant API.
+     */
+    private int paymentReconcileBatchSize = 50;
+
+    /**
      * Số giờ cho phép gửi lại yêu cầu Refund sau khi yêu cầu trước bị từ chối.
      *
      * <p>Tài liệu để ngỏ ("Quy tắc đề xuất: ... cần chốt liệu Tourist có được gửi lại

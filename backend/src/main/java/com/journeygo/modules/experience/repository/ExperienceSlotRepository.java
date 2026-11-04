@@ -34,9 +34,15 @@ public interface ExperienceSlotRepository extends JpaRepository<ExperienceSlot, 
      * <p>Thực hiện bằng một câu {@code UPDATE ... WHERE booked_tour_count < max_tour_per_day}
      * — hai request đồng thời không thể cùng chiếm slot cuối cùng (chống overselling).
      *
+     * <p>⚠️ {@code clearAutomatically = false} là BẮT BUỘC: nếu để {@code true}, Hibernate
+     * sẽ DETACH mọi entity đang được quản lý trong PersistenceContext — trong đó có
+     * {@code Booking} — ngay giữa transaction. Sau đó {@code BookingResponse.fromEntity(booking)}
+     * truy cập collection lazy {@code booking.getSlotHolds()} sẽ ném
+     * {@code LazyInitializationException: could not initialize proxy - no Session}.
+     *
      * @return số hàng được cập nhật (1 = giữ chỗ thành công, 0 = hết chỗ / không hợp lệ)
      */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying(clearAutomatically = false, flushAutomatically = true)
     @Query("""
             UPDATE ExperienceSlot s
             SET s.bookedTourCount = s.bookedTourCount + 1
@@ -49,9 +55,13 @@ public interface ExperienceSlotRepository extends JpaRepository<ExperienceSlot, 
     /**
      * Giải phóng chỗ trên một slot — chỉ giảm khi còn chỗ đã đặt.
      *
+     * <p>⚠️ {@code clearAutomatically = false} — xem giải thích ở {@link #atomicReserveSlot}.
+     * Việc xóa session của PersistenceContext giữa chừng sẽ làm hỏng các lazy
+     * collection của {@code Booking} (slotHolds) khi map sang DTO.
+     *
      * @return số hàng được cập nhật (0 nghĩa là slot đã ở trạng thái 0 — không âm số dư)
      */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying(clearAutomatically = false, flushAutomatically = true)
     @Query("""
             UPDATE ExperienceSlot s
             SET s.bookedTourCount = s.bookedTourCount - 1

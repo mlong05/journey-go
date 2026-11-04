@@ -8,6 +8,7 @@ import com.journeygo.common.security.AuthorizationGuard;
 import com.journeygo.modules.payment.dto.response.PaymentInitResponse;
 import com.journeygo.modules.payment.dto.response.PaymentMethodResponse;
 import com.journeygo.modules.payment.dto.response.PaymentResponse;
+import com.journeygo.modules.payment.dto.response.PaymentSummaryResponse;
 import com.journeygo.modules.payment.dto.response.PaymentVerificationResponse;
 import com.journeygo.modules.payment.entity.enums.PaymentOutcome;
 import com.journeygo.modules.payment.entity.enums.PaymentStatus;
@@ -53,17 +54,18 @@ public class PaymentController {
                     + "chỉ khi xác minh rõ ràng thất bại mới cho tạo lần thử mới. "
                     + "Không gia hạn thời hạn thanh toán 10 phút của Booking. "
                     + "Tham số bankCode cho phép chỉ định trước phương thức thanh toán "
-                    + "(VNPAYQR / VNBANK / INTCARD hoặc mã ngân hàng cụ thể); "
+                    + "(VNPAYQR / VNBANK / VISA hoặc mã ngân hàng cụ thể); "
                     + "bỏ trống thì khách tự chọn trên trang VNPay.")
     public ResponseEntity<ApiResponse<PaymentInitResponse>> initiate(
             @PathVariable Long bookingId,
             @RequestParam(required = false) String bankCode,
+            @RequestParam(required = false, defaultValue = "false") boolean appRedirect,
             HttpServletRequest httpRequest,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Khởi tạo thanh toán thành công",
                         paymentService.initiatePayment(bookingId, principal.getId(),
-                                resolveClientIp(httpRequest), bankCode)));
+                                resolveClientIp(httpRequest), bankCode, appRedirect)));
     }
 
     // ── Phương thức thanh toán ────────────────────────────────────────────────
@@ -72,10 +74,11 @@ public class PaymentController {
     @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Danh sách phương thức thanh toán khách hàng có thể chọn",
-            description = "Trả về 3 nhóm phương thức VNPay hiển thị trên trang thanh toán: "
-                    + "Ứng dụng Ngân hàng & Ví điện tử (VNPAYQR), Thẻ nội địa & tài khoản ngân hàng (VNBANK), "
-                    + "Thẻ thanh toán quốc tế (INTCARD) — kèm danh sách ngân hàng cụ thể lấy từ API "
-                    + "chính thức get_bank_list của VNPay.")
+            description = "Dự án CHỈ hỗ trợ phương thức 'Thẻ nội địa và tài khoản ngân hàng' "
+                    + "(mã nội bộ DOMESTIC_CARD, vnp_BankCode = VNBANK) — kèm danh sách ngân hàng "
+                    + "cụ thể lấy từ API chính thức get_bank_list của VNPay. "
+                    + "bankCodeSent = true ⇒ URL thanh toán LUÔN gửi vnp_BankCode = VNBANK, "
+                    + "trang VNPay mở thẳng nhóm thẻ nội địa (không mở trang chọn phương thức).")
     public ResponseEntity<ApiResponse<PaymentMethodResponse>> getPaymentMethods() {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách phương thức thanh toán thành công",
                 paymentMethodService.getPaymentMethods()));
@@ -131,6 +134,37 @@ public class PaymentController {
     }
 
     // ── Query / tra cứu ───────────────────────────────────────────────────────
+
+    /**
+     * Nhận kết quả thanh toán do APP MOBILE gửi lên.
+     *
+     * <p>── Vì sao cần endpoint này? ──
+     * <p>Khi {@code vnp_ReturnUrl} là CUSTOM SCHEME ({@code journeygo://payment/return}),
+     * VNPay chuyển hướng trình duyệt thẳng về app, mang theo TOÀN BỘ tham số kết quả
+     * ĐÃ KÝ của VNPay ({@code vnp_ResponseCode}, {@code vnp_TransactionStatus},
+     * {@code vnp_TransactionNo}, {@code vnp_PayDate}, {@code vnp_SecureHash}…).
+     *
+     * <p>App gửi lại các tham số đó qua endpoint này ⇒ backend kiểm tra chữ ký
+     * HMACSHA512 rồi áp dụng kết quả ⇒ khách thấy "thanh toán thành công" NGAY,
+     * <b>không cần máy chủ trung gian (ngrok/tunnel) còn sống</b>, và không phụ thuộc
+     * lệnh {@code querydr} (lệnh này đang trả {@code 99} trên VNPay Sandbox).
+     *
+     * <p>Endpoint này là <b>public</b> (không cần JWT) vì deep link có thể mở app khi
+     * người dùng chưa đăng nhập — nhưng mọi tham số đều phải có chữ ký hợp lệ nên
+     * không thể giả mạo kết quả thanh toán.
+     *
+     * <p>Trả về cùng cấu trúc với {@code /payments/return}.
+     */
+    @PostMapping("/return-result")
+    @Operation(summary = "Nhận kết quả thanh toán từ app mobile (deep link)",
+            description = "App gửi lại các tham số VNPay đã ký (vnp_*) nhận được qua deep link. "
+                    + "Backend kiểm tra chữ ký HMACSHA512 rồi áp dụng kết quả vào Payment + Booking.")
+    public ResponseEntity<ApiResponse<PaymentVerificationResponse>> returnResultFromApp(
+            @RequestParam Map<String, String> params,
+            HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(ApiResponse.success("Xử lý kết quả thanh toán",
+                paymentService.processReturn(params, null, resolveClientIp(httpRequest))));
+    }
 
     @GetMapping("/{paymentId}")
     @SecurityRequirement(name = "Bearer Authentication")
@@ -192,12 +226,27 @@ public class PaymentController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Danh sách toàn bộ giao dịch (ADMIN)")
+    @Operation(summary = "Danh sách toàn bộ giao dịch (ADMIN)",
+            description = "Hỗ trợ tìm kiếm theo mã giao dịch / mã đơn / mã giao dịch VNPay. "
+                    + "Tìm kiếm chạy trên TOÀN HỆ THỐNG (không giới hạn trong 1 trang) nên mã "
+                    + "giao dịch nằm ở trang khác vẫn tìm thấy được.")
     public ResponseEntity<ApiResponse<PageResponse<PaymentResponse>>> getAll(
             @RequestParam(required = false) PaymentStatus status,
+            @RequestParam(required = false) String search,
             @ParameterObject @PageableDefault(page = 0, size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách giao dịch thành công",
-                paymentService.getAll(status, pageable)));
+                paymentService.getAll(status, search, pageable)));
+    }
+
+    @GetMapping("/summary")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Tổng hợp giao dịch thanh toán toàn hệ thống (ADMIN)",
+            description = "Trả về tổng tiền các tour đã thanh toán thành công, số giao dịch theo nhóm trạng thái. "
+                    + "Số liệu độc lập với phân trang — dùng cho các ô chỉ số tổng quan.")
+    public ResponseEntity<ApiResponse<PaymentSummaryResponse>> getSummary() {
+        return ResponseEntity.ok(ApiResponse.success("Lấy tổng hợp giao dịch thành công",
+                paymentService.getSummary()));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

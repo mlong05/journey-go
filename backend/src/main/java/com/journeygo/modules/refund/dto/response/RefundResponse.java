@@ -21,11 +21,15 @@ public record RefundResponse(
         @Schema(description = "ID payment gốc") Long paymentId,
         @Schema(description = "Mã giao dịch thanh toán") String txnRef,
         @Schema(description = "ID booking") Long bookingId,
+        @Schema(description = "Mã đơn (mã người dùng thấy) — thay cho bookingId thô")
+        String bookingCode,
         @Schema(description = "ID tourist") Long touristId,
         @Schema(description = "Trạng thái refund") RefundStatus status,
         @Schema(description = "Nguyên nhân khai báo bởi tourist") RefundReason declaredReason,
         @Schema(description = "Nguyên nhân do Admin xác định") RefundReason approvedReason,
         @Schema(description = "Chi tiết lý do") String reasonDetail,
+        @Schema(description = "Số tiền gốc của giao dịch thanh toán (100% — cơ sở tính tỷ lệ hoàn)")
+        BigDecimal paymentAmount,
         @Schema(description = "Số tiền đề xuất (hệ thống tự tính)") BigDecimal proposedAmount,
         @Schema(description = "Số tiền được duyệt") BigDecimal approvedAmount,
         @Schema(description = "Số tiền đã hoàn thành thành công") BigDecimal refundedAmount,
@@ -59,11 +63,14 @@ public record RefundResponse(
                 .txnRef(r.getPayment() != null ? r.getPayment().getTxnRef() : null)
                 .bookingId(r.getPayment() != null && r.getPayment().getBooking() != null
                         ? r.getPayment().getBooking().getId() : null)
+                .bookingCode(r.getPayment() != null && r.getPayment().getBooking() != null
+                        ? r.getPayment().getBooking().getBookingCode() : null)
                 .touristId(r.getTourist() != null ? r.getTourist().getId() : null)
                 .status(r.getStatus())
                 .declaredReason(r.getDeclaredReason())
                 .approvedReason(r.getApprovedReason())
                 .reasonDetail(r.getReasonDetail())
+                .paymentAmount(r.getPayment() != null ? r.getPayment().getAmount() : null)
                 .proposedAmount(r.getProposedAmount())
                 .approvedAmount(r.getApprovedAmount())
                 .refundedAmount(r.getRefundedAmount())
@@ -112,7 +119,10 @@ public record RefundResponse(
                     .toStatus(log.getToStatus())
                     .amount(log.getAmount())
                     .reference(log.getReference())
-                    .detail(log.getDetail())
+                    // Chuẩn hoá lúc ĐỌC ⇒ các dòng cũ đã lưu trong DB (chứa map thô
+                    // tham số VNPay / mã enum / số tiền thô) cũng hiển thị đúng,
+                    // không cần migrate dữ liệu.
+                    .detail(RefundAuditDetailFormatter.format(log.getDetail()))
                     .createdAt(log.getCreatedAt())
                     .build();
         }

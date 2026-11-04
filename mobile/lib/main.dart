@@ -4,7 +4,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/constants/app_colors.dart';
 import 'core/models/auth_models.dart';
 import 'core/services/google_auth_service.dart';
+import 'core/services/payment_result_service.dart';
 import 'core/services/token_storage.dart';
+import 'screens/booking/pending_payment_host.dart';
 import 'screens/tourist_home_screen.dart';
 import 'tourist_auth_screen.dart';
 
@@ -34,6 +36,18 @@ void main() async {
     await GoogleAuthService.init();
   } catch (e) {
     debugPrint('GoogleAuthService.init() lỗi: $e');
+  }
+
+  // Bắt deep link `journeygo://payment/return` TRƯỚC KHI render app.
+  //
+  // ⚠️ Phải khởi tạo sớm: khi VNPay trả khách về app bằng deep link, app có thể
+  // đang ở trạng thái "chưa có listener" (app vừa bị hệ điều kill trong lúc khách
+  // ở trình duyệt). `PaymentDeepLinkService` giữ deep link đó lại và phát lại khi
+  // có listener ⇒ không bị mất.
+  try {
+    await PaymentResultService().init();
+  } catch (e) {
+    debugPrint('PaymentResultService.init() lỗi: $e');
   }
 
   // Kiểm tra phiên đăng nhập đã lưu
@@ -75,9 +89,14 @@ class JourneyGoTouristApp extends StatelessWidget {
           surface: AppCultureColors.background,
         ),
       ),
-      home: initialUser != null
-          ? TouristHomeScreen(initialUser: initialUser!)
-          : const TouristAuthScreen(),
+      home: PendingPaymentHost(
+        // ⚠️ `PendingPaymentHost` bọc TOÀN BỘ app (kể cả màn đăng nhập) vì deep
+        // link thanh toán có thể mở app khi khách CHƯA đăng nhập (endpoint
+        // `/return-result` là public). Kết quả được giữ lại và phát lại sau.
+        child: initialUser != null
+            ? TouristHomeScreen(initialUser: initialUser!)
+            : const TouristAuthScreen(),
+      ),
     );
   }
 }

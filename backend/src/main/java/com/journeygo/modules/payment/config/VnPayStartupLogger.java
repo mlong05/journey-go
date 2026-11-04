@@ -39,6 +39,22 @@ public class VnPayStartupLogger {
         log.info("[VNPay] IPN URL    = {}", properties.getIpnUrl());
         log.info("[VNPay] Return URL = {}", properties.getReturnUrl());
 
+        // Return URL riêng cho app mobile (custom scheme) — ưu tiên cao nhất cho MOBILE.
+        String appReturnUrl = properties.getAppReturnUrl();
+        if (appReturnUrl != null && !appReturnUrl.isBlank()) {
+            log.info("[VNPay] App Return URL (deep link) = {}", appReturnUrl);
+            log.info("[VNPay]   ⇒ MOBILE dùng deep link: app nhận kết quả ĐÃ KÝ trực tiếp, "
+                    + "KHÔNG cần tunnel (ngrok) còn sống, không phụ thuộc lệnh querydr.");
+            if (properties.getReturnUrl() != null
+                    && properties.getReturnUrl().contains("ngrok")) {
+                log.info("[VNPay]   ⇒ LƯU Ý: Return URL HTTPS đang trỏ qua ngrok. Ngrok miễn phí "
+                        + "chặn trình duyệt thật bằng trang cảnh báo (ERR_NGROK_6024) ⇒ deep link "
+                        + "KHÔNG bao giờ tới được app. Deep link custom scheme là đường đi đúng.");
+            }
+        } else {
+            log.info("[VNPay] App Return URL (deep link) = (trống — mobile dùng trang web trung gian, CẦN tunnel)");
+        }
+
         if (properties.getIpnUrl() == null || properties.getIpnUrl().isBlank()) {
             log.warn("""
 

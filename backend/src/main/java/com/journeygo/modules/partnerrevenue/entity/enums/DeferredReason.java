@@ -13,6 +13,8 @@ public enum DeferredReason {
     BOOKING_NOT_COMPLETED,
     /** Refund đang chờ duyệt hoặc đang xử lý / chưa xác định kết quả. */
     REFUND_PENDING,
+    /** Kỳ doanh thu chưa kết thúc — chưa đến hạn tất toán. */
+    PERIOD_NOT_CLOSED,
     /** Cần kiểm tra đối soát hoặc sai lệch tài chính. */
     FINANCIAL_REVIEW_REQUIRED
 }

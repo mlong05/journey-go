@@ -35,9 +35,7 @@ public record BookingResponse(
     public static BookingResponse fromEntity(Booking b) {
         if (b == null) return null;
 
-        List<SlotHoldResponse> holds = b.getSlotHolds() == null
-                ? List.of()
-                : b.getSlotHolds().stream().map(SlotHoldResponse::fromEntity).toList();
+        List<SlotHoldResponse> holds = resolveSlotHolds(b);
 
         return BookingResponse.builder()
                 .id(b.getId())
@@ -58,5 +56,30 @@ public record BookingResponse(
                 .cancellationReason(b.getCancellationReason())
                 .slotHolds(holds)
                 .build();
+    }
+
+    /**
+     * Đọc collection {@code slotHolds} của Booking — an toàn với lazy loading.
+     *
+     * <p>⚠️ Vì sao cần bọc try/catch?
+     * {@code Booking.slotHolds} là {@code @OneToMany(fetch = LAZY)}. Nếu entity đã bị
+     * DETACH khỏi PersistenceContext (VD do một câu bulk UPDATE có
+     * {@code clearAutomatically = true} chạy trước đó trong cùng transaction) thì
+     * truy cập collection sẽ ném
+     * {@code LazyInitializationException: could not initialize proxy - no Session}.
+     *
+     * <p>⇒ Ta bắt lỗi đó và trả về danh sách RỖNG thay vì làm hỏng cả request
+     * (thông tin slot hold không quan trọng bằng việc hủy đơn thành công).
+     */
+    private static List<SlotHoldResponse> resolveSlotHolds(Booking b) {
+        try {
+            if (b.getSlotHolds() == null) {
+                return List.of();
+            }
+            return b.getSlotHolds().stream().map(SlotHoldResponse::fromEntity).toList();
+        } catch (RuntimeException ex) {
+            // LazyInitializationException hoặc lỗi tương tự ⇒ bỏ qua phần slot hold.
+            return List.of();
+        }
     }
 }

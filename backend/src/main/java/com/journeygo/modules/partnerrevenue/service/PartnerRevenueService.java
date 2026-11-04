@@ -40,6 +40,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,7 +56,7 @@ import java.util.Map;
  *       ngày hoàn thành trải nghiệm là căn cứ xác định kỳ doanh thu.</li>
  *   <li><b>4.3</b> — Không chuyển {@code SETTLED} về {@code PENDING} để xử lý Refund —
  *       dùng giao dịch điều chỉnh riêng.</li>
- *   <li><b>5</b> — 8 điều kiện lọc đủ tư cách tất toán, đánh giá lại mỗi khi có sự kiện quan
+ *   <li><b>5</b> — 9 điều kiện lọc đủ tư cách tất toán, đánh giá lại mỗi khi có sự kiện quan
  *       trọng (Booking hoàn thành, Payment xác minh, Refund có kết quả cuối cùng,
  *       Settlement bị từ chối/hủy).</li>
  *   <li><b>6</b> — Công thức: {@code NetCollected = Gross − Refund},
@@ -193,10 +194,10 @@ public class PartnerRevenueService {
         }
     }
 
-    // ── Đánh giá điều kiện (Mục 5 — 8 điều kiện) ─────────────────────────────
+    // ── Đánh giá điều kiện (Mục 5 — 9 điều kiện) ─────────────────────────────
 
     /**
-     * Đánh giá 8 điều kiện đủ tư cách tất toán và cập nhật trạng thái.
+     * Đánh giá 9 điều kiện đủ tư cách tất toán và cập nhật trạng thái.
      *
      * <p>Điều kiện (theo bảng Mục 5):
      * <ol>
@@ -205,19 +206,42 @@ public class PartnerRevenueService {
      *   <li>Không có Refund chưa có kết quả cuối cùng (chờ duyệt / đang xử lý / chưa rõ).</li>
      *   <li>Đã cập nhật Refund thành công vào số tiền hoàn.</li>
      *   <li>Không có vấn đề đối soát (chưa có khoản điều chỉnh tài chính chờ xử lý).</li>
-     *   <li>Chưa được tất toán.</li>
+     *   <li>Chưa được tất toán (chấm theo ngữ cảnh — ứng viên hoặc duyệt).</li>
      *   <li>Đã tính được doanh thu Partner (hoa hồng + điều chỉnh đã tính).</li>
      *   <li>Doanh thu còn lại &gt; 0.</li>
+     *   <li>Kỳ doanh thu đã kết thúc.</li>
      * </ol>
      */
     @Transactional(readOnly = true)
     public EligibilityEvaluationResponse evaluateEligibility(Long revenueId) {
         PartnerRevenue revenue = revenueRepository.findById(revenueId)
                 .orElseThrow(() -> new AppException(ErrorCode.PARTNER_REVENUE_NOT_FOUND));
-        return evaluate(revenue);
+        return evaluate(revenue, EvaluationMode.CANDIDATE, null);
     }
 
-    private EligibilityEvaluationResponse evaluate(PartnerRevenue revenue) {
+    /**
+     * Đánh giá điều kiện khi DUYỆT một đợt tất toán.
+     *
+     * <p>Khác với {@link #evaluateEligibility(Long)} (chế độ ứng viên), ở chế độ này khoản
+     * doanh thu ĐÃ được gắn vào đợt tất toán đang duyệt — nên điều kiện 6 được chấm theo
+     * nghĩa "đúng thuộc đợt này và chưa bị tất toán", thay vì "chưa thuộc đợt nào".
+     *
+     * <p>Trước đây điều kiện 6 luôn yêu cầu {@code settlementId == null}, khiến mọi đợt
+     * tất toán bị từ chối với lý do {@code FINANCIAL_REVIEW_REQUIRED} dù dữ liệu hoàn toàn hợp lệ.
+     *
+     * @param revenueId   khoản doanh thu
+     * @param settlementId đợt tất toán đang duyệt
+     */
+    @Transactional(readOnly = true)
+    public EligibilityEvaluationResponse evaluateForApproval(Long revenueId, Long settlementId) {
+        PartnerRevenue revenue = revenueRepository.findById(revenueId)
+                .orElseThrow(() -> new AppException(ErrorCode.PARTNER_REVENUE_NOT_FOUND));
+        return evaluate(revenue, EvaluationMode.APPROVAL, settlementId);
+    }
+
+    private EligibilityEvaluationResponse evaluate(PartnerRevenue revenue,
+                                                   EvaluationMode mode,
+                                                   Long settlementId) {
         List<EligibilityEvaluationResponse.CheckItem> checks = new ArrayList<>();
         DeferredReason deferred = null;
 
@@ -276,11 +300,35 @@ public class PartnerRevenueService {
         if (hasPendingAdjustment && deferred == null) deferred = DeferredReason.FINANCIAL_REVIEW_REQUIRED;
 
         // 6. Chưa được tất toán
-        boolean notSettled = revenue.getStatus() != PartnerRevenueStatus.IN_SETTLEMENT
-                && revenue.getStatus() != PartnerRevenueStatus.SETTLED
-                && revenue.getSettlementId() == null;
-        checks.add(check("6_NOT_SETTLED", "Chưa thuộc Settlement đang xử lý hoặc đã duyệt", notSettled,
-                "status=" + revenue.getStatus()));
+        //
+        // QUAN TRỌNG: điều kiện này phụ thuộc ngữ cảnh.
+        //  • Chế độ CANDIDATE (lúc xem ứng viên / tạo bản nháp): khoản doanh thu phải
+        //    CHƯA thuộc đợt nào → status == ELIGIBLE và settlementId == null.
+        //  • Chế độ APPROVAL (lúc duyệt): khoản doanh thu BẮT BUỘC đã ở IN_SETTLEMENT và
+        //    trỏ đúng settlementId của đợt đang duyệt. Nếu chấm theo nghĩa "chưa thuộc
+        //    đợt nào" thì mọi đợt tất toán sẽ luôn fail ở bước duyệt.
+        boolean notSettled;
+        String settledDetail;
+        if (mode == EvaluationMode.APPROVAL) {
+            boolean belongsToThisSettlement = revenue.getSettlementId() != null
+                    && revenue.getSettlementId().equals(settlementId);
+            boolean notSettledYet = revenue.getStatus() != PartnerRevenueStatus.SETTLED;
+            notSettled = belongsToThisSettlement && notSettledYet;
+            settledDetail = "status=" + revenue.getStatus()
+                    + ", settlementId=" + revenue.getSettlementId()
+                    + " (đợt đang duyệt=" + settlementId + ")";
+        } else {
+            notSettled = revenue.getStatus() != PartnerRevenueStatus.IN_SETTLEMENT
+                    && revenue.getStatus() != PartnerRevenueStatus.SETTLED
+                    && revenue.getSettlementId() == null;
+            settledDetail = "status=" + revenue.getStatus()
+                    + ", settlementId=" + revenue.getSettlementId();
+        }
+        checks.add(check("6_NOT_SETTLED",
+                mode == EvaluationMode.APPROVAL
+                        ? "Thuộc đúng đợt tất toán đang duyệt và chưa bị tất toán"
+                        : "Chưa thuộc Settlement đang xử lý hoặc đã duyệt",
+                notSettled, settledDetail));
         if (!notSettled && deferred == null) deferred = DeferredReason.FINANCIAL_REVIEW_REQUIRED;
 
         // 7. Đã tính được doanh thu Partner
@@ -296,6 +344,20 @@ public class PartnerRevenueService {
         boolean positive = net.compareTo(BigDecimal.ZERO) > 0;
         checks.add(check("8_POSITIVE_NET", "Doanh thu còn lại sau Refund và điều chỉnh lớn hơn 0", positive,
                 "partnerNet=" + net));
+
+        // 9. Kỳ doanh thu đã kết thúc — không tất toán doanh thu của kỳ chưa đóng.
+        //
+        // Điều kiện này chặn việc doanh thu kỳ TƯƠNG LAI (ví dụ 11/2026 khi hiện tại là
+        // 10/2026) bị kéo vào đợt tất toán của kỳ đã đóng (ví dụ 09/2026) nhờ cơ chế
+        // "doanh thu chuyển tiếp". Không có điều kiện này thì hệ thống có thể trả tiền
+        // cho đối tác trước khi kỳ doanh thu thực sự kết thúc.
+        boolean periodClosed = isPeriodClosed(revenue.getRevenuePeriod());
+        checks.add(check("9_PERIOD_CLOSED", "Kỳ doanh thu đã kết thúc",
+                periodClosed,
+                periodClosed
+                        ? "Kỳ " + revenue.getRevenuePeriod() + " đã đóng"
+                        : "Kỳ " + revenue.getRevenuePeriod() + " chưa kết thúc — không được tất toán"));
+        if (!periodClosed && deferred == null) deferred = DeferredReason.PERIOD_NOT_CLOSED;
 
         boolean eligible = checks.stream().allMatch(EligibilityEvaluationResponse.CheckItem::passed);
         if (!eligible && deferred == null) {
@@ -320,7 +382,7 @@ public class PartnerRevenueService {
                 || revenue.getStatus() == PartnerRevenueStatus.IN_SETTLEMENT) {
             return;
         }
-        EligibilityEvaluationResponse evaluation = evaluate(revenue);
+        EligibilityEvaluationResponse evaluation = evaluate(revenue, EvaluationMode.CANDIDATE, null);
         if (evaluation.eligible()) {
             revenue.markEligible();
         } else {
@@ -446,6 +508,48 @@ public class PartnerRevenueService {
             return LocalDate.ofInstant(booking.getCompletedAt(), VIETNAM_ZONE);
         }
         return booking.getExperienceDate();
+    }
+
+    /**
+     * Kỳ doanh thu đã kết thúc hay chưa.
+     *
+     * <p>Một kỳ {@code YYYY-MM} được coi là đã đóng khi kỳ đó <b>trước</b> tháng hiện tại.
+     * Ví dụ: hôm nay 30/10/2026 ⇒ kỳ {@code 2026-09} đã đóng, kỳ {@code 2026-10} và
+     * {@code 2026-11} chưa đóng.
+     *
+     * <p>Nếu cấu hình {@code app.finance.allow-open-period-settlement = true} thì kỳ hiện tại
+     * cũng được coi là đã đóng (cho phép tất toán sớm). Kỳ TƯƠNG LAI (sau tháng hiện tại)
+     * <b>luôn</b> chưa đóng — không bao giờ tất toán trước khi kỳ đó thực sự kết thúc.
+     *
+     * <p>Kỳ chưa đóng ⇒ không được tất toán. Điều này ngăn việc doanh thu kỳ tương lai bị
+     * kéo vào đợt tất toán của kỳ đã đóng qua cơ chế "doanh thu chuyển tiếp".
+     */
+    private boolean isPeriodClosed(String revenuePeriod) {
+        if (revenuePeriod == null || revenuePeriod.isBlank()) {
+            return false;
+        }
+        try {
+            YearMonth period = YearMonth.parse(revenuePeriod.trim());
+            YearMonth current = YearMonth.now(VIETNAM_ZONE);
+            if (period.isBefore(current)) {
+                return true;
+            }
+            // Kỳ hiện tại — chỉ đóng khi Admin cho phép tất toán kỳ chưa kết thúc.
+            return period.equals(current) && financeProperties.isAllowOpenPeriodSettlement();
+        } catch (Exception e) {
+            log.warn("[PartnerRevenue] Không đọc được kỳ doanh thu '{}' — coi như chưa đóng", revenuePeriod);
+            return false;
+        }
+    }
+
+    /**
+     * Ngữ cảnh đánh giá điều kiện tất toán.
+     */
+    private enum EvaluationMode {
+        /** Xem ứng viên / tạo bản nháp — khoản doanh thu chưa thuộc đợt nào. */
+        CANDIDATE,
+        /** Duyệt đợt tất toán — khoản doanh thu đã gắn vào đợt đang duyệt. */
+        APPROVAL
     }
 
     private EligibilityEvaluationResponse.CheckItem check(String code, String description, boolean passed, String detail) {
