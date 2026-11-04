@@ -134,6 +134,10 @@ app:
     booking-expiry-scan-interval-seconds: ${BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS:60}
     # Số giây giữa các lần kiểm tra trạng thái Refund đang chờ kết quả từ VNPay.
     refund-status-check-interval-seconds: ${REFUND_STATUS_CHECK_INTERVAL_SECONDS:300}
+    # Số giây giữa các lần đối soát lại giao dịch thanh toán còn "kẹt" (PENDING/PROCESSING).
+    payment-reconcile-interval-seconds: ${PAYMENT_RECONCILE_INTERVAL_SECONDS:300}
+    # Số giao dịch tối đa xử lý trong một lượt đối soát.
+    payment-reconcile-batch-size: ${PAYMENT_RECONCILE_BATCH_SIZE:50}
     # Số giờ cho phép gửi lại yêu cầu Refund sau khi yêu cầu trước bị từ chối (0 = không cho).
     refund-resubmit-window-hours: ${REFUND_RESUBMIT_WINDOW_HOURS:0}
 

@@ -117,4 +117,20 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
               AND p.duplicatePayment = false
             """)
     List<Payment> findSuccessfulPaymentsOfBooking(@Param("bookingId") Long bookingId);
+
+    /**
+     * Các Payment còn "kẹt" (PENDING / PROCESSING) — chưa có kết quả cuối cùng.
+     *
+     * <p>Dùng cho tác vụ nền đối soát lại với VNPay (UC-03, UC-05): giao dịch mà
+     * khách ĐÃ thanh toán thành công nhưng callback/IPN bị mất (tunnel chết, app bị
+     * kill…) sẽ bị kẹt ở PROCESSING vô thời hạn nếu không có tác vụ quét lại.
+     *
+     * <p>Sắp xếp theo thời điểm tạo tăng dần ⇒ quét giao dịch cũ trước.
+     */
+    @Query("""
+            SELECT p FROM Payment p
+            WHERE p.status IN :statuses
+            ORDER BY p.createdAt ASC
+            """)
+    List<Payment> findStuckPayments(@Param("statuses") List<PaymentStatus> statuses);
 }

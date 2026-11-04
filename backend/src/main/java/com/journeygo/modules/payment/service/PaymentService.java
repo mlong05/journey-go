@@ -171,10 +171,30 @@ public class PaymentService {
                             "Giao dịch trước đã được xác minh thành công — không thể tạo giao dịch mới");
                 }
                 if (outcome == PaymentOutcome.UNKNOWN) {
-                    throw new AppException(ErrorCode.PAYMENT_NOT_RETRYABLE,
-                            "Chưa xác minh được kết quả giao dịch trước (mã " + attempt.getTxnRef()
-                                    + "). Vui lòng kiểm tra lại sau — hệ thống không cho phép tạo giao dịch mới "
-                                    + "để tránh thanh toán trùng.");
+                    // ── UC-03: lần thử trước chưa rõ kết quả ──────────────────
+                    // KHÔNG chặn vô điều kiện: QueryDR trên VNPay Sandbox luôn trả
+                    // `vnp_ResponseCode=99` ("Unexpected error") ⇒ nếu chặn, khách
+                    // KHÔNG BAO GIỜ thử lại được dù booking vẫn còn trong hạn 10 phút
+                    // (dead-end). Đây chính là lỗi "bấm thanh toán lại bị báo
+                    // PAYMENT_NOT_RETRYABLE" mà khách gặp phải.
+                    //
+                    // Vì sao vẫn AN TOÀN khi cho tạo attempt mới?
+                    //  • Mỗi attempt có `txnRef` RIÊNG ⇒ nếu khách thanh toán cả hai
+                    //    lần, ta nhận ra 2 giao dịch khác nhau ở VNPay.
+                    //  • Giao dịch cũ vẫn ở PENDING/PROCESSING ⇒ khi callback/IPN/
+                    //    Return về sau, nó sẽ được áp dụng bình thường.
+                    //  • Nếu giao dịch cũ thực sự THÀNH CÔNG, `applyVnPayResult` →
+                    //    `confirmBookingAfterVerifiedPayment` đánh dấu DUPLICATE cho
+                    //    giao dịch dư ⇒ không xác nhận Booking 2 lần, không ghi nhận
+                    //    doanh thu 2 lần (UC-04). Khoản tiền dư chuyển sang quy trình
+                    //    hoàn tiền/đối soát ⇒ KHÔNG mất tiền của khách.
+                    //
+                    // ⇒ Vẫn QueryDR trước (để bắt được case đã thành công mà chưa
+                    //   có callback), nhưng UNKNOWN chỉ mang tính cảnh báo, KHÔNG chặn.
+                    log.warn("[Payment][UC-03] txnRef={} chưa xác minh được kết quả (QueryDR trả 99 trên Sandbox). "
+                                    + "Vẫn cho tạo lần thử mới — booking còn trong hạn, giao dịch cũ sẽ được đối soát khi có callback.",
+                            attempt.getTxnRef());
+                    break;
                 }
                 // FAILED / CANCELLED rõ ràng → được phép tạo attempt mới.
                 break;
@@ -199,8 +219,16 @@ public class PaymentService {
         // Hạn thanh toán cố định theo Booking — KHÔNG gia hạn khi thử lại.
         LocalDateTime expireDate = LocalDateTime.ofInstant(booking.getPaymentDeadline(), VIETNAM_ZONE);
 
+        // Dự án chỉ hỗ trợ "Thẻ nội địa và tài khoản ngân hàng" (VNBANK).
+        // Nếu client KHÔNG gửi bankCode ⇒ mặc định dùng VNBANK, KHÔNG để trống —
+        // vì URL không có vnp_BankCode sẽ mở trang "chọn phương thức" của VNPay
+        // (có cả QR + thẻ quốc tế) — trái với quy ước đã thống nhất.
+        String effectiveBankCode = (bankCode != null && !bankCode.isBlank())
+                ? bankCode.trim()
+                : PaymentMethodService.SUPPORTED_METHOD.getBankCode();
+
         String paymentUrl = vnPayClient.buildPaymentUrl(txnRef, amount, orderInfo,
-                createDate, expireDate, clientIp, bankCode, appRedirect);
+                createDate, expireDate, clientIp, effectiveBankCode, appRedirect);
 
         Payment payment = paymentRepository.save(Payment.builder()
                 .booking(booking)
@@ -214,8 +242,7 @@ public class PaymentService {
                 .build());
 
         log.info("[Payment] Khởi tạo thanh toán id={} txnRef={} booking={} amount={} bankCode={}",
-                payment.getId(), txnRef, booking.getId(), amount,
-                (bankCode != null && !bankCode.isBlank()) ? bankCode : "(khách tự chọn)");
+                payment.getId(), txnRef, booking.getId(), amount, effectiveBankCode);
 
         return PaymentInitResponse.builder()
                 .paymentId(payment.getId())
@@ -346,6 +373,12 @@ public class PaymentService {
             checkOwnership(payment.getBooking(), touristId);
         }
 
+        // ── Kiểm tra số tiền khớp với đơn hàng ───────────────────────────────
+        // Chữ ký hợp lệ KHÔNG đủ: kết quả trả về có thể là của một giao dịch khác
+        // (VD khách mở nhiều tab VNPay). Nếu số tiền không khớp với đơn thì KHÔNG
+        // được xác nhận Booking — trả về lỗi rõ ràng cho khách.
+        verifyAmountMatchesBooking(payment, params);
+
         // Nếu đã có kết quả rõ ràng → trả về luôn, không cần truy vấn lại.
         if (payment.getStatus().isFinal()) {
             return toVerificationResponse(payment, payment.isSuccess()
@@ -380,6 +413,66 @@ public class PaymentService {
     }
 
     // ── QueryDR ───────────────────────────────────────────────────────────────
+
+    /**
+     * Đối soát lại các giao dịch còn "kẹt" (PENDING / PROCESSING) với VNPay.
+     *
+     * <p>── Vì sao cần? ──
+     * Giao dịch có thể kẹt ở PROCESSING vô thời hạn khi:
+     * <ul>
+     *   <li>IPN không tới (tunnel chết, IPN URL chưa khai báo trong VNPay Admin),</li>
+     *   <li>app bị kill nên deep link không mở được ⇒ {@code /return-result} không được gọi,</li>
+     *   <li>Request gửi lên backend bị từ chối (415, timeout…).</li>
+     * </ul>
+     * Khi đó khách ĐÃ thanh toán thành công nhưng hệ thống không biết ⇒ đơn vẫn hiện
+     * nút "Thanh toán" và bấm vào lại sẽ báo "chưa xác minh được kết quả".
+     *
+     * <p>Tác vụ này quét lại các giao dịch kẹt và gọi QueryDR. LƯU Ý: trên VNPay
+     * Sandbox, QueryDR luôn trả {@code vnp_ResponseCode=99} ⇒ không giải quyết được
+     * gốc rễ. Vì vậy tác vụ chỉ giữ vai trò "lướt an toàn" cho môi trường thật
+     * (nơi QueryDR hoạt động) và ghi log cảnh báo để Admin biết cần đối soát thủ công.
+     *
+     * @param maxPayments số giao dịch tối đa xử lý trong một lần quét (giới hạn tải)
+     * @return số giao dịch đã được xác minh thành công
+     */
+    @Transactional
+    public int reconcileStuckPayments(int maxPayments) {
+        List<Payment> stuck = paymentRepository.findStuckPayments(
+                List.of(PaymentStatus.PENDING, PaymentStatus.PROCESSING));
+        if (stuck.isEmpty()) {
+            return 0;
+        }
+
+        int resolved = 0;
+        int scanned = 0;
+        for (Payment payment : stuck) {
+            if (scanned >= maxPayments) {
+                log.info("[Payment][Reconcile] Đã quét tới giới hạn {} giao dịch — còn {} giao dịch chờ lượt sau.",
+                        maxPayments, stuck.size() - scanned);
+                break;
+            }
+            scanned++;
+
+            try {
+                PaymentOutcome outcome = verifyWithVnPay(payment, null);
+                if (outcome == PaymentOutcome.SUCCESS || outcome == PaymentOutcome.DUPLICATE) {
+                    resolved++;
+                    log.info("[Payment][Reconcile] txnRef={} đã được đối soát thành công (outcome={}).",
+                            payment.getTxnRef(), outcome);
+                }
+            } catch (Exception e) {
+                // Một giao dịch lỗi không được làm hỏng cả lượt quét.
+                log.warn("[Payment][Reconcile] Lỗi khi đối soát txnRef={}: {}",
+                        payment.getTxnRef(), e.getMessage());
+            }
+        }
+
+        if (scanned > 0) {
+            log.info("[Payment][Reconcile] Đã quét {} giao dịch kẹt, xác minh thành công {}.",
+                    scanned, resolved);
+        }
+        return resolved;
+    }
 
     /**
      * Truy vấn trực tiếp VNPay về kết quả một giao dịch (vnp_Command=querydr).
@@ -793,11 +886,47 @@ public class PaymentService {
         return "JG" + bookingId + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20).toUpperCase();
     }
 
+    /**
+     * Kiểm tra số tiền trong kết quả thanh toán có khớp với số tiền của đơn hàng không.
+     *
+     * <p>VNPay gửi {@code vnp_Amount} ĐÃ NHÂN 100 (VD 580.000 VND → {@code 58000000}).
+     * Nếu thiếu tham số này ⇒ bỏ qua kiểm tra (một số biến thể callback không kèm).
+     *
+     * @throws AppException {@link ErrorCode#PAYMENT_AMOUNT_MISMATCH} khi không khớp
+     */
+    private void verifyAmountMatchesBooking(Payment payment, Map<String, String> params) {
+        String rawAmount = params.get("vnp_Amount");
+        if (rawAmount == null || rawAmount.isBlank()) {
+            return;
+        }
+        long vnpAmount;
+        try {
+            vnpAmount = Long.parseLong(rawAmount.trim());
+        } catch (NumberFormatException e) {
+            throw new AppException(ErrorCode.PAYMENT_AMOUNT_MISMATCH,
+                    "Số tiền trong kết quả thanh toán không hợp lệ: " + rawAmount);
+        }
+
+        BigDecimal expected = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+        long expectedX100 = VnPayProperties.toVnPayAmount(expected);
+        if (vnpAmount != expectedX100) {
+            log.warn("[Payment][Return] txnRef={} SỐ TIỀN KHÔNG KHỚP: VNPay={} đơn hàng={} (x100).",
+                    payment.getTxnRef(), vnpAmount, expectedX100);
+            throw new AppException(ErrorCode.PAYMENT_AMOUNT_MISMATCH,
+                    "Số tiền thanh toán không khớp với đơn hàng (VNPay: "
+                            + expected.toPlainString() + " " + payment.getCurrency() + ")");
+        }
+    }
+
     private String buildOrderInfo(Booking booking) {
         String title = booking.getTour() != null ? booking.getTour().getTitle() : "Tour";
         // vnp_OrderInfo tối đa 255 ký tự, nên cắt bớt và bỏ dấu tiếng Việt cho an toàn.
         String info = "Thanh toan don hang " + booking.getBookingCode() + " - " + title;
-        return removeDiacritics(info).length() > 250 ? info.substring(0, 250) : info;
+        // ⚠️ Phải cắt trên CHÍNH chuỗi sẽ trả về. Trước đây kiểm tra
+        // `removeDiacritics(info).length() > 250` nhưng trả về `info` (còn dấu) ⇒
+        // độ dài thực tế có thể VƯỢT giới hạn 255 của VNPay.
+        String normalized = removeDiacritics(info);
+        return normalized.length() > 250 ? normalized.substring(0, 250) : normalized;
     }
 
     private String removeDiacritics(String text) {
