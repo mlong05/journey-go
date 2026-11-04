@@ -58,7 +58,6 @@ public class PaymentReturnPageController {
     public ResponseEntity<String> returnPage(
             @RequestParam Map<String, String> params,
             HttpServletRequest httpRequest) {
-        String txnRef = params.get("vnp_TxnRef");
         String status = "UNKNOWN";
         String message = "Đang xác minh kết quả thanh toán…";
         String bookingCode = null;
@@ -80,12 +79,15 @@ public class PaymentReturnPageController {
         String scheme = properties.getAppScheme() != null && !properties.getAppScheme().isBlank()
                 ? properties.getAppScheme()
                 : APP_SCHEME_DEFAULT;
-        // Deep link chỉ mang `vnp_TxnRef` — app dùng mã này để tra cứu giao dịch.
-        // KHÔNG truyền toàn bộ query string (chứa vnp_SecureHash) về app.
+        // Deep link mang TOÀN BỘ tham số kết quả ĐÃ KÝ của VNPay (vnp_*).
+        // App gửi lại các tham số đó cho backend (`POST /payments/return-result`) ⇒
+        // backend kiểm tra chữ ký rồi áp dụng kết quả ⇒ khách thấy "thành công" NGAY,
+        // không cần máy chủ trung gian (ngrok) còn sống và không phụ thuộc QueryDR.
         StringBuilder appLink = new StringBuilder();
         appLink.append(scheme).append("://").append(APP_ROUTE);
-        if (txnRef != null && !txnRef.isBlank()) {
-            appLink.append("?vnp_TxnRef=").append(urlEncode(txnRef));
+        String signedQuery = buildSignedQuery(params);
+        if (!signedQuery.isEmpty()) {
+            appLink.append('?').append(signedQuery);
         }
 
         String html = buildHtml(status, message, bookingCode, appLink.toString(),
@@ -95,12 +97,28 @@ public class PaymentReturnPageController {
                 .body(html);
     }
 
-    private String buildRawQuery(Map<String, String> params) {
+    /**
+     * Dựng query string gồm TOÀN BỘ tham số {@code vnp_*} (đã ký) để gửi về app.
+     *
+     * <p>⚠️ Chỉ lấy tham số có tiền tố {@code vnp_} — app gửi lại chúng cho backend để
+     * kiểm tra chữ ký HMACSHA512. Tham số khác (VD {@code app_redirect}) không nằm
+     * trong chuỗi hash của VNPay nên không được truyền đi (xem {@code VnPayClient#isValidSignature}).
+     *
+     * <p>Sắp xếp key tăng dần để thứ tự tham số ổn định (không ảnh hưởng chữ ký vì
+     * backend sắp xếp lại khi dựng hashData).
+     */
+    private String buildSignedQuery(Map<String, String> params) {
+        if (params == null || params.isEmpty()) {
+            return "";
+        }
         StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String, String> e : params.entrySet()) {
-            if (e.getValue() == null || e.getValue().isBlank()) continue;
+        for (Map.Entry<String, String> e : new java.util.TreeMap<>(params).entrySet()) {
+            String key = e.getKey();
+            String value = e.getValue();
+            if (key == null || !key.startsWith("vnp_")) continue;
+            if (value == null || value.isBlank()) continue;
             if (sb.length() > 0) sb.append('&');
-            sb.append(urlEncode(e.getKey())).append('=').append(urlEncode(e.getValue()));
+            sb.append(urlEncode(key)).append('=').append(urlEncode(value));
         }
         return sb.toString();
     }
@@ -201,8 +219,12 @@ public class PaymentReturnPageController {
     private String buildAutoRedirectScript(String appUrl) {
         String escaped = escapeJs(appUrl);
         // intent:// chỉ dùng được trên Android; Safari sẽ báo lỗi nên ta bọc trong try/catch.
-        String intentUrl = "intent://payment/return?scheme=journeygo&"
-                + "vnp_TxnRef=" + extractTxnRef(appUrl) + "#Intent;scheme=journeygo;package=com.journeygo.mobile;end";
+        // Giữ NGUYÊN toàn bộ query string đã ký (vnp_*) — app cần chúng để gửi lại
+        // backend xác minh chữ ký (không có query thì app phải chờ QueryDR).
+        String signedQuery = extractQuery(appUrl);
+        String intentUrl = "intent://payment/return?"
+                + (signedQuery.isEmpty() ? "scheme=journeygo" : signedQuery)
+                + "#Intent;scheme=journeygo;package=com.journeygo.mobile;end";
 
         return "<script>(function(){"
                 + "var appUrl='" + escaped + "';"
@@ -220,13 +242,12 @@ public class PaymentReturnPageController {
                 + "})();</script>";
     }
 
-    /** Trích {@code vnp_TxnRef} từ deep link để dựng {@code intent://} URL. */
-    private String extractTxnRef(String appUrl) {
-        int idx = appUrl.indexOf("vnp_TxnRef=");
+    /** Trích phần query string (sau `?`) từ deep link — dùng để dựng {@code intent://} URL. */
+    private String extractQuery(String appUrl) {
+        if (appUrl == null) return "";
+        int idx = appUrl.indexOf('?');
         if (idx < 0) return "";
-        String rest = appUrl.substring(idx + "vnp_TxnRef=".length());
-        int end = rest.indexOf('&');
-        return end >= 0 ? rest.substring(0, end) : rest;
+        return appUrl.substring(idx + 1);
     }
 
     /** Escape chuỗi để nhúng an toàn vào JavaScript (escape cả dấu nháy và backslash). */
