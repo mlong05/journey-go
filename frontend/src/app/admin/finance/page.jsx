@@ -91,30 +91,29 @@ export default function AdminFinancePage() {
   return (
     // Chiếm đúng chiều cao khung chứa — trang KHÔNG cuộn theo window.
     // Chỉ vùng bảng bên trong mới cuộn (overflow-auto ở từng tab).
-    <div className="flex h-full min-h-0 flex-col gap-4">
-      {/* Header — chỉ giữ tiêu đề, bỏ mô tả thừa để tận dụng chiều cao màn hình */}
-      <div className="shrink-0 bg-white rounded-2xl px-5 py-4 border border-slate-200/90 shadow-2xs">
-        <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      {/* Header — tiêu đề và tab chung một hàng để nhường chiều cao cho bảng */}
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <h1 className="min-w-0 text-lg sm:text-xl font-bold text-slate-900 truncate">
           Quản lý dòng tiền &amp; cổng thanh toán
         </h1>
-      </div>
 
-      {/* Tabs */}
-      <div className="shrink-0 flex gap-1 rounded-xl border border-slate-200 bg-white p-1 w-fit">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
-              tab === t.id
-                ? "bg-slate-900 text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+        <div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 w-fit shrink-0">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                tab === t.id
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Nội dung tab — chiếm phần chiều cao còn lại, tự cuộn bên trong */}
@@ -234,9 +233,9 @@ function PaymentsTab() {
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-4">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       {/* Chỉ số — số liệu TOÀN HỆ THỐNG, không phụ thuộc trang đang xem */}
-      <div className="shrink-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="shrink-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Metric label="Giao dịch thành công" value={String(totals.successCount)} />
         <Metric
           label="Tổng tiền đã thu"
@@ -509,7 +508,7 @@ function RefundsTab() {
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-4">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       <Panel
         fill
         icon={RotateCcw}
@@ -1212,7 +1211,7 @@ function BookingsTab() {
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-4">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       <Panel
         fill
         icon={Clock}
@@ -1316,10 +1315,10 @@ function Metric({ label, value, tone = "slate", hint }) {
     rose: "text-rose-600",
   };
   return (
-    <div className="bg-white rounded-2xl px-5 py-4 border border-slate-200/85 shadow-2xs">
+    <div className="bg-white rounded-xl px-4 py-2.5 border border-slate-200/85 shadow-2xs">
       <p className="text-xs font-medium text-slate-500">{label}</p>
-      <div className={`text-2xl font-semibold mt-1.5 font-mono ${tones[tone]}`}>{value}</div>
-      {hint && <p className="mt-1 text-[11px] text-slate-400 leading-snug">{hint}</p>}
+      <div className={`text-xl font-semibold mt-0.5 font-mono ${tones[tone]}`}>{value}</div>
+      {hint && <p className="mt-0.5 text-[11px] text-slate-400 leading-snug truncate" title={hint}>{hint}</p>}
     </div>
   );
 }
@@ -1342,7 +1341,7 @@ function Panel({ icon: Icon, title, right, children, fill = false, footer = null
         fill ? "flex-1 min-h-0 flex flex-col" : ""
       }`}
     >
-      <div className="shrink-0 px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="shrink-0 px-4 py-2.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Icon size={16} className="text-slate-500" />
           <h2 className="text-sm font-bold text-slate-900">{title}</h2>
