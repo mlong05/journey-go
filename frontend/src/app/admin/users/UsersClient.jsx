@@ -748,9 +748,9 @@ export default function AdminUsersClient() {
       {/* ============================================================
           TẦNG 1: HEADER + NÚT TIỆN ÍCH (shrink-0, không cuộn)
           ============================================================ */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             Quản lý Người dùng &amp; Phân quyền
           </h1>
           {isFallback && (
@@ -803,7 +803,7 @@ export default function AdminUsersClient() {
           THÔNG BÁO FALLBACK (PHÂN LOẠI LỖI CHI TIẾT)
           ============================================================ */}
       {isFallback && fetchError && (
-        <div className="shrink-0 mt-4">
+        <div className="shrink-0 mt-3">
           <FallbackBanner
             errorType={errorType}
             message={fetchError}
@@ -816,7 +816,7 @@ export default function AdminUsersClient() {
       {/* ============================================================
           TẦNG 2: 4 THẺ KPI TƯƠNG TÁC NHANH (shrink-0, không cuộn)
           ============================================================ */}
-      <section className="shrink-0 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-4">
+      <section className="shrink-0 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-3">
         <KpiCard
           title="Tổng tài khoản hệ thống"
           count={pageData.totalElements}
@@ -857,9 +857,9 @@ export default function AdminUsersClient() {
           - flex flex-col: xếp dọc 3 vùng (filter / table / pagination)
           - overflow-hidden: không cuộn ở khung ngoài
           ============================================================ */}
-      <div className="flex-1 min-h-0 mt-4 flex flex-col bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
+      <div className="flex-1 min-h-0 mt-3 flex flex-col bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
         {/* ---- THANH CÔNG CỤ LỌC (shrink-0, không cuộn) ---- */}
-        <div className="shrink-0 p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+        <div className="shrink-0 p-3 border-b border-slate-100 bg-slate-50/50 space-y-2.5">
           {/* Hàng 1: Segmented Tabs lọc nhanh theo role */}
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -998,12 +998,12 @@ export default function AdminUsersClient() {
           <table className="w-full text-left text-xs border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600">
-                <th className="py-3.5 px-4 whitespace-nowrap">Định danh &amp; Thành viên</th>
-                <th className="py-3.5 px-3 whitespace-nowrap">Liên hệ</th>
-                <th className="py-3.5 px-3 whitespace-nowrap">Vai trò</th>
-                <th className="py-3.5 px-3 whitespace-nowrap">Trạng thái</th>
-                <th className="py-3.5 px-3 whitespace-nowrap">Ngày tạo / Cập nhật</th>
-                <th className="py-3.5 px-4 text-left whitespace-nowrap">Thao tác</th>
+                <th className="py-2.5 px-4 whitespace-nowrap">Định danh &amp; Thành viên</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Liên hệ</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Vai trò</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Trạng thái</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Ngày tạo / Cập nhật</th>
+                <th className="py-2.5 px-4 text-left whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1200,7 +1200,7 @@ function UserRow({
       }`}
     >
       {/* Cột 1 - Định danh & Thành viên */}
-      <td className="py-3.5 px-4 whitespace-nowrap">
+      <td className="py-2.5 px-4 whitespace-nowrap">
         <div className="flex items-center gap-3">
           <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0">
             {showAvatar ? (
@@ -1234,7 +1234,7 @@ function UserRow({
       </td>
 
       {/* Cột 2 - Liên hệ */}
-      <td className="py-3.5 px-3 whitespace-nowrap">
+      <td className="py-2.5 px-3 whitespace-nowrap">
         {user.phone ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700">
             <Phone size={11} className="text-slate-400" />
@@ -1248,7 +1248,7 @@ function UserRow({
       </td>
 
       {/* Cột 3 - Vai trò (chỉ hiển thị, chỉnh sửa qua nút Sửa) */}
-      <td className="py-3.5 px-3 whitespace-nowrap">
+      <td className="py-2.5 px-3 whitespace-nowrap">
         <span
           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
             ROLE_BADGE_CLASS[user.role] ||
@@ -1260,7 +1260,7 @@ function UserRow({
       </td>
 
       {/* Cột 4 - Trạng thái (chỉ hiển thị, chỉnh sửa qua nút Sửa) */}
-      <td className="py-3.5 px-3 whitespace-nowrap">
+      <td className="py-2.5 px-3 whitespace-nowrap">
         {user.active ? (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -1275,7 +1275,7 @@ function UserRow({
       </td>
 
       {/* Cột 5 - Ngày tạo / Cập nhật */}
-      <td className="py-3.5 px-3 whitespace-nowrap">
+      <td className="py-2.5 px-3 whitespace-nowrap">
         <div className="flex flex-col gap-0.5 text-[11px]">
           <span className="text-slate-700 tabular-nums inline-flex items-center gap-1">
             <Calendar size={10} className="text-slate-400" />
@@ -1288,7 +1288,7 @@ function UserRow({
       </td>
 
       {/* Cột 6 - Thao tác */}
-      <td className="py-3.5 px-4 text-left whitespace-nowrap">
+      <td className="py-2.5 px-4 text-left whitespace-nowrap">
         <div className="inline-flex items-center gap-1">
           <button
             type="button"
@@ -1325,7 +1325,7 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 6 }).map((_, idx) => (
         <tr key={`skeleton-${idx}`} className="border-b border-slate-100">
-          <td className="py-3.5 px-4">
+          <td className="py-2.5 px-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-100 animate-pulse" />
               <div className="space-y-1.5">
