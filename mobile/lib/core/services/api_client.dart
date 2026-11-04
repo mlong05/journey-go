@@ -120,6 +120,10 @@ class ApiClient {
     bool isRetry = false,
     // 401 vốn hiểu là hết phiên; một số API dùng 401 cho sai mật khẩu nên giữ câu báo của máy chủ.
     bool keepUnauthorizedMessage = false,
+    // Gửi body dạng form-urlencoded thay vì JSON.
+    // ⚠️ BẮT BUỘC cho các endpoint backend khai báo `consumes = APPLICATION_FORM_URLENCODED_VALUE`:
+    // nếu không set Content-Type, Spring trả 415 Unsupported Media Type và request bị từ chối.
+    bool formEncoded = false,
   }) async {
     final baseUrl = await TokenStorage.getBaseUrl();
     final uri = Uri.parse('$baseUrl$path');
@@ -138,7 +142,14 @@ class ApiClient {
 
     try {
       final req = http.Request(method, uri)..headers.addAll(headers);
-      if (body != null) {
+      if (formEncoded) {
+        // Map<String, String> → application/x-www-form-urlencoded
+        final fields = body is Map
+            ? body.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))
+            : const <String, String>{};
+        req.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+        req.body = Uri(queryParameters: fields).query;
+      } else if (body != null) {
         req.headers['Content-Type'] = 'application/json';
         req.body = jsonEncode(body);
       }
@@ -172,6 +183,7 @@ class ApiClient {
             timeout: timeout,
             isRetry: true,
             keepUnauthorizedMessage: keepUnauthorizedMessage,
+            formEncoded: formEncoded,
           );
         }
         await TokenStorage.clear();
