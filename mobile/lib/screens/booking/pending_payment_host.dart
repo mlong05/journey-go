@@ -18,12 +18,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_colors.dart';
-import '../../core/services/payment_deep_link_service.dart';
-import '../../core/services/payment_service.dart';
+import '../../core/services/payment_result_service.dart';
 import '../../core/services/pending_payment_guard.dart';
 import '../../core/services/token_storage.dart';
 import '../booking/booking_detail_screen.dart';
+import 'payment_success_dialog.dart';
 
 class PendingPaymentHost extends StatefulWidget {
   final Widget child;
@@ -38,84 +37,52 @@ class _PendingPaymentHostState extends State<PendingPaymentHost> {
   /// Đã hiện thông báo cho giao dịch nào — tránh bật lặp.
   final Set<int> _notified = <int>{};
 
-  final PaymentDeepLinkService _deepLinks = PaymentDeepLinkService();
-  StreamSubscription<PaymentDeepLink>? _deepLinkSub;
+  /// Trung tâm xử lý kết quả thanh toán (chủ sở hữu DUY NHẤT của luồng deep link).
+  final PaymentResultService _results = PaymentResultService();
+  StreamSubscription<PaymentResultEvent>? _resultSub;
 
   @override
   void initState() {
     super.initState();
-    _initDeepLinks();
+    _initResults();
   }
 
   @override
   void dispose() {
-    _deepLinkSub?.cancel();
+    _resultSub?.cancel();
     super.dispose();
   }
 
-  /// Lắng nghe deep link `journeygo://payment/return` — app được mở lại từ
-  /// trình duyệt sau khi VNPay trả kết quả.
-  Future<void> _initDeepLinks() async {
-    await _deepLinks.init();
-    _deepLinkSub = _deepLinks.links.listen(_handleDeepLink);
+  /// Lắng nghe kết quả thanh toán đã được [PaymentResultService] xác minh.
+  ///
+  /// ⚠️ KHÔNG tự lắng nghe `PaymentDeepLinkService` ở đây — deep link sẽ bị xử lý
+  /// 2 lần (màn này + `PaymentScreen`) ⇒ 2 request trùng lặp và 2 hộp thoại.
+  Future<void> _initResults() async {
+    await _results.init();
+    _resultSub = _results.results.listen(_handleResult);
   }
 
-  /// Xử lý deep link thanh toán: áp dụng kết quả đã ký rồi báo cho người dùng.
-  ///
-  /// ── Luồng ──
-  /// Khi `vnp_ReturnUrl` là custom scheme, VNPay gửi kèm TOÀN BỘ tham số kết quả
-  /// ĐÃ KÝ. Ta gửi lại backend (`POST /payments/return-result`) ⇒ backend kiểm tra
-  /// chữ ký rồi áp dụng ⇒ không cần máy chủ trung gian (ngrok) còn sống.
-  ///
-  /// Nếu deep link KHÔNG có chữ ký (VD fallback qua trang web) ⇒ fallback sang
-  /// đường polling + QueryDR (xem `PendingPaymentGuard`).
-  Future<void> _handleDeepLink(PaymentDeepLink link) async {
+  /// Xử lý kết quả thanh toán đã xác minh.
+  Future<void> _handleResult(PaymentResultEvent event) async {
     if (!mounted) return;
 
-    if (link.hasSignature) {
-      final handled = await _submitSignedResult(link);
-      if (handled) return;
+    if (event.needsSync) {
+      // Deep link không có chữ ký (hoặc gửi lên backend lỗi) ⇒ để
+      // `PendingPaymentGuard` tra cứu (polling + QueryDR).
+      _triggerRecheck();
+      return;
     }
 
-    // Deep link có thể đến TRƯỚC khi `PendingPaymentGuard` kịp mount (app vừa được
-    // mở lại bởi deep link) ⇒ ép kiểm tra ở frame kế tiếp.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _pendingGuardKey.currentState?.recheck();
-    });
+    if (!event.isFinal || event.bookingId == null) return;
 
-    // Kèm theo: `PendingPaymentGuard` tự tra khi app resume / khởi động.
-    // Ở đây chỉ cần kích hoạt lại vòng kiểm tra khi có deep link.
-    _triggerRecheck();
-  }
+    await TokenStorage.clearPendingPayment(event.bookingId!);
+    if (!mounted) return;
 
-  /// Gửi kết quả đã ký lên backend và xử lý kết quả trả về.
-  ///
-  /// Trả về `true` nếu backend đã áp dụng kết quả (thành công hoặc thất bại rõ ràng).
-  /// Trả về `false` nếu backend chưa xác minh được ⇒ fallback sang polling.
-  Future<bool> _submitSignedResult(PaymentDeepLink link) async {
-    try {
-      final result = await PaymentService().submitReturnResult(link.params);
-      if (!mounted) return false;
-
-      if (result.isSuccess && result.bookingId != null) {
-        await TokenStorage.clearPendingPayment(result.bookingId!);
-        if (!mounted) return true;
-        await _handleCompleted(result.bookingId!);
-        return true;
-      }
-
-      if (result.isFinal && result.bookingId != null) {
-        await TokenStorage.clearPendingPayment(result.bookingId!);
-        if (!mounted) return true;
-        _handleFailed(result.bookingId!, result.message);
-        return true;
-      }
-      return false;
-    } catch (_) {
-      // Gửi lên backend thất bại ⇒ fallback sang polling + QueryDR.
-      return false;
+    if (event.isSuccess) {
+      await _handleCompleted(event.bookingId!);
+      return;
     }
+    _handleFailed(event.bookingId!, event.message);
   }
 
   /// Kích hoạt lại vòng kiểm tra giao dịch đang chờ.
@@ -150,77 +117,24 @@ class _PendingPaymentHostState extends State<PendingPaymentHost> {
   Future<void> _handleCompleted(int bookingId) async {
     if (!mounted || !_notified.add(bookingId)) return;
 
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        contentPadding: const EdgeInsets.all(24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: const BoxDecoration(
-                color: AppCultureColors.jadeLight,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.check_circle_rounded,
-                color: AppCultureColors.heritageJade,
-                size: 42,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Thanh toán thành công',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                color: AppCultureColors.textDark,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Giao dịch của bạn đã được xác nhận thành công.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: AppCultureColors.textMuted,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BookingDetailScreen(bookingId: bookingId),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppCultureColors.heritageJade,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: const Text(
-                  'Xem đơn của tôi',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    // ⚠️ Nếu có màn hình trong-app đang mở (VD `PaymentScreen`) ⇒ màn đó hiện hộp
+    // thoại (giàu thông tin hơn: mã đơn, số tiền) ⇒ host NHƯỜNG, không hiện trùng.
+    if (_results.hasActiveHandler(bookingId)) return;
+
+    // Chỉ MỘT nơi được quyền hiện hộp thoại cho booking này (tránh trùng khi
+    // deep link VÀ polling cùng phát hiện thành công).
+    if (!_results.claimDialog(bookingId)) return;
+
+    await showPaymentSuccessDialog(
+      context,
+      onViewBooking: () {
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BookingDetailScreen(bookingId: bookingId),
+          ),
+        );
+      },
     );
   }
 

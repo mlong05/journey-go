@@ -36,16 +36,15 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
-import '../../core/models/payment_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
-import '../../core/services/payment_deep_link_service.dart';
 import '../../core/services/payment_launcher.dart';
+import '../../core/services/payment_result_service.dart';
 import '../../core/services/payment_service.dart';
 import '../../core/services/payment_sync_service.dart';
 import '../../core/services/token_storage.dart';
-import '../../core/utils/formatters.dart';
 import 'booking_detail_screen.dart';
+import 'payment_success_dialog.dart';
 
 class PaymentScreen extends StatefulWidget {
   final int bookingId;
@@ -112,99 +111,94 @@ class _PaymentScreenState extends State<PaymentScreen> {
   /// Theo dõi vòng đời app — poll lại khi quay lại từ trình duyệt VNPay.
   late final PaymentLifecycleWatcher _lifecycleWatcher;
 
-  /// Lắng nghe deep link `journeygo://payment/return` — khi `vnp_ReturnUrl` là
-  /// custom scheme, VNPay mở app trực tiếp kèm tham số kết quả ĐÃ KÝ.
-  final PaymentDeepLinkService _deepLinks = PaymentDeepLinkService();
-  StreamSubscription<PaymentDeepLink>? _deepLinkSub;
+  /// Trung tâm xử lý kết quả thanh toán (chủ sở hữu DUY NHẤT của luồng deep link).
+  ///
+  /// ⚠️ KHÔNG tự lắng nghe `PaymentDeepLinkService` ở đây — nếu không, deep link
+  /// sẽ được xử lý 2 lần (màn này + `PendingPaymentHost`) ⇒ 2 request trùng lặp
+  /// và 2 hộp thoại thành công.
+  final PaymentResultService _results = PaymentResultService();
+  StreamSubscription<PaymentResultEvent>? _resultSub;
 
   @override
   void initState() {
     super.initState();
     _lifecycleWatcher = PaymentLifecycleWatcher(onResumed: _onAppResumed);
     WidgetsBinding.instance.addObserver(_lifecycleWatcher);
-    _listenDeepLinks();
+    // Báo cho trung tâm biết màn này đang mở ⇒ màn này (giàu thông tin hơn) được
+    // ưu tiên hiện hộp thoại thành công so với `PendingPaymentHost` (generic).
+    _results.registerHandler(widget.bookingId);
+    _listenResults();
     _load();
   }
 
   @override
   void dispose() {
-    _deepLinkSub?.cancel();
+    _resultSub?.cancel();
+    _results.unregisterHandler(widget.bookingId);
     WidgetsBinding.instance.removeObserver(_lifecycleWatcher);
     _countdownTimer?.cancel();
     super.dispose();
   }
 
-  /// Lắng nghe deep link trả kết quả thanh toán từ VNPay.
-  Future<void> _listenDeepLinks() async {
-    try {
-      await _deepLinks.init();
-      _deepLinkSub = _deepLinks.links.listen(_onDeepLink);
-    } catch (_) {
-      // Không lắng nghe được deep link ⇒ vẫn chạy được qua polling + QueryDR.
-    }
+  /// Lắng nghe kết quả thanh toán đã được [PaymentResultService] xác minh.
+  void _listenResults() {
+    _resultSub = _results.results.listen(_onResult);
   }
 
   /// Xử lý deep link kết quả thanh toán.
   ///
-  /// Deep link mang tham số kết quả ĐÃ KÝ của VNPay ⇒ gửi lại backend để kiểm tra
-  /// chữ ký rồi áp dụng (không cần tunnel, không phụ thuộc lệnh querydr).
-  Future<void> _onDeepLink(PaymentDeepLink link) async {
+  /// Deep link mang tham số kết quả ĐÃ KÝ của VNPay ⇒ backend đã xác minh và áp dụng.
+  ///
+  /// ⚠️ Kết quả do [PaymentResultService] xác minh và gửi lên backend TRƯỚC khi
+  /// tới đây ⇒ màn này KHÔNG cần gọi `/return-result` lần nữa.
+  Future<void> _onResult(PaymentResultEvent event) async {
     if (!mounted || _successDialogShown) return;
-    if (!link.hasSignature) {
-      // Không có chữ ký ⇒ fallback sang QueryDR.
+
+    // Chỉ xử lý kết quả thuộc đúng booking của màn này.
+    if (event.bookingId != null && event.bookingId != widget.bookingId) return;
+
+    if (event.needsSync) {
+      // Deep link không có chữ ký (hoặc gửi lên backend lỗi) ⇒ fallback sang QueryDR.
       final paymentId = _payment?.id ?? _init?.paymentId;
       if (paymentId != null) await _syncWithVnpay(paymentId);
       return;
     }
 
-    try {
-      final result = await _paymentService.submitReturnResult(link.params);
+    if (!event.isFinal) return;
+
+    if (event.isSuccess) {
+      await TokenStorage.clearPendingPayment(widget.bookingId);
       if (!mounted) return;
-
-      if (result.isSuccess) {
-        await TokenStorage.clearPendingPayment(widget.bookingId);
-        if (!mounted) return;
-        setState(() {
-          _syncing = false;
-          _polling = false;
-          _statusMessage = 'Thanh toán thành công!';
-        });
-        // Đọc lại giao dịch để có đầy đủ thông tin hiển thị.
-        final paymentId = _payment?.id ?? _init?.paymentId;
-        if (paymentId != null) {
-          try {
-            final fresh = await _paymentService.getPaymentById(paymentId);
-            if (mounted) setState(() => _payment = fresh);
-          } catch (_) {
-            // Không đọc lại được ⇒ vẫn hiện dialog thành công.
-          }
+      setState(() {
+        _syncing = false;
+        _polling = false;
+        _statusMessage = 'Thanh toán thành công!';
+      });
+      // Đọc lại giao dịch để có đầy đủ thông tin hiển thị.
+      final paymentId = _payment?.id ?? _init?.paymentId ?? event.paymentId;
+      if (paymentId != null) {
+        try {
+          final fresh = await _paymentService.getPaymentById(paymentId);
+          if (mounted) setState(() => _payment = fresh);
+        } catch (_) {
+          // Không đọc lại được ⇒ vẫn hiện dialog thành công.
         }
-        _showSuccessDialog();
-        return;
       }
-
-      if (result.isFinal) {
-        await TokenStorage.clearPendingPayment(widget.bookingId);
-        if (!mounted) return;
-        setState(() {
-          _syncing = false;
-          _polling = false;
-          _statusMessage = '';
-          _error = result.message.isNotEmpty
-              ? result.message
-              : 'Thanh toán không thành công. Bạn có thể thử lại.';
-        });
-        return;
-      }
-
-      // Chưa xác minh được ⇒ fallback sang QueryDR.
-      final paymentId = _payment?.id ?? _init?.paymentId;
-      if (paymentId != null) await _syncWithVnpay(paymentId);
-    } catch (_) {
-      // Gửi lên backend thất bại ⇒ fallback sang QueryDR.
-      final paymentId = _payment?.id ?? _init?.paymentId;
-      if (paymentId != null) await _syncWithVnpay(paymentId);
+      _showSuccessDialog();
+      return;
     }
+
+    // Thất bại / đã hủy.
+    await TokenStorage.clearPendingPayment(widget.bookingId);
+    if (!mounted) return;
+    setState(() {
+      _syncing = false;
+      _polling = false;
+      _statusMessage = '';
+      _error = event.message.isNotEmpty
+          ? event.message
+          : 'Thanh toán không thành công. Bạn có thể thử lại.';
+    });
   }
 
   // ── Tải dữ liệu ───────────────────────────────────────────────────────────
@@ -214,31 +208,50 @@ class _PaymentScreenState extends State<PaymentScreen> {
       _error = '';
     });
 
+    // ① Booking — tải trước. Nếu lỗi ⇒ hiện màn hình lỗi (không có gì để thanh toán).
+    BookingModel booking;
     try {
-      final booking = widget.booking ?? await _bookingService.getBookingById(widget.bookingId);
-      final methods = await _paymentService.getPaymentMethods();
-
-      if (!mounted) return;
-      setState(() {
-        _booking = booking;
-        _methods = methods;
-        _loading = false;
-        _autoSelectMethod(methods);
-      });
-      _startCountdown();
-      _checkPendingPayment();
+      booking = widget.booking ?? await _bookingService.getBookingById(widget.bookingId);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.message;
         _loading = false;
       });
+      return;
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _error = 'Không thể tải thông tin thanh toán.';
         _loading = false;
       });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _booking = booking;
+      _loading = false;
+    });
+    _startCountdown();
+    _checkPendingPayment();
+
+    // ② Danh sách phương thức thanh toán — tải SAU, lỗi ở đây KHÔNG được làm
+    //    mất thẻ đơn (vì lỗi mạng tạm thời rất hay xảy ra khi vừa quay lại
+    //    từ trình duyệt thanh toán). Thẻ đơn vẫn hiển thị + hiện cảnh báo.
+    try {
+      final methods = await _paymentService.getPaymentMethods();
+      if (!mounted) return;
+      setState(() {
+        _methods = methods;
+        _autoSelectMethod(methods);
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Không thể tải phương thức thanh toán.');
     }
   }
 
@@ -480,13 +493,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
         return;
       }
 
-      // Vẫn chưa xác minh được ⇒ KHÔNG cho tạo giao dịch mới (tránh trùng tiền).
+      // Vẫn chưa xác minh được ⇒ cho khách CHỌN: thử lại thanh toán, hoặc kiểm tra lại sau.
+      //
+      // ── Vì sao KHÔNG chặn vô điều kiện? ──
+      // QueryDR trên VNPay Sandbox luôn trả `vnp_ResponseCode=99` ⇒ nếu chặn, khách
+      // KHÔNG BAO GIỜ thanh toán lại được dù booking vẫn còn trong hạn 10 phút
+      // (dead-end). Mỗi lần thử có `txnRef` riêng nên không gây trùng tiền; nếu
+      // giao dịch cũ thực sự thành công thì backend tự đánh dấu DUPLICATE và
+      // chuyển khoản tiền dư sang quy trình hoàn tiền/đối soát.
+      if (!mounted) return;
       setState(() {
         _initializing = false;
         _statusMessage = '';
-        _error = 'Giao dịch trước chưa rõ kết quả. Vui lòng kiểm tra lại sau '
-            'hoặc liên hệ hỗ trợ để được hoàn tiền nếu giao dịch đã thất bại.';
+        _error = 'Chưa xác minh được kết quả giao dịch trước. Nếu bạn chưa thanh toán, '
+            'bạn có thể thử lại ngay; nếu đã thanh toán, hãy kiểm tra lại sau ít phút.';
       });
+      _offerRetry(bookingId);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -494,7 +516,51 @@ class _PaymentScreenState extends State<PaymentScreen> {
         _statusMessage = '';
         _error = 'Chưa xác minh được kết quả giao dịch trước. Vui lòng thử lại sau.';
       });
+      _offerRetry(bookingId);
     }
+  }
+
+  /// Hỏi khách có muốn thử lại thanh toán hay không.
+  ///
+  /// Nếu khách chọn "Thử lại" ⇒ xoá giao dịch đang chờ trong phiên này để lần bấm
+  /// kế tiếp tạo giao dịch MỚI (backend sẽ cho phép vì booking còn trong hạn).
+  Future<void> _offerRetry(int bookingId) async {
+    if (!mounted) return;
+    final retry = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Thanh toán lại?'),
+        content: const Text(
+          'Hệ thống chưa xác minh được kết quả giao dịch trước.\n\n'
+          '• Nếu bạn CHƯA thanh toán: bạn có thể thử lại ngay với thời hạn còn lại.\n'
+          '• Nếu bạn ĐÃ thanh toán: vui lòng chọn "Kiểm tra lại" để hệ thống đồng bộ '
+          'kết quả, tránh thanh toán trùng.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Kiểm tra lại'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Thử lại'),
+          ),
+        ],
+      ),
+    );
+
+    if (retry != true || !mounted) return;
+
+    // Cho phép tạo giao dịch mới: xoá giao dịch đang chờ trong phiên này.
+    setState(() {
+      _init = null;
+      _payment = null;
+      _polling = false;
+      _syncing = false;
+      _error = '';
+      _statusMessage = '';
+    });
+    await TokenStorage.clearPendingPayment(bookingId);
   }
 
   /// Poll trạng thái giao dịch mỗi 2.5 giây.
@@ -622,90 +688,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
+  /// Hiện hộp thoại "Thanh toán thành công".
+  ///
+  /// ⚠️ Quyền hiện hộp thoại được xin ở ĐÂY (đồng bộ) — mọi đường dẫn tới
+  /// thành công đều gọi hàm này ⇒ chỉ MỘT hộp thoại cho mỗi booking, và màn này
+  /// ( giàu thông tin hơn ) được ưu tiên so với `PendingPaymentHost` (generic).
   void _showSuccessDialog() {
     if (_successDialogShown) return;
+
+    // Không có quyền ⇒ nơi khác đã hiện hộp thoại ⇒ im lặng, không hiện trùng.
+    if (!_results.claimDialog(widget.bookingId)) return;
     _successDialogShown = true;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        contentPadding: const EdgeInsets.all(24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: const BoxDecoration(
-                color: AppCultureColors.jadeLight,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.check_circle_rounded,
-                color: AppCultureColors.heritageJade,
-                size: 42,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Thanh toán thành công',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                color: AppCultureColors.textDark,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Mã đơn: ${_booking?.bookingCode ?? '#${_booking?.id}'}\n'
-              'Số tiền: ${formatVndAmount(_booking?.totalAmount ?? 0)}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppCultureColors.textMuted,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Đóng dialog, rồi đưa khách tới TRANG CHI TIẾT ĐƠN.
-                  //
-                  // ⚠️ KHÔNG dùng `Navigator.pop()` ở đây: hành động đó chỉ quay về màn
-                  // TRƯỚC ĐÓ (màn chọn phương thức thanh toán) ⇒ khách thấy vẫn đang ở
-                  // trang booking, tưởng như nút bấm không hoạt động.
-                  //
-                  // ⇒ `pushReplacement` thay thế màn PaymentScreen bằng BookingDetailScreen
-                  // ⇒ stack sạch: không còn quay lại được màn thanh toán đã hoàn tất.
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => BookingDetailScreen(bookingId: widget.bookingId),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppCultureColors.heritageJade,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: const Text(
-                  'Xem đơn của tôi',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    showPaymentSuccessDialog(
+      context,
+      bookingCode: _booking?.bookingCode ?? '#${_booking?.id}',
+      amount: _booking?.totalAmount ?? 0,
+      onViewBooking: () {
+        if (!mounted) return;
+        // ⚠️ KHÔNG dùng `Navigator.pop()`: hành động đó chỉ quay về màn TRƯỚC ĐÓ
+        // (màn chọn phương thức thanh toán) ⇒ khách thấy vẫn đang ở trang booking,
+        // tưởng như nút bấm không hoạt động.
+        //
+        // ⇒ `pushReplacement` thay thế màn PaymentScreen bằng BookingDetailScreen
+        // ⇒ stack sạch: không còn quay lại được màn thanh toán đã hoàn tất.
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => BookingDetailScreen(bookingId: widget.bookingId),
+          ),
+        );
+      },
     );
   }
 
@@ -832,47 +844,78 @@ class _PaymentScreenState extends State<PaymentScreen> {
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        booking.bookingCode ?? 'Đơn #${booking.id}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
+                  // Tiêu đề tour có thể rất dài ⇒ bọc Expanded + ellipsis để Row
+                  // không bị RenderFlex overflow khi đi kèm badge đếm ngược.
+                  // Badge đếm ngược là chuỗi ngắn (mm:ss) nên để ở dạng child
+                  // thường + giới hạn bề rộng, còn tiêu đề chiếm toàn bộ phần
+                  // còn lại (Expanded) ⇒ không bị cắt cụt oan.
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          booking.bookingCode.isEmpty
+                              ? 'Đơn #${booking.id}'
+                              : booking.bookingCode,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        booking.tourTitle ?? 'Tour trải nghiệm',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
+                        const SizedBox(height: 6),
+                        Text(
+                          booking.tourTitle.isEmpty
+                              ? 'Tour trải nghiệm'
+                              : booking.tourTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  if (booking.isPendingPayment)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        booking.countdownText,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                  if (booking.isPendingPayment) ...[
+                    const SizedBox(width: 12),
+                    // Badge là chuỗi ngắn (mm:ss) nên để ở dạng child thường để
+                    // nó giữ bề rộng tự nhiên; ConstrainedBox chặn trường hợp
+                    // nội dung dài bất ngờ (mm:ss không bao giờ vượt 5 ký tự).
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 110),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          booking.countdownText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
               const SizedBox(height: 14),
@@ -880,48 +923,59 @@ class _PaymentScreenState extends State<PaymentScreen> {
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Ngày trải nghiệm',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11.5),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        booking.formattedExperienceDate.isEmpty
-                            ? '—'
-                            : booking.formattedExperienceDate,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ngày trải nghiệm',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11.5),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          booking.formattedExperienceDate.isEmpty
+                              ? '—'
+                              : booking.formattedExperienceDate,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Tổng thanh toán',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11.5),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        booking.formattedTotal,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
+                  const SizedBox(width: 12),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 160),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Tổng thanh toán',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11.5),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          booking.formattedTotal,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-            ],
+              ),            ],
           ),
         ),
 

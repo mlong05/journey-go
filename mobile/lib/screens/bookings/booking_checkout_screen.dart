@@ -7,16 +7,27 @@ import '../../core/models/booking_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
 import '../../core/services/mock_payment_store.dart';
+import '../../core/services/payment_result_service.dart';
 import '../../core/services/payment_service.dart';
+import '../../core/services/token_storage.dart';
+import '../booking/booking_detail_screen.dart';
+import '../booking/payment_success_dialog.dart';
 import '../journey/journey_screen.dart';
 import '../journey/journey_widgets.dart' show PrimaryButton;
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
 
 /// Thanh toán một booking qua VNPay.
 ///
-/// VNPay chặn WebView nên trang thanh toán mở bằng trình duyệt ngoài. Return URL không đưa
-/// khách về app, vì vậy kết quả luôn lấy từ trạng thái booking trên server (IPN / QueryDR):
-/// poll khi đang chờ và đọc lại mỗi lần app quay về foreground.
+/// VNPay chặn WebView nên trang thanh toán mở bằng trình duyệt ngoài.
+///
+/// ── Kết quả thanh toán đến app theo 2 đường ──
+///  1. **Deep link** (`journeygo://payment/return`) — VNPay chuyển thẳng trình duyệt
+///     về app kèm tham số kết quả ĐÃ KÝ ⇒ `PaymentResultService` gửi lại backend
+///     xác minh ⇒ hiện hộp thoại "Thanh toán thành công" NGAY.
+///  2. **Polling + QueryDR** (dự phòng) — app tự tra trạng thái booking trên server
+///     (IPN / QueryDR) khi đang chờ và mỗi lần quay lại foreground.
+///
+/// ⇒ Cả hai đường đều dẫn tới cùng một hộp thoại thành công (không hiện trùng).
 class BookingCheckoutScreen extends StatefulWidget {
   final int bookingId;
 
@@ -32,13 +43,29 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
   static const _queryAfter = Duration(seconds: 9);
   static const _giveUpAfter = Duration(minutes: 3);
 
+  /// Mã `vnp_BankCode` của phương thức DUY NHẤT được hỗ trợ:
+  /// "Thẻ nội địa và tài khoản ngân hàng".
+  static const String domesticCardBankCode = 'VNBANK';
+
   final BookingService _bookings = BookingService();
   final PaymentService _payments = PaymentService();
+
+  /// Trung tâm xử lý kết quả thanh toán (chủ sở hữu DUY NHẤT của luồng deep link).
+  final PaymentResultService _results = PaymentResultService();
+
+  StreamSubscription<PaymentResultEvent>? _resultSub;
 
   BookingModel? _booking;
   List<PaymentMethodModel> _methods = const [];
   List<PaymentModel> _attempts = const [];
-  String? _bankCode; // null: để khách tự chọn trên trang VNPay
+
+  /// Mã `vnp_BankCode` của phương thức thanh toán được chọn.
+  ///
+  /// Mặc định `VNBANK` — "Thẻ nội địa và tài khoản ngân hàng" (phương thức DUY NHẤT
+  /// dự án hỗ trợ). KHÔNG để null: nếu không gửi `vnp_BankCode`, trang VNPay sẽ mở
+  /// trang "chọn phương thức" (có cả QR + thẻ quốc tế) — trái với quy ước đã chốt.
+  String? _bankCode = domesticCardBankCode;
+
   bool _loading = true;
   String? _loadError;
   bool _busy = false;
@@ -62,11 +89,25 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && _booking?.status == BookingStatus.pendingPayment) setState(() {});
     });
+    // Báo cho trung tâm biết màn này đang mở ⇒ màn này (giàu thông tin hơn) được
+    // ưu tiên hiện hộp thoại thành công so với `PendingPaymentHost` (generic).
+    _results.registerHandler(widget.bookingId);
+    _listenResults();
     _load();
+  }
+
+  /// Lắng nghe kết quả thanh toán do [PaymentResultService] xác minh.
+  ///
+  /// Deep link `journeygo://payment/return` từ VNPay ⇒ backend kiểm tra chữ ký ⇒
+  /// app hiện hộp thoại "Thanh toán thành công" NGAY (không cần chờ poll).
+  void _listenResults() {
+    _resultSub = _results.results.listen(_onResult);
   }
 
   @override
   void dispose() {
+    _resultSub?.cancel();
+    _results.unregisterHandler(widget.bookingId);
     WidgetsBinding.instance.removeObserver(this);
     _clock?.cancel();
     _pollTimer?.cancel();
@@ -158,6 +199,62 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
     );
   }
 
+  /// Xử lý kết quả thanh toán do [PaymentResultService] xác minh.
+  ///
+  /// ⚠️ Chỉ xử lý khi kết quả thuộc đúng booking của màn hình này — tránh bắt
+  /// nhầm kết quả của một giao dịch khác (app có thể đang mở nhiều luồng).
+  Future<void> _onResult(PaymentResultEvent event) async {
+    if (!mounted) return;
+    if (event.bookingId != null && event.bookingId != widget.bookingId) return;
+
+    if (event.needsSync) {
+      // Deep link không có chữ ký ⇒ tự tra cứu (polling + QueryDR).
+      if (_awaiting) _startWaiting();
+      return;
+    }
+
+    if (!event.isFinal) return;
+
+    if (event.isSuccess) {
+      await _handlePaymentSuccess();
+      return;
+    }
+
+    // Thất bại / đã hủy ⇒ dừng chờ và báo lỗi (không hiện hộp thoại thành công).
+    _stopWaiting();
+    if (event.message.isNotEmpty && mounted) {
+      setState(() => _error = event.message);
+    }
+  }
+
+  /// Hiện hộp thoại "Thanh toán thành công" + đánh dấu đã xử lý.
+  ///
+  /// ⚠️ Dùng chung cho CẢ HAI đường (deep link và polling) ⇒ [claimDialog] bảo đảm
+  /// chỉ MỘT hộp thoại cho mỗi booking, dù hai đường cùng kích hoạt.
+  Future<void> _handlePaymentSuccess() async {
+    _stopWaiting();
+    await TokenStorage.clearPendingPayment(widget.bookingId);
+    await _refresh();
+    if (!mounted) return;
+
+    // Không có quyền ⇒ nơi khác đã hiện hộp thoại ⇒ im lặng, không hiện trùng.
+    if (!_results.claimDialog(widget.bookingId)) return;
+
+    await showPaymentSuccessDialog(
+      context,
+      bookingCode: _booking?.bookingCode,
+      amount: _booking?.totalAmount,
+      onViewBooking: () {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => BookingDetailScreen(bookingId: widget.bookingId),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _pay() async {
     if (ApiConstants.mockPayment) return _mockPay();
     setState(() {
@@ -171,6 +268,15 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
       if (paymentUrl == null || paymentUrl.isEmpty) {
         throw const ApiException('Máy chủ không trả về đường dẫn thanh toán.');
       }
+
+      // Nhớ giao dịch đang chờ ⇒ nếu hệ điều KILL app trong lúc khách ở trình
+      // duyệt, mở lại app vẫn tra được kết quả (PendingPaymentGuard).
+      await TokenStorage.savePendingPayment(
+        bookingId: widget.bookingId,
+        paymentId: init.paymentId,
+        paymentUrl: init.paymentUrl,
+      );
+
       final opened = await launchUrl(
         Uri.parse(paymentUrl), // URL đã ký: không sửa tham số
         mode: LaunchMode.externalApplication,
@@ -234,6 +340,8 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
 
     if (booking != null && booking.status != BookingStatus.pendingPayment) {
       _stopWaiting();
+      // Backend đã xác nhận (qua IPN / QueryDR) ⇒ hiện hộp thoại thành công.
+      if (booking.isPaid) await _handlePaymentSuccess();
       return;
     }
     final elapsed = DateTime.now().difference(_awaitStart);
@@ -500,31 +608,57 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
   }
 
   Widget _buildMethods() {
-    Widget option(String? code, String label, String description) {
-      return RadioListTile<String?>(
-        value: code,
-        enabled: !_busy,
-        activeColor: AppCultureColors.heritageJade,
-        contentPadding: EdgeInsets.zero,
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-        subtitle: Text(description, style: const TextStyle(fontSize: 12)),
-      );
-    }
+    // Chỉ hiển thị phương thức DUY NHẤT được hỗ trợ:
+    // "Thẻ nội địa và tài khoản ngân hàng" (DOMESTIC_CARD / VNBANK).
+    final visible = _methods
+        .where((m) => m.bankCode == domesticCardBankCode)
+        .toList(growable: false);
+
+    final label = visible.isNotEmpty
+        ? visible.first.label
+        : 'Thẻ nội địa và tài khoản ngân hàng';
+    final description = visible.isNotEmpty
+        ? visible.first.description
+        : 'Thanh toán bằng thẻ ATM nội địa hoặc tài khoản ngân hàng '
+            '(Internet Banking, Mobile Banking của các ngân hàng Việt Nam).';
 
     // Material trong suốt: RadioListTile vẽ hiệu ứng chạm lên Material gần nhất,
     // nếu không sẽ bị nền trắng của thẻ che mất.
     return RadioGroup<String?>(
       groupValue: _bankCode,
-      onChanged: (v) => setState(() => _bankCode = v),
+      // `RadioGroup.onChanged` bắt buộc khác null ⇒ khi đang bận ta bỏ qua,
+      // còn `RadioListTile.enabled = !_busy` đã lo việc khoá thao tác.
+      onChanged: (v) {
+        if (_busy) return;
+        setState(() => _bankCode = v);
+      },
       child: Material(
         type: MaterialType.transparency,
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Phương thức thanh toán', style: TextStyle(fontWeight: FontWeight.w700)),
-          option(null, 'Chọn trên cổng VNPay', 'Bạn sẽ chọn ngân hàng hoặc ví ở trang VNPay.'),
-          for (final m in _methods.where((m) => m.bankCode != null && m.bankCode!.isNotEmpty))
-            option(m.bankCode, m.label, m.description),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Phương thức thanh toán',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            const Text(
+              'Thanh toán an toàn qua cổng VNPay.',
+              style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+            ),
+            const SizedBox(height: 6),
+            RadioListTile<String?>(
+              value: domesticCardBankCode,
+              enabled: !_busy,
+              activeColor: AppCultureColors.heritageJade,
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+              subtitle: Text(
+                description,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
           ],
         ),
       ),
