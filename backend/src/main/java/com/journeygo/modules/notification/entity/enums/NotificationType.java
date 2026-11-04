@@ -8,6 +8,8 @@ public enum NotificationType {
 
     // ── Moderator: hàng chờ kiểm duyệt ───────────────────────────────────────
     DESTINATION_PENDING(Category.REVIEW),
+    DESTINATION_REQUEST_PENDING(Category.REVIEW),
+    DESTINATION_REQUEST_CONTENT_PENDING(Category.REVIEW),
     TOUR_PENDING(Category.REVIEW),
     CONTENT_PENDING(Category.REVIEW),
     EXPERIENCE_PENDING(Category.REVIEW),
@@ -17,8 +19,16 @@ public enum NotificationType {
     // ── Admin ────────────────────────────────────────────────────────────────
     REFUND_REQUESTED(Category.REFUND),
     ADJUSTMENT_PENDING(Category.FINANCE),
+    DESTINATION_REQUEST_APPROVED_FOR_ASSIGN(Category.REVIEW),
 
     // ── Provider ─────────────────────────────────────────────────────────────
+    DESTINATION_REQUEST_SUBMITTED(Category.REVIEW),
+    DESTINATION_REQUEST_APPROVED(Category.APPROVED),
+    DESTINATION_REQUEST_REJECTED(Category.REJECTED),
+    DESTINATION_REQUEST_ASSIGNED(Category.REVIEW),
+    DESTINATION_REQUEST_CONTENT_REJECTED(Category.REJECTED),
+    DESTINATION_REQUEST_COMPLETED(Category.APPROVED),
+    DESTINATION_REQUEST_CANCELLED(Category.REJECTED),
     DESTINATION_APPROVED(Category.APPROVED),
     DESTINATION_REJECTED(Category.REJECTED),
     TOUR_APPROVED(Category.APPROVED),
