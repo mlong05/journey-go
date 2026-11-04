@@ -420,7 +420,7 @@ public class CommunityService {
 
     @Transactional(readOnly = true)
     public Page<PostResponse> getPendingPosts(Pageable pageable) {
-        Page<CommunityPost> page = postRepository.findByStatusOrderByCreatedAtAsc(PostStatus.PENDING_REVIEW, pageable);
+        Page<CommunityPost> page = postRepository.findByStatusOrderByCreatedAtDesc(PostStatus.PENDING_REVIEW, pageable);
         Map<Long, Integer> counts = pendingReportCounts(page.getContent().stream().map(CommunityPost::getId).toList());
         return withNames(page.map(p -> PostResponse.fromEntity(p, null).toBuilder()
                 .reportCount(counts.getOrDefault(p.getId(), 0))

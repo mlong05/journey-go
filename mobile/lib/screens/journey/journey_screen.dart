@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' show Position;
 import 'package:latlong2/latlong.dart';
@@ -9,6 +10,7 @@ import '../../core/services/destination_service.dart';
 import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/route_service.dart';
+import '../common/heritage_motion.dart';
 import '../culture/cultural_stories.dart';
 import 'journey_map.dart';
 import 'journey_widgets.dart';
@@ -68,6 +70,11 @@ class _JourneyScreenState extends State<JourneyScreen> {
   bool _rerouting = false;
   int _offRouteHits = 0;
   DateTime _lastRouteAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  // Danh sách điểm đến: điểm đã xong được gập lại, chạm để mở; tự cuộn tới điểm đang làm một lần.
+  final Set<int> _expandedDone = {};
+  final GlobalKey _currentCardKey = GlobalKey();
+  bool _scrolledToCurrent = false;
 
   @override
   void initState() {
@@ -231,13 +238,16 @@ class _JourneyScreenState extends State<JourneyScreen> {
       if (!mounted) return;
       final journey = _journey;
       if (journey != null && journey.isCompleted) {
+        final badges = journey.destinations.where((d) => d.badgeAwarded).length;
         showRewardDialog(
           context,
           title: 'Hoàn thành hành trình!',
-          subtitle: 'Bạn đã đi trọn "${journey.tourName}". Cảm ơn bạn đã gìn giữ và lan tỏa di sản.',
-          points: 50,
+          subtitle: 'Bạn đã đi trọn "${journey.tourName}": ${journey.doneCount} điểm đến'
+              '${badges > 0 ? ', $badges huy hiệu di sản' : ''}, ${journey.pointsEarned} điểm nhiệm vụ. '
+              'Cảm ơn bạn đã gìn giữ và lan tỏa di sản.',
+          points: journey.completionBonusPoints,
           icon: Icons.emoji_events_rounded,
-          buttonLabel: 'Xem tổng kết',
+          buttonLabel: 'Tuyệt vời',
         );
       }
     }
@@ -525,11 +535,14 @@ class _JourneyScreenState extends State<JourneyScreen> {
     }
   }
 
-  /// Đã vào gần điểm đang chỉ đường (trong bán kính check-in 100 m, chừa sai số GPS).
+  /// Bán kính check-in GPS do backend quy định.
+  int get _radius => _journey?.checkInRadiusMeters ?? 100;
+
+  /// Đã vào trong bán kính check-in của điểm đang chỉ đường (cùng ngưỡng backend dùng để chấm).
   bool get _arrived {
     final dest = _navDestination;
     final point = dest == null ? null : _coords[dest.destinationId];
-    return point != null && _user != null && distanceMeters(_user!, point) <= 80;
+    return point != null && _user != null && distanceMeters(_user!, point) <= _radius;
   }
 
   /// Phần đường còn phải đi (từ chỗ du khách đang đứng trên tuyến tới đích).
@@ -554,7 +567,24 @@ class _JourneyScreenState extends State<JourneyScreen> {
     }
   }
 
+  /// Cuộn danh sách tới thẻ điểm đến đang làm (một lần, sau khi thẻ đã hiện).
+  void _scheduleScrollToCurrent() {
+    if (_scrolledToCurrent) return;
+    _scrolledToCurrent = true;
+    Future.delayed(const Duration(milliseconds: 450), () {
+      final ctx = _currentCardKey.currentContext;
+      if (!mounted || ctx == null || !ctx.mounted) return;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.02,
+        duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 520),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
   Widget _buildMapLayout(TourJourney journey) {
+    _scheduleScrollToCurrent();
     final topInset = MediaQuery.paddingOf(context).top;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final current = _currentDestination;
@@ -754,7 +784,13 @@ class _JourneyScreenState extends State<JourneyScreen> {
                         sliver: SliverList.list(
                           children: [
                             for (var i = 0; i < journey.destinations.length; i++)
-                              _buildDestination(journey.destinations[i], isLast: i == journey.destinations.length - 1),
+                              Reveal(
+                                order: i,
+                                child: _buildDestination(
+                                  journey.destinations[i],
+                                  isLast: i == journey.destinations.length - 1,
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -816,13 +852,13 @@ class _JourneyScreenState extends State<JourneyScreen> {
                     const SizedBox(height: 4),
                     Text(
                       journey.isCompleted
-                          ? '+50 điểm thưởng hoàn thành'
+                          ? '+${journey.completionBonusPoints} điểm thưởng hoàn thành'
                           : current == null
                           ? ''
                           : current.checkedIn
                           ? 'Đã check-in · ${current.tasksCompleted}/${current.totalTasks} nhiệm vụ'
                           : distance != null
-                          ? 'Cách bạn ${formatDistance(distance)} · check-in trong bán kính 100 m'
+                          ? 'Cách bạn ${formatDistance(distance)} · check-in trong bán kính $_radius m'
                           : 'Đến nơi và check-in để mở nhiệm vụ',
                       style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
                     ),
@@ -890,7 +926,9 @@ class _JourneyScreenState extends State<JourneyScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppCultureColors.heritageJade))
           : _journey == null
           ? _buildError()
-          : (_coordsLoaded && _coords.isNotEmpty)
+          : !_coordsLoaded
+          ? _buildMapLoading(_journey!)
+          : _coords.isNotEmpty
           ? _buildMapLayout(_journey!)
           : RefreshIndicator(
               color: AppCultureColors.heritageJade,
@@ -927,13 +965,120 @@ class _JourneyScreenState extends State<JourneyScreen> {
                         ),
                         const SizedBox(height: 12),
                         for (var i = 0; i < _journey!.destinations.length; i++)
-                          _buildDestination(_journey!.destinations[i], isLast: i == _journey!.destinations.length - 1),
+                          Reveal(
+                            order: i,
+                            child: _buildDestination(
+                              _journey!.destinations[i],
+                              isLast: i == _journey!.destinations.length - 1,
+                            ),
+                          ),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
+    );
+  }
+
+  /// Khung chờ trong lúc tải tọa độ: nền bản đồ giả, hoa văn trống đồng xoay chậm, bảng dưới dạng khung xám.
+  Widget _buildMapLoading(TourJourney journey) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFFE6F2EC), Color(0xFFF6F1E4)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+            child: CustomPaint(painter: _MapGridPainter()),
+          ),
+        ),
+        Align(
+          alignment: const Alignment(0, -0.35),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SlowSpin(
+                period: const Duration(seconds: 12),
+                child: DrumMotif(size: 120, color: AppCultureColors.heritageJade.withValues(alpha: 0.35)),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Đang trải bản đồ hành trình…',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppCultureColors.jadeDark),
+              ),
+            ],
+          ),
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Row(
+              children: [
+                MapRoundButton(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: 'Quay lại',
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    journey.tourName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: Container(
+            height: MediaQuery.sizeOf(context).height * 0.42,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            decoration: const BoxDecoration(
+              color: AppCultureColors.background,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 16, offset: Offset(0, -2))],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: AppCultureColors.border, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                for (final w in const [0.7, 0.45, 1.0, 1.0])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: FractionallySizedBox(
+                      widthFactor: w,
+                      child: Container(
+                        height: w == 1.0 ? 64 : 14,
+                        decoration: BoxDecoration(
+                          color: AppCultureColors.surfaceSubtle,
+                          borderRadius: BorderRadius.circular(w == 1.0 ? 18 : 7),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1048,13 +1193,22 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
   Widget _buildDestination(JourneyDestination dest, {required bool isLast}) {
     final busy = _busyDestinationId == dest.destinationId;
-    final Color accent = dest.isDone
+    final skipped = dest.status == ProgressStatus.skipped;
+    // Điểm bỏ qua dùng màu xám để không lẫn với điểm đã hoàn thành
+    final Color accent = skipped
+        ? AppCultureColors.textLight
+        : dest.isDone
         ? AppCultureColors.heritageJade
         : dest.isCurrent
         ? AppCultureColors.oceanBlue
         : AppCultureColors.textLight;
+    final collapsible = dest.isDone && !skipped;
+    final collapsed = collapsible && !_expandedDone.contains(dest.destinationId);
+    final destinations = _journey?.destinations ?? const <JourneyDestination>[];
+    final previous = destinations.where((d) => d.orderIndex < dest.orderIndex && !d.isDone).toList();
 
     return IntrinsicHeight(
+      key: dest.isCurrent ? _currentCardKey : null,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1062,37 +1216,27 @@ class _JourneyScreenState extends State<JourneyScreen> {
             width: 40,
             child: Column(
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: dest.isDone || dest.isCurrent ? accent : Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: accent, width: 2),
-                  ),
-                  child: Center(
-                    child: dest.isDone
-                        ? Icon(
-                            dest.status == ProgressStatus.skipped ? Icons.skip_next_rounded : Icons.check_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          )
-                        : Text(
-                            '${dest.orderIndex}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                              color: dest.isCurrent ? Colors.white : accent,
-                            ),
+                _TimelineDot(
+                  color: accent,
+                  filled: dest.isDone || dest.isCurrent,
+                  pulse: dest.isCurrent && !dest.checkedIn,
+                  child: dest.isDone
+                      ? Icon(skipped ? Icons.skip_next_rounded : Icons.check_rounded, size: 18, color: Colors.white)
+                      : Text(
+                          '${dest.orderIndex}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: dest.isCurrent ? Colors.white : accent,
                           ),
-                  ),
+                        ),
                 ),
                 if (!isLast)
                   Expanded(
                     child: Container(
                       width: 2,
                       margin: const EdgeInsets.symmetric(vertical: 4),
-                      color: dest.isDone
+                      color: dest.isDone && !skipped
                           ? AppCultureColors.heritageJade.withValues(alpha: 0.5)
                           : AppCultureColors.border,
                     ),
@@ -1105,49 +1249,79 @@ class _JourneyScreenState extends State<JourneyScreen> {
               padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
               child: SoftCard(
                 elevated: dest.isCurrent,
+                padding: collapsed ? const EdgeInsets.fromLTRB(16, 12, 12, 12) : const EdgeInsets.all(16),
                 borderColor: dest.isCurrent ? AppCultureColors.heritageJade : AppCultureColors.border,
-                color: dest.isLocked ? AppCultureColors.surfaceSubtle : Colors.white,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            dest.name,
-                            style: TextStyle(
-                              fontSize: 16,
-                              height: 1.25,
-                              fontWeight: FontWeight.w700,
-                              color: dest.isLocked ? AppCultureColors.textMuted : AppCultureColors.textDark,
+                color: dest.isLocked || skipped ? AppCultureColors.surfaceSubtle : Colors.white,
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: collapsible
+                            ? () => setState(() {
+                                if (!_expandedDone.remove(dest.destinationId)) _expandedDone.add(dest.destinationId);
+                              })
+                            : null,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                dest.name,
+                                maxLines: collapsed ? 1 : 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: collapsed ? 15 : 16,
+                                  height: 1.25,
+                                  fontWeight: FontWeight.w700,
+                                  color: dest.isLocked || skipped
+                                      ? AppCultureColors.textMuted
+                                      : AppCultureColors.textDark,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (_coords[dest.destinationId] != null && !collapsed)
+                              InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () => _focusDestination(dest.destinationId),
+                                child: const Padding(
+                                  padding: EdgeInsets.only(left: 8, right: 2),
+                                  child: Icon(Icons.map_outlined, size: 20, color: AppCultureColors.oceanBlue),
+                                ),
+                              ),
+                            if (dest.badgeAwarded)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 8),
+                                child: Icon(Icons.workspace_premium_rounded, color: AppCultureColors.gold, size: 22),
+                              ),
+                            if (dest.isLocked)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 8),
+                                child: Icon(Icons.lock_rounded, color: AppCultureColors.textLight, size: 20),
+                              ),
+                            if (collapsible)
+                              AnimatedRotation(
+                                turns: collapsed ? 0 : 0.5,
+                                duration: const Duration(milliseconds: 220),
+                                child: const Padding(
+                                  padding: EdgeInsets.only(left: 6),
+                                  child: Icon(Icons.expand_more_rounded, color: AppCultureColors.textMuted),
+                                ),
+                              ),
+                          ],
                         ),
-                        if (_coords[dest.destinationId] != null && _coords.isNotEmpty)
-                          InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () => _focusDestination(dest.destinationId),
-                            child: const Padding(
-                              padding: EdgeInsets.only(left: 8, right: 2),
-                              child: Icon(Icons.map_outlined, size: 20, color: AppCultureColors.oceanBlue),
-                            ),
-                          ),
-                        if (dest.badgeAwarded)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 8),
-                            child: Icon(Icons.workspace_premium_rounded, color: AppCultureColors.gold, size: 24),
-                          ),
-                        if (dest.isLocked)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 8),
-                            child: Icon(Icons.lock_rounded, color: AppCultureColors.textLight, size: 20),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    _buildDestinationBody(dest, busy),
-                  ],
+                      ),
+                      const SizedBox(height: 6),
+                      if (collapsed)
+                        _buildDoneSummary(dest)
+                      else
+                        _buildDestinationBody(dest, busy, previous: previous.isEmpty ? null : previous.first),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1157,11 +1331,39 @@ class _JourneyScreenState extends State<JourneyScreen> {
     );
   }
 
-  Widget _buildDestinationBody(JourneyDestination dest, bool busy) {
+  /// Một dòng tóm tắt cho điểm đã xong (đang gập): nhiệm vụ, điểm thưởng.
+  Widget _buildDoneSummary(JourneyDestination dest) {
+    final points = dest.tasks.fold<int>(0, (s, t) => s + t.pointsEarned);
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        InfoChip(
+          icon: Icons.verified_rounded,
+          text: 'Đã hoàn thành',
+          background: AppCultureColors.jadeLight,
+          foreground: AppCultureColors.jadeDark,
+        ),
+        if (dest.totalTasks > 0)
+          InfoChip(icon: Icons.task_alt_rounded, text: '${dest.tasksCompleted}/${dest.totalTasks} nhiệm vụ'),
+        if (points > 0)
+          InfoChip(
+            icon: Icons.stars_rounded,
+            text: '+$points điểm',
+            background: AppCultureColors.rewardBg,
+            foreground: AppCultureColors.rewardText,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDestinationBody(JourneyDestination dest, bool busy, {JourneyDestination? previous}) {
     if (dest.isLocked) {
-      return const Text(
-        'Hoàn thành điểm đến trước để mở khóa.',
-        style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
+      return Text(
+        previous != null
+            ? 'Hoàn thành "${previous.name}" để mở khóa điểm này.'
+            : 'Hoàn thành điểm đến trước để mở khóa.',
+        style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
       );
     }
 
@@ -1173,51 +1375,58 @@ class _JourneyScreenState extends State<JourneyScreen> {
     }
 
     if (!dest.checkedIn) {
+      final canDirect = dest.isCurrent && _coords[dest.destinationId] != null;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Hãy đến địa điểm này và check-in bằng GPS để mở khóa nhiệm vụ và nhận huy hiệu di sản.',
-            style: TextStyle(fontSize: 12.5, height: 1.45, color: AppCultureColors.textMuted),
+          Text(
+            'Đến nơi rồi check-in bằng GPS (trong bán kính $_radius m) hoặc quét mã QR tại điểm đến '
+            'để mở khóa nhiệm vụ và nhận huy hiệu di sản.',
+            style: const TextStyle(fontSize: 12.5, height: 1.45, color: AppCultureColors.textMuted),
           ),
-          const SizedBox(height: 14),
-          if (dest.isCurrent && _coords[dest.destinationId] != null) ...[
-            FilledButton.icon(
-              onPressed: busy ? null : () => _openDirections(dest),
-              icon: const Icon(Icons.directions_rounded),
-              label: const Text('Chỉ đường tới đây', style: TextStyle(fontWeight: FontWeight.w700)),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-                backgroundColor: AppCultureColors.oceanBlue,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: PrimaryButton(
+                  label: 'Check-in GPS',
+                  icon: Icons.my_location_rounded,
+                  loading: busy,
+                  onPressed: () => _checkIn(dest),
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          PrimaryButton(
-            label: 'Check-in bằng GPS',
-            icon: Icons.my_location_rounded,
-            loading: busy,
-            onPressed: () => _checkIn(dest),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: busy ? null : () => _checkInQr(dest),
+                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                  label: const Text('Quét QR', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    foregroundColor: AppCultureColors.jadeDark,
+                    side: const BorderSide(color: AppCultureColors.heritageJade),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: busy ? null : () => _checkInQr(dest),
-            icon: const Icon(Icons.qr_code_scanner_rounded),
-            label: const Text('Quét mã QR', style: TextStyle(fontWeight: FontWeight.w700)),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              foregroundColor: AppCultureColors.jadeDark,
-              side: const BorderSide(color: AppCultureColors.heritageJade),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-          ),
-          Align(
-            alignment: Alignment.center,
-            child: TextButton(
-              onPressed: busy ? null : () => _skip(dest),
-              child: const Text('Bỏ qua điểm này', style: TextStyle(color: AppCultureColors.textMuted, fontSize: 12.5)),
-            ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              if (canDirect)
+                TextButton.icon(
+                  onPressed: busy ? null : () => _openDirections(dest),
+                  icon: const Icon(Icons.directions_rounded, size: 18),
+                  label: const Text('Chỉ đường', style: TextStyle(fontWeight: FontWeight.w700)),
+                  style: TextButton.styleFrom(foregroundColor: AppCultureColors.oceanBlue),
+                ),
+              const Spacer(),
+              TextButton(
+                onPressed: busy ? null : () => _skip(dest),
+                child: const Text('Bỏ qua điểm này', style: TextStyle(color: AppCultureColors.textMuted, fontSize: 12.5)),
+              ),
+            ],
           ),
           CulturalStoriesSection(destinationId: dest.destinationId, hideWhenEmpty: true),
         ],
@@ -1264,6 +1473,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
     final failed = task.isFailed;
     final icon = switch (task.type.toUpperCase()) {
       final t when t.contains('PUZZLE') || t.contains('GPS') => Icons.explore_rounded,
+      final t when t.contains('REAL_WORLD') => Icons.directions_walk_rounded,
       final t when t.contains('QUIZ') => Icons.quiz_rounded,
       _ => Icons.flag_rounded,
     };
@@ -1323,4 +1533,117 @@ class _JourneyScreenState extends State<JourneyScreen> {
       ),
     );
   }
+}
+
+/// Chấm mốc trên dòng thời gian; điểm đang tới lượt có vòng sóng lan ra để thu hút chú ý.
+class _TimelineDot extends StatefulWidget {
+  final Color color;
+  final bool filled;
+  final bool pulse;
+  final Widget child;
+
+  const _TimelineDot({required this.color, required this.filled, required this.pulse, required this.child});
+
+  @override
+  State<_TimelineDot> createState() => _TimelineDotState();
+}
+
+class _TimelineDotState extends State<_TimelineDot> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TimelineDot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  void _sync() {
+    if (widget.pulse && !reduceMotion(context)) {
+      if (!_c.isAnimating) _c.repeat();
+    } else {
+      _c.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dot = Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: widget.filled ? widget.color : Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: widget.color, width: 2),
+      ),
+      child: Center(child: widget.child),
+    );
+    if (!widget.pulse) return dot;
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          AnimatedBuilder(
+            animation: _c,
+            builder: (_, _) => Transform.scale(
+              scale: 1 + _c.value * 0.7,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: widget.color.withValues(alpha: 0.28 * (1 - _c.value)),
+                ),
+              ),
+            ),
+          ),
+          dot,
+        ],
+      ),
+    );
+  }
+}
+
+/// Lưới đường mảnh như bản đồ giấy, làm nền cho màn chờ.
+class _MapGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppCultureColors.heritageJade.withValues(alpha: 0.07)
+      ..strokeWidth = 1;
+    const step = 36.0;
+    for (var x = 0.0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (var y = 0.0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+    final road = Paint()
+      ..color = Colors.white.withValues(alpha: 0.8)
+      ..strokeWidth = 7
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final path = ui.Path()
+      ..moveTo(-10, size.height * 0.28)
+      ..quadraticBezierTo(size.width * 0.45, size.height * 0.12, size.width * 0.6, size.height * 0.36)
+      ..quadraticBezierTo(size.width * 0.75, size.height * 0.55, size.width + 10, size.height * 0.48);
+    canvas.drawPath(path, road);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

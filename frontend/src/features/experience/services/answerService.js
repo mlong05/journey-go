@@ -30,6 +30,7 @@ export async function getAnswerById(id, forTourist = false) {
 export async function createAnswer(questionId, payload) {
   const body = {
     content: (payload.content || "").trim(),
+    imageUrl: payload.imageUrl ? String(payload.imageUrl).trim() : null,
     isCorrect: Boolean(payload.isCorrect),
     sequenceOrder: Number(payload.sequenceOrder) || 0,
     explanation: payload.explanation ? String(payload.explanation).trim() : null,
@@ -41,6 +42,8 @@ export async function createAnswer(questionId, payload) {
 export async function updateAnswer(id, payload) {
   const body = {};
   if (payload.content !== undefined) body.content = (payload.content || "").trim();
+  // imageUrl: "" = gỡ ảnh
+  if (payload.imageUrl !== undefined) body.imageUrl = payload.imageUrl ? String(payload.imageUrl).trim() : "";
   if (payload.isCorrect !== undefined) body.isCorrect = Boolean(payload.isCorrect);
   if (payload.sequenceOrder !== undefined) body.sequenceOrder = Number(payload.sequenceOrder) || 0;
   if (payload.explanation !== undefined) {

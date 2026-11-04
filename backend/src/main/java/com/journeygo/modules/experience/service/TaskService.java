@@ -123,6 +123,7 @@ public class TaskService {
                 .sequenceOrder(req.sequenceOrder())
                 .pointsReward(req.pointsReward())
                 .maxAttempts(req.maxAttempts() != null ? req.maxAttempts() : 3)
+                .freeOrder(Boolean.TRUE.equals(req.freeOrder()))
                 .checkInPoint(checkInPoint)
                 .status(TaskStatus.DRAFT)
                 .build();
@@ -153,6 +154,7 @@ public class TaskService {
         }
         if (req.pointsReward() != null) t.setPointsReward(req.pointsReward());
         if (req.maxAttempts() != null) t.setMaxAttempts(req.maxAttempts());
+        if (req.freeOrder() != null) t.setFreeOrder(req.freeOrder());
         if (req.checkInPointId() != null) {
             CheckInPoint cip = checkInPointRepository.findById(req.checkInPointId())
                     .orElseThrow(() -> new ResourceNotFoundException("CheckInPoint", req.checkInPointId()));

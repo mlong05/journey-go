@@ -13,6 +13,7 @@ public record AnswerResponse(
         @Schema(description = "ID Answer") Long id,
         @Schema(description = "ID Question") Long questionId,
         @Schema(description = "Nội dung đáp án") String content,
+        @Schema(description = "URL ảnh của phương án") String imageUrl,
         @Schema(description = "Đáp án đúng? (ẨN với Tourist — BR-TASK-5)") Boolean isCorrect,
         @Schema(description = "Thứ tự") Integer sequenceOrder,
         @Schema(description = "Giải thích (ẨN với Tourist — BR-TASK-5)") String explanation,
@@ -23,6 +24,7 @@ public record AnswerResponse(
                 .id(a.getId())
                 .questionId(a.getQuestion() != null ? a.getQuestion().getId() : null)
                 .content(a.getContent())
+                .imageUrl(a.getImageUrl())
                 .isCorrect(a.isCorrect())
                 .sequenceOrder(a.getSequenceOrder())
                 .explanation(a.getExplanation())
@@ -36,6 +38,7 @@ public record AnswerResponse(
                 .id(a.getId())
                 .questionId(a.getQuestion() != null ? a.getQuestion().getId() : null)
                 .content(a.getContent())
+                .imageUrl(a.getImageUrl())
                 .isCorrect(null)       // ẨN
                 .sequenceOrder(a.getSequenceOrder())
                 .explanation(null)     // ẨN

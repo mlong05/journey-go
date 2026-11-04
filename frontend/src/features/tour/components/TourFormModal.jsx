@@ -525,7 +525,9 @@ export default function TourFormModal({
                   disabled={loading}
                   label="Ảnh bìa tour"
                   folder="journeygo/tours"
-                  hint="Hiện trên thẻ tour và trang chi tiết tour trong app du khách. Bỏ trống thì dùng ảnh bìa của điểm đến đầu tiên."
+                  hint="Ảnh ngang 16:9 · bỏ trống thì dùng ảnh bìa của điểm đến đầu tiên"
+                  emptyTitle="Tải ảnh bìa tour lên"
+                  compact
                 />
               </div>
 

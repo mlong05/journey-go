@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
+import StationOrderPicker from "./StationOrderPicker";
 import {
   X,
   ListChecks,
@@ -34,6 +35,7 @@ const INITIAL_FORM = {
   sequenceOrder: 0,
   pointsReward: 0,
   maxAttempts: 1,
+  freeOrder: false,
   checkInPointId: "",
 };
 
@@ -1110,6 +1112,7 @@ function TaskFormDialog({
         sequenceOrder: task.sequenceOrder ?? 0,
         pointsReward: task.pointsReward ?? 0,
         maxAttempts: task.maxAttempts ?? 1,
+        freeOrder: Boolean(task.freeOrder),
         checkInPointId: task.checkInPointId ? String(task.checkInPointId) : "",
       };
     }
@@ -1182,6 +1185,7 @@ function TaskFormDialog({
       // Địa điểm check-in nay gắn ở từng câu hỏi, nên form nhiệm vụ không gửi checkInPointId
       const payload = { ...form };
       delete payload.checkInPointId;
+      if (!selectedType?.requiresLocation) payload.freeOrder = false;
       // Thứ tự do kéo thả quyết định: nhiệm vụ mới xếp cuối danh sách, sửa thì giữ nguyên vị trí
       delete payload.sequenceOrder;
       if (isEdit) {
@@ -1343,6 +1347,14 @@ function TaskFormDialog({
             </div>
 
           </div>
+
+          {selectedType?.requiresLocation && (
+            <StationOrderPicker
+              value={form.freeOrder}
+              onChange={(v) => handleChange("freeOrder", v)}
+              disabled={loading}
+            />
+          )}
 
         </div>
 

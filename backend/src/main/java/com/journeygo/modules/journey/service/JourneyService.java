@@ -1,5 +1,6 @@
 package com.journeygo.modules.journey.service;
 
+import com.journeygo.modules.journey.JourneyRules;
 import com.journeygo.modules.booking.service.BookingService;
 import com.journeygo.modules.experience.entity.enums.CheckInVerificationMethod;
 import com.journeygo.modules.experience.exception.BusinessException;
@@ -187,7 +188,9 @@ public class JourneyService {
             );
             distanceMeters = dist.intValue();
 
-            int allowedRadius = currentDestInfo.radiusMeters() != null ? currentDestInfo.radiusMeters() : 100;
+            int allowedRadius = currentDestInfo.radiusMeters() != null
+                    ? currentDestInfo.radiusMeters()
+                    : JourneyRules.DEFAULT_CHECK_IN_RADIUS_METERS;
             if (distanceMeters > allowedRadius) {
                 throw new BusinessException("GPS-OUT-OF-RANGE",
                         String.format("Bạn đang cách điểm đến %d mét (bán kính cho phép %d mét). Vui lòng đến gần hơn để check-in",
@@ -312,13 +315,18 @@ public class JourneyService {
                 .attemptsRemaining(Math.max(0, max - taskProgress.getAttempts()))
                 .status(taskProgress.getStatus())
                 .requiresLocation(task.requiresLocation())
-                .sequential(task.requiresLocation())
+                .sequential(task.requiresLocation() && !task.freeOrder())
+                .freeOrder(task.freeOrder())
                 .totalQuestions(total);
 
         if (!task.requiresLocation()) {
             List<TaskQuestionsResponse.Question> questions = finished ? null : task.questions().stream()
                     .map(this::toTouristQuestion).toList();
             return base.unlocked(!finished).questionIndex(0).questions(questions).build();
+        }
+
+        if (task.freeOrder()) {
+            return freeOrderQuestions(base, task, taskProgress, finished, latitude, longitude, qrValue);
         }
 
         // Nhiệm vụ tương tác ngoài thực tế: từng câu một, theo từng địa điểm
@@ -373,7 +381,38 @@ public class JourneyService {
         Boolean lastAnswerCorrect;
         int questionIndex;
 
-        if (task.requiresLocation() && total > 0) {
+        if (task.requiresLocation() && task.freeOrder() && total > 0) {
+            // ── Thứ tự tự do: trả lời câu của trạm du khách đang đứng ──
+            java.util.Set<Long> answered = taskProgress.answeredIdSet();
+            TourInfo.QuestionInfo current = task.questions().stream()
+                    .filter(q -> !answered.contains(q.questionId()) && findAnswerFor(request, q.questionId()) != null)
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException("ANSWER-MISSING",
+                            "Vui lòng trả lời câu hỏi của trạm bạn đang đứng"));
+            SubmitTaskRequest.QuestionAnswer given = findAnswerFor(request, current.questionId());
+            LocationCheck location = checkLocation(current, request.latitude(), request.longitude(), request.qrValue());
+            if (!location.unlocked()) {
+                throw new BusinessException(location.failureCode(), location.failureMessage());
+            }
+
+            if (isAnswerCorrect(current, given)) {
+                lastAnswerCorrect = true;
+                taskProgress.markAnswered(current.questionId());
+                taskProgress.setIsCorrect(null);
+                correctCount = taskProgress.answeredIdSet().size();
+                if (correctCount >= total) {
+                    taskProgress.setIsCorrect(true);
+                    completeTask(task, taskProgress, destProgress, userId, journeyId);
+                }
+            } else {
+                // Sai một trạm: chỉ mất một lượt, các trạm đã đúng vẫn được giữ
+                lastAnswerCorrect = false;
+                correctCount = answered.size();
+                taskProgress.setIsCorrect(false);
+                registerFailedAttempt(taskProgress, max, userId, taskId, journeyId);
+            }
+            questionIndex = correctCount;
+        } else if (task.requiresLocation() && total > 0) {
             // ── Từng câu theo từng địa điểm ──
             int index = taskProgress.getCurrentQuestionIndex();
             if (index >= total) index = 0;
@@ -531,7 +570,7 @@ public class JourneyService {
 
             gamificationService.awardPoints(
                     userId,
-                    50,
+                    JourneyRules.COMPLETION_BONUS_POINTS,
                     PointTransactionType.EARNED_TOUR,
                     "TOUR_COMPLETION_" + journey.getId(),
                     "Thưởng hoàn thành trọn vẹn hành trình " + journey.getTourName()
@@ -642,11 +681,11 @@ public class JourneyService {
 
     private TaskQuestionsResponse.Question toTouristQuestion(TourInfo.QuestionInfo q) {
         return new TaskQuestionsResponse.Question(
-                q.questionId(), q.content(), q.questionType(), q.orderIndex(),
+                q.questionId(), q.content(), q.imageUrl(), q.questionType(), q.orderIndex(),
                 "TEXT".equals(q.questionType())
                         ? List.of()
                         : q.answers().stream()
-                                .map(x -> new TaskQuestionsResponse.Option(x.answerId(), x.content(), x.orderIndex()))
+                                .map(x -> new TaskQuestionsResponse.Option(x.answerId(), x.content(), x.imageUrl(), x.orderIndex()))
                                 .toList());
     }
 
@@ -658,15 +697,78 @@ public class JourneyService {
             TourInfo.QuestionInfo q = questions.get(i);
             String name = q.stationName() != null ? q.stationName() : "Trạm " + (i + 1);
             result.add(i <= currentIndex
-                    ? new TaskQuestionsResponse.Station(name, q.stationLatitude(), q.stationLongitude(), q.stationRadiusMeters())
-                    : new TaskQuestionsResponse.Station(name, null, null, q.stationRadiusMeters()));
+                    ? new TaskQuestionsResponse.Station(q.questionId(), name, q.stationLatitude(), q.stationLongitude(),
+                            q.stationRadiusMeters(), i < currentIndex)
+                    : new TaskQuestionsResponse.Station(q.questionId(), name, null, null, q.stationRadiusMeters(), false));
         }
         return result;
     }
 
     private TaskQuestionsResponse.Station toStation(TourInfo.QuestionInfo q) {
         if (q.stationLatitude() == null && q.stationLongitude() == null && q.stationName() == null) return null;
-        return new TaskQuestionsResponse.Station(q.stationName(), q.stationLatitude(), q.stationLongitude(), q.stationRadiusMeters());
+        return new TaskQuestionsResponse.Station(q.questionId(), q.stationName(), q.stationLatitude(), q.stationLongitude(),
+                q.stationRadiusMeters(), false);
+    }
+
+    /**
+     * Thứ tự tự do: trả mọi trạm kèm tọa độ và trạng thái đã xong. Quét QR của trạm nào hoặc đứng trong bán kính
+     * trạm nào (chưa xong) thì mở câu hỏi của trạm đó; chưa tới trạm nào thì trả trạm chưa xong gần nhất để dẫn đường.
+     */
+    private TaskQuestionsResponse freeOrderQuestions(TaskQuestionsResponse.TaskQuestionsResponseBuilder base,
+                                                     TourInfo.TourTaskInfo task, JourneyTaskProgress taskProgress,
+                                                     boolean finished, BigDecimal latitude, BigDecimal longitude,
+                                                     String qrValue) {
+        List<TourInfo.QuestionInfo> questions = task.questions() == null ? List.of() : task.questions();
+        java.util.Set<Long> answered = taskProgress.getStatus() == TaskProgressStatus.COMPLETED
+                ? questions.stream().map(TourInfo.QuestionInfo::questionId).collect(java.util.stream.Collectors.toSet())
+                : taskProgress.answeredIdSet();
+
+        List<TaskQuestionsResponse.Station> stations = new java.util.ArrayList<>(questions.size());
+        for (int i = 0; i < questions.size(); i++) {
+            TourInfo.QuestionInfo q = questions.get(i);
+            String name = q.stationName() != null ? q.stationName() : "Trạm " + (i + 1);
+            stations.add(new TaskQuestionsResponse.Station(q.questionId(), name, q.stationLatitude(), q.stationLongitude(),
+                    q.stationRadiusMeters(), answered.contains(q.questionId())));
+        }
+        base.stations(stations).questionIndex(answered.size());
+        if (finished || questions.isEmpty()) {
+            return base.unlocked(!finished).questions(finished ? null : List.of()).build();
+        }
+
+        List<TourInfo.QuestionInfo> open = questions.stream().filter(q -> !answered.contains(q.questionId())).toList();
+
+        // 1) Quét QR: tìm trạm chưa xong có mã khớp
+        if (qrValue != null && !qrValue.isBlank()) {
+            for (TourInfo.QuestionInfo q : open) {
+                if (checkLocation(q, null, null, qrValue).unlocked()) {
+                    return base.unlocked(true).station(toStation(q)).questions(List.of(toTouristQuestion(q))).build();
+                }
+            }
+            return base.unlocked(false).station(open.isEmpty() ? null : toStation(open.get(0))).questions(null).build();
+        }
+
+        // 2) GPS: trạm chưa xong gần nhất; trong bán kính thì mở câu hỏi
+        TourInfo.QuestionInfo nearest = null;
+        Integer nearestDistance = null;
+        if (latitude != null && longitude != null) {
+            for (TourInfo.QuestionInfo q : open) {
+                if (q.stationLatitude() == null || q.stationLongitude() == null) continue;
+                int d = GeoUtils.haversineMeters(latitude, longitude, q.stationLatitude(), q.stationLongitude()).intValue();
+                if (nearestDistance == null || d < nearestDistance) {
+                    nearest = q;
+                    nearestDistance = d;
+                }
+            }
+        }
+        if (nearest != null) {
+            boolean inside = checkLocation(nearest, latitude, longitude, null).unlocked();
+            return base.unlocked(inside)
+                    .distanceMeters(nearestDistance)
+                    .station(toStation(nearest))
+                    .questions(inside ? List.of(toTouristQuestion(nearest)) : null)
+                    .build();
+        }
+        return base.unlocked(false).station(open.isEmpty() ? null : toStation(open.get(0))).questions(null).build();
     }
 
     // ── Tra cứu ────────────────────────────────────────────────────────────────

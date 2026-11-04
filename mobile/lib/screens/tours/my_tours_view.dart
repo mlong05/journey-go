@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
@@ -32,6 +34,11 @@ class _MyTour {
     if (j == null) return 0;
     return j.destinations.isNotEmpty ? j.doneCount : (j.currentOrder - 1).clamp(0, j.totalDestinations);
   }
+
+  double get progress => total == 0 ? 0 : (done / total).clamp(0, 1);
+  int get points => journey?.pointsEarned ?? 0;
+  int get badges => journey?.destinations.where((d) => d.badgeAwarded).length ?? 0;
+  JourneyDestination? get next => journey?.currentDestination;
 }
 
 /// "Tour của tôi": các tour đã mua, chia theo đang trải nghiệm / sẵn sàng khởi hành / đã hoàn thành.
@@ -55,6 +62,9 @@ class _MyToursViewState extends State<MyToursView> {
   List<_MyTour> _items = const [];
   bool _loading = true;
   String? _error;
+
+  /// Bộ lọc theo trạng thái; null = tất cả.
+  _Stage? _filter;
 
   @override
   void initState() {
@@ -183,55 +193,181 @@ class _MyToursViewState extends State<MyToursView> {
     final active = _of(_Stage.active);
     final ready = _of(_Stage.ready);
     final done = _of(_Stage.done);
-    var order = 1;
+    var order = 2;
+    final groups = [(_Stage.active, active), (_Stage.ready, ready), (_Stage.done, done)]
+        .where((g) => _filter == null || g.$1 == _filter)
+        .toList();
+    final shown = groups.fold<int>(0, (s, g) => s + g.$2.length);
 
-    return RefreshIndicator(
-      color: AppCultureColors.heritageJade,
-      onRefresh: _load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
-        children: [
-          Reveal(order: 0, child: _buildHeader(active.length, ready.length, done.length)),
-          if (_items.isEmpty)
-            Reveal(order: 1, child: _buildEmpty())
-          else ...[
-            for (final (stage, list) in [(_Stage.active, active), (_Stage.ready, ready), (_Stage.done, done)])
-              if (list.isNotEmpty) ...[
-                Reveal(order: order++, child: _sectionTitle(stage, list.length)),
-                for (final item in list)
-                  Reveal(
-                    order: order < 6 ? order++ : order,
-                    child: _TicketCard(
-                      item: item,
-                      // Vé đã xong nhưng không còn hành trình thì không mở lại (tránh tạo hành trình mới)
-                      onJourney: item.stage == _Stage.done && item.journey == null ? null : () => _openJourney(item),
-                      onRebook: item.tour == null ? null : () => _openTour(item.tour!),
+    return Stack(
+      children: [
+        const Positioned.fill(child: _HeritageBackdrop()),
+        RefreshIndicator(
+          color: AppCultureColors.heritageJade,
+          onRefresh: _load,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
+            children: [
+              Reveal(order: 0, child: _buildHeader(active, ready.length, done)),
+              if (_items.isEmpty)
+                Reveal(order: 1, child: _buildEmpty())
+              else ...[
+                Reveal(order: 1, child: _buildFilters(active.length, ready.length, done.length)),
+                if (shown == 0)
+                  _buildFilterEmpty()
+                else
+                  for (final (stage, list) in groups)
+                    if (list.isNotEmpty) ...[
+                      Reveal(order: order++, child: _sectionTitle(stage, list.length)),
+                      for (final item in list)
+                        Reveal(
+                          order: order < 7 ? order++ : order,
+                          child: _TicketCard(
+                            item: item,
+                            // Vé đã xong nhưng không còn hành trình thì không mở lại (tránh tạo hành trình mới)
+                            onJourney:
+                                item.stage == _Stage.done && item.journey == null ? null : () => _openJourney(item),
+                            onRebook: item.tour == null ? null : () => _openTour(item.tour!),
+                          ),
+                        ),
+                    ],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Hàng chip lọc: Tất cả / Đang đi / Chờ khởi hành / Hoàn thành, kèm số lượng.
+  Widget _buildFilters(int active, int ready, int done) {
+    Widget chip(_Stage? stage, String label, int count, IconData icon, Color color) {
+      final selected = _filter == stage;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Pressable(
+          onTap: () => setState(() => _filter = stage),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? color : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: selected ? color : AppCultureColors.border),
+              boxShadow: selected
+                  ? [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))]
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: selected ? Colors.white : color),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : AppCultureColors.textDark,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: selected ? Colors.white.withValues(alpha: 0.25) : color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? Colors.white : color,
                     ),
                   ),
+                ),
               ],
-          ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 54,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        clipBehavior: Clip.none,
+        children: [
+          chip(null, 'Tất cả', active + ready + done, Icons.apps_rounded, AppCultureColors.jadeDark),
+          chip(_Stage.active, 'Đang đi', active, Icons.explore_rounded, AppCultureColors.oceanBlue),
+          chip(_Stage.ready, 'Chờ khởi hành', ready, Icons.confirmation_number_rounded, AppCultureColors.heritageJade),
+          chip(_Stage.done, 'Hoàn thành', done, Icons.workspace_premium_rounded, AppCultureColors.amberDark),
         ],
       ),
     );
   }
 
-  /// Băng đầu trang: "Hành trang di sản" chữ ánh vàng, hoa văn trống đồng, ba con số tóm tắt.
-  Widget _buildHeader(int active, int ready, int done) {
-    Widget stat(int value, String label) => Expanded(
-          child: Column(
-            children: [
-              CountUpText(
-                value: value,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
-              ),
-              const SizedBox(height: 2),
-              Text(label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.85))),
-            ],
+  Widget _buildFilterEmpty() {
+    final text = switch (_filter) {
+      _Stage.active => 'Chưa có hành trình nào đang đi.',
+      _Stage.ready => 'Không có vé nào đang chờ khởi hành.',
+      _Stage.done => 'Bạn chưa hoàn thành hành trình nào. Đi trọn một tour để nhận thưởng nhé!',
+      null => '',
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      child: Column(
+        children: [
+          SlowSpin(child: DrumMotif(size: 72, color: AppCultureColors.amberDark.withValues(alpha: 0.3))),
+          const SizedBox(height: 14),
+          Text(text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13.5, height: 1.45, color: AppCultureColors.textMuted)),
+        ],
+      ),
+    );
+  }
+
+  /// Băng đầu trang: "Hành trang di sản" chữ ánh vàng, hoa văn trống đồng, ba con số tóm tắt
+  /// và thanh "chinh phục" gộp tiến độ mọi hành trình.
+  Widget _buildHeader(List<_MyTour> activeList, int ready, List<_MyTour> doneList) {
+    final active = activeList.length;
+    final done = doneList.length;
+    final journeys = [...activeList, ...doneList];
+    final totalStops = journeys.fold<int>(0, (s, i) => s + i.total);
+    final doneStops = journeys.fold<int>(0, (s, i) => s + i.done);
+    final points = journeys.fold<int>(0, (s, i) => s + i.points);
+
+    Widget stat(int value, String label, _Stage stage) => Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _filter = _filter == stage ? null : stage),
+            child: Column(
+              children: [
+                CountUpText(
+                  value: value,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+                const SizedBox(height: 2),
+                Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.85))),
+                const SizedBox(height: 4),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: _filter == stage ? 22 : 0,
+                  height: 3,
+                  decoration: BoxDecoration(color: const Color(0xFFFDE68A), borderRadius: BorderRadius.circular(2)),
+                ),
+              ],
+            ),
           ),
         );
 
@@ -279,12 +415,46 @@ class _MyToursViewState extends State<MyToursView> {
                   ),
                   child: Row(
                     children: [
-                      stat(active, 'Đang đi'),
-                      stat(ready, 'Chờ khởi hành'),
-                      stat(done, 'Đã hoàn thành'),
+                      stat(active, 'Đang đi', _Stage.active),
+                      stat(ready, 'Chờ khởi hành', _Stage.ready),
+                      stat(done, 'Đã hoàn thành', _Stage.done),
                     ],
                   ),
                 ),
+                if (totalStops > 0) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Icon(Icons.flag_circle_rounded, size: 18, color: Color(0xFFFDE68A)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Đã chinh phục $doneStops/$totalStops điểm đến',
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+                        ),
+                      ),
+                      if (points > 0)
+                        Text('$points điểm',
+                            style: const TextStyle(
+                                fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFFFDE68A))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: doneStops / totalStops),
+                      duration: const Duration(milliseconds: 1100),
+                      curve: Curves.easeOutCubic,
+                      builder: (_, v, _) => LinearProgressIndicator(
+                        value: v,
+                        minHeight: 8,
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        valueColor: const AlwaysStoppedAnimation(Color(0xFFFDE68A)),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -403,6 +573,10 @@ class _TicketCard extends StatelessWidget {
                     alignment: Alignment.topLeft,
                     child: TourChip(icon: stageIcon, label: stageLabel, dark: true),
                   ),
+                  if (item.stage == _Stage.active && item.total > 0)
+                    Align(alignment: Alignment.topRight, child: _CoverProgress(value: item.progress)),
+                  if (item.stage == _Stage.done)
+                    const Align(alignment: Alignment.topRight, child: _DoneStamp()),
                   Align(
                     alignment: Alignment.bottomLeft,
                     child: Text(
@@ -439,9 +613,42 @@ class _TicketCard extends StatelessWidget {
                         _Meta(icon: Icons.flag_rounded, text: 'Xong ngày ${_date(item.journey!.completedAt!)}'),
                       if (item.total > 0 && item.stage != _Stage.active)
                         _Meta(icon: Icons.place_rounded, text: '${item.total} điểm đến'),
+                      if (item.stage == _Stage.done && item.points > 0)
+                        _Meta(icon: Icons.stars_rounded, text: '+${item.points} điểm'),
+                      if (item.stage == _Stage.done && item.badges > 0)
+                        _Meta(icon: Icons.workspace_premium_rounded, text: '${item.badges} huy hiệu'),
                     ],
                   ),
                   if (item.stage == _Stage.active) ...[
+                    if (item.next != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppCultureColors.oceanLight,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.near_me_rounded, size: 16, color: AppCultureColors.oceanBlue),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Tiếp theo · Điểm ${item.next!.orderIndex}: ${item.next!.name}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 12.5, fontWeight: FontWeight.w600, color: AppCultureColors.oceanDark),
+                              ),
+                            ),
+                            if (item.points > 0)
+                              Text('${item.points} điểm',
+                                  style: const TextStyle(
+                                      fontSize: 12, fontWeight: FontWeight.w700, color: AppCultureColors.rewardText)),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -462,7 +669,7 @@ class _TicketCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Text('${item.done}/${item.total} điểm',
+                        Text('${item.done}/${item.total} điểm đến · ${(item.progress * 100).round()}%',
                             style: const TextStyle(
                                 fontSize: 12.5, fontWeight: FontWeight.w600, color: AppCultureColors.oceanDark)),
                       ],
@@ -621,6 +828,203 @@ class _Meta extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Nền trang trí phía sau danh sách: quầng màu ấm, hoa văn trống đồng xoay chậm và đốm sáng vàng trôi lên,
+/// tạo cảm giác "hành trang di sản" thay vì một danh sách trắng. Đứng yên khi máy bật giảm chuyển động.
+class _HeritageBackdrop extends StatefulWidget {
+  const _HeritageBackdrop();
+
+  @override
+  State<_HeritageBackdrop> createState() => _HeritageBackdropState();
+}
+
+class _HeritageBackdropState extends State<_HeritageBackdrop> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 14));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (reduceMotion(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          // Quầng màu ấm ở góc trên và xanh ngọc ở góc dưới
+          Positioned(
+            top: 180,
+            right: -120,
+            child: _glow(const Color(0xFFFDE68A), 300),
+          ),
+          Positioned(
+            bottom: 40,
+            left: -140,
+            child: _glow(AppCultureColors.heritageJade, 320),
+          ),
+          Positioned(
+            top: 420,
+            left: -70,
+            child: SlowSpin(
+              period: const Duration(seconds: 90),
+              child: DrumMotif(size: 220, color: AppCultureColors.amberDark.withValues(alpha: 0.06)),
+            ),
+          ),
+          Positioned(
+            bottom: -90,
+            right: -80,
+            child: SlowSpin(
+              period: const Duration(seconds: 120),
+              child: DrumMotif(size: 280, color: AppCultureColors.heritageJade.withValues(alpha: 0.06)),
+            ),
+          ),
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _c,
+              builder: (_, _) => CustomPaint(painter: _MotesPainter(_c.value)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _glow(Color color, double size) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [color.withValues(alpha: 0.18), color.withValues(alpha: 0)]),
+        ),
+      );
+}
+
+/// Các đốm sáng nhỏ trôi chậm từ dưới lên, mờ dần, như bụi vàng trên đèn lồng.
+class _MotesPainter extends CustomPainter {
+  final double t;
+
+  _MotesPainter(this.t);
+
+  // (vị trí ngang 0..1, độ lệch pha, bán kính)
+  static const _motes = [
+    (0.08, 0.00, 2.2), (0.22, 0.35, 1.6), (0.37, 0.70, 2.6), (0.52, 0.15, 1.8),
+    (0.66, 0.55, 2.4), (0.81, 0.85, 1.7), (0.93, 0.25, 2.1), (0.45, 0.92, 1.5),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+    for (final (x, phase, r) in _motes) {
+      final p = (t + phase) % 1.0;
+      final dx = x * size.width + 12 * math.sin(p * 2 * math.pi + phase * 6);
+      final dy = size.height * (1 - p);
+      final fade = p < 0.15 ? p / 0.15 : (p > 0.8 ? (1 - p) / 0.2 : 1.0);
+      paint.color = const Color(0xFFF59E0B).withValues(alpha: 0.35 * fade);
+      canvas.drawCircle(Offset(dx, dy), r, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MotesPainter old) => old.t != t;
+}
+
+/// Vòng tiến độ nhỏ đặt trên ảnh bìa của hành trình đang đi.
+class _CoverProgress extends StatelessWidget {
+  final double value;
+
+  const _CoverProgress({required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 50,
+      height: 50,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.35),
+        shape: BoxShape.circle,
+      ),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: value),
+        duration: const Duration(milliseconds: 900),
+        curve: Curves.easeOutCubic,
+        builder: (_, v, _) => Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox.expand(
+              child: CircularProgressIndicator(
+                value: v,
+                strokeWidth: 4,
+                strokeCap: StrokeCap.round,
+                backgroundColor: Colors.white.withValues(alpha: 0.25),
+                valueColor: const AlwaysStoppedAnimation(Colors.white),
+              ),
+            ),
+            Text(
+              '${(v * 100).round()}%',
+              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Con dấu "HOÀN THÀNH" màu son nghiêng trên ảnh bìa; đóng xuống (phóng to rồi thu lại) khi thẻ hiện.
+class _DoneStamp extends StatelessWidget {
+  const _DoneStamp();
+
+  @override
+  Widget build(BuildContext context) {
+    final stamp = Transform.rotate(
+      angle: -0.2,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFDE68A), width: 2),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.workspace_premium_rounded, size: 15, color: Color(0xFFFDE68A)),
+            SizedBox(width: 4),
+            Text(
+              'HOÀN THÀNH',
+              style: TextStyle(
+                color: Color(0xFFFDE68A),
+                fontSize: 11.5,
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (reduceMotion(context)) return stamp;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 1.8, end: 1),
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.elasticOut,
+      builder: (_, s, child) => Transform.scale(scale: s, child: child),
+      child: stamp,
     );
   }
 }

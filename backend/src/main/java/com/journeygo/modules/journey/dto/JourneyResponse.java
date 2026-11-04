@@ -1,5 +1,6 @@
 package com.journeygo.modules.journey.dto;
 
+import com.journeygo.modules.journey.JourneyRules;
 import com.journeygo.modules.journey.entity.Journey;
 import com.journeygo.modules.journey.entity.enums.JourneyStatus;
 import lombok.Builder;
@@ -21,6 +22,9 @@ public record JourneyResponse(
         Instant startedAt,
         Instant completedAt,
         Instant createdAt,
+        // Quy tắc để app hiển thị đúng như backend chấm (không chép cứng trong app)
+        Integer checkInRadiusMeters,
+        Integer completionBonusPoints,
         List<JourneyDestinationProgressResponse> destinations
 ) {
     public static JourneyResponse fromEntity(Journey entity) {
@@ -40,6 +44,8 @@ public record JourneyResponse(
                 .startedAt(entity.getStartedAt())
                 .completedAt(entity.getCompletedAt())
                 .createdAt(entity.getCreatedAt())
+                .checkInRadiusMeters(JourneyRules.DEFAULT_CHECK_IN_RADIUS_METERS)
+                .completionBonusPoints(JourneyRules.COMPLETION_BONUS_POINTS)
                 .destinations(destList)
                 .build();
     }

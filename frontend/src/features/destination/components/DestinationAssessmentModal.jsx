@@ -840,97 +840,85 @@ export default function DestinationAssessmentModal({
                   </div>
                 )}
 
-                <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs">
-
-                  <p className="text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
-                    <MapPin size={12} className="text-emerald-600" />
-                    Địa chỉ hành chính thực địa
-                  </p>
-                  <p className="text-sm font-medium text-slate-800 leading-relaxed">
-                    {destination?.address || "Chưa cập nhật địa chỉ"}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Tọa độ GPS */}
-                  <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-                        <Navigation size={12} className="text-emerald-600" /> Tọa độ GPS Thực tế
-                      </p>
-                      {destination?.latitude && destination?.longitude && (
-                        <a
-                          href={`https://www.google.com/maps?q=${destination.latitude},${destination.longitude}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] font-medium text-emerald-700 hover:text-emerald-900 underline flex items-center gap-1"
+                {/* Thông số điểm đến gói trong một khung, không cần cuộn; chữ dài cắt "…" (rê chuột để xem đủ) */}
+                {(() => {
+                  const lat = destination?.latitude;
+                  const lng = destination?.longitude;
+                  const coords =
+                    lat != null && lng != null ? `${lat.toFixed(6)}, ${lng.toFixed(6)}` : "—";
+                  const createdAt = destination?.createdAt
+                    ? new Date(destination.createdAt).toLocaleString("vi-VN")
+                    : "—";
+                  const capacity = destination?.capacity
+                    ? `${Number(destination.capacity).toLocaleString("vi-VN")} du khách / lượt`
+                    : "—";
+                  const rows = [
+                    {
+                      icon: MapPin,
+                      label: "Địa chỉ thực địa",
+                      value: destination?.address || "Chưa cập nhật địa chỉ",
+                      wide: true,
+                    },
+                    {
+                      icon: Navigation,
+                      label: "Tọa độ GPS",
+                      value: coords,
+                      mono: true,
+                      action:
+                        lat != null && lng != null ? (
+                          <a
+                            href={`https://www.google.com/maps?q=${lat},${lng}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="shrink-0 text-[11px] font-medium text-emerald-700 hover:text-emerald-900 underline inline-flex items-center gap-1"
+                          >
+                            Mở Maps
+                            <ExternalLink size={10} />
+                          </a>
+                        ) : null,
+                    },
+                    { icon: Users, label: "Sức chứa tối đa", value: capacity },
+                    {
+                      icon: Building2,
+                      label: "Đơn vị phụ trách",
+                      value: destination?.createdBy || "Hệ thống quản trị",
+                    },
+                    { icon: Clock, label: "Thời gian lập hồ sơ", value: createdAt, mono: true },
+                  ];
+                  return (
+                    <div className="rounded-2xl bg-white border border-slate-200/80 shadow-2xs grid grid-cols-1 sm:grid-cols-2 divide-y divide-slate-100 overflow-hidden">
+                      {rows.map(({ icon: Icon, label, value, mono, action, wide }, i) => (
+                        <div
+                          key={label}
+                          className={`min-w-0 px-4 py-3 ${wide ? "sm:col-span-2" : ""} ${
+                            // ô bên phải (2, 4) có đường kẻ dọc ngăn với ô bên trái
+                            !wide && i % 2 === 0 ? "sm:border-l sm:border-slate-100" : ""
+                          }`}
                         >
-                          <span>Mở Maps</span>
-                          <ExternalLink size={10} />
-                        </a>
-                      )}
+                          <p className="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5">
+                            <Icon size={12} className="text-emerald-600 shrink-0" />
+                            {label}
+                          </p>
+                          <div className="mt-1 flex items-center gap-2 min-w-0">
+                            <p
+                              title={value}
+                              className={`truncate text-[13px] font-medium text-slate-800 ${mono ? "font-mono" : ""}`}
+                            >
+                              {value}
+                            </p>
+                            {action}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="space-y-1.5 text-xs font-mono">
-                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                        <span className="text-slate-500">Vĩ độ (LAT):</span>
-                        <span className="font-semibold text-slate-900">
-                          {destination?.latitude?.toFixed(6) ?? "—"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center py-1">
-                        <span className="text-slate-500">Kinh độ (LNG):</span>
-                        <span className="font-semibold text-slate-900">
-                          {destination?.longitude?.toFixed(6) ?? "—"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Sức chứa */}
-                  <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs flex flex-col justify-between">
-                    <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 mb-2">
-                      <Users size={12} className="text-emerald-600" /> Sức chứa đón tiếp tối đa
-                    </p>
-                    <div className="mt-auto">
-                      <span className="text-2xl font-semibold text-slate-900">
-                        {destination?.capacity
-                          ? Number(destination.capacity).toLocaleString("vi-VN")
-                          : "—"}
-                      </span>
-                      <span className="text-xs font-medium text-slate-500 ml-1.5">
-                        du khách / lượt
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Đơn vị khởi tạo */}
-                  <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs">
-                    <p className="text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
-                      <Building2 size={12} className="text-emerald-600" /> Đơn vị / Đối tác phụ trách
-                    </p>
-                    <p className="text-xs font-medium text-slate-800">
-                      {destination?.createdBy || "Hệ thống quản trị"}
-                    </p>
-                  </div>
-
-                  {/* Ngày gửi hồ sơ */}
-                  <div className="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-2xs">
-                    <p className="text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
-                      <Clock size={12} className="text-emerald-600" /> Thời gian lập hồ sơ
-                    </p>
-                    <p className="text-xs font-medium text-slate-800 font-mono">
-                      {destination?.createdAt
-                        ? new Date(destination.createdAt).toLocaleString("vi-VN")
-                        : "—"}
-                    </p>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Gợi ý thẩm định */}
-                <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-900 flex items-start gap-2.5">
-                  <ShieldCheck size={16} className="text-amber-700 shrink-0 mt-0.5" />
-                  <p className="leading-relaxed">
-                    <strong>Bước 1/4:</strong> Kiểm tra địa chỉ, tọa độ và sức chứa của điểm đến. Bấm <strong>&ldquo;Tiếp tục&rdquo;</strong> để duyệt nội dung văn hóa, sau đó tới gói trải nghiệm và quyết định cuối cùng.
+                <div className="px-3.5 py-2.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-900 flex items-center gap-2.5">
+                  <ShieldCheck size={15} className="text-amber-700 shrink-0" />
+                  <p className="leading-relaxed truncate" title="Kiểm tra địa chỉ, tọa độ và sức chứa rồi bấm Tiếp tục để duyệt nội dung văn hóa.">
+                    <strong>Bước 1/4:</strong> Kiểm tra địa chỉ, tọa độ, sức chứa rồi bấm <strong>&ldquo;Tiếp tục&rdquo;</strong>.
                   </p>
                 </div>
               </div>
