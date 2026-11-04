@@ -13,11 +13,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
-import '../../core/models/payment_model.dart';
 import '../../core/models/refund_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
 import '../../core/services/payment_service.dart';
+import '../../core/services/payment_sync_service.dart';
 import '../../core/services/refund_service.dart';
 import '../../core/utils/formatters.dart';
 import 'payment_screen.dart';
@@ -37,6 +37,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   final BookingService _bookingService = BookingService();
   final PaymentService _paymentService = PaymentService();
   final RefundService _refundService = RefundService();
+  final PaymentSyncService _syncService = PaymentSyncService();
 
   BookingModel? _booking;
   List<PaymentModel> _payments = [];
@@ -45,6 +46,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   bool _loading = true;
   bool _busy = false;
   String _error = '';
+
+  /// Đang kiểm tra lại giao dịch nào (paymentId) — để disable nút tương ứng.
+  final Set<int> _checking = <int>{};
 
   @override
   void initState() {
@@ -130,6 +134,96 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   // ── Hành động ────────────────────────────────────────────────────────────
+
+  /// Kiểm tra lại kết quả một giao dịch đang "kẹt" (PENDING / PROCESSING).
+  ///
+  /// ── Vì sao cần? ──
+  /// Giao dịch có thể kẹt ở PROCESSING dù khách ĐÃ thanh toán thành công, khi:
+  /// IPN không tới (tunnel chết), app bị kill nên deep link không mở được, hoặc
+  /// request gửi lên backend bị từ chối. Khi đó nút "Thanh toán" vẫn hiện và bấm
+  /// vào sẽ báo "chưa xác minh được kết quả giao dịch trước".
+  ///
+  /// ⇒ Cho khách một nút "Kiểm tra lại" để tự đồng bộ lại trạng thái ngay tại chỗ,
+  /// thay vì phải chờ tác vụ nền hoặc liên hệ hỗ trợ.
+  Future<void> _recheckPayment(PaymentModel payment) async {
+    if (_checking.contains(payment.id)) return;
+    setState(() => _checking.add(payment.id));
+
+    try {
+      final result = await _syncService.sync(payment.id);
+      if (!mounted) return;
+
+      if (result.isSuccess) {
+        await _load();
+        if (!mounted) return;
+        _showToast(
+          'Đã xác nhận thanh toán thành công!',
+          icon: Icons.check_circle_rounded,
+          color: AppCultureColors.heritageJade,
+        );
+        return;
+      }
+
+      // isFinal = đã có kết quả cuối nhưng KHÔNG thành công (thất bại / khách hủy).
+      if (result.isFinal) {
+        await _load();
+        if (!mounted) return;
+        _showToast(
+          result.message.isNotEmpty
+              ? result.message
+              : 'Giao dịch đã được xác nhận không thành công.',
+          icon: Icons.cancel_rounded,
+          color: AppCultureColors.error,
+        );
+        return;
+      }
+
+      // Chưa xác minh được ⇒ vẫn còn thời gian thanh toán thì cho thử lại.
+      _showToast(
+        result.message.isNotEmpty
+            ? result.message
+            : 'Chưa xác minh được kết quả. Nếu bạn đã thanh toán, vui lòng thử lại sau ít phút.',
+        icon: Icons.info_rounded,
+        color: AppCultureColors.warning,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showToast(
+        'Không kiểm tra được trạng thái thanh toán. Vui lòng thử lại.',
+        icon: Icons.info_rounded,
+        color: AppCultureColors.warning,
+      );
+    } finally {
+      if (mounted) setState(() => _checking.remove(payment.id));
+    }
+  }
+
+  /// Hiện thông báo nhỏ ở đáy màn hình.
+  void _showToast(String message, {required IconData icon, required Color color}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+          backgroundColor: color,
+          content: Row(
+            children: [
+              Icon(icon, size: 18, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+  }
+
   Future<void> _openPayment() async {
     final booking = _booking;
     if (booking == null) return;
@@ -478,7 +572,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      booking.bookingCode ?? '#${booking.id}',
+                      booking.bookingCode.isEmpty
+                          ? '#${booking.id}'
+                          : booking.bookingCode,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
@@ -494,7 +590,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           ),
           const SizedBox(height: 14),
           Text(
-            booking.tourTitle ?? 'Tour trải nghiệm',
+            booking.tourTitle.isEmpty ? 'Tour trải nghiệm' : booking.tourTitle,
             style: const TextStyle(
               fontSize: 17,
               height: 1.3,
@@ -899,8 +995,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         children: [
           const _CardTitle(icon: Icons.receipt_long_rounded, text: 'Thông tin đơn'),
           const SizedBox(height: 12),
-          _buildInfoRow('Mã đơn', booking.bookingCode ?? '#${booking.id}'),
-          _buildInfoRow('Tour', booking.tourTitle ?? '—'),
+          _buildInfoRow(
+            'Mã đơn',
+            booking.bookingCode.isEmpty ? '#${booking.id}' : booking.bookingCode,
+          ),
+          _buildInfoRow('Tour', booking.tourTitle.isEmpty ? '—' : booking.tourTitle),
           _buildInfoRow('Ngày trải nghiệm',
               booking.formattedExperienceDate.isEmpty
                   ? '—'
@@ -1123,24 +1222,30 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
   Widget _buildPaymentRow(PaymentModel payment) {
     final isSuccess = payment.isSuccess;
+    final isStuck = payment.isProcessing;
+    final isChecking = _checking.contains(payment.id);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            isSuccess
-                ? Icons.check_circle_rounded
-                : payment.isFailed || payment.isCancelled
-                    ? Icons.cancel_rounded
-                    : Icons.schedule_rounded,
-            size: 17,
-            color: isSuccess
-                ? AppCultureColors.heritageJade
-                : payment.isFailed || payment.isCancelled
-                    ? AppCultureColors.error
-                    : AppCultureColors.warning,
-          ),
-          const SizedBox(width: 10),
+          Row(
+            children: [
+              Icon(
+                isSuccess
+                    ? Icons.check_circle_rounded
+                    : payment.isFailed || payment.isCancelled
+                        ? Icons.cancel_rounded
+                        : Icons.schedule_rounded,
+                size: 17,
+                color: isSuccess
+                    ? AppCultureColors.heritageJade
+                    : payment.isFailed || payment.isCancelled
+                        ? AppCultureColors.error
+                        : AppCultureColors.warning,
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1159,18 +1264,88 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       style: const TextStyle(
                           fontSize: 11, color: AppCultureColors.textMuted),
                     ),
+                    if (isStuck) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Chưa nhận được xác nhận từ VNPay. Nếu bạn đã thanh toán, hãy kiểm tra lại.',
+                        style: const TextStyle(
+                            fontSize: 10.5,
+                            color: AppCultureColors.textMuted,
+                            height: 1.35),
+                      ),
+                    ],
                   ],
                 ),
               ),
-          Text(
-            payment.formattedAmount,
-            style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
-              color: AppCultureColors.textDark,
-            ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    payment.formattedAmount,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppCultureColors.textDark,
+                    ),
+                  ),
+                  if (isStuck)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: _buildRecheckButton(payment, isChecking),
+                    ),
+                ],
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// Nút "Kiểm tra lại" cho giao dịch đang kẹt — đồng bộ lại trạng thái từ backend.
+  Widget _buildRecheckButton(PaymentModel payment, bool isChecking) {
+    return InkWell(
+      onTap: isChecking ? null : () => _recheckPayment(payment),
+      borderRadius: BorderRadius.circular(9),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppCultureColors.heritageJade.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(
+            color: AppCultureColors.heritageJade.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isChecking)
+              const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.8,
+                  color: AppCultureColors.heritageJade,
+                ),
+              )
+            else
+              const Icon(
+                Icons.refresh_rounded,
+                size: 13,
+                color: AppCultureColors.heritageJade,
+              ),
+            const SizedBox(width: 5),
+            Text(
+              isChecking ? 'Đang kiểm tra' : 'Kiểm tra lại',
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                color: AppCultureColors.heritageJade,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1199,7 +1374,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  refund.refundCode ?? 'Yêu cầu #${refund.id}',
+                  refund.refundCode.isEmpty
+                      ? 'Yêu cầu #${refund.id}'
+                      : refund.refundCode,
                   style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
