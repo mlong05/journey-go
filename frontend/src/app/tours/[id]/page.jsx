@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,13 +12,13 @@ import {
   Wallet,
 } from "lucide-react";
 import { apiClient } from "@/services/apiClient";
-import { formatVND, formatLocalDate } from "@/lib/money";
+import { formatVND } from "@/lib/money";
 import { ROUTES } from "@/constants/routes";
 import { useAuthSession } from "@/hooks";
 import {
-  getTourAvailableDates,
   getTourExperiences,
 } from "@/features/booking/services/tourAvailabilityService";
+import ExperienceDatePicker from "@/features/booking/components/ExperienceDatePicker";
 import { useCreateBooking } from "@/features/booking/hooks/useBookings";
 
 export default function TourDetailPage() {
@@ -30,34 +30,31 @@ export default function TourDetailPage() {
   const { create, loading: creating, error: createError } = useCreateBooking();
 
   const [tour, setTour] = useState(null);
-  const [experiences, setExperiences] = useState([]);
-  const [dates, setDates] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingDates, setLoadingDates] = useState(false);
-  const [error, setError] = useState("");
+  const [experiences, setExperiences] = useState([]);
+  // `loadedTourId` = tour nào đã tải xong ⇒ suy ra trạng thái "đang tải" mà KHÔNG
+  // cần setState đồng bộ trong effect (tránh cascading render).
+  const [loadedTourId, setLoadedTourId] = useState(null);
+  const [loadError, setLoadError] = useState("");
   const [submitError, setSubmitError] = useState("");
 
   // ── Tải tour ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!tourId) return;
+    if (!tourId) return undefined;
     let active = true;
-
-    setLoading(true);
-    setError("");
 
     apiClient
       .get(`/tours/${tourId}`)
       .then((res) => {
         if (!active) return;
         setTour(res?.data ?? res);
+        setLoadError("");
+        setLoadedTourId(tourId);
       })
       .catch((err) => {
         if (!active) return;
-        setError(err?.message || "Không thể tải thông tin tour.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        setLoadError(err?.message || "Không thể tải thông tin tour.");
+        setLoadedTourId(tourId);
       });
 
     return () => {
@@ -65,31 +62,30 @@ export default function TourDetailPage() {
     };
   }, [tourId]);
 
-  // ── Tải danh sách ngày còn chỗ ─────────────────────────────────────────────
-  const loadDates = useCallback(async (tourData) => {
-    if (!tourData) return;
-    setLoadingDates(true);
-    try {
-      const [expList, available] = await Promise.all([
-        getTourExperiences(tourData),
-        getTourAvailableDates(tourData, { horizonDays: 60 }),
-      ]);
-      setExperiences(expList);
-      setDates(available);
-      // Mặc định chọn ngày đầu tiên còn chỗ.
-      const firstAvailable = available.find((d) => d.available);
-      setSelectedDate(firstAvailable?.date ?? null);
-    } catch {
-      setExperiences([]);
-      setDates([]);
-    } finally {
-      setLoadingDates(false);
-    }
-  }, []);
+  // Đang tải cho tới khi đúng tour này đã tải xong.
+  const loading = !tourId || loadedTourId !== tourId;
+  // Lỗi chỉ hiển thị khi nó thuộc về tour đang xem (không phải lỗi của tour trước).
+  const error = loadedTourId === tourId ? loadError : "";
 
+  // ── Tải danh sách trải nghiệm của tour ────────────────────────────────────
   useEffect(() => {
-    if (tour) loadDates(tour);
-  }, [tour, loadDates]);
+    if (!tour) return undefined;
+    let active = true;
+
+    getTourExperiences(tour)
+      .then((list) => {
+        if (!active) return;
+        setExperiences(list);
+      })
+      .catch(() => {
+        if (!active) return;
+        setExperiences([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [tour]);
 
   // ── Đặt tour ──────────────────────────────────────────────────────────────
   const handleBook = async () => {
@@ -112,15 +108,12 @@ export default function TourDetailPage() {
     } catch (err) {
       // Message từ backend đã viết sẵn theo ngữ cảnh nghiệp vụ — hiển thị nguyên văn.
       setSubmitError(err?.message || "Không thể tạo đơn đặt tour.");
-      // Nếu lỗi do hết chỗ / không mở bán → tải lại danh sách ngày.
+      // Nếu lỗi do hết chỗ / không mở bán ⇒ bỏ chọn ngày cũ để khách chọn lại.
       if (err?.code === "BOOKING_SLOT_FULL" || err?.code === "BOOKING_SLOT_NOT_FOUND") {
-        loadDates(tour);
+        setSelectedDate(null);
       }
     }
   };
-
-  const availableDates = useMemo(() => dates.filter((d) => d.available), [dates]);
-  const soldOutDates = useMemo(() => dates.filter((d) => !d.available), [dates]);
 
   if (loading) {
     return (
@@ -248,41 +241,12 @@ export default function TourDetailPage() {
                 Chọn ngày trải nghiệm
               </h3>
 
-              {loadingDates ? (
-                <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Đang tải lịch...
-                </div>
-              ) : availableDates.length === 0 ? (
-                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  Hiện chưa có ngày nào còn chỗ cho tour này. Vui lòng quay lại sau.
-                </p>
-              ) : (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {availableDates.map((d) => (
-                    <button
-                      key={d.date}
-                      type="button"
-                      onClick={() => setSelectedDate(d.date)}
-                      className={`rounded-xl border px-3 py-2 text-left text-xs transition-colors ${
-                        selectedDate === d.date
-                          ? "border-blue-600 bg-blue-50 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
-                          : "border-gray-200 bg-white text-gray-700 hover:border-blue-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-                      }`}
-                    >
-                      <span className="block font-bold">{formatLocalDate(d.date)}</span>
-                      <span className="mt-0.5 block text-[11px] opacity-70">
-                        Còn {d.remaining} chỗ
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {soldOutDates.length > 0 && (
-                <p className="mt-3 text-[11px] text-gray-400">
-                  {soldOutDates.length} ngày khác đã hết chỗ.
-                </p>
-              )}
+              <ExperienceDatePicker
+                className="mt-3"
+                tour={tour}
+                value={selectedDate}
+                onChange={setSelectedDate}
+              />
             </div>
 
             {(submitError || createError) && (
@@ -294,7 +258,7 @@ export default function TourDetailPage() {
             <button
               type="button"
               onClick={handleBook}
-              disabled={creating || !selectedDate || availableDates.length === 0}
+              disabled={creating || !selectedDate}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
             >
               {creating ? (
