@@ -48,6 +48,14 @@ dependencies:
   flutter_compass: ^0.8.1
   youtube_player_iframe: ^6.0.2
 
+  # ── Booking / Payment / Refund ────────────────────────────────────────────
+  # Lưu trữ token trong Keychain (iOS) / EncryptedSharedPreferences (Android).
+  # Bản 11.x là bắt buộc để tương thích với win32 6.x (geolocator 14.x).
+  flutter_secure_storage: ^11.2.0
+  # Hiển thị mã QR thanh toán VNPay ngay trong app.
+  qr_flutter: ^4.1.0
+  app_links: ^7.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -4,6 +4,7 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.modules.settlement.dto.request.CreateSettlementRequest;
 import com.journeygo.modules.settlement.dto.request.RejectSettlementRequest;
+import com.journeygo.modules.settlement.dto.response.PlatformRevenueSummaryResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementCandidatesResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementDetailResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementResponse;
@@ -49,6 +50,22 @@ public class SettlementController {
             @RequestParam String revenuePeriod) {
         return ResponseEntity.ok(ApiResponse.success("Lấy ứng viên tất toán thành công",
                 settlementService.getCandidates(partnerId, revenuePeriod)));
+    }
+
+    // ── Doanh thu nền tảng ───────────────────────────────────────────────────
+
+    @GetMapping("/platform-revenue")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Tổng hợp doanh thu nền tảng",
+            description = "Phần doanh thu nền tảng thu được sau khi tất toán cho đối tác "
+                    + "(= tổng thanh toán − tổng hoàn tiền − tổng chi trả đối tác = hoa hồng + điều chỉnh). "
+                    + "Chỉ tính các đợt tất toán đã DUYỆT — kỳ đang chờ duyệt chưa phải doanh thu đã thu.")
+    public ResponseEntity<ApiResponse<PlatformRevenueSummaryResponse>> getPlatformRevenue(
+            @RequestParam(defaultValue = "12") int periods) {
+        int safePeriods = Math.min(Math.max(periods, 1), 60);
+        return ResponseEntity.ok(ApiResponse.success("Lấy tổng hợp doanh thu nền tảng thành công",
+                settlementService.getPlatformRevenueSummary(safePeriods)));
     }
 
     // ── Tạo / duyệt / từ chối ────────────────────────────────────────────────

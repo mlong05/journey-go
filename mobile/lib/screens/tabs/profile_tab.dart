@@ -23,6 +23,7 @@ import '../modals/notification_dialog.dart';
 import '../rewards/badges_screen.dart';
 import '../rewards/rewards_widgets.dart' show BadgeIcon, PointTransactionTile;
 import '../rewards/wallet_screen.dart';
+import '../booking/bookings_screen.dart';
 import '../refunds_screen.dart';
 import '../tickets_screen.dart';
 
@@ -128,6 +129,13 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const TicketsScreen()));
+  }
+
+  /// Mở danh sách đơn đặt tour (luồng booking + thanh toán + QR trải nghiệm).
+  void _openBookings() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const BookingsScreen()));
   }
 
   void _openBadges() {
@@ -996,6 +1004,15 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
         _sectionTitle('Vé & hỗ trợ'),
         const SizedBox(height: 12),
         _groupCard([
+          _buildSettingTile(
+            icon: Icons.receipt_long_rounded,
+            iconColor: AppCultureColors.oceanBlue,
+            iconBg: AppCultureColors.oceanLight,
+            title: 'Đơn đặt tour của tôi',
+            subtitle: 'Theo dõi đơn, thanh toán & mã QR trải nghiệm',
+            onTap: _openBookings,
+          ),
+          _tileDivider(),
           _buildSettingTile(
             icon: Icons.confirmation_number_outlined,
             iconColor: AppCultureColors.heritageJade,

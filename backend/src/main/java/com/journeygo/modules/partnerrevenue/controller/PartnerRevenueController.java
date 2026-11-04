@@ -74,11 +74,16 @@ public class PartnerRevenueController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Đánh giá điều kiện đủ tư cách tất toán",
-            description = "Đánh giá lại 8 điều kiện bắt buộc tại thời điểm gọi — không dựa vào trạng thái "
-                    + "tính từ trước, để dữ liệu cũ hoặc trạng thái chưa kịp cập nhật không lọt khoản doanh thu chưa đủ điều kiện.")
+            description = "Đánh giá lại 9 điều kiện bắt buộc tại thời điểm gọi — không dựa vào trạng thái "
+                    + "tính từ trước, để dữ liệu cũ hoặc trạng thái chưa kịp cập nhật không lọt khoản doanh thu chưa đủ điều kiện. "
+                    + "Khi truyền `settlementId`, điều kiện 6 được chấm theo ngữ cảnh duyệt đợt "
+                    + "(khoản doanh thu thuộc đúng đợt đang duyệt) thay vì ngữ cảnh ứng viên.")
     public ResponseEntity<ApiResponse<EligibilityEvaluationResponse>> evaluateEligibility(
-            @PathVariable Long revenueId) {
-        return ResponseEntity.ok(ApiResponse.success("Đánh giá điều kiện tất toán thành công",
-                revenueService.evaluateEligibility(revenueId)));
+            @PathVariable Long revenueId,
+            @RequestParam(required = false) Long settlementId) {
+        EligibilityEvaluationResponse result = (settlementId != null)
+                ? revenueService.evaluateForApproval(revenueId, settlementId)
+                : revenueService.evaluateEligibility(revenueId);
+        return ResponseEntity.ok(ApiResponse.success("Đánh giá điều kiện tất toán thành công", result));
     }
 }

@@ -11,6 +11,8 @@ import {
   Route,
   Receipt,
   Award,
+  HandCoins,
+  ShieldAlert,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -64,10 +66,24 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
+    id: "settlements",
+    label: "Tất toán doanh thu",
+    href: "/admin/settlements",
+    icon: HandCoins,
+    badge: null,
+  },
+  {
     id: "bookings",
     label: "Đơn đặt tour",
     href: "/admin/bookings",
     icon: Receipt,
+    badge: null,
+  },
+  {
+    id: "audit-logs",
+    label: "Nhật ký kiểm toán",
+    href: "/admin/audit-logs",
+    icon: ShieldAlert,
     badge: null,
   },
   {

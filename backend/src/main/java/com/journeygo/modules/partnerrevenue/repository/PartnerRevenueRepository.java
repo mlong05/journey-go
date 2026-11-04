@@ -48,6 +48,20 @@ public interface PartnerRevenueRepository extends JpaRepository<PartnerRevenue, 
     List<PartnerRevenue> findByRevenuePeriodAndStatus(String revenuePeriod, PartnerRevenueStatus status);
 
     /**
+     * Các khoản doanh thu của một Partner CHƯA được tất toán và CHƯA thuộc đợt tất toán
+     * nào đang xử lý — dùng để lọc ứng viên tất toán (bao gồm cả khoản đang
+     * {@code PENDING} vì lý do "kỳ doanh thu chưa kết thúc", khoản này sẽ đủ điều kiện
+     * khi kỳ đóng lại và cần được xét lại).
+     */
+    @Query("""
+            SELECT r FROM PartnerRevenue r
+            WHERE r.partner.id = :partnerId
+              AND r.status <> com.journeygo.modules.partnerrevenue.entity.enums.PartnerRevenueStatus.SETTLED
+              AND r.status <> com.journeygo.modules.partnerrevenue.entity.enums.PartnerRevenueStatus.IN_SETTLEMENT
+            """)
+    List<PartnerRevenue> findUnsettledByPartner(@Param("partnerId") Long partnerId);
+
+    /**
      * Các khoản doanh thu đủ điều kiện của một Partner, chưa thuộc Settlement nào đang xử lý
      * hoặc đã duyệt — dùng để lọc ứng viên tất toán.
      */

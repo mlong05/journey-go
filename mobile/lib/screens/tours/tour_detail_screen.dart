@@ -4,7 +4,9 @@ import '../../core/models/experience_model.dart';
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
+import '../../core/services/tour_availability_service.dart';
 import '../../core/services/tour_service.dart';
+import '../../core/utils/formatters.dart' show formatLocalDateString;
 import '../bookings/booking_checkout_screen.dart';
 import '../journey/journey_screen.dart';
 import 'tour_progress.dart';
@@ -12,6 +14,7 @@ import '../culture/cultural_stories.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
 import 'tour_route_map.dart';
 import 'tour_style.dart';
+import 'experience_date_calendar.dart';
 
 /// Chi tiết tour: hành trình theo thứ tự điểm đến, trải nghiệm của từng điểm và giá trọn gói.
 class TourDetailScreen extends StatefulWidget {
@@ -26,6 +29,7 @@ class TourDetailScreen extends StatefulWidget {
 class _TourDetailScreenState extends State<TourDetailScreen> {
   final TourService _service = TourService();
   final BookingService _bookingService = BookingService();
+  final TourAvailabilityService _availabilityService = TourAvailabilityService();
 
   // Chặn bấm "Đặt tour" nhiều lần trong lúc đang tạo booking.
   bool _bookingInProgress = false;
@@ -40,6 +44,11 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
   /// Du khách đang đi dở hoặc đã đi xong tour này; null nếu chưa đi.
   TourProgress? _myProgress;
+
+  // ── Chọn ngày trải nghiệm còn chỗ ────────────────────────────────────────
+  List<TourAvailableDate> _availableDates = [];
+  String? _selectedDate;
+  bool _loadingDates = false;
 
   @override
   void initState() {
@@ -78,11 +87,49 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         ..addEntries(entries);
       _loading = false;
     });
+
+    _loadAvailableDates();
+  }
+
+  /// Tải các ngày còn chỗ (mọi experience của tour đều phải còn slot).
+  Future<void> _loadAvailableDates() async {
+    if (!mounted) return;
+    setState(() => _loadingDates = true);
+    try {
+      final dates = await _availabilityService.getTourAvailableDates(_tour);
+      if (!mounted) return;
+      setState(() {
+        _availableDates = dates;
+        // Giữ lựa chọn của khách nếu ngày đó vẫn còn chỗ;
+        // nếu không còn thì mặc định chọn ngày đầu tiên còn chỗ.
+        final bookable = dates.where((d) => d.available).toList(growable: false);
+        final stillAvailable =
+            _selectedDate != null && bookable.any((d) => d.date == _selectedDate);
+        _selectedDate = stillAvailable
+            ? _selectedDate
+            : (bookable.isEmpty ? null : bookable.first.date);
+        _loadingDates = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _availableDates = [];
+        _loadingDates = false;
+      });
+    }
   }
 
   Future<void> _loadMyProgress() async {
     final byTour = await TourProgress.load();
     if (mounted) setState(() => _myProgress = byTour[widget.tour.id]);
+  }
+
+  /// Nhãn ngày trải nghiệm đang chọn (VD "20/11/2026") — null nếu chưa chọn.
+  String? get selectedDateLabel {
+    final date = _selectedDate;
+    if (date == null || date.isEmpty) return null;
+    final formatted = formatLocalDateString(date);
+    return formatted.isEmpty ? null : formatted;
   }
 
   Future<void> _continueJourney(TourProgress progress) async {
@@ -104,23 +151,23 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   }
 
   /// Chọn ngày, tạo booking (giữ chỗ 10 phút) rồi sang màn thanh toán.
+  ///
+  /// Dùng LỊCH THÁNG dùng chung (`ExperienceDateCalendar`) — mỗi ô hiện số slot
+  /// còn lại, chỉ ngày còn chỗ mới bấm được.
+  /// Nếu API lỗi / không trả về ngày nào ⇒ KHÔNG fallback sang `showDatePicker`
+  /// (lịch thuần cho phép chọn ngày không có slot ⇒ backend từ chối với lỗi khó hiểu).
+  /// ⇒ Khi không có ngày nào, ta báo rõ ràng cho khách và KHÔNG tạo booking.
   Future<void> _onBook() async {
     if (_bookingInProgress) return;
-    final today = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: today,
-      firstDate: DateTime(today.year, today.month, today.day),
-      lastDate: today.add(const Duration(days: 365)),
-      helpText: 'Chọn ngày trải nghiệm',
-    );
-    if (picked == null || !mounted) return;
+
+    final bookedDate = await _pickExperienceDate();
+    if (bookedDate == null || !mounted) return;
 
     setState(() => _bookingInProgress = true);
     try {
-      final booking = await _bookingService.create(
+      final booking = await _bookingService.createBooking(
         tourId: _tour.id,
-        experienceDate: picked,
+        experienceDate: bookedDate,
       );
       if (!mounted) return;
       // Đơn chưa thanh toán vẫn nằm ở "Đơn đặt tour > Chờ thanh toán" nếu khách thoát giữa chừng.
@@ -134,9 +181,155 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), behavior: SnackBarBehavior.floating),
       );
+      // Lỗi hết chỗ / ngày không mở bán ⇒ tải lại lịch để khách chọn ngày khác.
+      _loadAvailableDates();
     } finally {
       if (mounted) setState(() => _bookingInProgress = false);
     }
+  }
+
+  /// Trả về ngày trải nghiệm đã chọn (chuỗi `YYYY-MM-DD`), null nếu khách hủy.
+  ///
+  /// Mở bottom sheet chứa LỊCH THÁNG (dùng chung `ExperienceDateCalendar`):
+  /// mỗi ô hiện số slot còn lại, chỉ ngày còn chỗ mới bấm được.
+  /// Không có ngày nào ⇒ hiện thông báo và trả về null (không tạo booking sai).
+  Future<String?> _pickExperienceDate() async {
+    final bookable = _availableDates.where((d) => d.available).toList(growable: false);
+    if (bookable.isEmpty) {
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _loadingDates
+                ? 'Đang tải lịch trải nghiệm, vui lòng thử lại sau.'
+                : 'Hiện chưa có ngày nào còn chỗ cho tour này. Vui lòng quay lại sau.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return null;
+    }
+
+    // Mặc định chọn ngày đầu tiên còn chỗ nếu chưa có lựa chọn nào.
+    // Luôn non-null: nếu lựa chọn hiện tại không còn trong danh sách còn chỗ
+    // ⇒ dùng ngày đầu tiên còn chỗ.
+    final String initial = bookable.any((d) => d.date == _selectedDate)
+        ? _selectedDate!
+        : bookable.first.date;
+
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppCultureColors.surface,
+      isScrollControlled: true,
+      builder: (ctx) => _buildDateSheet(ctx, initial),
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedDate = picked);
+    }
+    return picked;
+  }
+
+  /// Bottom sheet chứa lịch tháng chọn ngày còn chỗ.
+  ///
+  /// ⚠️ Bấm vào ô ngày CHỈ chọn (tô đậm ô đang chọn) — KHÔNG đóng sheet và
+  /// KHÔNG tạo booking. Muốn đi tiếp, khách phải bấm nút "Xác nhận chọn ngày"
+  /// ở đáy sheet. Nhờ vậy khách tự do xem lịch, bấm nhiều ngày để so sánh
+  /// số chỗ còn lại rồi mới chốt.
+  Widget _buildDateSheet(
+    BuildContext ctx,
+    String initialDate,
+  ) {
+    // Ngày đang chọn trong sheet — nằm trong sheet để bấm ngày không đóng sheet.
+    String? tempSelected = initialDate;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        child: StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Chọn ngày trải nghiệm',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppCultureColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Số trong ô là số chỗ còn lại — chỉ ngày còn chỗ mới chọn được',
+                  style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                ),
+                const SizedBox(height: 14),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: ExperienceDateCalendar(
+                      dates: _availableDates,
+                      selectedDate: tempSelected,
+                      loading: _loadingDates,
+                      // Chỉ cập nhật lựa chọn trong sheet, KHÔNG pop.
+                      onDateSelected: (date) =>
+                          setSheetState(() => tempSelected = date),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                // Ngày đang chọn — để khách biết mình đã chọn ngày nào.
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.event_available_rounded,
+                      size: 16,
+                      color: AppCultureColors.oceanBlue,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        tempSelected == null
+                            ? 'Chưa chọn ngày nào'
+                            : 'Đang chọn: ${formatLocalDateString(tempSelected)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppCultureColors.textDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Nút xác nhận — mới đóng sheet và đi tiếp sang bước đặt tour.
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: tempSelected == null
+                        ? null
+                        : () => Navigator.of(ctx).pop(tempSelected),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text(
+                      'Xác nhận chọn ngày',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppCultureColors.heritageJade,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -610,6 +803,32 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           color: AppCultureColors.jadeDark,
                         ),
                       ),
+                      // Ngày trải nghiệm đang chọn — hiển thị rõ để khách không
+                      // phải mở lại lịch để biết mình đã chọn ngày nào.
+                      if (selectedDateLabel != null) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.event_available_rounded,
+                              size: 13,
+                              color: AppCultureColors.oceanBlue,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                selectedDateLabel!,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppCultureColors.oceanBlue,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

@@ -337,9 +337,25 @@ public class BookingService {
 
     /**
      * Giải phóng các slot đã giữ — đúng một lần nhờ cờ {@code released}.
+     *
+     * <p>⚠️ Vì sao phải gom ID slot TRƯỚC rồi mới gọi bulk UPDATE?
+     * <ul>
+     *   <li>{@code atomicReleaseSlot} là câu UPDATE hàng loạt — nếu để Hibernate tự
+     *       {@code clear} PersistenceContext thì entity {@code Booking} đang quản lý sẽ bị
+     *       detach ⇒ {@code BookingResponse.fromEntity(booking)} ném
+     *       {@code LazyInitializationException} khi truy cập {@code booking.getSlotHolds()}.</li>
+     *   <li>Gom ID trước còn giúp tránh truy cập lazy {@code hold.getExperienceSlot()}
+     *       sau khi bulk update đã làm thay đổi trạng thái của các entity liên quan.</li>
+     * </ul>
      */
     private void releaseSlots(Booking booking) {
         List<BookingSlotHold> holds = slotHoldRepository.findByBooking_Id(booking.getId());
+        if (holds.isEmpty()) {
+            return;
+        }
+
+        // Gom ID slot cần giải phóng + đánh dấu hold TRƯỚC khi chạy bulk UPDATE.
+        List<Long> slotIds = new java.util.ArrayList<>();
         for (BookingSlotHold hold : holds) {
             if (!hold.markReleased()) {
                 // Đã giải phóng trước đó — bỏ qua để không cộng/trừ sai số chỗ.
@@ -347,8 +363,14 @@ public class BookingService {
             }
             slotHoldRepository.save(hold);
             if (hold.getExperienceSlot() != null) {
-                experienceSlotRepository.atomicReleaseSlot(hold.getExperienceSlot().getId());
+                slotIds.add(hold.getExperienceSlot().getId());
             }
+        }
+
+        // Bulk UPDATE sau khi đã thu thập xong ID ⇒ PersistenceContext không bị clear
+        // giữa chừng ⇒ lazy collection của Booking vẫn khởi tạo được trong transaction.
+        for (Long slotId : slotIds) {
+            experienceSlotRepository.atomicReleaseSlot(slotId);
         }
     }
 

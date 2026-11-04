@@ -134,6 +134,10 @@ app:
     booking-expiry-scan-interval-seconds: ${BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS:60}
     # Số giây giữa các lần kiểm tra trạng thái Refund đang chờ kết quả từ VNPay.
     refund-status-check-interval-seconds: ${REFUND_STATUS_CHECK_INTERVAL_SECONDS:300}
+    # Số giây giữa các lần đối soát lại giao dịch thanh toán còn "kẹt" (PENDING/PROCESSING).
+    payment-reconcile-interval-seconds: ${PAYMENT_RECONCILE_INTERVAL_SECONDS:300}
+    # Số giao dịch tối đa xử lý trong một lượt đối soát.
+    payment-reconcile-batch-size: ${PAYMENT_RECONCILE_BATCH_SIZE:50}
     # Số giờ cho phép gửi lại yêu cầu Refund sau khi yêu cầu trước bị từ chối (0 = không cho).
     refund-resubmit-window-hours: ${REFUND_RESUBMIT_WINDOW_HOURS:0}
 
@@ -151,6 +155,35 @@ app:
     ipn-url: ${VNPAY_IPN_URL:}
     # URL nhận kết quả trả về (Return URL) sau khi khách thanh toán.
     return-url: ${VNPAY_RETURN_URL:}
+
+    # Return URL riêng cho WEB (frontend Next.js). Để trống ⇒ dùng `return-url`.
+    #   => VNPAY_WEB_RETURN_URL=http://localhost:3000/payment/return
+    # ⚠️ URL này phải truy cập được từ trình duyệt của khách (không dùng localhost
+    #    khi test trên điện thoại).
+    web-return-url: ${VNPAY_WEB_RETURN_URL:}
+
+    # ── Return URL riêng cho APP MOBILE (deep link, custom scheme) ─────────────
+    # ĐÃ KIỂM CHỨNG TRÊN SANDBOX: khi vnp_ReturnUrl là CUSTOM SCHEME, VNPay
+    # chuyển hướng trình duyệt thẳng về scheme này kèm TOÀN BỘ tham số kết quả
+    # ĐÃ KÝ (vnp_ResponseCode, vnp_TransactionStatus, vnp_TransactionNo,
+    # vnp_PayDate, vnp_SecureHash) ⇒ app nhận kết quả NGAY, KHÔNG CẦN tunnel
+    # (ngrok) còn sống, và không phụ thuộc lệnh querydr (Sandbox đang trả lỗi 99).
+    #
+    #   => VNPAY_APP_RETURN_URL=journeygo://payment/return
+    #
+    # Để trống ⇒ dùng `return-url` + `app_redirect=1` ⇒ trang kết quả của backend
+    # tự chuyển hướng trình duyệt về app (CẦN ngrok/tunnel còn sống).
+    app-return-url: ${VNPAY_APP_RETURN_URL:}
+
+    # ── Deep link về app mobile ───────────────────────────────────────────────
+    # Mặc định toàn cục: Return URL được gắn `app_redirect=1` ⇒ trang
+    # `/payments/return-page` chuyển hướng trình duyệt về app mobile
+    # (`journeygo://payment/return?...`) để app mở lại và hiện màn kết quả.
+    #
+    # ⚠️ Tham số `appRedirect` của `POST /payments/bookings/{id}/init` GHI ĐÈ cờ này
+    # cho từng giao dịch ⇒ WEB (không gửi cờ) không bị chuyển hướng về app.
+    app-redirect-enabled: ${VNPAY_APP_REDIRECT_ENABLED:false}
+    app-scheme: ${VNPAY_APP_SCHEME:journeygo}
     ip-addr: ${VNPAY_IP_ADDR:127.0.0.1}
     timezone: ${VNPAY_TIMEZONE:Asia/Ho_Chi_Minh}
     expiry-minutes: ${VNPAY_EXPIRY_MINUTES:10}

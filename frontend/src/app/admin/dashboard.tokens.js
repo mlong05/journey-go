@@ -74,7 +74,8 @@ export const KPI = {
 export const TABLE = {
   /** <table> wrapper. */
   base: "w-full text-left text-sm border-collapse",
-  theadRow: "bg-slate-50/70 border-b border-slate-200 text-xs font-semibold text-slate-600",
+  // Nền đục (không alpha) để tiêu đề cột dính (sticky) không bị nội dung lọt qua.
+  theadRow: "bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600",
   th: "py-3 px-4 font-bold",
   tbody: "divide-y divide-slate-100",
   tr: "hover:bg-slate-50/60 transition-colors",

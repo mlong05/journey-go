@@ -12,7 +12,7 @@ import java.util.Optional;
  * <ul>
  *   <li>{@code VNPAYQR} — Thanh toán quét mã QR (Ứng dụng Ngân hàng & Ví điện tử).</li>
  *   <li>{@code VNBANK} — Thẻ ATM / Tài khoản ngân hàng nội địa.</li>
- *   <li>{@code INTCARD} — Thẻ thanh toán quốc tế (Visa, Mastercard, JCB, UnionPay).</li>
+ *   <li>{@code VISA} — Thẻ thanh toán quốc tế (Visa, Mastercard, JCB, UnionPay).</li>
  * </ul>
  *
  * <p>Lưu ý quan trọng: nếu KHÔNG gửi tham số {@code vnp_BankCode}, VNPay sẽ chuyển khách
@@ -29,13 +29,28 @@ public enum VnPayPaymentMethod {
     /** Ứng dụng Ngân hàng & Ví điện tử — quét mã QR. */
     QR_APP_WALLET(
             "VNPAYQR",
-            "Ứng dụng Ngân hàng và Ví điện tử",
+            "App ngân hàng và Ví điện tử (VNPay QR)",
             "Quét mã QR bằng ứng dụng Mobile Banking hoặc ví điện tử liên kết VNPay-QR "
                     + "(MoMo, ZingPay, VNPay, Viettel Pay, VCB Digibank…)",
             "QRCODE",
             1),
 
-    /** Thẻ ATM nội địa & tài khoản ngân hàng. */
+    /**
+     * Thẻ ATM nội địa & tài khoản ngân hàng.
+     *
+     * <p>ĐÃ KIỂM CHỨNG TRÊN SANDBOX: {@code vnp_BankCode=VNBANK} mở trang
+     * {@code /paymentv2/Transaction/PaymentMethod.html} nhưng trang đó chỉ hiện
+     * ĐÚNG 1 mục "Thẻ nội địa và tài khoản ngân hàng" (KHÔNG có QR, KHÔNG có thẻ
+     * quốc tế — đã đếm DOM: 1 mục, không tìm thấy "QR"/"quốc tế"/"Visa").
+     * Bên trong mục đó, VNPay tự load danh sách ngân hàng (AJAX) để khách chọn —
+     * nên app KHÔNG cần hiển thị danh sách ngân hàng riêng.
+     *
+     * <p>Nếu muốn mở THẲNG form nhập thẻ của một ngân hàng (bỏ qua bước chọn
+     * ngân hàng), phải gửi MÃ NGÂN HÀNG CỤ THỂ lấy từ {@code get_bank_list}
+     * (bank_type = 2): {@code NCB}, {@code MBBANK}, {@code VIETINBANK},
+     * {@code VPBANK}, {@code AGRIBANK}… Mỗi mã mở thẳng form
+     * {@code /paymentv2/{Bank}/Transaction/Index.html} của ngân hàng đó.
+     */
     DOMESTIC_CARD(
             "VNBANK",
             "Thẻ nội địa và tài khoản ngân hàng",
@@ -43,17 +58,25 @@ public enum VnPayPaymentMethod {
                     + "Mobile Banking của các ngân hàng Việt Nam)",
             "ATM",
             2),
-
     /**
      * Thẻ thanh toán quốc tế.
      *
-     * <p>LƯU Ý: tài liệu chính thức VNPay chỉ liệt kê 2 giá trị cho {@code vnp_CardType}
-     * là {@code ATM} và {@code QRCODE} — KHÔNG có {@code CREDIT}. Vì vậy {@link #cardType}
-     * của nhóm này để trống: mã {@code vnp_BankCode} vẫn là {@code INTCARD}, còn
+     * <p>LƯU Ý QUAN TRỌNG: {@code vnp_BankCode=INTCARD} KHÔNG được VNPay Sandbox chấp nhận
+     * (đã kiểm chứng: URL bị fallback về trang chọn phương thức ⇒ không mở form thẻ).
+     * Các mã hợp lệ lấy từ API {@code get_bank_list} (bank_type = 3):
+     * {@code VISA}, {@code MASTERCARD}, {@code JCB}, {@code UPI}, {@code AMEX}.
+     *
+     * <p>Ta dùng {@code VISA} vì trang thanh toán đó nhận ĐẦY ĐỦ cả Visa/Mastercard/JCB
+     * (tiêu đề "Thanh toán qua thẻ quốc tế"), còn {@code MASTERCARD}/{@code JCB} chỉ nhận
+     * đúng loại thẻ tương ứng.
+     *
+     * <p>Về {@code vnp_CardType}: tài liệu chính thức VNPay chỉ liệt kê 2 giá trị là
+     * {@code ATM} và {@code QRCODE} — KHÔNG có {@code CREDIT}. Vì vậy {@link #cardType}
+     * của nhóm này để trống: mã {@code vnp_BankCode} vẫn là {@code VISA}, còn
      * {@code vnp_CardType} do VNPay trả về sẽ không khớp nhóm này.
      */
     INTERNATIONAL_CARD(
-            "INTCARD",
+            "VISA",
             "Thẻ thanh toán quốc tế",
             "Thanh toán bằng thẻ quốc tế Visa, Mastercard, JCB, UnionPay",
             null,

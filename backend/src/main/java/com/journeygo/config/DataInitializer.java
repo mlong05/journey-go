@@ -639,22 +639,27 @@ public class DataInitializer {
                 "INTCARD", null, "91000006", prev3Paid);
 
         // 7) COMPLETED + Refund đã hoàn thành 50% (thuộc Partner 1)
-        Booking bk7 = ensureBooking("JGSAMPLE07", tourist1, tour2, today.plusDays(1),
-                now.minusSeconds(7200), now.minusSeconds(3600), admin);
+        //
+        // LƯU Ý: các booking mẫu hoàn thành (BK7/BK8/BK9) đặt ngày trải nghiệm TRONG kỳ
+        // trước (kỳ đã đóng) để doanh thu của chúng thuộc kỳ đã đóng. Nếu đặt ở
+        // `today.plusDays(...)` thì kỳ doanh thu rơi vào kỳ TƯƠNG LAI (chưa kết thúc) và
+        // hệ thống sẽ từ chối tất toán khoản đó (điều kiện 9_PERIOD_CLOSED).
+        Booking bk7 = ensureBooking("JGSAMPLE07", tourist1, tour2, prevMonthDay,
+                prevMonthPaid, prevMonthDone, admin);
         Payment pay7 = ensurePayment("JGSAMPLE07-TXN", bk7, new BigDecimal("900000.00"),
-                "MOMO", "QRCODE", "91000007", now.minusSeconds(7200));
+                "MOMO", "QRCODE", "91000007", prevMonthPaid);
 
         // 8) COMPLETED + Refund đang chờ duyệt (chặn tất toán)
-        Booking bk8 = ensureBooking("JGSAMPLE08", tourist2, tour2, today.plusDays(4),
-                now.minusSeconds(10800), now.minusSeconds(7200), admin);
+        Booking bk8 = ensureBooking("JGSAMPLE08", tourist2, tour2, prevMonthDay,
+                prevMonthPaid, prevMonthDone, admin);
         Payment pay8 = ensurePayment("JGSAMPLE08-TXN", bk8, new BigDecimal("900000.00"),
-                "VNBANK", "ATM", "91000008", now.minusSeconds(10800));
+                "VNBANK", "ATM", "91000008", prevMonthPaid);
 
         // 9) COMPLETED — chưa có refund (dùng cho kịch bản C.1 / C.2)
-        Booking bk9 = ensureBooking("JGSAMPLE09", tourist2, tour1, today.plusDays(5),
-                now.minusSeconds(14400), now.minusSeconds(10800), admin);
+        Booking bk9 = ensureBooking("JGSAMPLE09", tourist2, tour1, prevMonthDay,
+                prevMonthPaid, prevMonthDone, admin);
         Payment pay9 = ensurePayment("JGSAMPLE09-TXN", bk9, new BigDecimal("1500000.00"),
-                "VNPAYQR", "QRCODE", "91000009", now.minusSeconds(14400));
+                "VNPAYQR", "QRCODE", "91000009", prevMonthPaid);
 
         // ── REFUNDS ─────────────────────────────────────────────────────────────
         // Refund 50% đã hoàn thành (chuyển khoản thủ công)
@@ -703,21 +708,21 @@ public class DataInitializer {
 
         // BK7: có refund 50% đã hoàn thành
         ensureRevenue(bk7, pay7, partner1, new BigDecimal("900000.00"), new BigDecimal("0.2500"),
-                new BigDecimal("450000.00"), PartnerRevenue.periodOf(today.plusDays(1)), today.plusDays(1),
-                PartnerRevenueStatus.ELIGIBLE, null, now.minusSeconds(3600), null, null);
+                new BigDecimal("450000.00"), prevMonthPeriod, prevMonthDay,
+                PartnerRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
 
         // BK8: refund đang chờ duyệt → REFUND_PENDING
         ensureRevenue(bk8, pay8, partner1, new BigDecimal("900000.00"), new BigDecimal("0.2500"),
-                BigDecimal.ZERO, PartnerRevenue.periodOf(today.plusDays(4)), today.plusDays(4),
+                BigDecimal.ZERO, prevMonthPeriod, prevMonthDay,
                 PartnerRevenueStatus.PENDING, DeferredReason.REFUND_PENDING, null, null, null);
 
         // BK9: chưa refund → ELIGIBLE
         ensureRevenue(bk9, pay9, partner1, new BigDecimal("500000.00"), new BigDecimal("0.2500"),
-                BigDecimal.ZERO, PartnerRevenue.periodOf(today.plusDays(5)), today.plusDays(5),
-                PartnerRevenueStatus.ELIGIBLE, null, now.minusSeconds(10800), null, null);
+                BigDecimal.ZERO, prevMonthPeriod, prevMonthDay,
+                PartnerRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
         ensureRevenue(bk9, pay9, partner2, new BigDecimal("1000000.00"), new BigDecimal("0.2000"),
-                BigDecimal.ZERO, PartnerRevenue.periodOf(today.plusDays(5)), today.plusDays(5),
-                PartnerRevenueStatus.ELIGIBLE, null, now.minusSeconds(10800), null, null);
+                BigDecimal.ZERO, prevMonthPeriod, prevMonthDay,
+                PartnerRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
 
         // ── SETTLEMENT đã duyệt (kỳ 3 tháng trước) ────────────────────────────
         BigDecimal settledAmount = new BigDecimal("675000.00");
@@ -1213,8 +1218,8 @@ public class DataInitializer {
                 .performedBy(tourist)
                 .amount(proposedAmount)
                 .reference(refundCode)
-                .detail("Tourist gửi yêu cầu hoàn tiền. Nguyên nhân: " + reason
-                        + ". Số tiền đề xuất: " + proposedAmount)
+                // Mô tả sạch — không kèm mã enum / số tiền thô (số tiền đã có ở cột amount).
+                .detail("Tourist gửi yêu cầu hoàn tiền.")
                 .build());
 
         if (status == RefundStatus.REFUNDED) {
@@ -1226,7 +1231,8 @@ public class DataInitializer {
                     .performedBy(admin)
                     .amount(approvedAmount)
                     .reference(null)
-                    .detail("Admin phê duyệt hoàn " + approvedAmount + " — nguyên nhân: " + reason)
+                    // Số tiền hiển thị ở cột riêng — không lặp lại trong mô tả.
+                    .detail("Quản trị viên phê duyệt hoàn tiền.")
                     .build());
             refundAuditLogRepository.save(RefundAuditLog.builder()
                     .refundRequest(refund)
@@ -1264,11 +1270,26 @@ public class DataInitializer {
         revenue.setAdjustmentAmount(BigDecimal.ZERO);
         revenue.setRevenuePeriod(revenuePeriod);
         revenue.setCompletedDate(completedDate);
-        revenue.setStatus(status);
         revenue.setDeferredReason(deferredReason);
         revenue.setEligibleAt(eligibleAt);
         revenue.setSettledAt(settledAt);
-        revenue.setSettlementId(settlementId);
+
+        // KHÔNG đụng vào trạng thái / settlementId nếu khoản doanh thu đã được gắn
+        // vào một đợt tất toán (IN_SETTLEMENT) hoặc đã tất toán (SETTLED).
+        //
+        // LÝ DO: hàm này chạy lại ở MỖI lần khởi động ứng dụng. Nếu ghi đè
+        // status/settlementId thì mọi đợt tất toán nháp đang chờ duyệt sẽ bị
+        // "mất liên kết" → khi Admin bấm Duyệt sẽ báo
+        // "Đợt tất toán không có khoản doanh thu nào" dù bản nháp vẫn còn
+        // đầy đủ dòng chi tiết (settlement_detail).
+        boolean linkedToSettlement = revenue.getSettlementId() != null
+                || revenue.getStatus() == PartnerRevenueStatus.IN_SETTLEMENT
+                || revenue.getStatus() == PartnerRevenueStatus.SETTLED;
+        if (!linkedToSettlement) {
+            revenue.setStatus(status);
+            revenue.setSettlementId(settlementId);
+        }
+
         revenue.recalculate();
         return partnerRevenueRepository.save(revenue);
     }

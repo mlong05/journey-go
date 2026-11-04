@@ -69,7 +69,7 @@ public class Payment {
      *
      * <p>Theo tài liệu chính thức VNPay chỉ có 2 giá trị: {@code ATM} (thẻ ATM nội địa /
      * tài khoản ngân hàng) và {@code QRCODE} (ứng dụng ngân hàng & ví điện tử).
-     * Thẻ quốc tế KHÔNG có mã cardType riêng — dùng {@code vnp_BankCode=INTCARD}.
+     * Thẻ quốc tế KHÔNG có mã cardType riêng — dùng {@code vnp_BankCode=VISA}.
      */
     @Column(name = "card_type", length = 20)
     private String cardType;

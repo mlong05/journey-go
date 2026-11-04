@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'token_storage.dart';
@@ -52,8 +53,63 @@ class ApiException implements Exception {
 }
 
 /// Gọi REST API của backend (đã gắn sẵn base URL và Bearer token), trả về trường `data`.
+///
+/// ── Xử lý 401 ──
+/// Khi gặp 401, client tự gọi `POST /auth/refresh` một lần rồi retry request gốc.
+/// Nếu refresh thất bại → ném `ApiException` 401 để UI đưa người dùng về màn đăng nhập.
+/// Nhiều request cùng lúc gặp 401 sẽ chỉ refresh MỘT lần (các request còn lại chờ kết quả).
 class ApiClient {
   ApiClient._();
+
+  static Future<bool>? _refreshing;
+
+  /// Đảm bảo có access token hợp lệ, refresh nếu cần.
+  static Future<bool> _ensureFreshToken() {
+    // Nếu đã có một lần refresh đang chạy → chờ chính lần đó.
+    if (_refreshing != null) return _refreshing!;
+
+    final completer = Completer<bool>();
+    _refreshing = completer.future;
+
+    () async {
+      var ok = false;
+      try {
+        final refreshToken = await TokenStorage.getRefreshToken();
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          final baseUrl = await TokenStorage.getBaseUrl();
+          final res = await http
+              .post(
+                Uri.parse('$baseUrl/auth/refresh'),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({'refreshToken': refreshToken}),
+              )
+              .timeout(const Duration(seconds: 15));
+
+          if (res.statusCode == 200) {
+            final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+            final data = (decoded is Map && decoded['data'] is Map)
+                ? decoded['data'] as Map
+                : null;
+            final accessToken = data?['accessToken']?.toString();
+            if (accessToken != null && accessToken.isNotEmpty) {
+              await TokenStorage.updateTokens(
+                accessToken: accessToken,
+                refreshToken: data?['refreshToken']?.toString(),
+              );
+              ok = true;
+            }
+          }
+        }
+      } catch (_) {
+        ok = false;
+      }
+
+      _refreshing = null;
+      if (!completer.isCompleted) completer.complete(ok);
+    }();
+
+    return completer.future;
+  }
 
   static Future<dynamic> request(
     String method,
@@ -61,8 +117,13 @@ class ApiClient {
     bool auth = true,
     Object? body,
     Duration timeout = const Duration(seconds: 15),
+    bool isRetry = false,
     // 401 vốn hiểu là hết phiên; một số API dùng 401 cho sai mật khẩu nên giữ câu báo của máy chủ.
     bool keepUnauthorizedMessage = false,
+    // Gửi body dạng form-urlencoded thay vì JSON.
+    // ⚠️ BẮT BUỘC cho các endpoint backend khai báo `consumes = APPLICATION_FORM_URLENCODED_VALUE`:
+    // nếu không set Content-Type, Spring trả 415 Unsupported Media Type và request bị từ chối.
+    bool formEncoded = false,
   }) async {
     final baseUrl = await TokenStorage.getBaseUrl();
     final uri = Uri.parse('$baseUrl$path');
@@ -80,12 +141,19 @@ class ApiClient {
     }
 
     try {
-      final request = http.Request(method, uri)..headers.addAll(headers);
-      if (body != null) {
-        request.headers['Content-Type'] = 'application/json';
-        request.body = jsonEncode(body);
+      final req = http.Request(method, uri)..headers.addAll(headers);
+      if (formEncoded) {
+        // Map<String, String> → application/x-www-form-urlencoded
+        final fields = body is Map
+            ? body.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))
+            : const <String, String>{};
+        req.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+        req.body = Uri(queryParameters: fields).query;
+      } else if (body != null) {
+        req.headers['Content-Type'] = 'application/json';
+        req.body = jsonEncode(body);
       }
-      final streamed = await request.send().timeout(timeout);
+      final streamed = await req.send().timeout(timeout);
       final response = await http.Response.fromStream(streamed);
       final responseText = utf8.decode(response.bodyBytes);
       final dynamic decoded = responseText.isEmpty ? null : jsonDecode(responseText);
@@ -94,18 +162,44 @@ class ApiClient {
         return decoded is Map ? decoded['data'] : decoded;
       }
 
+      // 401 với câu báo riêng của máy chủ (VD. sai mật khẩu) → giữ nguyên câu báo,
+      // KHÔNG refresh (refresh cũng không giúp được).
       if (response.statusCode == 401 && keepUnauthorizedMessage) {
         final message = decoded is Map ? decoded['message']?.toString() : null;
         if (message != null && message.isNotEmpty) {
           throw ApiException(message, statusCode: 401);
         }
       }
+
+      // ── 401: thử refresh rồi retry đúng 1 lần ────────────────────────────
+      if (response.statusCode == 401 && auth && !isRetry) {
+        final refreshed = await _ensureFreshToken();
+        if (refreshed) {
+          return await ApiClient.request(
+            method,
+            path,
+            auth: auth,
+            body: body,
+            timeout: timeout,
+            isRetry: true,
+            keepUnauthorizedMessage: keepUnauthorizedMessage,
+            formEncoded: formEncoded,
+          );
+        }
+        await TokenStorage.clear();
+        throw const ApiException(
+          'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          statusCode: 401,
+        );
+      }
+
       if (response.statusCode == 401) {
         throw const ApiException(
           'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
           statusCode: 401,
         );
       }
+
       final map = decoded is Map ? decoded : const {};
       final serverMessage = map['message']?.toString();
       throw ApiException(
@@ -173,5 +267,27 @@ class ApiClient {
         ? data['content'] as List
         : (data is List ? data : const []);
     return list.whereType<Map<String, dynamic>>().toList();
+  }
+
+  /// Bóc metadata phân trang từ `data` dạng trang Spring.
+  static Map<String, dynamic> asPageMeta(dynamic data) {
+    if (data is Map) {
+      return {
+        'page': data['page'] ?? 0,
+        'size': data['size'] ?? 0,
+        'totalElements': data['totalElements'] ?? 0,
+        'totalPages': data['totalPages'] ?? 0,
+        'first': data['first'] ?? true,
+        'last': data['last'] ?? true,
+      };
+    }
+    return {
+      'page': 0,
+      'size': 0,
+      'totalElements': 0,
+      'totalPages': 0,
+      'first': true,
+      'last': true,
+    };
   }
 }

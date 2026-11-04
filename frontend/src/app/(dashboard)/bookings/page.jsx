@@ -16,6 +16,15 @@ import {
 import { paymentService, getMockPaidIds } from "@/features/payment";
 import { journeyService } from "@/features/journey";
 
+const STATUS_FILTERS = [
+  { value: "", label: "Tất cả" },
+  { value: "PENDING_PAYMENT", label: "Chờ thanh toán" },
+  { value: "CONFIRMED", label: "Đã xác nhận" },
+  { value: "COMPLETED", label: "Đã hoàn thành" },
+  { value: "EXPIRED", label: "Hết hạn" },
+  { value: "CANCELLED", label: "Hủy" },
+];
+
 function BookingAttempts({ bookingId }) {
   const [attempts, setAttempts] = useState(null);
   const [error, setError] = useState("");
@@ -54,6 +63,7 @@ export default function MyBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [openId, setOpenId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -91,6 +101,11 @@ export default function MyBookingsPage() {
 
   const mockPaidIds = getMockPaidIds();
 
+  // Lọc theo trạng thái (client-side, trên trang hiện tại).
+  const visibleItems = statusFilter
+    ? data.items.filter((b) => b?.status === statusFilter)
+    : data.items;
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6 flex items-end justify-between">
@@ -106,6 +121,29 @@ export default function MyBookingsPage() {
         <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </p>
+      )}
+
+      {/* Bộ lọc trạng thái đơn */}
+      {data.items.length > 0 && (
+        <div className="mb-5 flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((f) => {
+            const active = statusFilter === f.value;
+            return (
+              <button
+                key={f.value || "all"}
+                type="button"
+                onClick={() => setStatusFilter(f.value)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       {loading ? (
@@ -126,7 +164,7 @@ export default function MyBookingsPage() {
         />
       ) : (
         <ul className="space-y-3">
-          {data.items.map((b) => (
+          {visibleItems.map((b) => (
             <li
               key={b.id}
               className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
@@ -166,6 +204,12 @@ export default function MyBookingsPage() {
                 >
                   {openId === b.id ? "Ẩn lần thanh toán" : "Các lần thanh toán"}
                 </button>
+                <Link
+                  href={ROUTES.BOOKING_DETAIL(b.id)}
+                  className="text-blue-600 hover:underline"
+                >
+                  Chi tiết
+                </Link>
               </div>
               {openId === b.id && (
                 <div className="mt-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-800">

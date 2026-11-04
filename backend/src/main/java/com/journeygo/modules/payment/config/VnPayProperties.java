@@ -55,6 +55,58 @@ public class VnPayProperties {
     /** URL nhận kết quả trả về (Return URL) sau khi khách thanh toán. */
     private String returnUrl = "";
 
+    /**
+     * Return URL riêng cho WEB (trang kết quả của frontend Next.js).
+     *
+     * <p>Nếu để trống ⇒ dùng {@link #returnUrl} cho mọi giao dịch.
+     * Nếu có ⇒ giao dịch KHÔNG phải từ app mobile sẽ redirect về trang này
+     * (frontend tự poll {@code GET /payments/{id}} để hiện kết quả).
+     *
+     * <p>VD: {@code http://localhost:3000/payment/return}
+     */
+    private String webReturnUrl = "";
+
+    /**
+     * Return URL riêng cho APP MOBILE — dạng CUSTOM SCHEME (deep link).
+     *
+     * <p>VD: {@code journeygo://payment/return}
+     *
+     * <p>── Vì sao dùng scheme thay vì URL https? ──
+     * <ul>
+     *   <li>VNPay Sandbox ĐÃ KIỂM CHỨNG: khi {@code vnp_ReturnUrl} là custom scheme,
+     *       sau khi khách thanh toán (hoặc bấm "Hủy"), VNPay chuyển hướng TRÌNH DUYỆT
+     *       thẳng về scheme đó, kèm <b>TOÀN BỘ tham số kết quả đã ký</b>
+     *       ({@code vnp_ResponseCode}, {@code vnp_TransactionStatus},
+     *       {@code vnp_TransactionNo}, {@code vnp_PayDate}, {@code vnp_SecureHash}…).</li>
+     *   <li>Nhờ vậy app nhận được kết quả NGAY mà KHÔNG CẦN máy chủ trung gian
+     *       (ngrok/tunnel) còn sống ⇒ hoạt động ổn định hơn nhiều so với mô hình
+     *       "web trung gian → JS redirect → app".</li>
+     * </ul>
+     *
+     * <p>App gửi kèm các tham số này lên backend để backend kiểm tra chữ ký
+     * rồi áp dụng — xem {@code POST /payments/return-result}.
+     *
+     * <p>Nếu để trống ⇒ dùng {@link #returnUrl} (https) + gắn {@code app_redirect=1}
+     * ⇒ trang kết quả của backend tự chuyển hướng trình duyệt về app (cần tunnel).
+     */
+    private String appReturnUrl = "";
+
+    /**
+     * Bật tự chuyển hướng về app mobile sau khi thanh toán xong.
+     *
+     * <p>Return URL được gắn thêm {@code app_redirect=1} ⇒ trang
+     * {@code /payments/return-page} sẽ chuyển hướng trình duyệt về scheme của app
+     * ({@link #appScheme}) ⇒ app mở lại và hiện màn kết quả.
+     *
+     * <p>⚠️ Cờ này chỉ là MẶC ĐỊNH toàn cục. Mỗi giao dịch có thể bật/tắt riêng qua
+     * tham số {@code appRedirect} của {@code POST /payments/bookings/{id}/init}
+     * ⇒ WEB (không gửi cờ) và MOBILE (gửi cờ) dùng chung một cấu hình Return URL.
+     */
+    private boolean appRedirectEnabled = false;
+
+    /** Scheme của app mobile (deep link) — ví dụ {@code journeygo}. */
+    private String appScheme = "journeygo";
+
     /** Địa chỉ IP server gửi lên VNPay (vnp_IpAddr). */
     private String ipAddr = "127.0.0.1";
 

@@ -30,6 +30,14 @@ class ApiConstants {
   static const String profileEndpoint = '/auth/profile';
   static const String destinationsEndpoint = '/destinations';
 
+  // ── Endpoint Booking / Payment / Refund ───────────────────────────────────
+  static const String bookingsEndpoint = '/bookings';
+  static const String paymentsEndpoint = '/payments';
+  static const String refundsEndpoint = '/refunds';
+
+  // Chu kỳ poll trạng thái thanh toán VNPay (milliseconds).
+  static const int paymentPollIntervalMs = 2500;
+
   // Vai trò cho phép trên Mobile Tourist App
   static const String requiredRole = 'USER';
 

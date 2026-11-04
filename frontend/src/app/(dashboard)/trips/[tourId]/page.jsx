@@ -8,13 +8,8 @@ import { ROUTES } from "@/constants/routes";
 import { useAuthSession } from "@/hooks";
 import { Button } from "@/components/ui";
 import { bookingService, formatMoney } from "@/features/booking";
+import ExperienceDatePicker from "@/features/booking/components/ExperienceDatePicker";
 import { CulturalStories } from "@/features/journey";
-
-function todayIso() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
 
 export default function TripDetailPage() {
   const { tourId } = useParams();
@@ -141,17 +136,14 @@ export default function TripDetailPage() {
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <h2 className="text-base font-bold text-gray-900 dark:text-white">Đặt tour</h2>
-        <label className="mt-4 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Ngày trải nghiệm
-          <input
-            type="date"
-            min={todayIso()}
+
+        <div className="mt-4">
+          <ExperienceDatePicker
+            tour={tour}
             value={experienceDate}
-            onChange={(e) => setExperienceDate(e.target.value)}
-            disabled={submitting}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+            onChange={setExperienceDate}
           />
-        </label>
+        </div>
 
         <p className="mt-3 text-xs text-gray-500">
           Sau khi đặt, hệ thống giữ chỗ cho bạn 10 phút để hoàn tất thanh toán.
@@ -163,7 +155,12 @@ export default function TripDetailPage() {
           </p>
         )}
 
-        <Button className="mt-4 w-full" size="lg" onClick={handleBook} disabled={submitting}>
+        <Button
+          className="mt-4 w-full"
+          size="lg"
+          onClick={handleBook}
+          disabled={submitting || !experienceDate}
+        >
           {submitting ? "Đang giữ chỗ..." : isLoggedIn ? "Đặt tour" : "Đăng nhập để đặt tour"}
         </Button>
       </section>

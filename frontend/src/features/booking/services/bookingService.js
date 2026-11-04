@@ -1,25 +1,21 @@
 /**
- * Service layer cho module Booking (đặt tour).
+ * Service cho module Booking (Đặt tour).
  *
- * Endpoint tích hợp:
- *  - POST /api/v1/bookings                  : tạo booking, giữ slot, hạn thanh toán 10 phút
- *  - GET  /api/v1/bookings/my               : booking của tôi (phân trang)
- *  - GET  /api/v1/bookings/{bookingId}      : chi tiết booking (chủ booking hoặc ADMIN)
- *  - POST /api/v1/bookings/{bookingId}/cancel : hủy booking khi chưa thanh toán
- *  - GET  /api/v1/bookings?status=          : toàn bộ booking (ADMIN)
+ * ── Contract ──
+ *  • POST /bookings                     body: { tourId, experienceDate }  → 201
+ *  • GET  /bookings/my                  (phân trang) → PageResponse<BookingResponse>
+ *  • GET  /bookings/{id}                → BookingResponse
+ *  • POST /bookings/{id}/cancel         body: { reason? } (optional) → BookingResponse
+ *  • GET  /bookings?status=             (ADMIN)
+ *
+ * ── Vòng đời ──
+ *  POST /bookings giữ slot nguyên tử trong 10 phút (`paymentDeadline = createdAt + 10m`).
+ *  Trạng thái: PENDING_PAYMENT → CONFIRMED → COMPLETED, hoặc EXPIRED / CANCELLED.
+ *  `POST /payments/.../init` KHÔNG gia hạn deadline — hạn giờ luôn lấy từ `paymentDeadline`.
  */
 import { apiClient } from "@/services/apiClient";
 
-const ENDPOINTS = {
-  ROOT: "/bookings",
-  MY: "/bookings/my",
-  BY_ID: (id) => `/bookings/${id}`,
-  CANCEL: (id) => `/bookings/${id}/cancel`,
-};
-
-function unwrap(res) {
-  return res?.data ?? res;
-}
+const ENDPOINT = "/bookings";
 
 /** Chuẩn hóa Page của Spring Data về { items, page, totalPages, totalElements }. */
 export function toPage(payload) {
@@ -33,35 +29,68 @@ export function toPage(payload) {
   };
 }
 
-function pageQuery({ page = 0, size = 10, status } = {}) {
-  const params = new URLSearchParams({ page: String(page), size: String(size) });
-  if (status) params.set("status", status);
-  return params.toString();
+/** Tạo booking mới. Trả về booking kèm `paymentDeadline` để đếm ngược 10 phút. */
+export async function createBooking({ tourId, experienceDate }) {
+  const res = await apiClient.post(ENDPOINT, { tourId, experienceDate });
+  return res?.data ?? res;
 }
 
+/** Danh sách booking của tôi. */
+export async function getMyBookings({ page = 0, size = 10 } = {}) {
+  const res = await apiClient.get(`${ENDPOINT}/my?page=${page}&size=${size}`);
+  return res?.data ?? res;
+}
+
+/** Chi tiết một booking. */
+export async function getBookingById(bookingId) {
+  const res = await apiClient.get(`${ENDPOINT}/${bookingId}`);
+  return res?.data ?? res;
+}
+
+/** Hủy booking (chỉ được khi chưa thanh toán). Slot đã giữ được giải phóng. */
+export async function cancelBooking(bookingId, reason) {
+  const res = await apiClient.post(`${ENDPOINT}/${bookingId}/cancel`, reason ? { reason } : {});
+  return res?.data ?? res;
+}
+
+/** Danh sách toàn bộ booking (ADMIN). */
+export async function getAllBookings({ status, page = 0, size = 20 } = {}) {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  if (status) query.set("status", status);
+  const res = await apiClient.get(`${ENDPOINT}?${query.toString()}`);
+  return res?.data ?? res;
+}
+
+/**
+ * Tự động hủy booking khi hết hạn thanh toán (10 phút).
+ * Backend có scheduler quét hẹn giờ, nhưng gọi tường minh giúp UI cập nhật ngay
+ * khi người dùng quay lại sau khi để mở app.
+ */
+export async function expireBookingIfNeeded(bookingId) {
+  const booking = await getBookingById(bookingId);
+  if (booking?.status === "PENDING_PAYMENT" && booking?.paymentDeadline) {
+    if (new Date(booking.paymentDeadline).getTime() <= Date.now()) {
+      try {
+        return await cancelBooking(bookingId, "Hết thời hạn thanh toán");
+      } catch {
+        return booking;
+      }
+    }
+  }
+  return booking;
+}
+
+/**
+ * Service dạng object (default export) — dùng bởi code gọi `bookingService.xxx`.
+ * Cùng contract với các hàm named export ở trên.
+ */
 const bookingService = {
-  async create({ tourId, experienceDate }) {
-    return unwrap(await apiClient.post(ENDPOINTS.ROOT, { tourId, experienceDate }));
-  },
-
-  async getMine(options) {
-    return toPage(unwrap(await apiClient.get(`${ENDPOINTS.MY}?${pageQuery(options)}`)));
-  },
-
-  async getById(bookingId) {
-    return unwrap(await apiClient.get(ENDPOINTS.BY_ID(bookingId)));
-  },
-
-  async cancel(bookingId, reason) {
-    return unwrap(
-      await apiClient.post(ENDPOINTS.CANCEL(bookingId), reason ? { reason } : undefined),
-    );
-  },
-
-  /** ADMIN */
-  async getAll(options) {
-    return toPage(unwrap(await apiClient.get(`${ENDPOINTS.ROOT}?${pageQuery({ size: 20, ...options })}`)));
-  },
+  create: createBooking,
+  getMine: getMyBookings,
+  getById: getBookingById,
+  cancel: cancelBooking,
+  getAll: getAllBookings,
+  expireBookingIfNeeded,
 };
 
 export default bookingService;

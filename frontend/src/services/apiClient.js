@@ -1,7 +1,30 @@
 /**
- * Base API Client wrapper dùng Fetch API
+ * Base API Client wrapper dùng Fetch API.
+ *
+ * ── Hành vi chuẩn hoá ──
+ *  • Mọi response đều là envelope `{ code, message, data, timestamp }`.
+ *    - Thành công (2xx): trả nguyên envelope, caller tự lấy `.data`.
+ *    - Lỗi: ném `Error` với `message` = message tiếng Việt của backend (đã viết sẵn theo
+ *      ngữ cảnh nghiệp vụ — KHÔNG tự viết lại), kèm `code` (mã lỗi nghiệp vụ) và
+ *      `status` (HTTP status) để UI xử lý riêng các mã đặc biệt.
+ *  • 401 → tự refresh token rồi retry đúng 1 lần. Nếu refresh thất bại, mọi request đang
+ *    chờ phải được reject (không được treo vô hạn).
  */
+
+/** Lỗi API chuẩn hoá — `message` đã là tiếng Việt để hiển thị trực tiếp. */
+export class ApiError extends Error {
+  constructor(message, { code = null, status = null, payload = null } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8088/api/v1";
+
+const AUTH_ENDPOINTS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"];
 
 class ApiClient {
   constructor(baseUrl) {
@@ -11,8 +34,15 @@ class ApiClient {
   }
 
   onRefreshed(token) {
-    this.refreshSubscribers.forEach((callback) => callback(token));
+    const subscribers = this.refreshSubscribers;
     this.refreshSubscribers = [];
+    subscribers.forEach((callback) => callback(token));
+  }
+
+  onRefreshFailed(error) {
+    const subscribers = this.refreshSubscribers;
+    this.refreshSubscribers = [];
+    subscribers.forEach((callback) => callback(null, error));
   }
 
   addRefreshSubscriber(callback) {
@@ -56,20 +86,34 @@ class ApiClient {
     return null;
   }
 
+  /** Đọc access token hiện tại từ localStorage. */
+  getAccessToken() {
+    if (typeof window === "undefined") return null;
+    const token = localStorage.getItem("jg_access_token");
+    if (token) return token;
+    try {
+      const authObj = JSON.parse(localStorage.getItem("journey_go_auth") || "{}");
+      return authObj?.token || authObj?.accessToken || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Xóa phiên đăng nhập cục bộ khi refresh token không còn dùng được. */
+  clearSession() {
+    if (typeof window === "undefined") return;
+    [
+      "jg_access_token",
+      "jg_refresh_token",
+      "jg_user_info",
+      "journey_go_auth",
+    ].forEach((key) => localStorage.removeItem(key));
+    window.dispatchEvent(new Event("storage"));
+  }
+
   async request(endpoint, options = {}, isRetry = false) {
     const url = `${this.baseUrl}${endpoint}`;
-    let token = null;
-    if (typeof window !== "undefined") {
-      token = localStorage.getItem("jg_access_token");
-      if (!token) {
-        try {
-          const authObj = JSON.parse(localStorage.getItem("journey_go_auth") || "{}");
-          token = authObj?.token || authObj?.accessToken || null;
-        } catch {
-          token = null;
-        }
-      }
-    }
+    const token = this.getAccessToken();
 
     const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
     const headers = {
@@ -83,51 +127,72 @@ class ApiClient {
       headers,
     };
 
+    let response;
+    let data = null;
+
     try {
-      const response = await fetch(url, config);
-      const data = await response.json().catch(() => null);
-
-      // Nếu gặp lỗi 401 và không phải các API auth cơ bản -> Tự động refresh token
-      if (
-        response.status === 401 &&
-        !isRetry &&
-        !endpoint.includes("/auth/login") &&
-        !endpoint.includes("/auth/refresh") &&
-        !endpoint.includes("/auth/logout")
-      ) {
-        if (!this.isRefreshing) {
-          this.isRefreshing = true;
-          const newToken = await this.refreshToken();
-          this.isRefreshing = false;
-          if (newToken) {
-            this.onRefreshed(newToken);
-            return this.request(endpoint, options, true);
-          }
-        } else {
-          return new Promise((resolve, reject) => {
-            this.addRefreshSubscriber((newToken) => {
-              if (newToken) {
-                resolve(this.request(endpoint, options, true));
-              } else {
-                reject(new Error(data?.message || "Phiên làm việc đã hết hạn"));
-              }
-            });
-          });
-        }
-      }
-
-      if (!response.ok) {
-        const apiError = new Error(data?.message || `HTTP error! status: ${response.status}`);
-        apiError.status = response.status;
-        apiError.code = data?.code;
-        throw apiError;
-      }
-
-      return data;
-    } catch (error) {
-      console.error(`[API Error] ${options.method || "GET"} ${endpoint}:`, error.message);
-      throw error;
+      response = await fetch(url, config);
+      data = await response.json().catch(() => null);
+    } catch (networkError) {
+      console.error(`[API Error] ${options.method || "GET"} ${endpoint}:`, networkError?.message);
+      throw new ApiError("Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng và thử lại.", {
+        status: 0,
+      });
     }
+
+    // 401 → refresh token rồi retry đúng 1 lần.
+    if (response.status === 401 && !isRetry && !AUTH_ENDPOINTS.some((a) => endpoint.includes(a))) {
+      const newToken = await this.ensureFreshToken();
+      if (newToken) {
+        return this.request(endpoint, options, true);
+      }
+      this.clearSession();
+      throw new ApiError(data?.message || "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.", {
+        code: data?.code ?? null,
+        status: 401,
+        payload: data,
+      });
+    }
+
+    if (!response.ok) {
+      throw new ApiError(
+        data?.message || `Không thể xử lý yêu cầu (mã ${response.status}).`,
+        { code: data?.code ?? null, status: response.status, payload: data },
+      );
+    }
+
+    return data;
+  }
+
+  /**
+   * Đảm bảo có access token mới.
+   * - Chưa có request refresh nào chạy → chạy refresh, rồi báo cho mọi request đang chờ.
+   * - Đang có refresh chạy → chờ và nhận kết quả.
+   * Nếu refresh thất bại → resolve `null` cho TẤT CẢ subscriber (tránh request treo).
+   */
+  ensureFreshToken() {
+    if (this.isRefreshing) {
+      return new Promise((resolve) => {
+        this.addRefreshSubscriber((newToken) => resolve(newToken || null));
+      });
+    }
+
+    this.isRefreshing = true;
+    return this.refreshToken()
+      .then((newToken) => {
+        this.isRefreshing = false;
+        if (newToken) {
+          this.onRefreshed(newToken);
+        } else {
+          this.onRefreshFailed(new Error("Refresh token không hợp lệ"));
+        }
+        return newToken || null;
+      })
+      .catch(() => {
+        this.isRefreshing = false;
+        this.onRefreshFailed(new Error("Refresh token không hợp lệ"));
+        return null;
+      });
   }
 
   get(endpoint, options = {}) {
