@@ -1,58 +1,51 @@
 // ============================================================================
-// DỮ LIỆU 3 DANH THẮNG DI SẢN TIÊU BIỂU (Hero Slideshow)
+// SLIDE ẢNH ĐIỂM ĐẾN VĂN HOÁ (cột trái màn đăng nhập)
+// Chỉ dùng ảnh rộng ≥ 1200px để không bị mờ khi phóng to.
+// Ảnh lấy từ Wikimedia Commons: giữ nguyên trường "credit" để ghi nguồn đúng giấy phép.
 // ============================================================================
 export const SLIDE_ITEMS = [
   {
-    id: "travelista",
+    id: "thanhha",
     shortName: "Khám Phá",
-    name: "Hành Trình Di Sản - Chạm vào Kỳ quan",
-    tag: "Khám Phá Di Sản & Thiên Nhiên",
-    slogan: "Hành Trình Di Sản",
-    subSlogan: "Du lịch là trải nghiệm duy nhất làm giàu tâm hồn vượt trên mọi giá trị vật chất",
-    quote:
-      "Du lịch là hành trình duy nhất bạn chi trả để nhận lại sự giàu có vô hạn về trải nghiệm, tâm hồn và tri thức di sản văn hóa.",
-    statNumber: "3,143m",
-    statLabel: "Đỉnh cao tuyệt cảnh thiên nhiên",
-    image: "/image/travel_mountain_hero.jpg",
+    name: "Làng gốm Thanh Hà - Hội An",
+    tag: "Làng nghề truyền thống",
+    slogan: "Hồn Việt Làng Nghề",
+    subSlogan: "Ngồi bên bàn xoay cùng nghệ nhân, nặn nên món gốm mang dấu tay của riêng bạn.",
+    image: "/image/hoian-pottery-craft.jpg",
+    position: "40% 50%",
   },
   {
     id: "trangan",
     shortName: "Tràng An",
     name: "Tràng An - Ninh Bình",
-    tag: "Di sản Kép Thế giới UNESCO",
-    slogan: "Chạm vào Hành trình - Khám phá Di sản",
-    subSlogan: "Quần thể danh thắng thiên nhiên & văn hoá kỳ vĩ giữa lòng cố đô Hoa Lư.",
-    quote:
-      "Nơi hội tụ trầm tích lịch sử ngàn năm, kết nối con người với thiên nhiên nguyên sơ, tạo tác nên tuyệt phẩm sơn thủy hữu tình.",
-    statNumber: "3,500+ ha",
-    statLabel: "Vùng lõi bảo tồn nghiêm ngặt",
-    image: "/image/trangan.jpg",
+    tag: "Di sản Văn hoá & Thiên nhiên Thế giới",
+    slogan: "Sơn Thuỷ Hữu Tình",
+    subSlogan: "Ngồi thuyền nan len giữa núi đá vôi và hang động nơi cố đô Hoa Lư.",
+    image: "/image/trangan-boats.jpg",
+    position: "50% 65%",
+    credit: { author: "Jakub Hałun", license: "CC BY 4.0", url: "https://commons.wikimedia.org/wiki/File:Trang_An_Landscape_Complex,_Ninh_Binh_Province,_Vietnam,_20240202_1446_5304.jpg" },
   },
   {
     id: "hoian",
     shortName: "Hội An",
-    name: "Phố Cổ Hội An - Quảng Nam",
-    tag: "Di sản Văn hóa Thế giới",
-    slogan: "Lung linh Đèn lồng - Dấu ấn Thương cảng",
-    subSlogan: "Không gian kiến trúc cổ kính giao thoa tinh hoa văn hóa Á - Âu thế kỷ XVII.",
-    quote:
-      "Mỗi mái ngói rêu phong, mỗi góc phố cổ là một câu chuyện lịch sử sống động trường tồn cùng dòng sông Hoài thơ mộng.",
-    statNumber: "400+ năm",
-    statLabel: "Lịch sử thương cảng quốc tế",
-    image: "/image/hoian.jpg",
+    name: "Phố cổ Hội An - Quảng Nam",
+    tag: "Di sản Văn hoá Thế giới",
+    slogan: "Phố Cổ Lên Đèn",
+    subSlogan: "Dạo phố cổ khi hoàng hôn buông, hàng trăm đèn lồng lụa cùng thắp sáng.",
+    image: "/image/hoian-lanterns.jpg",
+    position: "50% 55%",
+    credit: { author: "Mig Gilbert", license: "CC BY-SA 2.0", url: "https://commons.wikimedia.org/wiki/File:Lanterns_in_Hoi_An_(40480642302).jpg" },
   },
   {
     id: "vanmieu",
     shortName: "Văn Miếu",
-    name: "Văn Miếu Quốc Tử Giám - Hà Nội",
+    name: "Văn Miếu - Quốc Tử Giám, Hà Nội",
     tag: "Di tích Quốc gia Đặc biệt",
-    slogan: "Ngàn năm Văn hiến - Tinh hoa Đạo học",
-    subSlogan: "Trường đại học đầu tiên của Việt Nam, nơi lưu giữ 82 bia tiến sĩ trứ danh.",
-    quote:
-      "Hiền tài là nguyên khí quốc gia, cội nguồn sức mạnh và hưng thịnh của dân tộc Việt Nam qua bao thăng trầm thời đại.",
-    statNumber: "82 Bia",
-    statLabel: "Di sản Tư liệu Thế giới UNESCO",
-    image: "/image/vanmieu.jpg",
+    slogan: "Ngàn Năm Văn Hiến",
+    subSlogan: "Khuê Văn Các, biểu tượng của trường đại học đầu tiên của Việt Nam.",
+    image: "/image/vanmieu-khuevancac.jpg",
+    position: "50% 40%",
+    credit: { author: "Daderot", license: "CC0", url: "https://commons.wikimedia.org/wiki/File:Constellation_of_Literature_pavilion_-_Temple_of_Literature,_Hanoi_-_DSC04553.JPG" },
   },
 ];
 

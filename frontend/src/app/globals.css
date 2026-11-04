@@ -164,3 +164,61 @@ pre {
     --tw-enter-translate-y: -0.75rem;
   }
 }
+
+/* =========================================================================
+   TRANG CHỦ: thanh tiến trình slide hero + dải ảnh chạy vô tận
+   ========================================================================= */
+@keyframes jg-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes jg-marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+.jg-marquee {
+  animation: jg-marquee var(--jg-marquee-duration, 60s) linear infinite;
+}
+
+.jg-marquee-reverse {
+  animation-direction: reverse;
+}
+
+.jg-marquee-group:hover .jg-marquee {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jg-marquee {
+    animation: none;
+  }
+}
+
+/* =========================================================================
+   MÀN ĐĂNG NHẬP: đèn lồng đung đưa + bỏ nền xanh khi trình duyệt tự điền
+   ========================================================================= */
+@keyframes jg-lantern-swing {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+
+.jg-lantern {
+  animation: jg-lantern-swing 4.5s ease-in-out infinite;
+}
+
+.jg-auth input:-webkit-autofill,
+.jg-auth input:-webkit-autofill:hover,
+.jg-auth input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  -webkit-text-fill-color: #1e293b;
+  caret-color: #1e293b;
+  transition: background-color 9999s ease-out 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jg-lantern {
+    animation: none;
+  }
+}
