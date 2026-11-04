@@ -8,10 +8,7 @@ import {
   ArrowLeft,
   Building2,
   Clock,
-  CreditCard,
   Loader2,
-  QrCode,
-  Smartphone,
   Wallet,
 } from "lucide-react";
 import { apiClient } from "@/services/apiClient";
@@ -25,6 +22,18 @@ import {
   queryPayment,
 } from "@/features/payment/services/paymentService";
 
+/**
+ * Phương thức thanh toán DUY NHẤT dự án hỗ trợ:
+ * "Thẻ nội địa và tài khoản ngân hàng" (mã `vnp_BankCode` = VNBANK).
+ *
+ * ⚠️ KHÔNG để null — nếu không gửi `vnp_BankCode`, trang VNPay sẽ mở trang
+ * "chọn phương thức" (có cả QR + thẻ quốc tế) — trái với quy ước đã chốt.
+ */
+const DEFAULT_BANK_CODE = "VNBANK";
+
+/** Mã phương thức nội bộ (backend `VnPayPaymentMethod.DOMESTIC_CARD`). */
+const DOMESTIC_CARD_METHOD_CODE = "DOMESTIC_CARD";
+
 export default function CheckoutPage() {
   const params = useParams();
   const router = useRouter();
@@ -34,33 +43,35 @@ export default function CheckoutPage() {
 
   const [booking, setBooking] = useState(null);
   const [methods, setMethods] = useState([]);
-  const [selectedBankCode, setSelectedBankCode] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingMethods, setLoadingMethods] = useState(true);
+  const [selectedBankCode, setSelectedBankCode] = useState(DEFAULT_BANK_CODE);
+  // `loaded` = bookingId đã tải xong ⇒ suy ra trạng thái "đang tải" mà KHÔNG cần
+  // setState đồng bộ trong effect (tránh cascading render).
+  const [loadedBookingId, setLoadedBookingId] = useState(null);
+  const [methodsLoaded, setMethodsLoaded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(null);
+  // Đơn đã hết hạn thanh toán hay chưa — tính trong timer (mỗi giây) để không
+  // gọi `Date.now()` (hàm impure) trong lúc render.
+  const [expired, setExpired] = useState(false);
 
   // ── Tải booking ───────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!bookingId) return;
+    if (!bookingId) return undefined;
     let active = true;
-
-    setLoading(true);
-    setError("");
 
     apiClient
       .get(`/bookings/${bookingId}`)
       .then((res) => {
         if (!active) return;
         setBooking(res?.data ?? res);
+        setError("");
+        setLoadedBookingId(bookingId);
       })
       .catch((err) => {
         if (!active) return;
         setError(err?.message || "Không thể tải thông tin đơn.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        setLoadedBookingId(bookingId);
       });
 
     return () => {
@@ -68,22 +79,29 @@ export default function CheckoutPage() {
     };
   }, [bookingId]);
 
+  const loading = !bookingId || loadedBookingId !== bookingId;
+
   // ── Tải phương thức thanh toán ────────────────────────────────────────────
   useEffect(() => {
     let active = true;
-    setLoadingMethods(true);
 
     getPaymentMethods()
       .then((data) => {
         if (!active) return;
-        setMethods(Array.isArray(data?.methods) ? data.methods : []);
+        // Chỉ giữ phương thức được hỗ trợ: "Thẻ nội địa và tài khoản ngân hàng".
+        const list = Array.isArray(data?.methods) ? data.methods : [];
+        const supported = list.filter((m) => m?.code === DOMESTIC_CARD_METHOD_CODE);
+        setMethods(supported);
+        // Luôn chọn sẵn VNBANK — không để null (xem ghi chú DEFAULT_BANK_CODE).
+        setSelectedBankCode(
+          supported.find((m) => m?.bankCode)?.bankCode ?? DEFAULT_BANK_CODE,
+        );
+        setMethodsLoaded(true);
       })
       .catch((err) => {
         if (!active) return;
         setError(err?.message || "Không thể tải phương thức thanh toán.");
-      })
-      .finally(() => {
-        if (active) setLoadingMethods(false);
+        setMethodsLoaded(true);
       });
 
     return () => {
@@ -93,8 +111,11 @@ export default function CheckoutPage() {
 
   // ── Đồng hồ đếm ngược (luôn lấy từ booking.paymentDeadline) ───────────────
   useEffect(() => {
-    if (!booking?.paymentDeadline) return;
-    const tick = () => setCountdown(countdownTo(booking.paymentDeadline));
+    if (!booking?.paymentDeadline) return undefined;
+    const tick = () => {
+      setCountdown(countdownTo(booking.paymentDeadline));
+      setExpired(new Date(booking.paymentDeadline).getTime() <= Date.now());
+    };
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
@@ -150,10 +171,7 @@ export default function CheckoutPage() {
     }
   }, [bookingId, selectedBankCode, router]);
 
-  const isExpired = useMemo(() => {
-    if (!booking?.paymentDeadline) return false;
-    return new Date(booking.paymentDeadline).getTime() <= Date.now();
-  }, [booking?.paymentDeadline]);
+  const isExpired = expired;
 
   const canPay = useMemo(() => {
     if (!booking) return false;
@@ -217,24 +235,25 @@ export default function CheckoutPage() {
               của VNPay để hoàn tất.
             </p>
 
-            {loadingMethods ? (
+            {!methodsLoaded ? (
               <div className="mt-5 flex items-center gap-2 text-sm text-gray-500">
                 <Loader2 className="h-4 w-4 animate-spin" /> Đang tải phương thức...
               </div>
-            ) : methods.length === 0 ? (
-              <p className="mt-5 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Không tải được danh sách phương thức thanh toán. Vui lòng tải lại trang.
-              </p>
             ) : (
               <div className="mt-5 space-y-3">
                 {methods.map((m) => (
                   <MethodOption
                     key={m.code}
                     method={m}
-                    selected={selectedBankCode === (m.bankCode ?? null)}
-                    onSelect={() => setSelectedBankCode(m.bankCode ?? null)}
+                    selected={selectedBankCode === (m.bankCode ?? DEFAULT_BANK_CODE)}
+                    onSelect={() => setSelectedBankCode(m.bankCode ?? DEFAULT_BANK_CODE)}
                   />
                 ))}
+                {methods.length === 0 && (
+                  <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Không tải được danh sách phương thức thanh toán. Vui lòng tải lại trang.
+                  </p>
+                )}
               </div>
             )}
 
@@ -247,7 +266,7 @@ export default function CheckoutPage() {
             <button
               type="button"
               onClick={handlePay}
-              disabled={submitting || !canPay || loadingMethods}
+              disabled={submitting || !canPay || !methodsLoaded}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
             >
               {submitting ? (
@@ -256,7 +275,7 @@ export default function CheckoutPage() {
                 </>
               ) : (
                 <>
-                  <QrCode size={16} /> Thanh toán với VNPay
+                  <Wallet size={16} /> Thanh toán với VNPay
                 </>
               )}
             </button>
@@ -323,7 +342,6 @@ export default function CheckoutPage() {
 }
 
 function MethodOption({ method, selected, onSelect }) {
-  const Icon = methodIcon(method?.code);
   return (
     <button
       type="button"
@@ -335,7 +353,7 @@ function MethodOption({ method, selected, onSelect }) {
       }`}
     >
       <span className="mt-0.5 shrink-0">
-        <Icon size={20} className={selected ? "text-blue-600" : "text-gray-500"} />
+        <MethodIcon code={method?.code} selected={selected} />
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-bold text-gray-900 dark:text-white">
@@ -356,17 +374,16 @@ function MethodOption({ method, selected, onSelect }) {
   );
 }
 
-function methodIcon(code) {
-  switch (code) {
-    case "QR_APP_WALLET":
-      return Smartphone;
-    case "DOMESTIC_CARD":
-      return Building2;
-    case "INTERNATIONAL_CARD":
-      return CreditCard;
-    default:
-      return Wallet;
+/**
+ * Icon của phương thức thanh toán — khai báo NGOÀI render để React không tạo
+ * lại component mỗi lần render (mất state nếu có).
+ */
+function MethodIcon({ code, selected }) {
+  const className = selected ? "text-blue-600" : "text-gray-500";
+  if (code === DOMESTIC_CARD_METHOD_CODE) {
+    return <Building2 size={20} className={className} />;
   }
+  return <Wallet size={20} className={className} />;
 }
 
 function Row({ label, value, mono = false }) {

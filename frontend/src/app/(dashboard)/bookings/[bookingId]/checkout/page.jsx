@@ -16,6 +16,18 @@ import {
 import { paymentService, MOCK_PAYMENT, isMockPaid, markMockPaid } from "@/features/payment";
 import { journeyService } from "@/features/journey";
 
+/**
+ * Phương thức thanh toán DUY NHẤT dự án hỗ trợ:
+ * "Thẻ nội địa và tài khoản ngân hàng" (mã `vnp_BankCode` = VNBANK).
+ *
+ * ⚠️ KHÔNG để rỗng — nếu không gửi `vnp_BankCode`, trang VNPay sẽ mở trang
+ * "chọn phương thức" (có cả QR + thẻ quốc tế) — trái với quy ước đã chốt.
+ */
+const DEFAULT_BANK_CODE = "VNBANK";
+
+/** Mã phương thức nội bộ (backend `VnPayPaymentMethod.DOMESTIC_CARD`). */
+const DOMESTIC_CARD_METHOD_CODE = "DOMESTIC_CARD";
+
 export default function CheckoutPage() {
   const { bookingId } = useParams();
   const router = useRouter();
@@ -23,7 +35,7 @@ export default function CheckoutPage() {
   const [booking, setBooking] = useState(null);
   const [methods, setMethods] = useState([]);
   const [attempts, setAttempts] = useState([]);
-  const [bankCode, setBankCode] = useState("");
+  const [bankCode, setBankCode] = useState(DEFAULT_BANK_CODE);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,7 +62,11 @@ export default function CheckoutPage() {
   const apply = useCallback(({ bookingData, methodData, attemptPage, mockPaid: paidMock }) => {
     setMockPaid(paidMock);
     setBooking(bookingData);
-    setMethods(methodData?.methods ?? []);
+    // Chỉ giữ phương thức được hỗ trợ: "Thẻ nội địa và tài khoản ngân hàng".
+    const list = methodData?.methods ?? [];
+    const supported = list.filter((m) => m?.code === DOMESTIC_CARD_METHOD_CODE);
+    setMethods(supported);
+    setBankCode(supported.find((m) => m?.bankCode)?.bankCode ?? DEFAULT_BANK_CODE);
     setAttempts(attemptPage.items);
     return bookingData;
   }, []);
@@ -217,45 +233,35 @@ export default function CheckoutPage() {
       {canPay && (
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <h2 className="text-base font-bold">Phương thức thanh toán</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Thanh toán an toàn qua cổng VNPay.
+          </p>
           <div className="mt-3 space-y-2">
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700">
-              <input
-                type="radio"
-                name="bankCode"
-                value=""
-                checked={bankCode === ""}
-                onChange={() => setBankCode("")}
-                disabled={busy}
-                className="mt-1"
-              />
-              <span>
-                <span className="font-semibold">Chọn trên cổng VNPay</span>
-                <span className="block text-gray-500">Bạn sẽ chọn ngân hàng / ví ở trang VNPay.</span>
-              </span>
-            </label>
-            {methods
-              .filter((m) => m.bankCode)
-              .sort((a, b) => a.displayOrder - b.displayOrder)
-              .map((m) => (
-                <label
-                  key={m.code}
-                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700"
-                >
-                  <input
-                    type="radio"
-                    name="bankCode"
-                    value={m.bankCode}
-                    checked={bankCode === m.bankCode}
-                    onChange={() => setBankCode(m.bankCode)}
-                    disabled={busy}
-                    className="mt-1"
-                  />
-                  <span>
-                    <span className="font-semibold">{m.label}</span>
-                    <span className="block text-gray-500">{m.description}</span>
-                  </span>
-                </label>
-              ))}
+            {methods.map((m) => (
+              <label
+                key={m.code}
+                className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700"
+              >
+                <input
+                  type="radio"
+                  name="bankCode"
+                  value={m.bankCode}
+                  checked={bankCode === m.bankCode}
+                  onChange={() => setBankCode(m.bankCode)}
+                  disabled={busy}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="font-semibold">{m.label}</span>
+                  <span className="block text-gray-500">{m.description}</span>
+                </span>
+              </label>
+            ))}
+            {methods.length === 0 && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Không tải được danh sách phương thức thanh toán. Vui lòng tải lại trang.
+              </p>
+            )}
           </div>
 
           {notice && (
