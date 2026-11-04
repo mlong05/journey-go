@@ -7,7 +7,7 @@
 ///  • GET  /payments/my                                   → `PageResponse<PaymentResponse>`
 ///  • GET  /payments/bookings/{bookingId}                 → `PageResponse<PaymentResponse>`
 ///  • POST /payments/{paymentId}/query                    → { outcome, message }
-///  • POST /payments/return-result?<vnp_*>               → PaymentVerificationResponse (public)
+///  • POST /payments/return-result?vnp_*                  → PaymentVerificationResponse (public)
 ///
 /// ── Luật nghiệp vụ ──
 ///  • Mỗi lần gọi `init` tạo một `txnRef` riêng, KHÔNG gia hạn deadline 10 phút.
@@ -74,10 +74,15 @@ class PaymentService {
 
   /// Khởi tạo thanh toán (alias theo kiểu gọi của màn checkout).
   ///
+  /// [appRedirect] mặc định là `true` ⇒ backend gắn `app_redirect=1` vào Return URL
+  /// (hoặc dùng custom scheme `journeygo://payment/return` nếu `VNPAY_APP_RETURN_URL`
+  /// được cấu hình) ⇒ sau khi thanh toán, trình duyệt tự mở lại app ⇒ khách thấy
+  /// thông báo thanh toán thành công MÀ KHÔNG CẦN tự quay lại app.
+  ///
   /// Nếu lần thử trước chưa rõ kết quả, backend trả 409: người gọi nên [query]
   /// chứ không báo lỗi.
   Future<PaymentInitModel> init(int bookingId, {String? bankCode}) =>
-      initiatePayment(bookingId, bankCode: bankCode, appRedirect: false);
+      initiatePayment(bookingId, bankCode: bankCode, appRedirect: true);
 
   /// Chi tiết một giao dịch thanh toán.
   Future<PaymentModel> getPaymentById(int paymentId) async {
@@ -138,6 +143,13 @@ class PaymentService {
   /// rồi áp dụng kết quả ⇒ khách thấy "thanh toán thành công" NGAY, không cần
   /// máy chủ trung gian (ngrok) còn sống, và không phụ thuộc lệnh `querydr`.
   ///
+  /// ── Vì sao gửi CẢ query string LẪN body form? ──
+  /// Backend đọc tham số bằng `@RequestParam Map<String,String>` ⇒ nhận được từ cả
+  /// query string và body form-urlencoded. Gửi cả hai giúp:
+  ///  • Hoạt động với mọi phiên bản backend (kể cả bản cũ khai báo `consumes`).
+  ///  • Tránh lỗi 415 khi thiếu `Content-Type` — đây chính là lỗi đã làm hỏng
+  ///    luồng thanh toán trên mobile (kết quả bị backend từ chối mà không có log).
+  ///
   /// [params] là toàn bộ query parameters của deep link.
   Future<PaymentReturnResult> submitReturnResult(Map<String, String> params) async {
     final query = params.entries
@@ -146,6 +158,8 @@ class PaymentService {
     final data = await ApiClient.request(
       'POST',
       '$_endpoint/return-result?$query',
+      body: params,
+      formEncoded: true,
       // Endpoint public (không JWT) — deep link có thể mở app khi chưa đăng nhập.
       auth: false,
     );
