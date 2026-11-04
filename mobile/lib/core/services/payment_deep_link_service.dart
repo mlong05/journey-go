@@ -8,12 +8,20 @@
 ///    1. **Deep link** (`journeygo://payment/return?...`): nếu Return URL được cấu hình
 ///       trỏ về scheme này, hệ điều mở app ⇒ app nhận được kết quả ngay.
 ///       (Cần redirect bằng HTML meta-refresh vì VNPay chỉ chấp nhận URL http/https
-///       — xem `PaymentReturnRedirectController`.)
+///       — xem `PaymentReturnPageController`.)
 ///    2. **Polling + QueryDR** (fallback chắc chắn): app tự tra trạng thái qua API
 ///       khi quay lại foreground hoặc khi vừa mở lại.
 ///
 /// ── Quy tắc ──
 ///  • Deep link là TÍN HIỆU, không phải nguồn xác minh ⇒ luôn gọi API để xác nhận.
+///
+/// ── Vì sao cần BUFFER deep link ban đầu? ──
+///  `init()` đọc deep link đầu tiên (`getInitialLink`) — nhưng lúc đó thường CHƯA có
+///  listener nào đăng ký (widget gọi `await init()` rồi mới `listen(...)`).
+///  `StreamController.broadcast` DROP mọi event phát ra trước khi có listener
+///  ⇒ deep link đó bị mất ⇒ app không tự quay lại màn kết quả thanh toán.
+///
+///  ⇒ Ta giữ deep link đó lại và PHÁT LẠI ngay khi listener đầu tiên đăng ký.
 library;
 
 import 'dart:async';
@@ -58,11 +66,20 @@ class PaymentDeepLinkService {
   final AppLinks _appLinks = AppLinks();
   StreamSubscription<Uri>? _subscription;
 
-  /// Kết quả deep link mới nhận được (để app xử lý).
-  final StreamController<PaymentDeepLink> _controller =
-      StreamController<PaymentDeepLink>.broadcast();
+  StreamController<PaymentDeepLink>? _controller;
 
-  Stream<PaymentDeepLink> get links => _controller.stream;
+  /// Deep link nhận được khi CHƯA có listener ⇒ giữ lại, phát lại khi có listener.
+  PaymentDeepLink? _pendingLink;
+
+  /// Controller broadcast — tạo lazily để có thể gắn callback `onListen`.
+  StreamController<PaymentDeepLink> get _streamController {
+    return _controller ??= StreamController<PaymentDeepLink>.broadcast(
+      onListen: _flushPendingLink,
+    );
+  }
+
+  /// Kết quả deep link mới nhận được (để app xử lý).
+  Stream<PaymentDeepLink> get links => _streamController.stream;
 
   /// Bắt đầu lắng nghe. Gọi 1 lần khi app khởi động.
   Future<void> init() async {
@@ -82,10 +99,12 @@ class PaymentDeepLinkService {
         );
   }
 
+  /// Huỷ lắng nghe (giữ lại deep link đã nhận để phát lại khi init lại).
   void dispose() {
     _subscription?.cancel();
     _subscription = null;
-    _controller.close();
+    _controller?.close();
+    _controller = null;
   }
 
   /// Phân tích URI thành {@link PaymentDeepLink} (null nếu không phải deep link thanh toán).
@@ -99,10 +118,16 @@ class PaymentDeepLinkService {
   static PaymentDeepLink? parse(Uri? uri) {
     if (uri == null) return null;
 
+    // ⚠️ Không nhận URL web (http/https) làm deep link thanh toán — nếu không,
+    // mọi URL có đoạn "payment" trong path sẽ bị coi là kết quả thanh toán.
+    final isWebScheme = uri.scheme == 'http' || uri.scheme == 'https';
+    final path = uri.path.toLowerCase();
+
     // Chấp nhận cả `journeygo://payment/return` và `journeygo:///payment/return`.
-    final isPaymentReturn = uri.host == 'payment' ||
-        uri.pathSegments.contains('payment') ||
-        uri.path.contains('/payment/return');
+    final isAppSchemePayment = !isWebScheme &&
+        (uri.host.toLowerCase() == 'payment' ||
+            uri.pathSegments.map((e) => e.toLowerCase()).contains('payment'));
+    final isPaymentReturn = isAppSchemePayment || path.contains('/payment/return');
     if (!isPaymentReturn) return null;
 
     return PaymentDeepLink(
@@ -115,7 +140,32 @@ class PaymentDeepLinkService {
   void _emit(Uri uri) {
     final parsed = parse(uri);
     if (parsed == null) return;
-    if (_controller.isClosed) return;
-    _controller.add(parsed);
+
+    final controller = _streamController;
+    if (controller.isClosed) return;
+
+    // Chưa có listener ⇒ GIữ lại, phát lại khi listener đầu tiên đăng ký.
+    // (Broadcast controller drop event phát trước khi có listener.)
+    if (!controller.hasListener) {
+      _pendingLink = parsed;
+      return;
+    }
+    controller.add(parsed);
+  }
+
+  /// Phát lại deep link đã giữ khi listener đầu tiên đăng ký.
+  void _flushPendingLink() {
+    final pending = _pendingLink;
+    if (pending == null) return;
+    _pendingLink = null;
+
+    final controller = _controller;
+    if (controller == null || controller.isClosed) return;
+
+    // Phát ở microtask kế tiếp để chắc chắn listener đã đăng ký xong.
+    scheduleMicrotask(() {
+      if (controller.isClosed) return;
+      controller.add(pending);
+    });
   }
 }
