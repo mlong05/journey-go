@@ -94,7 +94,14 @@ public enum ErrorCode {
     WALLET_INSUFFICIENT_BALANCE("Số dư ví không đủ để thực hiện khoản khấu trừ", HttpStatus.CONFLICT),
 
     // ── Notification ──────────────────────────────────────────────────────────
-    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại", HttpStatus.NOT_FOUND);
+    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại", HttpStatus.NOT_FOUND),
+
+    // ── Destination Request Moderation ───────────────────────────────────────
+    DESTINATION_REQUEST_NOT_FOUND("Yêu cầu đề xuất điểm đến không tồn tại", HttpStatus.NOT_FOUND),
+    INVALID_DESTINATION_REQUEST_STATUS("Trạng thái yêu cầu đề xuất điểm đến không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
+    DESTINATION_REQUEST_CP_INVALID("Người dùng được phân công phải có vai trò Content Provider (PROVIDER)", HttpStatus.BAD_REQUEST),
+    DESTINATION_REQUEST_CANNOT_CANCEL("Chỉ có thể hủy yêu cầu khi chưa bắt đầu thực hiện nội dung", HttpStatus.BAD_REQUEST),
+    DESTINATION_REQUEST_DESTINATION_REQUIRED("Cần liên kết điểm đến hợp lệ trước khi gửi duyệt nội dung", HttpStatus.BAD_REQUEST);
 
     private final String message;
     private final HttpStatus httpStatus;
