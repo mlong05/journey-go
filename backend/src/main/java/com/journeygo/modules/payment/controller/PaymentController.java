@@ -25,7 +25,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -75,10 +74,11 @@ public class PaymentController {
     @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Danh sách phương thức thanh toán khách hàng có thể chọn",
-            description = "Trả về 3 nhóm phương thức VNPay hiển thị trên trang thanh toán: "
-                    + "Ứng dụng Ngân hàng & Ví điện tử (VNPAYQR), Thẻ nội địa & tài khoản ngân hàng (VNBANK), "
-                    + "Thẻ thanh toán quốc tế (VISA) — kèm danh sách ngân hàng cụ thể lấy từ API "
-                    + "chính thức get_bank_list của VNPay.")
+            description = "Dự án CHỈ hỗ trợ phương thức 'Thẻ nội địa và tài khoản ngân hàng' "
+                    + "(mã nội bộ DOMESTIC_CARD, vnp_BankCode = VNBANK) — kèm danh sách ngân hàng "
+                    + "cụ thể lấy từ API chính thức get_bank_list của VNPay. "
+                    + "bankCodeSent = true ⇒ URL thanh toán LUÔN gửi vnp_BankCode = VNBANK, "
+                    + "trang VNPay mở thẳng nhóm thẻ nội địa (không mở trang chọn phương thức).")
     public ResponseEntity<ApiResponse<PaymentMethodResponse>> getPaymentMethods() {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách phương thức thanh toán thành công",
                 paymentMethodService.getPaymentMethods()));
@@ -155,7 +155,7 @@ public class PaymentController {
      *
      * <p>Trả về cùng cấu trúc với {@code /payments/return}.
      */
-    @PostMapping(value = "/return-result", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    @PostMapping("/return-result")
     @Operation(summary = "Nhận kết quả thanh toán từ app mobile (deep link)",
             description = "App gửi lại các tham số VNPay đã ký (vnp_*) nhận được qua deep link. "
                     + "Backend kiểm tra chữ ký HMACSHA512 rồi áp dụng kết quả vào Payment + Booking.")
