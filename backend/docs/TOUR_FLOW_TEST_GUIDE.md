@@ -1,6 +1,6 @@
 # Test flow Tour
 
-Mở Swagger tại `http://localhost:8088/swagger-ui/index.html`. Dùng Provider/Admin để tạo tour; dùng Moderator/Admin cho moderation.
+Mở Swagger tại `http://localhost:8088/swagger-ui/index.html`. Dùng Provider/Admin để tạo tour; dùng Content Moderator/Admin cho moderation.
 
 ## Happy case: tạo và duyệt tour
 
@@ -23,7 +23,7 @@ Mở Swagger tại `http://localhost:8088/swagger-ui/index.html`. Dùng Provider
 ~~~
 
 Kỳ vọng: HTTP 201; lấy `data.tourId`; tour tự vào `PENDING`.
-3. Moderator/Admin mở `GET /api/v1/moderation/tours/queue?page=0&size=10`.
+3. Content Moderator/Admin mở `GET /api/v1/moderation/tours/queue?page=0&size=10`.
 4. Duyệt bằng `PATCH /api/v1/moderation/tours/{tourId}/approve`:
 
 ~~~json
@@ -34,7 +34,7 @@ Kỳ vọng review `APPROVED`, tour `PUBLISHED`, `approved: true`; tour xuất h
 
 ## Happy case: từ chối và gửi lại
 
-Moderator/Admin từ chối bằng `PATCH /api/v1/moderation/tours/{tourId}/reject`:
+Content Moderator/Admin từ chối bằng `PATCH /api/v1/moderation/tours/{tourId}/reject`:
 
 ~~~json
 {
