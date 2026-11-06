@@ -4,6 +4,7 @@ import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.modules.auth.dto.UserResponse;
 import com.journeygo.modules.auth.service.RefreshTokenService;
+import com.journeygo.modules.providerprofile.service.ProviderProfileService;
 import com.journeygo.modules.user.dto.AdminCreateUserRequest;
 import com.journeygo.modules.user.dto.AdminUpdateUserRequest;
 import com.journeygo.modules.user.dto.UpdateRoleRequest;
@@ -38,6 +39,7 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final ProviderProfileService providerProfileService;
 
     /**
      * Lấy danh sách người dùng có phân trang và bộ lọc (từ khóa, vai trò, trạng thái kích hoạt).
@@ -110,6 +112,8 @@ public class UserService {
                 .build();
 
         User savedUser = userRepository.save(user);
+        // Cấp vai trò CONTENT_PROVIDER => tự động có ProviderProfile + Wallet (idempotent).
+        provisionProviderProfileIfNeeded(savedUser);
         log.info("Admin created new user id={}, email={}, role={}", savedUser.getId(), savedUser.getEmail(), savedUser.getRole());
         return UserResponse.fromEntity(savedUser);
     }
@@ -139,6 +143,8 @@ public class UserService {
         }
 
         User updatedUser = userRepository.save(user);
+        // Cấp vai trò CONTENT_PROVIDER => tự động có ProviderProfile + Wallet (idempotent).
+        provisionProviderProfileIfNeeded(updatedUser);
         log.info("Admin id={} updated role for user id={} to {}", currentAdminId, updatedUser.getId(), updatedUser.getRole());
         return UserResponse.fromEntity(updatedUser);
     }
@@ -188,6 +194,8 @@ public class UserService {
         }
 
         User updatedUser = userRepository.save(user);
+        // Cấp vai trò CONTENT_PROVIDER => tự động có ProviderProfile + Wallet (idempotent).
+        provisionProviderProfileIfNeeded(updatedUser);
         log.info("Admin id={} updated user details for user id={}", currentAdminId, updatedUser.getId());
         return UserResponse.fromEntity(updatedUser);
     }
@@ -235,5 +243,22 @@ public class UserService {
     private User findUserOrThrow(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+    }
+
+    /**
+     * Nếu User mang vai trò {@code CONTENT_PROVIDER} thì bảo đảm tồn tại đúng một
+     * ProviderProfile và đúng một Wallet.
+     *
+     * <p>Idempotent — gọi nhiều lần không tạo trùng. Không làm gì với các role khác.
+     */
+    private void provisionProviderProfileIfNeeded(User user) {
+        if (user == null || user.getRole() == null) {
+            return;
+        }
+        if (!Role.CONTENT_PROVIDER.equalsIgnoreCase(user.getRole().getName())) {
+            return;
+        }
+        providerProfileService.ensureProfileAndWallet(user);
+        log.info("[User] Đã bảo đảm ProviderProfile + Wallet cho user id={} (role CONTENT_PROVIDER)", user.getId());
     }
 }

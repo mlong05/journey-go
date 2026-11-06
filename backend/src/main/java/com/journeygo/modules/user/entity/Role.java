@@ -8,6 +8,21 @@ import lombok.*;
 import java.time.Instant;
 import java.util.Objects;
 
+/**
+ * Role — vai trò của người dùng trong hệ thống.
+ *
+ * <p>Hệ thống chỉ có 4 role chính thức:
+ * <ul>
+ *   <li>{@link #ADMIN} — Quản trị nền tảng.</li>
+ *   <li>{@link #CONTENT_MODERATOR} — Kiểm duyệt nội dung.</li>
+ *   <li>{@link #CONTENT_PROVIDER} — Đối tác cung cấp nội dung (Destination, Tour,
+ *       Experience, Task, Cultural Content) và quản lý doanh thu, Wallet, Settlement.</li>
+ *   <li>{@link #TOURIST} — Khách du lịch.</li>
+ * </ul>
+ *
+ * <p>Role cũ {@code PROVIDER}, {@code MODERATOR}, {@code PARTNER} đã được hợp nhất và
+ * <b>không</b> giữ lại dưới dạng alias.
+ */
 @Entity
 @Table(name = "roles", indexes = {
         @Index(name = "idx_roles_name", columnList = "name", unique = true)
@@ -21,15 +36,13 @@ public class Role {
 
     public static final String TOURIST = "TOURIST";
     public static final String ADMIN = "ADMIN";
-    public static final String MODERATOR = "MODERATOR";
-    public static final String PROVIDER = "PROVIDER";
+    public static final String CONTENT_MODERATOR = "CONTENT_MODERATOR";
+
     /**
-     * Đối tác cung cấp dịch vụ — nắm giữ Wallet và là đối tượng hưởng doanh thu từ Booking.
-     *
-     * <p>Khác {@link #PROVIDER} (người tạo/nội dung Experience), {@code PARTNER} là đối tượng
-     * được hệ thống tất toán tiền (settlement).
+     * Đối tác cung cấp nội dung — vừa tạo/quản lý nội dung, vừa là đối tượng
+     * hưởng doanh thu và sở hữu Wallet nội bộ.
      */
-    public static final String PARTNER = "PARTNER";
+    public static final String CONTENT_PROVIDER = "CONTENT_PROVIDER";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -83,9 +96,7 @@ public class Role {
     public static Role fromString(String value) {
         if (value == null) return null;
         String upper = value.trim().toUpperCase();
-        if ("USER".equals(upper)) {
-            upper = TOURIST;
-        }
+        // Không giữ alias cho role cũ (PARTNER / PROVIDER / MODERATOR / USER).
         return Role.builder().name(upper).build();
     }
 
@@ -93,20 +104,18 @@ public class Role {
         return fromString(name);
     }
 
-    public boolean isProvider() {
-        return PROVIDER.equalsIgnoreCase(this.name);
-    }
-
-    public boolean isPartner() {
-        return PARTNER.equalsIgnoreCase(this.name);
+    /** Đối tác cung cấp nội dung — đồng thời là người nhận doanh thu. */
+    public boolean isContentProvider() {
+        return CONTENT_PROVIDER.equalsIgnoreCase(this.name);
     }
 
     public boolean isAdmin() {
         return ADMIN.equalsIgnoreCase(this.name);
     }
 
-    public boolean isModerator() {
-        return MODERATOR.equalsIgnoreCase(this.name);
+    /** Kiểm duyệt viên nội dung. */
+    public boolean isContentModerator() {
+        return CONTENT_MODERATOR.equalsIgnoreCase(this.name);
     }
 
     public static Role of(String name) {

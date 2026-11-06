@@ -55,28 +55,28 @@ const ROLE_CONFIG = {
     defaultName: "Kiểm duyệt viên",
     defaultInitials: "KD",
   },
+  // Đối tác cung cấp nội dung — quản lý nội dung, tour, doanh thu, ví & tất toán.
   provider: {
-    roleLabel: "Đối tác Điểm đến",
-    roleDesc: "Quản lý địa điểm di tích, khởi tạo lộ trình văn hóa và thiết lập nhiệm vụ trải nghiệm.",
+    roleLabel: "Đối tác cung cấp nội dung",
+    roleDesc: "Quản lý địa điểm di tích, khởi tạo lộ trình văn hóa, thiết lập nhiệm vụ trải nghiệm và theo dõi doanh thu, ví, tất toán.",
     roleColor: "text-emerald-600",
     dotColor: "bg-emerald-500",
     avatarBg: "bg-gradient-to-tr from-emerald-600 to-teal-500",
     headerGradient: "from-emerald-700 via-emerald-600 to-teal-500",
     badgeBg: "bg-emerald-50 text-emerald-700 border border-emerald-200/80",
-    defaultName: "Đối tác Điểm đến",
+    defaultName: "Đối tác cung cấp nội dung",
     defaultInitials: "ĐT",
   },
-  // Đối tác tài chính (PARTNER) — theo dõi doanh thu, ví, tất toán.
-  partner: {
-    roleLabel: "Đối tác tài chính",
-    roleDesc: "Theo dõi doanh thu, số dư ví và lịch sử tất toán của đơn vị đối tác.",
+  tourist: {
+    roleLabel: "Khách du lịch",
+    roleDesc: "Khám phá di sản, đặt tour và theo dõi hành trình của bạn.",
     roleColor: "text-sky-600",
     dotColor: "bg-sky-500",
     avatarBg: "bg-gradient-to-tr from-sky-600 to-cyan-500",
     headerGradient: "from-sky-700 via-sky-600 to-cyan-500",
     badgeBg: "bg-sky-50 text-sky-700 border border-sky-200/80",
-    defaultName: "Đối tác tài chính",
-    defaultInitials: "ĐT",
+    defaultName: "Khách du lịch",
+    defaultInitials: "KD",
   },
 };
 
@@ -98,15 +98,14 @@ function getRoleLabel(role, fallbackRole = "admin") {
   if (!role) {
     if (fallbackRole === "admin") return "Quản trị viên hệ thống";
     if (fallbackRole === "moderator") return "Kiểm duyệt viên";
-    if (fallbackRole === "provider") return "Đối tác Điểm đến";
-    if (fallbackRole === "partner") return "Đối tác tài chính";
+    if (fallbackRole === "provider") return "Đối tác cung cấp nội dung";
+    if (fallbackRole === "tourist") return "Khách du lịch";
     return "Người dùng hệ thống";
   }
   const r = String(role).toUpperCase();
   if (r.includes("ADMIN")) return "Quản trị viên hệ thống";
   if (r.includes("MODERATOR")) return "Kiểm duyệt viên";
-  if (r.includes("PARTNER")) return "Đối tác tài chính";
-  if (r.includes("DESTINATION") || r.includes("PROVIDER")) return "Đối tác Điểm đến";
+  if (r.includes("PROVIDER")) return "Đối tác cung cấp nội dung";
   if (r.includes("TOURIST")) return "Khách du lịch";
   return role;
 }

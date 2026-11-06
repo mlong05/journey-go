@@ -12,43 +12,47 @@ import {
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
 import { Sidebar, DashboardHeader } from "@/components/layout";
+import { ROUTES } from "@/constants/routes";
 
-const PARTNER_NAV_ITEMS = [
+const FINANCE_NAV_ITEMS = [
   {
     id: "overview",
     label: "Tổng quan",
-    href: "/partner",
+    href: ROUTES.PROVIDER_FINANCE,
     icon: LayoutDashboard,
   },
   {
     id: "wallet",
     label: "Ví & Doanh thu",
-    href: "/partner/wallet",
+    href: ROUTES.PROVIDER_FINANCE_WALLET,
     icon: Wallet,
   },
   {
     id: "settlements",
     label: "Lịch sử tất toán",
-    href: "/partner/settlements",
+    href: ROUTES.PROVIDER_FINANCE_SETTLEMENTS,
     icon: FileCheck,
   },
   {
     id: "revenues",
     label: "Doanh thu theo kỳ",
-    href: "/partner/revenues",
+    href: ROUTES.PROVIDER_FINANCE_REVENUES,
     icon: BarChart3,
   },
 ];
 
 /**
- * Layout khu vực Đối tác (PARTNER).
+ * Layout khu vực Tài chính của Đối tác cung cấp nội dung (CONTENT_PROVIDER).
  *
- * ── Khác biệt so với /provider ──
- *  • `/provider` là vai trò "Đối tác Điểm đến" (PROVIDER) — quản lý di tích, tour, điểm đến.
- *  • `/partner` là vai trò "Đối tác tài chính" (PARTNER) — theo dõi doanh thu, ví, tất toán.
- *  Hai khu vực dùng chung component Sidebar nhưng khác theme màu (partner = sky/cyan).
+ * ── Vị trí trong hệ thống ──
+ *  • `/provider`         — Provider Portal: quản lý di tích, tour, điểm đến, nhiệm vụ.
+ *  • `/provider/finance` — Khu vực tài chính CỦA CHÍNH đối tác đó: doanh thu, ví, tất toán.
+ *
+ * Trước đây khu vực tài chính nằm ở `/partner` (Partner Portal, role PARTNER).
+ * Sau khi hợp nhất PARTNER + PROVIDER thành CONTENT_PROVIDER, toàn bộ chức năng tài chính
+ * được chuyển vào Provider Portal và dùng chung theme màu của đối tác.
  */
-export default function PartnerLayout({ children }) {
+export default function ProviderFinanceLayout({ children }) {
   const pathname = usePathname();
   const authData = useAuthSession();
   const { performLogout, logoutModal } = useLogout();
@@ -69,18 +73,20 @@ export default function PartnerLayout({ children }) {
   const [isSidebarWide, setIsSidebarWide] = useState(true);
 
   const currentTitle =
-    [...PARTNER_NAV_ITEMS]
+    [...FINANCE_NAV_ITEMS]
       .sort((a, b) => b.href.length - a.href.length)
       .find((i) => {
         const p = i.href.split("#")[0];
-        return p === "/partner" ? pathname === "/partner" : pathname?.startsWith(p);
+        return p === ROUTES.PROVIDER_FINANCE
+          ? pathname === ROUTES.PROVIDER_FINANCE
+          : pathname?.startsWith(p);
       })?.label || "Tổng quan";
 
   return (
     <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 font-sans antialiased text-slate-800">
       <Sidebar
-        role="partner"
-        navItems={PARTNER_NAV_ITEMS}
+        role="provider"
+        navItems={FINANCE_NAV_ITEMS}
         onLogout={performLogout}
         isOpenMobile={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
@@ -90,9 +96,9 @@ export default function PartnerLayout({ children }) {
 
       <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
         <DashboardHeader
-          role="partner"
+          role="provider"
           user={authData?.user}
-          section="Đối tác tài chính"
+          section="Tài chính đối tác"
           title={currentTitle}
           onOpenMenu={() => setIsSidebarOpen(true)}
         >
