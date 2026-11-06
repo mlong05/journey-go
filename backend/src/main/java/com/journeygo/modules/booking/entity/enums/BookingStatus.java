@@ -9,7 +9,7 @@ package com.journeygo.modules.booking.entity.enums;
  *   <li>{@code CONFIRMED} — Thanh toán đã được xác minh thành công, mở quyền sử dụng tour.</li>
  *   <li>{@code EXPIRED} — Quá thời hạn thanh toán 10 phút, slot đã được giải phóng.</li>
  *   <li>{@code CANCELLED} — Bị hủy hợp lệ (bởi Tourist hoặc Admin), slot đã được giải phóng.</li>
- *   <li>{@code COMPLETED} — Trải nghiệm đã hoàn thành — điều kiện để doanh thu Partner đủ tư cách tất toán.</li>
+ *   <li>{@code COMPLETED} — Trải nghiệm đã hoàn thành — điều kiện để doanh thu ProviderProfile đủ tư cách tất toán.</li>
  * </ul>
  */
 public enum BookingStatus {
