@@ -33,7 +33,7 @@ public class BookingController {
     private final BookingService bookingService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo booking mới",
             description = "Kiểm tra tour còn hoạt động, ngày hợp lệ, còn sức chứa; chốt giá tại thời điểm đặt; "
@@ -47,7 +47,7 @@ public class BookingController {
     }
 
     @GetMapping("/my")
-    @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Danh sách booking của tôi")
     public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getMyBookings(

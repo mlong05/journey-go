@@ -46,7 +46,7 @@ public class PaymentController {
     // ── Khởi tạo & retry ──────────────────────────────────────────────────────
 
     @PostMapping("/bookings/{bookingId}/init")
-    @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Khởi tạo thanh toán (hoặc thử lại)",
             description = "Trả về URL/QR thanh toán VNPay. Mỗi lần thử tạo một mã giao dịch riêng. "
@@ -71,7 +71,7 @@ public class PaymentController {
     // ── Phương thức thanh toán ────────────────────────────────────────────────
 
     @GetMapping("/methods")
-    @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Danh sách phương thức thanh toán khách hàng có thể chọn",
             description = "Dự án CHỈ hỗ trợ phương thức 'Thẻ nội địa và tài khoản ngân hàng' "
@@ -178,7 +178,7 @@ public class PaymentController {
     }
 
     @GetMapping("/my")
-    @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lịch sử thanh toán của tôi")
     public ResponseEntity<ApiResponse<PageResponse<PaymentResponse>>> getMyPayments(
@@ -201,7 +201,7 @@ public class PaymentController {
     }
 
     @PostMapping("/{paymentId}/query")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TOURIST', 'USER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TOURIST')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Truy vấn kết quả giao dịch trực tiếp với VNPay (QueryDR)",
             description = "Dùng khi kết quả chưa rõ: timeout, callback đến muộn, hoặc cần đối soát. "

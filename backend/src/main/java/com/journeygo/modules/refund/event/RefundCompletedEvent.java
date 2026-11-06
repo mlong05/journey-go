@@ -12,9 +12,9 @@ import java.time.Instant;
  *   <li>Admin xác nhận đã chuyển khoản thủ công kèm bằng chứng.</li>
  * </ul>
  *
- * <p>Người nhận (Partner Revenue / Settlement) dùng sự kiện này để:
+ * <p>Người nhận (ProviderProfile Revenue / Settlement) dùng sự kiện này để:
  * <ul>
- *   <li>Tính lại doanh thu Partner trước khi xét tất toán.</li>
+ *   <li>Tính lại doanh thu ProviderProfile trước khi xét tất toán.</li>
  *   <li>Nếu Settlement đã được duyệt → tạo khoản điều chỉnh tài chính riêng
  *       (không sửa lịch sử đã duyệt).</li>
  * </ul>

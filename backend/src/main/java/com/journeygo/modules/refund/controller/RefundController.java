@@ -37,7 +37,7 @@ public class RefundController {
     // ── Tourist ───────────────────────────────────────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Gửi yêu cầu hoàn tiền",
             description = "Chỉ dành cho Payment đã thanh toán thành công (đã xác minh) và trong vòng 24 giờ "
@@ -53,7 +53,7 @@ public class RefundController {
     }
 
     @GetMapping("/my")
-    @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Danh sách yêu cầu hoàn tiền của tôi")
     public ResponseEntity<ApiResponse<PageResponse<RefundResponse>>> getMyRefunds(
