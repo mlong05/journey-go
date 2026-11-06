@@ -358,7 +358,7 @@ export default function RoleManagerModal({ isOpen, onClose, onRoleCreated }) {
                       maxLength={50}
                       value={name}
                       onChange={(e) => handleNameChange(e.target.value)}
-                      placeholder="VD: TOUR_GUIDE, PARTNER, VENDOR..."
+                      placeholder="VD: CONTENT_PROVIDER, CONTENT_MODERATOR..."
                       className={`w-full px-3.5 py-2 text-xs tabular-nums font-bold bg-white border rounded-xl outline-hidden   transition-all ${
                         formError
                           ? "border-rose-300 ring-2 ring-rose-100"

@@ -8,6 +8,7 @@ import {
   Trophy,
   FileCheck,
   Route,
+  Wallet,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -77,6 +78,12 @@ export default function ProviderLayout({ children }) {
       label: "Tiến độ Thẩm định",
       href: "/provider#reviews",
       icon: FileCheck,
+    },
+    {
+      id: "finance",
+      label: "Tài chính & Doanh thu",
+      href: "/provider/finance",
+      icon: Wallet,
     },
   ];
 
