@@ -4,6 +4,7 @@ import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.modules.auth.dto.UserResponse;
 import com.journeygo.modules.auth.service.RefreshTokenService;
+import com.journeygo.modules.providerprofile.service.ProviderProfileService;
 import com.journeygo.modules.user.dto.AdminCreateUserRequest;
 import com.journeygo.modules.user.dto.AdminUpdateUserRequest;
 import com.journeygo.modules.user.dto.UpdateRoleRequest;
@@ -48,6 +49,9 @@ class UserServiceTest {
     @Mock
     private RefreshTokenService refreshTokenService;
 
+    @Mock
+    private ProviderProfileService providerProfileService;
+
     @InjectMocks
     private UserService userService;
 
@@ -62,8 +66,8 @@ class UserServiceTest {
     void setUp() {
         touristRole = new Role(1L, Role.TOURIST);
         adminRole = new Role(2L, Role.ADMIN);
-        moderatorRole = new Role(3L, Role.MODERATOR);
-        providerRole = new Role(4L, Role.PROVIDER);
+        moderatorRole = new Role(3L, Role.CONTENT_MODERATOR);
+        providerRole = new Role(4L, Role.CONTENT_PROVIDER);
 
         sampleUser = User.builder()
                 .id(2L)
@@ -106,7 +110,7 @@ class UserServiceTest {
         );
 
         when(userRepository.existsByEmail("newuser@journeygo.com")).thenReturn(false);
-        when(roleRepository.findByName(Role.MODERATOR)).thenReturn(Optional.of(moderatorRole));
+        when(roleRepository.findByName(Role.CONTENT_MODERATOR)).thenReturn(Optional.of(moderatorRole));
         when(passwordEncoder.encode("Password123@")).thenReturn("encoded_pass");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User u = invocation.getArgument(0);
@@ -203,7 +207,7 @@ class UserServiceTest {
     void updateUserRole_Success() {
         UpdateRoleRequest request = new UpdateRoleRequest(moderatorRole);
         when(userRepository.findById(2L)).thenReturn(Optional.of(sampleUser));
-        when(roleRepository.findByName(Role.MODERATOR)).thenReturn(Optional.of(moderatorRole));
+        when(roleRepository.findByName(Role.CONTENT_MODERATOR)).thenReturn(Optional.of(moderatorRole));
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
         UserResponse response = userService.updateUserRole(2L, request, 1L);
@@ -238,7 +242,7 @@ class UserServiceTest {
         );
 
         when(userRepository.findById(2L)).thenReturn(Optional.of(sampleUser));
-        when(roleRepository.findByName(Role.PROVIDER)).thenReturn(Optional.of(providerRole));
+        when(roleRepository.findByName(Role.CONTENT_PROVIDER)).thenReturn(Optional.of(providerRole));
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
         UserResponse response = userService.updateUser(2L, request, 1L);
@@ -249,6 +253,8 @@ class UserServiceTest {
         assertEquals(providerRole, response.role());
         verify(refreshTokenService).revokeAllUserTokens(sampleUser);
         verify(userRepository).save(sampleUser);
+        // Cấp role CONTENT_PROVIDER → phải tự động bảo đảm ProviderProfile + Wallet.
+        verify(providerProfileService).ensureProfileAndWallet(sampleUser);
     }
 
     @Test

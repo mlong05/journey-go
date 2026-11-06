@@ -31,9 +31,9 @@
 | Vai trò | Quyền hạn |
 |---|---|
 | `USER` | Check-in, xem lịch sử cá nhân |
-| `PROVIDER` | Tạo/sửa/xóa Experience + nội dung con (Task, Question…) trên tài nguyên **của chính mình** |
-| `MODERATOR` | Phê duyệt / xóa mềm / khôi phục Destination |
-| `ADMIN` | Toàn quyền User, master data (`TaskType`, `PointRule`), mọi thao tác của MODERATOR + PROVIDER |
+| `CONTENT_PROVIDER` | Tạo/sửa/xóa Experience + nội dung con (Task, Question…) trên tài nguyên **của chính mình** |
+| `CONTENT_MODERATOR` | Phê duyệt / xóa mềm / khôi phục Destination |
+| `ADMIN` | Toàn quyền User, master data (`TaskType`, `PointRule`), mọi thao tác của CONTENT_MODERATOR + CONTENT_PROVIDER |
 
 **Chú ý:** một số controller dùng `hasRole('TOURIST')` nhưng enum `Role` hiện chỉ có `USER` — cần chuẩn hóa lại thành `USER` hoặc bổ sung `TOURIST` vào enum.
 
@@ -233,11 +233,11 @@
 | Tham số | Kiểu | Mô tả |
 |---|---|---|
 | `keyword` | string | Tìm theo email, họ tên, số điện thoại |
-| `role` | `USER \| MODERATOR \| PROVIDER \| ADMIN` | Lọc theo vai trò |
+| `role` | `USER \| CONTENT_MODERATOR \| CONTENT_PROVIDER \| ADMIN` | Lọc theo vai trò |
 | `active` | boolean | Lọc theo trạng thái kích hoạt |
 | `page`, `size`, `sort` | | Phân trang, ví dụ `sort=createdAt,desc` |
 
-**Ví dụ:** `GET /api/v1/users?role=PROVIDER&active=true&page=0&size=20&sort=id,asc`
+**Ví dụ:** `GET /api/v1/users?role=CONTENT_PROVIDER&active=true&page=0&size=20&sort=id,asc`
 
 ---
 
@@ -251,7 +251,7 @@
   "email": "partner@example.com",
   "password": "tempPassword123",
   "fullName": "Đối tác B",
-  "role": "PROVIDER",
+  "role": "CONTENT_PROVIDER",
   "phone": "0909876543"
 }
 ```
@@ -265,7 +265,7 @@
 {
   "fullName": "Tên mới",
   "phone": "0901112222",
-  "role": "MODERATOR",
+  "role": "CONTENT_MODERATOR",
   "active": true
 }
 ```
@@ -278,7 +278,7 @@ Mọi thay đổi đều ghi nhận `currentUser` (admin đang thao tác) vào a
 
 **Request body:**
 ```json
-{ "role": "PROVIDER" }
+{ "role": "CONTENT_PROVIDER" }
 ```
 
 ---
@@ -320,7 +320,7 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 ---
 
-### MODERATOR / ADMIN
+### CONTENT_MODERATOR / ADMIN
 
 | Method | Path | Mô tả |
 |---|---|---|
@@ -332,12 +332,12 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 ---
 
-### PROVIDER / MODERATOR / ADMIN
+### CONTENT_PROVIDER / CONTENT_MODERATOR / ADMIN
 
 | Method | Path | Mô tả |
 |---|---|---|
 | POST | `/` | Tạo điểm đến mới (mặc định chưa duyệt) |
-| PUT | `/{id}` | Cập nhật — **PROVIDER chỉ sửa điểm của chính mình** |
+| PUT | `/{id}` | Cập nhật — **CONTENT_PROVIDER chỉ sửa điểm của chính mình** |
 
 **Request body (create/update):**
 ```json
@@ -381,7 +381,7 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 ---
 
-### PROVIDER / ADMIN
+### CONTENT_PROVIDER / ADMIN
 
 | Method | Path | Mô tả |
 |---|---|---|
@@ -420,7 +420,7 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 ---
 
-### PROVIDER / ADMIN (chỉ owner)
+### CONTENT_PROVIDER / ADMIN (chỉ owner)
 
 | Method | Path | Mô tả |
 |---|---|---|
@@ -458,7 +458,7 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 ---
 
-### PROVIDER / ADMIN (chỉ owner, chỉ khi Experience DRAFT)
+### CONTENT_PROVIDER / ADMIN (chỉ owner, chỉ khi Experience DRAFT)
 
 | Method | Path | Mô tả |
 |---|---|---|
@@ -500,7 +500,7 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 ---
 
-### PROVIDER / ADMIN (chỉ owner, chỉ khi Experience DRAFT)
+### CONTENT_PROVIDER / ADMIN (chỉ owner, chỉ khi Experience DRAFT)
 
 | Method | Path | Mô tả |
 |---|---|---|
@@ -595,7 +595,7 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 ---
 
-### PROVIDER / ADMIN (chỉ owner, chỉ khi Task DRAFT)
+### CONTENT_PROVIDER / ADMIN (chỉ owner, chỉ khi Task DRAFT)
 
 | Method | Path | Mô tả |
 |---|---|---|
@@ -634,7 +634,7 @@ Shortcut cho `PATCH /{id}/status` với `active=true`.
 
 ---
 
-### PROVIDER / ADMIN (chỉ owner, chỉ khi Task DRAFT)
+### CONTENT_PROVIDER / ADMIN (chỉ owner, chỉ khi Task DRAFT)
 
 | Method | Path | Mô tả |
 |---|---|---|

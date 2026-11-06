@@ -20,7 +20,7 @@ Tất cả các tài khoản dưới đây đều có mật khẩu mặc định
 | Vai trò (Role) | Email | Mật khẩu | Mục đích sử dụng |
 | :--- | :--- | :--- | :--- |
 | **USER (Du khách)** | `tourist@journeygo.com` | `Password123@` | Bắt đầu hành trình, Check-in GPS, Trả lời Quiz/Puzzle, Đổi voucher, Đăng bài viết cộng đồng |
-| **MODERATOR (Kiểm duyệt)** | `moderator@journeygo.com` | `Password123@` | Duyệt bài viết du khách (`APPROVE`/`REJECT`), Xử lý báo cáo vi phạm nội dung |
+| **CONTENT_MODERATOR (Kiểm duyệt)** | `moderator@journeygo.com` | `Password123@` | Duyệt bài viết du khách (`APPROVE`/`REJECT`), Xử lý báo cáo vi phạm nội dung |
 | **ADMIN (Quản trị viên)** | `admin@journeygo.com` | `Password123@` | Toàn quyền quản trị hệ thống, quản lý điểm đến, master data |
 
 ### 1.2. Cách Đăng Nhập & Gán Token Trên Swagger UI
@@ -75,10 +75,10 @@ Tất cả các tài khoản dưới đây đều có mật khẩu mặc định
 | `POST` | `/api/v1/community/posts/{id}/comments` | User | Thêm bình luận mới vào bài viết |
 | `POST` | `/api/v1/community/posts/{id}/reactions` | User | Thả tim / Cảm xúc (`LIKE`, `LOVE`, `HELPFUL`, `WOW`). Bấm lại sẽ hủy |
 | `POST` | `/api/v1/community/posts/{id}/reports` | User | Báo cáo bài viết vi phạm tiêu chuẩn cộng đồng |
-| `GET` | `/api/v1/community/moderation/pending` | Moderator/Admin | Danh sách bài viết đang chờ duyệt |
-| `PUT` | `/api/v1/community/moderation/posts/{id}` | Moderator/Admin | Duyệt bài viết (`APPROVE`, `REJECT`, `REQUEST_REVISION`) |
-| `GET` | `/api/v1/community/moderation/reports` | Moderator/Admin | Danh sách báo cáo vi phạm nội dung |
-| `PUT` | `/api/v1/community/moderation/reports/{id}/resolve` | Moderator/Admin | Xử lý báo cáo (kèm cờ `hidePost = true/false`) |
+| `GET` | `/api/v1/community/moderation/pending` | Content Moderator/Admin | Danh sách bài viết đang chờ duyệt |
+| `PUT` | `/api/v1/community/moderation/posts/{id}` | Content Moderator/Admin | Duyệt bài viết (`APPROVE`, `REJECT`, `REQUEST_REVISION`) |
+| `GET` | `/api/v1/community/moderation/reports` | Content Moderator/Admin | Danh sách báo cáo vi phạm nội dung |
+| `PUT` | `/api/v1/community/moderation/reports/{id}/resolve` | Content Moderator/Admin | Xử lý báo cáo (kèm cờ `hidePost = true/false`) |
 
 ---
 

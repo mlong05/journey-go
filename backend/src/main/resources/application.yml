@@ -37,7 +37,7 @@ spring:
       timeout: 3000ms
   # ── Flyway ────────────────────────────────────────────────────────────────
   # Migration cho các bảng nghiệp vụ mới (booking / payment / refund / wallet /
-  # settlement / partner revenue). Các bảng cũ do Hibernate `ddl-auto: update` quản lý.
+  # settlement / provider revenue). Các bảng cũ do Hibernate `ddl-auto: update` quản lý.
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
     locations: classpath:db/migration
