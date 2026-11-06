@@ -28,10 +28,10 @@ import {
 import {
   evaluateEligibility,
   getRevenueById,
-} from "@/features/settlement/services/partnerRevenueService";
+} from "@/features/settlement/services/providerRevenueService";
 import { getBookingById } from "@/features/booking/services/bookingService";
 import { getPaymentsByBooking } from "@/features/payment/services/paymentService";
-import { getActivePartners } from "@/features/partner/services/partnerService";
+import { getActiveProviderProfiles } from "@/features/providerprofile/services/providerProfileService";
 import {
   BOOKING_STATUS_LABELS,
   DEFERRED_REASON_LABELS,
@@ -40,7 +40,7 @@ import {
   formatPeriod,
   formatVND,
   normalizePage,
-  PARTNER_REVENUE_STATUS_LABELS,
+  PROVIDER_REVENUE_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   previousMonth,
   SETTLEMENT_STATUS_LABELS,
@@ -325,7 +325,7 @@ function SettlementOverviewTab() {
                       {s?.settlementCode ?? `#${s?.id}`}
                     </td>
                     <td className="py-2.5 px-3 font-medium text-slate-700">
-                      {s?.partnerName ?? `#${s?.partnerId}`}
+                      {s?.providerName ?? `#${s?.providerProfileId}`}
                     </td>
                     <td className="py-2.5 px-3 text-slate-600">
                       {formatPeriod(s?.revenuePeriod)}
@@ -432,8 +432,8 @@ function SettlementOverviewTab() {
    ══════════════════════════════════════════════════════════════════════════ */
 
 function SettlementCandidatesTab() {
-  const [partners, setPartners] = useState([]);
-  const [partnerId, setPartnerId] = useState("");
+  const [providerProfiles, setProviderProfiles] = useState([]);
+  const [providerProfileId, setProviderProfileId] = useState("");
   const [revenuePeriod, setRevenuePeriod] = useState(previousMonth());
   const [candidates, setCandidates] = useState(null);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
@@ -448,11 +448,11 @@ function SettlementCandidatesTab() {
   // ── Đối tác ───────────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
-    getActivePartners()
+    getActiveProviderProfiles()
       .then((data) => {
         if (!active) return;
-        setPartners(Array.isArray(data) ? data : []);
-        if (data?.length > 0) setPartnerId(String(data[0].id));
+        setProviderProfiles(Array.isArray(data) ? data : []);
+        if (data?.length > 0) setProviderProfileId(String(data[0].id));
       })
       .catch(() => {});
     return () => {
@@ -462,14 +462,14 @@ function SettlementCandidatesTab() {
 
   // ── Ứng viên tất toán ─────────────────────────────────────────────────────
   const loadCandidates = useCallback(async () => {
-    if (!partnerId || !revenuePeriod) {
+    if (!providerProfileId || !revenuePeriod) {
       setCandidates(null);
       return;
     }
     setLoadingCandidates(true);
     setError("");
     try {
-      const data = await getSettlementCandidates(Number(partnerId), revenuePeriod);
+      const data = await getSettlementCandidates(Number(providerProfileId), revenuePeriod);
       setCandidates(data);
     } catch (err) {
       setError(err?.message || "Không thể tải ứng viên tất toán.");
@@ -477,7 +477,7 @@ function SettlementCandidatesTab() {
     } finally {
       setLoadingCandidates(false);
     }
-  }, [partnerId, revenuePeriod]);
+  }, [providerProfileId, revenuePeriod]);
 
   useEffect(() => {
     let cancelled = false;
@@ -494,7 +494,7 @@ function SettlementCandidatesTab() {
     setError("");
     try {
       await createSettlement({
-        partnerId: Number(partnerId),
+        providerProfileId: Number(providerProfileId),
         revenuePeriod,
         note: note.trim() || undefined,
       });
@@ -529,14 +529,14 @@ function SettlementCandidatesTab() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
           <Field label="Đối tác">
             <select
-              value={partnerId}
-              onChange={(e) => setPartnerId(e.target.value)}
+              value={providerProfileId}
+              onChange={(e) => setProviderProfileId(e.target.value)}
               className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs focus:bg-white focus:outline-none"
             >
               <option value="">-- Chọn đối tác --</option>
-              {partners.map((p) => (
+              {providerProfiles.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p?.partnerName ?? p?.email}
+                  {p?.providerName ?? p?.email}
                 </option>
               ))}
             </select>
@@ -670,7 +670,7 @@ function SettlementCandidatesTab() {
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="font-mono text-sm font-semibold text-emerald-700">
-                          {formatVND(r?.partnerNetAmount)}
+                          {formatVND(r?.providerNetAmount)}
                         </span>
                         {/* Nút xem chi tiết ĐƠN đặt tour — luôn hiện nếu có bookingId. */}
                         {r?.bookingId != null && (
@@ -727,7 +727,7 @@ function SettlementCandidatesTab() {
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="font-mono text-xs font-semibold text-slate-600">
-                          {formatVND(h?.partnerNetAmount)}
+                          {formatVND(h?.providerNetAmount)}
                         </span>
                         {/* Nút xem chi tiết ĐƠN đặt tour — luôn hiện nếu có bookingId. */}
                         {h?.bookingId != null && (
@@ -748,7 +748,7 @@ function SettlementCandidatesTab() {
                               id: h?.revenueId,
                               bookingId: h?.bookingId,
                               bookingCode: h?.bookingCode,
-                              partnerNetAmount: h?.partnerNetAmount,
+                              providerNetAmount: h?.providerNetAmount,
                               revenuePeriod: h?.revenuePeriod,
                               deferredReason: h?.deferredReason,
                             })
@@ -788,7 +788,7 @@ function SettlementCandidatesTab() {
       </div>
 
       {detailTarget && (
-        <PartnerRevenueDetailModal
+        <ProviderRevenueDetailModal
           revenue={detailTarget}
           onClose={() => setDetailTarget(null)}
         />
@@ -899,7 +899,7 @@ function PlatformRevenuePanel() {
             />
             <Metric
               label="Tổng chi trả đối tác"
-              value={formatVND(summary?.totalPartnerNetAmount)}
+              value={formatVND(summary?.totalProviderNetAmount)}
             />
             <Metric
               label="Số đợt đã duyệt"
@@ -947,7 +947,7 @@ function PlatformRevenuePanel() {
                           {formatVND(p?.commissionAmount)}
                         </td>
                         <td className="py-2 px-3 text-right font-mono text-slate-600">
-                          {formatVND(p?.partnerNetAmount)}
+                          {formatVND(p?.providerNetAmount)}
                         </td>
                         <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">
                           {formatVND(platform)}
@@ -1142,7 +1142,7 @@ function RejectSettlementModal({
           </span>
         </div>
         <p className="mt-1 text-xs text-slate-600">
-          {settlement?.partnerName ?? `#${settlement?.partnerId}`}
+          {settlement?.providerName ?? `#${settlement?.providerProfileId}`}
         </p>
         <p className="mt-2 text-sm font-semibold text-emerald-700">
           {formatVND(settlement?.settlementAmount)}
@@ -1207,14 +1207,14 @@ function RejectSettlementModal({
  * Danh sách ứng viên chỉ hiển thị mã đơn + số tiền. Admin cần xem:
  *   • Số tiền đầy đủ (tổng, hoàn, hoa hồng, điều chỉnh, đối tác nhận).
  *   • 9 ĐIỀU KIỆN tất toán — backend đánh giá lại tại thời điểm gọi
- *     (`GET /partner-revenues/{id}/eligibility`) ⇒ biết chính xác vì sao
+ *     (`GET /provider-revenues/{id}/eligibility`) ⇒ biết chính xác vì sao
  *     khoản này bị giữ lại / đủ điều kiện.
  *
  * Gọi song song 2 endpoint:
- *   • `GET /partner-revenues/{id}`             → thông tin khoản doanh thu.
- *   • `GET /partner-revenues/{id}/eligibility` → kết quả 9 điều kiện.
+ *   • `GET /provider-revenues/{id}`             → thông tin khoản doanh thu.
+ *   • `GET /provider-revenues/{id}/eligibility` → kết quả 9 điều kiện.
  */
-function PartnerRevenueDetailModal({ revenue, onClose }) {
+function ProviderRevenueDetailModal({ revenue, onClose }) {
   const revenueId = revenue?.id;
   const isHeld = Boolean(revenue?.deferredReason);
   const [data, setData] = useState(null);
@@ -1279,7 +1279,7 @@ function PartnerRevenueDetailModal({ revenue, onClose }) {
               label="Trạng thái khoản thu"
               value={
                 r?.status
-                  ? (PARTNER_REVENUE_STATUS_LABELS[r.status] ?? r.status)
+                  ? (PROVIDER_REVENUE_STATUS_LABELS[r.status] ?? r.status)
                   : "—"
               }
             />
@@ -1294,11 +1294,11 @@ function PartnerRevenueDetailModal({ revenue, onClose }) {
             <InfoRow label="Điều chỉnh" value={formatVND(r?.adjustmentAmount)} mono />
             <InfoRow
               label="Đối tác nhận"
-              value={formatVND(r?.partnerNetAmount)}
+              value={formatVND(r?.providerNetAmount)}
               mono
               tone="emerald"
             />
-            <InfoRow label="Đối tác" value={r?.partnerName} />
+            <InfoRow label="Đối tác" value={r?.providerName} />
           </div>
 
           {/* 9 điều kiện tất toán — đánh số thứ tự, tên điều kiện tiếng Việt,
@@ -1455,7 +1455,7 @@ function SettlementDetailModal({ settlementId, onClose }) {
               pill
               status={settlement?.status}
             />
-            <InfoRow label="Đối tác" value={settlement?.partnerName} />
+            <InfoRow label="Đối tác" value={settlement?.providerName} />
             <InfoRow
               label="Kỳ doanh thu"
               value={formatPeriod(settlement?.revenuePeriod)}
@@ -1526,7 +1526,7 @@ function SettlementDetailModal({ settlementId, onClose }) {
                         {formatVND(d?.commissionAmount)}
                       </td>
                       <td className="py-2 px-2 text-right font-mono font-semibold text-emerald-700">
-                        {formatVND(d?.partnerNetAmount)}
+                        {formatVND(d?.providerNetAmount)}
                       </td>
                     </tr>
                   ))}

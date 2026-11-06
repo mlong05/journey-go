@@ -32,7 +32,7 @@ import java.util.List;
 @RequestMapping("/api/v1/settlements")
 @RequiredArgsConstructor
 @Tag(name = "Settlement (Tất toán)",
-        description = "Đợt tất toán doanh thu cho Partner theo tháng dương lịch, duyệt nguyên tử và ghi nhận vào ví")
+        description = "Đợt tất toán doanh thu cho ProviderProfile theo tháng dương lịch, duyệt nguyên tử và ghi nhận vào ví")
 public class SettlementController {
 
     private final SettlementService settlementService;
@@ -40,16 +40,16 @@ public class SettlementController {
     // ── Ứng viên tất toán ────────────────────────────────────────────────────
 
     @GetMapping("/candidates")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Xem ứng viên tất toán của một đối tác theo kỳ",
             description = "Đánh giá lại điều kiện tất toán tại thời điểm gọi. Các khoản chưa đủ điều kiện "
                     + "được giữ lại kèm lý do rõ ràng và sẽ được xét lại ở kỳ sau.")
     public ResponseEntity<ApiResponse<SettlementCandidatesResponse>> getCandidates(
-            @RequestParam Long partnerId,
+            @RequestParam Long providerProfileId,
             @RequestParam String revenuePeriod) {
         return ResponseEntity.ok(ApiResponse.success("Lấy ứng viên tất toán thành công",
-                settlementService.getCandidates(partnerId, revenuePeriod)));
+                settlementService.getCandidates(providerProfileId, revenuePeriod)));
     }
 
     // ── Doanh thu nền tảng ───────────────────────────────────────────────────
@@ -89,7 +89,7 @@ public class SettlementController {
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Duyệt đợt tất toán",
             description = "Đánh giá lại toàn bộ điều kiện trước khi duyệt. Việc duyệt cập nhật Settlement, "
-                    + "Partner Revenue và tạo giao dịch cộng tiền vào ví trong CÙNG một transaction — "
+                    + "ProviderProfile Revenue và tạo giao dịch cộng tiền vào ví trong CÙNG một transaction — "
                     + "lỗi một bước thì rollback toàn bộ. Một Settlement chỉ tạo được một giao dịch cộng tiền.")
     public ResponseEntity<ApiResponse<SettlementResponse>> approve(
             @PathVariable Long settlementId,
@@ -115,7 +115,7 @@ public class SettlementController {
     // ── Read ──────────────────────────────────────────────────────────────────
 
     @GetMapping("/{settlementId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Chi tiết đợt tất toán")
     public ResponseEntity<ApiResponse<SettlementResponse>> getById(@PathVariable Long settlementId) {
@@ -124,7 +124,7 @@ public class SettlementController {
     }
 
     @GetMapping("/{settlementId}/details")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Chi tiết từng khoản doanh thu trong đợt tất toán",
             description = "Hiển thị từng Booking / Payment / Refund kèm công thức tính số tiền.")
@@ -144,14 +144,14 @@ public class SettlementController {
                 settlementService.getAll(status, pageable)));
     }
 
-    @GetMapping("/partner/{partnerId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
+    @GetMapping("/provider-profile/{providerProfileId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Danh sách đợt tất toán của một đối tác")
-    public ResponseEntity<ApiResponse<PageResponse<SettlementResponse>>> getByPartner(
-            @PathVariable Long partnerId,
+    public ResponseEntity<ApiResponse<PageResponse<SettlementResponse>>> getByProviderProfile(
+            @PathVariable Long providerProfileId,
             @ParameterObject @PageableDefault(page = 0, size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách đợt tất toán thành công",
-                settlementService.getByPartner(partnerId, pageable)));
+                settlementService.getByProviderProfile(providerProfileId, pageable)));
     }
 }

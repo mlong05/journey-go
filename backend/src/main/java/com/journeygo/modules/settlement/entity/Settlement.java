@@ -1,6 +1,6 @@
 package com.journeygo.modules.settlement.entity;
 
-import com.journeygo.modules.partner.entity.Partner;
+import com.journeygo.modules.providerprofile.entity.ProviderProfile;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
 import com.journeygo.modules.user.entity.User;
 import jakarta.persistence.*;
@@ -11,22 +11,22 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 /**
- * Settlement — phiếu tổng hợp doanh thu cho một Partner trong một kỳ tất toán.
+ * Settlement — phiếu tổng hợp doanh thu cho một ProviderProfile trong một kỳ tất toán.
  *
  * <p>Quy tắc:
  * <ul>
  *   <li>Kỳ tất toán dùng tháng dương lịch; chỉ tạo cho kỳ đã kết thúc.</li>
- *   <li>Mỗi Partner chỉ có tối đa một Settlement đã duyệt cho mỗi kỳ doanh thu.</li>
+ *   <li>Mỗi ProviderProfile chỉ có tối đa một Settlement đã duyệt cho mỗi kỳ doanh thu.</li>
  *   <li>Chỉ khi duyệt mới tạo giao dịch cộng tiền tương ứng trong Wallet.</li>
- *   <li>Duyệt phải nguyên tử: cập nhật Settlement + Partner Revenue + Wallet Transaction
+ *   <li>Duyệt phải nguyên tử: cập nhật Settlement + ProviderProfile Revenue + Wallet Transaction
  *       trong cùng một transaction, lỗi thì rollback toàn bộ.</li>
  * </ul>
  */
 @Entity
 @Table(name = "settlements", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_settlement_partner_period", columnNames = {"partner_id", "revenue_period"})
+        @UniqueConstraint(name = "uk_settlement_provider_profile_period", columnNames = {"provider_profile_id", "revenue_period"})
 }, indexes = {
-        @Index(name = "idx_settlement_partner", columnList = "partner_id"),
+        @Index(name = "idx_settlement_provider_profile", columnList = "provider_profile_id"),
         @Index(name = "idx_settlement_status", columnList = "status"),
         @Index(name = "idx_settlement_period", columnList = "revenue_period")
 })
@@ -45,8 +45,8 @@ public class Settlement {
     private String settlementCode;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "partner_id", nullable = false)
-    private Partner partner;
+    @JoinColumn(name = "provider_profile_id", nullable = false)
+    private ProviderProfile providerProfile;
 
     /** Kỳ doanh thu (yyyy-MM) mà Settlement này tổng hợp. */
     @Column(name = "revenue_period", nullable = false, length = 7)
@@ -78,7 +78,7 @@ public class Settlement {
     @Builder.Default
     private BigDecimal adjustmentAmount = BigDecimal.ZERO;
 
-    /** Tổng tiền Partner được nhận — số tiền cộng vào Wallet khi duyệt. */
+    /** Tổng tiền ProviderProfile được nhận — số tiền cộng vào Wallet khi duyệt. */
     @Column(name = "settlement_amount", nullable = false, precision = 16, scale = 2)
     @Builder.Default
     private BigDecimal settlementAmount = BigDecimal.ZERO;

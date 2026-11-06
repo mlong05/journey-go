@@ -75,10 +75,10 @@ public enum ErrorCode {
     REFUND_METHOD_NOT_ALLOWED("Chưa xác minh được trạng thái VNPay — không thể chuyển sang phương thức thủ công", HttpStatus.CONFLICT),
     REFUND_BANK_INFO_REQUIRED("Thiếu thông tin tài khoản nhận tiền cho chuyển khoản thủ công", HttpStatus.BAD_REQUEST),
 
-    // ── Partner / Revenue ─────────────────────────────────────────────────────
-    PARTNER_NOT_FOUND("Đối tác không tồn tại", HttpStatus.NOT_FOUND),
-    PARTNER_ALREADY_EXISTS("Người dùng này đã là đối tác", HttpStatus.CONFLICT),
-    PARTNER_REVENUE_NOT_FOUND("Bản ghi doanh thu không tồn tại", HttpStatus.NOT_FOUND),
+    // ── ProviderProfile / Revenue ─────────────────────────────────────────────────────
+    PROVIDER_PROFILE_NOT_FOUND("Đối tác không tồn tại", HttpStatus.NOT_FOUND),
+    PROVIDER_PROFILE_ALREADY_EXISTS("Người dùng này đã là đối tác", HttpStatus.CONFLICT),
+    PROVIDER_REVENUE_NOT_FOUND("Bản ghi doanh thu không tồn tại", HttpStatus.NOT_FOUND),
 
     // ── Wallet / Settlement ───────────────────────────────────────────────────
     WALLET_NOT_FOUND("Ví của đối tác không tồn tại", HttpStatus.NOT_FOUND),

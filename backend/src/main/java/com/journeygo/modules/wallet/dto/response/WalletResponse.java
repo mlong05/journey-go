@@ -8,12 +8,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Builder
-@Schema(description = "Thông tin ví nội bộ của Partner")
+@Schema(description = "Thông tin ví nội bộ của ProviderProfile")
 public record WalletResponse(
 
         @Schema(description = "ID ví") Long id,
-        @Schema(description = "ID partner") Long partnerId,
-        @Schema(description = "Tên partner") String partnerName,
+        @Schema(description = "ID providerProfile") Long providerProfileId,
+        @Schema(description = "Tên providerProfile") String providerName,
         @Schema(description = "Số dư đã được tất toán (VND)") BigDecimal balance,
         @Schema(description = "Loại tiền") String currency,
         @Schema(description = "Thời điểm tạo") Instant createdAt,
@@ -23,8 +23,8 @@ public record WalletResponse(
         if (w == null) return null;
         return WalletResponse.builder()
                 .id(w.getId())
-                .partnerId(w.getPartner() != null ? w.getPartner().getId() : null)
-                .partnerName(w.getPartner() != null ? w.getPartner().getPartnerName() : null)
+                .providerProfileId(w.getProviderProfile() != null ? w.getProviderProfile().getId() : null)
+                .providerName(w.getProviderProfile() != null ? w.getProviderProfile().getProviderName() : null)
                 .balance(w.getBalance())
                 .currency(w.getCurrency())
                 .createdAt(w.getCreatedAt())

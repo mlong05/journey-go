@@ -1,4 +1,4 @@
-# Tài liệu Triển khai — Booking · Payment · Refund · Partner Revenue · Wallet & Settlement
+﻿# Tài liệu Triển khai — Booking · Payment · Refund · Provider Revenue · Wallet & Settlement
 
 > **Nguồn yêu cầu:** `Booking - Payment - Refund - Wallet & Settlement.pdf`
 > **Backend:** `backend/` — Java 21 · Spring Boot 3.3.5 · PostgreSQL · Flyway · Spring Security (JWT + Method Security)
@@ -12,7 +12,7 @@
 2. [Booking](#2-booking)
 3. [Payment (VNPay)](#3-payment-vnpay)
 4. [Refund](#4-refund)
-5. [Partner Revenue](#5-partner-revenue)
+5. [Provider Revenue](#5-provider-revenue)
 6. [Wallet](#6-wallet)
 7. [Settlement](#7-settlement)
 8. [Financial Adjustment](#8-financial-adjustment)
@@ -33,9 +33,9 @@
 | Booking | `com.journeygo.modules.booking` | Đặt chỗ, giữ slot, timeout, hủy, hoàn thành |
 | Payment | `com.journeygo.modules.payment` | Thanh toán VNPay (init/retry/IPN/return/QueryDR) |
 | Refund | `com.journeygo.modules.refund` | Yêu cầu hoàn tiền, duyệt, gọi VNPay Refund, audit log |
-| Partner | `com.journeygo.modules.partner` | Quản lý đối tác (1-1 với Wallet) |
-| Partner Revenue | `com.journeygo.modules.partnerrevenue` | Ghi nhận doanh thu, hoa hồng, 8 điều kiện eligible |
-| Wallet | `com.journeygo.modules.wallet` | Ví Partner + giao dịch ví |
+| ProviderProfile | `com.journeygo.modules.providerprofile` | Quản lý đối tác (1-1 với Wallet) |
+| Provider Revenue | `com.journeygo.modules.providerrevenue` | Ghi nhận doanh thu, hoa hồng, 9 điều kiện eligible |
+| Wallet | `com.journeygo.modules.wallet` | Ví của đối tác + giao dịch ví |
 | Settlement | `com.journeygo.modules.settlement` | Đợt tất toán, duyệt nguyên tử, điều chỉnh tài chính |
 | Finance | `com.journeygo.modules.finance.config` | Cấu hình nghiệp vụ tài chính (`app.finance.*`) |
 
@@ -53,7 +53,7 @@ Tour đã publish (PUBLIC)
    │        │
    │        └─► Hết 10 phút → Scheduler → EXPIRED + giải phóng slot
    │
-   ├─► Journey hoàn thành → Booking COMPLETED → PartnerRevenue (ELIGIBLE)
+   ├─► Journey hoàn thành → Booking COMPLETED → ProviderRevenue (ELIGIBLE)
    │
    ├─► Refund (trong 24h từ paidAt) → PENDING_REVIEW → Admin duyệt
    │        └─► REFUND_PROCESSING → REFUNDED (qua VNPay API hoặc Manual Transfer)
@@ -71,8 +71,8 @@ Tour đã publish (PUBLIC)
 | 2 request giữ cùng slot cuối cùng | `@Modifying UPDATE experience_slot SET booked_tour_count = booked_tour_count + 1 WHERE booked_tour_count < max_tour_per_day` → `updated == 0` nghĩa là hết chỗ, rollback toàn transaction |
 | 2 IPN cùng giao dịch | `@Lock(PESSIMISTIC_WRITE)` trên `Payment` + `ipnCount` tăng, trạng thái SUCCESS không xác nhận lại |
 | 2 Admin duyệt cùng 1 Settlement | `@Lock(PESSIMISTIC_WRITE)` trên `Settlement` + unique constraint `uk_wallet_txn_settlement_credit (wallet_id, source_type, source_id)` |
-| Ghi doanh thu 2 lần | Unique `(booking_id, partner_id)` và `(payment_id, partner_id)` |
-| Tạo Partner + Wallet | 1 transaction duy nhất, rollback trọn vẹn nếu lỗi |
+| Ghi doanh thu 2 lần | Unique `(booking_id, provider_profile_id)` và `(payment_id, provider_profile_id)` |
+| Tạo ProviderProfile + Wallet | 1 transaction duy nhất, rollback trọn vẹn nếu lỗi |
 | Giải phóng slot 2 lần | `booking_slot_hold.released` flag — chỉ giải phóng lần đầu |
 
 ---
@@ -126,7 +126,7 @@ Ngoài ra, khi khách gọi `/init` sau khi hết hạn → `expireIfNeededInCur
 
 Được gọi từ `JourneyService` khi hành trình kết thúc (bỏ qua hết điểm đến / hoàn thành hết). Lỗi ở đây **không làm hỏng luồng Journey** — chỉ log cảnh báo.
 
-> **Đây là mốc thời gian quan trọng:** doanh thu Partner chỉ được xét tất toán **sau khi trải nghiệm hoàn thành** (điều kiện eligible #2).
+> **Đây là mốc thời gian quan trọng:** doanh thu đối tác chỉ được xét tất toán **sau khi trải nghiệm hoàn thành** (điều kiện eligible #2).
 
 ---
 
@@ -320,48 +320,48 @@ Không có endpoint sửa/xóa audit log.
 
 ---
 
-## 5. Partner Revenue
+## 5. Provider Revenue
 
 ### 5.1. Ghi nhận doanh thu — đúng 1 lần
 
-`PartnerRevenueService.recordRevenueForBooking(booking, payment)` được gọi từ:
+`ProviderRevenueService.recordRevenueForBooking(booking, payment)` được gọi từ:
 - `PaymentService` khi payment được xác minh thành công (hook)
 - Listener `BookingCompletedEvent` khi booking hoàn thành
 
 **Cơ chế chống trùng:** unique constraint
-- `(booking_id, partner_id)`
-- `(payment_id, partner_id)`
+- `(booking_id, provider_profile_id)`
+- `(payment_id, provider_profile_id)`
 
-### 5.2. Phân bổ cho nhiều Partner trong 1 Booking
+### 5.2. Phân bổ cho nhiều đối tác trong 1 Booking
 
-Một tour có thể gồm nhiều Experience của các Provider/Partner khác nhau. Ánh xạ:
+Một tour có thể gồm nhiều Experience của các đối tác khác nhau. Ánh xạ:
 
 ```
-Booking → Tour → TourDestination → Destination → Experience → người tạo (Partner)
+Booking → Tour → TourDestination → Destination → Experience → người tạo (đối tác)
 ```
 
-`resolveGrossPerPartner(booking)` → `Map<partnerId, grossAmount>`
+`resolveGrossPerProviderProfile(booking)` → `Map<providerProfileId, grossAmount>`
 
-> `grossAmount` của mỗi Partner = **tổng giá các Experience do Partner đó tạo**.
+> `grossAmount` của mỗi đối tác = **tổng giá các Experience do đối tác đó tạo**.
 
 ### 5.3. Công thức tài chính
 
 ```
 NetCollected     = GrossAmount − RefundAmount
 Commission       = NetCollected × CommissionRate
-PartnerNetAmount = NetCollected − Commission + AdjustmentAmount
+ProviderNetAmount = NetCollected − Commission + AdjustmentAmount
 ```
 
-**Phân bổ refund khi booking nhiều Partner:**
+**Phân bổ refund khi booking nhiều đối tác:**
 ```
-share = RefundedTotal × (GrossAmount_củaPartner / GrossAmount_tổng_củaBooking)
+share = RefundedTotal × (GrossAmount_củaĐốiTác / GrossAmount_tổng_củaBooking)
 ```
 
 ### 5.4. Kỳ doanh thu
 
 `revenuePeriod` = **tháng hoàn thành trải nghiệm** (`yyyy-MM`), tính theo thời điểm `completedAt` của booking — **không** theo thời điểm thanh toán.
 
-### 5.5. 8 điều kiện đủ tư cách tất toán (eligible)
+### 5.5. 9 điều kiện đủ tư cách tất toán (eligible)
 
 Đánh giá **trực tiếp tại thời điểm gọi** (không cache), trả về chi tiết từng check:
 
@@ -374,12 +374,19 @@ share = RefundedTotal × (GrossAmount_củaPartner / GrossAmount_tổng_củaBoo
 | 5 | `5_NO_RECONCILIATION_ISSUE` | Không có Financial Adjustment `PENDING` liên quan | `FINANCIAL_REVIEW_REQUIRED` |
 | 6 | `6_NOT_SETTLED` | Chưa `IN_SETTLEMENT` / `SETTLED` | `FINANCIAL_REVIEW_REQUIRED` |
 | 7 | `7_CALCULATED` | Đã có commission + net + rate | `FINANCIAL_REVIEW_REQUIRED` |
-| 8 | `8_POSITIVE_NET` | `partnerNetAmount > 0` | `FINANCIAL_REVIEW_REQUIRED` |
+| 8 | `8_POSITIVE_NET` | `providerNetAmount > 0` | `FINANCIAL_REVIEW_REQUIRED` |
+| 9 | `9_PERIOD_CLOSED` | Kỳ doanh thu (`yyyy-MM`) đã kết thúc | `PERIOD_NOT_CLOSED` |
 
 > **Điểm mấu chốt:** khoản đã `SETTLED` **không bao giờ hồi sinh** — Refund phát sinh sau tất toán được xử lý bằng Financial Adjustment riêng.
+>
+> **Điều kiện 6 phụ thuộc ngữ cảnh** (`EvaluationMode`):
+> - `CANDIDATE` (xem ứng viên / tạo bản nháp): khoản doanh thu phải **chưa thuộc đợt nào** (`status != IN_SETTLEMENT && status != SETTLED && settlementId == null`).
+> - `APPROVAL` (duyệt đợt tất toán): khoản doanh thu **phải thuộc đúng đợt đang duyệt** và chưa bị `SETTLED`. Nếu chấm theo nghĩa "chưa thuộc đợt nào" thì mọi đợt tất toán sẽ luôn fail ở bước duyệt.
+>
+> **Điều kiện 9** chặn việc doanh thu kỳ **tương lai** bị kéo vào đợt tất toán của kỳ đã đóng qua cơ chế "doanh thu chuyển tiếp". Kỳ hiện tại chỉ đóng khi bật `app.finance.allow-open-period-settlement=true`; kỳ tương lai **luôn** chưa đóng.
 
-**`PartnerRevenueStatus`:** `PENDING` · `ELIGIBLE` · `IN_SETTLEMENT` · `SETTLED`
-**`DeferredReason`:** `PAYMENT_NOT_VERIFIED` · `BOOKING_NOT_COMPLETED` · `REFUND_PENDING` · `FINANCIAL_REVIEW_REQUIRED`
+**`ProviderRevenueStatus`:** `PENDING` · `ELIGIBLE` · `IN_SETTLEMENT` · `SETTLED`
+**`DeferredReason`:** `PAYMENT_NOT_VERIFIED` · `BOOKING_NOT_COMPLETED` · `REFUND_PENDING` · `PERIOD_NOT_CLOSED` · `FINANCIAL_REVIEW_REQUIRED`
 
 ---
 
@@ -387,8 +394,8 @@ share = RefundedTotal × (GrossAmount_củaPartner / GrossAmount_tổng_củaBoo
 
 ### 6.1. Mô hình
 
-- **Wallet 1-to-1 với Partner** — tạo **nguyên tử cùng Partner** trong 1 transaction (`PartnerService.createPartner`)
-- `Wallet`: `partner`, `balance`, `currency`, `status`
+- **Wallet 1-to-1 với ProviderProfile** — tạo **nguyên tử cùng ProviderProfile** trong 1 transaction (`ProviderProfileService.createProviderProfile`)
+- `Wallet`: `providerProfile`, `balance`, `currency`, `status`
 - `WalletTransaction`: `wallet`, `type`, `direction`, `amount`, `balanceAfter`, `status`, `sourceType`, `sourceId`, `note`
 
 ### 6.2. Loại giao dịch
@@ -411,6 +418,32 @@ uk_wallet_txn_settlement_credit (wallet_id, source_type, source_id)
 - `creditFromSettlement(wallet, settlement, amount)` — cộng tiền từ settlement đã duyệt
 - `applyAdjustment(wallet, adjustment, amount)` — nếu **không đủ số dư** → ghi nhận khoản phải thu `PENDING` thay vì âm số dư
 
+### 6.5. Cô lập dữ liệu tài chính giữa các Content Provider
+
+> ⚠️ **Bắt buộc:** một Content Provider **KHÔNG** được xem số dư ví / giao dịch / doanh thu /
+> đợt tất toán của đối tác khác.
+
+| Role | Phạm vi xem dữ liệu tài chính |
+|---|---|
+| `ADMIN` | Toàn bộ mọi ProviderProfile |
+| `CONTENT_PROVIDER` | **Chỉ** ProviderProfile gắn với chính mình (`provider_profiles.user_id == principal.id`) |
+| `CONTENT_MODERATOR` | Không có quyền tài chính |
+| `TOURIST` | Không có quyền tài chính |
+
+Cơ chế thực thi: `AuthorizationGuard.requireFinanceOwnerOrAdmin(ownerUserId)` — ném
+`BusinessException` với mã `FORBIDDEN-FINANCE-OWNER` (HTTP 403) nếu caller là
+`CONTENT_PROVIDER` nhưng không sở hữu hồ sơ. Được áp dụng tại:
+
+- `WalletService.getByProviderProfile` · `getById` · `getTransactions` · `getTransactionsByWallet`
+- `ProviderRevenueService.getById` · `getByProviderProfile` · `evaluateEligibility` · `evaluateForApproval` · `findByBooking` (lọc theo chủ sở hữu)
+- `ProviderProfileService.getById` · `getByUserId` (hồ sơ chứa `commissionRate`, `hasWallet`)
+- `SettlementService.getCandidates` · `getById` · `getDetails` · `getByProviderProfile`
+
+> **Lưu ý:** `@PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")` **chỉ** chặn được
+> TOURIST/MODERATOR — nó KHÔNG chặn được việc một Content Provider đọc dữ liệu của đối tác
+> khác bằng cách đổi `providerProfileId` trong URL. Vì vậy phải có thêm lớp kiểm tra sở hữu ở
+> tầng service.
+
 ---
 
 ## 7. Settlement
@@ -424,7 +457,7 @@ uk_wallet_txn_settlement_credit (wallet_id, source_type, source_id)
 ### 7.2. Luồng
 
 ```
-Đánh giá candidates (8 điều kiện, live)
+Đánh giá candidates (9 điều kiện, live)
       │
       ├─► eligible  → tạo Settlement DRAFT (kèm SettlementDetail)
       └─► held     → giữ kèm lý do (DeferredReason)
@@ -432,7 +465,7 @@ uk_wallet_txn_settlement_credit (wallet_id, source_type, source_id)
       ▼
 Admin DUYỆT (nguyên tử, 1 transaction)
       ├─► Settlement.Status = APPROVED
-      ├─► PartnerRevenue.Status = SETTLED
+      ├─► ProviderRevenue.Status = SETTLED
       ├─► Wallet.balance += amount
       ├─► WalletTransaction(SETTLEMENT_CREDIT)
       └─► SettlementDetail → SETTLED
@@ -454,7 +487,7 @@ Admin TỪ CHỐI ────────────────────�
 
 Dùng cho **trường hợp phát sinh sau khi đã tất toán** (refund đến sau khi settlement đã APPROVED).
 
-- `FinancialAdjustment`: `partner`, `amount` (dương = cộng, âm = trừ), `reason`, `refundRequest`, `settlement`, `status`
+- `FinancialAdjustment`: `providerProfile`, `amount` (dương = cộng, âm = trừ), `reason`, `refundRequest`, `settlement`, `status`
 - **Không sửa lịch sử đã duyệt** — tạo khoản điều chỉnh riêng
 - `PENDING` → Admin duyệt → `APPROVED` (áp dụng vào Wallet, tạo `WalletTransaction` type `REFUND_ADJUSTMENT`) hoặc `REJECTED`
 
@@ -494,7 +527,7 @@ Xem `backend/.env.example` — nhóm `# ===== VNPay =====` và `# ===== Finance 
 - **Idempotent** — dùng `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`
 - Đủ **unique constraint** chống trùng
 - **Foreign key** đầy đủ
-- Insert role `PARTNER`
+- Insert role `CONTENT_PROVIDER`
 
 ### 10.1. Bảng chính
 
@@ -505,12 +538,12 @@ Xem `backend/.env.example` — nhóm `# ===== VNPay =====` và `# ===== Finance 
 | `payments` | Giao dịch thanh toán | `txn_ref` |
 | `refund_requests` | Yêu cầu hoàn tiền | `refund_code` |
 | `refund_audit_logs` | Audit bất biến | — |
-| `partners` | Đối tác | `user_id` (1-1) |
-| `partner_revenues` | Doanh thu | `(booking_id, partner_id)`, `(payment_id, partner_id)` |
-| `wallets` | Ví Partner | `partner_id` (1-1) |
+| `provider_profiles` | Đối tác | `user_id` (1-1) |
+| `provider_revenues` | Doanh thu | `(booking_id, provider_profile_id)`, `(payment_id, provider_profile_id)` |
+| `wallets` | Ví của đối tác | `provider_profile_id` (1-1) |
 | `wallet_transactions` | Giao dịch ví | `(wallet_id, source_type, source_id)` |
 | `settlements` | Đợt tất toán | — |
-| `settlement_details` | Chi tiết settlement | `(settlement_id, partner_revenue_id)` |
+| `settlement_details` | Chi tiết settlement | `(settlement_id, provider_revenue_id)` |
 | `financial_adjustments` | Điều chỉnh tài chính | — |
 
 ### 10.2. Index
@@ -524,8 +557,8 @@ Xem `backend/.env.example` — nhóm `# ===== VNPay =====` và `# ===== Finance 
 | `idx_payments_status` | `payments` | `status` |
 | `idx_refund_requests_payment` | `refund_requests` | `payment_id` |
 | `idx_refund_requests_status` | `refund_requests` | `status` |
-| `idx_partner_revenues_period` | `partner_revenues` | `revenue_period` |
-| `idx_partner_revenues_partner` | `partner_revenues` | `partner_id` |
+| `idx_provider_revenues_period` | `provider_revenues` | `revenue_period` |
+| `idx_provider_revenues_provider` | `provider_revenues` | `provider_profile_id` |
 | `idx_wallet_txn_wallet` | `wallet_transactions` | `wallet_id` |
 | `idx_wallet_txn_source` | `wallet_transactions` | `source_type, source_id` |
 | `idx_wallet_txn_created` | `wallet_transactions` | `created_at` |
@@ -590,48 +623,48 @@ Xem `backend/.env.example` — nhóm `# ===== VNPay =====` và `# ===== Finance 
 | POST | `/api/v1/refunds/{refundId}/manual-transfer` | ADMIN | Xác nhận chuyển khoản ngân hàng |
 | POST | `/api/v1/refunds/{refundId}/refresh-status` | ADMIN | Poll trạng thái VNPay |
 
-### 11.6. Partner
+### 11.6. ProviderProfile
 
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
-| POST | `/api/v1/partners` | ADMIN | Tạo Partner (+ Wallet nguyên tử) |
-| GET | `/api/v1/partners` | ADMIN | Danh sách partner |
-| GET | `/api/v1/partners/active` | ADMIN/PROVIDER/PARTNER | Partner đang hoạt động |
-| GET | `/api/v1/partners/{partnerId}` | ADMIN/PARTNER | Chi tiết partner |
-| GET | `/api/v1/partners/by-user/{userId}` | ADMIN/PARTNER | Partner theo user |
-| PUT | `/api/v1/partners/{partnerId}` | ADMIN | Cập nhật partner |
+| POST | `/api/v1/provider-profiles` | ADMIN | Tạo ProviderProfile (+ Wallet nguyên tử) |
+| GET | `/api/v1/provider-profiles` | ADMIN | Danh sách đối tác |
+| GET | `/api/v1/provider-profiles/active` | ADMIN/CONTENT_PROVIDER | Đối tác đang hoạt động |
+| GET | `/api/v1/provider-profiles/{providerProfileId}` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Chi tiết đối tác |
+| GET | `/api/v1/provider-profiles/by-user/{userId}` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Đối tác theo user |
+| PUT | `/api/v1/provider-profiles/{providerProfileId}` | ADMIN | Cập nhật đối tác |
 
-### 11.7. Partner Revenue
+### 11.7. Provider Revenue
 
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/v1/partner-revenues/partners/{partnerId}` | ADMIN/PARTNER | Doanh thu của partner |
-| GET | `/api/v1/partner-revenues` | ADMIN | Tất cả doanh thu |
-| GET | `/api/v1/partner-revenues/bookings/{bookingId}` | ADMIN/PARTNER | Doanh thu theo booking |
-| GET | `/api/v1/partner-revenues/{revenueId}` | ADMIN/PARTNER | Chi tiết |
-| GET | `/api/v1/partner-revenues/{revenueId}/eligibility` | ADMIN/PARTNER | **8 điều kiện eligible** |
+| GET | `/api/v1/provider-revenues/provider-profile/{providerProfileId}` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Doanh thu của đối tác |
+| GET | `/api/v1/provider-revenues` | ADMIN | Tất cả doanh thu |
+| GET | `/api/v1/provider-revenues/bookings/{bookingId}` | ADMIN/CONTENT_PROVIDER (lọc theo chủ sở hữu) | Doanh thu theo booking |
+| GET | `/api/v1/provider-revenues/{revenueId}` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Chi tiết |
+| GET | `/api/v1/provider-revenues/{revenueId}/eligibility` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | **9 điều kiện eligible** |
 
 ### 11.8. Wallet
 
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/v1/wallets/partner/{partnerId}` | ADMIN/PARTNER | Ví theo partner |
-| GET | `/api/v1/wallets/{walletId}` | ADMIN/PARTNER | Chi tiết ví |
-| GET | `/api/v1/wallets/partner/{partnerId}/transactions` | ADMIN/PARTNER | Giao dịch ví theo partner |
-| GET | `/api/v1/wallets/{walletId}/transactions` | ADMIN/PARTNER | Giao dịch của ví |
+| GET | `/api/v1/wallets/provider-profile/{providerProfileId}` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Ví theo đối tác |
+| GET | `/api/v1/wallets/{walletId}` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Chi tiết ví |
+| GET | `/api/v1/wallets/provider-profile/{providerProfileId}/transactions` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Giao dịch ví theo đối tác |
+| GET | `/api/v1/wallets/{walletId}/transactions` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Giao dịch của ví |
 
 ### 11.9. Settlement
 
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/v1/settlements/candidates?partnerId=&revenuePeriod=` | ADMIN/PARTNER | **Đánh giá 8 điều kiện** |
+| GET | `/api/v1/settlements/candidates?providerProfileId=&revenuePeriod=` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | **Đánh giá 9 điều kiện** |
 | POST | `/api/v1/settlements` | ADMIN | Tạo đợt tất toán (draft) |
 | POST | `/api/v1/settlements/{settlementId}/approve` | ADMIN | **Duyệt nguyên tử** |
 | POST | `/api/v1/settlements/{settlementId}/reject` | ADMIN | Từ chối / hủy |
-| GET | `/api/v1/settlements/{settlementId}` | ADMIN/PARTNER | Chi tiết |
-| GET | `/api/v1/settlements/{settlementId}/details` | ADMIN/PARTNER | Chi tiết từng khoản |
+| GET | `/api/v1/settlements/{settlementId}` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Chi tiết |
+| GET | `/api/v1/settlements/{settlementId}/details` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Chi tiết từng khoản |
 | GET | `/api/v1/settlements?status=...` | ADMIN | Tất cả settlement |
-| GET | `/api/v1/settlements/partner/{partnerId}` | ADMIN/PARTNER | Settlement của partner |
+| GET | `/api/v1/settlements/provider-profile/{providerProfileId}` | ADMIN/CONTENT_PROVIDER (chủ sở hữu) | Settlement của đối tác |
 
 ### 11.10. Financial Adjustment
 
@@ -640,9 +673,9 @@ Xem `backend/.env.example` — nhóm `# ===== VNPay =====` và `# ===== Finance 
 | POST | `/api/v1/financial-adjustments` | ADMIN | Tạo khoản điều chỉnh |
 | POST | `/api/v1/financial-adjustments/{id}/approve` | ADMIN | Duyệt → áp dụng vào ví |
 | POST | `/api/v1/financial-adjustments/{id}/reject` | ADMIN | Từ chối |
-| GET | `/api/v1/financial-adjustments/{id}` | ADMIN/PARTNER | Chi tiết |
+| GET | `/api/v1/financial-adjustments/{id}` | ADMIN/CONTENT_PROVIDER | Chi tiết |
 | GET | `/api/v1/financial-adjustments` | ADMIN | Tất cả |
-| GET | `/api/v1/financial-adjustments/partner/{partnerId}` | ADMIN/PARTNER | Theo partner |
+| GET | `/api/v1/financial-adjustments/provider-profile/{providerProfileId}` | ADMIN/CONTENT_PROVIDER | Theo đối tác |
 
 ### 11.11. Journey (để hoàn thành booking)
 
@@ -714,8 +747,8 @@ POST /bookings  → BOOKING_SLOT_FULL (không tạo booking, không giữ slot d
 | Bất biến | Bảo đảm bởi |
 |---|---|
 | Mỗi settlement credit ví đúng 1 lần | `uk_wallet_txn_settlement_credit` |
-| Mỗi booking ghi doanh thu đúng 1 lần / partner | `uk_partner_revenue_booking_partner` |
-| Mỗi payment ghi doanh thu đúng 1 lần / partner | `uk_partner_revenue_payment_partner` |
+| Mỗi booking ghi doanh thu đúng 1 lần / đối tác | `uk_provider_revenue_booking_provider` |
+| Mỗi payment ghi doanh thu đúng 1 lần / đối tác | `uk_provider_revenue_payment_provider` |
 | Slot giải phóng đúng 1 lần | `booking_slot_holds.released` |
 | Không hồi sinh doanh thu đã `SETTLED` | `applyEligibility()` guard |
 | Số dư ví không âm | `WalletService.applyAdjustment` → ghi `PENDING` |
@@ -830,24 +863,24 @@ modules/refund/
   scheduler/RefundStatusScheduler.java
   service/RefundService.java
 
-modules/partner/
-  controller/PartnerController.java
-  dto/request/CreatePartnerRequest.java
-  dto/request/UpdatePartnerRequest.java
-  dto/response/PartnerResponse.java
-  entity/Partner.java
-  repository/PartnerRepository.java
-  service/PartnerService.java
+modules/providerprofile/
+  controller/ProviderProfileController.java
+  dto/request/CreateProviderProfileRequest.java
+  dto/request/UpdateProviderProfileRequest.java
+  dto/response/ProviderProfileResponse.java
+  entity/ProviderProfile.java
+  repository/ProviderProfileRepository.java
+  service/ProviderProfileService.java
 
-modules/partnerrevenue/
-  controller/PartnerRevenueController.java
+modules/providerrevenue/
+  controller/ProviderRevenueController.java
   dto/response/EligibilityEvaluationResponse.java
-  dto/response/PartnerRevenueResponse.java
-  entity/PartnerRevenue.java
+  dto/response/ProviderRevenueResponse.java
+  entity/ProviderRevenue.java
   entity/enums/DeferredReason.java
-  entity/enums/PartnerRevenueStatus.java
-  repository/PartnerRevenueRepository.java
-  service/PartnerRevenueService.java
+  entity/enums/ProviderRevenueStatus.java
+  repository/ProviderRevenueRepository.java
+  service/ProviderRevenueService.java
 
 modules/wallet/
   controller/WalletController.java
@@ -901,11 +934,11 @@ resources/db/migration/V1__init_booking_payment_refund_wallet_settlement.sql
 | `.env.example` | Biến VNPay + Finance |
 | `ErrorCode.java` | Thêm các error code mới (`REFUND_AMOUNT_MISMATCH`, ...) |
 | `SecurityConfig.java` | Whitelist `/api/v1/payments/ipn` + `/api/v1/payments/return` |
-| `Role.java` | Thêm `PARTNER` + `isPartner()` |
+| `Role.java` | Thêm `CONTENT_PROVIDER` + `isContentProvider()` |
 | `BookingService.java` | `completeBooking` + phát `BookingCompletedEvent` |
 | `JourneyService.java` | Gọi `bookingService.completeBooking()` khi journey kết thúc |
-| `PartnerRevenue.java` | Unique constraint hỗ trợ nhiều partner / booking |
-| `PartnerRevenueRepository.java` | Thêm query theo booking |
+| `ProviderRevenue.java` | Unique constraint hỗ trợ nhiều đối tác / booking |
+| `ProviderRevenueRepository.java` | Thêm query theo booking |
 | `ExperienceRepository.java` / `ExperienceSlotRepository.java` | Query phục vụ slot hold |
 | `PaymentService.java` | Hook ghi doanh thu + hỗ trợ `bankCode` |
 
@@ -917,7 +950,7 @@ resources/db/migration/V1__init_booking_payment_refund_wallet_settlement.sql
 
 - Toàn bộ entity, repository, service, controller, DTO cho 7 module
 - Thuật toán VNPay 2.1.0 (payment URL, IPN/Return verify, QueryDR, Refund)
-- Đủ 8 điều kiện eligibility
+- Đủ 9 điều kiện eligibility
 - Cơ chế concurrency (pessimistic lock + atomic update + unique constraint)
 - Flyway migration idempotent
 - Cấu hình qua env, không hardcode
@@ -927,4 +960,4 @@ resources/db/migration/V1__init_booking_payment_refund_wallet_settlement.sql
 
 - **Unit test & Integration test** (xem `TEST_SCENARIOS.md` cho kịch bản chi tiết)
 - Tài liệu hướng dẫn cấu hình VNPay Sandbox độc lập (hiện đã tích hợp trong `application.yml` + `.env.example` + Mục 3 & 13)
-- Seed role `PARTNER` trong `DataInitializer` (migration SQL đã insert role)
+- Seed role `CONTENT_PROVIDER` trong `DataInitializer` (migration SQL đã insert role)

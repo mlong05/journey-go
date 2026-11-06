@@ -23,7 +23,7 @@ JSON cho phần `content`:
 ~~~
 
 Kỳ vọng: HTTP 201, response có `data.id` và `mediaUrl`; content tự vào hàng chờ `PENDING`.
-3. Moderator/Admin xử lý tại Moderation flow. Sau khi duyệt, xác nhận content xuất hiện ở `GET /api/v1/destinations/{destinationId}/contents` hoặc `GET /api/v1/cultural-contents/approved`.
+3. Content Moderator/Admin xử lý tại Moderation flow. Sau khi duyệt, xác nhận content xuất hiện ở `GET /api/v1/destinations/{destinationId}/contents` hoặc `GET /api/v1/cultural-contents/approved`.
 
 ## Happy case: thay/gỡ ảnh và gửi duyệt lại
 

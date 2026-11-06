@@ -51,7 +51,7 @@ public class TourController {
     // ── ADMIN / MODERATOR ─────────────────────────────────────────────────────
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy tất cả tour (ADMIN / MODERATOR)",
             description = "Bao gồm các tour chưa xuất bản, hỗ trợ phân trang và sắp xếp")
@@ -62,7 +62,7 @@ public class TourController {
     }
 
     @GetMapping("/deleted")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy tour đã xóa mềm (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<PageResponse<TourResponse>>> getDeleted(
@@ -72,7 +72,7 @@ public class TourController {
     }
 
     @DeleteMapping("/{tourId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Xóa mềm tour (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long tourId) {
@@ -81,7 +81,7 @@ public class TourController {
     }
 
     @PatchMapping("/{tourId}/restore")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Khôi phục tour đã xóa (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<TourResponse>> restore(@PathVariable Long tourId) {
@@ -92,7 +92,7 @@ public class TourController {
     // ── ADMIN / MODERATOR / PROVIDER ─────────────────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo tour mới (ADMIN / MODERATOR / PROVIDER)",
             description = "Tạo tour và tự gửi vào hàng chờ moderation. Giá tour được tính tự động từ các Experience; "
@@ -106,7 +106,7 @@ public class TourController {
     }
 
     @PutMapping("/{tourId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Cập nhật tour (ADMIN / MODERATOR / PROVIDER)",
             description = "PROVIDER chỉ được cập nhật tour của chính mình. Chỉnh sửa sẽ tự gửi duyệt lại. "
@@ -121,7 +121,7 @@ public class TourController {
     }
 
     @GetMapping("/my")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy tour của tôi (PROVIDER / ADMIN / MODERATOR)",
             description = "Trả về danh sách tour do người dùng hiện tại tạo")

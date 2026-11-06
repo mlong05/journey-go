@@ -10,7 +10,7 @@ import com.journeygo.modules.booking.service.BookingService;
 import com.journeygo.modules.notification.entity.enums.NotificationType;
 import com.journeygo.modules.notification.service.NotificationPublisher;
 import com.journeygo.modules.user.entity.Role;
-import com.journeygo.modules.partnerrevenue.service.PartnerRevenueService;
+import com.journeygo.modules.providerrevenue.service.ProviderRevenueService;
 import com.journeygo.modules.payment.config.VnPayProperties;
 import com.journeygo.modules.payment.dto.response.PaymentInitResponse;
 import com.journeygo.modules.payment.dto.response.PaymentResponse;
@@ -91,7 +91,7 @@ public class PaymentService {
     private final NotificationPublisher notifications;
     private final VnPayClient vnPayClient;
     private final VnPayProperties vnPayProperties;
-    private final PartnerRevenueService partnerRevenueService;
+    private final ProviderRevenueService providerRevenueService;
     private final PaymentMethodService paymentMethodService;
 
     // ── Khởi tạo thanh toán ───────────────────────────────────────────────────
@@ -671,8 +671,8 @@ public class PaymentService {
         booking.confirm(paidAt);
         bookingRepository.save(booking);
 
-        // Ghi nhận doanh thu Partner — CHỈ ghi nhận một lần cho giao dịch này.
-        recordPartnerRevenue(booking, payment);
+        // Ghi nhận doanh thu ProviderProfile — CHỈ ghi nhận một lần cho giao dịch này.
+        recordProviderRevenue(booking, payment);
         notifyBookingConfirmed(booking, payment);
 
         log.info("[Payment] Đã xác nhận booking {} sau khi xác minh thanh toán (txnRef={}, paidAt={}).",
@@ -681,14 +681,14 @@ public class PaymentService {
     }
 
     /**
-     * Ghi nhận doanh thu Partner cho Booking vừa được xác nhận.
+     * Ghi nhận doanh thu ProviderProfile cho Booking vừa được xác nhận.
      *
-     * <p>Idempotent — bản ghi doanh thu được tạo/cập nhật theo cặp (Booking, Partner), nên
+     * <p>Idempotent — bản ghi doanh thu được tạo/cập nhật theo cặp (Booking, ProviderProfile), nên
      * callback trùng (UC-04) không tạo ra doanh thu lần thứ hai.
      */
-    private void recordPartnerRevenue(Booking booking, Payment payment) {
+    private void recordProviderRevenue(Booking booking, Payment payment) {
         try {
-            partnerRevenueService.recordRevenueForBooking(booking, payment);
+            providerRevenueService.recordRevenueForBooking(booking, payment);
         } catch (Exception e) {
             // Không để lỗi ghi nhận doanh thu làm hỏng luồng thanh toán đã xác minh.
             // Tác vụ nền / đánh giá lại sẽ xử lý.
@@ -714,7 +714,7 @@ public class PaymentService {
         if (canReconfirm) {
             booking.confirm(paidAt);
             bookingRepository.save(booking);
-            recordPartnerRevenue(booking, payment);
+            recordProviderRevenue(booking, payment);
             notifyBookingConfirmed(booking, payment);
             payment.setNote("Thanh toán đến muộn nhưng vẫn còn chỗ — đã xác nhận lại Booking.");
             paymentRepository.save(payment);

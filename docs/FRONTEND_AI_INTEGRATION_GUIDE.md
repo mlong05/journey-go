@@ -1,10 +1,10 @@
-# 🤖 HƯỚNG DẪN TÍCH HỢP CHO AI — Booking → Payment → Refund → Settlement
+﻿# 🤖 HƯỚNG DẪN TÍCH HỢP CHO AI — Booking → Payment → Refund → Settlement
 
 > **Người đọc:** AI coding agent của team Frontend (Web Next.js + Mobile Flutter).
 > **Mục tiêu:** Tích hợp đầy đủ luồng đặt tour → thanh toán VNPay → hoàn tiền → tất toán đối tác,
 > chạy được trên **cả Web lẫn Mobile** với cùng một hợp đồng API (contract).
 >
-> **Nguồn sự thật:** mã nguồn backend trong `backend/src/main/java/com/journeygo/modules/{booking,payment,refund,settlement,wallet,partnerrevenue,partner}`.
+> **Nguồn sự thật:** mã nguồn backend trong `backend/src/main/java/com/journeygo/modules/{booking,payment,refund,settlement,wallet,providerrevenue,providerprofile}`.
 > Nếu tài liệu này và code backend lệch nhau → **code backend là chuẩn**.
 > Kịch bản test chi tiết kèm JSON copy-paste: `docs/TEST_SCENARIOS.md`.
 
@@ -19,7 +19,7 @@
 5. [Luồng A — Chọn tour → Booking](#5-luồng-a--chọn-tour--booking)
 6. [Luồng B — Payment (VNPay 2.1.0)](#6-luồng-b--payment-vnpay-210)
 7. [Luồng C — Refund](#7-luồng-c--refund)
-8. [Luồng D — Settlement & Wallet (Admin/Partner)](#8-luồng-d--settlement--wallet-adminpartner)
+8. [Luồng D — Settlement & Wallet (Admin/CONTENT_PROVIDER)](#8-luồng-d--settlement--wallet-admincontent_provider)
 9. [Luồng E — Financial Adjustment](#9-luồng-e--financial-adjustment)
 10. [Hướng dẫn riêng cho WEB (Next.js)](#10-hướng-dẫn-riêng-cho-web-nextjs)
 11. [Hướng dẫn riêng cho MOBILE (Flutter)](#11-hướng-dẫn-riêng-cho-mobile-flutter)
@@ -131,9 +131,9 @@ Header: `Authorization: Bearer <accessToken>`
 | Role | Dùng cho |
 |---|---|
 | `TOURIST` | Đặt tour, thanh toán, xin hoàn tiền, chạy hành trình |
-| `PARTNER` | Xem doanh thu, ví, settlement của mình |
-| `ADMIN` | Duyệt refund, settlement, financial adjustment, quản lý partner |
-| `MODERATOR`, `PROVIDER`, `USER` | Các module khác (không liên quan tài liệu này) |
+| `CONTENT_PROVIDER` | Xem doanh thu, ví, settlement của mình |
+| `ADMIN` | Duyệt refund, settlement, financial adjustment, quản lý đối tác |
+| `CONTENT_MODERATOR`, `CONTENT_PROVIDER`, `USER` | Các module khác (không liên quan tài liệu này) |
 
 ### 2.4. Tài khoản test (đã seed sẵn khi khởi động backend)
 
@@ -143,8 +143,8 @@ Mật khẩu chung: `Password123@`
 |---|---|
 | `tourist1@journeygo.com` | TOURIST |
 | `tourist2@journeygo.com` | TOURIST |
-| `partner1@journeygo.com` | PARTNER (hoa hồng 25%) |
-| `partner2@journeygo.com` | PARTNER (hoa hồng 20%) |
+| `provider1@journeygo.com` | CONTENT_PROVIDER (hoa hồng 25%) |
+| `provider2@journeygo.com` | CONTENT_PROVIDER (hoa hồng 20%) |
 | `admin@journeygo.com` | ADMIN |
 
 ---
@@ -161,7 +161,7 @@ Booking (tourist + tour + experienceDate) ──> BookingSlotHold (giữ chỗ t
   └── Payment (mỗi lần thử = 1 Payment)
         ├── RefundRequest (tối đa 1 đang mở / payment)
         │     └── RefundAuditLog
-        └── PartnerRevenue (mỗi Partner trong tour = 1 bản ghi)
+        └── ProviderRevenue (mỗi đối tác trong tour = 1 bản ghi)
               └── SettlementDetail ──> Settlement ──> WalletTransaction
 FinancialAdjustment ──> WalletTransaction
 ```
@@ -213,7 +213,7 @@ FinancialAdjustment ──> WalletTransaction
 
 `DRAFT` (bản nháp) → `APPROVED` (✅ đã cộng tiền vào ví) / `REJECTED` / `CANCELLED`
 
-### 3.8. PartnerRevenueStatus & DeferredReason
+### 3.8. ProviderRevenueStatus & DeferredReason
 
 | Status | Nghĩa |
 |---|---|
@@ -233,7 +233,7 @@ FinancialAdjustment ──> WalletTransaction
 
 | `transactionType` | `direction` | Khi nào |
 |---|---|---|
-| `SETTLEMENT_CREDIT` | `CREDIT` | Settlement được duyệt → cộng tiền vào ví Partner |
+| `SETTLEMENT_CREDIT` | `CREDIT` | Settlement được duyệt → cộng tiền vào ví đối tác |
 | `REFUND_ADJUSTMENT` | `DEBIT`/`CREDIT` | Refund xảy ra sau khi đã tất toán → khấu trừ hoặc hoàn lại |
 | `MANUAL_ADJUSTMENT` | `DEBIT`/`CREDIT` | Khoản điều chỉnh thủ công |
 
@@ -292,36 +292,36 @@ Base prefix: `/api/v1`
 | POST | `/refunds/{refundId}/manual-transfer` | ADMIN | Ghi nhận chuyển khoản tay |
 | POST | `/refunds/{refundId}/refresh-status` | ADMIN | Poll trạng thái từ VNPay |
 
-### 4.5. Settlement / Wallet / Revenue / Partner
+### 4.5. Settlement / Wallet / Revenue / ProviderProfile
 
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/settlements/candidates?partnerId=&revenuePeriod=` | ADMIN/PARTNER | Ứng viên tất toán (đánh giá 8 điều kiện) |
+| GET | `/settlements/candidates?providerProfileId=&revenuePeriod=` | ADMIN/CONTENT_PROVIDER | Ứng viên tất toán (đánh giá 9 điều kiện) |
 | POST | `/settlements` | ADMIN | Tạo bản nháp đợt tất toán |
 | POST | `/settlements/{id}/approve` | ADMIN | Duyệt (atomic: cộng tiền ví) |
 | POST | `/settlements/{id}/reject` | ADMIN | Từ chối (giải phóng doanh thu) |
-| GET | `/settlements/{id}` | ADMIN/PARTNER | Chi tiết |
-| GET | `/settlements/{id}/details` | ADMIN/PARTNER | Chi tiết từng khoản doanh thu |
+| GET | `/settlements/{id}` | ADMIN/CONTENT_PROVIDER | Chi tiết |
+| GET | `/settlements/{id}/details` | ADMIN/CONTENT_PROVIDER | Chi tiết từng khoản doanh thu |
 | GET | `/settlements?status=` | ADMIN | Toàn bộ |
-| GET | `/settlements/partner/{partnerId}` | ADMIN/PARTNER | Settlement của 1 đối tác |
-| GET | `/wallets/partner/{partnerId}` | ADMIN/PARTNER | Số dư ví |
-| GET | `/wallets/{walletId}` | ADMIN/PARTNER | Chi tiết ví |
-| GET | `/wallets/partner/{partnerId}/transactions` | ADMIN/PARTNER | Lịch sử giao dịch ví |
-| GET | `/wallets/{walletId}/transactions` | ADMIN/PARTNER | Lịch sử theo walletId |
-| GET | `/partner-revenues/partners/{partnerId}` | ADMIN/PARTNER | Doanh thu của đối tác |
-| GET | `/partner-revenues?status=` | ADMIN | Doanh thu theo trạng thái |
-| GET | `/partner-revenues/bookings/{bookingId}` | ADMIN/PARTNER | Doanh thu sinh ra từ 1 booking |
-| GET | `/partner-revenues/{revenueId}` | ADMIN/PARTNER | Chi tiết khoản doanh thu |
-| GET | `/partner-revenues/{revenueId}/eligibility` | ADMIN/PARTNER | **8 điều kiện tất toán** |
+| GET | `/settlements/provider-profile/{providerProfileId}` | ADMIN/CONTENT_PROVIDER | Settlement của 1 đối tác |
+| GET | `/wallets/provider-profile/{providerProfileId}` | ADMIN/CONTENT_PROVIDER | Số dư ví |
+| GET | `/wallets/{walletId}` | ADMIN/CONTENT_PROVIDER | Chi tiết ví |
+| GET | `/wallets/provider-profile/{providerProfileId}/transactions` | ADMIN/CONTENT_PROVIDER | Lịch sử giao dịch ví |
+| GET | `/wallets/{walletId}/transactions` | ADMIN/CONTENT_PROVIDER | Lịch sử theo walletId |
+| GET | `/provider-revenues/provider-profile/{providerProfileId}` | ADMIN/CONTENT_PROVIDER | Doanh thu của đối tác |
+| GET | `/provider-revenues?status=` | ADMIN | Doanh thu theo trạng thái |
+| GET | `/provider-revenues/bookings/{bookingId}` | ADMIN/CONTENT_PROVIDER | Doanh thu sinh ra từ 1 booking |
+| GET | `/provider-revenues/{revenueId}` | ADMIN/CONTENT_PROVIDER | Chi tiết khoản doanh thu |
+| GET | `/provider-revenues/{revenueId}/eligibility` | ADMIN/CONTENT_PROVIDER | **9 điều kiện tất toán** |
 | POST | `/financial-adjustments` | ADMIN | Tạo khoản điều chỉnh |
 | POST | `/financial-adjustments/{id}/approve` | ADMIN | Duyệt → áp vào ví |
 | POST | `/financial-adjustments/{id}/reject?reason=` | ADMIN | Từ chối |
-| GET | `/financial-adjustments/{id}` | ADMIN/PARTNER | Chi tiết |
+| GET | `/financial-adjustments/{id}` | ADMIN/CONTENT_PROVIDER | Chi tiết |
 | GET | `/financial-adjustments?status=` | ADMIN | Toàn bộ |
-| GET | `/financial-adjustments/partner/{partnerId}` | ADMIN/PARTNER | Của 1 đối tác |
-| GET | `/partners/active` | ADMIN/PROVIDER/PARTNER | Danh sách đối tác đang hoạt động |
-| GET | `/partners/by-user/{userId}` | ADMIN/PARTNER | Tìm Partner theo user (dùng để lấy partnerId của chính mình) |
-| GET | `/partners/{partnerId}` | ADMIN/PARTNER | Chi tiết đối tác |
+| GET | `/financial-adjustments/provider-profile/{providerProfileId}` | ADMIN/CONTENT_PROVIDER | Của 1 đối tác |
+| GET | `/provider-profiles/active` | ADMIN/CONTENT_PROVIDER | Danh sách đối tác đang hoạt động |
+| GET | `/provider-profiles/by-user/{userId}` | ADMIN/CONTENT_PROVIDER | Tìm đối tác theo user (dùng để lấy providerProfileId của chính mình) |
+| GET | `/provider-profiles/{providerProfileId}` | ADMIN/CONTENT_PROVIDER | Chi tiết đối tác |
 
 ---
 
@@ -847,41 +847,41 @@ Thiếu thông tin tài khoản → `400 REFUND_BANK_INFO_REQUIRED`.
 
 → Hiển thị timeline "Lịch sử xử lý" cho cả Tourist và Admin.
 
-### 7.8. Ảnh hưởng tới doanh thu Partner
+### 7.8. Ảnh hưởng tới doanh thu đối tác
 
 Khi refund `REFUNDED`:
-- `PartnerRevenue.refundAmount` tăng → `partnerNetAmount` giảm → ảnh hưởng settlement.
+- `ProviderRevenue.refundAmount` tăng → `providerNetAmount` giảm → ảnh hưởng settlement.
 - Nếu refund xảy ra **sau khi đã settlement** → hệ thống tự sinh `FinancialAdjustment` (mục 9).
 
 ---
 
-## 8. LUỒNG D — SETTLEMENT & WALLET (ADMIN/PARTNER)
+## 8. LUỒNG D — SETTLEMENT & WALLET (ADMIN/CONTENT_PROVIDER)
 
-> Phần này chủ yếu dành cho **web admin** (`/admin/finance`) và **web/mobile partner**. Tourist không cần.
+> Phần này chủ yếu dành cho **web admin** (`/admin/finance`) và **web/mobile đối tác**. Tourist không cần.
 
 ### 8.1. Bước 1 — Xem ứng viên tất toán
 
-`GET /settlements/candidates?partnerId=2&revenuePeriod=2026-09`
+`GET /settlements/candidates?providerProfileId=2&revenuePeriod=2026-09`
 
 ```json
 {
   "code": 200,
   "data": {
-    "partnerId": 2, "revenuePeriod": "2026-09",
+    "providerProfileId": 2, "revenuePeriod": "2026-09",
     "eligible": [
-      { "id": 15, "partnerId": 2, "partnerName": "Ban Quản lý Tràng An",
+      { "id": 15, "providerProfileId": 2, "providerName": "Ban Quản lý Tràng An",
         "bookingId": 11, "bookingCode": "JGSAMPLE01", "paymentId": 11,
         "txnRef": "JGSAMPLE01-TXN", "revenuePeriod": "2026-09",
         "completedDate": "2026-09-15",
         "grossAmount": 900000, "refundAmount": 0,
         "commissionRate": 0.2500, "commissionAmount": 225000,
-        "adjustmentAmount": 0, "partnerNetAmount": 675000,
+        "adjustmentAmount": 0, "providerNetAmount": 675000,
         "status": "ELIGIBLE", "deferredReason": null, "settlementId": null,
         "eligibleAt": "2026-10-01T02:00:00Z", "settledAt": null, "createdAt": "…" }
     ],
     "held": [
       { "revenueId": 17, "bookingId": 15, "revenuePeriod": "2026-09",
-        "partnerNetAmount": 450000, "deferredReason": "REFUND_PENDING" }
+        "providerNetAmount": 450000, "deferredReason": "REFUND_PENDING" }
     ],
     "totals": {
       "grossAmount": 900000, "refundAmount": 0, "commissionAmount": 225000,
@@ -899,9 +899,9 @@ Khi refund `REFUNDED`:
   - `REFUND_PENDING` → "Đang chờ xử lý hoàn tiền"
   - `FINANCIAL_REVIEW_REQUIRED` → "Cần đối soát thủ công"
 
-### 8.2. Bước 2 — 8 điều kiện đủ tư cách
+### 8.2. Bước 2 — 9 điều kiện đủ tư cách
 
-`GET /partner-revenues/{revenueId}/eligibility`
+`GET /provider-revenues/{revenueId}/eligibility`
 
 ```json
 {
@@ -916,20 +916,20 @@ Khi refund `REFUNDED`:
       { "code": "4_REFUND_APPLIED",    "description": "Số tiền Refund thành công đã được cập nhật", "passed": true, "detail": "refundAmount=0 / đã hoàn thành=0" },
       { "code": "5_NO_RECONCILIATION_ISSUE", "description": "Không có vấn đề đối soát tài chính", "passed": true, "detail": "OK" },
       { "code": "6_NOT_SETTLED",        "description": "Chưa thuộc Settlement đang xử lý hoặc đã duyệt", "passed": true, "detail": "status=ELIGIBLE" },
-      { "code": "7_CALCULATED",         "description": "Hoa hồng và doanh thu Partner đã được tính", "passed": true, "detail": "commission=225000, net=675000" },
-      { "code": "8_POSITIVE_NET",       "description": "Doanh thu còn lại sau Refund và điều chỉnh lớn hơn 0", "passed": true, "detail": "partnerNet=675000" }
+      { "code": "7_CALCULATED",         "description": "Hoa hồng và doanh thu đối tác đã được tính", "passed": true, "detail": "commission=225000, net=675000" },
+      { "code": "8_POSITIVE_NET",       "description": "Doanh thu còn lại sau Refund và điều chỉnh lớn hơn 0", "passed": true, "detail": "providerNet=675000" }
     ]
   }
 }
 ```
 
-→ Render thành checklist 8 dòng (✔ / ✘) cho Admin.
+→ Render thành checklist 9 dòng (✔ / ✘) cho Admin.
 
 ### 8.3. Bước 3 — Tạo bản nháp settlement
 
 `POST /settlements`
 ```json
-{ "partnerId": 2, "revenuePeriod": "2026-09", "note": "Tất toán tháng 9/2026" }
+{ "providerProfileId": 2, "revenuePeriod": "2026-09", "note": "Tất toán tháng 9/2026" }
 ```
 
 - `revenuePeriod` format `yyyy-MM`, **phải là kỳ đã kết thúc** → nếu không: `400 SETTLEMENT_PERIOD_NOT_CLOSED`.
@@ -944,24 +944,24 @@ Khi refund `REFUNDED`:
 
 ```json
 [
-  { "id": 5, "settlementId": 1, "partnerRevenueId": 15,
+  { "id": 5, "settlementId": 1, "providerRevenueId": 15,
     "bookingId": 11, "bookingCode": "JGSAMPLE01", "paymentId": 11, "txnRef": "JGSAMPLE01-TXN",
     "revenuePeriod": "2026-09",
     "grossAmount": 900000, "refundAmount": 0,
     "commissionRate": 0.2500, "commissionAmount": 225000,
-    "adjustmentAmount": 0, "partnerNetAmount": 675000,
+    "adjustmentAmount": 0, "providerNetAmount": 675000,
     "status": "IN_SETTLEMENT" }
 ]
 ```
 
-→ Bảng đối soát: cột Booking / Gross / Refund / Hoa hồng / Điều chỉnh / Partner nhận.
+→ Bảng đối soát: cột Booking / Gross / Refund / Hoa hồng / Điều chỉnh / Đối tác nhận.
 
 ### 8.5. Bước 5 — Duyệt (ATOMIC)
 
 `POST /settlements/{settlementId}/approve`
 
-- Đánh giá lại 8 điều kiện. Nếu điều kiện đã thay đổi → `409 SETTLEMENT_ELIGIBILITY_CHANGED` → UI bắt Admin tạo lại.
-- Trong **cùng 1 transaction**: settlement → `APPROVED`, các `PartnerRevenue` → `SETTLED`, tạo `WalletTransaction` `SETTLEMENT_CREDIT` cộng vào ví Partner.
+- Đánh giá lại 9 điều kiện. Nếu điều kiện đã thay đổi → `409 SETTLEMENT_ELIGIBILITY_CHANGED` → UI bắt Admin tạo lại.
+- Trong **cùng 1 transaction**: settlement → `APPROVED`, các `ProviderRevenue` → `SETTLED`, tạo `WalletTransaction` `SETTLEMENT_CREDIT` cộng vào ví đối tác.
 - Lỗi một bước → rollback toàn bộ.
 - Duyệt lần 2 → `409 SETTLEMENT_ALREADY_APPROVED`.
 
@@ -975,15 +975,15 @@ Khi refund `REFUNDED`:
 - Giải phóng các khoản doanh thu về `ELIGIBLE`/`PENDING`. **KHÔNG** ghi tiền vào ví.
 - Settlement đã `APPROVED` **không** từ chối được → phải dùng Financial Adjustment.
 
-### 8.7. Ví Partner
+### 8.7. Ví đối tác
 
-`GET /wallets/partner/{partnerId}`
+`GET /wallets/provider-profile/{providerProfileId}`
 ```json
-{ "code": 200, "data": { "id": 2, "partnerId": 2, "partnerName": "Ban Quản lý Tràng An",
+{ "code": 200, "data": { "id": 2, "providerProfileId": 2, "providerName": "Ban Quản lý Tràng An",
   "balance": 625000, "currency": "VND", "createdAt": "…", "updatedAt": "…" } }
 ```
 
-`GET /wallets/partner/{partnerId}/transactions?page=0&size=20`
+`GET /wallets/provider-profile/{providerProfileId}/transactions?page=0&size=20`
 ```json
 { "code": 200, "data": { "page": 0, "size": 20, "totalElements": 2, "totalPages": 1,
   "first": true, "last": true, "content": [
@@ -1005,11 +1005,11 @@ Khi refund `REFUNDED`:
 
 ## 9. LUỒNG E — FINANCIAL ADJUSTMENT
 
-Dùng cho: refund phát sinh **sau khi** đã settlement, hoặc bồi hoàn chi phí cho Partner.
+Dùng cho: refund phát sinh **sau khi** đã settlement, hoặc bồi hoàn chi phí cho đối tác.
 
 ### 9.1. `POST /financial-adjustments`
 ```json
-{ "partnerId": 2, "refundRequestId": 3, "sourceSettlementId": 1,
+{ "providerProfileId": 2, "refundRequestId": 3, "sourceSettlementId": 1,
   "amount": -50000, "reason": "Hoàn 50% doanh thu vì refund sau khi tất toán" }
 ```
 
@@ -1213,7 +1213,7 @@ export const refundService = {
 export default refundService;
 ```
 
-**File: `frontend/src/features/settlement/services/settlementService.js`** (dùng cho cả admin & partner)
+**File: `frontend/src/features/settlement/services/settlementService.js`** (dùng cho cả admin & đối tác)
 
 ```javascript
 import { apiClient } from "@/services/apiClient";
@@ -1225,26 +1225,26 @@ const ENDPOINTS = {
   DETAILS: (id) => `/settlements/${id}/details`,
   APPROVE: (id) => `/settlements/${id}/approve`,
   REJECT: (id) => `/settlements/${id}/reject`,
-  BY_PARTNER: (pid) => `/settlements/partner/${pid}`,
-  WALLET_BY_PARTNER: (pid) => `/wallets/partner/${pid}`,
-  WALLET_TXN: (pid) => `/wallets/partner/${pid}/transactions`,
-  REVENUE_BY_PARTNER: (pid) => `/partner-revenues/partners/${pid}`,
-  ELIGIBILITY: (id) => `/partner-revenues/${id}/eligibility`,
-  PARTNER_BY_USER: (uid) => `/partners/by-user/${uid}`,
+  BY_PROVIDER_PROFILE: (pid) => `/settlements/provider-profile/${pid}`,
+  WALLET_BY_PROVIDER_PROFILE: (pid) => `/wallets/provider-profile/${pid}`,
+  WALLET_TXN: (pid) => `/wallets/provider-profile/${pid}/transactions`,
+  REVENUE_BY_PROVIDER_PROFILE: (pid) => `/provider-revenues/provider-profile/${pid}`,
+  ELIGIBILITY: (id) => `/provider-revenues/${id}/eligibility`,
+  PROVIDER_PROFILE_BY_USER: (uid) => `/provider-profiles/by-user/${uid}`,
 };
 
 const unwrap = (res) => res?.data ?? res;
 
-export async function getCandidates(partnerId, revenuePeriod) {
+export async function getCandidates(providerProfileId, revenuePeriod) {
   const res = await apiClient.get(
-    `${ENDPOINTS.CANDIDATES}?partnerId=${partnerId}&revenuePeriod=${revenuePeriod}`
+    `${ENDPOINTS.CANDIDATES}?providerProfileId=${providerProfileId}&revenuePeriod=${revenuePeriod}`
   );
   return unwrap(res);
 }
 
 export async function createSettlement(payload) {
   const res = await apiClient.post(ENDPOINTS.ROOT, {
-    partnerId: Number(payload.partnerId),
+    providerProfileId: Number(payload.providerProfileId),
     revenuePeriod: payload.revenuePeriod, // "yyyy-MM"
     note: payload.note || null,
   });
@@ -1266,24 +1266,24 @@ export async function getSettlementDetails(id) {
   return unwrap(res) ?? [];
 }
 
-export async function getWallet(partnerId) {
-  const res = await apiClient.get(ENDPOINTS.WALLET_BY_PARTNER(partnerId));
+export async function getWallet(providerProfileId) {
+  const res = await apiClient.get(ENDPOINTS.WALLET_BY_PROVIDER_PROFILE(providerProfileId));
   return unwrap(res);
 }
 
-export async function getWalletTransactions(partnerId, params = {}) {
+export async function getWalletTransactions(providerProfileId, params = {}) {
   const { page = 0, size = 20 } = params;
   const res = await apiClient.get(
-    `${ENDPOINTS.WALLET_TXN(partnerId)}?page=${page}&size=${size}`
+    `${ENDPOINTS.WALLET_TXN(providerProfileId)}?page=${page}&size=${size}`
   );
   const payload = await unwrap(res);
   return payload?.content ?? [];
 }
 
-export async function getRevenues(partnerId, params = {}) {
+export async function getRevenues(providerProfileId, params = {}) {
   const { page = 0, size = 20 } = params;
   const res = await apiClient.get(
-    `${ENDPOINTS.REVENUE_BY_PARTNER(partnerId)}?page=${page}&size=${size}`
+    `${ENDPOINTS.REVENUE_BY_PROVIDER_PROFILE(providerProfileId)}?page=${page}&size=${size}`
   );
   const payload = await unwrap(res);
   return payload?.content ?? [];
@@ -1294,15 +1294,15 @@ export async function getEligibility(revenueId) {
   return unwrap(res);
 }
 
-export async function getPartnerByUserId(userId) {
-  const res = await apiClient.get(ENDPOINTS.PARTNER_BY_USER(userId));
+export async function getProviderProfileByUserId(userId) {
+  const res = await apiClient.get(ENDPOINTS.PROVIDER_PROFILE_BY_USER(userId));
   return unwrap(res);
 }
 
 export const settlementService = {
   getCandidates, createSettlement, approveSettlement, rejectSettlement,
   getDetails: getSettlementDetails, getWallet, getWalletTransactions,
-  getRevenues, getEligibility, getPartnerByUserId,
+  getRevenues, getEligibility, getProviderProfileByUserId,
 };
 export default settlementService;
 ```
@@ -2181,7 +2181,7 @@ VNPay redirect về `VNPAY_RETURN_URL`. Nếu cấu hình URL đó trỏ về tr
 | W8 | `/payment-methods` | Public | `GET /payments/methods` (giới thiệu 3 phương thức) |
 | W9 | `/admin/finance` | ADMIN | `GET /payments`, `GET /refunds`, `POST /refunds/{id}/review` |
 | W10 | `/admin/settlements` | ADMIN | `GET /settlements/candidates`, `POST /settlements`, `/approve`, `/reject` |
-| W11 | `/partner/wallet` | PARTNER | `GET /wallets/partner/{id}`, `/transactions`, `GET /partner-revenues/partners/{id}` |
+| W11 | `/provider/finance/wallet` | CONTENT_PROVIDER | `GET /wallets/provider-profile/{id}`, `/transactions`, `GET /provider-revenues/provider-profile/{id}` |
 
 ### 12.2. Mobile (Flutter)
 
@@ -2333,32 +2333,32 @@ POST   /refunds/{refundId}/review         { approve, reason?, amount?, method?, 
 POST   /refunds/{refundId}/manual-transfer { transferReference, transferEvidence?, transferredAt? }
 POST   /refunds/{refundId}/refresh-status
 
-SETTLEMENT (ADMIN/PARTNER)
-GET    /settlements/candidates?partnerId=&revenuePeriod=
-POST   /settlements                       (ADMIN) { partnerId, revenuePeriod, note? }
+SETTLEMENT (ADMIN/CONTENT_PROVIDER)
+GET    /settlements/candidates?providerProfileId=&revenuePeriod=
+POST   /settlements                       (ADMIN) { providerProfileId, revenuePeriod, note? }
 POST   /settlements/{id}/approve          (ADMIN)
 POST   /settlements/{id}/reject           (ADMIN) { reason }
 GET    /settlements/{id}
 GET    /settlements/{id}/details
-GET    /settlements/partner/{partnerId}
+GET    /settlements/provider-profile/{providerProfileId}
 GET    /settlements?status=               (ADMIN)
 
-WALLET / REVENUE (ADMIN/PARTNER)
-GET    /wallets/partner/{partnerId}
+WALLET / REVENUE (ADMIN/CONTENT_PROVIDER)
+GET    /wallets/provider-profile/{providerProfileId}
 GET    /wallets/{walletId}
-GET    /wallets/partner/{partnerId}/transactions
+GET    /wallets/provider-profile/{providerProfileId}/transactions
 GET    /wallets/{walletId}/transactions
-GET    /partner-revenues/partners/{partnerId}
-GET    /partner-revenues/bookings/{bookingId}
-GET    /partner-revenues/{revenueId}
-GET    /partner-revenues/{revenueId}/eligibility
+GET    /provider-revenues/provider-profile/{providerProfileId}
+GET    /provider-revenues/bookings/{bookingId}
+GET    /provider-revenues/{revenueId}
+GET    /provider-revenues/{revenueId}/eligibility
 
 FINANCIAL ADJUSTMENT (ADMIN)
-POST   /financial-adjustments              { partnerId, refundRequestId?, sourceSettlementId?, amount, reason }
+POST   /financial-adjustments              { providerProfileId, refundRequestId?, sourceSettlementId?, amount, reason }
 POST   /financial-adjustments/{id}/approve
 POST   /financial-adjustments/{id}/reject?reason=
 GET    /financial-adjustments/{id}
-GET    /financial-adjustments/partner/{partnerId}
+GET    /financial-adjustments/provider-profile/{providerProfileId}
 ```
 
 ## PHỤ LỤC B — Bản ghi mẫu có sẵn trong DB (dùng để test nhanh)

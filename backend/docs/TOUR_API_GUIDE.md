@@ -4,7 +4,7 @@
 
 - Swagger UI: http://localhost:8088/swagger-ui/index.html
 - Đăng nhập qua POST /api/v1/auth/login, lấy data.accessToken rồi nhấn Authorize.
-- Các API đánh dấu ADMIN / MODERATOR / PROVIDER yêu cầu token đúng vai trò.
+- Các API đánh dấu ADMIN / CONTENT_MODERATOR / CONTENT_PROVIDER yêu cầu token đúng vai trò.
 - Provider chỉ xem và sửa tour do mình tạo.
 - Response được bọc trong ApiResponse.
 
@@ -14,20 +14,20 @@
 | --- | --- | --- | --- |
 | GET | /api/v1/tours/published | Công khai | Tour đã xuất bản, phân trang |
 | GET | /api/v1/tours/{tourId} | Công khai | Chi tiết tour |
-| GET | /api/v1/tours | ADMIN, MODERATOR | Tất cả tour, phân trang |
-| GET | /api/v1/tours/deleted | ADMIN, MODERATOR | Tour đã xóa mềm |
-| GET | /api/v1/tours/my | PROVIDER, ADMIN, MODERATOR | Tour do tài khoản hiện tại tạo |
-| POST | /api/v1/tours | ADMIN, PROVIDER | Tạo tour và tự gửi moderation |
-| PUT | /api/v1/tours/{tourId} | ADMIN, MODERATOR, PROVIDER | Cập nhật và tự gửi duyệt lại |
-| DELETE | /api/v1/tours/{tourId} | ADMIN, MODERATOR | Xóa mềm |
-| PATCH | /api/v1/tours/{tourId}/restore | ADMIN, MODERATOR | Khôi phục tour đã xóa |
-| GET | /api/v1/moderation/tours/queue | ADMIN, MODERATOR | Hàng chờ kiểm duyệt |
-| GET | /api/v1/moderation/tours/status/{status} | ADMIN, MODERATOR | Lọc DRAFT, PENDING, APPROVED, REJECTED |
-| GET | /api/v1/moderation/tours/{tourId}/history | PROVIDER, ADMIN, MODERATOR | Lịch sử gửi và quyết định |
-| GET | /api/v1/moderation/tours/rejection-reasons | ADMIN, MODERATOR | Mã và nhãn checkbox lý do |
-| POST | /api/v1/moderation/tours/{tourId}/submit | PROVIDER, ADMIN, MODERATOR | Gửi lại tour bị từ chối |
-| PATCH | /api/v1/moderation/tours/{tourId}/approve | ADMIN, MODERATOR | Duyệt tour |
-| PATCH | /api/v1/moderation/tours/{tourId}/reject | ADMIN, MODERATOR | Từ chối với reason, otherReason |
+| GET | /api/v1/tours | ADMIN, CONTENT_MODERATOR | Tất cả tour, phân trang |
+| GET | /api/v1/tours/deleted | ADMIN, CONTENT_MODERATOR | Tour đã xóa mềm |
+| GET | /api/v1/tours/my | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Tour do tài khoản hiện tại tạo |
+| POST | /api/v1/tours | ADMIN, CONTENT_PROVIDER | Tạo tour và tự gửi moderation |
+| PUT | /api/v1/tours/{tourId} | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Cập nhật và tự gửi duyệt lại |
+| DELETE | /api/v1/tours/{tourId} | ADMIN, CONTENT_MODERATOR | Xóa mềm |
+| PATCH | /api/v1/tours/{tourId}/restore | ADMIN, CONTENT_MODERATOR | Khôi phục tour đã xóa |
+| GET | /api/v1/moderation/tours/queue | ADMIN, CONTENT_MODERATOR | Hàng chờ kiểm duyệt |
+| GET | /api/v1/moderation/tours/status/{status} | ADMIN, CONTENT_MODERATOR | Lọc DRAFT, PENDING, APPROVED, REJECTED |
+| GET | /api/v1/moderation/tours/{tourId}/history | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Lịch sử gửi và quyết định |
+| GET | /api/v1/moderation/tours/rejection-reasons | ADMIN, CONTENT_MODERATOR | Mã và nhãn checkbox lý do |
+| POST | /api/v1/moderation/tours/{tourId}/submit | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Gửi lại tour bị từ chối |
+| PATCH | /api/v1/moderation/tours/{tourId}/approve | ADMIN, CONTENT_MODERATOR | Duyệt tour |
+| PATCH | /api/v1/moderation/tours/{tourId}/reject | ADMIN, CONTENT_MODERATOR | Từ chối với reason, otherReason |
 
 Danh sách hỗ trợ page, size, sort. Ví dụ:
 
@@ -69,7 +69,7 @@ PUT /api/v1/tours/{tourId} nhận cùng cấu trúc body như lúc tạo. Cập 
 ## Gửi duyệt và xử lý
 
 1. Tạo/sửa tour để tự gửi vào hàng chờ; tour bị từ chối có thể gửi lại qua POST /api/v1/moderation/tours/{tourId}/submit.
-2. Moderator/Admin xem hàng chờ tại GET /api/v1/moderation/tours/queue.
+2. Content Moderator/Admin xem hàng chờ tại GET /api/v1/moderation/tours/queue.
 3. Duyệt bằng PATCH /api/v1/moderation/tours/{tourId}/approve.
 4. Từ chối bằng PATCH /api/v1/moderation/tours/{tourId}/reject.
 5. Provider theo dõi các quyết định và lần gửi tại GET /api/v1/moderation/tours/{tourId}/history.

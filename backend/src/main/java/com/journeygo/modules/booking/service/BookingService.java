@@ -241,11 +241,11 @@ public class BookingService {
     /**
      * Đánh dấu Booking đã hoàn thành trải nghiệm.
      *
-     * <p>Đây là mốc quyết định doanh thu Partner được xét điều kiện tất toán
+     * <p>Đây là mốc quyết định doanh thu ProviderProfile được xét điều kiện tất toán
      * (Mục 4.1 — "Booking chỉ phát sinh doanh thu có thể tất toán sau khi trải nghiệm hoàn thành";
      * ngày hoàn thành trải nghiệm là căn cứ xác định kỳ doanh thu).
      *
-     * <p>Phát {@link BookingCompletedEvent} để {@code PartnerRevenueService} đánh giá lại
+     * <p>Phát {@link BookingCompletedEvent} để {@code ProviderRevenueService} đánh giá lại
      * điều kiện tất toán.
      *
      * @param bookingId   Booking cần hoàn thành

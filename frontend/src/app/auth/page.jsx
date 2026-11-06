@@ -91,7 +91,7 @@ const SLIDE_ITEMS = [
 
 /**
  * DANH SÁCH VAI TRÒ MẪU (pill chọn nhanh ở form đăng nhập)
- * roleEnum phải khớp với enum Role của backend: TOURIST | PROVIDER | MODERATOR | ADMIN
+ * roleEnum phải khớp với enum Role của backend: TOURIST | CONTENT_PROVIDER | CONTENT_MODERATOR | ADMIN
  */
 const SAMPLE_ROLES = [
   {
@@ -102,14 +102,14 @@ const SAMPLE_ROLES = [
   },
   {
     id: "moderator",
-    roleEnum: "MODERATOR",
+    roleEnum: "CONTENT_MODERATOR",
     title: "Kiểm duyệt viên",
     redirectPath: "/moderator",
   },
   {
     id: "provider",
-    roleEnum: "PROVIDER",
-    title: "Đối tác điểm đến",
+    roleEnum: "CONTENT_PROVIDER",
+    title: "Đối tác cung cấp nội dung",
     redirectPath: "/provider",
   },
   {
@@ -280,12 +280,12 @@ export default function AuthPage() {
       if (roleStr === "ADMIN") {
         targetPath = "/admin";
         roleTitle = "Quản trị viên";
-      } else if (roleStr === "MODERATOR") {
+      } else if (roleStr === "CONTENT_MODERATOR") {
         targetPath = "/moderator";
         roleTitle = "Kiểm duyệt viên";
-      } else if (roleStr === "PROVIDER") {
+      } else if (roleStr === "CONTENT_PROVIDER") {
         targetPath = "/provider";
-        roleTitle = "Đối tác Điểm đến";
+        roleTitle = "Đối tác cung cấp nội dung";
       }
 
       const authSession = {

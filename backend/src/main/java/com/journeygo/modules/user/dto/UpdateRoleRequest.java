@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 
 @Schema(description = "Yêu cầu cập nhật vai trò người dùng")
 public record UpdateRoleRequest(
-        @Schema(description = "Vai trò mới của người dùng (TOURIST, MODERATOR, PROVIDER, ADMIN)", example = "MODERATOR")
+        @Schema(description = "Vai trò mới của người dùng (TOURIST, CONTENT_MODERATOR, CONTENT_PROVIDER, ADMIN)", example = "CONTENT_MODERATOR")
         @NotNull(message = "Vai trò không được để trống")
         Role role
 ) {}

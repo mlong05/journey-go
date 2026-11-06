@@ -27,7 +27,7 @@ public class ContentModerationController {
     private final ContentModerationService moderationService;
 
     @PostMapping("/{contentId}/submit")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN', 'CONTENT_MODERATOR')")
     @Operation(summary = "Gửi content kiểm duyệt hoặc gửi lại content bị từ chối")
     public ResponseEntity<ApiResponse<ContentReviewResponse>> submit(@PathVariable Long contentId,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -36,14 +36,14 @@ public class ContentModerationController {
     }
 
     @GetMapping("/queue")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     public ResponseEntity<ApiResponse<PageResponse<ContentReviewResponse>>> queue(Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy hàng chờ kiểm duyệt thành công",
                 PageResponse.from(moderationService.getQueue(pageable), x -> x)));
     }
 
     @GetMapping("/{contentId}/history")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN', 'CONTENT_MODERATOR')")
     @Operation(summary = "Xem trạng thái và toàn bộ lịch sử kiểm duyệt của content")
     public ResponseEntity<ApiResponse<ContentReviewResponse>> history(
             @PathVariable Long contentId,
@@ -53,7 +53,7 @@ public class ContentModerationController {
     }
 
     @GetMapping("/rejection-reasons")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     public ResponseEntity<ApiResponse<java.util.List<RejectionReasonOption>>> rejectionReasons() {
         var reasons = java.util.Arrays.stream(ContentRejectionReason.values())
                 .map(reason -> new RejectionReasonOption(reason.getCode(), reason.getLabel())).toList();
@@ -61,7 +61,7 @@ public class ContentModerationController {
     }
 
     @PatchMapping("/{contentId}/approve")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     public ResponseEntity<ApiResponse<ContentReviewResponse>> approve(@PathVariable Long contentId,
             @Valid @RequestBody(required = false) ReviewDecisionRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -70,7 +70,7 @@ public class ContentModerationController {
     }
 
     @PatchMapping("/{contentId}/reject")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     public ResponseEntity<ApiResponse<ContentReviewResponse>> reject(@PathVariable Long contentId,
             @Valid @RequestBody ReviewDecisionRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {

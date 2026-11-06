@@ -73,7 +73,7 @@ public class ContentModerationService {
 
         var destination = content.getDestination();
         notifications.send(NotificationType.CONTENT_PENDING)
-                .toRole(Role.MODERATOR)
+                .toRole(Role.CONTENT_MODERATOR)
                 .except(callerId)
                 .title(contentWasEdited ? "Nội dung văn hóa được cập nhật" : "Nội dung văn hóa mới chờ duyệt")
                 .body(NotificationPublisher.quote(content.getTitle()) + " thuộc điểm đến "
@@ -181,7 +181,7 @@ public class ContentModerationService {
                 .ref("CONTENT", contentId)
                 .queue(NotificationPublisher.Queue.MY_CONTENT)
                 .publish();
-        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.CONTENT_REVIEW);
+        notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.CONTENT_REVIEW);
         return toResponse(saved);
     }
 
@@ -218,7 +218,7 @@ public class ContentModerationService {
     }
 
     private void checkOwner(CulturalContent content, Long callerId, Role role) {
-        if (role != null && role.isProvider()) {
+        if (role != null && role.isContentProvider()) {
             Long ownerId = content.getDestination().getCreatedBy() == null ? null : content.getDestination().getCreatedBy().getId();
             if (ownerId == null || !ownerId.equals(callerId)) throw new AppException(ErrorCode.UNAUTHORIZED);
         }

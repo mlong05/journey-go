@@ -58,7 +58,7 @@ public class TaskController {
 
     @PostMapping("/experiences/{experienceId}/tasks")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
     @Operation(summary = "Tạo Task mới (chỉ khi Experience DRAFT, chỉ owner) — BR-TASK-1, BR-TASK-2")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
@@ -78,7 +78,7 @@ public class TaskController {
 
     @PatchMapping("/tasks/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
     @Operation(summary = "Cập nhật Task (chỉ khi Experience DRAFT — BR-TASK-1, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -95,7 +95,7 @@ public class TaskController {
 
     @DeleteMapping("/tasks/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
     @Operation(summary = "Xóa mềm Task (chỉ khi Experience DRAFT, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -109,7 +109,7 @@ public class TaskController {
 
     @GetMapping("/experiences/{experienceId}/tasks/deleted")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
     @Operation(summary = "Thùng rác: danh sách Task đã xoá của Experience (chỉ owner)")
     public ResponseEntity<ApiResponse<List<TaskResponse>>> listDeleted(@PathVariable Long experienceId) {
         return ResponseEntity.ok(ApiResponse.success(taskService.listDeletedByExperience(experienceId)));
@@ -117,7 +117,7 @@ public class TaskController {
 
     @PatchMapping("/tasks/{id}/restore")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
     @Operation(summary = "Khôi phục Task từ thùng rác về DRAFT (chỉ khi Experience DRAFT, chỉ owner)")
     public ResponseEntity<ApiResponse<TaskResponse>> restore(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Khôi phục Task thành công", taskService.restore(id)));
@@ -125,7 +125,7 @@ public class TaskController {
 
     @PostMapping("/experiences/{experienceId}/tasks/reorder")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
     @Operation(summary = "Sắp xếp lại thứ tự Task (theo thứ tự trong taskIds, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -142,7 +142,7 @@ public class TaskController {
 
     @PatchMapping("/tasks/{id}/points")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
     @Operation(summary = "Set points_reward cho Task (chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -157,7 +157,7 @@ public class TaskController {
 
     @PatchMapping("/tasks/{id}/location")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
     @Operation(summary = "Gán CheckInPoint cho Task (chỉ owner, BR-TASK-4 nếu loại Task cần location)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -173,7 +173,7 @@ public class TaskController {
 
     @PatchMapping("/tasks/{id}/unlock-condition")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfTask(#id)")
     @Operation(summary = "Set/Cập nhật UnlockCondition cho Task (chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),

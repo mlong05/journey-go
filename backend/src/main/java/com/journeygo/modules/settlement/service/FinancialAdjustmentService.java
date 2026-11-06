@@ -3,9 +3,9 @@ package com.journeygo.modules.settlement.service;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
-import com.journeygo.modules.partner.entity.Partner;
-import com.journeygo.modules.partner.repository.PartnerRepository;
-import com.journeygo.modules.partnerrevenue.repository.PartnerRevenueRepository;
+import com.journeygo.modules.providerprofile.entity.ProviderProfile;
+import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
+import com.journeygo.modules.providerrevenue.repository.ProviderRevenueRepository;
 import com.journeygo.modules.refund.entity.RefundRequest;
 import com.journeygo.modules.refund.entity.enums.RefundStatus;
 import com.journeygo.modules.refund.repository.RefundRequestRepository;
@@ -39,11 +39,11 @@ import java.math.BigDecimal;
  * <p>Quy tắc nghiệp vụ (Mục 8.2 — Refund phát sinh sau tất toán):
  * <ol>
  *   <li>KHÔNG sửa số liệu của Settlement đã duyệt.</li>
- *   <li>Ghi nhận Refund và xác định ảnh hưởng tài chính lên Partner.</li>
+ *   <li>Ghi nhận Refund và xác định ảnh hưởng tài chính lên ProviderProfile.</li>
  *   <li>Tạo khoản điều chỉnh liên kết với Refund và Settlement gốc.</li>
- *   <li>Nếu Partner phải chịu phần điều chỉnh → ghi nhận khoản khấu trừ vào kỳ tất toán tiếp theo
+ *   <li>Nếu ProviderProfile phải chịu phần điều chỉnh → ghi nhận khoản khấu trừ vào kỳ tất toán tiếp theo
  *       hoặc quy trình điều chỉnh tài chính được duyệt.</li>
- *   <li>Nếu có bồi hoàn cho Partner do lỗi nền tảng → ghi nhận khoản cộng riêng.</li>
+ *   <li>Nếu có bồi hoàn cho ProviderProfile do lỗi nền tảng → ghi nhận khoản cộng riêng.</li>
  * </ol>
  *
  * <p>KHÔNG tự động trừ tiền chỉ vì Tourist gửi yêu cầu Refund — chỉ điều chỉnh khi có kết quả
@@ -56,9 +56,9 @@ import java.math.BigDecimal;
 public class FinancialAdjustmentService {
 
     private final FinancialAdjustmentRepository adjustmentRepository;
-    private final PartnerRepository partnerRepository;
+    private final ProviderProfileRepository providerProfileRepository;
     private final RefundRequestRepository refundRepository;
-    private final PartnerRevenueRepository revenueRepository;
+    private final ProviderRevenueRepository revenueRepository;
     private final WalletRepository walletRepository;
     private final UserRepository userRepository;
     private final WalletService walletService;
@@ -71,8 +71,8 @@ public class FinancialAdjustmentService {
      */
     @Transactional
     public FinancialAdjustmentResponse createAdjustment(CreateFinancialAdjustmentRequest request, Long adminId) {
-        Partner partner = partnerRepository.findById(request.partnerId())
-                .orElseThrow(() -> new AppException(ErrorCode.PARTNER_NOT_FOUND));
+        ProviderProfile providerProfile = providerProfileRepository.findById(request.providerProfileId())
+                .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_PROFILE_NOT_FOUND));
 
         if (request.amount() == null || request.amount().compareTo(BigDecimal.ZERO) == 0) {
             throw new AppException(ErrorCode.VALIDATION_ERROR,
@@ -98,7 +98,7 @@ public class FinancialAdjustmentService {
         }
 
         FinancialAdjustment adjustment = adjustmentRepository.save(FinancialAdjustment.builder()
-                .partner(partner)
+                .providerProfile(providerProfile)
                 .refundRequest(refund)
                 .sourceSettlementId(request.sourceSettlementId())
                 .amount(request.amount())
@@ -108,15 +108,15 @@ public class FinancialAdjustmentService {
                 .createdBy(admin)
                 .build());
 
-        log.info("[FinancialAdjustment] Đã tạo khoản điều chỉnh id={} partner={} amount={}",
-                adjustment.getId(), partner.getId(), request.amount());
+        log.info("[FinancialAdjustment] Đã tạo khoản điều chỉnh id={} providerProfile={} amount={}",
+                adjustment.getId(), providerProfile.getId(), request.amount());
 
         // Người tạo không tự duyệt khoản của mình: báo các Admin còn lại
         notifications.send(NotificationType.ADJUSTMENT_PENDING)
                 .toRole(Role.ADMIN)
                 .except(adminId)
                 .title("Khoản điều chỉnh tài chính chờ duyệt")
-                .body(NotificationPublisher.money(request.amount()) + " cho đối tác " + partner.getPartnerName()
+                .body(NotificationPublisher.money(request.amount()) + " cho đối tác " + providerProfile.getProviderName()
                         + (request.reason() == null || request.reason().isBlank() ? "." : " — " + request.reason().trim()))
                 .link("/admin/finance")
                 .ref("ADJUSTMENT", adjustment.getId())
@@ -147,12 +147,12 @@ public class FinancialAdjustmentService {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-        Wallet wallet = walletRepository.findByPartnerIdForUpdate(adjustment.getPartner().getId())
+        Wallet wallet = walletRepository.findByProviderProfileIdForUpdate(adjustment.getProviderProfile().getId())
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND,
                         "Đối tác chưa có ví nội bộ"));
 
         // Khoản điều chỉnh có căn cứ từ Refund → REFUND_ADJUSTMENT;
-        // điều chỉnh thủ công (bồi hoàn cho Partner) → MANUAL_ADJUSTMENT.
+        // điều chỉnh thủ công (bồi hoàn cho ProviderProfile) → MANUAL_ADJUSTMENT.
         WalletTransactionType type = adjustment.getRefundRequest() != null
                 ? WalletTransactionType.REFUND_ADJUSTMENT
                 : WalletTransactionType.MANUAL_ADJUSTMENT;
@@ -221,41 +221,41 @@ public class FinancialAdjustmentService {
         // Tìm khoản doanh thu đã SETTLED của booking này — nếu có thì cần điều chỉnh.
         var revenues = revenueRepository.findByBooking_Id(bookingId);
         Long settlementId = null;
-        BigDecimal partnerShare = BigDecimal.ZERO;
+        BigDecimal providerShare = BigDecimal.ZERO;
 
         for (var revenue : revenues) {
             if (revenue.getSettlementId() != null) {
                 settlementId = revenue.getSettlementId();
-                partnerShare = revenue.getPartnerNetAmount() != null
-                        ? revenue.getPartnerNetAmount() : BigDecimal.ZERO;
+                providerShare = revenue.getProviderNetAmount() != null
+                        ? revenue.getProviderNetAmount() : BigDecimal.ZERO;
                 break;
             }
         }
 
         if (settlementId == null) {
             // Chưa được tất toán → không cần khoản điều chỉnh; doanh thu sẽ được tính lại
-            // bởi PartnerRevenueService qua sự kiện RefundCompletedEvent.
+            // bởi ProviderRevenueService qua sự kiện RefundCompletedEvent.
             return null;
         }
 
-        // Phần doanh thu Partner bị ảnh hưởng bởi refund = phần partner net tương ứng.
+        // Phần doanh thu ProviderProfile bị ảnh hưởng bởi refund = phần providerProfile net tương ứng.
         BigDecimal refundShare = refund.getRefundedAmount();
         BigDecimal gross = refund.getPayment().getAmount();
-        if (gross != null && gross.compareTo(BigDecimal.ZERO) > 0 && partnerShare.compareTo(BigDecimal.ZERO) > 0) {
+        if (gross != null && gross.compareTo(BigDecimal.ZERO) > 0 && providerShare.compareTo(BigDecimal.ZERO) > 0) {
             refundShare = refund.getRefundedAmount()
-                    .multiply(partnerShare)
+                    .multiply(providerShare)
                     .divide(gross, 2, java.math.RoundingMode.HALF_UP);
         }
 
-        // Điều chỉnh GIẢM doanh thu Partner sau khi đã tất toán.
+        // Điều chỉnh GIẢM doanh thu ProviderProfile sau khi đã tất toán.
         BigDecimal adjustmentAmount = refundShare.negate();
 
-        Partner partner = partnerRepository.findById(
-                        revenues.get(0).getPartner().getId())
-                .orElseThrow(() -> new AppException(ErrorCode.PARTNER_NOT_FOUND));
+        ProviderProfile providerProfile = providerProfileRepository.findById(
+                        revenues.get(0).getProviderProfile().getId())
+                .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_PROFILE_NOT_FOUND));
 
         FinancialAdjustment adjustment = adjustmentRepository.save(FinancialAdjustment.builder()
-                .partner(partner)
+                .providerProfile(providerProfile)
                 .refundRequest(refund)
                 .sourceSettlementId(settlementId)
                 .amount(adjustmentAmount)
@@ -280,9 +280,9 @@ public class FinancialAdjustmentService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<FinancialAdjustmentResponse> getByPartner(Long partnerId, Pageable pageable) {
+    public PageResponse<FinancialAdjustmentResponse> getByProviderProfile(Long providerProfileId, Pageable pageable) {
         Page<FinancialAdjustment> page = adjustmentRepository
-                .findByPartner_IdOrderByCreatedAtDesc(partnerId, pageable);
+                .findByProviderProfile_IdOrderByCreatedAtDesc(providerProfileId, pageable);
         return PageResponse.from(page, FinancialAdjustmentResponse::fromEntity);
     }
 

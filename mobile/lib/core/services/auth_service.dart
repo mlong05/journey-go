@@ -197,14 +197,17 @@ class AuthService {
   }
 
   // ==========================================================================
-  // 1b. ĐĂNG NHẬP GOOGLE (POST /api/v1/auth/google) - KIỂM TRA ROLE USER
+  // 1b. ĐĂNG NHẬP GOOGLE (POST /api/v1/auth/google) - KIỂM TRA ROLE TOURIST
   // ==========================================================================
   Future<AuthResponseModel> loginWithGoogle({required String idToken}) async {
     final response = await _post(
       path: '/auth/google',
       body: {
         'idToken': idToken,
-        'role': 'USER',
+        // Backend chỉ còn 4 role chính thức: ADMIN, CONTENT_MODERATOR,
+        // CONTENT_PROVIDER, TOURIST. Role 'USER' cũ đã bị gỡ khỏi bảng `roles`
+        // nên gửi 'USER' sẽ bị backend từ chối (ROLE_NOT_FOUND).
+        'role': 'TOURIST',
       },
     );
 
@@ -232,14 +235,15 @@ class AuthService {
   }
 
   // ==========================================================================
-  // 1c. ĐĂNG NHẬP APPLE (POST /api/v1/auth/apple) - KIỂM TRA ROLE USER
+  // 1c. ĐĂNG NHẬP APPLE (POST /api/v1/auth/apple) - KIỂM TRA ROLE TOURIST
   // ==========================================================================
   Future<AuthResponseModel> loginWithApple({required String identityToken}) async {
     final response = await _post(
       path: '/auth/apple',
       body: {
         'identityToken': identityToken,
-        'role': 'USER',
+        // Xem giải thích ở loginWithGoogle: role hợp lệ duy nhất cho Mobile là TOURIST.
+        'role': 'TOURIST',
       },
     );
 

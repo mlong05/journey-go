@@ -7,7 +7,7 @@ Tài liệu này bao gồm điểm đến, khu vực và chủ đề du lịch.
 - Swagger UI: http://localhost:8088/swagger-ui/index.html
 - OpenAPI JSON: http://localhost:8088/v3/api-docs
 - Đăng nhập qua POST /api/v1/auth/login, lấy data.accessToken rồi nhấn Authorize để gán Bearer token.
-- Các API đánh dấu ADMIN / MODERATOR / PROVIDER cần token đúng vai trò.
+- Các API đánh dấu ADMIN / CONTENT_MODERATOR / CONTENT_PROVIDER cần token đúng vai trò.
 - Response được bọc trong ApiResponse gồm code, message, data và timestamp.
 
 ## 1. API điểm đến
@@ -19,16 +19,16 @@ Tài liệu này bao gồm điểm đến, khu vực và chủ đề du lịch.
 | GET | /api/v1/destinations/{id} | Công khai | Chi tiết điểm đến |
 | GET | /api/v1/destinations/region/{slug} | Công khai | Điểm đến theo khu vực |
 | GET | /api/v1/destinations/theme/{slug} | Công khai | Điểm đến theo chủ đề |
-| POST | /api/v1/destinations | ADMIN, MODERATOR, PROVIDER | Tạo điểm đến và tự gửi moderation |
-| PUT | /api/v1/destinations/{id} | ADMIN, MODERATOR, PROVIDER | Cập nhật và gửi duyệt lại; Provider chỉ sửa điểm đến của mình |
-| GET | /api/v1/destinations/deleted | ADMIN, MODERATOR | Danh sách đã xóa mềm |
-| DELETE | /api/v1/destinations/{id} | ADMIN, MODERATOR | Xóa mềm điểm đến và content liên quan |
-| PATCH | /api/v1/destinations/{id}/restore | ADMIN, MODERATOR | Khôi phục điểm đến về DRAFT |
-| POST | /api/v1/moderation/destinations/{id}/submit | PROVIDER, ADMIN, MODERATOR | Gửi lại điểm đến bị từ chối |
-| GET | /api/v1/moderation/destinations/queue | ADMIN, MODERATOR | Hàng chờ kiểm duyệt |
-| GET | /api/v1/moderation/destinations/{id}/history | PROVIDER, ADMIN, MODERATOR | Trạng thái, lý do và lịch sử quyết định |
-| PATCH | /api/v1/moderation/destinations/{id}/approve | ADMIN, MODERATOR | Duyệt điểm đến |
-| PATCH | /api/v1/moderation/destinations/{id}/reject | ADMIN, MODERATOR | Từ chối kèm lý do |
+| POST | /api/v1/destinations | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Tạo điểm đến và tự gửi moderation |
+| PUT | /api/v1/destinations/{id} | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Cập nhật và gửi duyệt lại; Provider chỉ sửa điểm đến của mình |
+| GET | /api/v1/destinations/deleted | ADMIN, CONTENT_MODERATOR | Danh sách đã xóa mềm |
+| DELETE | /api/v1/destinations/{id} | ADMIN, CONTENT_MODERATOR | Xóa mềm điểm đến và content liên quan |
+| PATCH | /api/v1/destinations/{id}/restore | ADMIN, CONTENT_MODERATOR | Khôi phục điểm đến về DRAFT |
+| POST | /api/v1/moderation/destinations/{id}/submit | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Gửi lại điểm đến bị từ chối |
+| GET | /api/v1/moderation/destinations/queue | ADMIN, CONTENT_MODERATOR | Hàng chờ kiểm duyệt |
+| GET | /api/v1/moderation/destinations/{id}/history | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Trạng thái, lý do và lịch sử quyết định |
+| PATCH | /api/v1/moderation/destinations/{id}/approve | ADMIN, CONTENT_MODERATOR | Duyệt điểm đến |
+| PATCH | /api/v1/moderation/destinations/{id}/reject | ADMIN, CONTENT_MODERATOR | Từ chối kèm lý do |
 
 Danh sách hỗ trợ page, size, sort. Ví dụ:
 
@@ -61,17 +61,17 @@ Tạo mới sẽ tự gửi vào hàng chờ moderation và có trạng thái PE
 | GET | /api/v1/regions | Công khai | Danh sách khu vực |
 | GET | /api/v1/regions/{id} | Công khai | Khu vực theo ID |
 | GET | /api/v1/regions/slug/{slug} | Công khai | Khu vực theo slug |
-| POST, PUT | /api/v1/regions và /api/v1/regions/{id} | ADMIN, MODERATOR | Tạo/cập nhật khu vực |
-| GET | /api/v1/regions/deleted | ADMIN, MODERATOR | Khu vực đã xóa |
-| DELETE | /api/v1/regions/{id} | ADMIN, MODERATOR | Xóa mềm khu vực |
-| PATCH | /api/v1/regions/{id}/restore | ADMIN, MODERATOR | Khôi phục khu vực |
+| POST, PUT | /api/v1/regions và /api/v1/regions/{id} | ADMIN, CONTENT_MODERATOR | Tạo/cập nhật khu vực |
+| GET | /api/v1/regions/deleted | ADMIN, CONTENT_MODERATOR | Khu vực đã xóa |
+| DELETE | /api/v1/regions/{id} | ADMIN, CONTENT_MODERATOR | Xóa mềm khu vực |
+| PATCH | /api/v1/regions/{id}/restore | ADMIN, CONTENT_MODERATOR | Khôi phục khu vực |
 | GET | /api/v1/themes | Công khai | Danh sách chủ đề |
 | GET | /api/v1/themes/{id} | Công khai | Chủ đề theo ID |
 | GET | /api/v1/themes/slug/{slug} | Công khai | Chủ đề theo slug |
-| POST, PUT | /api/v1/themes và /api/v1/themes/{id} | ADMIN, MODERATOR | Tạo/cập nhật chủ đề |
-| GET | /api/v1/themes/deleted | ADMIN, MODERATOR | Chủ đề đã xóa |
-| DELETE | /api/v1/themes/{id} | ADMIN, MODERATOR | Xóa mềm chủ đề |
-| PATCH | /api/v1/themes/{id}/restore | ADMIN, MODERATOR | Khôi phục chủ đề |
+| POST, PUT | /api/v1/themes và /api/v1/themes/{id} | ADMIN, CONTENT_MODERATOR | Tạo/cập nhật chủ đề |
+| GET | /api/v1/themes/deleted | ADMIN, CONTENT_MODERATOR | Chủ đề đã xóa |
+| DELETE | /api/v1/themes/{id} | ADMIN, CONTENT_MODERATOR | Xóa mềm chủ đề |
+| PATCH | /api/v1/themes/{id}/restore | ADMIN, CONTENT_MODERATOR | Khôi phục chủ đề |
 
 Body tạo/cập nhật Region hoặc Theme:
 

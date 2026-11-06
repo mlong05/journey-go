@@ -1,6 +1,6 @@
 package com.journeygo.modules.settlement.entity;
 
-import com.journeygo.modules.partner.entity.Partner;
+import com.journeygo.modules.providerprofile.entity.ProviderProfile;
 import com.journeygo.modules.refund.entity.RefundRequest;
 import com.journeygo.modules.settlement.entity.enums.FinancialAdjustmentStatus;
 import com.journeygo.modules.user.entity.User;
@@ -17,13 +17,13 @@ import java.time.Instant;
  * <ul>
  *   <li>Refund phát sinh <b>sau</b> khi Settlement đã được duyệt — không sửa lịch sử đã duyệt,
  *       mà tạo khoản điều chỉnh riêng có liên kết nguồn.</li>
- *   <li>Bồi hoàn chi phí cho Partner do lỗi nền tảng (chính sách được phê duyệt).</li>
+ *   <li>Bồi hoàn chi phí cho ProviderProfile do lỗi nền tảng (chính sách được phê duyệt).</li>
  *   <li>Điều chỉnh thủ công bởi Admin.</li>
  * </ul>
  */
 @Entity
 @Table(name = "financial_adjustments", indexes = {
-        @Index(name = "idx_fin_adj_partner", columnList = "partner_id"),
+        @Index(name = "idx_fin_adj_provider_profile", columnList = "provider_profile_id"),
         @Index(name = "idx_fin_adj_status", columnList = "status"),
         @Index(name = "idx_fin_adj_refund", columnList = "refund_request_id")
 })
@@ -39,8 +39,8 @@ public class FinancialAdjustment {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "partner_id", nullable = false)
-    private Partner partner;
+    @JoinColumn(name = "provider_profile_id", nullable = false)
+    private ProviderProfile providerProfile;
 
     /** Refund gốc gây ra khoản điều chỉnh (nếu có). */
     @ManyToOne(fetch = FetchType.LAZY)

@@ -111,7 +111,7 @@ public class TourService {
         attachDestinations(tour, request.destinations());
 
         Tour saved = tourRepository.save(tour);
-        moderationService.submit(saved.getTourId(), creatorId, Role.of(Role.PROVIDER));
+        moderationService.submit(saved.getTourId(), creatorId, Role.of(Role.CONTENT_PROVIDER));
         log.info("Created tour id={} title={}", saved.getTourId(), saved.getTitle());
         return pricingService.toResponse(saved);
     }
@@ -199,7 +199,7 @@ public class TourService {
     }
 
     private void checkOwnership(Tour tour, Long callerId, Role callerRole) {
-        if (callerRole != null && callerRole.isProvider()) {
+        if (callerRole != null && callerRole.isContentProvider()) {
             Long ownerId = tour.getCreatedBy() != null ? tour.getCreatedBy().getId() : null;
             if (ownerId == null || !ownerId.equals(callerId)) {
                 throw new AppException(ErrorCode.UNAUTHORIZED);
