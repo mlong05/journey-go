@@ -4,7 +4,7 @@
 
 - Swagger UI: http://localhost:8088/swagger-ui/index.html
 - Đăng nhập qua POST /api/v1/auth/login, lấy data.accessToken rồi nhấn Authorize.
-- Các API quyết định kiểm duyệt và hàng chờ yêu cầu ADMIN hoặc MODERATOR.
+- Các API quyết định kiểm duyệt và hàng chờ yêu cầu ADMIN hoặc CONTENT_MODERATOR.
 - Provider chỉ gửi content/destination của chính mình và xem lịch sử gửi duyệt.
 - Response được bọc trong ApiResponse.
 
@@ -12,12 +12,12 @@
 
 | Method | Endpoint | Quyền | Chức năng |
 | --- | --- | --- | --- |
-| POST | /api/v1/moderation/contents/{contentId}/submit | PROVIDER, ADMIN, MODERATOR | Gửi mới hoặc gửi lại content đã bị từ chối |
-| GET | /api/v1/moderation/contents/queue | ADMIN, MODERATOR | Hàng chờ content PENDING |
-| GET | /api/v1/moderation/contents/rejection-reasons | ADMIN, MODERATOR | Mã và nhãn cho checkbox lý do |
-| PATCH | /api/v1/moderation/contents/{contentId}/approve | ADMIN, MODERATOR | Duyệt content; reason và otherReason được đặt null |
-| PATCH | /api/v1/moderation/contents/{contentId}/reject | ADMIN, MODERATOR | Từ chối content với lý do |
-| GET | /api/v1/moderation/contents/{contentId}/history | PROVIDER, ADMIN, MODERATOR | Trạng thái hiện tại và toàn bộ lịch sử |
+| POST | /api/v1/moderation/contents/{contentId}/submit | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Gửi mới hoặc gửi lại content đã bị từ chối |
+| GET | /api/v1/moderation/contents/queue | ADMIN, CONTENT_MODERATOR | Hàng chờ content PENDING |
+| GET | /api/v1/moderation/contents/rejection-reasons | ADMIN, CONTENT_MODERATOR | Mã và nhãn cho checkbox lý do |
+| PATCH | /api/v1/moderation/contents/{contentId}/approve | ADMIN, CONTENT_MODERATOR | Duyệt content; reason và otherReason được đặt null |
+| PATCH | /api/v1/moderation/contents/{contentId}/reject | ADMIN, CONTENT_MODERATOR | Từ chối content với lý do |
+| GET | /api/v1/moderation/contents/{contentId}/history | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Trạng thái hiện tại và toàn bộ lịch sử |
 
 Hàng chờ hỗ trợ page, size, sort. Ví dụ:
 
@@ -68,7 +68,7 @@ Luồng:
 ~~~text
 Provider tạo content hoặc gửi lại content REJECTED
   -> content vào trạng thái PENDING
-  -> Moderator/Admin xem queue
+  -> Content Moderator/Admin xem queue
   -> approve hoặc reject
   -> Provider xem GET /api/v1/moderation/contents/{contentId}/history
 ~~~
@@ -77,14 +77,14 @@ Provider tạo content hoặc gửi lại content REJECTED
 
 | Method | Endpoint | Quyền | Chức năng |
 | --- | --- | --- | --- |
-| POST | /api/v1/moderation/destinations/{destinationId}/submit | PROVIDER, ADMIN, MODERATOR | Gửi điểm đến vào hàng chờ |
+| POST | /api/v1/moderation/destinations/{destinationId}/submit | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Gửi điểm đến vào hàng chờ |
 | GET | /api/v1/moderation/destinations/approved | Công khai | Danh sách điểm đến đã được duyệt |
-| GET | /api/v1/moderation/destinations/queue | ADMIN, MODERATOR | Hàng chờ destination PENDING |
-| GET | /api/v1/moderation/destinations/status/{status} | ADMIN, MODERATOR | Lọc DRAFT, PENDING, APPROVED, REJECTED |
-| GET | /api/v1/moderation/destinations/{destinationId}/history | PROVIDER, ADMIN, MODERATOR | Trạng thái và toàn bộ lịch sử |
-| GET | /api/v1/moderation/destinations/rejection-reasons | ADMIN, MODERATOR | Mã và nhãn checkbox lý do |
-| PATCH | /api/v1/moderation/destinations/{destinationId}/approve | ADMIN, MODERATOR | Duyệt, có thể kèm note |
-| PATCH | /api/v1/moderation/destinations/{destinationId}/reject | ADMIN, MODERATOR | Từ chối với reason và otherReason |
+| GET | /api/v1/moderation/destinations/queue | ADMIN, CONTENT_MODERATOR | Hàng chờ destination PENDING |
+| GET | /api/v1/moderation/destinations/status/{status} | ADMIN, CONTENT_MODERATOR | Lọc DRAFT, PENDING, APPROVED, REJECTED |
+| GET | /api/v1/moderation/destinations/{destinationId}/history | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Trạng thái và toàn bộ lịch sử |
+| GET | /api/v1/moderation/destinations/rejection-reasons | ADMIN, CONTENT_MODERATOR | Mã và nhãn checkbox lý do |
+| PATCH | /api/v1/moderation/destinations/{destinationId}/approve | ADMIN, CONTENT_MODERATOR | Duyệt, có thể kèm note |
+| PATCH | /api/v1/moderation/destinations/{destinationId}/reject | ADMIN, CONTENT_MODERATOR | Từ chối với reason và otherReason |
 
 Hàng chờ destination hỗ trợ page, size, sort:
 
@@ -108,13 +108,13 @@ Lý do từ chối lấy từ GET /api/v1/moderation/destinations/rejection-reas
 
 | Method | Endpoint | Quyền | Chức năng |
 | --- | --- | --- | --- |
-| POST | /api/v1/moderation/tours/{tourId}/submit | PROVIDER, ADMIN, MODERATOR | Gửi lại tour bị từ chối |
-| GET | /api/v1/moderation/tours/queue | ADMIN, MODERATOR | Hàng chờ tour PENDING |
-| GET | /api/v1/moderation/tours/status/{status} | ADMIN, MODERATOR | Lọc DRAFT, PENDING, APPROVED, REJECTED |
-| GET | /api/v1/moderation/tours/{tourId}/history | PROVIDER, ADMIN, MODERATOR | Trạng thái và toàn bộ lịch sử |
-| GET | /api/v1/moderation/tours/rejection-reasons | ADMIN, MODERATOR | Mã và nhãn checkbox lý do |
-| PATCH | /api/v1/moderation/tours/{tourId}/approve | ADMIN, MODERATOR | Duyệt tour, có thể kèm note |
-| PATCH | /api/v1/moderation/tours/{tourId}/reject | ADMIN, MODERATOR | Từ chối với reason và otherReason |
+| POST | /api/v1/moderation/tours/{tourId}/submit | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Gửi lại tour bị từ chối |
+| GET | /api/v1/moderation/tours/queue | ADMIN, CONTENT_MODERATOR | Hàng chờ tour PENDING |
+| GET | /api/v1/moderation/tours/status/{status} | ADMIN, CONTENT_MODERATOR | Lọc DRAFT, PENDING, APPROVED, REJECTED |
+| GET | /api/v1/moderation/tours/{tourId}/history | CONTENT_PROVIDER, ADMIN, CONTENT_MODERATOR | Trạng thái và toàn bộ lịch sử |
+| GET | /api/v1/moderation/tours/rejection-reasons | ADMIN, CONTENT_MODERATOR | Mã và nhãn checkbox lý do |
+| PATCH | /api/v1/moderation/tours/{tourId}/approve | ADMIN, CONTENT_MODERATOR | Duyệt tour, có thể kèm note |
+| PATCH | /api/v1/moderation/tours/{tourId}/reject | ADMIN, CONTENT_MODERATOR | Từ chối với reason và otherReason |
 
 Tạo mới/cập nhật tour tự gửi vào hàng chờ. Tour PENDING không thể sửa. Tour bị REJECTED có thể sửa rồi gửi lại; mọi quyết định được lưu trong history.
 
@@ -130,7 +130,7 @@ Body từ chối:
 
 ## Quyền và giới hạn
 
-- Chỉ ADMIN/MODERATOR xem queue hoặc quyết định duyệt/từ chối.
+- Chỉ ADMIN/CONTENT_MODERATOR xem queue hoặc quyết định duyệt/từ chối.
 - Provider chỉ gửi content/destination thuộc quyền sở hữu của mình.
 - Notification email cho Provider chưa được tích hợp.
 

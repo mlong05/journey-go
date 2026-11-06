@@ -1,10 +1,10 @@
 # Test flow Moderation
 
-Mở Swagger tại `http://localhost:8088/swagger-ui/index.html`. Dùng token Admin/Moderator để xem queue, approve, reject; Provider chỉ gửi tài nguyên của mình và xem lịch sử của mình.
+Mở Swagger tại `http://localhost:8088/swagger-ui/index.html`. Dùng token Admin/Content Moderator để xem queue, approve, reject; Provider chỉ gửi tài nguyên của mình và xem lịch sử của mình.
 
 ## Happy case: duyệt
 
-Tạo destination, cultural content hoặc tour trước; các tài nguyên mới tự vào `PENDING`. Moderator/Admin mở queue tương ứng:
+Tạo destination, cultural content hoặc tour trước; các tài nguyên mới tự vào `PENDING`. Content Moderator/Admin mở queue tương ứng:
 
 - Content: `GET /api/v1/moderation/contents/queue?page=0&size=10`
 - Destination: `GET /api/v1/moderation/destinations/queue?page=0&size=10`
@@ -58,7 +58,7 @@ Kỳ vọng: trạng thái `REJECTED`; reason chứa các mã đã chọn và ot
 
 ## Test lọc trạng thái
 
-Moderator/Admin có thể lọc queue theo trạng thái:
+Content Moderator/Admin có thể lọc queue theo trạng thái:
 
 - `GET /api/v1/moderation/destinations/status/PENDING?page=0&size=10`
 - `GET /api/v1/moderation/tours/status/REJECTED?page=0&size=10`

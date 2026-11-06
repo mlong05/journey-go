@@ -78,7 +78,7 @@ public class ExperienceController {
      */
     @GetMapping("/experiences/mine")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN')")
     @Operation(summary = "Danh sách Experience của tôi (PROVIDER/ADMIN) — không thấy của người khác",
             description = "Lọc theo createdBy = current user. Hỗ trợ ?status=&?destinationId=&?includeInactive=true.")
     @ApiResponses({
@@ -101,7 +101,7 @@ public class ExperienceController {
 
     @PostMapping("/experiences")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN')")
     @Operation(summary = "Tạo Experience mới (PROVIDER/ADMIN) — status = DRAFT")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
@@ -118,7 +118,7 @@ public class ExperienceController {
 
     @PatchMapping("/experiences/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#id)")
     @Operation(summary = "Cập nhật Experience (chỉ DRAFT — BR-EXP-2, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -135,7 +135,7 @@ public class ExperienceController {
 
     @DeleteMapping("/experiences/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#id)")
     @Operation(summary = "Xóa mềm Experience (DRAFT/PUBLISHED → INACTIVE, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -149,7 +149,7 @@ public class ExperienceController {
 
     @PatchMapping("/experiences/{id}/status")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#id)")
     @Operation(summary = "Đổi trạng thái Experience (DRAFT ↔ PUBLISHED, chỉ owner)",
             description = "Không thể đổi INACTIVE; dùng DELETE để xoá mềm. Idempotent: trùng status hiện tại thì trả về object hiện tại.")
     @ApiResponses({
