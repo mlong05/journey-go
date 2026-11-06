@@ -18,16 +18,16 @@ public interface SettlementRepository extends JpaRepository<Settlement, Long> {
 
     Optional<Settlement> findBySettlementCode(String settlementCode);
 
-    Page<Settlement> findByPartner_IdOrderByCreatedAtDesc(Long partnerId, Pageable pageable);
+    Page<Settlement> findByProviderProfile_IdOrderByCreatedAtDesc(Long providerProfileId, Pageable pageable);
 
     Page<Settlement> findByStatus(SettlementStatus status, Pageable pageable);
 
-    List<Settlement> findByPartner_IdAndRevenuePeriod(Long partnerId, String revenuePeriod);
+    List<Settlement> findByProviderProfile_IdAndRevenuePeriod(Long providerProfileId, String revenuePeriod);
 
-    Optional<Settlement> findByPartner_IdAndRevenuePeriodAndStatus(Long partnerId, String revenuePeriod,
+    Optional<Settlement> findByProviderProfile_IdAndRevenuePeriodAndStatus(Long providerProfileId, String revenuePeriod,
                                                                  SettlementStatus status);
 
-    boolean existsByPartner_IdAndRevenuePeriod(Long partnerId, String revenuePeriod);
+    boolean existsByProviderProfile_IdAndRevenuePeriod(Long providerProfileId, String revenuePeriod);
 
     /**
      * Lấy Settlement kèm khóa pessimistic write — dùng khi duyệt để tránh hai Admin
@@ -39,10 +39,10 @@ public interface SettlementRepository extends JpaRepository<Settlement, Long> {
 
     @Query("""
             SELECT s FROM Settlement s
-            WHERE s.partner.id = :partnerId
+            WHERE s.providerProfile.id = :providerProfileId
               AND s.revenuePeriod = :period
             """)
-    List<Settlement> findByPartnerAndPeriod(@Param("partnerId") Long partnerId, @Param("period") String period);
+    List<Settlement> findByProviderProfileAndPeriod(@Param("providerProfileId") Long providerProfileId, @Param("period") String period);
 
     /**
      * Tổng hợp số tiền theo kỳ doanh thu cho các đợt đã duyệt.

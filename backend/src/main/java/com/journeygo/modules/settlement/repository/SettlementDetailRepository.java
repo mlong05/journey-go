@@ -15,7 +15,7 @@ public interface SettlementDetailRepository extends JpaRepository<SettlementDeta
 
     @Query("""
             SELECT d FROM SettlementDetail d
-            JOIN FETCH d.partnerRevenue r
+            JOIN FETCH d.providerRevenue r
             WHERE d.settlement.id = :settlementId
             """)
     List<SettlementDetail> findBySettlementIdWithRevenue(@Param("settlementId") Long settlementId);

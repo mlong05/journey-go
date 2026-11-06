@@ -13,8 +13,8 @@ import java.time.Instant;
 public record FinancialAdjustmentResponse(
 
         @Schema(description = "ID điều chỉnh") Long id,
-        @Schema(description = "ID đối tác") Long partnerId,
-        @Schema(description = "Tên đối tác") String partnerName,
+        @Schema(description = "ID đối tác") Long providerProfileId,
+        @Schema(description = "Tên đối tác") String providerName,
         @Schema(description = "ID refund gốc") Long refundRequestId,
         @Schema(description = "ID settlement gốc") Long sourceSettlementId,
         @Schema(description = "Số tiền điều chỉnh — dương = cộng, âm = trừ") BigDecimal amount,
@@ -30,8 +30,8 @@ public record FinancialAdjustmentResponse(
         if (a == null) return null;
         return FinancialAdjustmentResponse.builder()
                 .id(a.getId())
-                .partnerId(a.getPartner() != null ? a.getPartner().getId() : null)
-                .partnerName(a.getPartner() != null ? a.getPartner().getPartnerName() : null)
+                .providerProfileId(a.getProviderProfile() != null ? a.getProviderProfile().getId() : null)
+                .providerName(a.getProviderProfile() != null ? a.getProviderProfile().getProviderName() : null)
                 .refundRequestId(a.getRefundRequest() != null ? a.getRefundRequest().getId() : null)
                 .sourceSettlementId(a.getSourceSettlementId())
                 .amount(a.getAmount())

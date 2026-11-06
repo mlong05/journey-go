@@ -1,6 +1,6 @@
 package com.journeygo.modules.wallet.entity;
 
-import com.journeygo.modules.partner.entity.Partner;
+import com.journeygo.modules.providerprofile.entity.ProviderProfile;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -8,11 +8,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Wallet — ví nội bộ của Partner.
+ * Wallet — ví nội bộ của ProviderProfile.
  *
  * <p>Quy tắc nghiệp vụ:
  * <ul>
- *   <li>Một Partner chỉ có đúng một Wallet — ràng buộc duy nhất trên {@code partner_id}.</li>
+ *   <li>Một ProviderProfile chỉ có đúng một Wallet — ràng buộc duy nhất trên {@code provider_profile_id}.</li>
  *   <li>Số dư khởi tạo bằng 0.</li>
  *   <li>Số dư chỉ thay đổi qua giao dịch Wallet tương ứng — không sửa trực tiếp số dư.</li>
  *   <li>Số dư phản ánh quyền lợi tài chính đã được ghi nhận, KHÔNG đồng nghĩa tiền đã chuyển
@@ -21,7 +21,7 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "wallets", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_wallet_partner", columnNames = {"partner_id"})
+        @UniqueConstraint(name = "uk_wallet_provider_profile", columnNames = {"provider_profile_id"})
 })
 @Getter
 @Setter
@@ -35,8 +35,8 @@ public class Wallet {
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "partner_id", nullable = false, unique = true)
-    private Partner partner;
+    @JoinColumn(name = "provider_profile_id", nullable = false, unique = true)
+    private ProviderProfile providerProfile;
 
     /** Số dư đã được tất toán (VND). */
     @Column(name = "balance", nullable = false, precision = 16, scale = 2)

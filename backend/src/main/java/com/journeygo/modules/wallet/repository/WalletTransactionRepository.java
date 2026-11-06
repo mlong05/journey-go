@@ -19,7 +19,7 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
 
     List<WalletTransaction> findByWallet_IdOrderByCreatedAtDesc(Long walletId);
 
-    Page<WalletTransaction> findByWallet_Partner_IdOrderByCreatedAtDesc(Long partnerId, Pageable pageable);
+    Page<WalletTransaction> findByWallet_ProviderProfile_IdOrderByCreatedAtDesc(Long providerProfileId, Pageable pageable);
 
     /**
      * Kiểm tra đã có giao dịch cộng tiền thành công cho Settlement này chưa —
