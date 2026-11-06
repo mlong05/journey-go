@@ -185,7 +185,7 @@ public class CommunityController {
     // ── MODERATOR ENDPOINTS ─────────────────────────────────────────────────────
 
     @GetMapping("/moderation/pending")
-    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy danh sách bài viết chờ duyệt (Moderator)", description = "Danh sách bài viết PENDING_REVIEW dành cho Kiểm duyệt viên")
     public ResponseEntity<ApiResponse<Page<PostResponse>>> getPendingPosts(
@@ -196,7 +196,7 @@ public class CommunityController {
     }
 
     @PostMapping("/moderation/posts/{id}")
-    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Kiểm duyệt bài viết (Moderator)", description = "Phê duyệt (APPROVE), Từ chối (REJECT) hoặc Yêu cầu chỉnh sửa (REQUEST_REVISION)")
     public ResponseEntity<ApiResponse<PostResponse>> moderatePost(
@@ -209,7 +209,7 @@ public class CommunityController {
     }
 
     @PatchMapping("/moderation/posts/{id}/visibility")
-    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Ẩn hoặc hiện lại bài viết (Moderator)", description = "hidden=true để gỡ bài khỏi cộng đồng, hidden=false để khôi phục")
     public ResponseEntity<ApiResponse<PostResponse>> setPostVisibility(
@@ -222,7 +222,7 @@ public class CommunityController {
     }
 
     @PatchMapping("/moderation/comments/{id}/visibility")
-    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Ẩn hoặc hiện lại bình luận (Moderator)")
     public ResponseEntity<ApiResponse<CommentResponse>> setCommentVisibility(
@@ -235,7 +235,7 @@ public class CommunityController {
     }
 
     @GetMapping("/moderation/reports")
-    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Xem danh sách báo cáo vi phạm (Moderator)", description = "Lấy các báo cáo bài viết vi phạm từ cộng đồng")
     public ResponseEntity<ApiResponse<Page<ReportResponse>>> getReports(
@@ -247,7 +247,7 @@ public class CommunityController {
     }
 
     @PatchMapping("/moderation/reports/{id}/resolve")
-    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Xử lý báo cáo vi phạm (Moderator)", description = "Xác nhận xử lý vi phạm và tùy chọn ẩn bài viết khỏi cộng đồng")
     public ResponseEntity<ApiResponse<ReportResponse>> resolveReport(
@@ -261,7 +261,7 @@ public class CommunityController {
     }
 
     @PatchMapping("/moderation/reports/{id}/dismiss")
-    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Bác bỏ báo cáo vi phạm (Moderator)", description = "Báo cáo sai hoặc không vi phạm; bài viết giữ nguyên")
     public ResponseEntity<ApiResponse<ReportResponse>> dismissReport(
