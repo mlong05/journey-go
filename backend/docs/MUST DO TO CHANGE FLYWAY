@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS destination_request_histories CASCADE;
+DROP TABLE IF EXISTS destination_requests CASCADE;
+DELETE FROM flyway_schema_history WHERE version IN ('3', '4');
+
+Chạy cái này trong PostGres để loại bỏ hết những phần cũ
