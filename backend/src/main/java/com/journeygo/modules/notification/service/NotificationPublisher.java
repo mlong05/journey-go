@@ -55,40 +55,68 @@ public class NotificationPublisher {
 
     /** Trang quản lý của chủ hồ sơ: Admin tạo thay hệ thống thì về /admin, còn lại về /provider. */
     public static String dashboardPath(com.journeygo.modules.user.entity.User owner, String suffix) {
-        if (owner == null) return "/provider" + suffix;
-        return (owner.getRole() == com.journeygo.modules.user.entity.Role.ADMIN ? "/admin" : "/provider") + suffix;
+        boolean admin = owner != null && owner.getRole() != null && owner.getRole().isAdmin();
+        return (admin ? "/admin" : "/provider") + suffix;
     }
 
-    /** Phát sự kiện SSE để web/app cập nhật số đếm hàng chờ thời gian thực. */
-    public void notifyQueueChanged(String queueName) {
-        eventPublisher.publishEvent(new QueueChangedEvent(this, queueName));
+    public static Long idOf(com.journeygo.modules.user.entity.User user) {
+        return user == null ? null : user.getId();
     }
 
-    public class Builder {
+    /** Đặt tên trong ngoặc kép tiếng Việt, cắt bớt nếu quá dài. */
+    public static String quote(String name) {
+        if (name == null || name.isBlank()) return "“(chưa đặt tên)”";
+        String trimmed = name.trim();
+        return "“" + (trimmed.length() > 80 ? trimmed.substring(0, 79) + "…" : trimmed) + "”";
+    }
+
+    /** Định dạng tiền kiểu Việt Nam: 1.500.000 đ. */
+    public static String money(java.math.BigDecimal amount) {
+        if (amount == null) return "0 đ";
+        java.text.DecimalFormatSymbols symbols = new java.text.DecimalFormatSymbols(java.util.Locale.ROOT);
+        symbols.setGroupingSeparator('.');
+        return new java.text.DecimalFormat("#,##0", symbols).format(amount) + " đ";
+    }
+
+    /** Ghép câu chính với ghi chú của người duyệt (nếu có). */
+    public static String withNote(String sentence, String note) {
+        return note == null || note.isBlank() ? sentence : sentence + " Ghi chú: " + note.trim();
+    }
+
+    /** Báo cho cả vai trò rằng một hàng chờ vừa thay đổi (không tạo thông báo). */
+    public void queueChanged(String role, String queue) {
+        eventPublisher.publishEvent(new QueueChangedEvent(role, queue));
+    }
+
+    public final class Builder {
         private final NotificationType type;
-        private final Set<Long> recipientIds = new LinkedHashSet<>();
+        private final Set<Long> recipients = new LinkedHashSet<>();
+        private String role;
+        private Long exclude;
         private String title;
         private String body;
         private String link;
-        private String referenceType;
-        private Long referenceId;
-        private String queueToNotify;
+        private String refType;
+        private Long refId;
+        private String queue;
 
         private Builder(NotificationType type) {
             this.type = type;
         }
 
-        public Builder to(Long recipientId) {
-            if (recipientId != null) recipientIds.add(recipientId);
+        /** Người nhận cụ thể; null được bỏ qua (ví dụ hồ sơ không có người tạo). */
+        public Builder to(Long userId) {
+            if (userId != null) recipients.add(userId);
             return this;
         }
 
-        public Builder toAll(Iterable<Long> ids) {
-            if (ids != null) {
-                for (Long id : ids) {
-                    if (id != null) recipientIds.add(id);
-                }
-            }
+        public Builder toRole(String role) {
+            this.role = role;
+            return this;
+        }
+
+        public Builder except(Long userId) {
+            this.exclude = userId;
             return this;
         }
 
@@ -107,40 +135,21 @@ public class NotificationPublisher {
             return this;
         }
 
-        public Builder ref(String type, Long id) {
-            this.referenceType = type;
-            this.referenceId = id;
+        public Builder ref(String refType, Long refId) {
+            this.refType = refType;
+            this.refId = refId;
             return this;
         }
 
-        /**
-         * Phát cả QueueChangedEvent cho hàng chờ kiểm duyệt tương ứng để bell badge cập nhật ngay.
-         * Dùng hằng số từ {@link Queue}.
-         */
-        public Builder notifyQueue(String queueName) {
-            this.queueToNotify = queueName;
+        public Builder queue(String queue) {
+            this.queue = queue;
             return this;
         }
 
         public void publish() {
-            if (title == null || title.isBlank()) {
-                throw new IllegalStateException("Notification title is required");
-            }
-            for (Long recipientId : recipientIds) {
-                eventPublisher.publishEvent(new NotificationEvent(
-                        NotificationPublisher.this,
-                        recipientId,
-                        type,
-                        title,
-                        body,
-                        link,
-                        referenceType,
-                        referenceId
-                ));
-            }
-            if (queueToNotify != null && !queueToNotify.isBlank()) {
-                notifyQueueChanged(queueToNotify);
-            }
+            if (recipients.isEmpty() && role == null) return;
+            eventPublisher.publishEvent(new NotificationEvent(Set.copyOf(recipients), role, exclude, type,
+                    title, body, link, refType, refId, queue));
         }
     }
 }

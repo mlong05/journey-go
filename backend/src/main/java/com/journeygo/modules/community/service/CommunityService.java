@@ -164,7 +164,7 @@ public class CommunityService {
     private void notifyPostPending(CommunityPost post, boolean resubmitted) {
         String author = post.getAuthorName() != null && !post.getAuthorName().isBlank() ? post.getAuthorName() : "du khách";
         notifications.send(NotificationType.POST_PENDING)
-                .toRole(Role.MODERATOR)
+                .toRole(Role.CONTENT_MODERATOR)
                 .title(resubmitted ? "Bài viết được gửi lại chờ duyệt" : "Bài viết cộng đồng mới chờ duyệt")
                 .body(NotificationPublisher.quote(post.getTitle()) + " của " + author + " đang chờ bạn kiểm duyệt.")
                 .link("/moderator/community")
@@ -403,7 +403,7 @@ public class CommunityService {
         }
 
         notifications.send(NotificationType.POST_REPORTED)
-                .toRole(Role.MODERATOR)
+                .toRole(Role.CONTENT_MODERATOR)
                 .title(reported.isHidden() && pending >= autoHideReportThreshold
                         ? "Bài viết bị tạm ẩn do nhiều báo cáo"
                         : "Có báo cáo vi phạm mới")
@@ -470,7 +470,7 @@ public class CommunityService {
                         post.getModerationNote()))
                 .ref("POST", postId)
                 .publish();
-        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.POST_REVIEW);
+        notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.POST_REVIEW);
         return withNames(PostResponse.fromEntity(saved, null).toBuilder()
                 .reportCount((int) reportRepository.countByPostIdAndStatus(postId, ReportStatus.PENDING))
                 .build());
@@ -538,7 +538,7 @@ public class CommunityService {
         reporters.forEach(thanks::to);
         thanks.publish();
 
-        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.POST_REPORT);
+        notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.POST_REPORT);
         return toReportResponse(report);
     }
 
@@ -558,7 +558,7 @@ public class CommunityService {
                 .ref("REPORT", report.getPostId())
                 .publish();
 
-        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.POST_REPORT);
+        notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.POST_REPORT);
         return toReportResponse(report);
     }
 

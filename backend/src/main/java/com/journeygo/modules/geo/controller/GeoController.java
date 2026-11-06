@@ -23,7 +23,7 @@ import java.util.List;
 @RequestMapping("/api/v1/geo")
 @RequiredArgsConstructor
 @SecurityRequirement(name = "Bearer Authentication")
-@PreAuthorize("hasAnyRole('ADMIN', 'PROVIDER', 'MODERATOR')")
+@PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER', 'CONTENT_MODERATOR')")
 @Tag(name = "Bản đồ (Goong)", description = "Tra cứu địa chỉ khi khai báo điểm đến và chỉ đường cho du khách")
 public class GeoController {
 
@@ -45,14 +45,14 @@ public class GeoController {
     }
 
     @GetMapping("/reverse")
-    @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN', 'PROVIDER', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN', 'CONTENT_PROVIDER', 'CONTENT_MODERATOR')")
     @Operation(summary = "Địa chỉ tại một tọa độ (bấm/kéo ghim trên bản đồ; du khách dùng để biết đang ở tỉnh/thành nào)")
     public ResponseEntity<ApiResponse<GeoAddress>> reverse(@RequestParam double lat, @RequestParam double lng) {
         return ResponseEntity.ok(ApiResponse.success(geoService.reverse(lat, lng)));
     }
 
     @GetMapping("/direction")
-    @PreAuthorize("hasAnyRole('TOURIST', 'USER', 'ADMIN', 'PROVIDER', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN', 'CONTENT_PROVIDER', 'CONTENT_MODERATOR')")
     @Operation(summary = "Đường đi và các bước chỉ đường giữa hai tọa độ (du khách tới điểm đến)")
     public ResponseEntity<ApiResponse<GeoRoute>> direction(
             @RequestParam double fromLat,

@@ -47,7 +47,7 @@ public class NotificationEventListener {
     }
 
     private void mirrorToAdmin(String role, String queue) {
-        if (queue != null && Role.MODERATOR.equals(role) && ADMIN_ALSO_WATCHES.contains(queue)) {
+        if (queue != null && Role.CONTENT_MODERATOR.equals(role) && ADMIN_ALSO_WATCHES.contains(queue)) {
             notificationService.pushQueueChanged(Role.ADMIN, queue);
         }
     }

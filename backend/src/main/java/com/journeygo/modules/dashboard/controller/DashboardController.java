@@ -34,7 +34,7 @@ public class DashboardController {
     }
 
     @GetMapping("/provider")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN')")
     @Operation(summary = "Số liệu tổng quan của đối tác đang đăng nhập (range: today | week | month)")
     public ResponseEntity<ApiResponse<ProviderDashboardResponse>> provider(
             @RequestParam(defaultValue = "month") String range,
@@ -44,7 +44,7 @@ public class DashboardController {
     }
 
     @GetMapping("/moderator")
-    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
     @Operation(summary = "Số liệu bàn làm việc kiểm duyệt")
     public ResponseEntity<ApiResponse<ModeratorDashboardResponse>> moderator() {
         return ResponseEntity.ok(ApiResponse.success("Lấy số liệu tổng quan thành công", dashboardService.moderator()));
