@@ -73,7 +73,7 @@ export const ROLES = [
   },
   {
     id: "moderator",
-    roleEnum: "MODERATOR",
+    roleEnum: "CONTENT_MODERATOR",
     title: "Kiểm duyệt viên",
     scope: "Thẩm định hồ sơ & nội dung",
     redirectPath: "/moderator",
@@ -83,13 +83,13 @@ export const ROLES = [
   },
   {
     id: "provider",
-    roleEnum: "PROVIDER",
-    title: "Đối tác Điểm đến",
+    roleEnum: "CONTENT_PROVIDER",
+    title: "Đối tác cung cấp nội dung",
     scope: "Quản lý di tích & tour",
     redirectPath: "/provider",
     sampleEmail: "provider@journeygo.com",
     samplePassword: "Password123@",
-    desc: "Cập nhật thông tin điểm di sản, phát hành tour & vé",
+    desc: "Tạo di sản, tour, trải nghiệm; theo dõi doanh thu, ví và tất toán",
   },
   {
     id: "tourist",
