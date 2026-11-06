@@ -33,3 +33,6 @@ replay_pid*
 
 # Android/Gradle build artifacts
 mobile/android/build/
+
+# Database backups
+*.dump
