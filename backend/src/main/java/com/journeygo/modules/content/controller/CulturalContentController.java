@@ -73,7 +73,7 @@ public class CulturalContentController {
     // ── Protected endpoints (Admin / Moderator / Provider) ────────────────────
 
     @PostMapping("/api/v1/destinations/{destinationId}/contents")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo nội dung văn hóa mới cho điểm đến",
             description = "PROVIDER chỉ được thêm nội dung vào điểm đến của chính mình")
@@ -89,7 +89,7 @@ public class CulturalContentController {
 
     @PostMapping(value = "/api/v1/destinations/{destinationId}/contents/with-image",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo cultural content và tải ảnh cùng lúc",
             description = "Gửi multipart/form-data gồm phần content (JSON) và image (file ảnh); backend tải ảnh lên Cloudinary rồi tạo content ở trạng thái chờ kiểm duyệt",
@@ -116,7 +116,7 @@ public class CulturalContentController {
 
     @PostMapping(value = "/api/v1/destinations/{destinationId}/contents/with-image-url",
             consumes = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo cultural content bằng JSON với ảnh đã có URL",
             description = "Dùng khi ảnh đã được tải lên Cloudinary; gửi mediaUrl và mediaPublicId trong JSON")
@@ -131,7 +131,7 @@ public class CulturalContentController {
     }
 
     @PutMapping("/api/v1/cultural-contents/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Cập nhật nội dung văn hóa",
             description = "PROVIDER chỉ được sửa nội dung thuộc điểm đến của mình")
@@ -146,7 +146,7 @@ public class CulturalContentController {
 
     @PutMapping(value = "/api/v1/cultural-contents/{id}/with-image",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Cập nhật cultural content và thay ảnh cùng lúc",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
@@ -183,7 +183,7 @@ public class CulturalContentController {
     }
 
     @DeleteMapping("/api/v1/cultural-contents/{id}/image")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Gỡ ảnh khỏi nội dung văn hóa", description = "Xóa ảnh Cloudinary đang gắn với nội dung; nội dung được gửi kiểm duyệt lại")
     public ResponseEntity<ApiResponse<CulturalContentResponse>> removeImage(
@@ -195,7 +195,7 @@ public class CulturalContentController {
     }
 
     @DeleteMapping("/api/v1/cultural-contents/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Xóa mềm nội dung văn hóa",
             description = "PROVIDER chỉ được xóa nội dung thuộc điểm đến của mình")
@@ -208,7 +208,7 @@ public class CulturalContentController {
     }
 
     @PatchMapping("/api/v1/cultural-contents/{id}/restore")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Khôi phục nội dung văn hóa đã xóa mềm",
             description = "Khôi phục nội dung văn hóa bị xóa mềm")
@@ -221,7 +221,7 @@ public class CulturalContentController {
     }
 
     @GetMapping("/api/v1/destinations/{destinationId}/contents/manage")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy toàn bộ nội dung văn hóa của điểm đến để quản lý",
             description = "Gồm cả nội dung đang chờ duyệt hoặc bị từ chối; PROVIDER chỉ xem được điểm đến của chính mình")
@@ -234,7 +234,7 @@ public class CulturalContentController {
     }
 
     @GetMapping("/api/v1/destinations/{destinationId}/contents/deleted")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy danh sách nội dung văn hóa đã bị xóa mềm",
             description = "Trả về danh sách nội dung văn hóa đã bị xóa mềm của điểm đến")

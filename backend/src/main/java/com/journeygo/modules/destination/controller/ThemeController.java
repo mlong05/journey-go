@@ -43,7 +43,7 @@ public class ThemeController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo chủ đề mới (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<ThemeResponse>> create(@Valid @RequestBody ThemeRequest request) {
@@ -52,7 +52,7 @@ public class ThemeController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Cập nhật chủ đề (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<ThemeResponse>> update(
@@ -62,7 +62,7 @@ public class ThemeController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Xóa mềm chủ đề (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
@@ -71,7 +71,7 @@ public class ThemeController {
     }
 
     @PatchMapping("/{id}/restore")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Khôi phục chủ đề đã xóa mềm (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<ThemeResponse>> restore(@PathVariable Long id) {
@@ -79,7 +79,7 @@ public class ThemeController {
     }
 
     @GetMapping("/deleted")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy danh sách chủ đề đã xóa mềm (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<List<ThemeResponse>>> getDeleted() {
