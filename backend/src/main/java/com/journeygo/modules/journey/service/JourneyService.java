@@ -743,7 +743,7 @@ public class JourneyService {
     /**
      * Đánh dấu Booking tương ứng đã hoàn thành trải nghiệm.
      *
-     * <p>Điều kiện tiên quyết để doanh thu Partner được xét điều kiện tất toán
+     * <p>Điều kiện tiên quyết để doanh thu ProviderProfile được xét điều kiện tất toán
      * (Mục 4.1 — "Booking chỉ phát sinh doanh thu có thể tất toán sau khi trải nghiệm hoàn thành").
      *
      * <p>Không để lỗi ở đây làm hỏng luồng Journey — chỉ ghi log cảnh báo.

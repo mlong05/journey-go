@@ -57,7 +57,7 @@ public class CloudinaryImageService {
         requireConfigured();
         Destination destination = destinationRepository.findByIdAndDeletedFalse(destinationId)
                 .orElseThrow(() -> new AppException(ErrorCode.DESTINATION_NOT_FOUND));
-        if (callerRole != null && callerRole.isProvider()) {
+        if (callerRole != null && callerRole.isContentProvider()) {
             Long ownerId = destination.getCreatedBy() == null ? null : destination.getCreatedBy().getId();
             if (ownerId == null || !ownerId.equals(callerId)) throw new AppException(ErrorCode.UNAUTHORIZED);
         }
@@ -89,7 +89,7 @@ public class CloudinaryImageService {
 
         Destination destination = destinationRepository.findByIdAndDeletedFalse(destinationId)
                 .orElseThrow(() -> new AppException(ErrorCode.DESTINATION_NOT_FOUND));
-        if (callerRole != null && callerRole.isProvider()) {
+        if (callerRole != null && callerRole.isContentProvider()) {
             Long ownerId = destination.getCreatedBy() == null ? null : destination.getCreatedBy().getId();
             if (ownerId == null || !ownerId.equals(callerId)) throw new AppException(ErrorCode.UNAUTHORIZED);
         }

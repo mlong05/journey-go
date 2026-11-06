@@ -247,7 +247,7 @@ public class CulturalContentService {
     }
 
     private void checkOwnership(Destination destination, Long callerId, Role callerRole) {
-        if (callerRole != null && callerRole.isProvider()) {
+        if (callerRole != null && callerRole.isContentProvider()) {
             Long ownerId = destination.getCreatedBy() != null ? destination.getCreatedBy().getId() : null;
             if (ownerId == null || !ownerId.equals(callerId)) {
                 throw new AppException(ErrorCode.UNAUTHORIZED);

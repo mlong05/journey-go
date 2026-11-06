@@ -132,7 +132,7 @@ export default function ProviderOverviewPage() {
     };
   }, [timeRange, reloadKey]);
 
-  const partnerName = authData?.user?.fullName || authData?.user?.name || "Đối tác điểm đến";
+  const providerName = authData?.user?.fullName || authData?.user?.name || "Đối tác cung cấp nội dung";
   const range = RANGE_OPTIONS.find((r) => r.id === timeRange) ?? RANGE_OPTIONS[2];
 
   const destStats = stats?.destinations ?? { total: 0, published: 0, pending: 0, rejected: 0, draft: 0 };
@@ -225,7 +225,7 @@ export default function ProviderOverviewPage() {
     <div className="space-y-6 animate-in fade-in-50 duration-200">
       <PageHeader
         eyebrow="Đối tác điểm đến"
-        title={partnerName}
+        title={providerName}
         description="Theo dõi lượt check-in, quản lý tọa độ di tích và đồng hành cùng Hội đồng Thẩm định văn hóa."
         meta={
           <>

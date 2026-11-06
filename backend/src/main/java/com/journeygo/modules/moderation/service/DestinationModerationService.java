@@ -82,7 +82,7 @@ public class DestinationModerationService {
 
         String sender = destination.getCreatedBy() == null ? "đối tác" : destination.getCreatedBy().getFullName();
         notifications.send(NotificationType.DESTINATION_PENDING)
-                .toRole(Role.MODERATOR)
+                .toRole(Role.CONTENT_MODERATOR)
                 .title(edited ? "Điểm đến được gửi lại sau chỉnh sửa" : "Điểm đến mới chờ thẩm định")
                 .body(NotificationPublisher.quote(destination.getName()) + " do " + sender + " gửi, đang chờ bạn thẩm định.")
                 .link("/moderator/destinations/" + id)
@@ -90,7 +90,7 @@ public class DestinationModerationService {
                 .queue(NotificationPublisher.Queue.DESTINATION_REVIEW)
                 .publish();
         // Gói trải nghiệm đi kèm cũng vừa vào hàng chờ duyệt riêng
-        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.EXPERIENCE_REVIEW);
+        notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.EXPERIENCE_REVIEW);
         return toResponse(saved);
     }
 
@@ -138,7 +138,7 @@ public class DestinationModerationService {
                 .ref("DESTINATION", id)
                 .queue(NotificationPublisher.Queue.MY_CONTENT)
                 .publish();
-        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.DESTINATION_REVIEW);
+        notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.DESTINATION_REVIEW);
         return toResponse(review);
     }
 
@@ -181,7 +181,7 @@ public class DestinationModerationService {
                 .ref("DESTINATION", id)
                 .queue(NotificationPublisher.Queue.MY_CONTENT)
                 .publish();
-        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.DESTINATION_REVIEW);
+        notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.DESTINATION_REVIEW);
         return toResponse(review);
     }
 
@@ -313,7 +313,7 @@ public class DestinationModerationService {
     }
 
     private void checkOwnership(Destination destination, Long callerId, Role callerRole) {
-        if (callerRole != null && callerRole.isProvider()) {
+        if (callerRole != null && callerRole.isContentProvider()) {
             Long ownerId = destination.getCreatedBy() == null ? null : destination.getCreatedBy().getId();
             if (ownerId == null || !ownerId.equals(callerId)) {
                 throw new AppException(ErrorCode.UNAUTHORIZED);

@@ -37,16 +37,29 @@ export const ROUTES = {
   SETTINGS: "/settings",
 
   // ── Khu vực quản trị ──────────────────────────────────────────────────────
-  PROVIDER: "/provider",
-  MODERATOR: "/moderator",
   ADMIN: "/admin",
   ADMIN_FINANCE: "/admin/finance",
   ADMIN_SETTLEMENTS: "/admin/settlements",
   ADMIN_AUDIT_LOGS: "/admin/audit-logs",
 
-  // ── Khu vực đối tác (PARTNER) ─────────────────────────────────────────────
-  PARTNER: "/partner",
-  PARTNER_WALLET: "/partner/wallet",
-  PARTNER_SETTLEMENTS: "/partner/settlements",
-  PARTNER_REVENUES: "/partner/revenues",
+  // ── Khu vực kiểm duyệt ────────────────────────────────────────────────────
+  MODERATOR: "/moderator",
+
+  // ── Khu vực đối tác cung cấp nội dung (CONTENT_PROVIDER) ───────────────────
+  PROVIDER: "/provider",
+  PROVIDER_TOURS: "/provider/tours",
+  PROVIDER_DESTINATIONS: "/provider/destinations",
+  PROVIDER_TASKS: "/provider/tasks/create",
+
+  // ── Khu vực tài chính của đối tác (CONTENT_PROVIDER) ──────────────────────
+  PROVIDER_FINANCE: "/provider/finance",
+  PROVIDER_FINANCE_WALLET: "/provider/finance/wallet",
+  PROVIDER_FINANCE_SETTLEMENTS: "/provider/finance/settlements",
+  PROVIDER_FINANCE_REVENUES: "/provider/finance/revenues",
+
+  // ── Redirect từ các route cũ (Partner Portal đã hợp nhất vào Provider Portal) ──
+  LEGACY_PARTNER: "/partner",
+  LEGACY_PARTNER_WALLET: "/partner/wallet",
+  LEGACY_PARTNER_SETTLEMENTS: "/partner/settlements",
+  LEGACY_PARTNER_REVENUES: "/partner/revenues",
 };

@@ -1,7 +1,11 @@
 /// Thông điệp lỗi chuẩn bảo mật - không làm lộ vai trò người dùng
 const String kInvalidAuthErrorMessage = 'Tài khoản hoặc mật khẩu không hợp lệ!';
 
-/// Kiểm tra vai trò hợp lệ cho ứng dụng di động Khách du lịch
+/// Kiểm tra vai trò hợp lệ cho ứng dụng di động Khách du lịch.
+///
+/// Backend chỉ còn 4 role chính thức: ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER, TOURIST.
+/// Role cũ `USER` đã bị gỡ trong đợt hợp nhất Role → Content Provider, nhưng vẫn chấp nhận
+/// để tương thích với phiên đăng nhập đã lưu sẵn trên thiết bị.
 bool isTouristRole(String? role) {
   if (role == null) return false;
   final normalized = role.trim().toUpperCase();

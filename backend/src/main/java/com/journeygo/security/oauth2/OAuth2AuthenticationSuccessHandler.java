@@ -93,13 +93,13 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                     .orElse(Role.TOURIST);
 
             // Kiểm tra bảo mật: chỉ cho phép tự đăng ký TOURIST hoặc PROVIDER
-            if (!Role.TOURIST.equals(requestedRole) && !Role.PROVIDER.equals(requestedRole)) {
+            if (!Role.TOURIST.equals(requestedRole) && !Role.CONTENT_PROVIDER.equals(requestedRole)) {
                 requestedRole = Role.TOURIST;
             }
 
             final String finalRole = requestedRole;
             Role userRole = roleRepository.findByName(finalRole)
-                    .orElseGet(() -> roleRepository.save(new Role(finalRole, Role.PROVIDER.equals(finalRole) ? "Nhà cung cấp" : "Khách du lịch")));
+                    .orElseGet(() -> roleRepository.save(new Role(finalRole, Role.CONTENT_PROVIDER.equals(finalRole) ? "Nhà cung cấp" : "Khách du lịch")));
 
             user = User.builder()
                     .email(email)

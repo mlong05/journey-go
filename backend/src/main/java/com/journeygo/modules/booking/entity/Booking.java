@@ -53,7 +53,7 @@ public class Booking {
     @JoinColumn(name = "tour_id", nullable = false)
     private Tour tour;
 
-    /** Ngày trải nghiệm — căn cứ xác định kỳ doanh thu (revenue period) của Partner. */
+    /** Ngày trải nghiệm — căn cứ xác định kỳ doanh thu (revenue period) của ProviderProfile. */
     @Column(name = "experience_date", nullable = false)
     private LocalDate experienceDate;
 

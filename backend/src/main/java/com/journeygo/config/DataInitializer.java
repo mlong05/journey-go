@@ -53,12 +53,12 @@ import com.journeygo.modules.refund.entity.enums.RefundReason;
 import com.journeygo.modules.refund.entity.enums.RefundStatus;
 import com.journeygo.modules.refund.repository.RefundAuditLogRepository;
 import com.journeygo.modules.refund.repository.RefundRequestRepository;
-import com.journeygo.modules.partner.entity.Partner;
-import com.journeygo.modules.partner.repository.PartnerRepository;
-import com.journeygo.modules.partnerrevenue.entity.PartnerRevenue;
-import com.journeygo.modules.partnerrevenue.entity.enums.DeferredReason;
-import com.journeygo.modules.partnerrevenue.entity.enums.PartnerRevenueStatus;
-import com.journeygo.modules.partnerrevenue.repository.PartnerRevenueRepository;
+import com.journeygo.modules.providerprofile.entity.ProviderProfile;
+import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
+import com.journeygo.modules.providerrevenue.entity.ProviderRevenue;
+import com.journeygo.modules.providerrevenue.entity.enums.DeferredReason;
+import com.journeygo.modules.providerrevenue.entity.enums.ProviderRevenueStatus;
+import com.journeygo.modules.providerrevenue.repository.ProviderRevenueRepository;
 import com.journeygo.modules.settlement.entity.FinancialAdjustment;
 import com.journeygo.modules.settlement.entity.Settlement;
 import com.journeygo.modules.settlement.entity.SettlementDetail;
@@ -118,8 +118,8 @@ public class DataInitializer {
     private final PaymentRepository paymentRepository;
     private final RefundRequestRepository refundRequestRepository;
     private final RefundAuditLogRepository refundAuditLogRepository;
-    private final PartnerRepository partnerRepository;
-    private final PartnerRevenueRepository partnerRevenueRepository;
+    private final ProviderProfileRepository providerProfileRepository;
+    private final ProviderRevenueRepository providerRevenueRepository;
     private final SettlementRepository settlementRepository;
     private final SettlementDetailRepository settlementDetailRepository;
     private final FinancialAdjustmentRepository financialAdjustmentRepository;
@@ -127,6 +127,7 @@ public class DataInitializer {
     private final WalletTransactionRepository walletTransactionRepository;
     private final PlatformTransactionManager transactionManager;
     private final JdbcTemplate jdbcTemplate;
+    private final com.journeygo.modules.providerprofile.service.ProviderProfileService providerProfileService;
 
     @Bean
     @org.springframework.core.annotation.Order(1)
@@ -137,12 +138,10 @@ public class DataInitializer {
                     .orElseGet(() -> roleRepository.save(new Role(Role.TOURIST, "Khách du lịch")));
             Role adminRole = roleRepository.findByName(Role.ADMIN)
                     .orElseGet(() -> roleRepository.save(new Role(Role.ADMIN, "Quản trị viên")));
-            Role modRole = roleRepository.findByName(Role.MODERATOR)
-                    .orElseGet(() -> roleRepository.save(new Role(Role.MODERATOR, "Kiểm duyệt viên")));
-            Role providerRole = roleRepository.findByName(Role.PROVIDER)
-                    .orElseGet(() -> roleRepository.save(new Role(Role.PROVIDER, "Đối tác cung cấp dịch vụ")));
-            Role partnerRole = roleRepository.findByName(Role.PARTNER)
-                    .orElseGet(() -> roleRepository.save(new Role(Role.PARTNER, "Đối tác hưởng doanh thu và sở hữu ví nội bộ")));
+            Role modRole = roleRepository.findByName(Role.CONTENT_MODERATOR)
+                    .orElseGet(() -> roleRepository.save(new Role(Role.CONTENT_MODERATOR, "Kiểm duyệt viên")));
+            Role providerRole = roleRepository.findByName(Role.CONTENT_PROVIDER)
+                    .orElseGet(() -> roleRepository.save(new Role(Role.CONTENT_PROVIDER, "Đối tác cung cấp nội dung và trải nghiệm")));
 
             // Tài khoản admin mặc định
             userRepository.findByEmail("admin@journeygo.com").ifPresentOrElse(admin -> {
@@ -192,13 +191,17 @@ public class DataInitializer {
                         .build());
             });
 
-            // Tài khoản Đối tác điểm đến (PROVIDER)
+            // Tài khoản Đối tác điểm đến (CONTENT_PROVIDER)
             userRepository.findByEmail("provider@journeygo.com").ifPresentOrElse(provider -> {
                 provider.setPassword(passwordEncoder.encode("Password123@"));
                 provider.setRole(providerRole);
                 userRepository.save(provider);
+                // Cấp role CONTENT_PROVIDER => phải có ProviderProfile + Wallet.
+                // `UserService` không được gọi ở đây (vòng lặp phụ thuộc), nên gọi trực tiếp
+                // `ensureProfileAndWallet` — hàm này idempotent.
+                providerProfileService.ensureProfileAndWallet(provider);
             }, () -> {
-                userRepository.save(User.builder()
+                User created = userRepository.save(User.builder()
                         .email("provider@journeygo.com")
                         .password(passwordEncoder.encode("Password123@"))
                         .fullName("Ban Quản Lý Tràng An")
@@ -206,6 +209,8 @@ public class DataInitializer {
                         .role(providerRole)
                         .active(true)
                         .build());
+                // Cấp role CONTENT_PROVIDER => phải có ProviderProfile + Wallet.
+                providerProfileService.ensureProfileAndWallet(created);
             });
 
             // Tài khoản Khách du lịch (TOURIST) dành riêng cho ứng dụng Mobile
@@ -468,7 +473,7 @@ public class DataInitializer {
                 }
             });
 
-            log.info("Khởi tạo và đồng bộ tài khoản mẫu (ADMIN, MODERATOR, PROVIDER, TOURIST) thành công với mật khẩu Password123@");
+            log.info("Khởi tạo và đồng bộ tài khoản mẫu (ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER, TOURIST) thành công với mật khẩu Password123@");
         };
     }
 
@@ -480,13 +485,13 @@ public class DataInitializer {
     //  phải tạo dữ liệu thủ công.
     //
     //  Dữ liệu tạo ra:
-    //   • 2 Partner (kèm Wallet)  — partner1@ / partner2@journeygo.com
+    //   • 2 ProviderProfile (kèm Wallet)  — provider1@ / provider2@journeygo.com
     //   • 2 Tourist               — tourist1@ / tourist2@journeygo.com
     //   • 5 Destination (PUBLISHED) + 5 Experience (PUBLISHED) + slot cho nhiều ngày
-    //   • 2 Tour PUBLISHED (1 tour nhiều Partner)
+    //   • 2 Tour PUBLISHED (1 tour nhiều ProviderProfile)
     //   • 9 Booking ở các trạng thái: COMPLETED / CONFIRMED / PENDING_PAYMENT / CANCELLED
     //   • 7 Payment SUCCESS + 2 Refund (REFUNDED, PENDING_REVIEW)
-    //   • PartnerRevenue (ELIGIBLE / PENDING / SETTLED)
+    //   • ProviderRevenue (ELIGIBLE / PENDING / SETTLED)
     //   • 1 Settlement APPROVED (đã cộng tiền vào ví) + 1 FinancialAdjustment APPROVED
     //
     //  Tất cả thao tác đều IDEMPOTENT — chạy lại nhiều lần không tạo trùng.
@@ -503,7 +508,7 @@ public class DataInitializer {
                 new TransactionTemplate(transactionManager)
                         .executeWithoutResult(status -> seedSampleBookingData());
                 log.info("Đã khởi tạo DỮ LIỆU MẪU cho kịch bản test Booking → Payment → Refund → Settlement "
-                        + "(2 partner, 2 tourist, 5 destination, 5 experience, 2 tour, 9 booking, 7 payment, 2 refund, "
+                        + "(2 providerProfile, 2 tourist, 5 destination, 5 experience, 2 tour, 9 booking, 7 payment, 2 refund, "
                         + "1 settlement, 1 adjustment).");
             } catch (Exception e) {
                 log.warn("Không thể khởi tạo dữ liệu mẫu Booking/Payment/Refund/Settlement: {}", e.getMessage(), e);
@@ -516,31 +521,31 @@ public class DataInitializer {
                 .orElseGet(() -> roleRepository.save(new Role(Role.ADMIN, "Quản trị viên")));
         Role touristRole = roleRepository.findByName(Role.TOURIST)
                 .orElseGet(() -> roleRepository.save(new Role(Role.TOURIST, "Khách du lịch")));
-        Role partnerRole = roleRepository.findByName(Role.PARTNER)
-                .orElseGet(() -> roleRepository.save(new Role(Role.PARTNER,
+        Role providerRole = roleRepository.findByName(Role.CONTENT_PROVIDER)
+                .orElseGet(() -> roleRepository.save(new Role(Role.CONTENT_PROVIDER,
                         "Đối tác hưởng doanh thu và sở hữu ví nội bộ")));
 
         // Dọn các bản ghi "rác" sinh ra từ những lần khởi tạo bị lỗi trước đó
-        // (ví dụ Partner gắn nhầm user, settlement cũ đã hủy…) để dữ liệu mẫu luôn sạch.
+        // (ví dụ ProviderProfile gắn nhầm user, settlement cũ đã hủy…) để dữ liệu mẫu luôn sạch.
         purgeStraySampleArtifacts();
 
         // ── Tài khoản ────────────────────────────────────────────────────────────
         User admin = ensureUser("admin@journeygo.com", "Hệ Thống Quản Trị", "0900000001", adminRole);
-        User partner1User = ensureUser("partner1@journeygo.com", "Tràng An Heritage", "0900000011", partnerRole);
-        User partner2User = ensureUser("partner2@journeygo.com", "Hạ Long Bay Tours", "0900000012", partnerRole);
+        User provider1User = ensureUser("provider1@journeygo.com", "Tràng An Heritage", "0900000011", providerRole);
+        User provider2User = ensureUser("provider2@journeygo.com", "Hạ Long Bay Tours", "0900000012", providerRole);
         User tourist1 = ensureUser("tourist1@journeygo.com", "Nguyễn Văn A", "0912345678", touristRole);
         User tourist2 = ensureUser("tourist2@journeygo.com", "Nguyễn Văn B", "0912345679", touristRole);
 
-        // ── Partner + Wallet (tạo nguyên tử) ────────────────────────────────────
-        Partner partner1 = ensurePartner(partner1User, "Ban Quản lý Tràng An", new BigDecimal("0.2500"));
-        Partner partner2 = ensurePartner(partner2User, "Ban Quản lý Hạ Long", new BigDecimal("0.2000"));
+        // ── ProviderProfile + Wallet (tạo nguyên tử) ────────────────────────────────────
+        ProviderProfile provider1 = ensureProviderProfile(provider1User, "Ban Quản lý Tràng An", new BigDecimal("0.2500"));
+        ProviderProfile provider2 = ensureProviderProfile(provider2User, "Ban Quản lý Hạ Long", new BigDecimal("0.2000"));
 
         // ── Ngày tham chiếu ──────────────────────────────────────────────────────
         LocalDate today = LocalDate.now(VN_ZONE);
         LocalDate prevMonthDay = YearMonth.now(VN_ZONE).minusMonths(1).atDay(20);
         LocalDate prev3MonthDay = YearMonth.now(VN_ZONE).minusMonths(3).atDay(15);
-        String prevMonthPeriod = PartnerRevenue.periodOf(prevMonthDay);
-        String prev3MonthPeriod = PartnerRevenue.periodOf(prev3MonthDay);
+        String prevMonthPeriod = ProviderRevenue.periodOf(prevMonthDay);
+        String prev3MonthPeriod = ProviderRevenue.periodOf(prev3MonthDay);
 
         // ── Destination ─────────────────────────────────────────────────────────
         Destination destVanMieu = ensureDestination("Văn Miếu – Quốc Tử Giám",
@@ -559,23 +564,23 @@ public class DataInitializer {
                 "Đường Thanh Niên, Yên Phụ, Tây Hồ, Hà Nội",
                 "21.0483000", "105.8368000", 4000, admin);
 
-        // ── Experience (người tạo = Partner → nguồn doanh thu) ──────────────────
+        // ── Experience (người tạo = ProviderProfile → nguồn doanh thu) ──────────────────
         Experience expVanMieu = ensureExperience(destVanMieu, "Tham quan Văn Miếu – Quốc Tử Giám",
                 "Khám phá 107 môn xuất và trường đại học đầu tiên của Việt Nam. Bao gồm vé vào cổng "
                         + "và hướng dẫn viên thuyết minh 60 phút.",
-                new BigDecimal("500000.00"), 90, partner1User);
+                new BigDecimal("500000.00"), 90, provider1User);
         Experience expHoangThanh = ensureExperience(destHoangThanh, "Dạo bộ Hoàng Thành Thăng Long",
                 "Đi dạo trong khu thành cổ với hướng dẫn viên lịch sử, kể lại 1000 năm hào hùng kinh thành.",
-                new BigDecimal("400000.00"), 75, partner1User);
+                new BigDecimal("400000.00"), 75, provider1User);
         Experience expBatTrang = ensureExperience(destBatTrang, "Trải nghiệm làng gốm Bát Tràng",
                 "Tự tay ném gốm với nghệ nhân và nấu món gốm truyền thống.",
-                new BigDecimal("500000.00"), 120, partner1User);
+                new BigDecimal("500000.00"), 120, provider1User);
         Experience expTrangAn = ensureExperience(destTrangAn, "Tham quan Quần thể di sản Tràng An",
                 "Đi thuyền qua các hang động tự nhiên và khu du lịch Tam Cốc.",
-                new BigDecimal("600000.00"), 240, partner2User);
+                new BigDecimal("600000.00"), 240, provider2User);
         Experience expTranQuoc = ensureExperience(destTranQuoc, "Tham quan Chùa Trấn Quốc & Hồ Tây",
                 "Chiêm ngắm chùa Trấn Quốc nổi tiếng với tháp Bảo Nghiêm 11 tầng và hồ Tây.",
-                new BigDecimal("400000.00"), 60, partner2User);
+                new BigDecimal("400000.00"), 60, provider2User);
 
         // ── Slot (mở bán nhiều ngày) ─────────────────────────────────────────────
         List<LocalDate> slotDates = new ArrayList<>(List.of(
@@ -595,10 +600,10 @@ public class DataInitializer {
         }
 
         // ── Tour ────────────────────────────────────────────────────────────────
-        // Tour 1: nhiều Partner (P1 giữ Bát Tràng, P2 giữ Tràng An + Trấn Quốc) → 1.500.000đ
+        // Tour 1: nhiều ProviderProfile (P1 giữ Bát Tràng, P2 giữ Tràng An + Trấn Quốc) → 1.500.000đ
         Tour tour1 = ensureTour("Hành trình Tràng An 2 ngày 1 đêm", TourType.ECOTOURISM, 2, admin,
                 List.of(destBatTrang, destTrangAn, destTranQuoc));
-        // Tour 2: 1 Partner (P1 giữ Văn Miếu + Hoàng Thành) → 900.000đ
+        // Tour 2: 1 ProviderProfile (P1 giữ Văn Miếu + Hoàng Thành) → 900.000đ
         Tour tour2 = ensureTour("Hành trình kinh thành Thăng Long 1 ngày", TourType.CULTURAL, 1, admin,
                 List.of(destVanMieu, destHoangThanh));
 
@@ -609,13 +614,13 @@ public class DataInitializer {
         Instant prev3Paid = prev3MonthDay.atTime(10, 0).atZone(VN_ZONE).toInstant();
         Instant prev3Done = prev3MonthDay.atTime(15, 0).atZone(VN_ZONE).toInstant();
 
-        // 1) COMPLETED — kỳ trước — dùng để tạo Settlement (2 Partner)
+        // 1) COMPLETED — kỳ trước — dùng để tạo Settlement (2 ProviderProfile)
         Booking bk1 = ensureBooking("JGSAMPLE01", tourist1, tour1, prevMonthDay, prevMonthPaid, prevMonthDone,
                 admin);
         Payment pay1 = ensurePayment("JGSAMPLE01-TXN", bk1, new BigDecimal("1500000.00"),
                 "MOMO", "QRCODE", "91000001", prevMonthPaid);
 
-        // 2) COMPLETED — kỳ trước — 1 Partner
+        // 2) COMPLETED — kỳ trước — 1 ProviderProfile
         Booking bk2 = ensureBooking("JGSAMPLE02", tourist2, tour2, prevMonthDay, prevMonthPaid, prevMonthDone,
                 admin);
         Payment pay2 = ensurePayment("JGSAMPLE02-TXN", bk2, new BigDecimal("900000.00"),
@@ -638,7 +643,7 @@ public class DataInitializer {
         Payment pay6 = ensurePayment("JGSAMPLE06-TXN", bk6, new BigDecimal("900000.00"),
                 "INTCARD", null, "91000006", prev3Paid);
 
-        // 7) COMPLETED + Refund đã hoàn thành 50% (thuộc Partner 1)
+        // 7) COMPLETED + Refund đã hoàn thành 50% (thuộc ProviderProfile 1)
         //
         // LƯU Ý: các booking mẫu hoàn thành (BK7/BK8/BK9) đặt ngày trải nghiệm TRONG kỳ
         // trước (kỳ đã đóng) để doanh thu của chúng thuộc kỳ đã đóng. Nếu đặt ở
@@ -679,72 +684,72 @@ public class DataInitializer {
                 "9876543210", "NGUYEN VAN B", "Vietcombank",
                 null, null);
 
-        // ── PARTNER REVENUE ─────────────────────────────────────────────────────
-        // BK1 (tour nhiều Partner): P1 = 500.000, P2 = 1.000.000
-        PartnerRevenue rev1P1 = ensureRevenue(bk1, pay1, partner1, new BigDecimal("500000.00"),
+        // ── PROVIDER REVENUE ─────────────────────────────────────────────────────
+        // BK1 (tour nhiều ProviderProfile): P1 = 500.000, P2 = 1.000.000
+        ProviderRevenue rev1P1 = ensureRevenue(bk1, pay1, provider1, new BigDecimal("500000.00"),
                 new BigDecimal("0.2500"), BigDecimal.ZERO, prevMonthPeriod, prevMonthDay,
-                PartnerRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
-        PartnerRevenue rev1P2 = ensureRevenue(bk1, pay1, partner2, new BigDecimal("1000000.00"),
+                ProviderRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
+        ProviderRevenue rev1P2 = ensureRevenue(bk1, pay1, provider2, new BigDecimal("1000000.00"),
                 new BigDecimal("0.2000"), BigDecimal.ZERO, prevMonthPeriod, prevMonthDay,
-                PartnerRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
+                ProviderRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
 
         // BK2: P1 = 900.000
-        PartnerRevenue rev2P1 = ensureRevenue(bk2, pay2, partner1, new BigDecimal("900000.00"),
+        ProviderRevenue rev2P1 = ensureRevenue(bk2, pay2, provider1, new BigDecimal("900000.00"),
                 new BigDecimal("0.2500"), BigDecimal.ZERO, prevMonthPeriod, prevMonthDay,
-                PartnerRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
+                ProviderRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
 
         // BK3: đã thanh toán nhưng chưa hoàn thành trải nghiệm → PENDING
-        ensureRevenue(bk3, pay3, partner1, new BigDecimal("500000.00"), new BigDecimal("0.2500"),
-                BigDecimal.ZERO, PartnerRevenue.periodOf(today.plusDays(1)), today.plusDays(1),
-                PartnerRevenueStatus.PENDING, DeferredReason.BOOKING_NOT_COMPLETED, null, null, null);
-        ensureRevenue(bk3, pay3, partner2, new BigDecimal("1000000.00"), new BigDecimal("0.2000"),
-                BigDecimal.ZERO, PartnerRevenue.periodOf(today.plusDays(1)), today.plusDays(1),
-                PartnerRevenueStatus.PENDING, DeferredReason.BOOKING_NOT_COMPLETED, null, null, null);
+        ensureRevenue(bk3, pay3, provider1, new BigDecimal("500000.00"), new BigDecimal("0.2500"),
+                BigDecimal.ZERO, ProviderRevenue.periodOf(today.plusDays(1)), today.plusDays(1),
+                ProviderRevenueStatus.PENDING, DeferredReason.BOOKING_NOT_COMPLETED, null, null, null);
+        ensureRevenue(bk3, pay3, provider2, new BigDecimal("1000000.00"), new BigDecimal("0.2000"),
+                BigDecimal.ZERO, ProviderRevenue.periodOf(today.plusDays(1)), today.plusDays(1),
+                ProviderRevenueStatus.PENDING, DeferredReason.BOOKING_NOT_COMPLETED, null, null, null);
 
         // BK6: đã tất toán (SETTLED)
-        PartnerRevenue rev6P1 = ensureRevenue(bk6, pay6, partner1, new BigDecimal("900000.00"),
+        ProviderRevenue rev6P1 = ensureRevenue(bk6, pay6, provider1, new BigDecimal("900000.00"),
                 new BigDecimal("0.2500"), BigDecimal.ZERO, prev3MonthPeriod, prev3MonthDay,
-                PartnerRevenueStatus.ELIGIBLE, null, prev3Done, null, null);
+                ProviderRevenueStatus.ELIGIBLE, null, prev3Done, null, null);
 
         // BK7: có refund 50% đã hoàn thành
-        ensureRevenue(bk7, pay7, partner1, new BigDecimal("900000.00"), new BigDecimal("0.2500"),
+        ensureRevenue(bk7, pay7, provider1, new BigDecimal("900000.00"), new BigDecimal("0.2500"),
                 new BigDecimal("450000.00"), prevMonthPeriod, prevMonthDay,
-                PartnerRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
+                ProviderRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
 
         // BK8: refund đang chờ duyệt → REFUND_PENDING
-        ensureRevenue(bk8, pay8, partner1, new BigDecimal("900000.00"), new BigDecimal("0.2500"),
+        ensureRevenue(bk8, pay8, provider1, new BigDecimal("900000.00"), new BigDecimal("0.2500"),
                 BigDecimal.ZERO, prevMonthPeriod, prevMonthDay,
-                PartnerRevenueStatus.PENDING, DeferredReason.REFUND_PENDING, null, null, null);
+                ProviderRevenueStatus.PENDING, DeferredReason.REFUND_PENDING, null, null, null);
 
         // BK9: chưa refund → ELIGIBLE
-        ensureRevenue(bk9, pay9, partner1, new BigDecimal("500000.00"), new BigDecimal("0.2500"),
+        ensureRevenue(bk9, pay9, provider1, new BigDecimal("500000.00"), new BigDecimal("0.2500"),
                 BigDecimal.ZERO, prevMonthPeriod, prevMonthDay,
-                PartnerRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
-        ensureRevenue(bk9, pay9, partner2, new BigDecimal("1000000.00"), new BigDecimal("0.2000"),
+                ProviderRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
+        ensureRevenue(bk9, pay9, provider2, new BigDecimal("1000000.00"), new BigDecimal("0.2000"),
                 BigDecimal.ZERO, prevMonthPeriod, prevMonthDay,
-                PartnerRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
+                ProviderRevenueStatus.ELIGIBLE, null, prevMonthDone, null, null);
 
         // ── SETTLEMENT đã duyệt (kỳ 3 tháng trước) ────────────────────────────
         BigDecimal settledAmount = new BigDecimal("675000.00");
-        Settlement settlement = ensureSettlement("JGSETTLE001", partner1, prev3MonthPeriod,
+        Settlement settlement = ensureSettlement("JGSETTLE001", provider1, prev3MonthPeriod,
                 SettlementStatus.APPROVED, new BigDecimal("900000.00"), BigDecimal.ZERO,
                 new BigDecimal("225000.00"), BigDecimal.ZERO, settledAmount,
                 "Tất toán mẫu kỳ " + prev3MonthPeriod + " — Ban Quản lý Tràng An", admin);
 
-        // Chi tiết settlement — idempotent (unique: settlement_id + partner_revenue_id)
+        // Chi tiết settlement — idempotent (unique: settlement_id + provider_revenue_id)
         boolean detailExists = settlementDetailRepository.findBySettlement_Id(settlement.getId()).stream()
-                .anyMatch(d -> d.getPartnerRevenue() != null
-                        && rev6P1.getId().equals(d.getPartnerRevenue().getId()));
+                .anyMatch(d -> d.getProviderRevenue() != null
+                        && rev6P1.getId().equals(d.getProviderRevenue().getId()));
         if (!detailExists) {
             settlementDetailRepository.save(SettlementDetail.builder()
                     .settlement(settlement)
-                    .partnerRevenue(rev6P1)
+                    .providerRevenue(rev6P1)
                     .revenuePeriod(rev6P1.getRevenuePeriod())
                     .grossAmount(rev6P1.getGrossAmount())
                     .refundAmount(rev6P1.getRefundAmount())
                     .commissionAmount(rev6P1.getCommissionAmount())
                     .adjustmentAmount(rev6P1.getAdjustmentAmount())
-                    .partnerNetAmount(rev6P1.getPartnerNetAmount())
+                    .providerNetAmount(rev6P1.getProviderNetAmount())
                     .build());
         }
 
@@ -752,11 +757,11 @@ public class DataInitializer {
         rev6P1.markInSettlement(settlement.getId());
         rev6P1.setSettlementId(settlement.getId());
         rev6P1.markSettled();
-        partnerRevenueRepository.save(rev6P1);
+        providerRevenueRepository.save(rev6P1);
 
-        // Cộng tiền vào ví Partner 1
-        Wallet wallet1 = walletRepository.findByPartner_Id(partner1.getId())
-                .orElseThrow(() -> new IllegalStateException("Thiếu ví của partner 1"));
+        // Cộng tiền vào ví ProviderProfile 1
+        Wallet wallet1 = walletRepository.findByProviderProfile_Id(provider1.getId())
+                .orElseThrow(() -> new IllegalStateException("Thiếu ví của providerProfile 1"));
         if (walletTransactionRepository.findSettlementCredit(wallet1.getId(), settlement.getId(),
                 WalletTransactionType.SETTLEMENT_CREDIT).isEmpty()) {
             creditWallet(wallet1, WalletTransactionType.SETTLEMENT_CREDIT,
@@ -772,7 +777,7 @@ public class DataInitializer {
                 .findFirst().orElse(null);
         if (adjustment == null) {
             adjustment = financialAdjustmentRepository.save(FinancialAdjustment.builder()
-                    .partner(partner1)
+                    .providerProfile(provider1)
                     .refundRequest(null)
                     .sourceSettlementId(settlement.getId())
                     .amount(adjustmentAmount)
@@ -798,16 +803,16 @@ public class DataInitializer {
                             + ": Bồi hoàn chi phí vận hành cho đợt tất toán " + settlementCode);
         }
 
-        log.info("Dữ liệu mẫu: {} partner, {} wallet, {} destination, {} experience, {} slot, {} tour, "
-                        + "{} booking, {} payment, {} refund, {} partner_revenue, {} settlement, {} adjustment",
-                partnerRepository.count(), walletRepository.count(), destinationRepository.count(),
+        log.info("Dữ liệu mẫu: {} providerProfile, {} wallet, {} destination, {} experience, {} slot, {} tour, "
+                        + "{} booking, {} payment, {} refund, {} provider_revenue, {} settlement, {} adjustment",
+                providerProfileRepository.count(), walletRepository.count(), destinationRepository.count(),
                 experienceRepository.count(), experienceSlotRepository.count(), tourRepository.count(),
                 bookingRepository.count(), paymentRepository.count(), refundRequestRepository.count(),
-                partnerRevenueRepository.count(), settlementRepository.count(),
+                providerRevenueRepository.count(), settlementRepository.count(),
                 financialAdjustmentRepository.count());
     }
 
-    // ── Helpers: User / Partner / Wallet ─────────────────────────────────────
+    // ── Helpers: User / ProviderProfile / Wallet ─────────────────────────────────────
 
     private User ensureUser(String email, String fullName, String phone, Role role) {
         User user = userRepository.findByEmail(email).orElse(null);
@@ -830,31 +835,31 @@ public class DataInitializer {
         return userRepository.save(user);
     }
 
-    private Partner ensurePartner(User user, String partnerName, BigDecimal commissionRate) {
-        Partner partner = partnerRepository.findByUser_Id(user.getId()).orElse(null);
-        if (partner == null) {
-            partner = partnerRepository.save(Partner.builder()
+    private ProviderProfile ensureProviderProfile(User user, String providerName, BigDecimal commissionRate) {
+        ProviderProfile providerProfile = providerProfileRepository.findByUser_Id(user.getId()).orElse(null);
+        if (providerProfile == null) {
+            providerProfile = providerProfileRepository.save(ProviderProfile.builder()
                     .user(user)
-                    .partnerName(partnerName)
+                    .providerName(providerName)
                     .commissionRate(commissionRate)
                     .active(true)
                     .build());
         } else {
-            partner.setPartnerName(partnerName);
-            partner.setCommissionRate(commissionRate);
-            partner.setActive(true);
-            partnerRepository.save(partner);
+            providerProfile.setProviderName(providerName);
+            providerProfile.setCommissionRate(commissionRate);
+            providerProfile.setActive(true);
+            providerProfileRepository.save(providerProfile);
         }
 
-        // Wallet (1-1 với Partner) — tạo nếu chưa có
-        if (walletRepository.findByPartner_Id(partner.getId()).isEmpty()) {
+        // Wallet (1-1 với ProviderProfile) — tạo nếu chưa có
+        if (walletRepository.findByProviderProfile_Id(providerProfile.getId()).isEmpty()) {
             walletRepository.save(Wallet.builder()
-                    .partner(partner)
+                    .providerProfile(providerProfile)
                     .balance(BigDecimal.ZERO)
                     .currency("VND")
                     .build());
         }
-        return partner;
+        return providerProfile;
     }
 
     private void creditWallet(Wallet wallet, WalletTransactionType type,
@@ -1006,42 +1011,50 @@ public class DataInitializer {
      * Dọn các bản ghi không còn khớp với dữ liệu mẫu mong muốn.
      *
      * <p>Trường hợp xảy ra: một lần khởi tạo bị lỗi giữa chừng (ví dụ transaction rollback
-     * giữa chừng, hoặc code cũ tạo Partner cho user khác) để lại Partner không thuộc
+     * giữa chừng, hoặc code cũ tạo ProviderProfile cho user khác) để lại ProviderProfile không thuộc
      * tài khoản mẫu, Settlement cũ, hay Wallet/Transaction mồ côi. Nếu không dọn,
-     * danh sách Partner/Wallet trong Swagger sẽ lộn xộn và số dư ví sai.
+     * danh sách ProviderProfile/Wallet trong Swagger sẽ lộn xộn và số dư ví sai.
      *
-     * <p>Chỉ xóa những bản ghi thuộc scope "mẫu" (mã {@code JGSAMPLE*}, {@code JGSETTLE*})
-     * hoặc Partner không gắn với tài khoản mẫu nào — KHÔNG đụng tới dữ liệu người dùng tạo tay.
+     * <p>⚠️ CHỈ dọn bản ghi thuộc scope "mẫu" — mã {@code JGSAMPLE*}, {@code JGSETTLE*}.
+     *
+     * <p>KHÔNG được xóa ProviderProfile của tài khoản thật (ví dụ đối tác do Admin tạo qua
+     * API, hoặc tài khoản {@code provider@journeygo.com} mặc định). Trước đây hàm này xóa
+     * MỌI ProviderProfile không thuộc {@code provider1@}/{@code provider2@} — kể cả hồ sơ hợp
+     * lệ của đối tác thật, kèm theo toàn bộ doanh thu / settlement / lịch sử ví của họ.
+     * Đây là mất dữ liệu nghiêm trọng: chỉ cần khởi động lại ứng dụng là sạch dữ liệu đối tác.
+     * Nay chỉ dọn bản ghi mẫu, và bản ghi mồ côi (không còn user) thì bỏ qua — V5 migration
+     * đã loại phần "rác" đó.
      */
     private void purgeStraySampleArtifacts() {
-        // Partner không gắn với user mẫu (partner1@ / partner2@) → coi là rác.
-        // Xóa theo thứ tự FK: settlement_details → settlements → partner_revenues
-        // → financial_adjustments → wallet_transactions → wallets → partners.
-        List<Long> sampleUserIds = userRepository.findAll().stream()
-                .filter(u -> "partner1@journeygo.com".equals(u.getEmail())
-                        || "partner2@journeygo.com".equals(u.getEmail()))
-                .map(User::getId)
+        // Xóa theo thứ tự FK: settlement_details → settlements → provider_revenues
+        // → financial_adjustments → wallet_transactions → wallets → provider_profiles.
+        //
+        // CHỈ các bản ghi mẫu (mã JGSAMPLE* / JGSETTLE*). ProviderProfile của tài khoản
+        // thật được giữ nguyên — kể cả khi không thuộc tài khoản mẫu.
+        List<Long> sampleProviderProfileIds = providerProfileRepository.findAll().stream()
+                .filter(p -> p.getUser() != null)
+                .filter(p -> {
+                    // Profile "rác" = không gắn với user nào, hoặc gắn với user không tồn tại.
+                    // User thật (kể cả không phải tài khoản mẫu) thì KHÔNG xóa.
+                    return p.getUser().getId() == null;
+                })
+                .map(ProviderProfile::getId)
                 .toList();
 
-        List<Long> strayPartnerIds = partnerRepository.findAll().stream()
-                .filter(p -> p.getUser() == null || !sampleUserIds.contains(p.getUser().getId()))
-                .map(Partner::getId)
-                .toList();
-
-        for (Long pid : strayPartnerIds) {
+        for (Long pid : sampleProviderProfileIds) {
             try {
                 jdbcTemplate.update("DELETE FROM settlement_details WHERE settlement_id IN "
-                        + "(SELECT id FROM settlements WHERE partner_id = ?)", pid);
-                jdbcTemplate.update("DELETE FROM settlements WHERE partner_id = ?", pid);
-                jdbcTemplate.update("DELETE FROM partner_revenues WHERE partner_id = ?", pid);
-                jdbcTemplate.update("DELETE FROM financial_adjustments WHERE partner_id = ?", pid);
+                        + "(SELECT id FROM settlements WHERE provider_profile_id = ?)", pid);
+                jdbcTemplate.update("DELETE FROM settlements WHERE provider_profile_id = ?", pid);
+                jdbcTemplate.update("DELETE FROM provider_revenues WHERE provider_profile_id = ?", pid);
+                jdbcTemplate.update("DELETE FROM financial_adjustments WHERE provider_profile_id = ?", pid);
                 jdbcTemplate.update("DELETE FROM wallet_transactions WHERE wallet_id IN "
-                        + "(SELECT id FROM wallets WHERE partner_id = ?)", pid);
-                jdbcTemplate.update("DELETE FROM wallets WHERE partner_id = ?", pid);
-                jdbcTemplate.update("DELETE FROM partners WHERE id = ?", pid);
-                log.info("Đã dọn Partner rác (không thuộc tài khoản mẫu): id={}", pid);
+                        + "(SELECT id FROM wallets WHERE provider_profile_id = ?)", pid);
+                jdbcTemplate.update("DELETE FROM wallets WHERE provider_profile_id = ?", pid);
+                jdbcTemplate.update("DELETE FROM provider_profiles WHERE id = ?", pid);
+                log.info("Đã dọn ProviderProfile mồ côi (không còn user): id={}", pid);
             } catch (Exception e) {
-                log.warn("Không thể dọn Partner rác id={}: {}", pid, e.getMessage());
+                log.warn("Không thể dọn ProviderProfile mồ côi id={}: {}", pid, e.getMessage());
             }
         }
     }
@@ -1248,17 +1261,17 @@ public class DataInitializer {
         return refund;
     }
 
-    private PartnerRevenue ensureRevenue(Booking booking, Payment payment, Partner partner,
+    private ProviderRevenue ensureRevenue(Booking booking, Payment payment, ProviderProfile providerProfile,
                                          BigDecimal grossAmount, BigDecimal commissionRate,
                                          BigDecimal refundAmount, String revenuePeriod,
-                                         LocalDate completedDate, PartnerRevenueStatus status,
+                                         LocalDate completedDate, ProviderRevenueStatus status,
                                          DeferredReason deferredReason, Instant eligibleAt,
                                          Instant settledAt, Long settlementId) {
-        PartnerRevenue revenue = partnerRevenueRepository
-                .findByBooking_IdAndPartner_Id(booking.getId(), partner.getId()).orElse(null);
+        ProviderRevenue revenue = providerRevenueRepository
+                .findByBooking_IdAndProviderProfile_Id(booking.getId(), providerProfile.getId()).orElse(null);
         if (revenue == null) {
-            revenue = PartnerRevenue.builder()
-                    .partner(partner)
+            revenue = ProviderRevenue.builder()
+                    .providerProfile(providerProfile)
                     .booking(booking)
                     .payment(payment)
                     .build();
@@ -1283,18 +1296,18 @@ public class DataInitializer {
         // "Đợt tất toán không có khoản doanh thu nào" dù bản nháp vẫn còn
         // đầy đủ dòng chi tiết (settlement_detail).
         boolean linkedToSettlement = revenue.getSettlementId() != null
-                || revenue.getStatus() == PartnerRevenueStatus.IN_SETTLEMENT
-                || revenue.getStatus() == PartnerRevenueStatus.SETTLED;
+                || revenue.getStatus() == ProviderRevenueStatus.IN_SETTLEMENT
+                || revenue.getStatus() == ProviderRevenueStatus.SETTLED;
         if (!linkedToSettlement) {
             revenue.setStatus(status);
             revenue.setSettlementId(settlementId);
         }
 
         revenue.recalculate();
-        return partnerRevenueRepository.save(revenue);
+        return providerRevenueRepository.save(revenue);
     }
 
-    private Settlement ensureSettlement(String code, Partner partner, String revenuePeriod,
+    private Settlement ensureSettlement(String code, ProviderProfile providerProfile, String revenuePeriod,
                                         SettlementStatus status, BigDecimal grossAmount,
                                         BigDecimal refundAmount, BigDecimal commissionAmount,
                                         BigDecimal adjustmentAmount, BigDecimal settlementAmount,
@@ -1302,7 +1315,7 @@ public class DataInitializer {
         Settlement settlement = settlementRepository.findBySettlementCode(code).orElse(null);
         if (settlement != null) {
             // Chữa lành: đồng bộ số liệu với dữ liệu mẫu mong muốn
-            settlement.setPartner(partner);
+            settlement.setProviderProfile(providerProfile);
             settlement.setRevenuePeriod(revenuePeriod);
             settlement.setGrossAmount(grossAmount);
             settlement.setRefundAmount(refundAmount);
@@ -1320,7 +1333,7 @@ public class DataInitializer {
         YearMonth period = YearMonth.parse(revenuePeriod);
         settlement = settlementRepository.save(Settlement.builder()
                 .settlementCode(code)
-                .partner(partner)
+                .providerProfile(providerProfile)
                 .revenuePeriod(revenuePeriod)
                 .periodStart(period.atDay(1))
                 .periodEnd(period.atEndOfMonth())

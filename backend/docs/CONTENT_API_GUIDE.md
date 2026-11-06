@@ -4,7 +4,7 @@
 
 - Swagger UI: http://localhost:8088/swagger-ui/index.html
 - Đăng nhập qua POST /api/v1/auth/login, lấy data.accessToken rồi nhấn Authorize.
-- Các API ghi ADMIN / MODERATOR / PROVIDER cần token đúng vai trò. Provider chỉ thao tác trên content thuộc điểm đến của mình.
+- Các API ghi ADMIN / CONTENT_MODERATOR / CONTENT_PROVIDER cần token đúng vai trò. Provider chỉ thao tác trên content thuộc điểm đến của mình.
 - Response được bọc trong ApiResponse gồm code, message, data và timestamp.
 
 ## API content
@@ -15,15 +15,15 @@
 | GET | /api/v1/destinations/{destinationId}/contents | Công khai | Content đã duyệt theo điểm đến |
 | GET | /api/v1/cultural-contents/{id} | Công khai | Chi tiết content đã duyệt |
 | GET | /api/v1/cultural-contents/{id}/play | Công khai | Tăng playCount và trả content |
-| POST | /api/v1/destinations/{destinationId}/contents | ADMIN, MODERATOR, PROVIDER | Tạo bằng JSON |
-| POST | /api/v1/destinations/{destinationId}/contents/with-image | ADMIN, MODERATOR, PROVIDER | Tạo content và upload ảnh cùng request |
-| POST | /api/v1/destinations/{destinationId}/contents/with-image-url | ADMIN, MODERATOR, PROVIDER | Tạo bằng JSON với ảnh đã có URL |
-| PUT | /api/v1/cultural-contents/{id} | ADMIN, MODERATOR, PROVIDER | Cập nhật content |
-| PUT | /api/v1/cultural-contents/{id}/with-image | ADMIN, MODERATOR, PROVIDER | Cập nhật content và thay ảnh |
-| DELETE | /api/v1/cultural-contents/{id}/image | ADMIN, MODERATOR, PROVIDER | Gỡ ảnh khỏi content |
-| DELETE | /api/v1/cultural-contents/{id} | ADMIN, MODERATOR, PROVIDER | Xóa mềm content |
-| PATCH | /api/v1/cultural-contents/{id}/restore | ADMIN, MODERATOR, PROVIDER | Khôi phục content |
-| GET | /api/v1/destinations/{destinationId}/contents/deleted | ADMIN, MODERATOR, PROVIDER | Content đã xóa theo điểm đến |
+| POST | /api/v1/destinations/{destinationId}/contents | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Tạo bằng JSON |
+| POST | /api/v1/destinations/{destinationId}/contents/with-image | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Tạo content và upload ảnh cùng request |
+| POST | /api/v1/destinations/{destinationId}/contents/with-image-url | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Tạo bằng JSON với ảnh đã có URL |
+| PUT | /api/v1/cultural-contents/{id} | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Cập nhật content |
+| PUT | /api/v1/cultural-contents/{id}/with-image | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Cập nhật content và thay ảnh |
+| DELETE | /api/v1/cultural-contents/{id}/image | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Gỡ ảnh khỏi content |
+| DELETE | /api/v1/cultural-contents/{id} | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Xóa mềm content |
+| PATCH | /api/v1/cultural-contents/{id}/restore | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Khôi phục content |
+| GET | /api/v1/destinations/{destinationId}/contents/deleted | ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER | Content đã xóa theo điểm đến |
 
 ## Tạo content bằng JSON
 
@@ -73,7 +73,7 @@ Với POST /api/v1/destinations/{destinationId}/contents/with-image-url, gửi J
 
 Backend nhận cấu hình qua CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY và CLOUDINARY_API_SECRET. Nếu chưa cấu hình, upload trả lỗi CLOUDINARY_NOT_CONFIGURED.
 
-API xin chữ ký upload: POST /api/v1/media/cloudinary/signature?destinationId={destinationId}. Cần token ADMIN, MODERATOR hoặc PROVIDER; Provider chỉ upload cho điểm đến của mình.
+API xin chữ ký upload: POST /api/v1/media/cloudinary/signature?destinationId={destinationId}. Cần token ADMIN, CONTENT_MODERATOR hoặc PROVIDER; Provider chỉ upload cho điểm đến của mình.
 
 GET content trả mediaUrl, không trả mediaPublicId vì đây là dữ liệu nội bộ.
 

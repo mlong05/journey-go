@@ -7,7 +7,7 @@
 ## 1. Bối cảnh & Mục đích
 
 ### 1.1. Thực trạng trước khi refactor
-- Trước đây, `Role` chỉ là một **Java Enum** (`Role { TOURIST, ADMIN, MODERATOR, PROVIDER }`).
+- Trước đây, `Role` chỉ là một **Java Enum** (`Role { TOURIST, ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER }`).
 - Trong database, bảng `users` lưu giá trị role dưới dạng một chuỗi VARCHAR thông qua `RoleConverter` (`@Convert(converter = RoleConverter.class)`).
 - **Hạn chế**:
   - Không thể thêm vai trò mới một cách linh hoạt (dynamic roles) trong quá trình ứng dụng chạy mà không cần sửa code và build lại backend.
@@ -79,13 +79,13 @@ erDiagram
     ```java
     public static final String TOURIST = "TOURIST";
     public static final String ADMIN = "ADMIN";
-    public static final String MODERATOR = "MODERATOR";
-    public static final String PROVIDER = "PROVIDER";
+    public static final String CONTENT_MODERATOR = "CONTENT_MODERATOR";
+    public static final String CONTENT_PROVIDER = "CONTENT_PROVIDER";
     ```
   - Hỗ trợ JSON Serialization/Deserialization tương thích ngược:
     - `@JsonValue public String getName()`: Jackson tự động serialize entity `Role` thành chuỗi `"TOURIST"`, `"ADMIN"`...
     - `@JsonCreator public static Role fromString(String value)`: Cho phép client gửi JSON dạng `"TOURIST"` hoặc `"ADMIN"` và Jackson tự động map thành đối tượng `Role`. Hỗ trợ chuyển đổi từ alias `"USER"` cũ sang `"TOURIST"`.
-  - Cung cấp các phương thức tiện ích: `isProvider()`, `isAdmin()`, `isModerator()`, `isTourist()`, `valueOf(String)`, `of(String)`.
+  - Cung cấp các phương thức tiện ích: `isContentProvider()`, `isAdmin()`, `isContentModerator()`, `isTourist()`, `valueOf(String)`, `of(String)`.
 - **[`RoleRepository.java`](file:///d:/S9/journey-go/backend/src/main/java/com/journeygo/modules/user/repository/RoleRepository.java)** (File mới):
   - Kế thừa `JpaRepository<Role, Long>`.
   - Bổ sung `Optional<Role> findByName(String name)` và `boolean existsByName(String name)`.
@@ -109,8 +109,8 @@ erDiagram
 - **[`DataInitializer.java`](file:///d:/S9/journey-go/backend/src/main/java/com/journeygo/config/DataInitializer.java)**:
   - Hàm `seedRoles()`: Khởi tạo 4 vai trò mặc định nếu bảng `roles` chưa có:
     - `ADMIN` ("Quản trị viên hệ thống")
-    - `MODERATOR` ("Kiểm duyệt viên nội dung")
-    - `PROVIDER` ("Nhà cung cấp dịch vụ du lịch")
+    - `CONTENT_MODERATOR` ("Kiểm duyệt viên nội dung")
+    - `CONTENT_PROVIDER` ("Đối tác cung cấp nội dung và trải nghiệm")
     - `TOURIST` ("Khách du lịch")
   - Khi seed các tài khoản admin/moderator/provider/tourist mẫu: Lookup vai trò tương ứng từ `roleRepository`.
   - Migrate an toàn: Nếu trong database có user nào có `role == null`, tự động gán role mặc định là `TOURIST`.
@@ -184,7 +184,7 @@ Nếu sau này cần phân quyền chi tiết (ví dụ: `READ_DESTINATION`, `CR
 4. Trong `UserPrincipal.java`, nạp authorities gồm cả vai trò (`ROLE_...`) và từng permission riêng lẻ để dùng với `@PreAuthorize("hasAuthority('APPROVE_REVIEW')")`.
 
 ### 5.3. Nâng cấp từ 1 User - 1 Role sang 1 User - Nhiều Roles (N - N)
-Nếu một ngày một tài khoản vừa có thể là `PROVIDER` vừa có thể là `MODERATOR`:
+Nếu một ngày một tài khoản vừa có thể là `CONTENT_PROVIDER` vừa có thể là `CONTENT_MODERATOR`:
 1. Tạo bảng liên kết `user_roles` (`user_id`, `role_id`).
 2. Trong `User.java`, thay `@ManyToOne private Role role;` thành `@ManyToMany private Set<Role> roles;`.
 3. Trong `UserPrincipal.java`, duyệt qua danh sách `roles` để nạp danh sách `SimpleGrantedAuthority`.

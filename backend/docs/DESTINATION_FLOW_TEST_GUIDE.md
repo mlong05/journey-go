@@ -1,6 +1,6 @@
 # Test flow Destination
 
-Mở Swagger tại `http://localhost:8088/swagger-ui/index.html`. Đăng nhập và nhấn **Authorize** với token `Bearer <accessToken>`. Dùng Provider để tạo/sửa destination; dùng Admin/Moderator để xử lý moderation.
+Mở Swagger tại `http://localhost:8088/swagger-ui/index.html`. Đăng nhập và nhấn **Authorize** với token `Bearer <accessToken>`. Dùng Provider để tạo/sửa destination; dùng Admin/Content Moderator để xử lý moderation.
 
 ## Happy case: tạo và duyệt
 
@@ -20,7 +20,7 @@ Mở Swagger tại `http://localhost:8088/swagger-ui/index.html`. Đăng nhập 
 ~~~
 
 Kỳ vọng: HTTP 201, lấy `data.id`; destination tự vào `PENDING`.
-3. Admin/Moderator gọi `GET /api/v1/moderation/destinations/queue?page=0&size=10` để tìm ID.
+3. Admin/Content Moderator gọi `GET /api/v1/moderation/destinations/queue?page=0&size=10` để tìm ID.
 4. Duyệt bằng `PATCH /api/v1/moderation/destinations/{id}/approve`:
 
 ~~~json
@@ -32,7 +32,7 @@ Kỳ vọng: review `APPROVED`, destination `PUBLISHED`, `approved: true`, `reas
 
 ## Happy case: từ chối và gửi lại
 
-Admin/Moderator gọi `PATCH /api/v1/moderation/destinations/{id}/reject`:
+Admin/Content Moderator gọi `PATCH /api/v1/moderation/destinations/{id}/reject`:
 
 ~~~json
 {

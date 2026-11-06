@@ -12,9 +12,9 @@ import java.util.List;
 @Repository
 public interface FinancialAdjustmentRepository extends JpaRepository<FinancialAdjustment, Long> {
 
-    Page<FinancialAdjustment> findByPartner_IdOrderByCreatedAtDesc(Long partnerId, Pageable pageable);
+    Page<FinancialAdjustment> findByProviderProfile_IdOrderByCreatedAtDesc(Long providerProfileId, Pageable pageable);
 
-    List<FinancialAdjustment> findByPartner_IdAndStatus(Long partnerId, FinancialAdjustmentStatus status);
+    List<FinancialAdjustment> findByProviderProfile_IdAndStatus(Long providerProfileId, FinancialAdjustmentStatus status);
 
     Page<FinancialAdjustment> findByStatus(FinancialAdjustmentStatus status, Pageable pageable);
 

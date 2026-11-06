@@ -25,7 +25,7 @@ public record AdminCreateUserRequest(
         @Schema(description = "Số điện thoại", example = "0987654321")
         String phone,
 
-        @Schema(description = "Vai trò phân quyền (TOURIST, MODERATOR, PROVIDER, ADMIN)", example = "TOURIST")
+        @Schema(description = "Vai trò phân quyền (TOURIST, CONTENT_MODERATOR, CONTENT_PROVIDER, ADMIN)", example = "TOURIST")
         Role role,
 
         @Schema(description = "Trạng thái kích hoạt tài khoản", example = "true")

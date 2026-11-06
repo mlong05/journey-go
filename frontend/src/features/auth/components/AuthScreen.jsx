@@ -126,19 +126,14 @@ export default function AuthScreen({ initialTab = "login" }) {
         targetPath = ROUTES.ADMIN || "/admin";
         roleTitle = "Quản trị viên";
         roleScope = "Quản trị hệ thống & vận hành";
-      } else if (roleStr === "MODERATOR") {
+      } else if (roleStr === "CONTENT_MODERATOR") {
         targetPath = ROUTES.MODERATOR || "/moderator";
         roleTitle = "Kiểm duyệt viên";
         roleScope = "Thẩm định hồ sơ & nội dung";
-      } else if (roleStr === "PROVIDER") {
+      } else if (roleStr === "CONTENT_PROVIDER") {
         targetPath = ROUTES.PROVIDER || "/provider";
-        roleTitle = "Đối tác Điểm đến";
-        roleScope = "Quản lý di tích & tour";
-      } else if (roleStr === "PARTNER") {
-        // Đối tác tài chính — theo dõi doanh thu, ví, tất toán.
-        targetPath = ROUTES.PARTNER || "/partner";
-        roleTitle = "Đối tác tài chính";
-        roleScope = "Doanh thu, ví & tất toán";
+        roleTitle = "Đối tác cung cấp nội dung";
+        roleScope = "Nội dung, tour, doanh thu & tất toán";
       } else {
         targetPath = ROUTES.HOME || "/";
         roleTitle = "Du khách khám phá";
@@ -262,15 +257,12 @@ export default function AuthScreen({ initialTab = "login" }) {
       if (roleStr === "ADMIN") {
         targetPath = ROUTES.ADMIN || "/admin";
         roleTitle = "Quản trị viên";
-      } else if (roleStr === "MODERATOR") {
+      } else if (roleStr === "CONTENT_MODERATOR") {
         targetPath = ROUTES.MODERATOR || "/moderator";
         roleTitle = "Kiểm duyệt viên";
-      } else if (roleStr === "PROVIDER") {
+      } else if (roleStr === "CONTENT_PROVIDER") {
         targetPath = ROUTES.PROVIDER || "/provider";
-        roleTitle = "Đối tác Điểm đến";
-      } else if (roleStr === "PARTNER") {
-        targetPath = ROUTES.PARTNER || "/partner";
-        roleTitle = "Đối tác tài chính";
+        roleTitle = "Đối tác cung cấp nội dung";
       } else {
         targetPath = ROUTES.HOME || "/";
         roleTitle = "Du khách khám phá";

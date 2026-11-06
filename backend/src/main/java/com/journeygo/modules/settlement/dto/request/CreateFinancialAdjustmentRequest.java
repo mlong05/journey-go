@@ -12,7 +12,7 @@ public record CreateFinancialAdjustmentRequest(
 
         @Schema(description = "ID đối tác")
         @NotNull(message = "Đối tác không được để trống")
-        Long partnerId,
+        Long providerProfileId,
 
         @Schema(description = "Số tiền điều chỉnh — dương = cộng, âm = trừ")
         @NotNull(message = "Số tiền điều chỉnh không được để trống")

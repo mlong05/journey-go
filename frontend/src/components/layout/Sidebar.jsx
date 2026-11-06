@@ -36,16 +36,6 @@ const ROLE_THEMES = {
     iconActive: "text-indigo-600",
     dot: "bg-indigo-500",
   },
-  // Đối tác tài chính (PARTNER) — theo dõi doanh thu, ví, tất toán.
-  partner: {
-    badgeText: "Đối tác tài chính",
-    groupLabel: "Tài chính",
-    homeHref: "/partner",
-    chip: "bg-sky-50 text-sky-700 ring-sky-200/70",
-    itemActive: "bg-sky-50 text-sky-700",
-    iconActive: "text-sky-600",
-    dot: "bg-sky-500",
-  },
 };
 
 export default function Sidebar({
@@ -66,7 +56,7 @@ export default function Sidebar({
       path === "/admin" ||
       path === "/provider" ||
       path === "/moderator" ||
-      path === "/partner"
+      path === "/provider/finance"
     ) {
       return pathname === path && !href.includes("#");
     }

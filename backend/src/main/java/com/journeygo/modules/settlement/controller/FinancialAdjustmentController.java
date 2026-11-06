@@ -36,7 +36,7 @@ public class FinancialAdjustmentController {
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Ghi nhận khoản điều chỉnh tài chính (chờ phê duyệt)",
             description = "Dùng cho Refund phát sinh sau khi Settlement đã duyệt, hoặc bồi hoàn chi phí "
-                    + "cho Partner do lỗi nền tảng. Số tiền dương = cộng, âm = trừ. "
+                    + "cho ProviderProfile do lỗi nền tảng. Số tiền dương = cộng, âm = trừ. "
                     + "Chỉ có một khoản điều chỉnh đang mở cho mỗi Refund.")
     public ResponseEntity<ApiResponse<FinancialAdjustmentResponse>> create(
             @Valid @RequestBody CreateFinancialAdjustmentRequest request,
@@ -72,7 +72,7 @@ public class FinancialAdjustmentController {
     }
 
     @GetMapping("/{adjustmentId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Chi tiết khoản điều chỉnh tài chính")
     public ResponseEntity<ApiResponse<FinancialAdjustmentResponse>> getById(@PathVariable Long adjustmentId) {
@@ -91,14 +91,14 @@ public class FinancialAdjustmentController {
                 adjustmentService.getAll(status, pageable)));
     }
 
-    @GetMapping("/partner/{partnerId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
+    @GetMapping("/provider-profile/{providerProfileId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Khoản điều chỉnh tài chính của một đối tác")
-    public ResponseEntity<ApiResponse<PageResponse<FinancialAdjustmentResponse>>> getByPartner(
-            @PathVariable Long partnerId,
+    public ResponseEntity<ApiResponse<PageResponse<FinancialAdjustmentResponse>>> getByProviderProfile(
+            @PathVariable Long providerProfileId,
             @ParameterObject @PageableDefault(page = 0, size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách khoản điều chỉnh thành công",
-                adjustmentService.getByPartner(partnerId, pageable)));
+                adjustmentService.getByProviderProfile(providerProfileId, pageable)));
     }
 }

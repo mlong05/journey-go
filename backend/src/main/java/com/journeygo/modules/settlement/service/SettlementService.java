@@ -3,16 +3,17 @@ package com.journeygo.modules.settlement.service;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
+import com.journeygo.common.security.AuthorizationGuard;
 import com.journeygo.modules.finance.config.FinanceProperties;
-import com.journeygo.modules.partner.entity.Partner;
-import com.journeygo.modules.partner.repository.PartnerRepository;
-import com.journeygo.modules.partnerrevenue.dto.response.EligibilityEvaluationResponse;
-import com.journeygo.modules.partnerrevenue.dto.response.PartnerRevenueResponse;
-import com.journeygo.modules.partnerrevenue.entity.PartnerRevenue;
-import com.journeygo.modules.partnerrevenue.entity.enums.DeferredReason;
-import com.journeygo.modules.partnerrevenue.entity.enums.PartnerRevenueStatus;
-import com.journeygo.modules.partnerrevenue.repository.PartnerRevenueRepository;
-import com.journeygo.modules.partnerrevenue.service.PartnerRevenueService;
+import com.journeygo.modules.providerprofile.entity.ProviderProfile;
+import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
+import com.journeygo.modules.providerrevenue.dto.response.EligibilityEvaluationResponse;
+import com.journeygo.modules.providerrevenue.dto.response.ProviderRevenueResponse;
+import com.journeygo.modules.providerrevenue.entity.ProviderRevenue;
+import com.journeygo.modules.providerrevenue.entity.enums.DeferredReason;
+import com.journeygo.modules.providerrevenue.entity.enums.ProviderRevenueStatus;
+import com.journeygo.modules.providerrevenue.repository.ProviderRevenueRepository;
+import com.journeygo.modules.providerrevenue.service.ProviderRevenueService;
 import com.journeygo.modules.settlement.dto.request.CreateSettlementRequest;
 import com.journeygo.modules.settlement.dto.request.RejectSettlementRequest;
 import com.journeygo.modules.settlement.dto.response.PlatformRevenueSummaryResponse;
@@ -50,15 +51,15 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Settlement — đợt tất toán doanh thu cho Partner theo tháng dương lịch.
+ * Settlement — đợt tất toán doanh thu cho ProviderProfile theo tháng dương lịch.
  *
  * <p>Quy tắc nghiệp vụ (Mục 7 & 9):
  * <ul>
  *   <li><b>7.1</b> — Kỳ tất toán dùng tháng dương lịch; chỉ tạo cho kỳ đã kết thúc.
- *       Mỗi Partner tối đa một Settlement đã duyệt cho mỗi kỳ.</li>
+ *       Mỗi ProviderProfile tối đa một Settlement đã duyệt cho mỗi kỳ.</li>
  *   <li><b>7.4</b> — Tạo bản nháp: các khoản được chọn chuyển {@code IN_SETTLEMENT}.
  *       Duyệt: đánh giá lại điều kiện, chuyển {@code APPROVED}, tạo giao dịch cộng tiền Wallet
- *       và chuyển các Partner Revenue sang {@code SETTLED} — TẤT CẢ trong cùng transaction.
+ *       và chuyển các ProviderProfile Revenue sang {@code SETTLED} — TẤT CẢ trong cùng transaction.
  *       Từ chối: giải phóng các khoản doanh thu về {@code ELIGIBLE}/{@code PENDING},
  *       KHÔNG ghi tiền vào Wallet.</li>
  *   <li><b>9.6</b> — Duyệt phải nguyên tử; lỗi một bước → rollback toàn bộ.</li>
@@ -72,11 +73,11 @@ public class SettlementService {
 
     private final SettlementRepository settlementRepository;
     private final SettlementDetailRepository detailRepository;
-    private final PartnerRevenueRepository revenueRepository;
-    private final PartnerRepository partnerRepository;
+    private final ProviderRevenueRepository revenueRepository;
+    private final ProviderProfileRepository providerProfileRepository;
     private final WalletRepository walletRepository;
     private final UserRepository userRepository;
-    private final PartnerRevenueService revenueService;
+    private final ProviderRevenueService revenueService;
     private final WalletService walletService;
     private final FinanceProperties financeProperties;
     private final NotificationPublisher notifications;
@@ -84,7 +85,7 @@ public class SettlementService {
     // ── Ứng viên tất toán ────────────────────────────────────────────────────
 
     /**
-     * Xem ứng viên tất toán của một Partner theo kỳ (chức năng "View Settlement Candidates").
+     * Xem ứng viên tất toán của một ProviderProfile theo kỳ (chức năng "View Settlement Candidates").
      *
      * <p>Đánh giá lại điều kiện TẠI THỜI ĐIỂM GỌI — không tin hoàn toàn vào trạng thái tính từ trước.
      * Khoản chưa đủ điều kiện được giữ lại kèm lý do rõ ràng và được xét lại ở lần sau.
@@ -93,13 +94,14 @@ public class SettlementService {
      * (doanh thu chuyển tiếp) — nhưng vẫn giữ {@code revenuePeriod} gốc.
      */
     @Transactional
-    public SettlementCandidatesResponse getCandidates(Long partnerId, String revenuePeriod) {
-        Partner partner = partnerRepository.findById(partnerId)
-                .orElseThrow(() -> new AppException(ErrorCode.PARTNER_NOT_FOUND));
+    public SettlementCandidatesResponse getCandidates(Long providerProfileId, String revenuePeriod) {
+        ProviderProfile providerProfile = providerProfileRepository.findById(providerProfileId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_PROFILE_NOT_FOUND));
+        requireFinanceAccess(providerProfile);
 
         YearMonth period = parsePeriod(revenuePeriod);
 
-        List<PartnerRevenue> eligible = new ArrayList<>();
+        List<ProviderRevenue> eligible = new ArrayList<>();
         List<SettlementCandidatesResponse.HeldItem> held = new ArrayList<>();
 
         BigDecimal gross = BigDecimal.ZERO;
@@ -108,9 +110,9 @@ public class SettlementService {
         BigDecimal adjustment = BigDecimal.ZERO;
         BigDecimal net = BigDecimal.ZERO;
 
-        // Lấy TẤT CẢ khoản doanh thu của Partner thuộc kỳ (bất kể trạng thái) — bao gồm cả
+        // Lấy TẤT CẢ khoản doanh thu của ProviderProfile thuộc kỳ (bất kể trạng thái) — bao gồm cả
         // các khoản chưa đủ điều kiện được giữ lại từ kỳ trước (doanh thu chuyển tiếp).
-        List<PartnerRevenue> all = revenueRepository.findByPartnerAndPeriod(partnerId, revenuePeriod);
+        List<ProviderRevenue> all = revenueRepository.findByProviderProfileAndPeriod(providerProfileId, revenuePeriod);
 
         // Ngoài ra: các khoản CHƯA được tất toán từ KỲ TRƯỚC — doanh thu chuyển tiếp.
         //
@@ -118,20 +120,20 @@ public class SettlementService {
         // (kỳ chưa kết thúc) không phải "doanh thu chuyển tiếp" mà là doanh thu chưa tới hạn —
         // không được trả tiền trước khi kỳ đó kết thúc.
         //
-        // Dùng `findUnsettledByPartner` (không chỉ ELIGIBLE) vì khoản bị giữ ở trạng thái
+        // Dùng `findUnsettledByProviderProfile` (không chỉ ELIGIBLE) vì khoản bị giữ ở trạng thái
         // PENDING vì lý do "kỳ doanh thu chưa kết thúc" sẽ tự đủ điều kiện khi kỳ đóng lại
         // — nếu chỉ lấy ELIGIBLE thì khoản đó bị bỏ sót vĩnh viễn.
-        List<PartnerRevenue> carried = revenueRepository.findUnsettledByPartner(partnerId).stream()
+        List<ProviderRevenue> carried = revenueRepository.findUnsettledByProviderProfile(providerProfileId).stream()
                 .filter(r -> !revenuePeriod.equals(r.getRevenuePeriod()))
                 .filter(r -> isPeriodBefore(r.getRevenuePeriod(), revenuePeriod))
                 .toList();
 
-        List<PartnerRevenue> combined = new ArrayList<>(all);
+        List<ProviderRevenue> combined = new ArrayList<>(all);
         combined.addAll(carried);
 
-        for (PartnerRevenue revenue : combined) {
-            if (revenue.getStatus() == PartnerRevenueStatus.SETTLED
-                    || revenue.getStatus() == PartnerRevenueStatus.IN_SETTLEMENT) {
+        for (ProviderRevenue revenue : combined) {
+            if (revenue.getStatus() == ProviderRevenueStatus.SETTLED
+                    || revenue.getStatus() == ProviderRevenueStatus.IN_SETTLEMENT) {
                 // Đã thuộc Settlement khác — không đưa vào ứng viên.
                 continue;
             }
@@ -145,27 +147,27 @@ public class SettlementService {
                 refund = refund.add(nz(revenue.getRefundAmount()));
                 commission = commission.add(nz(revenue.getCommissionAmount()));
                 adjustment = adjustment.add(nz(revenue.getAdjustmentAmount()));
-                net = net.add(nz(revenue.getPartnerNetAmount()));
+                net = net.add(nz(revenue.getProviderNetAmount()));
             } else {
                 held.add(SettlementCandidatesResponse.HeldItem.builder()
                         .revenueId(revenue.getId())
                         .bookingId(revenue.getBooking() != null ? revenue.getBooking().getId() : null)
                         .bookingCode(revenue.getBooking() != null ? revenue.getBooking().getBookingCode() : null)
                         .revenuePeriod(revenue.getRevenuePeriod())
-                        .partnerNetAmount(revenue.getPartnerNetAmount())
+                        .providerNetAmount(revenue.getProviderNetAmount())
                         .deferredReason(evaluation.deferredReason())
                         .build());
             }
         }
 
-        log.info("[Settlement] Ứng viên tất toán partner={} kỳ={}: {} khoản đủ điều kiện, {} khoản giữ lại",
-                partner.getId(), revenuePeriod, eligible.size(), held.size());
+        log.info("[Settlement] Ứng viên tất toán providerProfile={} kỳ={}: {} khoản đủ điều kiện, {} khoản giữ lại",
+                providerProfile.getId(), revenuePeriod, eligible.size(), held.size());
 
         // Đợt tất toán đang chờ duyệt của cùng đối tác + kỳ (nếu có).
         // Khi đợt này tồn tại, các khoản doanh thu đã chuyển sang IN_SETTLEMENT
         // nên `eligible` sẽ rỗng — trả về thông tin này để UI giải thích cho Admin.
         SettlementCandidatesResponse.OpenSettlement openSettlement = null;
-        for (Settlement existing : settlementRepository.findByPartnerAndPeriod(partner.getId(), revenuePeriod)) {
+        for (Settlement existing : settlementRepository.findByProviderProfileAndPeriod(providerProfile.getId(), revenuePeriod)) {
             if (!existing.getStatus().isOpen()) {
                 continue;
             }
@@ -181,9 +183,9 @@ public class SettlementService {
         }
 
         return SettlementCandidatesResponse.builder()
-                .partnerId(partnerId)
+                .providerProfileId(providerProfileId)
                 .revenuePeriod(revenuePeriod)
-                .eligible(eligible.stream().map(PartnerRevenueResponse::fromEntity).toList())
+                .eligible(eligible.stream().map(ProviderRevenueResponse::fromEntity).toList())
                 .held(held)
                 .totals(SettlementCandidatesResponse.Totals.builder()
                         .grossAmount(gross)
@@ -220,7 +222,7 @@ public class SettlementService {
         BigDecimal totalRefund = BigDecimal.ZERO;
         BigDecimal totalCommission = BigDecimal.ZERO;
         BigDecimal totalAdjustment = BigDecimal.ZERO;
-        BigDecimal totalPartnerNet = BigDecimal.ZERO;
+        BigDecimal totalProviderNet = BigDecimal.ZERO;
         BigDecimal totalPlatform = BigDecimal.ZERO;
         long totalCount = 0;
 
@@ -232,7 +234,7 @@ public class SettlementService {
             BigDecimal refund = nz(row.getRefundAmount());
             BigDecimal commission = nz(row.getCommissionAmount());
             BigDecimal adjustment = nz(row.getAdjustmentAmount());
-            BigDecimal partnerNet = nz(row.getSettlementAmount());
+            BigDecimal providerNet = nz(row.getSettlementAmount());
             long count = row.getSettlementCount() != null ? row.getSettlementCount() : 0L;
 
             // Doanh thu nền tảng = hoa hồng + điều chỉnh (tương đương gross − refund − net).
@@ -242,7 +244,7 @@ public class SettlementService {
             totalRefund = totalRefund.add(refund);
             totalCommission = totalCommission.add(commission);
             totalAdjustment = totalAdjustment.add(adjustment);
-            totalPartnerNet = totalPartnerNet.add(partnerNet);
+            totalProviderNet = totalProviderNet.add(providerNet);
             totalPlatform = totalPlatform.add(platform);
             totalCount += count;
 
@@ -252,7 +254,7 @@ public class SettlementService {
                     .refundAmount(refund)
                     .commissionAmount(commission)
                     .adjustmentAmount(adjustment)
-                    .partnerNetAmount(partnerNet)
+                    .providerNetAmount(providerNet)
                     .platformRevenue(platform)
                     .settlementCount(count)
                     .build());
@@ -267,7 +269,7 @@ public class SettlementService {
                 .totalPlatformRevenue(totalPlatform)
                 .totalGrossAmount(totalGross)
                 .totalRefundAmount(totalRefund)
-                .totalPartnerNetAmount(totalPartnerNet)
+                .totalProviderNetAmount(totalProviderNet)
                 .totalCommissionAmount(totalCommission)
                 .totalAdjustmentAmount(totalAdjustment)
                 .approvedSettlementCount(totalCount)
@@ -285,21 +287,21 @@ public class SettlementService {
      */
     @Transactional
     public SettlementResponse createSettlement(CreateSettlementRequest request, Long adminId) {
-        Partner partner = partnerRepository.findById(request.partnerId())
-                .orElseThrow(() -> new AppException(ErrorCode.PARTNER_NOT_FOUND));
+        ProviderProfile providerProfile = providerProfileRepository.findById(request.providerProfileId())
+                .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_PROFILE_NOT_FOUND));
 
         YearMonth period = parsePeriod(request.revenuePeriod());
         validatePeriodClosed(period);
 
-        // Mỗi Partner tối đa một Settlement đã duyệt cho mỗi kỳ (ràng buộc 9.4).
-        if (settlementRepository.findByPartner_IdAndRevenuePeriodAndStatus(
-                partner.getId(), request.revenuePeriod(), SettlementStatus.APPROVED).isPresent()) {
+        // Mỗi ProviderProfile tối đa một Settlement đã duyệt cho mỗi kỳ (ràng buộc 9.4).
+        if (settlementRepository.findByProviderProfile_IdAndRevenuePeriodAndStatus(
+                providerProfile.getId(), request.revenuePeriod(), SettlementStatus.APPROVED).isPresent()) {
             throw new AppException(ErrorCode.SETTLEMENT_ALREADY_EXISTS,
                     "Đối tác đã có đợt tất toán được duyệt cho kỳ doanh thu " + request.revenuePeriod());
         }
-        // Không tạo nhiều Settlement nháp cạnh tranh cho cùng Partner và kỳ.
-        List<Settlement> existingForPeriod = settlementRepository.findByPartnerAndPeriod(
-                partner.getId(), request.revenuePeriod());
+        // Không tạo nhiều Settlement nháp cạnh tranh cho cùng ProviderProfile và kỳ.
+        List<Settlement> existingForPeriod = settlementRepository.findByProviderProfileAndPeriod(
+                providerProfile.getId(), request.revenuePeriod());
         boolean hasOpenDraft = existingForPeriod.stream().anyMatch(s -> s.getStatus().isOpen());
         if (hasOpenDraft) {
             throw new AppException(ErrorCode.SETTLEMENT_ALREADY_EXISTS,
@@ -310,7 +312,7 @@ public class SettlementService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         // Lọc ứng viên (đánh giá lại điều kiện tại thời điểm tạo bản nháp).
-        SettlementCandidatesResponse candidates = getCandidates(partner.getId(), request.revenuePeriod());
+        SettlementCandidatesResponse candidates = getCandidates(providerProfile.getId(), request.revenuePeriod());
         if (candidates.eligible() == null || candidates.eligible().isEmpty()) {
             throw new AppException(ErrorCode.SETTLEMENT_NO_ELIGIBLE_REVENUE,
                     "Không có khoản doanh thu nào đủ điều kiện để tất toán cho kỳ " + request.revenuePeriod());
@@ -318,7 +320,7 @@ public class SettlementService {
 
         Settlement settlement = Settlement.builder()
                 .settlementCode(generateSettlementCode())
-                .partner(partner)
+                .providerProfile(providerProfile)
                 .revenuePeriod(request.revenuePeriod())
                 .periodStart(period.atDay(1))
                 .periodEnd(period.atEndOfMonth())
@@ -335,14 +337,14 @@ public class SettlementService {
         BigDecimal adjustment = BigDecimal.ZERO;
         BigDecimal net = BigDecimal.ZERO;
 
-        for (PartnerRevenueResponse candidate : candidates.eligible()) {
-            PartnerRevenue revenue = revenueRepository.findByIdForUpdate(candidate.id())
-                    .orElseThrow(() -> new AppException(ErrorCode.PARTNER_REVENUE_NOT_FOUND));
+        for (ProviderRevenueResponse candidate : candidates.eligible()) {
+            ProviderRevenue revenue = revenueRepository.findByIdForUpdate(candidate.id())
+                    .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_REVENUE_NOT_FOUND));
 
             // Chống chọn trùng — khoản doanh thu đã thuộc Settlement khác.
             if (revenue.getSettlementId() != null
-                    || revenue.getStatus() == PartnerRevenueStatus.IN_SETTLEMENT
-                    || revenue.getStatus() == PartnerRevenueStatus.SETTLED) {
+                    || revenue.getStatus() == ProviderRevenueStatus.IN_SETTLEMENT
+                    || revenue.getStatus() == ProviderRevenueStatus.SETTLED) {
                 continue;
             }
 
@@ -351,7 +353,7 @@ public class SettlementService {
             // thời điểm gọi. Chuyển sang ELIGIBLE trước khi gắn vào đợt — nếu không,
             // điều kiện chặn ở trên sẽ bỏ sót khoản này và tổng tiền đợt lệch với
             // tổng hiển thị ở danh sách ứng viên.
-            if (revenue.getStatus() != PartnerRevenueStatus.ELIGIBLE) {
+            if (revenue.getStatus() != ProviderRevenueStatus.ELIGIBLE) {
                 revenue.markEligible();
             }
 
@@ -360,20 +362,20 @@ public class SettlementService {
 
             detailRepository.save(SettlementDetail.builder()
                     .settlement(saved)
-                    .partnerRevenue(revenue)
+                    .providerRevenue(revenue)
                     .revenuePeriod(revenue.getRevenuePeriod())
                     .grossAmount(nz(revenue.getGrossAmount()))
                     .refundAmount(nz(revenue.getRefundAmount()))
                     .commissionAmount(nz(revenue.getCommissionAmount()))
                     .adjustmentAmount(nz(revenue.getAdjustmentAmount()))
-                    .partnerNetAmount(nz(revenue.getPartnerNetAmount()))
+                    .providerNetAmount(nz(revenue.getProviderNetAmount()))
                     .build());
 
             gross = gross.add(nz(revenue.getGrossAmount()));
             refund = refund.add(nz(revenue.getRefundAmount()));
             commission = commission.add(nz(revenue.getCommissionAmount()));
             adjustment = adjustment.add(nz(revenue.getAdjustmentAmount()));
-            net = net.add(nz(revenue.getPartnerNetAmount()));
+            net = net.add(nz(revenue.getProviderNetAmount()));
         }
 
         saved.setGrossAmount(gross);
@@ -383,8 +385,8 @@ public class SettlementService {
         saved.setSettlementAmount(net);
         settlementRepository.save(saved);
 
-        log.info("[Settlement] Đã tạo bản nháp settlement {} cho partner {} kỳ {} — tổng {}",
-                saved.getSettlementCode(), partner.getId(), request.revenuePeriod(), net);
+        log.info("[Settlement] Đã tạo bản nháp settlement {} cho providerProfile {} kỳ {} — tổng {}",
+                saved.getSettlementCode(), providerProfile.getId(), request.revenuePeriod(), net);
 
         return SettlementResponse.fromEntity(saved);
     }
@@ -403,7 +405,7 @@ public class SettlementService {
      *   <li>Settlement chưa được duyệt trước đó.</li>
      * </ul>
      *
-     * <p>Mục 9.6 — cập nhật trạng thái Settlement + Partner Revenue + Wallet Transaction phải
+     * <p>Mục 9.6 — cập nhật trạng thái Settlement + ProviderProfile Revenue + Wallet Transaction phải
      * thành công CÙNG NHAU; lỗi một bước → rollback toàn bộ.
      */
     @Transactional
@@ -425,24 +427,24 @@ public class SettlementService {
 
         // ── Đánh giá lại toàn bộ điều kiện ─────────────────────────────────────
         // Lấy khoản doanh thu qua SettlementDetail (bảng chi tiết của đợt tất toán)
-        // thay vì tra theo `partner_revenue.settlement_id`.
+        // thay vì tra theo `provider_revenue.settlement_id`.
         //
-        // LÝ DO: `partner_revenue.settlement_id` là cột denormalized do code khác
+        // LÝ DO: `provider_revenue.settlement_id` là cột denormalized do code khác
         // ghi và có thể bị lệch (đặc biệt khi dữ liệu mẫu được seed lại mỗi lần
         // khởi động server). SettlementDetail mới là bảng ghi ĐỐI CHIẾU chuẩn —
         // nó được tạo đúng một lần khi lập bản nháp và không bị ghi đè.
         // Tra cả hai nguồn rồi hợp nhất để không bỏ sót khoản nào.
-        List<PartnerRevenue> details = new ArrayList<>();
-        Map<Long, PartnerRevenue> merged = new LinkedHashMap<>();
+        List<ProviderRevenue> details = new ArrayList<>();
+        Map<Long, ProviderRevenue> merged = new LinkedHashMap<>();
 
         for (SettlementDetail d : detailRepository.findBySettlementIdWithRevenue(settlementId)) {
-            PartnerRevenue r = d.getPartnerRevenue();
+            ProviderRevenue r = d.getProviderRevenue();
             if (r != null) {
                 merged.put(r.getId(), r);
             }
         }
         // Bổ sung các khoản doanh thu vẫn còn trỏ `settlement_id` (đường dẫn cũ).
-        for (PartnerRevenue r : revenueRepository.findBySettlementId(settlementId)) {
+        for (ProviderRevenue r : revenueRepository.findBySettlementId(settlementId)) {
             merged.putIfAbsent(r.getId(), r);
         }
         details.addAll(merged.values());
@@ -458,20 +460,20 @@ public class SettlementService {
         BigDecimal recomputedAdjustment = BigDecimal.ZERO;
         BigDecimal recomputedNet = BigDecimal.ZERO;
 
-        for (PartnerRevenue revenue : details) {
-            PartnerRevenue locked = revenueRepository.findByIdForUpdate(revenue.getId())
-                    .orElseThrow(() -> new AppException(ErrorCode.PARTNER_REVENUE_NOT_FOUND));
+        for (ProviderRevenue revenue : details) {
+            ProviderRevenue locked = revenueRepository.findByIdForUpdate(revenue.getId())
+                    .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_REVENUE_NOT_FOUND));
 
             // Tự vá liên kết bị lệch: khoản doanh thu có mặt trong SettlementDetail
             // của đợt này nhưng cột `settlement_id` lại trỏ null (do dữ liệu mẫu được
             // seed lại mỗi lần khởi động server). Gắn lại liên kết thay vì báo lỗi.
             if (locked.getSettlementId() == null
-                    && locked.getStatus() != PartnerRevenueStatus.SETTLED) {
+                    && locked.getStatus() != ProviderRevenueStatus.SETTLED) {
                 locked.markInSettlement(settlementId);
                 revenueRepository.save(locked);
             }
 
-            if (locked.getStatus() != PartnerRevenueStatus.IN_SETTLEMENT
+            if (locked.getStatus() != ProviderRevenueStatus.IN_SETTLEMENT
                     || !settlementId.equals(locked.getSettlementId())) {
                 throw new AppException(ErrorCode.SETTLEMENT_ELIGIBILITY_CHANGED,
                         "Khoản doanh thu " + locked.getId()
@@ -496,7 +498,7 @@ public class SettlementService {
             recomputedRefund = recomputedRefund.add(nz(locked.getRefundAmount()));
             recomputedCommission = recomputedCommission.add(nz(locked.getCommissionAmount()));
             recomputedAdjustment = recomputedAdjustment.add(nz(locked.getAdjustmentAmount()));
-            recomputedNet = recomputedNet.add(nz(locked.getPartnerNetAmount()));
+            recomputedNet = recomputedNet.add(nz(locked.getProviderNetAmount()));
         }
 
         // Số tiền đã lưu trong bản nháp phải khớp với số tiền tính lại.
@@ -508,7 +510,7 @@ public class SettlementService {
         }
 
         // ── Ghi nhận tài chính ────────────────────────────────────────────────
-        Wallet wallet = walletRepository.findByPartnerIdForUpdate(settlement.getPartner().getId())
+        Wallet wallet = walletRepository.findByProviderProfileIdForUpdate(settlement.getProviderProfile().getId())
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND,
                         "Đối tác chưa có ví nội bộ — không thể tất toán"));
 
@@ -530,18 +532,18 @@ public class SettlementService {
                         + " (kỳ doanh thu " + settlement.getRevenuePeriod() + ")");
 
         // Chuyển các khoản doanh thu sang SETTLED.
-        for (PartnerRevenue revenue : details) {
-            PartnerRevenue locked = revenueRepository.findByIdForUpdate(revenue.getId())
-                    .orElseThrow(() -> new AppException(ErrorCode.PARTNER_REVENUE_NOT_FOUND));
+        for (ProviderRevenue revenue : details) {
+            ProviderRevenue locked = revenueRepository.findByIdForUpdate(revenue.getId())
+                    .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_REVENUE_NOT_FOUND));
             locked.markSettled();
             revenueRepository.save(locked);
         }
 
-        log.info("[Settlement] Đã duyệt settlement {} — cộng {} vào ví partner {}",
-                settlement.getSettlementCode(), recomputedNet, settlement.getPartner().getId());
+        log.info("[Settlement] Đã duyệt settlement {} — cộng {} vào ví providerProfile {}",
+                settlement.getSettlementCode(), recomputedNet, settlement.getProviderProfile().getId());
 
         notifications.send(NotificationType.SETTLEMENT_APPROVED)
-                .to(NotificationPublisher.idOf(settlement.getPartner().getUser()))
+                .to(NotificationPublisher.idOf(settlement.getProviderProfile().getUser()))
                 .title("Đối soát doanh thu đã được duyệt")
                 .body(NotificationPublisher.money(recomputedNet) + " của kỳ " + settlement.getRevenuePeriod()
                         + " (đợt " + settlement.getSettlementCode() + ") đã được cộng vào ví của bạn.")
@@ -586,7 +588,7 @@ public class SettlementService {
                 settlement.getSettlementCode());
 
         notifications.send(NotificationType.SETTLEMENT_REJECTED)
-                .to(NotificationPublisher.idOf(settlement.getPartner().getUser()))
+                .to(NotificationPublisher.idOf(settlement.getProviderProfile().getUser()))
                 .title("Đợt đối soát chưa được duyệt")
                 .body("Đợt " + settlement.getSettlementCode() + " kỳ " + settlement.getRevenuePeriod()
                         + " chưa được duyệt" + (request.reason() == null || request.reason().isBlank()
@@ -607,7 +609,7 @@ public class SettlementService {
      * <p>Liệt kê rõ những điều kiện KHÔNG đạt kèm chi tiết, để Admin biết chính xác cần
      * xử lý gì thay vì chỉ nhận một mã lý do chung chung.
      */
-    private String buildEligibilityErrorMessage(PartnerRevenue revenue,
+    private String buildEligibilityErrorMessage(ProviderRevenue revenue,
                                                  EligibilityEvaluationResponse evaluation) {
         String bookingId = revenue.getBooking() != null
                 ? String.valueOf(revenue.getBooking().getId())
@@ -635,22 +637,22 @@ public class SettlementService {
      * {@code ELIGIBLE} hoặc {@code PENDING}.
      */
     private void releaseRevenues(Long settlementId) {
-        // Gom từ CẢ HAI nguồn: SettlementDetail (chuẩn) và partner_revenue.settlement_id.
-        Map<Long, PartnerRevenue> merged = new LinkedHashMap<>();
+        // Gom từ CẢ HAI nguồn: SettlementDetail (chuẩn) và provider_revenue.settlement_id.
+        Map<Long, ProviderRevenue> merged = new LinkedHashMap<>();
         for (SettlementDetail d : detailRepository.findBySettlementIdWithRevenue(settlementId)) {
-            PartnerRevenue r = d.getPartnerRevenue();
+            ProviderRevenue r = d.getProviderRevenue();
             if (r != null) {
                 merged.put(r.getId(), r);
             }
         }
-        for (PartnerRevenue r : revenueRepository.findBySettlementId(settlementId)) {
+        for (ProviderRevenue r : revenueRepository.findBySettlementId(settlementId)) {
             merged.putIfAbsent(r.getId(), r);
         }
 
-        for (PartnerRevenue revenue : merged.values()) {
-            PartnerRevenue locked = revenueRepository.findByIdForUpdate(revenue.getId())
-                    .orElseThrow(() -> new AppException(ErrorCode.PARTNER_REVENUE_NOT_FOUND));
-            if (locked.getStatus() != PartnerRevenueStatus.IN_SETTLEMENT) {
+        for (ProviderRevenue revenue : merged.values()) {
+            ProviderRevenue locked = revenueRepository.findByIdForUpdate(revenue.getId())
+                    .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_REVENUE_NOT_FOUND));
+            if (locked.getStatus() != ProviderRevenueStatus.IN_SETTLEMENT) {
                 continue;
             }
             locked.releaseFromSettlement();
@@ -667,21 +669,23 @@ public class SettlementService {
     public SettlementResponse getById(Long settlementId) {
         Settlement settlement = settlementRepository.findById(settlementId)
                 .orElseThrow(() -> new AppException(ErrorCode.SETTLEMENT_NOT_FOUND));
+        requireFinanceAccess(settlement.getProviderProfile());
         return SettlementResponse.fromEntity(settlement);
     }
 
     @Transactional(readOnly = true)
     public List<SettlementDetailResponse> getDetails(Long settlementId) {
-        settlementRepository.findById(settlementId)
+        Settlement settlement = settlementRepository.findById(settlementId)
                 .orElseThrow(() -> new AppException(ErrorCode.SETTLEMENT_NOT_FOUND));
+        requireFinanceAccess(settlement.getProviderProfile());
 
         return detailRepository.findBySettlementIdWithRevenue(settlementId).stream()
                 .map(d -> {
-                    PartnerRevenue r = d.getPartnerRevenue();
+                    ProviderRevenue r = d.getProviderRevenue();
                     return SettlementDetailResponse.builder()
                             .id(d.getId())
                             .settlementId(d.getSettlement().getId())
-                            .partnerRevenueId(r.getId())
+                            .providerRevenueId(r.getId())
                             .bookingId(r.getBooking() != null ? r.getBooking().getId() : null)
                             .bookingCode(r.getBooking() != null ? r.getBooking().getBookingCode() : null)
                             .paymentId(r.getPayment() != null ? r.getPayment().getId() : null)
@@ -692,7 +696,7 @@ public class SettlementService {
                             .commissionRate(r.getCommissionRate())
                             .commissionAmount(d.getCommissionAmount())
                             .adjustmentAmount(d.getAdjustmentAmount())
-                            .partnerNetAmount(d.getPartnerNetAmount())
+                            .providerNetAmount(d.getProviderNetAmount())
                             .status(r.getStatus())
                             .build();
                 })
@@ -700,8 +704,11 @@ public class SettlementService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<SettlementResponse> getByPartner(Long partnerId, Pageable pageable) {
-        Page<Settlement> page = settlementRepository.findByPartner_IdOrderByCreatedAtDesc(partnerId, pageable);
+    public PageResponse<SettlementResponse> getByProviderProfile(Long providerProfileId, Pageable pageable) {
+        ProviderProfile providerProfile = providerProfileRepository.findById(providerProfileId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_PROFILE_NOT_FOUND));
+        requireFinanceAccess(providerProfile);
+        Page<Settlement> page = settlementRepository.findByProviderProfile_IdOrderByCreatedAtDesc(providerProfileId, pageable);
         return PageResponse.from(page, SettlementResponse::fromEntity);
     }
 
@@ -714,6 +721,17 @@ public class SettlementService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Chặn Content Provider đọc dữ liệu tất toán của đối tác khác. ADMIN thì qua tất cả.
+     */
+    private void requireFinanceAccess(ProviderProfile providerProfile) {
+        if (providerProfile == null) {
+            return;
+        }
+        User owner = providerProfile.getUser();
+        AuthorizationGuard.requireFinanceOwnerOrAdmin(owner == null ? null : owner.getId());
+    }
 
     /**
      * Kiểm tra kỳ doanh thu đã kết thúc (Mục 7.1).

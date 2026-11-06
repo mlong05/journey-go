@@ -43,7 +43,7 @@ public class RegionController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo khu vực mới (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<RegionResponse>> create(@Valid @RequestBody RegionRequest request) {
@@ -52,7 +52,7 @@ public class RegionController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Cập nhật khu vực (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<RegionResponse>> update(
@@ -62,7 +62,7 @@ public class RegionController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Xóa mềm khu vực (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
@@ -71,7 +71,7 @@ public class RegionController {
     }
 
     @PatchMapping("/{id}/restore")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Khôi phục khu vực đã xóa mềm (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<RegionResponse>> restore(@PathVariable Long id) {
@@ -79,7 +79,7 @@ public class RegionController {
     }
 
     @GetMapping("/deleted")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy danh sách khu vực đã xóa mềm (ADMIN / MODERATOR)")
     public ResponseEntity<ApiResponse<List<RegionResponse>>> getDeleted() {

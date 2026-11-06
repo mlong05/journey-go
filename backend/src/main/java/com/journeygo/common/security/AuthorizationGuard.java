@@ -26,7 +26,13 @@ public final class AuthorizationGuard {
 
     public static final String FORBIDDEN_NOT_OWNER = "FORBIDDEN-OWNER";
     public static final String FORBIDDEN_NOT_ADMIN = "FORBIDDEN-ADMIN";
-    public static final String FORBIDDEN_NOT_PROVIDER = "FORBIDDEN-PROVIDER";
+    public static final String FORBIDDEN_NOT_CONTENT_PROVIDER = "FORBIDDEN-PROVIDER";
+
+    /**
+     * Mã lỗi khi Content Provider cố xem dữ liệu tài chính của đối tác khác.
+     * Dùng chung cho Wallet / Revenue / Settlement / ProviderProfile.
+     */
+    public static final String FORBIDDEN_NOT_FINANCE_OWNER = "FORBIDDEN-FINANCE-OWNER";
 
     private AuthorizationGuard() {}
 
@@ -49,8 +55,8 @@ public final class AuthorizationGuard {
         return hasRole("ADMIN");
     }
 
-    public static boolean isProviderOrAdmin() {
-        return hasRole("ADMIN") || hasRole("PROVIDER");
+    public static boolean isContentProviderOrAdmin() {
+        return hasRole("ADMIN") || hasRole("CONTENT_PROVIDER");
     }
 
     public static boolean hasRole(String roleName) {
@@ -75,9 +81,9 @@ public final class AuthorizationGuard {
     /**
      * Yêu cầu role ADMIN hoặc PROVIDER.
      */
-    public static void requireProviderOrAdmin() {
-        if (!isProviderOrAdmin()) {
-            throw new BusinessException(FORBIDDEN_NOT_PROVIDER,
+    public static void requireContentProviderOrAdmin() {
+        if (!isContentProviderOrAdmin()) {
+            throw new BusinessException(FORBIDDEN_NOT_CONTENT_PROVIDER,
                     "Chỉ Provider hoặc Admin mới có quyền thực hiện thao tác này");
         }
     }
@@ -97,6 +103,43 @@ public final class AuthorizationGuard {
         if (!ownerId.equals(currentUserId())) {
             throw new BusinessException(FORBIDDEN_NOT_OWNER,
                     "Bạn không phải chủ sở hữu của " + resourceLabel + " này");
+        }
+    }
+
+    /**
+     * Yêu cầu caller được xem dữ liệu tài chính của một ProviderProfile.
+     *
+     * <p>Quy tắc cô lập dữ liệu tài chính:
+     * <ul>
+     *   <li><b>ADMIN</b> — xem được mọi ProviderProfile.</li>
+     *   <li><b>CONTENT_PROVIDER</b> — CHỈ xem được dữ liệu của chính mình
+     *       (ProviderProfile.user.id == principal.id).</li>
+     *   <li><b>Mọi role khác</b> (TOURIST, CONTENT_MODERATOR) — bị chặn hoàn toàn,
+     *       kể cả khi trùng {@code userId} với chủ sở hữu hồ sơ.</li>
+     * </ul>
+     *
+     * <p>{@code @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')}") chỉ chặn được
+     * TOURIST/MODERATOR ở tầng controller, nhưng KHÔNG chặn được việc một Content Provider đọc
+     * số dư ví và doanh thu của đối tác khác (chỉ cần đổi {@code providerProfileId} trong URL).
+     * Hàm này bịt lỗ đó, đồng thời là lớp phòng thủ thứ hai nếu controller bị cấu hình lỏng.
+     *
+     * @param providerProfileOwnerUserId userId sở hữu ProviderProfile (null nếu hồ sơ không có user)
+     */
+    public static void requireFinanceOwnerOrAdmin(Long providerProfileOwnerUserId) {
+        if (isAdmin()) return;
+
+        // Chỉ CONTENT_PROVIDER mới được phép xem dữ liệu tài chính — và chỉ của chính mình.
+        if (!isContentProviderOrAdmin()) {
+            throw new BusinessException(FORBIDDEN_NOT_FINANCE_OWNER,
+                    "Bạn không có quyền xem dữ liệu tài chính của đối tác");
+        }
+        if (providerProfileOwnerUserId == null) {
+            throw new BusinessException(FORBIDDEN_NOT_FINANCE_OWNER,
+                    "Hồ sơ đối tác này không có chủ sở hữu — chỉ Admin mới được xem dữ liệu tài chính");
+        }
+        if (!providerProfileOwnerUserId.equals(currentUserId())) {
+            throw new BusinessException(FORBIDDEN_NOT_FINANCE_OWNER,
+                    "Bạn không có quyền xem dữ liệu tài chính của đối tác khác");
         }
     }
 }

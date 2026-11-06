@@ -276,10 +276,10 @@ export const PAYMENT_BANK_CODE_LABELS = {
 
 /**
  * Nhãn tiếng Việt cho trạng thái khoản doanh thu đối tác.
- * Khớp enum `PartnerRevenueStatus` ở backend
+ * Khớp enum `ProviderRevenueStatus` ở backend
  * (PENDING / ELIGIBLE / IN_SETTLEMENT / SETTLED).
  */
-export const PARTNER_REVENUE_STATUS_LABELS = {
+export const PROVIDER_REVENUE_STATUS_LABELS = {
   PENDING: "Chờ đủ điều kiện",
   ELIGIBLE: "Đủ điều kiện tất toán",
   IN_SETTLEMENT: "Đã gom vào đợt tất toán",
@@ -329,7 +329,7 @@ export const REFUND_METHOD_LABELS = {
  * tiếng Việt theo `code` của điều kiện ⇒ không bao giờ lộ thuật ngữ kỹ thuật
  * cho người dùng, và không phụ thuộc backend đã sửa nội dung hay chưa.
  *
- * Khớp `code` mà backend gửi lên (PartnerRevenueService#evaluateEligibility).
+ * Khớp `code` mà backend gửi lên (ProviderRevenueService#evaluateEligibility).
  */
 export const SETTLEMENT_CHECK_LABELS = {
   "1_PAYMENT_VERIFIED": {

@@ -76,7 +76,7 @@ public class TourModerationService {
 
         String sender = tour.getCreatedBy() == null ? "đối tác" : tour.getCreatedBy().getFullName();
         notifications.send(NotificationType.TOUR_PENDING)
-                .toRole(Role.MODERATOR)
+                .toRole(Role.CONTENT_MODERATOR)
                 .title(edited ? "Tour được gửi lại sau chỉnh sửa" : "Tour mới chờ thẩm định")
                 .body(NotificationPublisher.quote(tour.getTitle()) + " do " + sender + " gửi, đang chờ bạn thẩm định.")
                 .link("/moderator/tours")
@@ -131,7 +131,7 @@ public class TourModerationService {
                 .ref("TOUR", tourId)
                 .queue(NotificationPublisher.Queue.MY_CONTENT)
                 .publish();
-        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.TOUR_REVIEW);
+        notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.TOUR_REVIEW);
         return toResponse(review);
     }
 
@@ -171,7 +171,7 @@ public class TourModerationService {
                 .ref("TOUR", tourId)
                 .queue(NotificationPublisher.Queue.MY_CONTENT)
                 .publish();
-        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.TOUR_REVIEW);
+        notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.TOUR_REVIEW);
         return toResponse(review);
     }
 
@@ -265,7 +265,7 @@ public class TourModerationService {
     }
 
     private void checkOwnership(Tour tour, Long actorId, Role role) {
-        if (role != null && role.isProvider()) {
+        if (role != null && role.isContentProvider()) {
             Long ownerId = tour.getCreatedBy() == null ? null : tour.getCreatedBy().getId();
             if (ownerId == null || !ownerId.equals(actorId)) throw new AppException(ErrorCode.UNAUTHORIZED);
         }

@@ -7,13 +7,13 @@
  *  • POST /financial-adjustments/{id}/reject?reason=  (ADMIN)
  *  • GET  /financial-adjustments/{id}
  *  • GET  /financial-adjustments?status=         (ADMIN)
- *  • GET  /financial-adjustments/partner/{partnerId}
+ *  • GET  /financial-adjustments/provider-profile/{providerProfileId}
  *
- *  • GET  /partner-revenues/partners/{partnerId}
- *  • GET  /partner-revenues/{revenueId}/eligibility
+ *  • GET  /provider-revenues/provider-profile/{providerProfileId}
+ *  • GET  /provider-revenues/{revenueId}/eligibility
  *
- *  • GET  /wallets/partner/{partnerId}
- *  • GET  /wallets/partner/{partnerId}/transactions
+ *  • GET  /wallets/provider-profile/{providerProfileId}
+ *  • GET  /wallets/provider-profile/{providerProfileId}/transactions
  *
  * ── Luật nghiệp vụ ──
  *  • Khoản điều chỉnh phát sinh SAU khi đã tất toán — không sửa lịch sử đã duyệt.
@@ -28,11 +28,10 @@ const ENDPOINT = "/financial-adjustments";
 /**
  * Ghi nhận khoản điều chỉnh tài chính (chờ phê duyệt).
  * @param {object} payload
- * @param {number} payload.partnerId
- * @param {number} [payload.refundId] khoản điều chỉnh phát sinh từ refund
+ * @param {number} payload.providerProfileId
+ * @param {number} [payload.refundRequestId] khoản điều chỉnh phát sinh từ refund
  * @param {number} payload.amount dương = cộng, âm = trừ
  * @param {string} payload.reason lý do điều chỉnh
- * @param {string} [payload.note]
  */
 export async function createFinancialAdjustment(payload) {
   const res = await apiClient.post(ENDPOINT, payload);
@@ -67,7 +66,9 @@ export async function getAllFinancialAdjustments({ status, page = 0, size = 20 }
 }
 
 /** Khoản điều chỉnh tài chính của một đối tác. */
-export async function getFinancialAdjustmentsByPartner(partnerId, { page = 0, size = 20 } = {}) {
-  const res = await apiClient.get(`${ENDPOINT}/partner/${partnerId}?page=${page}&size=${size}`);
+export async function getFinancialAdjustmentsByProviderProfile(providerProfileId, { page = 0, size = 20 } = {}) {
+  const res = await apiClient.get(
+    `${ENDPOINT}/provider-profile/${providerProfileId}?page=${page}&size=${size}`,
+  );
   return res?.data ?? res;
 }

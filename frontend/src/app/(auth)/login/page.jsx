@@ -40,10 +40,10 @@ export default function LoginPage() {
         if (role === "ADMIN") {
           router.replace(ROUTES.ADMIN || "/admin");
           return;
-        } else if (role === "MODERATOR") {
+        } else if (role === "CONTENT_MODERATOR") {
           router.replace(ROUTES.MODERATOR || "/moderator");
           return;
-        } else if (role === "PROVIDER") {
+        } else if (role === "CONTENT_PROVIDER") {
           router.replace(ROUTES.PROVIDER || "/provider");
           return;
         }

@@ -38,8 +38,10 @@ class ApiConstants {
   // Chu kỳ poll trạng thái thanh toán VNPay (milliseconds).
   static const int paymentPollIntervalMs = 2500;
 
-  // Vai trò cho phép trên Mobile Tourist App
-  static const String requiredRole = 'USER';
+  // Vai trò cho phép trên Mobile Tourist App.
+  // Backend chỉ còn 4 role chính thức (ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER, TOURIST);
+  // role 'USER' cũ đã bị gỡ trong đợt hợp nhất Role → Content Provider.
+  static const String requiredRole = 'TOURIST';
 
   // Thanh toán giả lập để thử luồng trải nghiệm khi backend chưa chạy VNPay.
   // Chỉ bật khi dev: MOCK_PAYMENT=true trong .env, hoặc --dart-define=MOCK_PAYMENT=true.

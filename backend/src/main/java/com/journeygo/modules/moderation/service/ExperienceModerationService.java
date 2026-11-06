@@ -84,7 +84,7 @@ public class ExperienceModerationService {
                 .ref("EXPERIENCE", e.getId())
                 .queue(NotificationPublisher.Queue.MY_CONTENT)
                 .publish();
-        notifications.queueChanged(Role.MODERATOR, NotificationPublisher.Queue.EXPERIENCE_REVIEW);
+        notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.EXPERIENCE_REVIEW);
     }
 
     private Experience findActiveOrThrow(Long id) {

@@ -29,7 +29,7 @@ public class UserCheckInPointController {
 
     @PostMapping("/check-in-points/{id}/check-in")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('TOURIST','ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @Operation(summary = "Tourist check-in tại CheckInPoint",
             description = "GPS: gửi latitude/longitude; QR: gửi qrValue; MANUAL: admin duyệt")
     public ResponseEntity<ApiResponse<UserCheckInResponse>> checkIn(
@@ -44,7 +44,7 @@ public class UserCheckInPointController {
 
     @GetMapping("/me/check-in-points")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('TOURIST','ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @Operation(summary = "Lịch sử check-in của tôi (lấy từ JWT)")
     public ResponseEntity<ApiResponse<List<UserCheckInResponse>>> myHistory(
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -55,7 +55,7 @@ public class UserCheckInPointController {
 
     @GetMapping("/me/experiences/{experienceId}/check-in-points")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('TOURIST','ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @Operation(summary = "Check-in của tôi theo Experience (lấy từ JWT)")
     public ResponseEntity<ApiResponse<List<UserCheckInResponse>>> myHistoryByExperience(
             @PathVariable Long experienceId,

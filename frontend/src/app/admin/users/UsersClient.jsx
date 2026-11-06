@@ -50,15 +50,15 @@ const API_BASE_URL_DISPLAY =
 
 const ROLES = {
   ADMIN: "ADMIN",
-  MODERATOR: "MODERATOR",
-  PROVIDER: "PROVIDER",
+  MODERATOR: "CONTENT_MODERATOR",
+  PROVIDER: "CONTENT_PROVIDER",
   TOURIST: "TOURIST",
 };
 
 const ROLE_LABELS = {
   [ROLES.ADMIN]: "Quản trị viên",
   [ROLES.MODERATOR]: "Kiểm duyệt viên",
-  [ROLES.PROVIDER]: "Đối tác Điểm đến",
+  [ROLES.PROVIDER]: "Đối tác cung cấp nội dung",
   [ROLES.TOURIST]: "Khách du lịch",
 };
 
@@ -2497,7 +2497,7 @@ const ERROR_GUIDE = {
         /api/v1/users
       </code>{" "}
       yêu cầu quyền <code>ADMIN</code>. Tài khoản hiện tại có thể là{" "}
-      <code>TOURIST</code>/<code>MODERATOR</code>/<code>PROVIDER</code>.
+      <code>TOURIST</code>/<code>CONTENT_MODERATOR</code>/<code>CONTENT_PROVIDER</code>.
     </>
   ),
   notfound: (

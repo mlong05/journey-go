@@ -60,8 +60,8 @@ public class DashboardService {
                 count("select count(u) from User u"),
                 count("select count(u) from User u where u.active = true"),
                 countUsersByRole(Role.TOURIST),
-                countUsersByRole(Role.PROVIDER),
-                countUsersByRole(Role.MODERATOR),
+                countUsersByRole(Role.CONTENT_PROVIDER),
+                countUsersByRole(Role.CONTENT_MODERATOR),
                 count("select count(u) from User u where u.createdAt >= ?1", startOfMonth));
 
         var destinations = new AdminDashboardResponse.DestinationStats(

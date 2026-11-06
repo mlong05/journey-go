@@ -33,7 +33,7 @@ public record PlatformRevenueSummaryResponse(
         BigDecimal totalRefundAmount,
 
         @Schema(description = "Tổng tiền đã chi trả cho đối tác")
-        BigDecimal totalPartnerNetAmount,
+        BigDecimal totalProviderNetAmount,
 
         @Schema(description = "Tổng hoa hồng ghi nhận trong các đợt đã duyệt")
         BigDecimal totalCommissionAmount,
@@ -56,7 +56,7 @@ public record PlatformRevenueSummaryResponse(
             @Schema(description = "Tổng hoàn tiền") BigDecimal refundAmount,
             @Schema(description = "Tổng hoa hồng") BigDecimal commissionAmount,
             @Schema(description = "Tổng điều chỉnh") BigDecimal adjustmentAmount,
-            @Schema(description = "Tổng chi trả đối tác") BigDecimal partnerNetAmount,
+            @Schema(description = "Tổng chi trả đối tác") BigDecimal providerNetAmount,
             @Schema(description = "Doanh thu nền tảng của kỳ") BigDecimal platformRevenue,
             @Schema(description = "Số đợt tất toán đã duyệt trong kỳ") long settlementCount
     ) {

@@ -21,24 +21,24 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/wallets")
 @RequiredArgsConstructor
 @Tag(name = "Wallet (Ví nội bộ)",
-        description = "Ví nội bộ của Partner và lịch sử giao dịch ví")
+        description = "Ví nội bộ của ProviderProfile và lịch sử giao dịch ví")
 public class WalletController {
 
     private final WalletService walletService;
 
-    @GetMapping("/partner/{partnerId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
+    @GetMapping("/provider-profile/{providerProfileId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Số dư ví của một đối tác",
             description = "Số dư phản ánh quyền lợi tài chính đã được ghi nhận, KHÔNG đồng nghĩa "
                     + "tiền đã chuyển vào tài khoản ngân hàng.")
-    public ResponseEntity<ApiResponse<WalletResponse>> getByPartner(@PathVariable Long partnerId) {
+    public ResponseEntity<ApiResponse<WalletResponse>> getByProviderProfile(@PathVariable Long providerProfileId) {
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin ví thành công",
-                walletService.getByPartner(partnerId)));
+                walletService.getByProviderProfile(providerProfileId)));
     }
 
     @GetMapping("/{walletId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Chi tiết ví theo ID")
     public ResponseEntity<ApiResponse<WalletResponse>> getById(@PathVariable Long walletId) {
@@ -46,21 +46,21 @@ public class WalletController {
                 walletService.getById(walletId)));
     }
 
-    @GetMapping("/partner/{partnerId}/transactions")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
+    @GetMapping("/provider-profile/{providerProfileId}/transactions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lịch sử giao dịch ví của một đối tác",
             description = "Mọi biến động số dư đều có một giao dịch tương ứng: SETTLEMENT_CREDIT, "
                     + "REFUND_ADJUSTMENT, MANUAL_ADJUSTMENT.")
-    public ResponseEntity<ApiResponse<PageResponse<WalletTransactionResponse>>> getTransactionsByPartner(
-            @PathVariable Long partnerId,
+    public ResponseEntity<ApiResponse<PageResponse<WalletTransactionResponse>>> getTransactionsByProviderProfile(
+            @PathVariable Long providerProfileId,
             @ParameterObject @PageableDefault(page = 0, size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử giao dịch ví thành công",
-                walletService.getTransactions(partnerId, pageable)));
+                walletService.getTransactions(providerProfileId, pageable)));
     }
 
     @GetMapping("/{walletId}/transactions")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PARTNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lịch sử giao dịch của một ví theo ID")
     public ResponseEntity<ApiResponse<PageResponse<WalletTransactionResponse>>> getTransactions(

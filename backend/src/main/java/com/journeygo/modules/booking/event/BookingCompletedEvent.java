@@ -8,7 +8,7 @@ import java.time.Instant;
  * <p>Được phát ra khi trải nghiệm của một Booking hoàn tất (Journey kết thúc) hoặc khi
  * Admin xác nhận hoàn thành thủ công.
  *
- * <p>Ý nghĩa nghiệp vụ: từ thời điểm này, doanh thu Partner phát sinh từ Booking đó bắt đầu
+ * <p>Ý nghĩa nghiệp vụ: từ thời điểm này, doanh thu ProviderProfile phát sinh từ Booking đó bắt đầu
  * được xét điều kiện tất toán (Mục 5 tài liệu — 9 điều kiện lọc).
  *
  * @param bookingId   ID Booking
