@@ -9,7 +9,7 @@ public record CreateSettlementRequest(
 
         @Schema(description = "ID đối tác cần tất toán", example = "1")
         @NotNull(message = "Đối tác không được để trống")
-        Long partnerId,
+        Long providerProfileId,
 
         @Schema(description = "Kỳ doanh thu (yyyy-MM) — phải là kỳ đã kết thúc", example = "2026-09")
         @NotNull(message = "Kỳ doanh thu không được để trống")

@@ -15,8 +15,8 @@ public record SettlementResponse(
 
         @Schema(description = "ID settlement") Long id,
         @Schema(description = "Mã settlement") String settlementCode,
-        @Schema(description = "ID partner") Long partnerId,
-        @Schema(description = "Tên partner") String partnerName,
+        @Schema(description = "ID providerProfile") Long providerProfileId,
+        @Schema(description = "Tên providerProfile") String providerName,
         @Schema(description = "Kỳ doanh thu (yyyy-MM)") String revenuePeriod,
         @Schema(description = "Ngày bắt đầu kỳ") LocalDate periodStart,
         @Schema(description = "Ngày kết thúc kỳ") LocalDate periodEnd,
@@ -24,7 +24,7 @@ public record SettlementResponse(
         @Schema(description = "Tổng refund thành công") BigDecimal refundAmount,
         @Schema(description = "Tổng hoa hồng") BigDecimal commissionAmount,
         @Schema(description = "Tổng điều chỉnh") BigDecimal adjustmentAmount,
-        @Schema(description = "Tổng tiền Partner được nhận") BigDecimal settlementAmount,
+        @Schema(description = "Tổng tiền ProviderProfile được nhận") BigDecimal settlementAmount,
         @Schema(description = "Trạng thái") SettlementStatus status,
         @Schema(description = "Admin tạo") Long createdBy,
         @Schema(description = "Admin duyệt") Long approvedBy,
@@ -39,8 +39,8 @@ public record SettlementResponse(
         return SettlementResponse.builder()
                 .id(s.getId())
                 .settlementCode(s.getSettlementCode())
-                .partnerId(s.getPartner() != null ? s.getPartner().getId() : null)
-                .partnerName(s.getPartner() != null ? s.getPartner().getPartnerName() : null)
+                .providerProfileId(s.getProviderProfile() != null ? s.getProviderProfile().getId() : null)
+                .providerName(s.getProviderProfile() != null ? s.getProviderProfile().getProviderName() : null)
                 .revenuePeriod(s.getRevenuePeriod())
                 .periodStart(s.getPeriodStart())
                 .periodEnd(s.getPeriodEnd())

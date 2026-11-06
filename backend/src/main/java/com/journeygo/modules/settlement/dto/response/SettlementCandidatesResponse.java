@@ -1,7 +1,7 @@
 package com.journeygo.modules.settlement.dto.response;
 
-import com.journeygo.modules.partnerrevenue.dto.response.PartnerRevenueResponse;
-import com.journeygo.modules.partnerrevenue.entity.enums.DeferredReason;
+import com.journeygo.modules.providerrevenue.dto.response.ProviderRevenueResponse;
+import com.journeygo.modules.providerrevenue.entity.enums.DeferredReason;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -25,9 +25,9 @@ import java.util.List;
 @Schema(description = "Ứng viên tất toán của một đối tác theo kỳ")
 public record SettlementCandidatesResponse(
 
-        @Schema(description = "ID đối tác") Long partnerId,
+        @Schema(description = "ID đối tác") Long providerProfileId,
         @Schema(description = "Kỳ doanh thu (yyyy-MM)") String revenuePeriod,
-        @Schema(description = "Các khoản đủ điều kiện") List<PartnerRevenueResponse> eligible,
+        @Schema(description = "Các khoản đủ điều kiện") List<ProviderRevenueResponse> eligible,
         @Schema(description = "Các khoản bị giữ lại kèm lý do") List<HeldItem> held,
         @Schema(description = "Tổng số tiền của các khoản đủ điều kiện") Totals totals,
         @Schema(description = "Đợt tất toán đang chờ duyệt của cùng đối tác + kỳ (nếu có)")
@@ -56,7 +56,7 @@ public record SettlementCandidatesResponse(
             @Schema(description = "ID booking") Long bookingId,
             @Schema(description = "Mã đơn đặt tour") String bookingCode,
             @Schema(description = "Kỳ doanh thu gốc") String revenuePeriod,
-            @Schema(description = "Số tiền Partner được nhận") BigDecimal partnerNetAmount,
+            @Schema(description = "Số tiền ProviderProfile được nhận") BigDecimal providerNetAmount,
             @Schema(description = "Lý do bị giữ lại") DeferredReason deferredReason
     ) {
     }
@@ -68,7 +68,7 @@ public record SettlementCandidatesResponse(
             @Schema(description = "Tổng refund thành công") BigDecimal refundAmount,
             @Schema(description = "Tổng hoa hồng") BigDecimal commissionAmount,
             @Schema(description = "Tổng điều chỉnh") BigDecimal adjustmentAmount,
-            @Schema(description = "Tổng tiền Partner được nhận") BigDecimal settlementAmount
+            @Schema(description = "Tổng tiền ProviderProfile được nhận") BigDecimal settlementAmount
     ) {
     }
 }

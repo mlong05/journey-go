@@ -15,7 +15,7 @@ import java.math.BigDecimal;
  * <p>Tham chiếu tài liệu "Booking - Payment - Refund - Wallet &amp; Settlement":
  * <ul>
  *   <li>Thời hạn gửi yêu cầu Refund: 24 giờ kể từ thời điểm thanh toán thành công đã xác minh.</li>
- *   <li>Tỷ lệ hoa hồng nền tảng mặc định khi Partner chưa có cấu hình riêng.</li>
+ *   <li>Tỷ lệ hoa hồng nền tảng mặc định khi ProviderProfile chưa có cấu hình riêng.</li>
  *   <li>Số phút cho phép tạo một đợt tất toán sau khi kỳ doanh thu kết thúc.</li>
  * </ul>
  */
@@ -32,7 +32,7 @@ public class FinanceProperties {
     private int refundWindowHours = 24;
 
     /**
-     * Tỷ lệ hoa hồng nền tảng mặc định (0.20 = 20%) — dùng khi Partner chưa có cấu hình riêng.
+     * Tỷ lệ hoa hồng nền tảng mặc định (0.20 = 20%) — dùng khi ProviderProfile chưa có cấu hình riêng.
      */
     private BigDecimal defaultCommissionRate = new BigDecimal("0.2000");
 

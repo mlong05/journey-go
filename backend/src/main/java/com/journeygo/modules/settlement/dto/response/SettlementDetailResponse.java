@@ -1,6 +1,6 @@
 package com.journeygo.modules.settlement.dto.response;
 
-import com.journeygo.modules.partnerrevenue.entity.enums.PartnerRevenueStatus;
+import com.journeygo.modules.providerrevenue.entity.enums.ProviderRevenueStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
@@ -16,7 +16,7 @@ public record SettlementDetailResponse(
 
         @Schema(description = "ID chi tiết") Long id,
         @Schema(description = "ID settlement") Long settlementId,
-        @Schema(description = "ID khoản doanh thu") Long partnerRevenueId,
+        @Schema(description = "ID khoản doanh thu") Long providerRevenueId,
         @Schema(description = "ID booking") Long bookingId,
         @Schema(description = "Mã đơn") String bookingCode,
         @Schema(description = "ID payment") Long paymentId,
@@ -28,7 +28,7 @@ public record SettlementDetailResponse(
         @Schema(description = "Tỷ lệ hoa hồng") BigDecimal commissionRate,
         @Schema(description = "Hoa hồng nền tảng") BigDecimal commissionAmount,
         @Schema(description = "Tổng điều chỉnh") BigDecimal adjustmentAmount,
-        @Schema(description = "Số tiền Partner được nhận") BigDecimal partnerNetAmount,
-        @Schema(description = "Trạng thái khoản doanh thu") PartnerRevenueStatus status
+        @Schema(description = "Số tiền ProviderProfile được nhận") BigDecimal providerNetAmount,
+        @Schema(description = "Trạng thái khoản doanh thu") ProviderRevenueStatus status
 ) {
 }
