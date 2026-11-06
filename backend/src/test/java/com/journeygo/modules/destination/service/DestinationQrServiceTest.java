@@ -34,7 +34,7 @@ class DestinationQrServiceTest {
     @InjectMocks
     private DestinationService destinationService;
 
-    private static final Role PROVIDER = Role.of("PROVIDER");
+    private static final Role PROVIDER = Role.of("CONTENT_PROVIDER");
     private static final Role ADMIN = Role.of("ADMIN");
 
     private Destination destination(Long ownerId, String qrToken) {

@@ -1,4 +1,4 @@
-# Kịch bản Test trên Swagger — Booking → Payment → Refund → Settlement
+﻿# Kịch bản Test trên Swagger — Booking → Payment → Refund → Settlement
 
 > **Cách chạy:** mở `http://localhost:8088/swagger-ui.html` → chọn tag → **Try it out** → dán JSON → **Execute**.
 > **Mọi JSON trong tài liệu này đều copy-paste được.** Thứ tự bước đã tối ưu để chạy liền nhau.
@@ -41,7 +41,7 @@
 | `{paymentId}` | A.7 | `501` |
 | `{journeyId}` | B.1 | `901` |
 | `{destinationId}` | B.2 | `11` |
-| `{partnerId}` | 0.4 | `1` |
+| `{providerProfileId}` | 0.4 | `1` |
 | `{revenueId}` | B.5 | `301` |
 | `{refundId}` | C.1 | `701` |
 | `{settlementId}` | D.2 | `801` |
@@ -77,30 +77,30 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
 
 | Email | Vai trò | Dùng cho |
 |---|---|---|
-| `admin@journeygo.com` | `ADMIN` | Tất cả thao tác duyệt (partner, refund, settlement, adjustment) |
+| `admin@journeygo.com` | `ADMIN` | Tất cả thao tác duyệt (đối tác, refund, settlement, adjustment) |
 | `user@journeygo.com` | `ADMIN` | Tài khoản admin thay thế |
 | `tourist1@journeygo.com` | `TOURIST` | Đặt tour, thanh toán, hành trình, gửi refund |
 | `tourist2@journeygo.com` | `TOURIST` | Kịch bản thứ 2 (vượt sức chứa, refund 100%) |
-| `partner1@journeygo.com` | `PARTNER` | Đối tác "Ban Quản lý Tràng An" — hoa hồng **25%** |
-| `partner2@journeygo.com` | `PARTNER` | Đối tác "Ban Quản lý Hạ Long" — hoa hồng **20%** |
+| `provider1@journeygo.com` | `CONTENT_PROVIDER` | Đối tác "Ban Quản lý Tràng An" — hoa hồng **25%** |
+| `provider2@journeygo.com` | `CONTENT_PROVIDER` | Đối tác "Ban Quản lý Hạ Long" — hoa hồng **20%** |
 
-> 📌 Hai tài khoản `partner1@` / `partner2@` **đã có sẵn Partner + Wallet** → không cần
-> gọi `POST /api/v1/partners` ở bước 0.4 nữa (bước đó giữ lại để hiểu nghiệp vụ).
+> 📌 Hai tài khoản `provider1@` / `provider2@` **đã có sẵn ProviderProfile + Wallet** → không cần
+> gọi `POST /api/v1/provider-profiles` ở bước 0.4 nữa (bước đó giữ lại để hiểu nghiệp vụ).
 
 ### Dữ liệu nghiệp vụ đã tạo
 
 | Nhóm | Chi tiết |
 |---|---|
 | Destination (5) | Văn Miếu, Hoàng Thành, Bát Tràng, Quần Thể Tràng An, Chùa Trấn Quốc — đều `PUBLISHED` |
-| Experience (5) | Giá 500k / 400k / 500k / 600k / 400k — đều `PUBLISHED`, gắn với partner tạo |
+| Experience (5) | Giá 500k / 400k / 500k / 600k / 400k — đều `PUBLISHED`, gắn với đối tác tạo |
 | Experience Slot | Mở bán từ hôm nay đến +30 ngày, `maxTourPerDay = 20`, có 1 slot hết chỗ (test unhappy path) |
-| Tour (2) | ✅ "Hành trình Tràng An 2 ngày 1 đêm" (3 điểm đến, **2 Partner**, 1.500.000đ) · ✅ "Hành trình kinh thành Thăng Long 1 ngày" (2 điểm đến, **1 Partner**, 900.000đ) |
+| Tour (2) | ✅ "Hành trình Tràng An 2 ngày 1 đêm" (3 điểm đến, **2 đối tác**, 1.500.000đ) · ✅ "Hành trình kinh thành Thăng Long 1 ngày" (2 điểm đến, **1 đối tác**, 900.000đ) |
 | Booking (9) | `COMPLETED` ×6 · `CONFIRMED` ×1 · `PENDING_PAYMENT` ×1 · `CANCELLED` ×1 |
 | Payment (8) | `SUCCESS`, `bankCode` MOMO / VNBANK / VNPAYQR / INTCARD |
 | Refund (2) | `JGSAMPLERF01` → `REFUNDED` (50%, chuyển khoản thủ công) · `JGSAMPLERF02` → `PENDING_REVIEW` (chặn tất toán) |
-| PartnerRevenue (10) | `ELIGIBLE` ×6 · `PENDING` ×3 (`BOOKING_NOT_COMPLETED` ×2, `REFUND_PENDING` ×1) · `SETTLED` ×1 |
+| ProviderRevenue (10) | `ELIGIBLE` ×6 · `PENDING` ×3 (`BOOKING_NOT_COMPLETED` ×2, `REFUND_PENDING` ×1) · `SETTLED` ×1 |
 | Settlement (1) | `JGSETTLE001` — kỳ **3 tháng trước**, `APPROVED`, gross 900.000đ → **net 675.000đ** |
-| Wallet (2) | Partner 1 (`id=2`): **625.000đ** (675.000 cộng − 50.000 điều chỉnh) · Partner 2 (`id=3`): **0đ** |
+| Wallet (2) | Đối tác 1 (`id=2`): **625.000đ** (675.000 cộng − 50.000 điều chỉnh) · Đối tác 2 (`id=3`): **0đ** |
 | FinancialAdjustment (1) | `JGSAMPLEADJ01` — `APPROVED`, **−50.000đ** (bồi hoàn chi phí vận hành) |
 
 ### Bản ghi mẫu dùng để tra cứu nhanh
@@ -197,25 +197,25 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
 
 📌 **Lưu:** `data.accessToken` → `{{TOURIST2_TOKEN}}`.
 
-> **Về vai trò ADMIN:** `POST /api/v1/auth/register` chỉ nhận `TOURIST` / `PROVIDER`. Role `ADMIN` phải cấp trực tiếp trong DB:
+> **Về vai trò ADMIN:** `POST /api/v1/auth/register` chỉ nhận `TOURIST` / `CONTENT_PROVIDER`. Role `ADMIN` phải cấp trực tiếp trong DB:
 > ```sql
 > UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'ADMIN') WHERE email = 'admin@journeygo.com';
 > ```
 
 ---
 
-## 0.4. Tạo Partner (BẮT BUỘC — không có Partner sẽ không sinh doanh thu)
+## 0.4. Tạo ProviderProfile (BẮT BUỘC — không có đối tác sẽ không sinh doanh thu)
 
-🟦 **Partner (Đối tác)**
+🟦 **ProviderProfile (Đối tác)**
 
-▶ **POST** `/api/v1/partners`
+▶ **POST** `/api/v1/provider-profiles`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 
 📋 **Body:**
 ```json
 {
   "userId": 12,
-  "partnerName": "Ban Quản lý Tràng An",
+  "providerName": "Ban Quản lý Tràng An",
   "commissionRate": 0.2500
 }
 ```
@@ -228,9 +228,9 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
   "data": {
     "id": 2,
     "userId": 12,
-    "email": "partner1@journeygo.com",
+    "email": "provider1@journeygo.com",
     "fullName": "Tràng An Heritage",
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerName": "Ban Quản lý Tràng An",
     "commissionRate": 0.2500,
     "active": true,
     "hasWallet": true,
@@ -240,18 +240,18 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
 }
 ```
 
-📌 **Lưu:** `data.id` → `{partnerId}`
+📌 **Lưu:** `data.id` → `{providerProfileId}`
 
-> ⚠️ **Điều kiện tiên quyết:** `userId` phải là user **tạo Experience** thuộc các điểm đến trong tour — đó là người sẽ nhận doanh thu. Hệ thống tự gán role `PARTNER` cho user đó.
-> ⚠️ **Wallet được tạo NGUYÊN TỬ cùng Partner** → `hasWallet: true`. Nếu tạo Wallet lỗi thì cả Partner cũng rollback.
+> ⚠️ **Điều kiện tiên quyết:** `userId` phải là user **tạo Experience** thuộc các điểm đến trong tour — đó là người sẽ nhận doanh thu. Hệ thống tự gán role `CONTENT_PROVIDER` cho user đó.
+> ⚠️ **Wallet được tạo NGUYÊN TỬ cùng ProviderProfile** → `hasWallet: true`. Nếu tạo Wallet lỗi thì cả ProviderProfile cũng rollback.
 
 ---
 
-## 0.5. Danh sách Partner (Admin)
+## 0.5. Danh sách ProviderProfile (Admin)
 
-🟦 **Partner (Đối tác)**
+🟦 **ProviderProfile (Đối tác)**
 
-▶ **GET** `/api/v1/partners`
+▶ **GET** `/api/v1/provider-profiles`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 📋 **Query:** `page=0`, `size=20`, `active=true`
 
@@ -271,9 +271,9 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
       {
         "id": 2,
         "userId": 12,
-        "email": "partner1@journeygo.com",
+        "email": "provider1@journeygo.com",
         "fullName": "Tràng An Heritage",
-        "partnerName": "Ban Quản lý Tràng An",
+        "providerName": "Ban Quản lý Tràng An",
         "commissionRate": 0.2500,
         "active": true,
         "hasWallet": true,
@@ -282,9 +282,9 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
       {
         "id": 3,
         "userId": 13,
-        "email": "partner2@journeygo.com",
+        "email": "provider2@journeygo.com",
         "fullName": "Hạ Long Bay Tours",
-        "partnerName": "Ban Quản lý Hạ Long",
+        "providerName": "Ban Quản lý Hạ Long",
         "commissionRate": 0.2000,
         "active": true,
         "hasWallet": true,
@@ -298,17 +298,17 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
 
 ---
 
-## 0.6. Cập nhật tỷ lệ hoa hồng của Partner
+## 0.6. Cập nhật tỷ lệ hoa hồng của đối tác
 
-🟦 **Partner (Đối tác)**
+🟦 **ProviderProfile (Đối tác)**
 
-▶ **PUT** `/api/v1/partners/{partnerId}`
+▶ **PUT** `/api/v1/provider-profiles/{providerProfileId}`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 
 📋 **Body:**
 ```json
 {
-  "partnerName": "Ban Quản lý Tràng An",
+  "providerName": "Ban Quản lý Tràng An",
   "commissionRate": 0.2500,
   "active": true
 }
@@ -322,9 +322,9 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
   "data": {
     "id": 2,
     "userId": 12,
-    "email": "partner1@journeygo.com",
+    "email": "provider1@journeygo.com",
     "fullName": "Tràng An Heritage",
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerName": "Ban Quản lý Tràng An",
     "commissionRate": 0.2500,
     "active": true,
     "hasWallet": true,
@@ -336,11 +336,11 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
 
 ---
 
-## 0.7. Kiểm tra Wallet của Partner (mẫu đã có 625.000đ)
+## 0.7. Kiểm tra Wallet của đối tác (mẫu đã có 625.000đ)
 
 🟦 **Wallet (Ví nội bộ)**
 
-▶ **GET** `/api/v1/wallets/partner/{partnerId}`
+▶ **GET** `/api/v1/wallets/provider-profile/{providerProfileId}`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 
 ✅ **Kết quả:**
@@ -350,8 +350,8 @@ Hoặc gõ thẳng vào ô `Value` của tham số `Authorization` nếu endpoin
   "message": "Lấy thông tin ví thành công",
   "data": {
     "id": 2,
-    "partnerId": 2,
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerProfileId": 2,
+    "providerName": "Ban Quản lý Tràng An",
     "balance": 625000.00,
     "currency": "VND",
     "createdAt": "2026-11-20T02:00:00Z",
@@ -1211,7 +1211,7 @@ UPDATE bookings SET payment_deadline = NOW() - INTERVAL '1 minute' WHERE id = 10
 
 # PHẦN B — Hoàn thành trải nghiệm → Kiểm tra doanh thu
 
-> ⚠️ **BẮT BUỘC** — doanh thu Partner chỉ được xét tất toán **sau khi booking `COMPLETED`**.
+> ⚠️ **BẮT BUỘC** — doanh thu đối tác chỉ được xét tất toán **sau khi booking `COMPLETED`**.
 
 ## B.1. Bắt đầu hành trình
 
@@ -1424,15 +1424,15 @@ Lặp lại cho từng `destinationId`: `11` → `12` → `13`
 
 ✅ **Điều kiện đạt:** `status = COMPLETED`, `completedAt` khác null.
 
-> 📌 Khi booking `COMPLETED`, hệ thống bắn event `BookingCompletedEvent` → `PartnerRevenueService` tính lại doanh thu và đánh giá 8 điều kiện.
+> 📌 Khi booking `COMPLETED`, hệ thống bắn event `BookingCompletedEvent` → `ProviderRevenueService` tính lại doanh thu và đánh giá 9 điều kiện.
 
 ---
 
-## B.5. Xem doanh thu của Partner
+## B.5. Xem doanh thu của đối tác
 
-🟦 **Partner Revenue (Doanh thu đối tác)**
+🟦 **Provider Revenue (Doanh thu đối tác)**
 
-▶ **GET** `/api/v1/partner-revenues/partners/{partnerId}`
+▶ **GET** `/api/v1/provider-revenues/provider-profile/{providerProfileId}`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 📋 **Query:** `page=0`, `size=20`
 
@@ -1451,8 +1451,8 @@ Lặp lại cho từng `destinationId`: `11` → `12` → `13`
     "content": [
       {
         "id": 301,
-        "partnerId": 1,
-        "partnerName": "Ban Quản lý Tràng An",
+        "providerProfileId": 1,
+        "providerName": "Ban Quản lý Tràng An",
         "bookingId": 101,
         "bookingCode": "JG9F3A2B1C4D5E6F708",
         "paymentId": 501,
@@ -1464,7 +1464,7 @@ Lặp lại cho từng `destinationId`: `11` → `12` → `13`
         "commissionRate": 0.2500,
         "commissionAmount": 375000.00,
         "adjustmentAmount": 0,
-        "partnerNetAmount": 1125000.00,
+        "providerNetAmount": 1125000.00,
         "status": "ELIGIBLE",
         "deferredReason": null,
         "settlementId": null,
@@ -1486,21 +1486,21 @@ GrossAmount     = 1.500.000
 RefundAmount    = 0
 NetCollected    = 1.500.000 − 0        = 1.500.000
 Commission      = 1.500.000 × 0.25     = 375.000
-PartnerNet      = 1.500.000 − 375.000  = 1.125.000  ✅
+ProviderNet      = 1.500.000 − 375.000  = 1.125.000  ✅
 ```
 
 > 📌 **Công thức chuẩn:**
-> `NetCollected = Gross − Refund` → `Commission = NetCollected × CommissionRate` → `PartnerNet = NetCollected − Commission + Adjustment`
+> `NetCollected = Gross − Refund` → `Commission = NetCollected × CommissionRate` → `ProviderNet = NetCollected − Commission + Adjustment`
 > 📌 **`revenuePeriod`** = tháng **hoàn thành trải nghiệm** (dùng `completedDate`), không phải tháng thanh toán.
-> 📌 **`grossAmount`** khi tour có **nhiều Partner** được chia theo tổng giá Experience của mỗi Partner.
+> 📌 **`grossAmount`** khi tour có **nhiều đối tác** được chia theo tổng giá Experience của mỗi đối tác.
 
 ---
 
-## B.6. Xem 8 điều kiện đủ tư cách tất toán ⭐
+## B.6. Xem 9 điều kiện đủ tư cách tất toán ⭐
 
-🟦 **Partner Revenue (Doanh thu đối tác)**
+🟦 **Provider Revenue (Doanh thu đối tác)**
 
-▶ **GET** `/api/v1/partner-revenues/{revenueId}/eligibility`
+▶ **GET** `/api/v1/provider-revenues/{revenueId}/eligibility`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 
 ✅ **Kết quả:**
@@ -1518,8 +1518,8 @@ PartnerNet      = 1.500.000 − 375.000  = 1.125.000  ✅
       { "code": "4_REFUND_APPLIED", "description": "Số tiền Refund thành công đã được cập nhật", "passed": true, "detail": "refundAmount=0" },
       { "code": "5_NO_RECONCILIATION_ISSUE", "description": "Không có vấn đề đối soát tài chính", "passed": true, "detail": "OK" },
       { "code": "6_NOT_SETTLED", "description": "Chưa thuộc Settlement đang xử lý hoặc đã duyệt", "passed": true, "detail": "status=ELIGIBLE" },
-      { "code": "7_CALCULATED", "description": "Hoa hồng và doanh thu Partner đã được tính", "passed": true, "detail": "commission=375000.00, net=1125000.00" },
-      { "code": "8_POSITIVE_NET", "description": "Doanh thu còn lại sau Refund và điều chỉnh lớn hơn 0", "passed": true, "detail": "partnerNet=1125000.00" }
+      { "code": "7_CALCULATED", "description": "Hoa hồng và doanh thu đối tác đã được tính", "passed": true, "detail": "commission=375000.00, net=1125000.00" },
+      { "code": "8_POSITIVE_NET", "description": "Doanh thu còn lại sau Refund và điều chỉnh lớn hơn 0", "passed": true, "detail": "providerNet=1125000.00" }
     ]
   },
   "timestamp": "2026-11-20T03:18:00Z"
@@ -1539,32 +1539,32 @@ PartnerNet      = 1.500.000 − 375.000  = 1.125.000  ✅
 
 ---
 
-## B.7. Doanh thu theo booking (kiểm tra tour nhiều Partner)
+## B.7. Doanh thu theo booking (kiểm tra tour nhiều đối tác)
 
-🟦 **Partner Revenue (Doanh thu đối tác)**
+🟦 **Provider Revenue (Doanh thu đối tác)**
 
-▶ **GET** `/api/v1/partner-revenues/bookings/{bookingId}`
+▶ **GET** `/api/v1/provider-revenues/bookings/{bookingId}`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 
-✅ **Kết quả (tour có 1 Partner):**
+✅ **Kết quả (tour có 1 đối tác):**
 ```json
 {
   "code": 200,
   "message": "Lấy doanh thu của booking thành công",
   "data": [
-    { "id": 301, "partnerId": 1, "partnerName": "Ban Quản lý Tràng An", "bookingId": 101, "bookingCode": "JG9F3A2B1C4D5E6F708", "paymentId": 501, "txnRef": "JG101-8F3A2B1C4D5E6F7089A", "revenuePeriod": "2026-11", "completedDate": "2026-11-20", "grossAmount": 1500000, "refundAmount": 0, "commissionRate": 0.2500, "commissionAmount": 375000.00, "adjustmentAmount": 0, "partnerNetAmount": 1125000.00, "status": "ELIGIBLE", "deferredReason": null, "settlementId": null, "eligibleAt": "2026-11-20T03:15:00Z", "settledAt": null, "createdAt": "2026-11-20T02:03:00Z" }
+    { "id": 301, "providerProfileId": 1, "providerName": "Ban Quản lý Tràng An", "bookingId": 101, "bookingCode": "JG9F3A2B1C4D5E6F708", "paymentId": 501, "txnRef": "JG101-8F3A2B1C4D5E6F7089A", "revenuePeriod": "2026-11", "completedDate": "2026-11-20", "grossAmount": 1500000, "refundAmount": 0, "commissionRate": 0.2500, "commissionAmount": 375000.00, "adjustmentAmount": 0, "providerNetAmount": 1125000.00, "status": "ELIGIBLE", "deferredReason": null, "settlementId": null, "eligibleAt": "2026-11-20T03:15:00Z", "settledAt": null, "createdAt": "2026-11-20T02:03:00Z" }
   ],
   "timestamp": "2026-11-20T03:19:00Z"
 }
 ```
 
-✅ **Kết quả (tour có 2 Partner — mỗi Partner 1 bản ghi):**
+✅ **Kết quả (tour có 2 đối tác — mỗi đối tác 1 bản ghi):**
 ```json
 {
   "code": 200,
   "data": [
-    { "id": 301, "partnerId": 1, "partnerName": "Ban Quản lý Tràng An", "grossAmount": 900000, "commissionRate": 0.2500, "commissionAmount": 225000.00, "partnerNetAmount": 675000.00, "status": "ELIGIBLE" },
-    { "id": 302, "partnerId": 2, "partnerName": "Ban Quản lý Hạ Long", "grossAmount": 600000, "commissionRate": 0.2000, "commissionAmount": 120000.00, "partnerNetAmount": 480000.00, "status": "ELIGIBLE" }
+    { "id": 301, "providerProfileId": 1, "providerName": "Ban Quản lý Tràng An", "grossAmount": 900000, "commissionRate": 0.2500, "commissionAmount": 225000.00, "providerNetAmount": 675000.00, "status": "ELIGIBLE" },
+    { "id": 302, "providerProfileId": 2, "providerName": "Ban Quản lý Hạ Long", "grossAmount": 600000, "commissionRate": 0.2000, "commissionAmount": 120000.00, "providerNetAmount": 480000.00, "status": "ELIGIBLE" }
   ],
   "timestamp": "2026-11-20T03:19:00Z"
 }
@@ -2270,11 +2270,11 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '25 hours' WHERE id = 503;
 
 ---
 
-## C.15. Kiểm tra tác động lên doanh thu Partner
+## C.15. Kiểm tra tác động lên doanh thu đối tác
 
-🟦 **Partner Revenue (Doanh thu đối tác)**
+🟦 **Provider Revenue (Doanh thu đối tác)**
 
-▶ **GET** `/api/v1/partner-revenues/partners/{partnerId}`
+▶ **GET** `/api/v1/provider-revenues/provider-profile/{providerProfileId}`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 
 ✅ **Kết quả sau khi refund 750.000:**
@@ -2292,8 +2292,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '25 hours' WHERE id = 503;
     "content": [
       {
         "id": 301,
-        "partnerId": 1,
-        "partnerName": "Ban Quản lý Tràng An",
+        "providerProfileId": 1,
+        "providerName": "Ban Quản lý Tràng An",
         "bookingId": 101,
         "bookingCode": "JG9F3A2B1C4D5E6F708",
         "paymentId": 501,
@@ -2305,7 +2305,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '25 hours' WHERE id = 503;
         "commissionRate": 0.2500,
         "commissionAmount": 187500.00,
         "adjustmentAmount": 0,
-        "partnerNetAmount": 562500.00,
+        "providerNetAmount": 562500.00,
         "status": "ELIGIBLE",
         "deferredReason": null,
         "settlementId": null,
@@ -2324,10 +2324,10 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '25 hours' WHERE id = 503;
 RefundAmount  = 750.000
 NetCollected  = 1.500.000 − 750.000      = 750.000
 Commission    = 750.000 × 0.25            = 187.500
-PartnerNet    = 750.000 − 187.500         = 562.500  ✅
+ProviderNet    = 750.000 − 187.500         = 562.500  ✅
 ```
 
-▶ **GET** `/api/v1/partner-revenues/{revenueId}/eligibility** → check `4_REFUND_APPLIED` vẫn `passed = true`.
+▶ **GET** `/api/v1/provider-revenues/{revenueId}/eligibility** → check `4_REFUND_APPLIED` vẫn `passed = true`.
 
 > ⚠️ Nếu refund đang ở `PENDING_REVIEW` hoặc `REFUND_PROCESSING` → check `3_NO_PENDING_REFUND` **fail** → `deferredReason = REFUND_PENDING` → doanh thu bị **giữ lại**, không vào ứng viên tất toán.
 
@@ -2343,7 +2343,7 @@ PartnerNet    = 750.000 − 187.500         = 562.500  ✅
 ```sql
 -- Đưa booking về tháng 09/2026 để tạo settlement cho kỳ "2026-09"
 UPDATE bookings SET completed_at = TIMESTAMP '2026-09-20 10:00:00' WHERE id = 101;
-UPDATE partner_revenues SET completed_date = DATE '2026-09-20' WHERE id = 301;
+UPDATE provider_revenues SET completed_date = DATE '2026-09-20' WHERE id = 301;
 ```
 
 **Giá trị `revenuePeriod` cần dùng:** tháng trước 2 tháng, định dạng `yyyy-MM`.
@@ -2353,13 +2353,13 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 
 ---
 
-## D.1. Xem ứng viên tất toán (đánh giá 8 điều kiện) ⭐
+## D.1. Xem Ứng viên tất toán (đánh giá 9 điều kiện) ⭐
 
 🟦 **Settlement (Tất toán)**
 
 ▶ **GET** `/api/v1/settlements/candidates`
 🔑 `Bearer {{ADMIN_TOKEN}}`
-📋 **Query:** `partnerId={partnerId}`, `revenuePeriod=2026-09`
+📋 **Query:** `providerProfileId={providerProfileId}`, `revenuePeriod=2026-09`
 
 ✅ **Kết quả:**
 ```json
@@ -2367,13 +2367,13 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
   "code": 200,
   "message": "Lấy ứng viên tất toán thành công",
   "data": {
-    "partnerId": 1,
+    "providerProfileId": 1,
     "revenuePeriod": "2026-09",
     "eligible": [
       {
         "id": 301,
-        "partnerId": 1,
-        "partnerName": "Ban Quản lý Tràng An",
+        "providerProfileId": 1,
+        "providerName": "Ban Quản lý Tràng An",
         "bookingId": 101,
         "bookingCode": "JG9F3A2B1C4D5E6F708",
         "paymentId": 501,
@@ -2385,7 +2385,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
         "commissionRate": 0.2500,
         "commissionAmount": 187500.00,
         "adjustmentAmount": 0,
-        "partnerNetAmount": 562500.00,
+        "providerNetAmount": 562500.00,
         "status": "ELIGIBLE",
         "deferredReason": null,
         "settlementId": null,
@@ -2399,7 +2399,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
         "revenueId": 302,
         "bookingId": 102,
         "revenuePeriod": "2026-09",
-        "partnerNetAmount": 300000.00,
+        "providerNetAmount": 300000.00,
         "deferredReason": "BOOKING_NOT_COMPLETED"
       }
     ],
@@ -2418,7 +2418,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 ✅ **Điều kiện đạt:**
 - `eligible` — các khoản đủ điều kiện (sẽ được đưa vào Settlement)
 - `held` — các khoản bị giữ, **kèm lý do cụ thể** (`deferredReason`)
-- `totals.settlementAmount` = tổng `partnerNetAmount` của `eligible`
+- `totals.settlementAmount` = tổng `providerNetAmount` của `eligible`
 
 ---
 
@@ -2432,7 +2432,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 📋 **Body:**
 ```json
 {
-  "partnerId": 1,
+  "providerProfileId": 1,
   "revenuePeriod": "2026-09",
   "note": "Tất toán tháng 09/2026 cho Ban Quản lý Tràng An"
 }
@@ -2446,8 +2446,8 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
   "data": {
     "id": 801,
     "settlementCode": "ST9F3A2B1C4D5E6F708",
-    "partnerId": 1,
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerProfileId": 1,
+    "providerName": "Ban Quản lý Tràng An",
     "revenuePeriod": "2026-09",
     "periodStart": "2026-09-01",
     "periodEnd": "2026-09-30",
@@ -2491,7 +2491,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
     {
       "id": 901,
       "settlementId": 801,
-      "partnerRevenueId": 301,
+      "providerRevenueId": 301,
       "bookingId": 101,
       "bookingCode": "JG9F3A2B1C4D5E6F708",
       "paymentId": 501,
@@ -2502,7 +2502,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
       "commissionRate": 0.2500,
       "commissionAmount": 187500.00,
       "adjustmentAmount": 0,
-      "partnerNetAmount": 562500.00,
+      "providerNetAmount": 562500.00,
       "status": "IN_SETTLEMENT"
     }
   ],
@@ -2530,8 +2530,8 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
   "data": {
     "id": 801,
     "settlementCode": "ST9F3A2B1C4D5E6F708",
-    "partnerId": 1,
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerProfileId": 1,
+    "providerName": "Ban Quản lý Tràng An",
     "revenuePeriod": "2026-09",
     "periodStart": "2026-09-01",
     "periodEnd": "2026-09-30",
@@ -2555,15 +2555,15 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 
 ✅ **Kiểm tra 4 thứ đổi cùng lúc (cùng 1 transaction):**
 
-▶ **GET** `/api/v1/wallets/partner/{partnerId}` → số dư ví
+▶ **GET** `/api/v1/wallets/provider-profile/{providerProfileId}` → số dư ví
 ```json
 {
   "code": 200,
   "message": "Lấy thông tin ví thành công",
   "data": {
     "id": 1,
-    "partnerId": 1,
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerProfileId": 1,
+    "providerName": "Ban Quản lý Tràng An",
     "balance": 562500.00,
     "currency": "VND",
     "createdAt": "2026-11-20T02:00:00Z",
@@ -2573,7 +2573,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 }
 ```
 
-▶ **GET** `/api/v1/wallets/partner/{partnerId}/transactions`
+▶ **GET** `/api/v1/wallets/provider-profile/{providerProfileId}/transactions`
 ```json
 {
   "code": 200,
@@ -2607,7 +2607,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 }
 ```
 
-▶ **GET** `/api/v1/partner-revenues/partners/{partnerId}`
+▶ **GET** `/api/v1/provider-revenues/provider-profile/{providerProfileId}`
 ```json
 {
   "code": 200,
@@ -2623,7 +2623,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
         "commissionRate": 0.2500,
         "commissionAmount": 187500.00,
         "adjustmentAmount": 0,
-        "partnerNetAmount": 562500.00,
+        "providerNetAmount": 562500.00,
         "status": "SETTLED",
         "deferredReason": null,
         "settlementId": 801,
@@ -2641,7 +2641,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 | Settlement | `status = APPROVED`, `approvedBy` khác null, `approvedAt` khác null |
 | Wallet | `balance = 562500.00` |
 | WalletTransaction | **đúng 1** dòng, `transactionType = SETTLEMENT_CREDIT`, `direction = CREDIT`, `sourceType = SETTLEMENT`, `sourceId = 801` |
-| PartnerRevenue | `status = SETTLED`, `settlementId = 801`, `settledAt` khác null |
+| ProviderRevenue | `status = SETTLED`, `settlementId = 801`, `settledAt` khác null |
 
 > 📌 Ràng buộc `uk_wallet_txn_settlement_credit` trên `(wallet_id, source_type, source_id)` bảo đảm **một Settlement chỉ tạo được một giao dịch cộng tiền**.
 
@@ -2673,7 +2673,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 📋 **Body:**
 ```json
 {
-  "partnerId": 1,
+  "providerProfileId": 1,
   "revenuePeriod": "2026-11",
   "note": "Test kỳ chưa kết thúc"
 }
@@ -2695,7 +2695,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 📋 **Body:**
 ```json
 {
-  "partnerId": 1,
+  "providerProfileId": 1,
   "revenuePeriod": "2026-09",
   "note": "Test trùng kỳ"
 }
@@ -2758,8 +2758,8 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
   "data": {
     "id": 802,
     "settlementCode": "ST2A4B5C6D7E8F901234",
-    "partnerId": 1,
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerProfileId": 1,
+    "providerName": "Ban Quản lý Tràng An",
     "revenuePeriod": "2026-09",
     "periodStart": "2026-09-01",
     "periodEnd": "2026-09-30",
@@ -2782,8 +2782,8 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 ```
 
 ✅ **Kiểm tra:**
-▶ **GET** `/api/v1/wallets/partner/{partnerId}` → `balance` **không đổi** (từ chối không ghi tiền vào ví).
-▶ **GET** `/api/v1/partner-revenues/partners/{partnerId}` → `status` quay lại `ELIGIBLE` hoặc `PENDING` (không phải `SETTLED`), `settlementId = null`.
+▶ **GET** `/api/v1/wallets/provider-profile/{providerProfileId}` → `balance` **không đổi** (từ chối không ghi tiền vào ví).
+▶ **GET** `/api/v1/provider-revenues/provider-profile/{providerProfileId}` → `status` quay lại `ELIGIBLE` hoặc `PENDING` (không phải `SETTLED`), `settlementId = null`.
 
 > ⚠️ **Đợt đã `APPROVED` không thể từ chối** → HTTP 409. Muốn đảo ngược phải dùng khoản điều chỉnh tài chính (PHẦN E).
 
@@ -2810,7 +2810,7 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
     "first": true,
     "last": true,
     "content": [
-      { "id": 801, "settlementCode": "ST9F3A2B1C4D5E6F708", "partnerId": 1, "partnerName": "Ban Quản lý Tràng An", "revenuePeriod": "2026-09", "grossAmount": 1500000.00, "refundAmount": 750000.00, "commissionAmount": 187500.00, "adjustmentAmount": 0.00, "settlementAmount": 562500.00, "status": "APPROVED", "createdBy": 1, "approvedBy": 1, "createdAt": "2026-11-20T07:00:00Z", "approvedAt": "2026-11-20T07:05:00Z", "rejectionReason": null, "note": "Tất toán tháng 09/2026", "detailCount": 1 }
+      { "id": 801, "settlementCode": "ST9F3A2B1C4D5E6F708", "providerProfileId": 1, "providerName": "Ban Quản lý Tràng An", "revenuePeriod": "2026-09", "grossAmount": 1500000.00, "refundAmount": 750000.00, "commissionAmount": 187500.00, "adjustmentAmount": 0.00, "settlementAmount": 562500.00, "status": "APPROVED", "createdBy": 1, "approvedBy": 1, "createdAt": "2026-11-20T07:00:00Z", "approvedAt": "2026-11-20T07:05:00Z", "rejectionReason": null, "note": "Tất toán tháng 09/2026", "detailCount": 1 }
     ]
   },
   "timestamp": "2026-11-20T07:40:00Z"
@@ -2819,11 +2819,11 @@ Ví dụ nếu hôm nay là `2026-11-20` → `2026-09`.
 
 ---
 
-## D.11. Settlement của một Partner
+## D.11. Settlement của một đối tác
 
 🟦 **Settlement (Tất toán)**
 
-▶ **GET** `/api/v1/settlements/partner/{partnerId}`
+▶ **GET** `/api/v1/settlements/provider-profile/{providerProfileId}`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 📋 **Query:** `page=0`, `size=20`
 
@@ -2896,9 +2896,9 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 
 ## E.2. Kiểm tra doanh thu đã SETTLED không bị sửa
 
-🟦 **Partner Revenue (Doanh thu đối tác)**
+🟦 **Provider Revenue (Doanh thu đối tác)**
 
-▶ **GET** `/api/v1/partner-revenues/{revenueId}`
+▶ **GET** `/api/v1/provider-revenues/{revenueId}`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 
 ✅ **Kết quả:**
@@ -2908,8 +2908,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
   "message": "Lấy thông tin doanh thu thành công",
   "data": {
     "id": 301,
-    "partnerId": 1,
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerProfileId": 1,
+    "providerName": "Ban Quản lý Tràng An",
     "bookingId": 101,
     "bookingCode": "JG9F3A2B1C4D5E6F708",
     "paymentId": 501,
@@ -2921,7 +2921,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
     "commissionRate": 0.2500,
     "commissionAmount": 187500.00,
     "adjustmentAmount": 0,
-    "partnerNetAmount": 562500.00,
+    "providerNetAmount": 562500.00,
     "status": "SETTLED",
     "deferredReason": null,
     "settlementId": 801,
@@ -2960,8 +2960,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
     "content": [
       {
         "id": 902,
-        "partnerId": 1,
-        "partnerName": "Ban Quản lý Tràng An",
+        "providerProfileId": 1,
+        "providerName": "Ban Quản lý Tràng An",
         "refundRequestId": 704,
         "sourceSettlementId": 801,
         "amount": -187500.00,
@@ -2979,7 +2979,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 }
 ```
 
-> 📌 **Công thức adjustment âm:** `refundedAmount × partnerNetAmount ÷ paymentAmount` → ở đây `750.000 × 562.500 ÷ 1.500.000 = 281.250`. Giá trị thực tế sẽ khác tuỳ dữ liệu — hãy lấy từ response.
+> 📌 **Công thức adjustment âm:** `refundedAmount × providerNetAmount ÷ paymentAmount` → ở đây `750.000 × 562.500 ÷ 1.500.000 = 281.250`. Giá trị thực tế sẽ khác tuỳ dữ liệu — hãy lấy từ response.
 
 ---
 
@@ -2993,7 +2993,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 📋 **Body:**
 ```json
 {
-  "partnerId": 1,
+  "providerProfileId": 1,
   "amount": -150000.00,
   "reason": "Hoàn tiền phát sinh sau khi đã tất toán kỳ 2026-09",
   "refundRequestId": 704,
@@ -3008,8 +3008,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
   "message": "Ghi nhận khoản điều chỉnh tài chính thành công",
   "data": {
     "id": 903,
-    "partnerId": 1,
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerProfileId": 1,
+    "providerName": "Ban Quản lý Tràng An",
     "refundRequestId": 704,
     "sourceSettlementId": 801,
     "amount": -150000.00,
@@ -3046,8 +3046,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
   "message": "Phê duyệt khoản điều chỉnh tài chính thành công",
   "data": {
     "id": 903,
-    "partnerId": 1,
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerProfileId": 1,
+    "providerName": "Ban Quản lý Tràng An",
     "refundRequestId": 704,
     "sourceSettlementId": 801,
     "amount": -150000.00,
@@ -3065,9 +3065,9 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 
 ✅ **Kiểm tra:**
 
-▶ **GET** `/api/v1/wallets/partner/{partnerId}` → `balance = 562500.00 − 150000.00 = 412500.00`
+▶ **GET** `/api/v1/wallets/provider-profile/{providerProfileId}` → `balance = 562500.00 − 150000.00 = 412500.00`
 
-▶ **GET** `/api/v1/wallets/partner/{partnerId}/transactions`
+▶ **GET** `/api/v1/wallets/provider-profile/{providerProfileId}/transactions`
 ```json
 {
   "code": 200,
@@ -3122,7 +3122,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 📋 **Body:**
 ```json
 {
-  "partnerId": 1,
+  "providerProfileId": 1,
   "amount": -999999999.00,
   "reason": "Test vượt số dư ví"
 }
@@ -3135,7 +3135,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
   "message": "Ghi nhận khoản điều chỉnh tài chính thành công",
   "data": {
     "id": 904,
-    "partnerId": 1,
+    "providerProfileId": 1,
     "amount": -999999999.00,
     "status": "PENDING",
     "reason": "Test vượt số dư ví",
@@ -3161,8 +3161,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 }
 ```
 
-▶ **GET** `/api/v1/wallets/partner/{partnerId}` → `balance` **không đổi** (không tạo số dư âm).
-▶ **GET** `/api/v1/wallets/partner/{partnerId}/transactions` → có 1 dòng `status = PENDING`, `direction = DEBIT`.
+▶ **GET** `/api/v1/wallets/provider-profile/{providerProfileId}` → `balance` **không đổi** (không tạo số dư âm).
+▶ **GET** `/api/v1/wallets/provider-profile/{providerProfileId}/transactions` → có 1 dòng `status = PENDING`, `direction = DEBIT`.
 
 > ⚠️ Đây là hành vi **có chủ đích**: hệ thống không tạo số dư âm không kiểm soát, mà ghi nhận khoản phải thu để xử lý riêng.
 
@@ -3185,8 +3185,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
   "message": "Từ chối khoản điều chỉnh tài chính thành công",
   "data": {
     "id": 904,
-    "partnerId": 1,
-    "partnerName": "Ban Quản lý Tràng An",
+    "providerProfileId": 1,
+    "providerName": "Ban Quản lý Tràng An",
     "amount": -999999999.00,
     "currency": "VND",
     "reason": "Test vượt số dư ví",
@@ -3200,15 +3200,15 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 }
 ```
 
-✅ **Kiểm tra:** `GET /api/v1/wallets/partner/{partnerId}` → `balance` **không đổi**.
+✅ **Kiểm tra:** `GET /api/v1/wallets/provider-profile/{providerProfileId}` → `balance` **không đổi**.
 
 ---
 
-## E.8. Khoản điều chỉnh của một Partner
+## E.8. Khoản điều chỉnh của một đối tác
 
 🟦 **Financial Adjustment (Điều chỉnh tài chính)**
 
-▶ **GET** `/api/v1/financial-adjustments/partner/{partnerId}`
+▶ **GET** `/api/v1/financial-adjustments/provider-profile/{providerProfileId}`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 📋 **Query:** `page=0`, `size=20`
 
@@ -3227,8 +3227,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
     "content": [
       {
         "id": 902,
-        "partnerId": 1,
-        "partnerName": "Ban Quản lý Tràng An",
+        "providerProfileId": 1,
+        "providerName": "Ban Quản lý Tràng An",
         "refundRequestId": 704,
         "sourceSettlementId": 801,
         "amount": -187500.00,
@@ -3242,8 +3242,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
       },
       {
         "id": 903,
-        "partnerId": 1,
-        "partnerName": "Ban Quản lý Tràng An",
+        "providerProfileId": 1,
+        "providerName": "Ban Quản lý Tràng An",
         "refundRequestId": 704,
         "sourceSettlementId": 801,
         "amount": -150000.00,
@@ -3275,7 +3275,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 | Refund 50% | 6 | Lặp C.1 → C.8 → C.9 | 6 `REFUNDED` |
 | Refund 100% | 3 | Lặp C.2 → C.8 → C.9 | 3 `REFUNDED` |
 | Refund chờ duyệt | 2 | Lặp C.1 (bỏ qua C.8) | 2 `PENDING_REVIEW` → giữ doanh thu ở `held` |
-| Partner | 4 | Lặp BƯỚC 0.4 với 4 `userId` khác nhau | 4 partner, tỷ lệ 20%/25%/15%/30% |
+| ProviderProfile | 4 | Lặp BƯỚC 0.4 với 4 `userId` khác nhau | 4 đối tác, tỷ lệ 20%/25%/15%/30% |
 | Kỳ tất toán | 3 | D.1 → D.2 → D.4 cho 3 kỳ | 3 settlement `APPROVED` |
 
 > 📌 **Mẹo tăng tốc:** dùng `POST /api/v1/journeys` + `PATCH .../skip` cho từng booking thay vì làm thủ công từng nhiệm vụ — `SKIPPED` cũng được tính là hoàn thành.
@@ -3392,11 +3392,11 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 
 ---
 
-## F.5. Thống kê doanh thu theo Partner
+## F.5. Thống kê doanh thu theo đối tác
 
-🟦 **Partner Revenue (Doanh thu đối tác)**
+🟦 **Provider Revenue (Doanh thu đối tác)**
 
-▶ **GET** `/api/v1/partner-revenues`
+▶ **GET** `/api/v1/provider-revenues`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 📋 **Query:** `page=0`, `size=100`
 
@@ -3415,8 +3415,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
     "content": [
       {
         "id": 301,
-        "partnerId": 1,
-        "partnerName": "Ban Quản lý Tràng An",
+        "providerProfileId": 1,
+        "providerName": "Ban Quản lý Tràng An",
         "bookingId": 101,
         "bookingCode": "JG9F3A2B1C4D5E6F708",
         "paymentId": 501,
@@ -3428,7 +3428,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
         "commissionRate": 0.2500,
         "commissionAmount": 187500.00,
         "adjustmentAmount": 0,
-        "partnerNetAmount": 562500.00,
+        "providerNetAmount": 562500.00,
         "status": "SETTLED",
         "deferredReason": null,
         "settlementId": 801,
@@ -3438,8 +3438,8 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
       },
       {
         "id": 302,
-        "partnerId": 2,
-        "partnerName": "Ban Quản lý Hạ Long",
+        "providerProfileId": 2,
+        "providerName": "Ban Quản lý Hạ Long",
         "bookingId": 102,
         "bookingCode": "JG2A3B4C5D6E7F809A1B",
         "paymentId": 502,
@@ -3451,7 +3451,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
         "commissionRate": 0.2000,
         "commissionAmount": 300000.00,
         "adjustmentAmount": 0,
-        "partnerNetAmount": 1200000.00,
+        "providerNetAmount": 1200000.00,
         "status": "ELIGIBLE",
         "deferredReason": null,
         "settlementId": null,
@@ -3488,9 +3488,9 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
     "first": true,
     "last": true,
     "content": [
-      { "id": 801, "settlementCode": "ST9F3A2B1C4D5E6F708", "partnerId": 1, "partnerName": "Ban Quản lý Tràng An", "revenuePeriod": "2026-07", "grossAmount": 9000000.00, "refundAmount": 1500000.00, "commissionAmount": 1875000.00, "adjustmentAmount": 0.00, "settlementAmount": 5625000.00, "status": "APPROVED" },
-      { "id": 802, "settlementCode": "ST2A4B5C6D7E8F901234", "partnerId": 1, "partnerName": "Ban Quản lý Tràng An", "revenuePeriod": "2026-08", "grossAmount": 12000000.00, "refundAmount": 0.00, "commissionAmount": 3000000.00, "adjustmentAmount": 0.00, "settlementAmount": 9000000.00, "status": "APPROVED" },
-      { "id": 803, "settlementCode": "ST3B4C5D6E7F8012345", "partnerId": 1, "partnerName": "Ban Quản lý Tràng An", "revenuePeriod": "2026-09", "grossAmount": 15000000.00, "refundAmount": 7500000.00, "commissionAmount": 1875000.00, "adjustmentAmount": 0.00, "settlementAmount": 5625000.00, "status": "APPROVED" }
+      { "id": 801, "settlementCode": "ST9F3A2B1C4D5E6F708", "providerProfileId": 1, "providerName": "Ban Quản lý Tràng An", "revenuePeriod": "2026-07", "grossAmount": 9000000.00, "refundAmount": 1500000.00, "commissionAmount": 1875000.00, "adjustmentAmount": 0.00, "settlementAmount": 5625000.00, "status": "APPROVED" },
+      { "id": 802, "settlementCode": "ST2A4B5C6D7E8F901234", "providerProfileId": 1, "providerName": "Ban Quản lý Tràng An", "revenuePeriod": "2026-08", "grossAmount": 12000000.00, "refundAmount": 0.00, "commissionAmount": 3000000.00, "adjustmentAmount": 0.00, "settlementAmount": 9000000.00, "status": "APPROVED" },
+      { "id": 803, "settlementCode": "ST3B4C5D6E7F8012345", "providerProfileId": 1, "providerName": "Ban Quản lý Tràng An", "revenuePeriod": "2026-09", "grossAmount": 15000000.00, "refundAmount": 7500000.00, "commissionAmount": 1875000.00, "adjustmentAmount": 0.00, "settlementAmount": 5625000.00, "status": "APPROVED" }
     ]
   },
   "timestamp": "2026-11-20T09:04:00Z"
@@ -3503,7 +3503,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 
 🟦 **Wallet (Ví nội bộ)**
 
-▶ **GET** `/api/v1/wallets/partner/{partnerId}/transactions`
+▶ **GET** `/api/v1/wallets/provider-profile/{providerProfileId}/transactions`
 🔑 `Bearer {{ADMIN_TOKEN}}`
 📋 **Query:** `page=0`, `size=100`
 
@@ -3544,7 +3544,7 @@ UPDATE payments SET paid_at = NOW() - INTERVAL '2 hours' WHERE id = 501;
 | Refund `REFUNDED` | `GET /api/v1/refunds` | 9 |
 | Refund `PENDING_REVIEW` | `GET /api/v1/refunds` | 2 |
 | Settlement `APPROVED` | `GET /api/v1/settlements` | 3 |
-| Tổng tiền trong ví | `GET /api/v1/wallets/partner/{partnerId}` | 20.100.000 |
+| Tổng tiền trong ví | `GET /api/v1/wallets/provider-profile/{providerProfileId}` | 20.100.000 |
 | Tổng giao dịch ví | `GET .../transactions` | 4 (3 CREDIT + 1 DEBIT) |
 
 **Bất biến phải đạt:**
@@ -3582,7 +3582,7 @@ Tổng gross − tổng refund = tổng net, và commission = net × rate
 | `Đã có đợt tất toán nháp đang chờ xử lý cho kỳ...` | 409 `SETTLEMENT_ALREADY_EXISTS` | Đợt nháp cùng kỳ còn tồn tại | Từ chối/hủy đợt cũ trước |
 | `Không có khoản doanh thu nào đủ điều kiện để tất toán` | 400 `SETTLEMENT_NO_ELIGIBLE_REVENUE` | Chưa có revenue `ELIGIBLE` | Kiểm tra 8 check ở B.6 |
 | `Điều kiện tất toán đã thay đổi...` | 409 `SETTLEMENT_ELIGIBILITY_CHANGED` | Điều kiện đổi sau khi tạo bản nháp | Tạo settlement mới |
-| Không thấy doanh thu | — | Người tạo Experience chưa có Partner | Tạo Partner cho user đó (BƯỚC 0.4) |
-| `Người dùng này đã là đối tác` | 409 `PARTNER_ALREADY_EXISTS` | User đã là Partner | Dùng user khác hoặc `PUT /api/v1/partners/{partnerId}` |
+| Không thấy doanh thu | — | Người tạo Experience chưa có ProviderProfile | Tạo ProviderProfile cho user đó (BƯỚC 0.4) |
+| `Người dùng này đã là đối tác` | 409 `PROVIDER_PROFILE_ALREADY_EXISTS` | User đã là đối tác | Dùng user khác hoặc `PUT /api/v1/provider-profiles/{providerProfileId}` |
 | `Người dùng không tồn tại` | 404 `USER_NOT_EXISTED` | `userId` không tồn tại | Lấy `data.user.id` từ BƯỚC 0.1 |
 | Adjustment approve trả 201 nhưng ví không đổi | — | Số dư không đủ → giao dịch `PENDING` | Xem `transactions` → `status = PENDING` là khoản phải thu |

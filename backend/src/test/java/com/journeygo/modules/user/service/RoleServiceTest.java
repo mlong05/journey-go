@@ -48,9 +48,9 @@ class RoleServiceTest {
     @Test
     @DisplayName("Tạo vai trò mới thành công với tên được chuẩn hóa chữ hoa")
     void createRole_Success() {
-        CreateRoleRequest request = new CreateRoleRequest("partner", "Đối tác ngoài");
+        CreateRoleRequest request = new CreateRoleRequest("content_provider", "Đối tác cung cấp nội dung");
 
-        when(roleRepository.existsByName("PARTNER")).thenReturn(false);
+        when(roleRepository.existsByName("CONTENT_PROVIDER")).thenReturn(false);
         when(roleRepository.save(any(Role.class))).thenAnswer(invocation -> {
             Role r = invocation.getArgument(0);
             r.setId(10L);
@@ -61,8 +61,8 @@ class RoleServiceTest {
 
         assertNotNull(response);
         assertEquals(10L, response.id());
-        assertEquals("PARTNER", response.name());
-        assertEquals("Đối tác ngoài", response.description());
+        assertEquals("CONTENT_PROVIDER", response.name());
+        assertEquals("Đối tác cung cấp nội dung", response.description());
         assertFalse(response.isSystem());
         verify(roleRepository).save(any(Role.class));
     }

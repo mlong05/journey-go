@@ -101,11 +101,11 @@ const loginWithGoogle = async (idToken, desiredRole = "USER") => {
       targetPath = ROUTES.ADMIN || "/admin";
       roleTitle = "Quản trị viên";
       roleScope = "Quản trị hệ thống & vận hành";
-    } else if (roleStr === "MODERATOR") {
+    } else if (roleStr === "CONTENT_MODERATOR") {
       targetPath = ROUTES.MODERATOR || "/moderator";
       roleTitle = "Kiểm duyệt viên";
       roleScope = "Thẩm định hồ sơ & nội dung";
-    } else if (roleStr === "PROVIDER") {
+    } else if (roleStr === "CONTENT_PROVIDER") {
       targetPath = ROUTES.PROVIDER || "/provider";
       roleTitle = "Đối tác Điểm đến";
       roleScope = "Quản lý di tích & tour";
