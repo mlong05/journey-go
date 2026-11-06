@@ -130,7 +130,7 @@ public class ExperienceService {
         Destination destination = e.getDestination();
         if (destination == null || !destination.isApproved()) return;
         notifications.send(NotificationType.EXPERIENCE_PENDING)
-                .toRole(Role.MODERATOR)
+                .toRole(Role.CONTENT_MODERATOR)
                 .title(edited ? "Trải nghiệm được cập nhật, cần duyệt lại" : "Trải nghiệm mới chờ duyệt")
                 .body(NotificationPublisher.quote(e.getTitle()) + " tại " + NotificationPublisher.quote(destination.getName())
                         + " đang chờ bạn thẩm định.")
@@ -289,7 +289,7 @@ public class ExperienceService {
         }
         if (e.getStatus() == ExperienceStatus.DRAFT) {
             try {
-                if (AuthorizationGuard.isAdmin() || AuthorizationGuard.hasRole("MODERATOR")) {
+                if (AuthorizationGuard.isAdmin() || AuthorizationGuard.hasRole("CONTENT_MODERATOR")) {
                     return true;
                 }
                 Long ownerId = e.getCreatedBy() != null ? e.getCreatedBy().getId() : null;

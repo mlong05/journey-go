@@ -47,7 +47,7 @@ public class CheckInPointController {
 
     @PostMapping("/experiences/{experienceId}/check-in-points")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
     @Operation(summary = "Tạo CheckInPoint (chỉ khi Experience DRAFT, chỉ owner) — BR-CIP-1: qr_token UNIQUE")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
@@ -65,7 +65,7 @@ public class CheckInPointController {
 
     @PatchMapping("/check-in-points/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfCheckInPoint(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfCheckInPoint(#id)")
     @Operation(summary = "Cập nhật CheckInPoint (chỉ khi Experience DRAFT, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -81,7 +81,7 @@ public class CheckInPointController {
 
     @PostMapping("/check-in-points/{id}/qr/regenerate")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfCheckInPoint(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfCheckInPoint(#id)")
     @Operation(summary = "Tạo lại mã QR của trạm check-in (chỉ owner)",
             description = "Dùng khi mã cũ bị lộ. Được phép cả khi Experience đã PUBLISHED vì chỉ đổi mã. "
                     + "Mã cũ hết hiệu lực ngay, cần in lại QR.")
@@ -92,7 +92,7 @@ public class CheckInPointController {
 
     @DeleteMapping("/check-in-points/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('PROVIDER','ADMIN') and @experienceSecurityBean.isOwnerOfCheckInPoint(#id)")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfCheckInPoint(#id)")
     @Operation(summary = "Xóa CheckInPoint (chỉ khi Experience DRAFT, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
