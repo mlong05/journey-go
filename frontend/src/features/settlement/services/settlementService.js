@@ -1,27 +1,27 @@
 /**
- * Service cho module Settlement (Tất toán) + Partner Revenue + Wallet.
+ * Service cho module Settlement (Tất toán) + Provider Revenue + Wallet.
  *
  * ── Contract ──
- *  • GET  /settlements/candidates?partnerId=&revenuePeriod= → SettlementCandidatesResponse
- *  • POST /settlements                    (ADMIN) body: { partnerId, revenuePeriod, note }
+ *  • GET  /settlements/candidates?providerProfileId=&revenuePeriod= → SettlementCandidatesResponse
+ *  • POST /settlements                    (ADMIN) body: { providerProfileId, revenuePeriod, note }
  *  • POST /settlements/{id}/approve       (ADMIN)
  *  • POST /settlements/{id}/reject        (ADMIN) body: { reason }
  *  • GET  /settlements/{id}               → SettlementResponse
  *  • GET  /settlements/{id}/details       → SettlementDetailResponse[]
  *  • GET  /settlements?status=            (ADMIN)
- *  • GET  /settlements/partner/{partnerId}
+ *  • GET  /settlements/provider-profile/{providerProfileId}
  *
- *  • GET  /partner-revenues/partners/{partnerId}
- *  • GET  /partner-revenues/{revenueId}/eligibility → 9 điều kiện tất toán
+ *  • GET  /provider-revenues/provider-profile/{providerProfileId}
+ *  • GET  /provider-revenues/{revenueId}/eligibility → 9 điều kiện tất toán
  *
- *  • GET  /wallets/partner/{partnerId}
- *  • GET  /wallets/partner/{partnerId}/transactions
+ *  • GET  /wallets/provider-profile/{providerProfileId}
+ *  • GET  /wallets/provider-profile/{providerProfileId}/transactions
  *
  * ── Luật nghiệp vụ ──
  *  • Kỳ doanh thu là THÁNG DƯƠNG LỊCH đã đóng (`YYYY-MM`). Backend từ chối tạo settlement
  *    cho kỳ chưa kết thúc (`SETTLEMENT_PERIOD_NOT_CLOSED`).
  *  • `POST /settlements` KHÔNG nhận danh sách revenueId — backend tự lấy các khoản ELIGIBLE
- *    của partner trong kỳ và chuyển chúng sang IN_SETTLEMENT.
+ *    của đối tác trong kỳ và chuyển chúng sang IN_SETTLEMENT.
  *  • Duyệt settlement ghi tiền vào ví trong CÙNG một transaction (nguyên tử).
  *    Đợt đã duyệt không thể từ chối — phải dùng khoản điều chỉnh tài chính.
  */
@@ -30,9 +30,9 @@ import { apiClient } from "@/services/apiClient";
 const ENDPOINT = "/settlements";
 
 /** Ứng viên tất toán của một đối tác theo kỳ (đánh giá lại 9 điều kiện tại thời điểm gọi). */
-export async function getSettlementCandidates(partnerId, revenuePeriod) {
+export async function getSettlementCandidates(providerProfileId, revenuePeriod) {
   const query = new URLSearchParams({
-    partnerId: String(partnerId),
+    providerProfileId: String(providerProfileId),
     revenuePeriod: String(revenuePeriod),
   });
   const res = await apiClient.get(`${ENDPOINT}/candidates?${query.toString()}`);
@@ -40,8 +40,8 @@ export async function getSettlementCandidates(partnerId, revenuePeriod) {
 }
 
 /** Tạo bản nháp đợt tất toán (chỉ kỳ đã đóng). */
-export async function createSettlement({ partnerId, revenuePeriod, note }) {
-  const res = await apiClient.post(ENDPOINT, { partnerId, revenuePeriod, note });
+export async function createSettlement({ providerProfileId, revenuePeriod, note }) {
+  const res = await apiClient.post(ENDPOINT, { providerProfileId, revenuePeriod, note });
   return res?.data ?? res;
 }
 
@@ -93,7 +93,9 @@ export async function getPlatformRevenueSummary(periods = 12) {
 }
 
 /** Danh sách đợt tất toán của một đối tác. */
-export async function getSettlementsByPartner(partnerId, { page = 0, size = 20 } = {}) {
-  const res = await apiClient.get(`${ENDPOINT}/partner/${partnerId}?page=${page}&size=${size}`);
+export async function getSettlementsByProviderProfile(providerProfileId, { page = 0, size = 20 } = {}) {
+  const res = await apiClient.get(
+    `${ENDPOINT}/provider-profile/${providerProfileId}?page=${page}&size=${size}`,
+  );
   return res?.data ?? res;
 }
