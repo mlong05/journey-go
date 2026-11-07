@@ -93,6 +93,31 @@ public enum ErrorCode {
     FINANCIAL_ADJUSTMENT_NOT_FOUND("Khoản điều chỉnh tài chính không tồn tại", HttpStatus.NOT_FOUND),
     WALLET_INSUFFICIENT_BALANCE("Số dư ví không đủ để thực hiện khoản khấu trừ", HttpStatus.CONFLICT),
 
+    // ── Partner Application (Đăng ký đối tác) ───────────────────────────────────
+    PARTNER_NOT_FOUND("Đối tác không tồn tại", HttpStatus.NOT_FOUND),
+    PARTNER_ALREADY_EXISTS("Người dùng này đã là đối tác", HttpStatus.CONFLICT),
+    PARTNER_REVENUE_NOT_FOUND("Bản ghi doanh thu không tồn tại", HttpStatus.NOT_FOUND),
+    PARTNER_APPLICATION_NOT_FOUND("Đơn đăng ký đối tác không tồn tại", HttpStatus.NOT_FOUND),
+    PARTNER_APPLICATION_ALREADY_EXISTS("Bạn đã có một đơn đăng ký đối tác đang được xử lý", HttpStatus.CONFLICT),
+    PARTNER_APPLICATION_DUPLICATE("Đã tồn tại đơn đăng ký đối tác đang chờ duyệt cho email hoặc doanh nghiệp này", HttpStatus.CONFLICT),
+    PARTNER_APPLICATION_INVALID_STATUS("Trạng thái đơn đăng ký không cho phép thao tác này", HttpStatus.BAD_REQUEST),
+    PARTNER_APPLICATION_EMAIL_NOT_VERIFIED("Email chưa được xác minh — vui lòng xác thực OTP trước", HttpStatus.BAD_REQUEST),
+    PARTNER_APPLICATION_INCOMPLETE("Hồ sơ đăng ký chưa đầy đủ, vui lòng bổ sung các trường còn thiếu", HttpStatus.BAD_REQUEST),
+    PARTNER_APPLICATION_REJECTION_REASON_REQUIRED("Lý do từ chối không được để trống", HttpStatus.BAD_REQUEST),
+    PARTNER_OTP_LIMIT_EXCEEDED("Bạn đã yêu cầu gửi mã xác thực quá 3 lần trong ngày. Vui lòng thử lại sau", HttpStatus.TOO_MANY_REQUESTS),
+    PARTNER_OTP_ATTEMPT_LIMIT_EXCEEDED("Bạn đã nhập sai mã xác thực quá 5 lần. Vui lòng yêu cầu mã mới", HttpStatus.TOO_MANY_REQUESTS),
+    PARTNER_OTP_INVALID("Mã xác thực không đúng hoặc đã hết hạn", HttpStatus.BAD_REQUEST),
+    PARTNER_OTP_EXPIRED("Mã xác thực đã hết hạn, vui lòng yêu cầu mã mới", HttpStatus.BAD_REQUEST),
+
+    // ── Commission Policy (Quản lý chính sách hoa hồng) ─────────────────────────
+    COMMISSION_POLICY_NOT_FOUND("Chính sách hoa hồng không tồn tại", HttpStatus.NOT_FOUND),
+    COMMISSION_POLICY_INVALID_RATE("Tỷ lệ hoa hồng phải lớn hơn 0% và nhỏ hơn 100%", HttpStatus.BAD_REQUEST),
+    COMMISSION_POLICY_OVERLAPPING("Thời gian hiệu lực chồng lấn với một chính sách đang có hiệu lực", HttpStatus.CONFLICT),
+    COMMISSION_POLICY_ALREADY_ACTIVE("Đã có một chính sách đang có hiệu lực tại thời điểm này", HttpStatus.CONFLICT),
+    COMMISSION_POLICY_IMMUTABLE("Chính sách đã có hiệu lực không được chỉnh sửa trực tiếp — hãy tạo chính sách mới", HttpStatus.CONFLICT),
+    COMMISSION_POLICY_NOT_CANCELLABLE("Chỉ có thể hủy chính sách chưa tới ngày hiệu lực", HttpStatus.CONFLICT),
+    COMMISSION_POLICY_REASON_REQUIRED("Lý do thay đổi không được để trống", HttpStatus.BAD_REQUEST),
+
     // ── Notification ──────────────────────────────────────────────────────────
     NOTIFICATION_NOT_FOUND("Thông báo không tồn tại", HttpStatus.NOT_FOUND);
 
