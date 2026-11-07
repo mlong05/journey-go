@@ -7,31 +7,42 @@ import { Menu, X, LogIn, ArrowRight } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 
 const NAV_LINKS = [
+  { href: "#chu-de", label: "Chủ đề" },
   { href: "#trai-nghiem", label: "Trải nghiệm" },
   { href: "#diem-den", label: "Điểm đến" },
   { href: "#lich-trinh", label: "Lịch trình" },
   { href: "#cau-chuyen-host", label: "Host bản địa" },
 ];
 
-export function BrandLogo({ subtitle = true }) {
+/**
+ * Logo thương hiệu — cùng bộ ảnh với trang đăng nhập và thanh bên dashboard
+ * (biểu tượng + chữ "JourneyGo!" kèm khẩu hiệu).
+ * Dùng bản ảnh nền trong suốt (`*-clear.png`) để hoà vào header.
+ * `light`: đang nằm trên ảnh hero tối ⇒ dùng bản chữ sáng (chữ trắng, giữ "Go!" màu cam).
+ */
+export function BrandLogo({ light = false }) {
   return (
-    <Link href={ROUTES.HOME} className="flex items-center gap-2.5 shrink-0">
+    <Link
+      href={ROUTES.HOME}
+      title="Về trang chủ JourneyGo"
+      className="flex items-center gap-1.5 shrink-0 min-w-0"
+    >
       <Image
-        src="/image/logo-mark.png"
+        src="/image/logo-emblem-clear.png"
         alt="JourneyGo"
-        width={96}
-        height={96}
+        width={372}
+        height={380}
         priority
-        className="w-9 h-9 rounded-[22%]"
+        className="h-10 w-auto shrink-0"
       />
-      <div className="leading-tight">
-        <p className="text-[17px] font-semibold tracking-tight text-slate-900">
-          Journey<span className="text-rose-600">Go</span>
-        </p>
-        {subtitle && (
-          <p className="text-[11px] text-slate-500">Du lịch trải nghiệm</p>
-        )}
-      </div>
+      <Image
+        src={light ? "/image/logo-wordmark-light.png" : "/image/logo-wordmark-clear.png"}
+        alt="JourneyGo - đồng hành cùng bạn trong chuyến đi"
+        width={424}
+        height={104}
+        priority
+        className="h-8 w-auto min-w-0"
+      />
     </Link>
   );
 }
@@ -41,27 +52,36 @@ export default function LandingNavbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 8);
+    const handleScroll = () => setIsScrolled(window.scrollY > 24);
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Trong suốt khi nằm trên ảnh hero; chuyển nền trắng khi cuộn hoặc mở menu mobile.
+  const solid = isScrolled || isMobileMenuOpen;
+
   return (
     <header
-      className={`sticky top-0 z-50 bg-white/85 backdrop-blur-md border-b transition-colors ${
-        isScrolled ? "border-slate-200 shadow-xs" : "border-transparent"
+      className={`fixed inset-x-0 top-0 z-50 border-b transition-all duration-300 ${
+        solid
+          ? "bg-white/90 backdrop-blur-md border-slate-200 shadow-xs"
+          : "bg-gradient-to-b from-slate-950/50 to-transparent border-transparent"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-6">
-        <BrandLogo />
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-6 transition-all duration-300 ${solid ? "h-16" : "h-20"}`}>
+        <BrandLogo light={!solid} />
 
         <nav className="hidden md:flex items-center gap-1">
           {NAV_LINKS.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className="px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                solid
+                  ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  : "text-white/85 hover:text-white hover:bg-white/10"
+              }`}
             >
               {link.label}
             </a>
@@ -71,7 +91,11 @@ export default function LandingNavbar() {
         <div className="hidden md:flex items-center gap-2">
           <Link
             href={ROUTES.LOGIN}
-            className="h-9 px-3.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-1.5 transition-colors"
+            className={`h-9 px-3.5 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-colors ${
+              solid
+                ? "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                : "border-white/30 bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm"
+            }`}
           >
             <LogIn size={15} />
             Đăng nhập
@@ -88,7 +112,9 @@ export default function LandingNavbar() {
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen((v) => !v)}
-          className="md:hidden p-2 -mr-2 rounded-lg text-slate-700 hover:bg-slate-100"
+          className={`md:hidden p-2 -mr-2 rounded-lg transition-colors ${
+            solid ? "text-slate-700 hover:bg-slate-100" : "text-white hover:bg-white/10"
+          }`}
           aria-label={isMobileMenuOpen ? "Đóng menu" : "Mở menu"}
           aria-expanded={isMobileMenuOpen}
         >

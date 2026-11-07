@@ -138,9 +138,11 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <div className={SURFACE.page}>
+    // Khung 1 màn hình: trên desktop chỉ bảng giao dịch & danh sách phê duyệt tự cuộn;
+    // màn hình nhỏ không đủ chỗ nên cả trang cuộn như bình thường.
+    <div className="h-full min-h-0 flex flex-col gap-3 overflow-y-auto lg:overflow-hidden animate-in fade-in-50 duration-200">
       <PageHeader
-        eyebrow="Quản trị"
+        compact
         title="Tổng quan vận hành"
         description="Theo dõi người dùng, điểm đến, lượt kích hoạt và doanh số toàn sàn JourneyGo."
       >
@@ -156,13 +158,13 @@ export default function AdminDashboardPage() {
       </PageHeader>
 
       {error && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+        <div className="shrink-0 flex items-center gap-2 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
           <AlertTriangle size={15} className="shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <section className="shrink-0 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {kpiCards.map((card) => (
           <StatCard
             key={card.id}
@@ -172,6 +174,7 @@ export default function AdminDashboardPage() {
             icon={card.icon}
             tone={KPI_TONE[card.id]}
             badge={{ text: card.trend }}
+            compact
           />
         ))}
       </section>
@@ -179,10 +182,10 @@ export default function AdminDashboardPage() {
       {/* ────────────────────────────────────────────────────────
           3. KHỐI 2 CỘT GIÁM SÁT
       ──────────────────────────────────────────────────────── */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+      <section className="shrink-0 lg:shrink lg:flex-1 lg:min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
         {/* CỘT TRÁI (8/12): Giao Dịch Mới Nhất */}
-        <div className={`lg:col-span-8 ${SURFACE.card} overflow-hidden`}>
-          <div className={SURFACE.cardHeader}>
+        <div className={`lg:col-span-8 lg:min-h-0 ${SURFACE.card} overflow-hidden flex flex-col`}>
+          <div className={`${SURFACE.cardHeader} shrink-0 !px-4 !py-3`}>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center">
                 <CreditCard size={16} />
@@ -206,7 +209,7 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
 
-          <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
+          <div className="max-h-[520px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
             <table className={TABLE.base}>
               <thead className="sticky top-0 z-10">
                 <tr className={TABLE.theadRow}>
@@ -242,13 +245,13 @@ export default function AdminDashboardPage() {
                     const StatusIcon = status.icon;
                     return (
                       <tr key={tx.paymentId} className={TABLE.tr}>
-                        <td className={TABLE.td}>
+                        <td className={`${TABLE.td} !py-2.5`}>
                           <div className="font-bold text-slate-900">{tx.touristName || "Du khách"}</div>
                           <div className="text-[11px] font-mono text-slate-400 mt-0.5">
                             {tx.bookingCode || tx.txnRef}
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 max-w-[200px]">
+                        <td className="py-2.5 px-4 max-w-[200px]">
                           <p className="font-semibold text-slate-800 truncate" title={tx.tourTitle}>
                             {tx.tourTitle}
                           </p>
@@ -256,18 +259,18 @@ export default function AdminDashboardPage() {
                             {fmtDateTime(tx.paidAt || tx.createdAt)}
                           </p>
                         </td>
-                        <td className={TABLE.td}>
+                        <td className={`${TABLE.td} !py-2.5`}>
                           <span className={`${BADGE.base} ${BADGE.info}`}>
                             {tx.method}
                             {tx.bankCode ? ` · ${tx.bankCode}` : ""}
                           </span>
                         </td>
-                        <td className={TABLE.td}>
+                        <td className={`${TABLE.td} !py-2.5`}>
                           <span className="font-bold text-slate-900 tabular-nums">
                             {fmtNumber(tx.amount)} đ
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-right">
+                        <td className="py-2.5 px-4 text-right">
                           <span className={`${BADGE.base} ${status.badge}`}>
                             <StatusIcon size={11} />
                             <span>{status.label}</span>
@@ -281,7 +284,7 @@ export default function AdminDashboardPage() {
             </table>
           </div>
 
-          <div className={`${SURFACE.cardFooter} flex items-center justify-between`}>
+          <div className={`${SURFACE.cardFooter} shrink-0 flex items-center justify-between`}>
             <span className="inline-flex items-center gap-1.5 font-semibold">
               <span className={`w-1.5 h-1.5 rounded-full ${error ? "bg-rose-500" : "bg-emerald-500"}`} />
               {error ? "Mất kết nối máy chủ" : `${recentPayments.length} giao dịch gần nhất`}
@@ -291,9 +294,9 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* CỘT PHẢI (4/12): Yêu Cầu Cần Phê Duyệt Cấp Quản Trị */}
-        <div className={`lg:col-span-4 ${SURFACE.card} overflow-hidden flex flex-col`}>
-          <div>
-            <div className={SURFACE.cardHeader}>
+        <div className={`lg:col-span-4 lg:min-h-0 ${SURFACE.card} overflow-hidden flex flex-col`}>
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className={`${SURFACE.cardHeader} shrink-0 !px-4 !py-3`}>
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-md bg-rose-50 text-rose-700 flex items-center justify-center">
                   <ShieldAlert size={16} />
@@ -313,7 +316,7 @@ export default function AdminDashboardPage() {
               </span>
             </div>
 
-            <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-[640px]">
+            <div className="p-3 space-y-2.5 flex-1 min-h-0 overflow-y-auto max-h-[640px] lg:max-h-none [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
               {approvalTasks.length === 0 ? (
                 <div className={TABLE.emptyCell}>
                   <CheckCircle2 size={28} className="mx-auto text-emerald-500 mb-2" />
@@ -365,7 +368,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className={`${SURFACE.cardFooter} flex items-center justify-between`}>
+          <div className={`${SURFACE.cardFooter} shrink-0 flex items-center justify-between`}>
             <span className="font-bold text-rose-700">
               Cam kết SLA duyệt đối tác: &lt; 24h
             </span>

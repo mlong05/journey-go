@@ -94,7 +94,8 @@ export default function AdminBadgesPage() {
   };
 
   return (
-    <div className={SURFACE.page}>
+    // Khung 1 màn hình: trên desktop chỉ lưới huy hiệu tự cuộn, tiêu đề & bộ lọc đứng yên.
+    <div className="h-full min-h-0 flex flex-col gap-3 overflow-y-auto lg:overflow-hidden animate-in fade-in-50 duration-200">
       {toastMsg && (
         <div className="fixed top-5 right-5 z-[60] bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg border border-slate-700 text-xs font-bold flex items-center gap-2.5 max-w-md">
           <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
@@ -103,7 +104,7 @@ export default function AdminBadgesPage() {
       )}
 
       <PageHeader
-        eyebrow="Quản trị"
+        compact
         title="Huy hiệu di sản"
         description="Tải ảnh riêng cho từng huy hiệu du khách nhận được khi check-in, chỉnh mô tả và điểm thưởng."
       >
@@ -119,14 +120,14 @@ export default function AdminBadgesPage() {
       </PageHeader>
 
       {error && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+        <div className="shrink-0 flex items-center gap-2 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
           <AlertTriangle size={15} className="shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      <section className={`${SURFACE.card} overflow-hidden`}>
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <section className={`${SURFACE.card} overflow-hidden shrink-0 lg:shrink lg:flex-1 lg:min-h-0 flex flex-col`}>
+        <div className="shrink-0 px-4 py-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-0.5 bg-slate-100 p-1 rounded-lg w-fit">
             {FILTERS.map((f) => (
               <button
@@ -161,7 +162,7 @@ export default function AdminBadgesPage() {
             description="Huy hiệu check-in được tạo tự động khi du khách check-in lần đầu tại một điểm đến."
           />
         ) : (
-          <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 p-4 sm:p-5">
+          <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 content-start gap-3 p-4 lg:flex-1 lg:min-h-0 lg:overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
             {visible.map((b) => (
               <li
                 key={b.id}
