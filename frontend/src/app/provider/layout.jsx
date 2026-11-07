@@ -4,8 +4,6 @@ import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  MapPin,
-  Trophy,
   FileCheck,
   Route,
   Wallet,
@@ -42,10 +40,8 @@ export default function ProviderLayout({ children }) {
 
   // Dynamic danh sách thông báo duyệt bài (sẵn sàng gắn API)
 
-  // Trang Quản lý Điểm đến: khóa khung 100vh, cố định header & filter, chỉ danh sách thẻ tự cuộn
-  const isScrollLockedPage =
-    pathname?.startsWith("/provider/destinations") ||
-    pathname?.startsWith("/provider/tours");
+  // Trang Quản lý Tour: khóa khung 100vh, cố định header & filter, chỉ phần nội dung tự cuộn
+  const isScrollLockedPage = pathname?.startsWith("/provider/tours");
 
   // Danh mục điều hướng Sidebar của Đối tác
   const navMenuItems = [
@@ -60,18 +56,6 @@ export default function ProviderLayout({ children }) {
       label: "Quản lý Tour Du Lịch",
       href: "/provider/tours",
       icon: Route,
-    },
-    {
-      id: "destinations",
-      label: "Quản lý Điểm đến",
-      href: "/provider/destinations",
-      icon: MapPin,
-    },
-    {
-      id: "missions",
-      label: "Nhiệm vụ & Đố vui",
-      href: "/provider/tasks/create",
-      icon: Trophy,
     },
     {
       id: "reviews",
@@ -124,16 +108,18 @@ export default function ProviderLayout({ children }) {
           <main
             className={
               isScrollLockedPage
-                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8"
+                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col px-4 sm:px-6 lg:px-8 pt-4 lg:pt-5 pb-4 sm:pb-6"
                 : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
             }
           >
+            {/* key theo đường dẫn: mỗi lần chuyển trang chạy lại hiệu ứng hiện dần */}
             <div
-              className={
+              key={pathname}
+              className={`jg-page-enter ${
                 isScrollLockedPage
                   ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
                   : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
-              }
+              }`}
             >
               {children}
             </div>
