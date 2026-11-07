@@ -61,8 +61,6 @@ export const ROUTES = {
   // ── Khu vực đối tác cung cấp nội dung (CONTENT_PROVIDER) ───────────────────
   PROVIDER: "/provider",
   PROVIDER_TOURS: "/provider/tours",
-  PROVIDER_DESTINATIONS: "/provider/destinations",
-  PROVIDER_TASKS: "/provider/tasks/create",
 
   // ── Khu vực tài chính của đối tác (CONTENT_PROVIDER) ──────────────────────
   PROVIDER_FINANCE: "/provider/finance",
