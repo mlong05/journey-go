@@ -81,6 +81,46 @@ public class CloudinaryService {
     }
 
     /**
+     * Upload tài liệu (ảnh hoặc PDF) lên Cloudinary và trả về secure URL.
+     *
+     * <p>Dùng cho hồ sơ đăng ký đối tác: giấy phép, GPKD, giấy ký quỹ — có thể là PDF.
+     * Nếu Cloudinary chưa cấu hình thì trả Base64 Data URL để luồng vẫn chạy được.
+     */
+    public String uploadDocument(MultipartFile file, String folder) {
+        validateDocumentFile(file);
+
+        if (isConfigured()) {
+            try {
+                String targetFolder = StringUtils.hasText(folder) ? folder : "journeygo/documents";
+                @SuppressWarnings("unchecked")
+                Map<String, Object> uploadResult = cloudinary.uploader().upload(
+                        file.getBytes(),
+                        ObjectUtils.asMap(
+                                "folder", targetFolder,
+                                "resource_type", "auto"
+                        )
+                );
+                String secureUrl = (String) uploadResult.get("secure_url");
+                log.info("Uploaded document to Cloudinary successfully: url={}", secureUrl);
+                return secureUrl;
+            } catch (IOException e) {
+                log.error("Failed to upload document to Cloudinary: {}", e.getMessage(), e);
+                throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION,
+                        "Lỗi khi tải tài liệu lên dịch vụ Cloudinary: " + e.getMessage());
+            }
+        }
+
+        log.warn("Cloudinary chưa được cấu hình key. Đang chuyển tệp sang Base64 Data URL để tiếp tục chạy.");
+        try {
+            String base64 = Base64.getEncoder().encodeToString(file.getBytes());
+            String mimeType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
+            return "data:" + mimeType + ";base64," + base64;
+        } catch (IOException e) {
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Lỗi khi đọc file tài liệu: " + e.getMessage());
+        }
+    }
+
+    /**
      * Xóa ảnh trên Cloudinary theo publicId
      */
     public void deleteImage(String publicId) {
@@ -113,6 +153,34 @@ public class CloudinaryService {
         long maxSize = 10L * 1024 * 1024;
         if (file.getSize() > maxSize) {
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Dung lượng ảnh tối đa cho phép là 10MB");
+        }
+    }
+
+    /**
+     * Kiểm tra tệp tài liệu: chấp nhận ảnh và PDF (hồ sơ đăng ký đối tác).
+     */
+    private void validateDocumentFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "Tệp tải lên không được để trống");
+        }
+
+        String contentType = file.getContentType() == null
+                ? "" : file.getContentType().toLowerCase();
+        String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+
+        boolean imageType = contentType.startsWith("image/");
+        boolean pdfType = contentType.equals("application/pdf");
+        boolean imageExtension = filename.matches(".*\\.(png|jpe?g|webp|gif|heic|heif)$");
+        boolean pdfExtension = filename.endsWith(".pdf");
+
+        if (!imageType && !pdfType && !imageExtension && !pdfExtension) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                    "Chỉ chấp nhận tệp ảnh (PNG, JPG, WEBP) hoặc PDF");
+        }
+
+        long maxSize = 10L * 1024 * 1024;
+        if (file.getSize() > maxSize) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "Dung lượng tệp tối đa cho phép là 10MB");
         }
     }
 }
