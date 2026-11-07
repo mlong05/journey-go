@@ -27,6 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.journeygo.modules.finance.entity.CommissionPolicy;
 import com.journeygo.modules.gamification.entity.Badge;
 import com.journeygo.modules.gamification.entity.UserPoint;
 import com.journeygo.modules.gamification.entity.Voucher;
@@ -128,6 +129,7 @@ public class DataInitializer {
     private final PlatformTransactionManager transactionManager;
     private final JdbcTemplate jdbcTemplate;
     private final com.journeygo.modules.providerprofile.service.ProviderProfileService providerProfileService;
+    private final com.journeygo.modules.finance.repository.CommissionPolicyRepository commissionPolicyRepository;
 
     @Bean
     @org.springframework.core.annotation.Order(1)
@@ -472,6 +474,21 @@ public class DataInitializer {
                     log.info("Khởi tạo 100 điểm ban đầu cho tài khoản tourist@journeygo.com");
                 }
             });
+
+            // ── Chính sách hoa hồng mặc định (nếu chưa có chính sách nào) ───────────
+            //  Tỷ lệ mặc định ban đầu 20% — Admin có thể tạo chính sách mới có ngày
+            //  hiệu lực riêng tại trang "Chính sách hoa hồng" (BR-01..BR-09).
+            if (commissionPolicyRepository.count() == 0) {
+                commissionPolicyRepository.save(CommissionPolicy.builder()
+                        .name("Chính sách hoa hồng mặc định")
+                        .commissionRate(new BigDecimal("0.2000"))
+                        .effectiveFrom(Instant.now())
+                        .effectiveTo(null)
+                        .changeReason("Khởi tạo chính sách hoa hồng mặc định của nền tảng")
+                        .cancelled(false)
+                        .build());
+                log.info("Khởi tạo chính sách hoa hồng mặc định 20%");
+            }
 
             log.info("Khởi tạo và đồng bộ tài khoản mẫu (ADMIN, CONTENT_MODERATOR, CONTENT_PROVIDER, TOURIST) thành công với mật khẩu Password123@");
         };
