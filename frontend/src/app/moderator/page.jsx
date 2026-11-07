@@ -9,11 +9,7 @@ import {
   ShieldAlert,
   Search,
   ArrowUpRight,
-  MapPin,
   Compass,
-  HelpCircle,
-  BookOpen,
-  ScrollText,
   Building2,
   ChevronRight,
   Inbox,
@@ -39,15 +35,12 @@ import { useQueueRefresh } from "@/context/NotificationContext";
  */
 const QUICK_LINKS = [
   { href: "/moderator/tours", label: "Thẩm định tour", icon: Compass },
-  { href: "/moderator/destinations", label: "Duyệt điểm đến & lộ trình", icon: MapPin },
-  { href: "/moderator/destinations", label: "Duyệt thuyết minh di sản", icon: BookOpen },
   { href: "/moderator/community", label: "Duyệt bài cộng đồng", icon: MessageSquare },
   { href: "/moderator/history", label: "Nhật ký & lịch sử duyệt", icon: History },
 ];
 
 export default function ModeratorDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(false);
 
   // Dynamic KPI Stats
@@ -68,7 +61,7 @@ export default function ModeratorDashboardPage() {
   // Thời gian thực: hồ sơ mới gửi duyệt hoặc moderator khác vừa xử lý → tải ngầm lại hàng chờ
   const [reloadKey, setReloadKey] = useState(0);
   useQueueRefresh(
-    ["destination-review", "tour-review", "content-review", "experience-review", "post-review", "post-report"],
+    ["tour-review", "post-review", "post-report"],
     () => setReloadKey((k) => k + 1),
   );
 
@@ -77,10 +70,8 @@ export default function ModeratorDashboardPage() {
     async function fetchDashboardData() {
       if (reloadKey === 0) setIsLoading(true);
       try {
-        const [destQueueRes, contentQueueRes, tourQueueRes, statsRes] =
+        const [tourQueueRes, statsRes] =
           await Promise.allSettled([
-            moderationService.getDestinationQueue({ size: 500 }),
-            moderationService.getContentQueue({ size: 500 }),
             moderationService.getTourQueue({ size: 500 }),
             dashboardService.getModerator(),
           ]);
@@ -95,25 +86,18 @@ export default function ModeratorDashboardPage() {
           return [];
         };
 
-        const destQueue = extractQueueArray(destQueueRes);
-        const contentQueue = extractQueueArray(contentQueueRes);
         const tourQueue = extractQueueArray(tourQueueRes);
         const stats = statsRes.status === "fulfilled" ? statsRes.value : null;
         if (!stats) console.error("[Moderator Dashboard] Stats error:", statsRes.reason);
 
         // Số đếm lấy từ API thống kê (không bị giới hạn kích thước trang); hàng chờ chỉ dùng làm dự phòng
-        const pending = stats?.pending ?? {
-          destinations: destQueue.length,
-          tours: tourQueue.length,
-          contents: contentQueue.length,
-        };
-        const totalPending = pending.destinations + pending.tours + pending.contents;
+        const totalPending = stats?.pending?.tours ?? tourQueue.length;
 
         setKpiMetrics({
           pendingCount: totalPending,
           pendingTrend:
             totalPending > 0
-              ? `${pending.destinations} điểm đến, ${pending.tours} tour, ${pending.contents} thuyết minh`
+              ? `${totalPending} tour chờ thẩm định`
               : "Hàng chờ hiện đang trống",
           publishedCount: stats?.approvedToday ?? 0,
           publishedTrend: stats
@@ -128,22 +112,6 @@ export default function ModeratorDashboardPage() {
         });
 
         // Xây dựng danh sách hàng chờ ưu tiên từ API thực tế
-        const mappedDestItems = destQueue.map((d) => ({
-          id: d.id,
-          code: `DEST-${d.id}`,
-          title: d.name,
-          type: "destination",
-          typeLabel: "Điểm đến & Di tích",
-          sender: d.createdBy || "Đối tác du lịch",
-          submittedTime: d.updatedAt
-            ? new Date(d.updatedAt).toLocaleDateString("vi-VN")
-            : "Mới cập nhật",
-          urgency: "urgent",
-          urgencyLabel: "Cần thẩm định",
-          actionHref: `/moderator/destinations`,
-          actionText: "Thẩm định ngay",
-        }));
-
         const mappedTourItems = tourQueue.map((t) => {
           const tId = t.tourId || t.id;
           return {
@@ -158,28 +126,12 @@ export default function ModeratorDashboardPage() {
               : "Mới cập nhật",
             urgency: "urgent",
             urgencyLabel: "Cần thẩm định",
-            actionHref: `/moderator/tours`,
+            actionHref: `/moderator/tours/${tId}`,
             actionText: "Thẩm định tour",
           };
         });
 
-        const mappedContentItems = contentQueue.map((c) => ({
-          id: c.contentId,
-          code: `DOC-${c.contentId}`,
-          title: c.title || `Thuyết minh văn hóa #${c.contentId}`,
-          type: "cultural",
-          typeLabel: "Thuyết minh & Văn hóa",
-          sender: c.destinationName || "Biên tập viên",
-          submittedTime: c.submittedAt
-            ? new Date(c.submittedAt).toLocaleDateString("vi-VN")
-            : "Mới cập nhật",
-          urgency: "warning",
-          urgencyLabel: "Chờ phê duyệt",
-          actionHref: `/moderator/destinations`,
-          actionText: "Kiểm tra nội dung",
-        }));
-
-        setQueueData([...mappedDestItems, ...mappedTourItems, ...mappedContentItems]);
+        setQueueData(mappedTourItems);
 
       } catch (err) {
         console.error("[Moderator Dashboard] Fetch error:", err);
@@ -242,23 +194,15 @@ export default function ModeratorDashboardPage() {
 
   // Cơ cấu hàng chờ theo loại (tính từ dữ liệu API thật)
   const queueSegments = [
-    { label: "Điểm đến & di tích", value: queueData.filter((i) => i.type === "destination").length, tone: "sky" },
-    { label: "Tuyến hành trình", value: queueData.filter((i) => i.type === "tour").length, tone: "amber" },
-    { label: "Thuyết minh & văn hóa", value: queueData.filter((i) => i.type === "cultural").length, tone: "violet" },
+    { label: "Tuyến hành trình", value: queueData.length, tone: "amber" },
   ];
 
-  // Lọc dữ liệu theo từ khóa tìm kiếm và loại hình
-  const filteredQueue = queueData.filter((item) => {
-    const matchesSearch =
-      (item.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.sender || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.code || "").toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesType =
-      categoryFilter === "all" || item.type === categoryFilter;
-
-    return matchesSearch && matchesType;
-  });
+  // Lọc dữ liệu theo từ khóa tìm kiếm
+  const keyword = searchQuery.toLowerCase();
+  const filteredQueue = queueData.filter((item) =>
+    (item.title || "").toLowerCase().includes(keyword) ||
+    (item.sender || "").toLowerCase().includes(keyword) ||
+    (item.code || "").toLowerCase().includes(keyword));
 
   return (
     <div className={SURFACE.page}>
@@ -355,18 +299,6 @@ export default function ModeratorDashboardPage() {
                 className={INPUT.search}
               />
             </div>
-
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:border-slate-400"
-            >
-              <option value="all">Tất cả loại hình</option>
-              <option value="destination">Điểm đến và di tích</option>
-              <option value="tour">Tuyến hành trình &amp; Tour</option>
-              <option value="cultural">Thuyết minh &amp; Di sản</option>
-            </select>
-
           </div>
         </div>
 
@@ -419,21 +351,8 @@ export default function ModeratorDashboardPage() {
                       </p>
                     </td>
                     <td className={TABLE.td}>
-                      <span
-                        className={`${BADGE.base} ${
-                          item.type === "destination"
-                            ? BADGE.info
-                            : item.type === "cultural"
-                            ? BADGE.purple
-                            : item.type === "route"
-                            ? BADGE.success
-                            : BADGE.warning
-                        }`}
-                      >
-                        {item.type === "destination" && <MapPin size={11} />}
-                        {item.type === "cultural" && <BookOpen size={11} />}
-                        {item.type === "route" && <Compass size={11} />}
-                        {item.type === "quiz" && <HelpCircle size={11} />}
+                      <span className={`${BADGE.base} ${BADGE.warning}`}>
+                        <Compass size={11} />
                         <span>{item.typeLabel || item.type}</span>
                       </span>
                     </td>
@@ -466,7 +385,7 @@ export default function ModeratorDashboardPage() {
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <Link
-                        href={item.actionHref || `/moderator/destinations/${item.id}`}
+                        href={item.actionHref}
                         className={BUTTON.primary}
                       >
                         <span>{item.actionText || "Thẩm định ngay"}</span>
@@ -484,10 +403,10 @@ export default function ModeratorDashboardPage() {
         <div className={`${SURFACE.cardFooter} flex items-center justify-between`}>
           <span>Đang hiển thị {filteredQueue.length} hồ sơ trong hàng chờ</span>
           <Link
-            href="/moderator/destinations"
+            href="/moderator/tours"
             className="font-bold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 transition-colors"
           >
-            <span>Đến trang duyệt điểm đến và lộ trình</span>
+            <span>Đến trang thẩm định tour</span>
             <ChevronRight size={14} />
           </Link>
         </div>

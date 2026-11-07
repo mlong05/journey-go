@@ -1,15 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  MapPin,
   MessageSquare,
   History,
-  LogOut,
-  X,
-  Compass,
   Route,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
@@ -27,23 +23,18 @@ import NotificationToaster from "@/components/notifications/NotificationToaster"
  */
 export default function ModeratorLayout({ children }) {
   const pathname = usePathname();
-  const router = useRouter();
   const authData = useAuthSession();
   const { performLogout, logoutModal } = useLogout();
 
   // State drawer trên mobile & trạng thái co giãn của side rail
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarWide, setIsSidebarWide] = useState(true);
-  const [topSearch, setTopSearch] = useState("");
 
-  /* Chỉ trang DANH SÁCH điểm đến mới dùng khung cố định h-full/overflow-hidden
-     để vùng bảng tự cuộn. Các trang khác (kể cả hồ sơ chi tiết /destinations/[id])
-     vẫn cuộn toàn trang như cũ. So khớp chính xác để không áp nhầm. */
-  const isDestinationList = /^\/moderator\/destinations\/?$/.test(pathname || "");
   // Trang khung cố định: tiêu đề, thẻ số liệu, bộ lọc đứng yên, chỉ vùng danh sách tự cuộn
-  const isExperiencesPage = /^\/moderator\/(experiences|tours|community)\/?$/.test(pathname || "");
+  // (gồm cả trang thẩm định một tour: chỉ cột nội dung tự cuộn)
+  const isScrollLockedPage = /^\/moderator\/(tours|community|tours\/[^/]+)\/?$/.test(pathname || "");
 
-  // 5 mục menu điều hướng chuyên biệt của kiểm duyệt viên
+  // Menu điều hướng của kiểm duyệt viên
   const moderatorNavItems = [
     {
       id: "overview",
@@ -60,14 +51,6 @@ export default function ModeratorLayout({ children }) {
       badge: null,
     },
     {
-      id: "destinations-routes",
-      label: "Duyệt Điểm đến & Lộ trình",
-      href: "/moderator/destinations",
-      icon: MapPin,
-      badge: null,
-    },
-
-    {
       id: "community-media",
       label: "Duyệt Bài Cộng đồng",
       href: "/moderator/community",
@@ -82,14 +65,6 @@ export default function ModeratorLayout({ children }) {
       badge: null,
     },
   ];
-
-  // Xử lý tìm kiếm mã hồ sơ nhanh từ Topbar
-  const handleTopSearchSubmit = (e) => {
-    e.preventDefault();
-    if (topSearch.trim()) {
-      router.push(`/moderator/destinations?search=${encodeURIComponent(topSearch.trim())}`);
-    }
-  };
 
   const currentTitle =
     [...moderatorNavItems]
@@ -119,35 +94,25 @@ export default function ModeratorLayout({ children }) {
             section="Thẩm định"
             title={currentTitle}
             onOpenMenu={() => setIsSidebarOpen(true)}
-            searchValue={topSearch}
-            onSearchChange={setTopSearch}
-            onSearchSubmit={handleTopSearchSubmit}
-            searchPlaceholder="Tìm mã hồ sơ, tên di tích..."
           >
             <NotificationBell hint="Hồ sơ mới gửi duyệt và báo cáo vi phạm sẽ hiện ở đây." openLinks={false} />
           </DashboardHeader>
 
           {/* Nội dung trang làm việc.
-              • TRANG DANH SÁCH (/moderator/destinations): dùng khung cố định
-                h-full + overflow-hidden NGAY TỪ RENDER ĐẦU TIÊN để trang con tự
-                cuộn riêng vùng danh sách, không bị nhảy layout khi dữ liệu về.
-              • CÁC TRANG KHÁC: giữ nguyên cuộn toàn trang + padding như cũ. */}
+              • TRANG DANH SÁCH (tours, community): khung cố định, chỉ vùng danh sách tự cuộn.
+              • CÁC TRANG KHÁC: cuộn toàn trang + padding. */}
           <main
             className={
-              isDestinationList
-                ? "flex-1 w-full h-full overflow-hidden bg-slate-50"
-                : isExperiencesPage
-                  ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8 bg-slate-50"
-                  : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
+              isScrollLockedPage
+                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-6 lg:p-8 bg-slate-50"
+                : "flex-1 w-full overflow-y-auto overflow-x-hidden p-6 lg:p-8 bg-slate-50"
             }
           >
             <div
               className={
-                isDestinationList
-                  ? "w-full max-w-[1600px] mx-auto h-full flex flex-col"
-                  : isExperiencesPage
-                    ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
-                    : "w-full max-w-[1600px] mx-auto space-y-6"
+                isScrollLockedPage
+                  ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col"
+                  : "w-full max-w-[1600px] mx-auto space-y-6"
               }
             >
               {children}
