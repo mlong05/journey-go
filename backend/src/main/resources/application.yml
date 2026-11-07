@@ -8,8 +8,9 @@ spring:
     name: journey-go-backend
   servlet:
     multipart:
-      max-file-size: 8MB
-      max-request-size: 10MB
+      # Ảnh tối đa 10MB, video cổ vật tối đa 100MB (kiểm tra chi tiết trong CloudinaryService)
+      max-file-size: 100MB
+      max-request-size: 105MB
   threads:
     virtual:
       enabled: true

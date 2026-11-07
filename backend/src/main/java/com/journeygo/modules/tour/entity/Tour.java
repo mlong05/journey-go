@@ -1,5 +1,7 @@
 package com.journeygo.modules.tour.entity;
 
+import com.journeygo.modules.destination.entity.Region;
+import com.journeygo.modules.destination.entity.Theme;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
 import jakarta.persistence.*;
@@ -78,11 +80,103 @@ public class Tour {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
-    /** Ordered list of destinations that make up this tour. */
+    /** Ordered list of destinations that make up this tour (luồng cũ — dùng danh mục điểm đến chung). */
     @OneToMany(mappedBy = "tour", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequenceOrder ASC")
     @Builder.Default
     private List<TourDestination> tourDestinations = new ArrayList<>();
+
+    // ── Luồng tạo tour 5 bước ────────────────────────────────────────────────
+    // Tour tạo theo luồng mới có tourFormat != null. Các cột cũ (tourType, startDate, endDate,
+    // approved) giữ lại cho tour cũ; `approved` vẫn được đồng bộ để API công khai lọc tour đang bán.
+
+    /** Bước 1 — hình thức tour: trong ngày / nhiều ngày. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tour_format", length = 20)
+    private TourFormat tourFormat;
+
+    /** Bước 1 — thời lượng tour trong ngày, tính bằng phút. */
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
+
+    /** Bước 1 — số đêm của tour nhiều ngày (không lớn hơn số ngày). */
+    @Column(name = "duration_nights")
+    private Integer durationNights;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_id")
+    private Region region;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "theme_id")
+    private Theme theme;
+
+    /** Câu đầu tiên hiển thị trên thẻ tour ở trang tìm kiếm. */
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    /** Bước 1 — 3 đến 5 điểm nổi bật. */
+    @ElementCollection
+    @CollectionTable(name = "tour_highlights", joinColumns = @JoinColumn(name = "tour_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "content", length = 300, nullable = false)
+    @Builder.Default
+    private List<String> highlights = new ArrayList<>();
+
+    /** Bước 1 — ít nhất 5 ảnh; ảnh bìa (coverImageUrl) phải nằm trong danh sách này. */
+    @ElementCollection
+    @CollectionTable(name = "tour_images", joinColumns = @JoinColumn(name = "tour_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "image_url", length = 1000, nullable = false)
+    @Builder.Default
+    private List<String> images = new ArrayList<>();
+
+    /** Bước 2 — chính sách hủy do đối tác tự nhập. */
+    @Column(name = "cancellation_policy", columnDefinition = "TEXT")
+    private String cancellationPolicy;
+
+    /** Bước 2 — số chỗ tối đa mỗi slot. */
+    @Column(name = "max_guests_per_slot")
+    private Integer maxGuestsPerSlot;
+
+    /** Bước 2 — bảng giá theo 4 loại khách. */
+    @OneToMany(mappedBy = "tour", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("guestType ASC")
+    @Builder.Default
+    private List<TourPrice> prices = new ArrayList<>();
+
+    /** Bước 3 — điểm đến riêng của tour. */
+    @OneToMany(mappedBy = "tour", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sequenceOrder ASC")
+    @Builder.Default
+    private List<TourStop> stops = new ArrayList<>();
+
+    /** Bước 4 — các ngày khởi hành được chọn trên lịch. */
+    @OneToMany(mappedBy = "tour", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("departureDate ASC")
+    @Builder.Default
+    private List<TourDepartureDate> departureDates = new ArrayList<>();
+
+    /** Bước 5 — đối tác cam kết quyền sử dụng hình ảnh, nội dung. */
+    @Column(name = "content_rights_confirmed", nullable = false)
+    @Builder.Default
+    private boolean contentRightsConfirmed = false;
+
+    /** Tăng mỗi lần gửi duyệt; lưu vào lịch sử kiểm duyệt. */
+    @Column(name = "version_number", nullable = false)
+    @Builder.Default
+    private int versionNumber = 1;
+
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
+
+    @Column(name = "published_at")
+    private Instant publishedAt;
+
+    /** Tour tạo theo luồng 5 bước (khác tour cũ chọn điểm đến từ danh mục chung). */
+    public boolean isWizardTour() {
+        return tourFormat != null;
+    }
 
     @PrePersist
     protected void onCreate() {

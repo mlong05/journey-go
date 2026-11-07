@@ -26,6 +26,12 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
 
     Page<Tour> findByCreatedBy_Id(Long creatorId, Pageable pageable);
 
+    /** Tour của đối tác tạo theo luồng 5 bước. */
+    Page<Tour> findByCreatedBy_IdAndTourFormatIsNotNull(Long creatorId, Pageable pageable);
+
+    Page<Tour> findByCreatedBy_IdAndTourFormatIsNotNullAndStatus(Long creatorId,
+            com.journeygo.modules.tour.entity.enums.TourStatus status, Pageable pageable);
+
     @Query("""
             SELECT new com.journeygo.modules.tour.repository.TourPriceProjection(td.tour.tourId, SUM(e.price))
             FROM TourDestination td, Experience e
