@@ -113,6 +113,17 @@ app:
     from-name: ${MAIL_FROM_NAME:JourneyGo Platform}
     otp-expiration-minutes: ${MAIL_OTP_EXPIRATION_MINUTES:10}
 
+  # ── Partner Application (Đăng ký đối tác) ────────────────────────────────
+  partner:
+    # Thời hạn hiệu lực mã OTP xác minh email khi đăng ký đối tác (phút).
+    otp-expiry-minutes: ${PARTNER_OTP_EXPIRY_MINUTES:5}
+    # Link đối tác truy cập để đăng nhập sau khi được duyệt.
+    web-login-url: ${PARTNER_WEB_LOGIN_URL:http://localhost:3000/login}
+    # Link thiết lập mật khẩu (activation token) gửi kèm email duyệt.
+    activation-url: ${PARTNER_ACTIVATION_URL:http://localhost:3000/activate}
+    # Email hỗ trợ hiển thị trong email từ chối.
+    support-contact: ${PARTNER_SUPPORT_CONTACT:support@journeygo.com}
+
   # ── Finance (Booking / Payment / Refund / Wallet & Settlement) ────────────
   finance:
     # Thời hạn gửi yêu cầu hoàn tiền kể từ thời điểm thanh toán thành công đã xác minh.

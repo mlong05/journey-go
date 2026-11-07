@@ -38,6 +38,11 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/v1/auth/**",
+            // Luồng đăng ký trở thành đối tác — người dùng CHƯA có tài khoản vẫn phải đăng ký được.
+            // Bằng chứng "email đã xác minh" là bản ghi OTP đã dùng trong `partner_application_otps`
+            // (service kiểm tra lại khi lưu nháp / gửi đơn).
+            // Endpoint duyệt/từ chối vẫn được bảo vệ bằng @PreAuthorize("hasRole('ADMIN')").
+            "/api/v1/partner-applications/**",
             // VNPay callback — endpoint server-to-server, KHÔNG có JWT.
             "/api/v1/payments/ipn",
             "/api/v1/payments/return",
