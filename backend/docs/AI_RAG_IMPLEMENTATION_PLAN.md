@@ -12,7 +12,7 @@
 ```mermaid
 flowchart TD
     subgraph DevA["Dev A: Ingestion & Vector Pipeline"]
-        A1["Docker pgvector & Flyway V3"] --> A2["AiKnowledgeChunk Entity & Repo"]
+        A1["Docker pgvector & Flyway V7"] --> A2["AiKnowledgeChunk Entity & Repo"]
         A2 --> A3["Gemini Embedding Client (text-embedding-004)"]
         A3 --> A4["TextChunkerHelper & IngestionService"]
         A4 --> A5["Moderation Event Listener (Approve/Edit/Delete)"]
@@ -43,7 +43,7 @@ flowchart TD
 
 Hai bạn chỉ cần chốt trước 2 interface này vào ngày đầu tiên để Dev B có thể mock dữ liệu làm việc độc lập với Dev A:
 
-### 2.1. Cấu trúc bảng Vector (`V3__ai_virtual_guide_pgvector.sql`)
+### 2.1. Cấu trúc bảng Vector (`V7__ai_virtual_guide_pgvector.sql`)
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -103,7 +103,7 @@ public interface AiKnowledgeChunkRepository extends JpaRepository<AiKnowledgeChu
 
 | Giai đoạn | Nhiệm vụ cụ thể | Đầu ra (Deliverables) |
 | :--- | :--- | :--- |
-| **P1. Hạ tầng & DB** | - Cập nhật `docker-compose.yml` sang image `pgvector/pgvector:pg16`.<br>- Viết Flyway migration `V3__ai_virtual_guide_pgvector.sql`.<br>- Tạo Entity `AiKnowledgeChunk` và `AiKnowledgeChunkRepository`. | Migration chạy mượt, bảng vector sẵn sàng. |
+| **P1. Hạ tầng & DB** | - Cập nhật `docker-compose.yml` sang image `pgvector/pgvector:pg16`.<br>- Viết Flyway migration `V7__ai_virtual_guide_pgvector.sql`.<br>- Tạo Entity `AiKnowledgeChunk` và `AiKnowledgeChunkRepository`. | Migration chạy mượt, bảng vector sẵn sàng. |
 | **P2. Gemini Embedding** | - Viết `GeminiEmbeddingClient` kết nối API Google `text-embedding-004` (768 dimensions).<br>- Triển khai `AiEmbeddingService` và hàm chuyển đổi vector float array sang định dạng Postgres vector. | Unit test embedding trả về mảng 768 float thành công. |
 | **P3. Chunker & Ingestion** | - Viết `TextChunkerHelper`: thuật toán cắt đoạn văn 300 - 500 từ, overlap 50 từ, ưu tiên theo `\n\n` hoặc tiêu đề.<br>- Kỹ thuật gán Context Prefix: `"[Địa điểm: {name} - Danh mục: {category}] {chunk}"`.<br>- Viết `DocumentIngestionService`: làm sạch text, băm đoạn, gọi embedding và lưu batch vào DB. | Chunker test case xử lý mượt văn bản dài và ngắn. |
 | **P4. Sự kiện Moderation** | - Tạo event DTO `ContentApprovedEvent`, `ContentInvalidatedEvent`.<br>- Lồng sự kiện vào [`ContentModerationService.java`](file:///d:/S9/journey-go/backend/src/main/java/com/journeygo/modules/moderation/service/ContentModerationService.java) và [`CulturalContentService.java`](file:///d:/S9/journey-go/backend/src/main/java/com/journeygo/modules/content/service/CulturalContentService.java).<br>- Viết `@Async` listener: khi duyệt bài -> tự động ingest; khi sửa/xóa bài -> tự động xóa vector cũ. | Luồng duyệt bài nạp vector ngầm không ảnh hưởng tốc độ duyệt. |
@@ -132,7 +132,7 @@ gantt
     title Lộ trình phối hợp 2 Developer (4 Ngày)
     dateFormat  YYYY-MM-DD
     section Dev A (Ingestion & Vector)
-    Setup pgvector & Flyway V3        :a1, 2026-11-08, 1d
+    Setup pgvector & Flyway V7        :a1, 2026-11-08, 1d
     Gemini Embedding Client           :a2, 2026-11-09, 1d
     Chunker Helper & Ingestion Service :a3, 2026-11-09, 1d
     Async Moderation Event Listener   :a4, 2026-11-10, 1d
@@ -146,7 +146,7 @@ gantt
 ```
 
 ### Chi tiết các mốc phối hợp (Sync Points):
-* **Cuối Ngày 1 (Sync 1):** Dev A hoàn thành Flyway V3 (bảng `ai_knowledge_chunks`) và Dev B hoàn thành bảng `ai_chat_sessions/messages`. Cả 2 cùng commit để thống nhất database migration.
+* **Cuối Ngày 1 (Sync 1):** Dev A hoàn thành Flyway V7 (bao gồm bảng `ai_knowledge_chunks` và các bảng chat cho Dev B). Cả 2 cùng commit để thống nhất database migration.
 * **Cuối Ngày 2 (Sync 2):** Dev A hoàn thành `AiEmbeddingService` và nạp thủ công một vài chunk mẫu. Dev B hoàn thành `GeminiChatClient` và test prompt độc lập.
 * **Cuối Ngày 3 (Sync 3):** Ghép nối: Dev B gọi hàm tìm kiếm vector của Dev A để hoàn thiện luồng RAG. Dev A viết listener tự động nạp từ Moderation.
 * **Ngày 4 (Final Integration & Demo):** Cả 2 cùng test End-to-End: Moderator duyệt bài -> Dữ liệu vào Vector -> Du khách mở app hỏi -> AI trả lời chuẩn xác.

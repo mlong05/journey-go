@@ -3,7 +3,7 @@ services:
   # 1. Cơ sở dữ liệu PostgreSQL
   # ========================================================
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: journeygo-postgres
     restart: unless-stopped
     ports:

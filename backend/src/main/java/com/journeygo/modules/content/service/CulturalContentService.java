@@ -14,6 +14,8 @@ import com.journeygo.modules.destination.repository.DestinationRepository;
 import com.journeygo.modules.user.entity.Role;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.journeygo.modules.aiguide.event.ContentInvalidatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,6 +32,7 @@ public class CulturalContentService {
     private final DestinationRepository destinationRepository;
     private final ContentModerationService contentModerationService;
     private final CloudinaryImageService cloudinaryImageService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public List<CulturalContentResponse> getByDestinationId(Long destinationId) {
@@ -142,6 +145,7 @@ public class CulturalContentService {
 
         CulturalContent saved = culturalContentRepository.save(content);
         contentModerationService.submitAfterEdit(saved.getId(), callerId, callerRole);
+        eventPublisher.publishEvent(new ContentInvalidatedEvent(saved.getId(), "CONTENT_EDITED"));
         if (previousPublicId != null && !previousPublicId.equals(saved.getMediaPublicId())) {
             cloudinaryImageService.deleteAfterCommit(previousPublicId);
         }
@@ -177,6 +181,7 @@ public class CulturalContentService {
 
         content.setDeleted(true);
         culturalContentRepository.save(content);
+        eventPublisher.publishEvent(new ContentInvalidatedEvent(id, "CONTENT_DELETED"));
         log.info("Soft-deleted cultural content id={}", id);
     }
 
@@ -190,6 +195,7 @@ public class CulturalContentService {
         content.setMediaPublicId(null);
         CulturalContent saved = culturalContentRepository.save(content);
         contentModerationService.submitAfterEdit(saved.getId(), callerId, callerRole);
+        eventPublisher.publishEvent(new ContentInvalidatedEvent(saved.getId(), "CONTENT_EDITED"));
         if (previousPublicId != null) cloudinaryImageService.deleteAfterCommit(previousPublicId);
         return CulturalContentResponse.fromEntity(saved);
     }

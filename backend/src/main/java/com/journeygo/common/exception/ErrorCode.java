@@ -119,7 +119,13 @@ public enum ErrorCode {
     COMMISSION_POLICY_REASON_REQUIRED("Lý do thay đổi không được để trống", HttpStatus.BAD_REQUEST),
 
     // ── Notification ──────────────────────────────────────────────────────────
-    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại", HttpStatus.NOT_FOUND);
+    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại", HttpStatus.NOT_FOUND),
+
+    // ── AI Virtual Guide ──────────────────────────────────────────────────────
+    AI_SERVICE_UNAVAILABLE("Dịch vụ AI chưa sẵn sàng hoặc chưa được cấu hình API Key", HttpStatus.SERVICE_UNAVAILABLE),
+    AI_EMBEDDING_FAILED("Không thể tính toán vector nhúng từ mô hình AI", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_CHAT_FAILED("Xử lý hội thoại AI thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_SESSION_NOT_FOUND("Phiên hội thoại AI không tồn tại", HttpStatus.NOT_FOUND);
 
     private final String message;
     private final HttpStatus httpStatus;
