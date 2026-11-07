@@ -20,10 +20,11 @@ import java.sql.SQLException;
  *
  * Bối cảnh: các bảng cũ (users, roles, destinations...) do Hibernate `ddl-auto=update` tạo,
  * còn các bảng nghiệp vụ mới do Flyway tạo. Spring Boot luôn chạy Flyway TRƯỚC Hibernate.
- *  - V1, V2 cố ý chạy trước Hibernate để tự tạo bảng kèm UNIQUE constraint (chống trùng
- *    payment/refund/settlement). Chúng không tham chiếu bảng của Hibernate.
- *  - Từ V3 trở đi có khóa ngoại tới `users` / `destinations` → trên DB trống sẽ lỗi
- *    "relation users does not exist".
+ *  - V1, V2, V5 chạy trước Hibernate: V1, V2 tự tạo bảng kèm UNIQUE constraint (chống trùng
+ *    payment/refund/settlement), V5 đổi tên schema partner → provider_profile.
+ *    Chúng không bắt buộc bảng của Hibernate phải tồn tại.
+ *  - Migration mới cần khóa ngoại tới `users` / `destinations` phải đặt sau
+ *    {@link #PRE_HIBERNATE_TARGET} (trên DB trống sẽ lỗi "relation users does not exist").
  *
  * Cách xử lý:
  *  - DB đã có bảng `users` (DB đang dùng bình thường): chạy toàn bộ migration như cũ, không đổi gì.
@@ -37,8 +38,16 @@ import java.sql.SQLException;
 @ConditionalOnProperty(prefix = "spring.flyway", name = "enabled", matchIfMissing = true)
 public class FlywayConfig {
 
-    /** Phiên bản migration cuối cùng KHÔNG phụ thuộc bảng do Hibernate tạo. */
-    static final String PRE_HIBERNATE_TARGET = "2";
+    /**
+     * Phiên bản migration cuối cùng KHÔNG phụ thuộc bảng do Hibernate tạo.
+     *
+     * V5 (đổi tên partner → provider_profile) PHẢI chạy trước Hibernate: nếu Hibernate chạy trước,
+     * nó tự thêm cột/constraint tên mới (vd. uk_wallet_provider_profile) song song với tên cũ của V1,
+     * và lệnh RENAME CONSTRAINT trong V5 sẽ lỗi "already exists". Mọi thao tác của V5 lên
+     * `roles` / `users` đã được bọc `to_regclass(...) IS NOT NULL` nên chạy được trên DB trống.
+     * V3, V4 đã bị gỡ khỏi code.
+     */
+    static final String PRE_HIBERNATE_TARGET = "5";
 
     @Bean
     public FlywayMigrationStrategy twoPhaseFlywayMigrationStrategy() {

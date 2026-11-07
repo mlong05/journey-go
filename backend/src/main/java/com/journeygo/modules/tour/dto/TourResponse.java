@@ -25,7 +25,7 @@ public record TourResponse(
         @Schema(description = "Ngày bắt đầu tour") LocalDate startDate,
         @Schema(description = "Ngày kết thúc tour") LocalDate endDate,
         @Schema(description = "Đã được phê duyệt") boolean approved,
-        @Schema(description = "Trạng thái quy trình (DRAFT, PENDING, PUBLISHED, REJECTED)") TourStatus status,
+        @Schema(description = "Trạng thái (DRAFT, PENDING_REVIEW, CHANGES_REQUESTED, REJECTED, PUBLISHED, PAUSED)") TourStatus status,
         @Schema(description = "Lý do từ chối (nếu có)") String rejectionReason,
         @Schema(description = "Đã xóa") boolean deleted,
         @Schema(description = "Thời điểm xóa mềm (null nếu còn hoạt động)") Instant deletedAt,
@@ -37,6 +37,7 @@ public record TourResponse(
         @Schema(description = "Tổng điểm thưởng tối đa từ các nhiệm vụ") int totalTaskPoints,
         @Schema(description = "Số huy hiệu check-in có thể nhận (mỗi điểm đến một huy hiệu, trừ huy hiệu đã tắt)") int badgeCount,
         @Schema(description = "Người tạo") String createdBy,
+        @Schema(description = "Tour tạo theo luồng 5 bước (kiểm duyệt bằng màn hình thẩm định mới)") boolean wizardTour,
         @Schema(description = "Thời gian tạo") Instant createdAt,
         @Schema(description = "Thời gian cập nhật") Instant updatedAt
 ) {
@@ -70,6 +71,7 @@ public record TourResponse(
                         .filter(url -> url != null && !url.isBlank())
                         .findFirst().orElse(null))
                 .createdBy(t.getCreatedBy() != null ? t.getCreatedBy().getFullName() : null)
+                .wizardTour(t.isWizardTour())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
                 .build();

@@ -30,6 +30,29 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /** Tệp vượt giới hạn multipart của Spring (100MB) — trả thông báo dễ hiểu thay vì lỗi 500. */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMaxUploadSize(
+            org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ApiResponse.builder()
+                .code(HttpStatus.PAYLOAD_TOO_LARGE.value())
+                .message("Tệp quá lớn: ảnh tối đa 10MB, video tối đa 100MB")
+                .build());
+    }
+
+    /** Tour chưa đủ điều kiện gửi duyệt: data = danh sách {step, stopIndex, field, message}. */
+    @ExceptionHandler(com.journeygo.modules.tour.exception.TourValidationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleTourValidation(
+            com.journeygo.modules.tour.exception.TourValidationException ex) {
+        ErrorCode errorCode = ex.getErrorCode();
+        ApiResponse<Object> response = ApiResponse.builder()
+                .code(errorCode.getHttpStatus().value())
+                .message(ex.getMessage())
+                .data(ex.getIssues())
+                .build();
+        return ResponseEntity.status(errorCode.getHttpStatus()).body(response);
+    }
+
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Object>> handleAppException(AppException ex) {
         ErrorCode errorCode = ex.getErrorCode();

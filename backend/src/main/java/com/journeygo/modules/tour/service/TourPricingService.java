@@ -1,8 +1,10 @@
 package com.journeygo.modules.tour.service;
 
 import com.journeygo.modules.tour.dto.TourResponse;
+import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.repository.TourPriceProjection;
+import com.journeygo.modules.tour.repository.TourPriceRepository;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.tour.repository.TourRewardProjection;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ import java.util.stream.Collectors;
 public class TourPricingService {
 
     private final TourRepository tourRepository;
+    private final TourPriceRepository tourPriceRepository;
 
     @Transactional(readOnly = true)
     public TourResponse toResponse(Tour tour) {
@@ -36,8 +39,14 @@ public class TourPricingService {
     public Function<Tour, TourResponse> mapperFor(Collection<Tour> tours) {
         List<Long> ids = tours.stream().map(Tour::getTourId).toList();
         if (ids.isEmpty()) return TourResponse::fromEntity;
-        Map<Long, BigDecimal> totals = tourRepository.sumExperiencePricesByTourIds(ids).stream()
-                .collect(Collectors.toMap(TourPriceProjection::tourId, TourPriceProjection::totalPrice));
+        Map<Long, BigDecimal> totals = new java.util.HashMap<>(tourRepository.sumExperiencePricesByTourIds(ids).stream()
+                .collect(Collectors.toMap(TourPriceProjection::tourId, TourPriceProjection::totalPrice)));
+        // Tour tạo theo luồng 5 bước: giá hiển thị = giá vé người lớn.
+        List<Long> wizardIds = tours.stream().filter(Tour::isWizardTour).map(Tour::getTourId).toList();
+        if (!wizardIds.isEmpty()) {
+            tourPriceRepository.findByTourIdsAndGuestType(wizardIds, GuestType.ADULT)
+                    .forEach(p -> totals.put(p.getTour().getTourId(), p.getPrice()));
+        }
         // Phần thưởng hiển thị trên thẻ tour: nhiệm vụ, điểm tối đa, huy hiệu (mỗi điểm đến một huy hiệu check-in)
         Map<Long, TourRewardProjection> rewards = tourRepository.sumTaskRewardsByTourIds(ids).stream()
                 .collect(Collectors.toMap(TourRewardProjection::tourId, Function.identity()));

@@ -36,6 +36,7 @@ public class TourService {
     private final DestinationRepository destinationRepository;
     private final TourModerationService moderationService;
     private final TourPricingService pricingService;
+    private final com.journeygo.modules.providerprofile.service.ProviderProfileService providerProfileService;
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
             "tourId", "title", "tourType", "durationDays", "startDate", "endDate",
@@ -95,6 +96,10 @@ public class TourService {
 
         User creator = userRepository.findById(creatorId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        // BR-01: chỉ đối tác đã được Admin duyệt mới tạo tour.
+        if (creator.getRole() != null && Role.CONTENT_PROVIDER.equalsIgnoreCase(creator.getRole().getName())) {
+            providerProfileService.requireCanManageTours(creatorId);
+        }
 
         Tour tour = Tour.builder()
                 .title(request.title().trim())

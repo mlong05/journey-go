@@ -43,4 +43,17 @@ public class UploadController {
                 )
         ));
     }
+
+    @PostMapping(value = "/video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN')")
+    @Operation(summary = "Tải video lên Cloudinary", description = "Video MP4 / WEBM / MOV tối đa 100MB — dùng cho video cổ vật của tour")
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadVideo(
+            @Parameter(description = "Tệp video cần tải lên (MP4, WEBM, MOV)")
+            @RequestParam("file") MultipartFile file,
+            @Parameter(description = "Thư mục lưu trữ trên Cloudinary (mặc định: journeygo/videos)")
+            @RequestParam(value = "folder", defaultValue = "journeygo/videos") String folder
+    ) {
+        String videoUrl = cloudinaryService.uploadVideo(file, folder);
+        return ResponseEntity.ok(ApiResponse.success("Tải video lên thành công", Map.of("url", videoUrl)));
+    }
 }

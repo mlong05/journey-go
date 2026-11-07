@@ -156,6 +156,46 @@ public class CloudinaryService {
         }
     }
 
+    /** Dung lượng video tối đa (giới hạn upload của gói Cloudinary miễn phí là 100MB). */
+    public static final long MAX_VIDEO_BYTES = 100L * 1024 * 1024;
+
+    /**
+     * Upload video (MP4 / WEBM / MOV) lên Cloudinary — dùng cho video cổ vật của tour.
+     * Video không có phương án Base64 dự phòng vì quá lớn để lưu trong DB: chưa cấu hình Cloudinary thì báo lỗi.
+     */
+    public String uploadVideo(MultipartFile file, String folder) {
+        if (file == null || file.isEmpty()) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "Tệp tải lên không được để trống");
+        }
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+        String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        boolean videoType = contentType.startsWith("video/");
+        boolean videoExtension = filename.matches(".*\\.(mp4|webm|mov|m4v)$");
+        if (!videoType && !videoExtension) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "Chỉ chấp nhận tệp video (MP4, WEBM, MOV)");
+        }
+        if (file.getSize() > MAX_VIDEO_BYTES) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "Dung lượng video tối đa cho phép là 100MB");
+        }
+        if (!isConfigured()) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                    "Máy chủ chưa cấu hình Cloudinary nên chưa tải được video. Vui lòng dùng link YouTube hoặc MP4");
+        }
+        try {
+            String targetFolder = StringUtils.hasText(folder) ? folder : "journeygo/videos";
+            @SuppressWarnings("unchecked")
+            Map<String, Object> uploadResult = cloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap("folder", targetFolder, "resource_type", "video"));
+            String secureUrl = (String) uploadResult.get("secure_url");
+            log.info("Uploaded video to Cloudinary successfully: url={}", secureUrl);
+            return secureUrl;
+        } catch (IOException e) {
+            log.error("Failed to upload video to Cloudinary: {}", e.getMessage(), e);
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Lỗi khi tải video lên dịch vụ Cloudinary: " + e.getMessage());
+        }
+    }
+
     /**
      * Kiểm tra tệp tài liệu: chấp nhận ảnh và PDF (hồ sơ đăng ký đối tác).
      */
