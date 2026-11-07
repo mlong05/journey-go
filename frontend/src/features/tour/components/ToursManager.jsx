@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Search,
@@ -60,9 +61,9 @@ import { useQueueRefresh } from "@/context/NotificationContext";
  *   - Admin / Moderator: GET /tours  (+ GET /tours/deleted cho Admin)
  *
  *  Quy trình duyệt (TourStatus):
- *   DRAFT ──submit──> PENDING ──publish──> PUBLISHED
+ *   DRAFT ──submit──> PENDING_REVIEW ──publish──> PUBLISHED
  *     ^                 │
- *     └───update────────┴──reject──> REJECTED ──submit──> PENDING
+ *     └───update────────┴──reject──> REJECTED ──submit──> PENDING_REVIEW
  * ========================================================================= */
 
 /* Số dòng mỗi trang */
@@ -270,8 +271,13 @@ export default function ToursManager({
   canModerate = false,
   canDelete = false,
   showDeletedFilter = false,
+  /** Tour tạo theo luồng 5 bước: trả URL màn hình mới (thẩm định / wizard). null = không có màn hình mới. */
+  wizardHref = null,
+  /** Ẩn tour 5 bước khỏi danh sách (tab "Tour tạo theo luồng cũ" của đối tác). */
+  excludeWizard = false,
 }) {
   const palette = getTourTheme(theme);
+  const router = useRouter();
 
   /* ── State ──────────────────────────────────────────────────── */
   const [tours, setTours] = useState([]);
@@ -568,22 +574,28 @@ export default function ToursManager({
   }, [restoreTarget, mergeTour, showToast]);
 
   /* ── Counts (luôn tính trên toàn bộ danh sách) ─────────────── */
+  const baseTours = useMemo(
+    () => (excludeWizard ? tours.filter((t) => !t.wizardTour) : tours),
+    [tours, excludeWizard]
+  );
   const counts = useMemo(
     () => ({
-      all: tours.length,
-      DRAFT: tours.filter((t) => t.status === "DRAFT").length,
-      PENDING: tours.filter((t) => t.status === "PENDING").length,
-      PUBLISHED: tours.filter((t) => t.status === "PUBLISHED").length,
-      REJECTED: tours.filter((t) => t.status === "REJECTED").length,
-      DELETED: tours.filter((t) => t.deleted).length,
+      all: baseTours.length,
+      DRAFT: baseTours.filter((t) => t.status === "DRAFT").length,
+      PENDING_REVIEW: baseTours.filter((t) => t.status === "PENDING_REVIEW").length,
+      CHANGES_REQUESTED: baseTours.filter((t) => t.status === "CHANGES_REQUESTED").length,
+      PUBLISHED: baseTours.filter((t) => t.status === "PUBLISHED").length,
+      PAUSED: baseTours.filter((t) => t.status === "PAUSED").length,
+      REJECTED: baseTours.filter((t) => t.status === "REJECTED").length,
+      DELETED: baseTours.filter((t) => t.deleted).length,
     }),
-    [tours]
+    [baseTours]
   );
 
   /* ── Lọc ───────────────────────────────────────────────────── */
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return tours.filter((tour) => {
+    return baseTours.filter((tour) => {
       const matchSearch =
         !q ||
         tour.title.toLowerCase().includes(q) ||
@@ -606,7 +618,7 @@ export default function ToursManager({
 
       return matchSearch && matchStatus && matchDeletion;
     });
-  }, [tours, searchQuery, statusTab, deletionFilter]);
+  }, [baseTours, searchQuery, statusTab, deletionFilter]);
 
   /* ── Phân trang ────────────────────────────────────────────── */
   const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1);
@@ -652,7 +664,7 @@ export default function ToursManager({
       {TOUR_STATUS_ORDER.map((status) => {
         const meta = TOUR_STATUS_META[status];
         const isActive = statusTab === status;
-        const isPending = status === "PENDING";
+        const isPending = status === "PENDING_REVIEW";
         const isRejected = status === "REJECTED";
         const isPublished = status === "PUBLISHED";
         const isDraft = status === "DRAFT";
@@ -710,14 +722,18 @@ export default function ToursManager({
   /* ── Nút hành động trong bảng ──────────────────────────────── */
   const renderRowActions = (tour) => {
     const busy = actionLoadingId === tour.tourId;
-    const canSubmit = SUBMITTABLE_STATUSES.includes(tour.status) && !tour.deleted;
-    const canEdit = EDITABLE_STATUSES.includes(tour.status) && !tour.deleted;
+    const wizard = !!tour.wizardTour;
+    const wizardUrl = wizard && wizardHref ? wizardHref(tour) : null;
+    // Tour 5 bước không dùng form / nút duyệt cũ (cần 5 tiêu chí + ghi chú) — chuyển sang màn hình mới.
+    const canSubmit = !wizard && SUBMITTABLE_STATUSES.includes(tour.status) && !tour.deleted;
+    const canEdit = !wizard && EDITABLE_STATUSES.includes(tour.status) && !tour.deleted;
+    const canLegacyModerate = canModerate && !wizard;
 
     return (
       <div className="col-span-12 md:col-span-1 flex items-center justify-start md:justify-end gap-1.5 shrink-0">
         <button
           type="button"
-          onClick={() => openDetail(tour.tourId)}
+          onClick={() => (wizardUrl ? router.push(wizardUrl) : openDetail(tour.tourId))}
           className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
           title="Xem chi tiết"
           aria-label="Xem chi tiết"
@@ -754,7 +770,18 @@ export default function ToursManager({
           </button>
         )}
 
-        {canModerate && tour.status === "PENDING" && !tour.deleted && (
+        {wizardUrl && canModerate && tour.status === "PENDING_REVIEW" && !tour.deleted && (
+          <button
+            type="button"
+            onClick={() => router.push(wizardUrl)}
+            className="px-2.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
+            title="Mở màn hình thẩm định tour 5 bước"
+          >
+            Thẩm định
+          </button>
+        )}
+
+        {canLegacyModerate && tour.status === "PENDING_REVIEW" && !tour.deleted && (
           <button
             type="button"
             onClick={() => handlePublish(tour)}
@@ -771,7 +798,7 @@ export default function ToursManager({
           </button>
         )}
 
-        {canModerate && tour.status === "PENDING" && !tour.deleted && (
+        {canLegacyModerate && tour.status === "PENDING_REVIEW" && !tour.deleted && (
           <button
             type="button"
             onClick={() => setRejectTarget(tour)}
@@ -876,7 +903,7 @@ export default function ToursManager({
         <KpiTile
           icon={Clock}
           label="Chờ duyệt"
-          value={counts.PENDING}
+          value={counts.PENDING_REVIEW}
           unit="tour"
           tone="amber"
         />
