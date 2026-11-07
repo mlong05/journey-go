@@ -12,6 +12,7 @@ import com.journeygo.modules.experience.entity.Experience;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.repository.ExperienceRepository;
 import com.journeygo.modules.finance.config.FinanceProperties;
+import com.journeygo.modules.finance.service.CommissionPolicyService;
 import com.journeygo.modules.providerprofile.entity.ProviderProfile;
 import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
 import com.journeygo.modules.providerrevenue.dto.response.EligibilityEvaluationResponse;
@@ -87,6 +88,7 @@ public class ProviderRevenueService {
     private final RefundRequestRepository refundRepository;
     private final FinancialAdjustmentRepository financialAdjustmentRepository;
     private final FinanceProperties financeProperties;
+    private final CommissionPolicyService commissionPolicyService;
 
     // ── Ghi nhận doanh thu ────────────────────────────────────────────────────
 
@@ -497,6 +499,12 @@ public class ProviderRevenueService {
     private BigDecimal resolveCommissionRate(ProviderProfile providerProfile) {
         BigDecimal rate = providerProfile.getEffectiveCommissionRate();
         if (rate == null || rate.compareTo(BigDecimal.ZERO) == 0) {
+            // Ưu tiên chính sách hoa hồng đang hiệu lực do Admin quản lý (BR-05);
+            // chỉ fallback sang cấu hình tài chính mặc định khi chưa có chính sách nào.
+            BigDecimal policyRate = commissionPolicyService.getEffectiveRate();
+            if (policyRate != null && policyRate.compareTo(BigDecimal.ZERO) > 0) {
+                return policyRate;
+            }
             return financeProperties.getDefaultCommissionRate();
         }
         return rate;
