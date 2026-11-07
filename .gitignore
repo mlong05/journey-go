@@ -36,3 +36,4 @@ mobile/android/build/
 
 # Database backups
 *.dump
+.worktrees/
