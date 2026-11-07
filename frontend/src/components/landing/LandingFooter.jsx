@@ -29,7 +29,15 @@ const COLUMNS = [
     links: [
       { label: "Đăng nhập", href: ROUTES.LOGIN, internal: true },
       { label: "Tạo tài khoản", href: ROUTES.REGISTER, internal: true },
-      { label: "Trở thành Host", href: ROUTES.REGISTER, internal: true },
+      { label: "Trở thành Host", href: ROUTES.PARTNER_PROGRAM, internal: true },
+    ],
+  },
+  {
+    title: "Hợp tác",
+    links: [
+      { label: "Trở thành đối tác", href: ROUTES.PARTNER_PROGRAM, internal: true },
+      { label: "Điều khoản hợp tác", href: ROUTES.PARTNER_PROGRAM, internal: true },
+      { label: "Liên hệ hỗ trợ", href: ROUTES.PARTNER_PROGRAM, internal: true },
     ],
   },
 ];
