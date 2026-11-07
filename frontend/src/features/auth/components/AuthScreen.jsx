@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, ArrowLeft } from "lucide-react";
+import Image from "next/image";
+import { ArrowLeft } from "lucide-react";
 import Script from "next/script";
 import { ROUTES } from "@/constants/routes";
 import { STORAGE_KEYS } from "@/constants";
@@ -18,6 +19,7 @@ import RegisterForm from "./RegisterForm";
 import ForgotPasswordFlow from "./ForgotPasswordFlow";
 import SocialLoginButtons from "./SocialLoginButtons";
 import HeritageLandmarksArt from "./HeritageLandmarksArt";
+import BronzeDrumMotif from "@/components/ui/BronzeDrumMotif";
 import { translateAuthError } from "@/services/errorMessage";
 
 export default function AuthScreen({ initialTab = "login" }) {
@@ -488,70 +490,90 @@ export default function AuthScreen({ initialTab = "login" }) {
   return (
     <div
       suppressHydrationWarning
-      className="relative h-screen w-screen max-h-screen overflow-hidden bg-[#eef6fc] flex items-center justify-center p-3 sm:p-4 xl:p-8"
+      className="jg-auth relative h-screen w-screen overflow-hidden bg-white grid grid-cols-1 lg:grid-cols-12"
     >
-      {/* Vòng sáng nền mờ tạo độ sâu */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-sky-200/40 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
-
-      {/* Nút quay về xem Trang chủ nổi ở góc trên bên trái */}
-      <Link
-        href="/"
-        className="fixed top-4 left-4 sm:top-6 sm:left-6 z-50 inline-flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl bg-white/95 hover:bg-white text-slate-700 hover:text-emerald-600 shadow-md hover:shadow-lg border border-sky-100 backdrop-blur-md transition-all duration-200 font-semibold text-xs sm:text-sm group"
-        title="Quay lại Trang chủ Journey Go"
-      >
-        <ArrowLeft className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:-translate-x-0.5 transition-transform" />
-        <Home className="w-4 h-4 text-emerald-600" />
-        <span>Xem trang chủ</span>
-      </Link>
-
       {/* Modal phản hồi xác thực & chuyển hướng */}
       <AuthFeedbackModal feedbackModal={feedbackModal} />
 
-      {/* Card chính Split-screen 5/12 và 7/12 bo góc mềm mại như Hình 2 */}
-      <div
-        suppressHydrationWarning
-        className="relative w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1360px] h-[96vh] max-h-[920px] min-h-[580px] bg-white rounded-3xl xl:rounded-[36px] shadow-[0_20px_60px_-15px_rgba(0,159,227,0.18),0_10px_25px_-5px_rgba(0,0,0,0.04)] border border-sky-100/70 overflow-hidden grid grid-cols-1 lg:grid-cols-12 z-10"
-      >
-        {/* Toast thông báo */}
-        <AuthToast toast={toast} onClose={() => setToast(null)} />
+      {/* Toast thông báo */}
+      <AuthToast toast={toast} onClose={() => setToast(null)} />
 
-        {/* Cột trái Hero Banner Di sản & Du lịch văn hóa (5/12) */}
-        <AuthHeroCarousel />
+      {/* Cột trái: ảnh điểm đến văn hoá toàn chiều cao (ẩn trên mobile) */}
+      <AuthHeroCarousel />
 
-        {/* Cột phải Form Xác thực phỏng theo Hình 2 (7/12) */}
-        <div className="relative lg:col-span-7 col-span-12 flex flex-col justify-between overflow-hidden h-full bg-white p-6 sm:p-8 xl:p-12">
-          {/* Họa tiết máy bay lượn trên góc phải chuẩn xác theo Hình 2 */}
+      {/* Cột phải: logo + form, nội dung căn giữa */}
+      <div className="relative isolate lg:col-span-6 xl:col-span-7 col-span-12 h-screen overflow-y-auto overflow-x-hidden flex flex-col bg-white">
+        {/* Trống đồng Đông Sơn mờ ở góc dưới phải: nằm dưới mọi nội dung (-z-10), không bắt sự kiện chuột */}
+        <BronzeDrumMotif className="pointer-events-none absolute -z-10 -right-44 -bottom-44 w-[520px] h-[520px] text-amber-800/[0.07] motion-safe:animate-[spin_180s_linear_infinite]" />
+
+          {/* Dây đèn lồng Hội An đung đưa nhẹ ở góc phải */}
           <div
             aria-hidden="true"
-            className="absolute top-4 right-6 pointer-events-none select-none z-10 hidden sm:block"
+            className="absolute top-0 right-8 xl:right-12 pointer-events-none select-none z-10 hidden sm:flex items-start gap-4"
           >
-            <svg
-              className="w-32 h-20 text-[#009fe3]"
-              viewBox="0 0 120 70"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              {/* Đường bay cong chấm gạch mềm mại */}
-              <path
-                d="M 5 62 C 45 50, 78 22, 102 18"
-                stroke="#009fe3"
-                strokeWidth="1.6"
-                strokeDasharray="3.5 3.5"
-                strokeLinecap="round"
-              />
-              {/* Biểu tượng máy bay phản lực bay hướng góc phải */}
-              <g transform="translate(104, 18) rotate(48)">
-                <path
-                  d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"
-                  fill="#009fe3"
-                  transform="scale(0.85) translate(-11, -11)"
-                />
-              </g>
-            </svg>
+            {[
+              { h: 34, color: "#c2410c", delay: "0s", size: 1 },
+              { h: 58, color: "#b91c1c", delay: "0.6s", size: 1.15 },
+              { h: 22, color: "#d97706", delay: "1.2s", size: 0.9 },
+            ].map((l, i) => (
+              <span
+                key={i}
+                className="jg-lantern flex flex-col items-center origin-top"
+                style={{ animationDelay: l.delay }}
+              >
+                <span className="w-px bg-amber-900/40" style={{ height: l.h }} />
+                <svg width={26 * l.size} height={38 * l.size} viewBox="0 0 26 38">
+                  <rect x="9" y="0" width="8" height="3" rx="1" fill="#78350f" />
+                  <ellipse cx="13" cy="18" rx="12" ry="14" fill={l.color} />
+                  <path d="M13 4 Q5 18 13 32 M13 4 Q21 18 13 32" stroke="#fde68a" strokeOpacity="0.55" strokeWidth="1" fill="none" />
+                  <ellipse cx="13" cy="18" rx="12" ry="14" fill="url(#jg-lantern-glow)" />
+                  <rect x="9" y="31" width="8" height="3" rx="1" fill="#78350f" />
+                  <path d="M11 34 L10 38 M13 34 L13 38 M15 34 L16 38" stroke="#f59e0b" strokeWidth="1" />
+                  <defs>
+                    <radialGradient id="jg-lantern-glow" cx="0.4" cy="0.35" r="0.7">
+                      <stop offset="0" stopColor="#fef3c7" stopOpacity="0.55" />
+                      <stop offset="1" stopColor="#fef3c7" stopOpacity="0" />
+                    </radialGradient>
+                  </defs>
+                </svg>
+              </span>
+            ))}
           </div>
 
-          <div className="w-full flex flex-col justify-between h-full space-y-3 z-10">
+
+        {/* Logo thương hiệu (giống thanh bên trang quản trị) */}
+        <header className="relative z-10 shrink-0 px-6 sm:px-10 xl:px-14 pt-6 sm:pt-8 flex items-center justify-between gap-4">
+          <Link href={ROUTES.HOME} className="flex items-center gap-1.5 min-w-0" title="Về trang chủ JourneyGo">
+            <Image
+              src="/image/logo-emblem.png"
+              alt="JourneyGo"
+              width={372}
+              height={380}
+              priority
+              className="h-12 w-auto shrink-0"
+            />
+            <Image
+              src="/image/logo-wordmark.png"
+              alt="JourneyGo - đồng hành cùng bạn trong chuyến đi"
+              width={424}
+              height={104}
+              priority
+              className="h-9 w-auto min-w-0"
+            />
+          </Link>
+
+          {/* Trên mobile không có cột ảnh nên nút về trang chủ nằm ở đây */}
+          <Link
+            href={ROUTES.HOME}
+            className="lg:hidden inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-stone-200 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:border-emerald-200 transition-colors shrink-0"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Trang chủ
+          </Link>
+        </header>
+
+        <main className="relative z-10 flex-1 flex items-center justify-center px-6 sm:px-10 xl:px-14 py-8">
+          <div className="w-full max-w-[440px] space-y-5">
             {/* Chế độ Quên mật khẩu & Khôi phục bằng OTP */}
             {activeTab === "forgot_password" ? (
               <ForgotPasswordFlow
@@ -572,30 +594,23 @@ export default function AuthScreen({ initialTab = "login" }) {
               />
             ) : (
               <>
-                {/* Tiêu đề Chào mừng bạn quay trở lại */}
-                <div className="space-y-1 pt-1 sm:pt-2">
-                  <div className="flex items-center justify-between pb-1">
-                    <Link
-                      href="/"
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-600 transition-colors group"
-                    >
-                      <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 group-hover:-translate-x-0.5 transition-transform" />
-                      <span>Xem trang chủ Journey Go</span>
-                    </Link>
-                  </div>
-                  <h1 className="font-jakarta text-2xl sm:text-[26px] xl:text-[28px] font-bold text-[#009fe3] tracking-tight leading-snug">
-                    {activeTab === "login"
-                      ? "Chào mừng bạn quay trở lại"
-                      : "Đăng Ký Tài Khoản"}
+                <div className="space-y-1.5">
+                  {activeTab !== "login" && (
+                    <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700 leading-normal">
+                      <span className="w-5 h-px bg-amber-600/60" />
+                      Gia nhập hành trình
+                    </p>
+                  )}
+                  <h1 className="font-jakarta text-[26px] xl:text-[30px] font-bold text-emerald-900 tracking-tight leading-[1.3]">
+                    {activeTab === "login" ? "Chào mừng bạn quay trở lại" : "Đăng ký tài khoản"}
                   </h1>
-                  <p className="text-xs sm:text-sm font-medium text-slate-400 mt-0.5">
-                    {activeTab === "login"
-                      ? "Đăng nhập bằng Email & Mật khẩu"
-                      : "Khởi tạo tài khoản quản trị & đối tác"}
-                  </p>
+                  {activeTab !== "login" && (
+                    <p className="text-sm font-medium text-stone-500 leading-normal">
+                      Tạo tài khoản để đặt trải nghiệm cùng người bản địa
+                    </p>
+                  )}
                 </div>
 
-                {/* Form Đăng nhập hoặc Form Đăng ký */}
                 {activeTab === "login" ? (
                   <LoginForm
                     loginForm={loginForm}
@@ -620,53 +635,34 @@ export default function AuthScreen({ initialTab = "login" }) {
                   />
                 )}
 
-                {/* Các nút Đăng nhập nhanh Google / SSO / Apple chuẩn Hình 2 */}
                 <SocialLoginButtons
                   onSocialLogin={handleSocialLogin}
                   onGoogleLogin={handleGoogleClick}
                   loading={loading}
                 />
 
-                {/* Dòng liên kết chuyển đổi Đăng ký / Đăng nhập */}
-                <div className="text-center pt-1 w-full">
-                  {activeTab === "login" ? (
-                    <p className="text-xs text-slate-600">
-                      Chưa có tài khoản?{" "}
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("register")}
-                        className="font-bold text-slate-900 hover:text-[#009fe3] transition-colors cursor-pointer"
-                      >
-                        Đăng ký ngay
-                      </button>
-                    </p>
-                  ) : (
-                    <p className="text-xs text-slate-600">
-                      Đã có tài khoản?{" "}
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("login")}
-                        className="font-bold text-slate-900 hover:text-[#009fe3] transition-colors cursor-pointer"
-                      >
-                        Đăng nhập ngay
-                      </button>
-                    </p>
-                  )}
-                </div>
+                <p className="text-center text-sm text-slate-600 leading-normal">
+                  {activeTab === "login" ? "Chưa có tài khoản? " : "Đã có tài khoản? "}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(activeTab === "login" ? "register" : "login")}
+                    className="font-bold text-emerald-800 hover:text-emerald-600 transition-colors cursor-pointer"
+                  >
+                    {activeTab === "login" ? "Đăng ký ngay" : "Đăng nhập ngay"}
+                  </button>
+                </p>
               </>
             )}
-
-            {/* Footer bản quyền */}
-            <div className="text-center pt-0.5 w-full">
-              <p className="text-[10px] text-slate-400">
-                Bảo hộ bởi JourneyGo Identity Service • Phiên bản 2.5
-              </p>
-            </div>
           </div>
+        </main>
 
-          {/* Đồ họa danh thắng chân trang vector xanh ngọc chuẩn Hình 2 */}
+        {/* Chân trang: bản quyền + hình bóng di sản Việt (nằm trong luồng, không đè lên form) */}
+        <footer className="relative shrink-0 h-28 md:h-32">
+          <p className="relative z-10 text-center text-[11px] text-slate-400 leading-normal">
+            Bảo hộ bởi JourneyGo Identity Service • Phiên bản 2.5
+          </p>
           <HeritageLandmarksArt />
-        </div>
+        </footer>
       </div>
 
       {/* Nút Google chính thức (ẩn): nút tùy chỉnh bên trên sẽ kích hoạt nó */}

@@ -141,8 +141,12 @@ export default function AdminLayout({ children }) {
   const [isSidebarWide, setIsSidebarWide] = useState(true);
   const [topSearch, setTopSearch] = useState("");
 
-  // Trang Điểm đến & Trải nghiệm: khóa khung 100vh, cố định header & filter, chỉ danh sách tự cuộn
+  // Các trang khóa khung 100vh: header, thẻ số liệu & bộ lọc đứng yên, chỉ danh sách trong thẻ tự cuộn
   const isScrollLockedPage =
+    pathname === "/admin" ||
+    pathname?.startsWith("/admin/users") ||
+    pathname?.startsWith("/admin/badges") ||
+    pathname?.startsWith("/admin/finance") ||
     pathname?.startsWith("/admin/destinations") ||
     pathname?.startsWith("/admin/experiences") ||
     pathname?.startsWith("/admin/tours");
@@ -195,8 +199,8 @@ export default function AdminLayout({ children }) {
           <main
             className={
               isScrollLockedPage
-                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 bg-slate-50"
-                : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-slate-50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
+                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-3 sm:p-4 lg:p-5 bg-slate-50"
+                : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-5 bg-slate-50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
             }
           >
             <div

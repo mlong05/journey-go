@@ -31,15 +31,15 @@ export default function AuthFeedbackModal({ feedbackModal }) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -12 }}
             transition={{ type: "spring", damping: 28, stiffness: 360 }}
-            className="max-w-[380px] w-full bg-white rounded-[28px] p-6 sm:p-7 shadow-[0_25px_70px_-15px_rgba(0,159,227,0.25),0_15px_30px_-10px_rgba(15,23,42,0.1)] border border-sky-100/90 text-center relative overflow-hidden"
+            className="max-w-[380px] w-full bg-white rounded-[28px] p-6 sm:p-7 shadow-[0_25px_70px_-15px_rgba(0,159,227,0.25),0_15px_30px_-10px_rgba(15,23,42,0.1)] border border-emerald-100/90 text-center relative overflow-hidden"
           >
             {/* Vầng sáng ambient di sản tỏa nhẹ ở hai góc */}
-            <div className="absolute -top-16 -right-16 w-36 h-36 bg-sky-200/40 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-200/40 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-amber-200/35 rounded-full blur-3xl pointer-events-none" />
 
             {/* Logo Thương hiệu JourneyGo nhỏ gọn tinh tế ở góc trên */}
             <div className="flex items-center justify-center gap-1.5 pb-4 text-[11px] font-bold tracking-wider uppercase text-slate-400">
-              <Compass className="w-3.5 h-3.5 text-[#009fe3]" />
+              <Compass className="w-3.5 h-3.5 text-emerald-800" />
               <span>JourneyGo • Hành Trình Di Sản</span>
             </div>
 
@@ -50,7 +50,7 @@ export default function AuthFeedbackModal({ feedbackModal }) {
                 initial={{ rotate: 0 }}
                 animate={{ rotate: 360 }}
                 transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 rounded-full border border-dashed border-[#009fe3]/40"
+                className="absolute inset-0 rounded-full border border-dashed border-emerald-600/40"
               />
 
               {/* Vòng nền gradient đôi cao cấp */}
@@ -58,10 +58,10 @@ export default function AuthFeedbackModal({ feedbackModal }) {
                 initial={{ scale: 0.7, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.45, ease: "easeOut" }}
-                className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#009fe3] to-sky-400 p-0.5 shadow-lg shadow-[#009fe3]/30 flex items-center justify-center"
+                className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-amber-400 p-0.5 shadow-lg shadow-emerald-900/20 flex items-center justify-center"
               >
                 <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-sky-50/60" />
+                  <div className="absolute inset-0 bg-emerald-50/60" />
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
@@ -71,7 +71,7 @@ export default function AuthFeedbackModal({ feedbackModal }) {
                       stiffness: 400,
                       damping: 18,
                     }}
-                    className="relative z-10 w-9 h-9 rounded-full bg-gradient-to-tr from-[#009fe3] to-teal-500 flex items-center justify-center text-white shadow-sm"
+                    className="relative z-10 w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-sm"
                   >
                     <Check className="w-5 h-5 stroke-[2.5]" />
                   </motion.div>
@@ -89,7 +89,7 @@ export default function AuthFeedbackModal({ feedbackModal }) {
 
               {/* Huy hiệu định danh vai trò chuyên môn */}
               {feedbackModal.roleBadge && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200/70 shadow-2xs my-1">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-amber-200/70 shadow-2xs my-1">
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                   <span>{feedbackModal.roleBadge}</span>
                 </div>
@@ -103,12 +103,12 @@ export default function AuthFeedbackModal({ feedbackModal }) {
                   initial={{ width: "0%" }}
                   animate={{ width: "100%" }}
                   transition={{ duration: 1.25, ease: "easeInOut" }}
-                  className="h-full bg-gradient-to-r from-[#009fe3] to-teal-400 rounded-full"
+                  className="h-full bg-gradient-to-r from-emerald-600 to-teal-400 rounded-full"
                 />
               </div>
 
               <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 mt-2.5 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#009fe3] animate-ping" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-ping" />
                 <span>Đang kết nối phiên làm việc, vui lòng chờ giây lát...</span>
               </div>
             </div>

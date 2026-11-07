@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Star, BadgeCheck, ArrowRight, Quote, MapPin } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import SectionHeading from "./SectionHeading";
+import Reveal from "./Reveal";
 
 const HOSTS = [
   {
@@ -44,7 +45,7 @@ const HOSTS = [
 
 export default function HostSpotlight() {
   return (
-    <section id="cau-chuyen-host" className="py-20 bg-white scroll-mt-16">
+    <section id="cau-chuyen-host" className="py-20 sm:py-24 bg-white scroll-mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading
           eyebrow="Những người bạn đồng hành"
@@ -53,10 +54,10 @@ export default function HostSpotlight() {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {HOSTS.map((host) => (
+          {HOSTS.map((host, i) => (
+            <Reveal key={host.id} delay={i * 0.1}>
             <article
-              key={host.id}
-              className="bg-white border border-slate-200 rounded-xl shadow-xs p-6 flex flex-col"
+              className="h-full bg-white border border-slate-200 rounded-2xl shadow-xs p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/10"
             >
               <Quote size={22} className="text-emerald-600/40" />
               <p className="mt-3 text-[15px] text-slate-700 leading-relaxed flex-1">
@@ -72,7 +73,7 @@ export default function HostSpotlight() {
                     {host.name}
                     <BadgeCheck size={14} className="text-emerald-600" />
                   </p>
-                  <p className="text-xs text-slate-500 truncate">{host.role}</p>
+                  <p className="text-xs text-slate-500 leading-normal truncate">{host.role}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="flex items-center justify-end gap-1 text-sm font-semibold text-slate-900 tabular-nums">
@@ -86,11 +87,13 @@ export default function HostSpotlight() {
                 </div>
               </div>
             </article>
+            </Reveal>
           ))}
         </div>
 
         {/* Kêu gọi làm Host */}
-        <div className="mt-10 rounded-xl border border-emerald-200 bg-emerald-50/70 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <Reveal className="mt-10">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="max-w-2xl">
             <h3 className="text-lg sm:text-xl font-semibold text-slate-900">
               Bạn có câu chuyện hay và trải nghiệm độc đáo muốn chia sẻ?
@@ -108,6 +111,7 @@ export default function HostSpotlight() {
             <ArrowRight size={16} />
           </Link>
         </div>
+        </Reveal>
       </div>
     </section>
   );
