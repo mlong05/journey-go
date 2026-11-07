@@ -70,7 +70,7 @@ export const TOUR_STATUS_META = {
     cls: "bg-slate-100 text-slate-600 border-slate-200",
     dot: "bg-slate-400",
   },
-  PENDING: {
+  PENDING_REVIEW: {
     label: "Chờ duyệt",
     cls: "bg-amber-50 text-amber-700 border-amber-200",
     dot: "bg-amber-500",
@@ -85,6 +85,16 @@ export const TOUR_STATUS_META = {
     label: "Bị từ chối",
     cls: "bg-rose-50 text-rose-700 border-rose-200",
     dot: "bg-rose-500",
+  },
+  CHANGES_REQUESTED: {
+    label: "Cần chỉnh sửa",
+    cls: "bg-orange-50 text-orange-700 border-orange-200",
+    dot: "bg-orange-500",
+  },
+  PAUSED: {
+    label: "Tạm ngừng bán",
+    cls: "bg-slate-100 text-slate-600 border-slate-300",
+    dot: "bg-slate-400",
   },
   DELETED: {
     label: "Đã xoá",
@@ -113,7 +123,7 @@ export const TOUR_TYPE_OPTIONS = Object.entries(TOUR_TYPE_META).map(
 /**
  * Thứ tự hiển thị của bảng điều khiển lọc, khớp thứ tự khai báo trong enum backend.
  */
-export const TOUR_STATUS_ORDER = ["DRAFT", "PENDING", "PUBLISHED", "REJECTED"];
+export const TOUR_STATUS_ORDER = ["DRAFT", "PENDING_REVIEW", "CHANGES_REQUESTED", "PUBLISHED", "PAUSED", "REJECTED"];
 
 /** Trạng thái mà một tour được phép gửi duyệt (submit). */
 export const SUBMITTABLE_STATUSES = ["DRAFT", "REJECTED"];
@@ -170,7 +180,7 @@ export function formatDuration(days) {
 /**
  * Chuẩn hoá response thô của backend về dạng dùng chung cho UI.
  * Hỗ trợ cả TourResponse trực tiếp và TourReviewResponse từ moderation.
- * Backend trả `status` (DRAFT/PENDING/APPROVED/PUBLISHED/REJECTED) kèm cờ `deleted`.
+ * Backend trả `status` (DRAFT/PENDING_REVIEW/CHANGES_REQUESTED/REJECTED/PUBLISHED/PAUSED) kèm cờ `deleted`.
  */
 export function normalizeTour(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -203,6 +213,8 @@ export function normalizeTour(raw) {
     createdBy: inner.createdBy || raw.reviewerName || "",
     createdAt: inner.createdAt || raw.submittedAt || null,
     updatedAt: inner.updatedAt || raw.reviewedAt || null,
+    // Tour tạo theo luồng 5 bước → dùng màn hình wizard / thẩm định mới thay cho form & nút duyệt cũ.
+    wizardTour: inner.wizardTour === true || raw.wizardTour === true,
   };
 }
 
