@@ -30,6 +30,8 @@ import {
 import { taskTypeService, TaskTypeManagerModal } from "@/features/experience";
 import { regionService } from "@/features/destination";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import ThemeCatalogCard from "@/features/catalog/components/ThemeCatalogCard";
+import RewardSettingsCard from "@/features/catalog/components/RewardSettingsCard";
 
 /**
  * Trang Cấu Hình Danh Mục & Luật Hệ Thống (System Config & Rules) - JourneyGo
@@ -63,45 +65,6 @@ export default function AdminSystemConfigPage() {
   const [newRegionName, setNewRegionName] = useState("");
   const [regionActionLoading, setRegionActionLoading] = useState(false);
 
-  // Danh mục Chủ đề di sản (sẵn sàng gắn API)
-  const [themes, setThemes] = useState([
-    {
-      id: "theme-01",
-      name: "Di tích lịch sử",
-      description: "Đền đài, chùa cổ, hoàng thành, khu chiến tích và lăng tẩm",
-      iconName: "Landmark",
-      count: 0,
-      color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      isVisible: true,
-    },
-    {
-      id: "theme-02",
-      name: "Làng nghề truyền thống",
-      description: "Làng nghề thủ công mỹ nghệ, làng gốm, lụa, tranh dân gian",
-      iconName: "Compass",
-      count: 0,
-      color: "bg-amber-50 text-amber-800 border-amber-200",
-      isVisible: true,
-    },
-    {
-      id: "theme-03",
-      name: "Danh thắng thiên nhiên",
-      description: "Quần thể danh thắng, hang động, vịnh biển, sinh thái di sản",
-      iconName: "MapPin",
-      count: 0,
-      color: "bg-sky-50 text-sky-700 border-sky-200",
-      isVisible: true,
-    },
-    {
-      id: "theme-04",
-      name: "Ẩm thực dân gian",
-      description: "Văn hóa ẩm thực cổ truyền, đặc sản địa phương",
-      iconName: "Utensils",
-      count: 0,
-      color: "bg-rose-50 text-rose-700 border-rose-200",
-      isVisible: true,
-    },
-  ]);
 
   // Danh mục loại nhiệm vụ thực địa (kết nối live API TaskType)
   const [taskTypes, setTaskTypes] = useState([]);
@@ -260,13 +223,6 @@ export default function AdminSystemConfigPage() {
     } finally {
       setRegionActionLoading(false);
     }
-  };
-
-  // Toggle ẩn/hiện Chủ đề
-  const handleToggleThemeVisibility = (id) => {
-    setThemes((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, isVisible: !t.isVisible } : t))
-    );
   };
 
   // Toggle kích hoạt loại nhiệm vụ
@@ -514,53 +470,8 @@ export default function AdminSystemConfigPage() {
             )}
           </div>
 
-          {/* 1.2 Quản lý danh mục Chủ đề di sản */}
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
-            <div className="pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-900">
-                Chủ Đề & Thể Loại Di Sản
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Các phân loại văn hóa chuẩn hóa giúp AI phân loại nội dung thuyết minh và nhiệm vụ du khách
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {themes.map((theme) => (
-                <div
-                  key={theme.id}
-                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
-                    theme.isVisible
-                      ? "bg-white border-slate-200 shadow-2xs hover:border-slate-300"
-                      : "bg-slate-50 border-slate-200 opacity-60"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-bold border mb-1.5 ${theme.color}`}
-                      >
-                        {theme.count} điểm di tích
-                      </span>
-                      <h4 className="font-bold text-slate-900 text-sm">{theme.name}</h4>
-                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        {theme.description}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleToggleThemeVisibility(theme.id)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-                      title={theme.isVisible ? "Ẩn phân loại" : "Hiện phân loại"}
-                    >
-                      {theme.isVisible ? <Eye size={16} /> : <EyeOff size={16} />}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* 1.2 Quản lý Chủ đề tour (live API /themes) */}
+          <ThemeCatalogCard />
 
           {/* 1.3 Quản lý Loại nhiệm vụ tương tác thực địa (TaskType Master Data) */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
@@ -654,6 +565,9 @@ export default function AdminSystemConfigPage() {
       ──────────────────────────────────────────────────────── */}
       {activeTab === "gamification" && (
         <div className="space-y-6">
+          {/* Điểm thưởng tour (live API /reward-settings) */}
+          <RewardSettingsCard />
+
           {/* Định mức điểm */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
             <div className="pb-3 border-b border-slate-100">
