@@ -294,12 +294,6 @@ export default function ProviderOverviewPage() {
         footer={
           <div className="flex items-center justify-between">
             <span>Hiển thị {filteredDestinations.length} / {managedDestinations.length} điểm đến</span>
-            <Link
-              href="/provider/destinations"
-              className="inline-flex items-center gap-1 font-semibold text-slate-600 hover:text-slate-900"
-            >
-              Quản lý tất cả <ChevronRight size={13} />
-            </Link>
           </div>
         }
       >
@@ -311,17 +305,15 @@ export default function ProviderOverviewPage() {
                 <th className="py-3 px-4">Tọa độ GPS</th>
                 <th className="py-3 px-4">Lượt check-in</th>
                 <th className="py-3 px-4">Trạng thái</th>
-                <th className="py-3 px-5 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredDestinations.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={4}>
                     <EmptyBlock
                       icon={Inbox}
                       title={isLoading ? "Đang tải điểm đến…" : "Chưa có điểm đến di tích nào trong danh sách."}
-                      description="Vào Quản lý Điểm đến để khai báo điểm mới và gửi hồ sơ thẩm định."
                     />
                   </td>
                 </tr>
@@ -357,15 +349,6 @@ export default function ProviderOverviewPage() {
                           <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
                           {status.label}
                         </span>
-                      </td>
-                      <td className="py-3.5 px-5 text-right">
-                        <Link
-                          href="/provider/destinations"
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors"
-                        >
-                          Quản lý
-                          <ChevronRight size={13} />
-                        </Link>
                       </td>
                     </tr>
                   );

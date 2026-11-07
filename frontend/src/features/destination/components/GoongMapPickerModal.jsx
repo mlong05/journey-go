@@ -25,8 +25,8 @@ function parseCoord(val, fallback) {
   return Number.isFinite(num) && num !== 0 ? num : fallback;
 }
 
-/** Nạp goong-js (CSS + JS) từ CDN một lần. */
-function loadGoongJs() {
+/** Nạp goong-js (CSS + JS) từ CDN một lần. Dùng chung cho bản đồ xem trước checkpoint của tour. */
+export function loadGoongJs() {
   if (typeof window === "undefined") return Promise.reject(new Error("No window"));
   if (window.goongjs) return Promise.resolve(window.goongjs);
 

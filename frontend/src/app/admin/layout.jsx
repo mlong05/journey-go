@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
-  MapPin,
   CreditCard,
   Settings,
   Route,
@@ -15,6 +14,8 @@ import {
   ShieldAlert,
   Handshake,
   BadgePercent,
+  Globe2,
+  Tags,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -60,10 +61,17 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
-    id: "destinations",
-    label: "Quản lý điểm đến",
-    href: "/admin/destinations",
-    icon: MapPin,
+    id: "regions",
+    label: "Quản lý khu vực",
+    href: "/admin/regions",
+    icon: Globe2,
+    badge: null,
+  },
+  {
+    id: "themes",
+    label: "Quản lý chủ đề",
+    href: "/admin/themes",
+    icon: Tags,
     badge: null,
   },
   {
@@ -147,8 +155,6 @@ export default function AdminLayout({ children }) {
     pathname?.startsWith("/admin/users") ||
     pathname?.startsWith("/admin/badges") ||
     pathname?.startsWith("/admin/finance") ||
-    pathname?.startsWith("/admin/destinations") ||
-    pathname?.startsWith("/admin/experiences") ||
     pathname?.startsWith("/admin/tours");
 
   // Xử lý tìm kiếm nhanh từ Topbar
