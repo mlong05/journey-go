@@ -163,6 +163,28 @@ pre {
   .slide-in-from-top-3 {
     --tw-enter-translate-y: -0.75rem;
   }
+
+  .slide-in-from-bottom-2 {
+    --tw-enter-translate-y: 0.5rem;
+  }
+
+  .slide-in-from-right {
+    --tw-enter-translate-x: 100%;
+  }
+
+  /* Chuyển trang / chuyển bước: hiện dần + trượt nhẹ lên (dùng kèm key thay đổi để chạy lại). */
+  .jg-page-enter {
+    animation: jg-enter 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    --tw-enter-opacity: 0;
+    --tw-enter-translate-y: 0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .jg-page-enter {
+    animation: none !important;
+  }
 }
 
 /* =========================================================================
