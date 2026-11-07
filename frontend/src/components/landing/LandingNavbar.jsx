@@ -14,25 +14,35 @@ const NAV_LINKS = [
   { href: "#cau-chuyen-host", label: "Host bản địa" },
 ];
 
-export function BrandLogo({ subtitle = true, light = false }) {
+/**
+ * Logo thương hiệu — cùng bộ ảnh với trang đăng nhập và thanh bên dashboard
+ * (biểu tượng + chữ "JourneyGo!" kèm khẩu hiệu).
+ * Dùng bản ảnh nền trong suốt (`*-clear.png`) để hoà vào header.
+ * `light`: đang nằm trên ảnh hero tối ⇒ dùng bản chữ sáng (chữ trắng, giữ "Go!" màu cam).
+ */
+export function BrandLogo({ light = false }) {
   return (
-    <Link href={ROUTES.HOME} className="flex items-center gap-2.5 shrink-0">
+    <Link
+      href={ROUTES.HOME}
+      title="Về trang chủ JourneyGo"
+      className="flex items-center gap-1.5 shrink-0 min-w-0"
+    >
       <Image
-        src="/image/logo-mark.png"
+        src="/image/logo-emblem-clear.png"
         alt="JourneyGo"
-        width={96}
-        height={96}
+        width={372}
+        height={380}
         priority
-        className="w-9 h-9 rounded-[22%]"
+        className="h-10 w-auto shrink-0"
       />
-      <div className="leading-tight">
-        <p className={`text-[17px] font-semibold tracking-tight leading-normal transition-colors ${light ? "text-white" : "text-slate-900"}`}>
-          Journey<span className={light ? "text-rose-400" : "text-rose-600"}>Go</span>
-        </p>
-        {subtitle && (
-          <p className={`text-[11px] leading-normal transition-colors ${light ? "text-white/70" : "text-slate-500"}`}>Du lịch trải nghiệm</p>
-        )}
-      </div>
+      <Image
+        src={light ? "/image/logo-wordmark-light.png" : "/image/logo-wordmark-clear.png"}
+        alt="JourneyGo - đồng hành cùng bạn trong chuyến đi"
+        width={424}
+        height={104}
+        priority
+        className="h-8 w-auto min-w-0"
+      />
     </Link>
   );
 }
