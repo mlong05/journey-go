@@ -36,6 +36,19 @@ export const ROUTES = {
   PROFILE: "/profile",
   SETTINGS: "/settings",
 
+  // ── Đăng ký trở thành đối tác ─────────────────────────────────────────────
+  /** Luồng đăng ký đối tác (4 giai đoạn) — link đặt ở footer trang chủ. */
+  PARTNER_REGISTER: "/partner-register",
+  PARTNER_REGISTER_SUCCESS: "/partner-register/success",
+  /** Trang giới thiệu quyền lợi hợp tác + nút "Bắt đầu" (đích của link footer). */
+  PARTNER_PROGRAM: "/partner-program",
+  /** Admin — quản lý đối tác (duyệt đơn đăng ký). */
+  ADMIN_PARTNERS: "/admin/partners",
+  /** Admin — quản lý chính sách hoa hồng. */
+  ADMIN_COMMISSION_POLICIES: "/admin/commission-policies",
+  /** Thiết lập mật khẩu lần đầu cho đối tác (link trong email duyệt). */
+  ACTIVATE: "/activate",
+
   // ── Khu vực quản trị ──────────────────────────────────────────────────────
   ADMIN: "/admin",
   ADMIN_FINANCE: "/admin/finance",

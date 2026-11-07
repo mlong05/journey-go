@@ -101,7 +101,7 @@ export default function HostSpotlight() {
             </p>
           </div>
           <Link
-            href={ROUTES.REGISTER}
+            href={ROUTES.PARTNER_PROGRAM}
             className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold shadow-xs transition-colors shrink-0"
           >
             Đăng ký làm Host

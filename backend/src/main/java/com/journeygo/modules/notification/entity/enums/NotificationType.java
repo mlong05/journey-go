@@ -17,6 +17,7 @@ public enum NotificationType {
     // ── Admin ────────────────────────────────────────────────────────────────
     REFUND_REQUESTED(Category.REFUND),
     ADJUSTMENT_PENDING(Category.FINANCE),
+    PARTNER_APPLICATION_PENDING(Category.REVIEW),
 
     // ── Provider ─────────────────────────────────────────────────────────────
     DESTINATION_APPROVED(Category.APPROVED),
@@ -30,6 +31,8 @@ public enum NotificationType {
     BOOKING_RECEIVED(Category.BOOKING),
     SETTLEMENT_APPROVED(Category.FINANCE),
     SETTLEMENT_REJECTED(Category.REJECTED),
+    PARTNER_APPLICATION_APPROVED(Category.APPROVED),
+    PARTNER_APPLICATION_REJECTED(Category.REJECTED),
 
     // ── Du khách ─────────────────────────────────────────────────────────────
     PAYMENT_SUCCESS(Category.BOOKING),
