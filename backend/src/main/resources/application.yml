@@ -230,3 +230,15 @@ cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME:}
   api-key: ${CLOUDINARY_API_KEY:}
   api-secret: ${CLOUDINARY_API_SECRET:}
+
+# AI Virtual Guide (RAG) Configuration
+journeygo:
+  ai:
+    api-key: ${GEMINI_API_KEY:}
+    base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+    embedding-model: ${GEMINI_EMBEDDING_MODEL:text-embedding-004}
+    chat-model: ${GEMINI_CHAT_MODEL:gemini-1.5-flash}
+    chunk-size: 400
+    chunk-overlap: 50
+    top-k: 4
+

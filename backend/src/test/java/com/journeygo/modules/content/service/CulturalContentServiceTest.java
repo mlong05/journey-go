@@ -40,6 +40,9 @@ class CulturalContentServiceTest {
     @Mock
     private com.journeygo.modules.media.service.CloudinaryImageService cloudinaryImageService;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private CulturalContentService culturalContentService;
 
