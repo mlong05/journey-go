@@ -13,6 +13,8 @@ import {
   Award,
   HandCoins,
   ShieldAlert,
+  Handshake,
+  BadgePercent,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -34,6 +36,20 @@ const ADMIN_NAV_ITEMS = [
     label: "Quản lý người dùng",
     href: "/admin/users",
     icon: Users,
+    badge: null,
+  },
+  {
+    id: "partners",
+    label: "Quản lý đối tác",
+    href: "/admin/partners",
+    icon: Handshake,
+    badge: null,
+  },
+  {
+    id: "commission-policies",
+    label: "Chính sách hoa hồng",
+    href: "/admin/commission-policies",
+    icon: BadgePercent,
     badge: null,
   },
   {
