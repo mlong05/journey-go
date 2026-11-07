@@ -1,5 +1,6 @@
 import { Star, BadgeCheck, MapPin } from "lucide-react";
 import SectionHeading from "./SectionHeading";
+import Reveal from "./Reveal";
 
 const REVIEWS = [
   {
@@ -39,7 +40,7 @@ const REVIEWS = [
 
 export default function TestimonialSection() {
   return (
-    <section className="py-20 bg-slate-50/70 border-t border-slate-100">
+    <section className="py-20 sm:py-24 bg-slate-50/70 border-t border-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading
           align="center"
@@ -49,10 +50,10 @@ export default function TestimonialSection() {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {REVIEWS.map((rev) => (
+          {REVIEWS.map((rev, i) => (
+            <Reveal key={rev.id} delay={i * 0.1}>
             <article
-              key={rev.id}
-              className="bg-white border border-slate-200 rounded-xl shadow-xs p-6 flex flex-col"
+              className="h-full bg-white border border-slate-200 rounded-2xl shadow-xs p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/10"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-0.5">
@@ -69,7 +70,7 @@ export default function TestimonialSection() {
 
               <p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-2">
                 <MapPin size={13} className="shrink-0" />
-                <span className="truncate">{rev.experience}</span>
+                <span className="truncate leading-normal">{rev.experience}</span>
               </p>
 
               <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-3">
@@ -85,6 +86,7 @@ export default function TestimonialSection() {
                 </div>
               </div>
             </article>
+            </Reveal>
           ))}
         </div>
       </div>

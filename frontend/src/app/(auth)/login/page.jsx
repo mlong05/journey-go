@@ -17,10 +17,10 @@ function LoadingFallback({ message }) {
   return (
     <div
       suppressHydrationWarning
-      className="h-screen w-screen flex items-center justify-center bg-[#eef6fc]"
+      className="h-screen w-screen flex items-center justify-center bg-white"
       aria-hidden="true"
     >
-      <div className="animate-pulse text-[#009fe3] text-sm font-semibold tracking-wide">
+      <div className="animate-pulse text-emerald-800 text-sm font-semibold tracking-wide">
         {message}
       </div>
     </div>

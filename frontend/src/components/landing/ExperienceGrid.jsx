@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ArrowRight, Inbox, X } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import ExperienceCard from "./ExperienceCard";
@@ -151,6 +152,7 @@ export default function ExperienceGrid({
   onClearDestination,
 }) {
   const [sortTab, setSortTab] = useState("popular");
+  const reduce = useReducedMotion();
 
   const filteredExperiences = useMemo(() => {
     const q = searchDestination.toLowerCase();
@@ -168,7 +170,7 @@ export default function ExperienceGrid({
   }, [activeCategory, searchDestination, sortTab]);
 
   return (
-    <section id="trai-nghiem" className="py-20 bg-slate-50/70 scroll-mt-16">
+    <section id="trai-nghiem" className="py-20 sm:py-24 bg-slate-50/70 scroll-mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading
           eyebrow="Khám phá khoảnh khắc chân thực"
@@ -210,11 +212,24 @@ export default function ExperienceGrid({
         </div>
 
         {filteredExperiences.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {filteredExperiences.map((exp) => (
-              <ExperienceCard key={exp.id} item={exp} />
-            ))}
-          </div>
+          <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {filteredExperiences.map((exp, i) => (
+                <motion.div
+                  key={exp.id}
+                  layout={!reduce}
+                  initial={reduce ? false : { opacity: 0, y: 32 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.15 }}
+                  exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.2 } }}
+                  transition={{ duration: 0.6, delay: (i % 4) * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                  className="h-full"
+                >
+                  <ExperienceCard item={exp} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
         ) : (
           <div className="py-16 text-center bg-white rounded-xl border border-dashed border-slate-300">
             <div className="mx-auto w-11 h-11 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">

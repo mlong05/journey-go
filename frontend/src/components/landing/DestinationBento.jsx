@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MapPin, ArrowUpRight } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import SectionHeading from "./SectionHeading";
+import Reveal from "./Reveal";
 
 const DESTINATIONS = [
   {
@@ -46,7 +47,7 @@ const DESTINATIONS = [
 
 export default function DestinationBento() {
   return (
-    <section id="diem-den" className="py-20 bg-white scroll-mt-16">
+    <section id="diem-den" className="py-20 sm:py-24 bg-white scroll-mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeading
           eyebrow="Miền đất di sản"
@@ -63,18 +64,18 @@ export default function DestinationBento() {
         </SectionHeading>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 auto-rows-[220px]">
-          {DESTINATIONS.map((dest) => (
+          {DESTINATIONS.map((dest, i) => (
+            <Reveal key={dest.id} delay={i * 0.08} className={dest.className || ""}>
             <Link
-              key={dest.id}
               href={ROUTES.LOGIN}
-              className={`group relative rounded-xl overflow-hidden border border-slate-200 ${dest.className || ""}`}
+              className="group relative block h-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-100"
             >
               <Image
                 src={dest.image}
                 alt={dest.name}
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover group-hover:scale-105 transition-transform duration-700"
+                className="object-cover group-hover:scale-110 transition-transform duration-[1200ms] ease-out"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
 
@@ -92,10 +93,11 @@ export default function DestinationBento() {
                   <MapPin size={13} />
                   {dest.experiencesCount} trải nghiệm
                 </p>
-                <h3 className="mt-1 text-xl font-semibold">{dest.name}</h3>
-                <p className="mt-0.5 text-sm text-slate-200 line-clamp-1">{dest.tagline}</p>
+                <h3 className="mt-1 text-xl font-semibold leading-normal">{dest.name}</h3>
+                <p className="mt-0.5 text-sm text-slate-200 leading-normal line-clamp-1 transition-all duration-500 group-hover:text-white">{dest.tagline}</p>
               </div>
             </Link>
+            </Reveal>
           ))}
         </div>
       </div>

@@ -10,14 +10,14 @@ export default function ExperienceCard({ item }) {
   const [isLiked, setIsLiked] = useState(false);
 
   return (
-    <article className="group flex flex-col bg-white rounded-xl border border-slate-200 shadow-xs hover:shadow-md hover:border-slate-300 transition-all overflow-hidden">
+    <article className="group h-full flex flex-col bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-xl hover:shadow-slate-900/10 hover:-translate-y-1 hover:border-slate-300 transition-all duration-300 overflow-hidden">
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
         <Image
           src={item.image}
           alt={item.title}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          className="object-cover group-hover:scale-105 transition-transform duration-500"
+          className="object-cover group-hover:scale-110 transition-transform duration-700"
         />
 
         {item.badge && (
@@ -53,7 +53,8 @@ export default function ExperienceCard({ item }) {
           </span>
         </div>
 
-        <h3 className="mt-2 text-[15px] font-semibold text-slate-900 leading-snug line-clamp-2 group-hover:text-emerald-700 transition-colors">
+        {/* line-clamp có overflow:hidden: giữ line-height ≥ 1.45 để dấu tiếng Việt dòng đầu không bị cắt */}
+        <h3 className="mt-2 text-[15px] font-semibold text-slate-900 leading-[1.45] line-clamp-2 group-hover:text-emerald-700 transition-colors">
           {item.title}
         </h3>
 

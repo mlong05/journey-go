@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, MapPin, Clock, Users, CheckCircle2, ArrowRight, Plus, Route } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import Reveal from "./Reveal";
 
 const FEATURES = [
   {
@@ -25,11 +26,11 @@ const DAYS = [
 
 export default function TripPlannerTeaser() {
   return (
-    <section id="lich-trinh" className="py-20 bg-slate-50/70 border-y border-slate-100 scroll-mt-16">
+    <section id="lich-trinh" className="py-20 sm:py-24 bg-slate-50/70 border-y border-slate-100 scroll-mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-        <div>
-          <p className="text-sm font-medium text-emerald-700 mb-2">Độc quyền trên JourneyGo</p>
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-slate-900 leading-tight">
+        <Reveal x={-32} y={0}>
+          <p className="text-sm font-medium text-emerald-700 mb-2 leading-normal">Độc quyền trên JourneyGo</p>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-slate-900 leading-[1.25] text-balance">
             Tự tay thiết kế kế hoạch chuyến đi chỉ trong vài phút.
           </h2>
           <p className="mt-4 text-base text-slate-600 leading-relaxed">
@@ -58,17 +59,18 @@ export default function TripPlannerTeaser() {
             Tạo lịch trình miễn phí
             <ArrowRight size={16} />
           </Link>
-        </div>
+        </Reveal>
 
         {/* Mô phỏng giao diện lịch trình — cùng phong cách bảng điều khiển */}
-        <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+        <Reveal x={32} y={0} delay={0.1}>
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-900/10 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
                 <CalendarDays size={17} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900 truncate">
+                <p className="text-sm font-semibold text-slate-900 leading-normal truncate">
                   Hành trình mùa hoa tam giác mạch
                 </p>
                 <p className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
@@ -90,7 +92,7 @@ export default function TripPlannerTeaser() {
                   {d.day}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-900 truncate">{d.title}</p>
+                  <p className="text-sm font-semibold text-slate-900 leading-normal truncate">{d.title}</p>
                   <p className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
                     <Clock size={12} /> {d.meta}
                   </p>
@@ -110,6 +112,7 @@ export default function TripPlannerTeaser() {
             </span>
           </div>
         </div>
+        </Reveal>
       </div>
     </section>
   );

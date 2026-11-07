@@ -17,7 +17,23 @@ const TONES = {
   slate: { chip: "bg-slate-100 text-slate-600", bar: "bg-slate-400", dot: "bg-slate-400" },
 };
 
-export function PageHeader({ title, description, eyebrow, meta, children }) {
+export function PageHeader({ title, description, eyebrow, meta, children, compact = false }) {
+  // compact: một hàng thấp (bỏ eyebrow + mô tả) để nhường chiều cao cho danh sách bên dưới
+  if (compact) {
+    return (
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <h1
+          className="min-w-0 text-lg sm:text-xl font-bold tracking-tight text-slate-900 truncate"
+          title={description || undefined}
+        >
+          {title}
+        </h1>
+        {children && (
+          <div className="flex flex-wrap items-center gap-2 shrink-0">{children}</div>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
       <div className="min-w-0">
@@ -89,8 +105,35 @@ export function StatCard({
   badge, // { text, positive }
   href,
   linkText = "Chi tiết",
+  compact = false,
 }) {
   const t = TONES[tone] || TONES.slate;
+  if (compact) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl px-3.5 py-3 shadow-xs flex items-center gap-3 min-w-0">
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${t.chip}`}>
+          {Icon && <Icon size={17} strokeWidth={1.9} />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-slate-600 truncate" title={title}>{title}</p>
+          <div className="mt-0.5 flex items-center justify-between gap-2">
+            <p className="min-w-0 flex items-baseline gap-1 text-lg font-bold tracking-tight text-slate-900 tabular-nums leading-tight">
+              <span className="truncate">{value}</span>
+              {unit && <span className="text-[11px] font-semibold text-slate-400">{unit}</span>}
+            </p>
+            {badge && (
+              <span
+                className="min-w-0 truncate px-1.5 py-0.5 rounded-md text-[10.5px] font-bold bg-slate-100 text-slate-600"
+                title={badge.text}
+              >
+                {badge.text}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col gap-4 hover:border-slate-300 transition-colors">
       <div className="flex items-start justify-between gap-3">
