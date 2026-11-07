@@ -819,7 +819,7 @@ export default function ToursManager({
 
   /* ── Tiêu đề trang + nút thao tác (dùng chung cho mọi vai trò) ─── */
   const renderHeader = () => (
-    <PageHeader title={heading} description={description}>
+    <PageHeader compact title={heading} description={description}>
       <button
         type="button"
         onClick={loadList}
@@ -850,7 +850,7 @@ export default function ToursManager({
      DANH SÁCH DẠNG HÀNG (Provider / Moderator / Admin)
      ══════════════════════════════════════════════════════════════ */
   return (
-    <div className="h-full min-h-0 flex flex-col gap-4 overflow-hidden animate-in fade-in-50 duration-200">
+    <div className="h-full min-h-0 flex flex-col gap-3 overflow-hidden animate-in fade-in-50 duration-200">
       <Toast msg={toastMsg} tone={toastTone} />
 
       <div className="shrink-0">{renderHeader()}</div>
@@ -899,7 +899,7 @@ export default function ToursManager({
       </section>
 
       {/* ── THANH LỌC ────────────────────────────────────────── */}
-      <div className="shrink-0 bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="shrink-0 bg-white rounded-xl border border-slate-200 shadow-xs px-3 py-2.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         {renderStatusTabs()}
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
@@ -1003,7 +1003,7 @@ export default function ToursManager({
               {pagedItems.map((tour, idx) => (
                 <li
                   key={tour.tourId}
-                  className="px-4 sm:px-5 py-3.5 hover:bg-slate-50/60 transition-colors"
+                  className="px-4 sm:px-5 py-2.5 hover:bg-slate-50/60 transition-colors"
                 >
                   <div className={ROW_GRID}>
                     {/* Số thứ tự (tính theo trang) */}

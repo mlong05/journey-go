@@ -21,8 +21,8 @@ export default function RegisterForm({
     <form onSubmit={onSubmit} className="space-y-3.5 w-full">
       <div className="grid grid-cols-2 gap-3 w-full">
         {/* Họ và tên */}
-        <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all pt-0.5">
-          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-[#009fe3] tracking-wide select-none z-10">
+        <div className="relative w-full rounded-2xl border border-stone-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-4 focus-within:ring-emerald-600/10 bg-white transition-all pt-0.5">
+          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-emerald-800 tracking-wide select-none z-10">
             Họ và tên
           </label>
           <div className="flex items-center px-3 h-11">
@@ -41,8 +41,8 @@ export default function RegisterForm({
         </div>
 
         {/* Số điện thoại */}
-        <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all pt-0.5">
-          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-[#009fe3] tracking-wide select-none z-10">
+        <div className="relative w-full rounded-2xl border border-stone-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-4 focus-within:ring-emerald-600/10 bg-white transition-all pt-0.5">
+          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-emerald-800 tracking-wide select-none z-10">
             Số điện thoại
           </label>
           <div className="flex items-center px-3 h-11">
@@ -62,8 +62,8 @@ export default function RegisterForm({
       </div>
 
       {/* Email */}
-      <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all pt-0.5">
-        <label className="absolute -top-2.5 left-4 bg-white px-2 text-[10px] font-bold text-[#009fe3] tracking-wide select-none z-10">
+      <div className="relative w-full rounded-2xl border border-stone-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-4 focus-within:ring-emerald-600/10 bg-white transition-all pt-0.5">
+        <label className="absolute -top-2.5 left-4 bg-white px-2 text-[10px] font-bold text-emerald-800 tracking-wide select-none z-10">
           Email đăng ký
         </label>
         <div className="flex items-center px-3.5 h-11">
@@ -83,8 +83,8 @@ export default function RegisterForm({
 
       {/* Mật khẩu & Xác nhận */}
       <div className="grid grid-cols-2 gap-3 w-full">
-        <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all pt-0.5">
-          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-[#009fe3] tracking-wide select-none z-10">
+        <div className="relative w-full rounded-2xl border border-stone-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-4 focus-within:ring-emerald-600/10 bg-white transition-all pt-0.5">
+          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-emerald-800 tracking-wide select-none z-10">
             Mật khẩu
           </label>
           <div className="flex items-center px-3 h-11">
@@ -111,8 +111,8 @@ export default function RegisterForm({
           </div>
         </div>
 
-        <div className="relative w-full rounded-2xl border-2 border-[#009fe3]/70 focus-within:border-[#009fe3] focus-within:ring-2 focus-within:ring-[#009fe3]/20 bg-white transition-all pt-0.5">
-          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-[#009fe3] tracking-wide select-none z-10">
+        <div className="relative w-full rounded-2xl border border-stone-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-4 focus-within:ring-emerald-600/10 bg-white transition-all pt-0.5">
+          <label className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-emerald-800 tracking-wide select-none z-10">
             Xác nhận
           </label>
           <div className="flex items-center px-3 h-11">
@@ -155,11 +155,11 @@ export default function RegisterForm({
                 agreeTerms: e.target.checked,
               }))
             }
-            className="w-4 h-4 text-[#009fe3] rounded border-slate-300 focus:ring-[#009fe3] cursor-pointer accent-[#009fe3]"
+            className="w-4 h-4 text-emerald-800 rounded border-slate-300 focus:ring-emerald-600 cursor-pointer accent-emerald-700"
           />
           <span className="text-[11px] text-slate-600">
             Tôi đồng ý với{" "}
-            <span className="text-[#009fe3] font-semibold underline">
+            <span className="text-emerald-800 font-semibold underline">
               Điều khoản dịch vụ &amp; Quy chế di sản
             </span>
           </span>
@@ -170,7 +170,7 @@ export default function RegisterForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 rounded-xl font-bold text-xs sm:text-sm tracking-wider uppercase text-white bg-[#009fe3] hover:bg-[#008bd0] shadow-md shadow-[#009fe3]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+        className="w-full py-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide text-white bg-emerald-700 hover:bg-emerald-800 shadow-md shadow-emerald-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
       >
         {loading ? (
           <>
@@ -178,7 +178,7 @@ export default function RegisterForm({
             <span>Đang khởi tạo tài khoản...</span>
           </>
         ) : (
-          <span>HOÀN TẤT ĐĂNG KÝ</span>
+          <span>Hoàn tất đăng ký</span>
         )}
       </button>
     </form>
