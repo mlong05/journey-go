@@ -87,7 +87,8 @@ public class TourModerationMailer {
             case "BASIC_INFO" -> "Bước 1 – Thông tin cơ bản";
             case "PRICING" -> "Bước 2 – Giá vé";
             case "STOPS" -> "Bước 3 – Điểm đến";
-            case "SCHEDULE" -> "Bước 4 – Lịch khởi hành";
+            case "ITINERARY" -> "Bước 4 – Lịch trình";
+            case "SCHEDULE" -> "Bước 5 – Lịch khởi hành";
             default -> step;
         };
     }

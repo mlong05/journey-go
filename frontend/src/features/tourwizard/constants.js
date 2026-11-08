@@ -1,5 +1,5 @@
 /**
- * Hằng số luồng tạo tour 5 bước — khớp enum backend
+ * Hằng số luồng tạo tour theo bước — khớp enum backend
  * (TourStatus, GuestType, TourFormat, VideoSource, TourReviewStep).
  */
 
@@ -7,7 +7,8 @@ export const WIZARD_STEPS = [
   { key: "BASIC_INFO", label: "Thông tin cơ bản", short: "Cơ bản" },
   { key: "PRICING", label: "Giá vé", short: "Giá vé" },
   { key: "STOPS", label: "Điểm đến", short: "Điểm đến" },
-  { key: "SCHEDULE", label: "Lịch khởi hành", short: "Lịch" },
+  { key: "ITINERARY", label: "Lịch trình", short: "Lịch trình" },
+  { key: "SCHEDULE", label: "Lịch khởi hành", short: "Khởi hành" },
   { key: "REVIEW", label: "Xem lại và gửi duyệt", short: "Gửi duyệt" },
 ];
 
@@ -89,8 +90,9 @@ export const STEP_LABEL = {
   BASIC_INFO: "Bước 1 – Thông tin cơ bản",
   PRICING: "Bước 2 – Giá vé",
   STOPS: "Bước 3 – Điểm đến",
-  SCHEDULE: "Bước 4 – Lịch khởi hành",
-  REVIEW: "Bước 5 – Xem lại",
+  ITINERARY: "Bước 4 – Lịch trình",
+  SCHEDULE: "Bước 5 – Lịch khởi hành",
+  REVIEW: "Bước 6 – Xem lại",
   ACCOUNT: "Tài khoản đối tác",
 };
 

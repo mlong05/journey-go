@@ -102,9 +102,6 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
             </ul>
           )}
         </Block>
-        <Block anchor={{ step: "BASIC_INFO", field: "itinerary" }} label="Lịch trình">
-          <ItineraryView tour={tour} showEmpty />
-        </Block>
         <Block anchor={{ step: "BASIC_INFO", field: "notices" }} label="Những thông tin cần lưu ý">
           {/* Hiện đủ 4 mục (mục trống ghi "Chưa nhập") để người duyệt thấy mục nào còn thiếu */}
           <NoticeAccordion tour={tour} showEmpty />
@@ -268,8 +265,14 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
         })}
       </Section>
 
+      <Section title="4. Lịch trình" step="ITINERARY" onEdit={onEdit}>
+        <Block anchor={{ step: "ITINERARY", field: "itinerary" }} label="Lịch trình">
+          <ItineraryView tour={tour} title={null} showEmpty />
+        </Block>
+      </Section>
+
       {showSchedule && (
-        <Section title="4. Lịch khởi hành" step="SCHEDULE" onEdit={onEdit}>
+        <Section title="5. Lịch khởi hành" step="SCHEDULE" onEdit={onEdit}>
           <Block anchor={{ step: "SCHEDULE", field: "departureDates" }} label="Ngày khởi hành">
             <p className="text-xs text-slate-500 mb-2 inline-flex items-center gap-1"><CalendarDays size={12} />{(tour.departureDates || []).length} ngày mở bán</p>
             <div className="flex flex-wrap gap-1.5">

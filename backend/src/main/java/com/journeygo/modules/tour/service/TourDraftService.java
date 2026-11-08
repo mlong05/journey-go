@@ -131,7 +131,16 @@ public class TourDraftService {
         return save(tour);
     }
 
-    // ── Bước 2 ───────────────────────────────────────────────────────────────
+    /** Bước 4 — Lịch trình (lưu riêng, không đụng các trường của bước 1). */
+    @Transactional
+    public TourDetailResponse updateItinerary(Long tourId, TourWizardRequests.Itinerary request, Long userId) {
+        Tour tour = findOwnedTour(tourId, userId);
+        requireContentEditable(tour);
+        replaceItinerary(tour, request.itinerary() == null ? List.of() : request.itinerary());
+        return save(tour);
+    }
+
+    // ── Bước 2───────────────────────────────────────────────────────────────
 
     @Transactional
     public TourDetailResponse updatePricing(Long tourId, TourWizardRequests.Pricing request, Long userId) {

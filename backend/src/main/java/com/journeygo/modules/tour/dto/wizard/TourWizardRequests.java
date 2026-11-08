@@ -69,6 +69,11 @@ public final class TourWizardRequests {
             @Schema(description = "Nội dung: mỗi dòng một ý, **chữ** để in đậm") @Size(max = 5000) String content
     ) {}
 
+    @Schema(description = "Bước 4 — Lịch trình theo ngày (tour trong ngày: 1 mục)")
+    public record Itinerary(
+            @Valid @Size(max = 60, message = "Tối đa 60 ngày") List<ItineraryDayItem> itinerary
+    ) {}
+
     @Schema(description = "Giá của một loại khách")
     public record PriceItem(
             @NotNull(message = "Loại khách không được để trống") GuestType guestType,

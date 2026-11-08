@@ -15,10 +15,10 @@ import CustomerPreview from "./CustomerPreview";
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : "");
 const ACTION_LABEL = { SUBMITTED: "Gửi duyệt", APPROVED: "Đồng ý", CHANGES_REQUESTED: "Yêu cầu chỉnh sửa", REJECTED: "Từ chối" };
 const statusLabel = (s) => (s ? TOUR_STATUS[s]?.label || s : "—");
-const STEP_SHORT = { BASIC_INFO: "Thông tin cơ bản", PRICING: "Giá vé", STOPS: "Điểm đến", SCHEDULE: "Lịch khởi hành" };
+const STEP_SHORT = { BASIC_INFO: "Thông tin cơ bản", PRICING: "Giá vé", STOPS: "Điểm đến", ITINERARY: "Lịch trình", SCHEDULE: "Lịch khởi hành" };
 /** Lịch sử cũ lưu dạng "STOPS info: …" → "Điểm đến: …" (bản mới backend đã ghi tiếng Việt). */
 const readableNote = (text) =>
-  String(text).replace(/\b(BASIC_INFO|PRICING|STOPS|SCHEDULE)(?: [\w.[\]]+)?:/g, (_, step) => `${STEP_SHORT[step]}:`);
+  String(text).replace(/\b(BASIC_INFO|PRICING|STOPS|ITINERARY|SCHEDULE)(?: [\w.[\]]+)?:/g, (_, step) => `${STEP_SHORT[step]}:`);
 let noteSeq = 0;
 
 function RejectReasons({ value, onChange, other, onOther }) {
