@@ -44,6 +44,8 @@ export const ROUTES = {
   PARTNER_PROGRAM: "/partner-program",
   /** Admin — quản lý đối tác (duyệt đơn đăng ký). */
   ADMIN_PARTNERS: "/admin/partners",
+  /** Admin — yêu cầu đổi thông tin do đối tác gửi. */
+  ADMIN_PARTNER_PROFILE_UPDATES: "/admin/partner-profile-updates",
   /** Admin — quản lý chính sách hoa hồng. */
   ADMIN_COMMISSION_POLICIES: "/admin/commission-policies",
   /** Thiết lập mật khẩu lần đầu cho đối tác (link trong email duyệt). */
@@ -61,6 +63,8 @@ export const ROUTES = {
   // ── Khu vực đối tác cung cấp nội dung (CONTENT_PROVIDER) ───────────────────
   PROVIDER: "/provider",
   PROVIDER_TOURS: "/provider/tours",
+  /** Đối tác — tab "Thông tin đối tác" (hồ sơ đăng ký + yêu cầu đổi thông tin). */
+  PROVIDER_PARTNER_INFO: "/provider/partner-info",
 
   // ── Khu vực tài chính của đối tác (CONTENT_PROVIDER) ──────────────────────
   PROVIDER_FINANCE: "/provider/finance",
