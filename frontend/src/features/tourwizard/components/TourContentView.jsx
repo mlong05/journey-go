@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import { Pencil, ChevronDown, ChevronUp, CheckCircle2, MapPin, Timer, Film, Clock, CalendarDays, Users } from "lucide-react";
 import { GUEST_TYPES } from "../constants";
+import NoticeAccordion from "./NoticeAccordion";
+import ItineraryView from "./ItineraryView";
 
 const money = (v) => (v == null ? "—" : `${Number(v).toLocaleString("vi-VN")} đ`);
 const fmtDate = (s) => { const [y, m, d] = (s || "").split("-"); return d ? `${d}/${m}/${y}` : s; };
@@ -97,6 +99,13 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
               ))}
             </ul>
           )}
+        </Block>
+        <Block anchor={{ step: "BASIC_INFO", field: "itinerary" }} label="Lịch trình">
+          <ItineraryView tour={tour} showEmpty />
+        </Block>
+        <Block anchor={{ step: "BASIC_INFO", field: "notices" }} label="Những thông tin cần lưu ý">
+          {/* Hiện đủ 4 mục (mục trống ghi "Chưa nhập") để người duyệt thấy mục nào còn thiếu */}
+          <NoticeAccordion tour={tour} showEmpty />
         </Block>
         <Block anchor={{ step: "BASIC_INFO", field: "images" }} label="Hình ảnh">
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">

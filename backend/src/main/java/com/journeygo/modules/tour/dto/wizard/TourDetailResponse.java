@@ -44,6 +44,11 @@ public record TourDetailResponse(
         List<String> highlights,
         List<String> images,
         String coverImageUrl,
+        @Schema(description = "Lịch trình theo ngày (dạng chữ)") List<ItineraryDay> itinerary,
+        @Schema(description = "Những thông tin cần lưu ý") String priceIncludes,
+        String priceExcludes,
+        String forceMajeure,
+        String contactInfo,
 
         // Bước 2
         List<Price> prices,
@@ -69,6 +74,9 @@ public record TourDetailResponse(
                         boolean countsTowardSlot, boolean alwaysFree) {}
 
     public record Answer(Long id, String content, boolean correct) {}
+
+    /** dayNumber bắt đầu từ 1. */
+    public record ItineraryDay(int dayNumber, String title, String mainActivity, String content) {}
 
     public record Question(Long id, StopQuestionKind kind, QuestionType type, String content, Integer points,
                            List<Answer> answers, String referenceAnswer) {}

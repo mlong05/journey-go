@@ -122,6 +122,11 @@ public class TourDraftService {
         replaceList(tour.getHighlights(), cleanList(request.highlights()));
         replaceList(tour.getImages(), cleanList(request.images()));
         tour.setCoverImageUrl(trimToNull(request.coverImageUrl()));
+        replaceItinerary(tour, request.itinerary());
+        tour.setPriceIncludes(trimToNull(request.priceIncludes()));
+        tour.setPriceExcludes(trimToNull(request.priceExcludes()));
+        tour.setForceMajeure(trimToNull(request.forceMajeure()));
+        tour.setContactInfo(trimToNull(request.contactInfo()));
         return save(tour);
     }
 
@@ -341,6 +346,10 @@ public class TourDraftService {
                 .region(source.getRegion())
                 .theme(source.getTheme())
                 .description(source.getDescription())
+                .priceIncludes(source.getPriceIncludes())
+                .priceExcludes(source.getPriceExcludes())
+                .forceMajeure(source.getForceMajeure())
+                .contactInfo(source.getContactInfo())
                 .coverImageUrl(source.getCoverImageUrl())
                 .cancellationPolicy(source.getCancellationPolicy())
                 .maxGuestsPerSlot(source.getMaxGuestsPerSlot())
@@ -350,6 +359,14 @@ public class TourDraftService {
                 .createdBy(source.getCreatedBy())
                 .build();
         copy.getHighlights().addAll(source.getHighlights());
+        for (int i = 0; i < source.getItinerary().size(); i++) {
+            TourItineraryDay d = source.getItinerary().get(i);
+            copy.getItinerary().add(TourItineraryDay.builder().dayNumber(i + 1)
+                    .title(d == null ? null : d.getTitle())
+                    .mainActivity(d == null ? null : d.getMainActivity())
+                    .content(d == null ? null : d.getContent())
+                    .build());
+        }
         copy.getImages().addAll(source.getImages());
         for (TourPrice p : source.getPrices()) {
             copy.getPrices().add(TourPrice.builder().tour(copy).guestType(p.getGuestType())
@@ -478,6 +495,25 @@ public class TourDraftService {
                 s.getExperiences().stream().map(e -> new TourWizardRequests.ExperienceItem(e.getActivityName(),
                         e.getCheckpointLatitude(), e.getCheckpointLongitude(), e.getRadiusMeters(),
                         e.getDurationSeconds(), e.getQuestion() == null ? null : toQuestionItem(e.getQuestion()))).toList());
+    }
+
+    /**
+     * Thay lịch trình. null = giữ nguyên (client cũ không gửi trường này).
+     * Tour trong ngày chỉ giữ 1 mục.
+     */
+    private static void replaceItinerary(Tour tour, List<TourWizardRequests.ItineraryDayItem> items) {
+        if (items == null) return;
+        int limit = tour.getTourFormat() == TourFormat.DAY_TRIP ? 1 : items.size();
+        tour.getItinerary().clear();
+        for (int i = 0; i < Math.min(limit, items.size()); i++) {
+            TourWizardRequests.ItineraryDayItem d = items.get(i);
+            tour.getItinerary().add(TourItineraryDay.builder()
+                    .dayNumber(i + 1)
+                    .title(d == null ? null : trimToNull(d.title()))
+                    .mainActivity(d == null ? null : trimToNull(d.mainActivity()))
+                    .content(d == null ? null : trimToNull(d.content()))
+                    .build());
+        }
     }
 
     private static TourWizardRequests.QuestionItem toQuestionItem(TourStopQuestion q) {

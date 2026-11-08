@@ -115,6 +115,30 @@ public class Tour {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    /** Bước 1 — Lịch trình theo ngày (dạng chữ, không gắn với điểm đến). */
+    @ElementCollection
+    @CollectionTable(name = "tour_itinerary_days", joinColumns = @JoinColumn(name = "tour_id"))
+    @OrderColumn(name = "position")
+    @Builder.Default
+    private List<TourItineraryDay> itinerary = new ArrayList<>();
+
+    // ── Bước 1 — "Những thông tin cần lưu ý" (không bắt buộc) ─────────────────
+    /** Giá tour bao gồm. */
+    @Column(name = "price_includes", columnDefinition = "TEXT")
+    private String priceIncludes;
+
+    /** Giá tour không bao gồm. */
+    @Column(name = "price_excludes", columnDefinition = "TEXT")
+    private String priceExcludes;
+
+    /** Trường hợp bất khả kháng. */
+    @Column(name = "force_majeure", columnDefinition = "TEXT")
+    private String forceMajeure;
+
+    /** Liên hệ. */
+    @Column(name = "contact_info", columnDefinition = "TEXT")
+    private String contactInfo;
+
     /** Bước 1 — 3 đến 5 điểm nổi bật. */
     @ElementCollection
     @CollectionTable(name = "tour_highlights", joinColumns = @JoinColumn(name = "tour_id"))
