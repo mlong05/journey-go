@@ -2,21 +2,21 @@
  * Service layer cho module Tour du lịch.
  *
  * Endpoint tích hợp:
- *  - GET    /api/v1/tours                       : ADMIN / MODERATOR
+ *  - GET    /api/v1/tours                       : CONTENT_MODERATOR
  *  - GET    /api/v1/tours/published              : danh sách đã xuất bản
- *  - GET    /api/v1/tours/my                    : ADMIN / MODERATOR / PROVIDER
- *  - GET    /api/v1/tours/status/{status}       : ADMIN / MODERATOR
- *  - GET    /api/v1/tours/deleted               : ADMIN / MODERATOR
+ *  - GET    /api/v1/tours/my                    : CONTENT_MODERATOR / CONTENT_PROVIDER
+ *  - GET    /api/v1/tours/status/{status}       : CONTENT_MODERATOR
+ *  - GET    /api/v1/tours/deleted               : CONTENT_MODERATOR
  *  - GET    /api/v1/tours/{tourId}              : tất cả role
- *  - POST   /api/v1/tours                       : ADMIN / PROVIDER
- *  - PUT    /api/v1/tours/{tourId}              : chủ sở hữu PROVIDER, hoặc ADMIN / MODERATOR
- *  - PATCH  /api/v1/tours/{tourId}/submit       : chủ sở hữu PROVIDER, hoặc ADMIN / MODERATOR
- *  - PATCH  /api/v1/tours/{tourId}/publish      : ADMIN / MODERATOR
- *  - PATCH  /api/v1/tours/{tourId}/reject       : ADMIN / MODERATOR (bắt buộc lý do)
- *  - DELETE /api/v1/tours/{tourId}              : ADMIN / MODERATOR (xoá mềm)
- *  - PATCH  /api/v1/tours/{tourId}/restore      : ADMIN / MODERATOR
+ *  - POST   /api/v1/tours                       : CONTENT_PROVIDER
+ *  - PUT    /api/v1/tours/{tourId}              : chủ sở hữu CONTENT_PROVIDER, hoặc CONTENT_MODERATOR
+ *  - PATCH  /api/v1/tours/{tourId}/submit       : chủ sở hữu CONTENT_PROVIDER, hoặc CONTENT_MODERATOR
+ *  - PATCH  /api/v1/tours/{tourId}/publish      : CONTENT_MODERATOR
+ *  - PATCH  /api/v1/tours/{tourId}/reject       : CONTENT_MODERATOR (bắt buộc lý do)
+ *  - DELETE /api/v1/tours/{tourId}              : CONTENT_MODERATOR (xoá mềm)
+ *  - PATCH  /api/v1/tours/{tourId}/restore      : CONTENT_MODERATOR
  *
- * Lưu ý quyền tạo tour: backend chốt `hasAnyRole('ADMIN', 'PROVIDER')`
+ * Lưu ý quyền tạo tour: backend chốt `hasRole('CONTENT_PROVIDER')`
  * cho POST /tours, nên MODERATOR không có quyền tạo tour.
  */
 import { apiClient } from "@/services/apiClient";
