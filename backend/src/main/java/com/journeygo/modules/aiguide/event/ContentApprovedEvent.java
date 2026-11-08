@@ -12,3 +12,4 @@ public record ContentApprovedEvent(
         String title,
         String contentText
 ) {}
+
