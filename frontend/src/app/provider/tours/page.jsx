@@ -10,7 +10,6 @@ import { ProviderToursList } from "@/features/tourwizard";
  *  - POST   /provider/tours                : tạo bản nháp → mở wizard /provider/tours/{id}/edit
  *  - POST   /provider/tours/{id}/duplicate : nhân bản
  *  - PATCH  /provider/tours/{id}/pause|resume, DELETE /provider/tours/{id}
- * Tour tạo theo luồng cũ vẫn xem được ở tab "Tour tạo theo luồng cũ".
  */
 export default function ProviderToursPage() {
   return <ProviderToursList />;

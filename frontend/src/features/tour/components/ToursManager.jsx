@@ -273,8 +273,6 @@ export default function ToursManager({
   showDeletedFilter = false,
   /** Tour tạo theo luồng 5 bước: trả URL màn hình mới (thẩm định / wizard). null = không có màn hình mới. */
   wizardHref = null,
-  /** Ẩn tour 5 bước khỏi danh sách (tab "Tour tạo theo luồng cũ" của đối tác). */
-  excludeWizard = false,
 }) {
   const palette = getTourTheme(theme);
   const router = useRouter();
@@ -574,10 +572,7 @@ export default function ToursManager({
   }, [restoreTarget, mergeTour, showToast]);
 
   /* ── Counts (luôn tính trên toàn bộ danh sách) ─────────────── */
-  const baseTours = useMemo(
-    () => (excludeWizard ? tours.filter((t) => !t.wizardTour) : tours),
-    [tours, excludeWizard]
-  );
+  const baseTours = tours;
   const counts = useMemo(
     () => ({
       all: baseTours.length,

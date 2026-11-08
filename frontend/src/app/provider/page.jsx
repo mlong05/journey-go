@@ -8,14 +8,8 @@ import {
   Compass,
   Trophy,
   Coins,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  Send,
   ChevronRight,
   Inbox,
-  FileCheck,
-  PhoneCall,
   Navigation,
   Layers,
   AlertTriangle,
@@ -46,23 +40,7 @@ const DEST_STATUS = {
   DRAFT: { label: "Bản nháp", cls: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
 };
 
-const REVIEW_ACTION = {
-  SUBMITTED: { label: "Đã gửi thẩm định", icon: Send, cls: "bg-amber-50/70 border-amber-200/80", iconCls: "text-amber-600" },
-  APPROVED: { label: "Đã được phê duyệt", icon: CheckCircle2, cls: "bg-emerald-50/70 border-emerald-200/80", iconCls: "text-emerald-600" },
-  REJECTED: { label: "Bị yêu cầu chỉnh sửa", icon: XCircle, cls: "bg-rose-50/70 border-rose-200/80", iconCls: "text-rose-600" },
-};
-
 const fmtNumber = (n) => Number(n || 0).toLocaleString("vi-VN");
-
-const fmtDateTime = (iso) =>
-  iso
-    ? new Date(iso).toLocaleString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-      })
-    : "";
 
 /** Badge % so với kỳ trước; không hiển thị khi kỳ trước chưa có số liệu để so. */
 function changeBadge(current, previous) {
@@ -140,7 +118,6 @@ export default function ProviderOverviewPage() {
   const revenue = stats?.revenue ?? { current: 0, previous: 0, allTime: 0, currentBookings: 0 };
   const missions = stats?.missions ?? { tasks: 0, answered: 0, correct: 0 };
   const managedDestinations = stats?.destinationRows ?? [];
-  const moderationUpdates = stats?.moderationUpdates ?? [];
 
   const withCoordinates = managedDestinations.filter((d) => d.latitude != null && d.longitude != null).length;
   const correctRate = missions.answered > 0 ? (missions.correct / missions.answered) * 100 : null;
@@ -430,59 +407,6 @@ export default function ProviderOverviewPage() {
               ]}
               emptyText="Chưa có điểm đến nào để thống kê."
             />
-          </Panel>
-
-          <Panel
-            id="reviews"
-            title="Tiến độ thẩm định nội dung"
-            description="Hoạt động gần nhất của Hội đồng thẩm định"
-            icon={FileCheck}
-            tone="amber"
-            bodyClassName="p-4 space-y-3"
-            footer={
-              <div className="flex items-center justify-between gap-3">
-                <span>Cần hỗ trợ số hóa di tích? Hỗ trợ 24/7</span>
-                <a
-                  href="tel:19006888"
-                  className="inline-flex items-center gap-1.5 font-bold text-emerald-700 hover:text-emerald-800"
-                >
-                  <PhoneCall size={12} /> 1900 6888
-                </a>
-              </div>
-            }
-          >
-            {moderationUpdates.length === 0 ? (
-              <EmptyBlock
-                icon={FileCheck}
-                title="Chưa có hoạt động thẩm định"
-                description="Khi bạn gửi điểm đến hoặc tour đi duyệt, tiến độ sẽ cập nhật tại đây."
-              />
-            ) : (
-              moderationUpdates.map((item) => {
-                const action = REVIEW_ACTION[item.action] ?? REVIEW_ACTION.SUBMITTED;
-                const ActionIcon = action.icon ?? Clock;
-                return (
-                  <div
-                    key={`${item.type}-${item.targetId}-${item.createdAt}`}
-                    className={`p-3.5 rounded-lg border flex items-start gap-3 ${action.cls}`}
-                  >
-                    <ActionIcon size={16} className={`mt-0.5 shrink-0 ${action.iconCls}`} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900">
-                        {item.type === "TOUR" ? "Tour" : "Điểm đến"} {item.targetName}
-                      </p>
-                      <p className="text-xs text-slate-600 mt-0.5">
-                        {action.label}
-                        {item.note || item.reason ? ` — ${item.note || item.reason}` : ""}
-                      </p>
-                      <span className="text-[11px] text-slate-500 font-semibold mt-1 inline-block">
-                        {fmtDateTime(item.createdAt)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
           </Panel>
         </div>
       </section>
