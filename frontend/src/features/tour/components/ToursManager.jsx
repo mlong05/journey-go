@@ -24,6 +24,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Layers,
+  ClipboardCheck,
 } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { tourService } from "../services/tourService";
@@ -34,9 +35,8 @@ import {
   TOUR_STATUS_ORDER,
   SUBMITTABLE_STATUSES,
   EDITABLE_STATUSES,
-  formatVND,
   getRejectionLabels,
-  formatDuration,
+  formatTourDuration,
   normalizeTour,
 } from "../theme";
 import TourFormModal from "./TourFormModal";
@@ -730,17 +730,8 @@ export default function ToursManager({
     const canLegacyModerate = canModerate && !wizard;
 
     return (
+      /* Nút "Xem" (con mắt) luôn đứng cuối hàng → các con mắt thẳng một cột; nút khác xếp trước nó. */
       <div className="col-span-12 md:col-span-1 flex items-center justify-start md:justify-end gap-1.5 shrink-0">
-        <button
-          type="button"
-          onClick={() => (wizardUrl ? router.push(wizardUrl) : openDetail(tour.tourId))}
-          className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
-          title="Xem chi tiết"
-          aria-label="Xem chi tiết"
-        >
-          <Eye size={14} />
-        </button>
-
         {canEdit && (
           <button
             type="button"
@@ -774,10 +765,11 @@ export default function ToursManager({
           <button
             type="button"
             onClick={() => router.push(wizardUrl)}
-            className="px-2.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
-            title="Mở màn hình thẩm định tour 5 bước"
+            className="p-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white border border-teal-600 transition-colors cursor-pointer"
+            title="Thẩm định tour"
+            aria-label="Thẩm định tour"
           >
-            Thẩm định
+            <ClipboardCheck size={14} />
           </button>
         )}
 
@@ -840,6 +832,16 @@ export default function ToursManager({
             )}
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={() => (wizardUrl ? router.push(wizardUrl) : openDetail(tour.tourId))}
+          className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
+          title="Xem chi tiết"
+          aria-label="Xem chi tiết"
+        >
+          <Eye size={14} />
+        </button>
       </div>
     );
   };
@@ -996,8 +998,8 @@ export default function ToursManager({
           >
             <div className="hidden md:block md:col-span-1 text-center">STT</div>
             <div className="col-span-12 md:col-span-1">Tour</div>
-            <div className="col-span-6 md:col-span-1">Hành trình</div>
-            <div className="col-span-6 md:col-span-1 truncate" title="Tổng giá &amp; thời lượng">Tổng giá &amp; thời lượng</div>
+            <div className="col-span-6 md:col-span-1">Điểm đến</div>
+            <div className="col-span-6 md:col-span-1 truncate">Thời gian</div>
             <div className="col-span-6 md:col-span-1">Trạng thái</div>
             <div className="col-span-12 md:col-span-1 md:text-right">Thao tác</div>
           </div>
@@ -1060,30 +1062,18 @@ export default function ToursManager({
                       </div>
                     </div>
 
-                    {/* Cột 2: Hành trình */}
+                    {/* Cột 2: Số điểm đến (tour 5 bước: điểm đến ở bước 3) */}
                     <div className="col-span-6 md:col-span-1 flex items-center gap-1.5 min-w-0">
                       <MapPin size={13} className="text-slate-400 shrink-0" />
-                      <span className="text-xs font-bold text-slate-700 tabular-nums">
-                        {tour.destinationCount}
-                      </span>
-                      <span
-                        className="text-[11px] text-slate-600 truncate"
-                        title={tour.destinations.map((d) => d.destinationName).join(" → ") || undefined}
-                      >
-                        {tour.destinations[0]?.destinationName || "chưa có"}
+                      <span className={`text-xs font-bold tabular-nums ${tour.destinationCount > 0 ? "text-slate-700" : "text-slate-400"}`}>
+                        {tour.destinationCount > 0 ? `${tour.destinationCount} điểm đến` : "Chưa có"}
                       </span>
                     </div>
 
-                    {/* Cột 3: Tổng giá & thời lượng */}
-                    <div
-                      className="col-span-6 md:col-span-1 flex flex-col gap-0.5 min-w-0"
-                      title={`${formatVND(tour.price)} · ${formatDuration(tour.durationDays)}`}
-                    >
-                      <span className="text-xs font-bold text-slate-900 tabular-nums leading-none truncate">
-                        {formatVND(tour.price)}
-                      </span>
-                      <span className="text-[11px] font-bold text-slate-600 tabular-nums truncate">
-                        {formatDuration(tour.durationDays)}
+                    {/* Cột 3: Thời gian (theo ngày / đêm) */}
+                    <div className="col-span-6 md:col-span-1 flex items-center min-w-0" title={formatTourDuration(tour)}>
+                      <span className="text-xs font-bold text-slate-700 tabular-nums truncate">
+                        {formatTourDuration(tour)}
                       </span>
                     </div>
 

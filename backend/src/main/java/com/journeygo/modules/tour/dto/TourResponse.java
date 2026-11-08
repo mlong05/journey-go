@@ -3,6 +3,7 @@ package com.journeygo.modules.tour.dto;
 import com.journeygo.modules.destination.dto.DestinationResponse;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
+import com.journeygo.modules.tour.entity.TourFormat;
 import com.journeygo.modules.tour.entity.TourType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -38,6 +39,9 @@ public record TourResponse(
         @Schema(description = "Số huy hiệu check-in có thể nhận (mỗi điểm đến một huy hiệu, trừ huy hiệu đã tắt)") int badgeCount,
         @Schema(description = "Người tạo") String createdBy,
         @Schema(description = "Tour tạo theo luồng 5 bước (kiểm duyệt bằng màn hình thẩm định mới)") boolean wizardTour,
+        @Schema(description = "Tour 5 bước: DAY_TRIP (trong ngày) hoặc MULTI_DAY; null với tour luồng cũ") TourFormat tourFormat,
+        @Schema(description = "Tour trong ngày: thời lượng (phút)") Integer durationMinutes,
+        @Schema(description = "Tour nhiều ngày: số đêm") Integer durationNights,
         @Schema(description = "Thời gian tạo") Instant createdAt,
         @Schema(description = "Thời gian cập nhật") Instant updatedAt
 ) {
@@ -62,7 +66,8 @@ public record TourResponse(
                 .rejectionReason(t.getRejectionReason())
                 .deleted(t.isDeleted())
                 .deletedAt(t.getDeletedAt())
-                .destinationCount(t.getDestinationCount())
+                // Tour 5 bước: điểm đến riêng (bước 3); tour luồng cũ: điểm đến chọn từ danh mục chung.
+                .destinationCount(t.isWizardTour() ? t.getStops().size() : t.getDestinationCount())
                 .destinations(destResponses)
                 .tourCoverImageUrl(t.getCoverImageUrl())
                 .coverImageUrl(t.getCoverImageUrl() != null && !t.getCoverImageUrl().isBlank() ? t.getCoverImageUrl() : destResponses.stream()
@@ -72,6 +77,9 @@ public record TourResponse(
                         .findFirst().orElse(null))
                 .createdBy(t.getCreatedBy() != null ? t.getCreatedBy().getFullName() : null)
                 .wizardTour(t.isWizardTour())
+                .tourFormat(t.getTourFormat())
+                .durationMinutes(t.getDurationMinutes())
+                .durationNights(t.getDurationNights())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
                 .build();

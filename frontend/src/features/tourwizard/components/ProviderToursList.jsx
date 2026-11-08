@@ -15,7 +15,7 @@ import { TOUR_STATUS, TOUR_STATUS_ORDER, CONTENT_EDITABLE } from "../constants";
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
 
 /** Cột bảng: STT | Tour | Trạng thái | Cập nhật | Thao tác (mobile: STT | Tour, thao tác xuống dòng). */
-const ROW_GRID = "grid items-center gap-x-4 gap-y-2 grid-cols-[32px_minmax(0,1fr)] md:grid-cols-[40px_minmax(0,1fr)_120px_140px_190px]";
+const ROW_GRID = "grid items-center gap-x-4 gap-y-2 grid-cols-[32px_minmax(0,1fr)] md:grid-cols-[40px_minmax(0,1fr)_130px_150px_88px]";
 const PAGE_SIZES = [4, 8, 12, 20];
 
 /** Dãy số trang gọn: 1 … 4 5 6 … 12 */
@@ -182,7 +182,7 @@ export default function ProviderToursList() {
               <span>Tour</span>
               <span>Trạng thái</span>
               <span>Cập nhật</span>
-              <span>Thao tác</span>
+              <span className="text-right">Thao tác</span>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
             {loading ? (
@@ -231,12 +231,8 @@ export default function ProviderToursList() {
                       </span>
                       <span className="hidden md:block text-xs text-slate-500 tabular-nums">{fmt(t.updatedAt)}</span>
 
-                      {/* Thao tác: nút chính rộng cố định + 1 ô biểu tượng cố định → các nút luôn thẳng cột */}
-                      <div className="col-span-2 md:col-span-1 flex items-center gap-1.5 justify-end md:justify-start">
-                        <button type="button" onClick={open}
-                          className={`w-[150px] py-1.5 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1 cursor-pointer transition-colors ${editable ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
-                          {editable ? <><Pencil size={12} />{t.status === "CHANGES_REQUESTED" ? "Sửa theo ghi chú" : "Tiếp tục sửa"}</> : <><Eye size={12} />Xem</>}
-                        </button>
+                      {/* Thao tác chỉ là biểu tượng: [ô phụ cố định] [xem / sửa] → luôn thẳng cột */}
+                      <div className="col-span-2 md:col-span-1 flex items-center gap-1.5 justify-end">
                         <span className="w-8 h-8 flex items-center justify-center shrink-0">
                           {t.status === "PUBLISHED" && (
                             <button type="button" title="Tạm ngừng bán" disabled={busy} onClick={() => act(t, () => providerTourService.pause(t.tourId), "Đã tạm ngừng bán")}
@@ -257,6 +253,15 @@ export default function ProviderToursList() {
                             </button>
                           )}
                         </span>
+                        {(() => {
+                          const label = editable ? (t.status === "CHANGES_REQUESTED" ? "Sửa theo ghi chú" : "Tiếp tục sửa") : "Xem tour";
+                          return (
+                            <button type="button" onClick={open} title={label} aria-label={label}
+                              className={`w-8 h-8 shrink-0 rounded-lg inline-flex items-center justify-center border cursor-pointer transition-colors ${editable ? "bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700" : "bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100"}`}>
+                              {editable ? <Pencil size={15} /> : <Eye size={15} />}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </li>
                   );
