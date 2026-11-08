@@ -22,7 +22,7 @@ public class CloudinaryImageController {
     private final CloudinaryImageService cloudinaryImageService;
 
     @PostMapping("/signature")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     public ResponseEntity<ApiResponse<CloudinaryUploadSignatureResponse>> createSignature(
             @RequestParam Long destinationId,
             @AuthenticationPrincipal UserPrincipal principal) {
