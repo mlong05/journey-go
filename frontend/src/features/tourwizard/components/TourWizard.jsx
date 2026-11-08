@@ -36,14 +36,17 @@ function SaveIndicator({ saveState, lastSavedAt, saveError, onRetry }) {
 
 const AFTER_SUBMIT_HREF = "/provider/tours";
 
+const NOTICE_MS = 2500;
+
 /**
  * Hộp thông báo "gửi tour thành công" giữa màn hình (trang phía sau mờ đi).
- * Chuyển về danh sách tour ngay; hộp hiện trong lúc trang mới đang tải.
+ * Hiện khoảng 2.5 giây rồi chuyển về danh sách tour (trang đích được prefetch sẵn).
  */
 function SubmittedNotice({ onDone }) {
   useEffect(() => {
-    onDone();
-    // chỉ chuyển trang một lần khi hiện
+    // Giữ thông báo khoảng 2.5 giây rồi mới chuyển trang (chỉ một lần khi hiện)
+    const t = setTimeout(onDone, NOTICE_MS);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
