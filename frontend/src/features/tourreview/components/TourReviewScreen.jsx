@@ -14,6 +14,11 @@ import CustomerPreview from "./CustomerPreview";
 
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : "");
 const ACTION_LABEL = { SUBMITTED: "Gửi duyệt", APPROVED: "Đồng ý", CHANGES_REQUESTED: "Yêu cầu chỉnh sửa", REJECTED: "Từ chối" };
+const statusLabel = (s) => (s ? TOUR_STATUS[s]?.label || s : "—");
+const STEP_SHORT = { BASIC_INFO: "Thông tin cơ bản", PRICING: "Giá vé", STOPS: "Điểm đến", SCHEDULE: "Lịch khởi hành" };
+/** Lịch sử cũ lưu dạng "STOPS info: …" → "Điểm đến: …" (bản mới backend đã ghi tiếng Việt). */
+const readableNote = (text) =>
+  String(text).replace(/\b(BASIC_INFO|PRICING|STOPS|SCHEDULE)(?: [\w.[\]]+)?:/g, (_, step) => `${STEP_SHORT[step]}:`);
 let noteSeq = 0;
 
 function RejectReasons({ value, onChange, other, onOther }) {
@@ -185,7 +190,7 @@ export default function TourReviewScreen({ tourId }) {
         <div className="shrink-0 flex items-center gap-3">
           <button type="button" onClick={() => router.push("/moderator/tours")} className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer" aria-label="Quay lại"><ArrowLeft size={16} /></button>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-teal-700 uppercase tracking-wide">Thẩm định tour · phiên bản {tour.versionNumber}</p>
+            <p className="text-[11px] font-bold text-teal-700 uppercase tracking-wide">Thẩm định tour</p>
             <h1 className="text-lg font-bold text-slate-900 truncate">{tour.title}</h1>
           </div>
           <span className={`px-2 py-0.5 rounded-md border text-[11px] font-bold shrink-0 ${meta.cls}`}>{meta.label}</span>
@@ -207,7 +212,8 @@ export default function TourReviewScreen({ tourId }) {
         </div>
 
           <div className={`min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:pr-1 pb-6 ${SCROLL}`}>
-            {tab === "content" && (
+            {/* Tab "Xem trước": cột trái vẫn hiện nội dung để đối chiếu, điện thoại nằm ở cột phải */}
+            {(tab === "content" || tab === "preview") && (
               <>
                 {pending && <p className="text-[11px] text-slate-500 mb-2">Rê chuột vào từng khối để <b>Gắn cờ / Ghi chú</b>. Khối bị gắn cờ có viền cam.</p>}
                 <TourContentView tour={tour} Block={FlaggableBlock} />
@@ -233,14 +239,13 @@ export default function TourReviewScreen({ tourId }) {
                 </section>
               </>
             )}
-            {tab === "preview" && <CustomerPreview tour={tour} />}
             {tab === "history" && (
               <ol className="space-y-2">
                 {(review?.history || []).slice().reverse().map((h, i) => (
                   <li key={i} className="p-3 rounded-xl border border-slate-200 bg-white text-xs space-y-0.5">
                     <p className="font-bold text-slate-800">{ACTION_LABEL[h.action] || h.action} · {h.actorName || "—"} · {fmt(h.createdAt)}</p>
-                    <p className="text-slate-500">{h.fromStatus} → {h.toStatus} · phiên bản {h.tourVersion ?? "—"}</p>
-                    {h.note && <p className="text-slate-700">{h.note}</p>}
+                    <p className="text-slate-500">{statusLabel(h.fromStatus)} → {statusLabel(h.toStatus)}</p>
+                    {h.note && <p className="text-slate-700">{readableNote(h.note)}</p>}
                     {h.reason && <p className="text-rose-700">Lý do: {h.reason}{h.otherReason ? ` (${h.otherReason})` : ""}</p>}
                   </li>
                 ))}
@@ -250,9 +255,14 @@ export default function TourReviewScreen({ tourId }) {
           </div>
         </div>
 
-          {/* Cột tổng hợp — tiêu chí + nút thao tác, vừa khít chiều cao màn hình, không cuộn.
-              (Danh sách ghi chú gắn cờ nằm cuối cột nội dung bên trái.) */}
+          {/* Cột phải (cao hết màn hình, không cuộn):
+              - Tab "Xem trước phía khách": điện thoại mô phỏng (thay cho tiêu chí → máy lớn hơn).
+              - Tab khác: tiêu chí + ghi chú chung + nút thao tác. */}
           <aside className="flex flex-col gap-3 xl:min-h-0 xl:h-full xl:overflow-hidden pb-6 xl:pb-0">
+            {tab === "preview" ? (
+              <CustomerPreview tour={tour} />
+            ) : (
+            <>
             <div className="shrink-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 space-y-1.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-900">Tiêu chí kiểm duyệt</h3>
@@ -338,6 +348,8 @@ export default function TourReviewScreen({ tourId }) {
                 )}
                 {!answered && <p className="text-[11px] text-slate-500">Hãy đánh giá đủ 5 tiêu chí để mở các nút thao tác.</p>}
               </div>
+            )}
+            </>
             )}
           </aside>
       </div>

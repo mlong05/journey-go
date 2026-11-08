@@ -413,7 +413,7 @@ public class TourModerationService {
 
     private static String summarizeNotes(String general, List<TourReviewNote> notes) {
         String joined = notes.stream()
-                .map(n -> n.getStep().name() + (n.getField() == null ? "" : " " + n.getField()) + ": " + n.getNote())
+                .map(n -> n.getStep().getLabel() + ": " + n.getNote())
                 .collect(Collectors.joining("; "));
         String text = general == null ? joined : general + " | " + joined;
         return text.length() > 1000 ? text.substring(0, 997) + "..." : text;
