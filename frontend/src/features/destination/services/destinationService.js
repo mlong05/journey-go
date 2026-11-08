@@ -3,15 +3,15 @@
  * Chuẩn hóa các cuộc gọi API liên quan đến Destination.
  *
  * Các endpoint tích hợp:
- *  - GET    /api/v1/destinations              (cả đã duyệt & chưa duyệt) — MODERATOR/ADMIN/PROVIDER
+ *  - GET    /api/v1/destinations              (đã duyệt) — công khai
  *  - GET    /api/v1/destinations/approved     — Tất cả role
- *  - GET    /api/v1/destinations/deleted      — ADMIN
+ *  - GET    /api/v1/destinations/deleted      — CONTENT_MODERATOR
  *  - GET    /api/v1/destinations/{id}         — Tất cả role
- *  - POST   /api/v1/destinations              — ADMIN/MODERATOR/PROVIDER
- *  - PUT    /api/v1/destinations/{id}         — ADMIN/MODERATOR/PROVIDER (tự động hủy duyệt)
- *  - PATCH  /api/v1/destinations/{id}/approve — MODERATOR/ADMIN
- *  - PATCH  /api/v1/destinations/{id}/restore — ADMIN
- *  - DELETE /api/v1/destinations/{id}         — ADMIN/PROVIDER
+ *  - POST   /api/v1/destinations              — CONTENT_MODERATOR/CONTENT_PROVIDER
+ *  - PUT    /api/v1/destinations/{id}         — CONTENT_MODERATOR/CONTENT_PROVIDER (tự động hủy duyệt)
+ *  - PATCH  /api/v1/destinations/{id}/approve — CONTENT_MODERATOR
+ *  - PATCH  /api/v1/destinations/{id}/restore — CONTENT_MODERATOR
+ *  - DELETE /api/v1/destinations/{id}         — CONTENT_MODERATOR
  */
 import { apiClient } from "@/services/apiClient";
 

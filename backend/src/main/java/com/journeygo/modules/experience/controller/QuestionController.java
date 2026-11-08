@@ -52,7 +52,7 @@ public class QuestionController {
 
     @PostMapping("/tasks/{taskId}/questions")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfTask(#taskId)")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER') and @experienceSecurityBean.isOwnerOfTask(#taskId)")
     @Operation(summary = "Tạo Question cho Task (chỉ khi Task DRAFT, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
@@ -70,7 +70,7 @@ public class QuestionController {
 
     @PatchMapping("/questions/{id}/expected-text")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfQuestion(#id)")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER') and @experienceSecurityBean.isOwnerOfQuestion(#id)")
     @Operation(summary = "Set/Cập nhật expectedText (chỉ khi Task DRAFT, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -85,7 +85,7 @@ public class QuestionController {
 
     @DeleteMapping("/questions/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfQuestion(#id)")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER') and @experienceSecurityBean.isOwnerOfQuestion(#id)")
     @Operation(summary = "Xóa Question (chỉ khi Task DRAFT, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),

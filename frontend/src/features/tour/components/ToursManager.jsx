@@ -45,20 +45,20 @@ import RejectTourDialog from "./RejectTourDialog";
 import { useQueueRefresh } from "@/context/NotificationContext";
 
 /* =========================================================================
- *  KHU VỰC QUẢN LÝ Tour, dùng chung cho Provider, Moderator & Admin.
+ *  KHU VỰC QUẢN LÝ Tour, dùng chung cho Provider & Moderator.
  *
  *  Props:
- *   - theme: "emerald" | "teal" | "slate"   (accent theo vai trò)
+ *   - theme: "emerald" | "teal"   (accent theo vai trò)
  *   - source: "mine" | "all"                (Provider: tour của chính mình; còn lại: toàn sàn)
  *   - heading / description: nhãn hiển thị
  *   - canCreate: quyền tạo tour. Backend chốt POST /tours cho
- *     ADMIN + PROVIDER, nên Moderator để false.
+ *     CONTENT_PROVIDER, nên Moderator để false.
  *   - canModerate: quyền duyệt / từ chối (PATCH publish, PATCH reject).
  *   - canDelete: quyền xoá mềm / khôi phục.
  *
  *  Nguồn dữ liệu:
  *   - Provider: GET /tours/my        (chỉ tour của chính mình)
- *   - Admin / Moderator: GET /tours  (+ GET /tours/deleted cho Admin)
+ *   - Moderator: GET /tours          (+ GET /tours/deleted cho bộ lọc thùng rác)
  *
  *  Quy trình duyệt (TourStatus):
  *   DRAFT ──submit──> PENDING_REVIEW ──publish──> PUBLISHED
@@ -335,7 +335,7 @@ export default function ToursManager({
    * Tách riêng để effect và nút "Làm mới" dùng chung một nguồn dữ liệu.
    */
   const fetchTours = useCallback(async () => {
-    // Provider dùng endpoint "của tôi", còn Admin / Moderator dùng "toàn sàn".
+    // Provider dùng endpoint "của tôi", còn Moderator dùng "toàn sàn".
     const isProvider = source === "mine";
     const [mainRes, deletedRes] = await Promise.allSettled([
       isProvider ? tourService.getMy() : tourService.getAll(),
@@ -879,7 +879,7 @@ export default function ToursManager({
   );
 
   /* ══════════════════════════════════════════════════════════════
-     DANH SÁCH DẠNG HÀNG (Provider / Moderator / Admin)
+     DANH SÁCH DẠNG HÀNG (Provider / Moderator)
      ══════════════════════════════════════════════════════════════ */
   return (
     <div className="h-full min-h-0 flex flex-col gap-3 overflow-hidden animate-in fade-in-50 duration-200">

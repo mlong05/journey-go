@@ -54,7 +54,7 @@ public class ExperienceSlotController {
 
     @PostMapping("/experiences/{experienceId}/slots")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER') and @experienceSecurityBean.isOwnerOfExperience(#experienceId)")
     @Operation(summary = "Tạo / cập nhật quota theo ngày (Upsert, chỉ owner — KHÔNG yêu cầu Experience DRAFT)",
     description = "Upsert theo (experienceId, slotDate). Owner được tạo quota ngay cả khi Experience đã PUBLISHED.")
     @ApiResponses({
@@ -73,7 +73,7 @@ public class ExperienceSlotController {
 
     @PatchMapping("/slots/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfSlot(#id)")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER') and @experienceSecurityBean.isOwnerOfSlot(#id)")
     @Operation(summary = "Cập nhật quota / status slot (chỉ owner — KHÔNG yêu cầu Experience DRAFT)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -89,7 +89,7 @@ public class ExperienceSlotController {
 
     @DeleteMapping("/slots/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfSlot(#id)")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER') and @experienceSecurityBean.isOwnerOfSlot(#id)")
     @Operation(summary = "Xóa Slot (chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
