@@ -38,7 +38,7 @@ import java.sql.SQLException;
 public class FlywayConfig {
 
     /** Phiên bản migration cuối cùng KHÔNG phụ thuộc bảng do Hibernate tạo. */
-    static final String PRE_HIBERNATE_TARGET = "2";
+    static final String PRE_HIBERNATE_TARGET = "7";
 
     @Bean
     public FlywayMigrationStrategy twoPhaseFlywayMigrationStrategy() {

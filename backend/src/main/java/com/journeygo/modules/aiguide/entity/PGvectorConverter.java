@@ -47,3 +47,4 @@ public class PGvectorConverter implements AttributeConverter<float[], Object> {
         throw new IllegalArgumentException("Kiểu dữ liệu vector không được hỗ trợ: " + dbData.getClass().getName());
     }
 }
+
