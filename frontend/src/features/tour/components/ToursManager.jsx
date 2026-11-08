@@ -24,7 +24,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Layers,
-  ClipboardCheck,
+  ShieldCheck,
 } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { tourService } from "../services/tourService";
@@ -765,11 +765,11 @@ export default function ToursManager({
           <button
             type="button"
             onClick={() => router.push(wizardUrl)}
-            className="p-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white border border-teal-600 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 shadow-sm shadow-emerald-600/20 transition-colors cursor-pointer"
             title="Thẩm định tour"
             aria-label="Thẩm định tour"
           >
-            <ClipboardCheck size={14} />
+            <ShieldCheck size={14} />
           </button>
         )}
 
@@ -833,15 +833,18 @@ export default function ToursManager({
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={() => (wizardUrl ? router.push(wizardUrl) : openDetail(tour.tourId))}
-          className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
-          title="Xem chi tiết"
-          aria-label="Xem chi tiết"
-        >
-          <Eye size={14} />
-        </button>
+        {/* Tour chờ duyệt đã có nút "Thẩm định" (cùng đích) — không hiện thêm nút xem. */}
+        {!(wizardUrl && canModerate && tour.status === "PENDING_REVIEW" && !tour.deleted) && (
+          <button
+            type="button"
+            onClick={() => (wizardUrl ? router.push(wizardUrl) : openDetail(tour.tourId))}
+            className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
+            title="Xem chi tiết"
+            aria-label="Xem chi tiết"
+          >
+            <Eye size={14} />
+          </button>
+        )}
       </div>
     );
   };
