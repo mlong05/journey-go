@@ -69,12 +69,12 @@ public class DestinationController {
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin điểm đến thành công", destinationService.getById(id)));
     }
 
-    // ── ADMIN / MODERATOR only ────────────────────────────────────────────────
+    // ── CONTENT_MODERATOR only ────────────────────────────────────────────────
 
     @Operation(summary = "Lấy điểm đến đã xóa (phân trang & sắp xếp)",
-            description = "Trả về danh sách điểm đến đã bị xóa mềm (ADMIN / MODERATOR)")
+            description = "Trả về danh sách điểm đến đã bị xóa mềm (CONTENT_MODERATOR)")
     @GetMapping("/deleted")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     public ResponseEntity<ApiResponse<PageResponse<DestinationResponse>>> getDeleted(
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -83,26 +83,26 @@ public class DestinationController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Xóa điểm đến", description = "Xóa mềm điểm đến (ADMIN / MODERATOR)")
+    @Operation(summary = "Xóa điểm đến", description = "Xóa mềm điểm đến (CONTENT_MODERATOR)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         destinationService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Xóa điểm đến thành công"));
     }
 
     @PatchMapping("/{id}/restore")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Khôi phục điểm đến", description = "Khôi phục điểm đến đã bị xóa mềm (ADMIN / MODERATOR)")
+    @Operation(summary = "Khôi phục điểm đến", description = "Khôi phục điểm đến đã bị xóa mềm (CONTENT_MODERATOR)")
     public ResponseEntity<ApiResponse<DestinationResponse>> restore(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Khôi phục điểm đến thành công", destinationService.restore(id)));
     }
 
-    // ── ADMIN / MODERATOR / PROVIDER ─────────────────────────────────────────
+    // ── CONTENT_MODERATOR / CONTENT_PROVIDER ─────────────────────────────────
 
     @GetMapping("/my")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy điểm đến của tôi",
             description = "Trả về mọi điểm đến (kể cả DRAFT/PENDING/REJECTED) do người dùng hiện tại tạo")
@@ -114,9 +114,9 @@ public class DestinationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Tạo điểm đến mới", description = "Tạo điểm đến mới, mặc định trạng thái DRAFT (ADMIN / MODERATOR / PROVIDER)")
+    @Operation(summary = "Tạo điểm đến mới", description = "Tạo điểm đến mới, mặc định trạng thái DRAFT (CONTENT_MODERATOR / CONTENT_PROVIDER)")
     public ResponseEntity<ApiResponse<DestinationResponse>> create(
             @Valid @RequestBody DestinationRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -125,9 +125,9 @@ public class DestinationController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Cập nhật điểm đến", description = "Cập nhật điểm đến; PROVIDER chỉ được sửa điểm đến của chính mình")
+    @Operation(summary = "Cập nhật điểm đến", description = "Cập nhật điểm đến; CONTENT_PROVIDER chỉ được sửa điểm đến của chính mình")
     public ResponseEntity<ApiResponse<DestinationResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody DestinationRequest request,
@@ -138,11 +138,11 @@ public class DestinationController {
     }
 
     @GetMapping("/{id}/qr")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy mã QR check-in của điểm đến",
             description = "Mã dùng để in QR dán tại cổng; du khách quét để check-in thay GPS. "
-                    + "PROVIDER chỉ xem được điểm đến của chính mình. Mã không xuất hiện ở API công khai.")
+                    + "CONTENT_PROVIDER chỉ xem được điểm đến của chính mình. Mã không xuất hiện ở API công khai.")
     public ResponseEntity<ApiResponse<DestinationQrResponse>> getQr(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -151,7 +151,7 @@ public class DestinationController {
     }
 
     @PostMapping("/{id}/qr/regenerate")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'CONTENT_PROVIDER')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tạo lại mã QR check-in của điểm đến",
             description = "Dùng khi mã cũ bị lộ. Mã cũ hết hiệu lực ngay, cần in lại QR.")
