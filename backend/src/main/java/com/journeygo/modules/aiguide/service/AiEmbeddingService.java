@@ -43,3 +43,4 @@ public interface AiEmbeddingService {
         return sb.toString();
     }
 }
+

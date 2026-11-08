@@ -65,3 +65,4 @@ class TextChunkerHelperTest {
         assertThat(chunks.size()).isGreaterThanOrEqualTo(3);
     }
 }
+

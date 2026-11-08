@@ -3,7 +3,9 @@ package com.journeygo.modules.aiguide.entity;
 import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Type;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -66,7 +68,8 @@ public class AiKnowledgeChunk {
      * Vector nhúng 768 chiều (tạo bởi Gemini text-embedding-004).
      */
     @Convert(converter = PGvectorConverter.class)
-    @Column(name = "embedding", columnDefinition = "vector(768)", nullable = false)
+    @JdbcTypeCode(SqlTypes.OTHER)
+    @Column(name = "embedding", nullable = false)
     private float[] embedding;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -87,3 +90,4 @@ public class AiKnowledgeChunk {
         this.updatedAt = Instant.now();
     }
 }
+

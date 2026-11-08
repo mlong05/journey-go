@@ -58,3 +58,4 @@ class GeminiEmbeddingClientTest {
         assertThat(vectorStr).isEqualTo("[0.15,-0.25,0.5]");
     }
 }
+
