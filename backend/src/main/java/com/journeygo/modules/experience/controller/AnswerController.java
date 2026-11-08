@@ -39,7 +39,7 @@ public class AnswerController {
 
     @PostMapping("/questions/{questionId}/answers")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfQuestion(#questionId)")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER') and @experienceSecurityBean.isOwnerOfQuestion(#questionId)")
     @Operation(summary = "Tạo Answer cho Question (chỉ khi Task DRAFT, chỉ owner)",
             description = "BR-TASK-6: MULTIPLE_CHOICE chỉ 1 isCorrect=true; TEXT tất cả isCorrect=true")
     @ApiResponses({
@@ -58,7 +58,7 @@ public class AnswerController {
 
     @PatchMapping("/answers/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfAnswer(#id)")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER') and @experienceSecurityBean.isOwnerOfAnswer(#id)")
     @Operation(summary = "Cập nhật Answer (chỉ khi Task DRAFT, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
@@ -74,7 +74,7 @@ public class AnswerController {
 
     @DeleteMapping("/answers/{id}")
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN') and @experienceSecurityBean.isOwnerOfAnswer(#id)")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER') and @experienceSecurityBean.isOwnerOfAnswer(#id)")
     @Operation(summary = "Xóa Answer (chỉ khi Task DRAFT, chỉ owner)")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
