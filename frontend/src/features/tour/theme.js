@@ -178,6 +178,22 @@ export function formatDuration(days) {
 }
 
 /**
+ * Thời gian của một tour theo ngày: tour trong ngày → "1 ngày";
+ * tour nhiều ngày → "3 ngày 2 đêm" (số đêm lấy từ tour, mặc định = số ngày − 1).
+ */
+export function formatTourDuration(tour) {
+  if (tour?.tourFormat === "DAY_TRIP") return "1 ngày";
+  const days = Number(tour?.durationDays);
+  if (!Number.isFinite(days) || days <= 0) return EMPTY_VALUE;
+  if (tour?.tourFormat === "MULTI_DAY") {
+    const n = tour?.durationNights == null ? NaN : Number(tour.durationNights);
+    const nights = Number.isFinite(n) && n >= 0 ? n : Math.max(days - 1, 0);
+    return nights > 0 ? `${days} ngày ${nights} đêm` : `${days} ngày`;
+  }
+  return formatDuration(days);
+}
+
+/**
  * Chuẩn hoá response thô của backend về dạng dùng chung cho UI.
  * Hỗ trợ cả TourResponse trực tiếp và TourReviewResponse từ moderation.
  * Backend trả `status` (DRAFT/PENDING_REVIEW/CHANGES_REQUESTED/REJECTED/PUBLISHED/PAUSED) kèm cờ `deleted`.
@@ -198,6 +214,10 @@ export function normalizeTour(raw) {
     // Giá do backend tính động (tổng giá Experience của các điểm đến trong hành trình).
     price: inner.price != null ? Number(inner.price) : null,
     durationDays: inner.durationDays != null ? Number(inner.durationDays) : null,
+    // Tour 5 bước: DAY_TRIP tính theo phút, MULTI_DAY theo ngày.
+    tourFormat: inner.tourFormat || null,
+    durationMinutes: inner.durationMinutes != null ? Number(inner.durationMinutes) : null,
+    durationNights: inner.durationNights != null ? Number(inner.durationNights) : null,
     approved: inner.approved === true || status === "PUBLISHED",
     status,
     rejectionReason: raw.reason || inner.rejectionReason || "",
