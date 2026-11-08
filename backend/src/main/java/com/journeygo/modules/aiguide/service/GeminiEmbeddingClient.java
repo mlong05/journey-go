@@ -33,7 +33,7 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
     private final ObjectMapper objectMapper;
 
     public GeminiEmbeddingClient(GeminiAiProperties properties,
-                                 RestClient.Builder restClientBuilder,
+                                 @org.springframework.beans.factory.annotation.Qualifier("geminiRestClientBuilder") RestClient.Builder restClientBuilder,
                                  ObjectMapper objectMapper) {
         this.properties = properties;
         this.restClient = restClientBuilder.build();
@@ -61,6 +61,7 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
 
         ObjectNode requestBody = objectMapper.createObjectNode();
         requestBody.put("model", "models/" + properties.getEmbeddingModel());
+        requestBody.put("outputDimensionality", 768);
         ObjectNode content = requestBody.putObject("content");
         ArrayNode parts = content.putArray("parts");
         parts.addObject().put("text", text);
@@ -124,6 +125,7 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
         for (String text : texts) {
             ObjectNode item = requestsArray.addObject();
             item.put("model", "models/" + properties.getEmbeddingModel());
+            item.put("outputDimensionality", 768);
             ObjectNode content = item.putObject("content");
             ArrayNode parts = content.putArray("parts");
             parts.addObject().put("text", text != null ? text : "");
