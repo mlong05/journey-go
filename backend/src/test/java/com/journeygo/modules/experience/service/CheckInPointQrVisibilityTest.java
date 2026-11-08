@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Mã QR của trạm check-in chỉ trả cho chủ trải nghiệm / ADMIN / MODERATOR; du khách và khách vãng lai
+ * Mã QR của trạm check-in chỉ trả cho chủ trải nghiệm / MODERATOR; du khách và khách vãng lai
  * vẫn thấy vị trí trạm để được dẫn đường nhưng không có mã (phải tới trạm mới quét được).
  */
 @ExtendWith(MockitoExtension.class)
