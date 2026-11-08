@@ -96,5 +96,6 @@ export const NOTICE_SECTIONS = [
   { key: "priceIncludes", label: "Giá tour bao gồm", max: 5000 },
   { key: "priceExcludes", label: "Giá tour không bao gồm", max: 5000 },
   { key: "forceMajeure", label: "Trường hợp bất khả kháng", max: 5000 },
+  { key: "refundPolicy", label: "Chính sách hỗ trợ hoàn tiền", max: 5000 },
   { key: "contactInfo", label: "Liên hệ", max: 2000 },
 ];

@@ -48,6 +48,7 @@ public record TourDetailResponse(
         @Schema(description = "Những thông tin cần lưu ý") String priceIncludes,
         String priceExcludes,
         String forceMajeure,
+        String refundPolicy,
         String contactInfo,
 
         // Bước 2

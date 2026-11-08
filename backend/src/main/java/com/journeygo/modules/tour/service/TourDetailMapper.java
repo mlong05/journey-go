@@ -71,6 +71,7 @@ public class TourDetailMapper {
                 .priceIncludes(tour.getPriceIncludes())
                 .priceExcludes(tour.getPriceExcludes())
                 .forceMajeure(tour.getForceMajeure())
+                .refundPolicy(tour.getRefundPolicy())
                 .contactInfo(tour.getContactInfo())
                 .images(List.copyOf(tour.getImages()))
                 .coverImageUrl(tour.getCoverImageUrl())
