@@ -52,7 +52,9 @@ public class FlywayConfig {
     @Bean
     public FlywayMigrationStrategy twoPhaseFlywayMigrationStrategy() {
         return flyway -> {
-            if (hibernateTablesExist(flyway.getConfiguration().getDataSource())) {
+            DataSource dataSource = flyway.getConfiguration().getDataSource();
+            forgetRenumberedTourTaskMigrations(dataSource);
+            if (hibernateTablesExist(dataSource)) {
                 flyway.migrate();
                 return;
             }
@@ -79,6 +81,36 @@ public class FlywayConfig {
                 log.info("[Flyway] Đã chạy thêm {} migration sau khi Hibernate tạo bảng.", result.migrationsExecuted);
             }
         };
+    }
+
+    /**
+     * Ba migration nhiệm vụ của tour từng mang số V14–V16 trước khi bị đổi thành V15–V17
+     * (V14 trên main là partner_profile_update_request). DB đã chạy bản số cũ sẽ lỗi
+     * "checksum mismatch" cho version 14–16. Xóa đúng 3 dòng lịch sử cũ đó (khớp cả version lẫn
+     * tên) để Flyway chạy lại theo thứ tự mới; cả 3 migration đều idempotent (IF NOT EXISTS /
+     * ON CONFLICT) nên chạy lại trên DB đã có bảng vẫn an toàn. DB chưa từng chạy bản cũ: không làm gì.
+     */
+    private static void forgetRenumberedTourTaskMigrations(DataSource dataSource) {
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement check = conn.prepareStatement("SELECT to_regclass('flyway_schema_history') IS NOT NULL");
+                 ResultSet rs = check.executeQuery()) {
+                if (!rs.next() || !rs.getBoolean(1)) return;
+            }
+            try (PreparedStatement ps = conn.prepareStatement("""
+                    DELETE FROM flyway_schema_history
+                    WHERE (version = '14' AND description = 'tour stop tasks')
+                       OR (version = '15' AND description = 'tour stop tasks under stop')
+                       OR (version = '16' AND description = 'tour task reward')
+                    """)) {
+                int removed = ps.executeUpdate();
+                if (removed > 0) {
+                    log.warn("[Flyway] Đã xóa {} dòng lịch sử của migration nhiệm vụ tour mang số cũ (V14–V16); "
+                            + "chúng sẽ chạy lại với số mới V15–V17.", removed);
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không dọn được lịch sử Flyway của migration nhiệm vụ tour", e);
+        }
     }
 
     private static boolean hibernateTablesExist(DataSource dataSource) {
