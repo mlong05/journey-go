@@ -22,9 +22,11 @@ function SaveIndicator({ saveState, lastSavedAt, saveError, onRetry }) {
   }
   if (saveState === "error") {
     return (
-      <span className="text-xs font-bold text-rose-600 inline-flex items-center gap-1.5" title={saveError}>
+      <span className="text-xs font-bold text-rose-600 inline-flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 max-w-md text-right" title={saveError}>
         <CloudOff size={13} />Chưa lưu được
         <button type="button" onClick={onRetry} className="underline inline-flex items-center gap-0.5 cursor-pointer"><RotateCw size={11} />Thử lại</button>
+        {/* Hiện luôn lý do để đối tác biết cần sửa gì (trước chỉ hiện khi rê chuột) */}
+        {saveError && <span className="basis-full text-[11px] font-semibold text-rose-500 line-clamp-2">{saveError}</span>}
       </span>
     );
   }

@@ -7,7 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -279,12 +282,40 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(response);
     }
 
+    /**
+     * Client đã đóng kết nối (tải lại / đóng tab khi đang mở luồng SSE thông báo…).
+     * Không còn ai nhận phản hồi → bỏ qua, không cố ghi JSON (tránh lỗi "No converter … text/event-stream").
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientGone(AsyncRequestNotUsableException ex) {
+        log.debug("Client đã ngắt kết nối: {}", ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Object>> handleGeneralException(Exception ex) {
+    public ResponseEntity<ApiResponse<Object>> handleGeneralException(Exception ex, HttpServletRequest request) {
+        // Lỗi trên luồng SSE hoặc do client ngắt kết nối: không thể (và không cần) trả JSON.
+        String accept = request.getHeader("Accept");
+        if ((accept != null && accept.contains(MediaType.TEXT_EVENT_STREAM_VALUE)) || isClientAbort(ex)) {
+            log.debug("Bỏ qua lỗi trên kết nối đã đóng / SSE: {}", ex.toString());
+            return null;
+        }
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .message("Đã xảy ra lỗi máy chủ: " + ex.getMessage())
                 .build();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
+
+    /** "Broken pipe", "connection was aborted/reset" — trình duyệt đã đóng kết nối. */
+    private static boolean isClientAbort(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t.getClass().getName().endsWith("ClientAbortException")) return true;
+            if (t instanceof java.io.IOException) {
+                String msg = String.valueOf(t.getMessage()).toLowerCase();
+                if (msg.contains("broken pipe") || msg.contains("connection was aborted")
+                        || msg.contains("connection reset") || msg.contains("aborted by the software")) return true;
+            }
+        }
+        return false;
     }
 }
