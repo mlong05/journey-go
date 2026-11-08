@@ -91,6 +91,8 @@ public class DashboardService {
                         (Instant) r[9], (Instant) r[10]))
                 .toList();
 
+        // Phạm vi Admin chỉ gồm cấu hình hệ thống, đối tác, người dùng và tất toán.
+        // Việc thẩm định điểm đến / tour thuộc CONTENT_MODERATOR nên không xuất hiện ở đây.
         List<AdminDashboardResponse.PendingTask> tasks = new ArrayList<>();
         query("select r.id, r.refundCode, u.fullName, r.proposedAmount, r.declaredReason, r.reasonDetail, r.createdAt "
                 + "from RefundRequest r join r.tourist u where r.status = ?1 order by r.createdAt asc", Object[].class,
@@ -100,26 +102,10 @@ public class DashboardService {
                         "Du khách: " + r[2] + " · Đề xuất " + formatVnd((BigDecimal) r[3]),
                         r[5] != null ? (String) r[5] : "Lý do: " + name(r[4]),
                         (Instant) r[6], "/admin/finance")));
-        query("select r.id, d.id, d.name, c.fullName, r.submittedAt from DestinationReview r join r.destination d "
-                + "left join d.createdBy c where r.status = ?1 order by r.submittedAt asc", Object[].class,
-                DestinationReviewStatus.PENDING).setMaxResults(TASK_LIMIT).getResultList()
-                .forEach(r -> tasks.add(new AdminDashboardResponse.PendingTask("DESTINATION", (Long) r[0],
-                        "DEST-" + r[1], (String) r[2], "Đối tác: " + orDash(r[3]),
-                        "Hồ sơ điểm đến đang chờ thẩm định trước khi xuất bản.",
-                        (Instant) r[4], "/admin/destinations")));
-        query("select r.id, t.tourId, t.title, c.fullName, r.submittedAt from TourReview r join r.tour t "
-                + "left join t.createdBy c where r.status = ?1 order by r.submittedAt asc", Object[].class,
-                TourReviewStatus.PENDING).setMaxResults(TASK_LIMIT).getResultList()
-                .forEach(r -> tasks.add(new AdminDashboardResponse.PendingTask("TOUR", (Long) r[0],
-                        "TOUR-" + r[1], (String) r[2], "Đối tác: " + orDash(r[3]),
-                        "Tour đang chờ thẩm định trước khi mở bán.",
-                        (Instant) r[4], "/admin/tours")));
         tasks.sort(Comparator.comparing(AdminDashboardResponse.PendingTask::submittedAt,
                 Comparator.nullsLast(Comparator.naturalOrder())));
 
-        long pendingTotal = count("select count(r) from RefundRequest r where r.status = ?1", RefundStatus.PENDING_REVIEW)
-                + count("select count(r) from DestinationReview r where r.status = ?1", DestinationReviewStatus.PENDING)
-                + count("select count(r) from TourReview r where r.status = ?1", TourReviewStatus.PENDING);
+        long pendingTotal = count("select count(r) from RefundRequest r where r.status = ?1", RefundStatus.PENDING_REVIEW);
 
         return new AdminDashboardResponse(users, destinations, checkIns, revenue, recentPayments, pendingTotal,
                 tasks.stream().limit(TASK_LIMIT).toList());
