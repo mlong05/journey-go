@@ -14,6 +14,7 @@ import {
   Globe2,
   Tags,
   Award,
+  UserCog,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -42,6 +43,13 @@ const ADMIN_NAV_ITEMS = [
     label: "Quản lý đối tác",
     href: "/admin/partners",
     icon: Handshake,
+    badge: null,
+  },
+  {
+    id: "partner-profile-updates",
+    label: "Yêu cầu đổi thông tin",
+    href: "/admin/partner-profile-updates",
+    icon: UserCog,
     badge: null,
   },
   {
