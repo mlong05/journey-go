@@ -154,7 +154,7 @@ public class SchemaMigration {
     /**
      * Cấu trúc mới: điểm đến → nhiệm vụ → (quiz, trải nghiệm thực tế → câu hỏi sau trải nghiệm).
      * <ol>
-     *   <li>Hoàn tác bản tạm V14 (nhiệm vụ nằm trong trải nghiệm, câu hỏi kind = TASK): câu hỏi trở lại
+     *   <li>Hoàn tác bản tạm V15 (nhiệm vụ nằm trong trải nghiệm, câu hỏi kind = TASK): câu hỏi trở lại
      *       thành câu hỏi sau trải nghiệm, xóa các nhiệm vụ tạm đó.</li>
      *   <li>Điểm đến còn quiz / trải nghiệm gắn thẳng vào điểm đến: tạo "Nhiệm vụ 1"
      *       và chuyển toàn bộ quiz, trải nghiệm vào nhiệm vụ đó.</li>

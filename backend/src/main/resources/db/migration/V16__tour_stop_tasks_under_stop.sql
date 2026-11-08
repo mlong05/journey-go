@@ -1,5 +1,5 @@
 -- Nhiệm vụ chuyển lên cấp điểm đến: điểm đến → nhiệm vụ → (quiz, trải nghiệm thực tế).
--- Dữ liệu cũ (quiz / trải nghiệm gắn thẳng vào điểm đến, hoặc nhiệm vụ nằm trong trải nghiệm theo V14)
+-- Dữ liệu cũ (quiz / trải nghiệm gắn thẳng vào điểm đến, hoặc nhiệm vụ nằm trong trải nghiệm theo V15)
 -- được chuyển bởi runner SchemaMigration.migrateTourStopsToTasks (cần task_type đã được seed).
 
 ALTER TABLE tour_stop_tasks
