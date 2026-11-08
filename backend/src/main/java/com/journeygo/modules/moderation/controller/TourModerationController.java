@@ -35,7 +35,7 @@ public class TourModerationController {
     private final TourModerationService moderationService;
 
     @PostMapping("/{tourId}/submit")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'CONTENT_MODERATOR')")
     @Operation(summary = "Gửi lại tour bị từ chối để kiểm duyệt")
     public ResponseEntity<ApiResponse<TourReviewResponse>> submit(@PathVariable Long tourId,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -44,7 +44,7 @@ public class TourModerationController {
     }
 
     @GetMapping("/queue")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Lấy hàng chờ kiểm duyệt tour")
     public ResponseEntity<ApiResponse<PageResponse<TourReviewResponse>>> queue(
             @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
@@ -53,7 +53,7 @@ public class TourModerationController {
     }
 
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Lọc tour theo trạng thái kiểm duyệt")
     public ResponseEntity<ApiResponse<PageResponse<TourReviewResponse>>> byStatus(@PathVariable TourReviewStatus status,
             @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
@@ -62,7 +62,7 @@ public class TourModerationController {
     }
 
     @GetMapping("/rejection-reasons")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Lấy danh sách lý do từ chối tour")
     public ResponseEntity<ApiResponse<List<RejectionReasonOption>>> rejectionReasons() {
         var reasons = Arrays.stream(TourRejectionReason.values())
@@ -71,7 +71,7 @@ public class TourModerationController {
     }
 
     @GetMapping("/{tourId}/history")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'CONTENT_MODERATOR')")
     @Operation(summary = "Xem trạng thái và lịch sử kiểm duyệt tour")
     public ResponseEntity<ApiResponse<TourReviewResponse>> history(@PathVariable Long tourId,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -80,7 +80,7 @@ public class TourModerationController {
     }
 
     @GetMapping("/{tourId}/detail")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Xem toàn bộ nội dung tour (luồng 5 bước) để kiểm duyệt")
     public ResponseEntity<ApiResponse<TourDetailResponse>> detail(@PathVariable Long tourId) {
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tour thành công",
@@ -88,7 +88,7 @@ public class TourModerationController {
     }
 
     @PatchMapping("/{tourId}/approve")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Đồng ý duyệt tour",
             description = "Tour 5 bước: bắt buộc tick 5 tiêu chí, đạt tối thiểu 3/5 và không có ghi chú lỗi. "
                     + "Backend kiểm tra lại toàn bộ dữ liệu, chốt điểm thưởng, sinh slot, chuyển PUBLISHED và gửi email.")
@@ -100,7 +100,7 @@ public class TourModerationController {
     }
 
     @PatchMapping("/{tourId}/request-changes")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Yêu cầu đối tác chỉnh sửa tour",
             description = "Bắt buộc ít nhất 1 ghi chú (gắn với bước / điểm đến). Tour chuyển CHANGES_REQUESTED.")
     public ResponseEntity<ApiResponse<TourReviewResponse>> requestChanges(@PathVariable Long tourId,
@@ -110,7 +110,7 @@ public class TourModerationController {
     }
 
     @PatchMapping("/{tourId}/reject")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Từ chối tour",
             description = "Bắt buộc mã lý do hoặc ghi chú. Tour 5 bước: bắt buộc tick 5 tiêu chí.")
     public ResponseEntity<ApiResponse<TourReviewResponse>> reject(@PathVariable Long tourId,
