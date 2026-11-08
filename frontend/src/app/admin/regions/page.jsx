@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/dashboard/DashboardUI";
 import RegionCatalogCard from "@/features/catalog/components/RegionCatalogCard";
 
 /**
- * Quản lý khu vực (ADMIN) — backend /api/v1/regions.
+ * Cấu hình khu vực (ADMIN) — backend /api/v1/regions.
  * Khu vực hiện trong dropdown "Khu vực" ở bước 1 khi đối tác tạo tour.
  */
 export default function AdminRegionsPage() {

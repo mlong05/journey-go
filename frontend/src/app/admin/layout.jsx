@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Users,
   CreditCard,
-  Settings,
   HandCoins,
   ShieldAlert,
   Handshake,
@@ -15,6 +14,8 @@ import {
   Tags,
   Award,
   UserCog,
+  Sparkles,
+  Medal,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -61,16 +62,30 @@ const ADMIN_NAV_ITEMS = [
   },
   {
     id: "regions",
-    label: "Quản lý khu vực",
+    label: "Cấu hình khu vực",
     href: "/admin/regions",
     icon: Globe2,
     badge: null,
   },
   {
     id: "themes",
-    label: "Quản lý chủ đề",
+    label: "Cấu hình chủ đề",
     href: "/admin/themes",
     icon: Tags,
+    badge: null,
+  },
+  {
+    id: "experience-rewards",
+    label: "Cấu hình trải nghiệm và điểm thưởng",
+    href: "/admin/experience-rewards",
+    icon: Sparkles,
+    badge: null,
+  },
+  {
+    id: "badge-config",
+    label: "Cấu hình huy hiệu",
+    href: "/admin/badge-config",
+    icon: Medal,
     badge: null,
   },
   {
@@ -99,13 +114,6 @@ const ADMIN_NAV_ITEMS = [
     label: "Nhật ký kiểm toán",
     href: "/admin/audit-logs",
     icon: ShieldAlert,
-    badge: null,
-  },
-  {
-    id: "system-config",
-    label: "Cấu hình hệ thống",
-    href: "/admin/system-config",
-    icon: Settings,
     badge: null,
   },
 ];

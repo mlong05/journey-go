@@ -20,16 +20,30 @@ import {
   Save,
 } from "lucide-react";
 import { taskTypeService } from "../services/taskTypeService";
+import { VERIFICATION_METHOD_LABELS, verificationMethodLabel } from "../constants";
 
 const VERIFICATION_METHODS = [
-  { value: "ANSWER_MATCH", label: "So khớp đáp án (Trắc nghiệm)", icon: HelpCircle },
-  { value: "GPS_PRESENCE", label: "Định vị GPS tại chỗ", icon: MapPin },
-  { value: "QR_SCAN", label: "Quét mã QR hiện vật", icon: QrCode },
-  { value: "PHOTO_SUBMISSION", label: "Nộp ảnh thực địa", icon: Camera },
-];
+  { value: "ANSWER_MATCH", icon: HelpCircle },
+  { value: "GPS_PRESENCE", icon: MapPin },
+  { value: "QR_SCAN", icon: QrCode },
+  { value: "PHOTO_SUBMISSION", icon: Camera },
+].map((m) => ({ ...m, label: VERIFICATION_METHOD_LABELS[m.value] }));
+
+/**
+ * Sinh mã định danh nội bộ từ tên hiển thị (bỏ dấu, viết hoa, nối bằng "_"),
+ * để admin không phải tự nhập mã. Vd: "Giải mã âm thanh" → "GIAI_MA_AM_THANH".
+ */
+const codeFromName = (name) =>
+  name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 
 const INITIAL_FORM = {
-  code: "",
   name: "",
   hasQuestions: false,
   requiresLocation: false,
@@ -87,15 +101,14 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
     };
   }, [isOpen, loadList]);
 
-  // Tìm kiếm theo code hoặc name
+  // Tìm kiếm theo tên hoặc phương thức xác minh
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return types;
     return types.filter(
       (t) =>
         t.name?.toLowerCase().includes(q) ||
-        t.code?.toLowerCase().includes(q) ||
-        t.verificationMethod?.toLowerCase().includes(q)
+        verificationMethodLabel(t.verificationMethod).toLowerCase().includes(q)
     );
   }, [types, searchQuery]);
 
@@ -110,24 +123,6 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
       setDetailTarget(found || null);
     } finally {
       setDetailLoading(false);
-    }
-  };
-
-  // Tra cứu theo code: GET /api/v1/task-types/code/{code}
-  const handleSearchCode = async () => {
-    const code = searchQuery.trim().toUpperCase();
-    if (!code) return;
-    setLoading(true);
-    try {
-      const res = await taskTypeService.getByCode(code);
-      if (res) {
-        setDetailTarget(res);
-        showToast(`Tìm thấy loại nhiệm vụ: ${res.name}`);
-      }
-    } catch {
-      // nếu không tìm thấy chính xác theo code, danh sách vẫn lọc bình thường
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -152,7 +147,7 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                Quản lý Loại nhiệm vụ (TaskType Master Data)
+                Quản lý loại nhiệm vụ
               </h3>
               <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                 Chuẩn hóa các loại nhiệm vụ, cơ chế chấm điểm và yêu cầu vị trí cho toàn sàn.
@@ -188,21 +183,10 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearchCode()}
-                placeholder="Tìm kiếm theo tên hoặc mã code..."
+                placeholder="Tìm kiếm theo tên loại nhiệm vụ..."
                 className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
               />
             </div>
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={handleSearchCode}
-                className="h-8 px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold"
-                title="Tra cứu theo mã code chính xác (GET /task-types/code/{code})"
-              >
-                Code
-              </button>
-            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -241,7 +225,7 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
           {loading && types.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
               <Loader2 size={24} className="animate-spin text-violet-600" />
-              <span className="text-xs font-semibold">Đang tải danh mục TaskType...</span>
+              <span className="text-xs font-semibold">Đang tải danh mục loại nhiệm vụ...</span>
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-slate-400">
@@ -263,14 +247,14 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <span className="font-mono text-xs font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-lg border border-violet-200">
-                          {item.code}
-                        </span>
-                        <div className="flex items-center gap-1">
+                        <h4 className="text-sm font-bold text-slate-900">
+                          {item.name}
+                        </h4>
+                        <div className="flex items-center gap-1 shrink-0">
                           <button
                             type="button"
                             onClick={() => handleViewDetail(item.id)}
-                            title="Xem chi tiết (GET /task-types/{id})"
+                            title="Xem chi tiết"
                             className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
                           >
                             <Eye size={13} />
@@ -281,23 +265,19 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
                               setIsCreating(false);
                               setEditingType(item);
                             }}
-                            title="Chỉnh sửa (PATCH /task-types/{id})"
+                            title="Chỉnh sửa"
                             className="p-1 rounded-lg text-slate-400 hover:text-violet-700 hover:bg-violet-50 cursor-pointer"
                           >
                             <Pencil size={13} />
                           </button>
                         </div>
                       </div>
-
-                      <h4 className="text-sm font-bold text-slate-900 mt-2">
-                        {item.name}
-                      </h4>
                     </div>
 
                     <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-600">
                       <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md text-slate-700">
                         <MethodIcon size={12} className="text-violet-600" />
-                        {methodMeta?.label || item.verificationMethod}
+                        {verificationMethodLabel(item.verificationMethod)}
                       </span>
                       {item.hasQuestions && (
                         <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">
@@ -306,7 +286,7 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
                       )}
                       {item.requiresLocation && (
                         <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded">
-                          <MapPin size={11} /> Cần vị trí GPS
+                          <MapPin size={11} /> Cần vị trí
                         </span>
                       )}
                     </div>
@@ -353,7 +333,7 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
         />
       )}
 
-      {/* MODAL CHI TIẾT (GET /api/v1/task-types/{id}) */}
+      {/* MODAL CHI TIẾT */}
       {detailTarget && (
         <TaskTypeDetailDialog
           taskType={detailTarget}
@@ -373,7 +353,6 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
   const [form, setForm] = useState(
     taskType
       ? {
-          code: taskType.code || "",
           name: taskType.name || "",
           hasQuestions: Boolean(taskType.hasQuestions),
           requiresLocation: Boolean(taskType.requiresLocation),
@@ -392,8 +371,9 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
       setError("Vui lòng nhập tên loại nhiệm vụ.");
       return;
     }
-    if (!isEdit && !form.code.trim()) {
-      setError("Vui lòng nhập mã code (vd: QUIZ, AUDIO_CLUE).");
+    const code = codeFromName(form.name);
+    if (!isEdit && !code) {
+      setError("Tên loại nhiệm vụ cần có ít nhất một chữ cái hoặc chữ số.");
       return;
     }
 
@@ -409,7 +389,7 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
         onSaved(updated, true);
       } else {
         const created = await taskTypeService.create({
-          code: form.code.trim().toUpperCase(),
+          code,
           name: form.name.trim(),
           hasQuestions: form.hasQuestions,
           requiresLocation: form.requiresLocation,
@@ -456,28 +436,6 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
-          {/* Mã Code (chỉ nhập khi tạo mới, không cho sửa theo thiết kế backend) */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700">
-              Mã code (UNIQUE) <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              disabled={isEdit || loading}
-              value={form.code}
-              onChange={(e) =>
-                setForm({ ...form, code: e.target.value.toUpperCase() })
-              }
-              placeholder="Vd: AUDIO_CLUE"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:bg-white focus:outline-none disabled:opacity-60"
-            />
-            {isEdit && (
-              <p className="text-[11px] text-slate-400">
-                Mã code là khoá định danh cố định, không thể chỉnh sửa.
-              </p>
-            )}
-          </div>
-
           {/* Tên hiển thị */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-700">
@@ -508,13 +466,13 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
             >
               {VERIFICATION_METHODS.map((m) => (
                 <option key={m.value} value={m.value}>
-                  {m.label} ({m.value})
+                  {m.label}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Cờ hasQuestions & requiresLocation */}
+          {/* Có câu hỏi & yêu cầu vị trí */}
           <div className="pt-1 space-y-2">
             <label className="flex items-center gap-2.5 text-xs font-bold text-slate-700 cursor-pointer">
               <input
@@ -525,7 +483,7 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
                 }
                 className="w-4 h-4 rounded text-violet-600 focus:ring-violet-500"
               />
-              <span>Loại này có kèm bộ câu hỏi / trắc nghiệm (hasQuestions)</span>
+              <span>Loại này có kèm bộ câu hỏi / trắc nghiệm</span>
             </label>
 
             <label className="flex items-center gap-2.5 text-xs font-bold text-slate-700 cursor-pointer">
@@ -537,7 +495,7 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
                 }
                 className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
               />
-              <span>Bắt buộc vị trí Check-in khi tạo Task (requiresLocation)</span>
+              <span>Bắt buộc có vị trí khi tạo nhiệm vụ</span>
             </label>
           </div>
 
@@ -585,7 +543,7 @@ function TaskTypeDetailDialog({ taskType, loading, onClose }) {
         className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4"
       >
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-base font-bold text-slate-900">Chi tiết TaskType</h3>
+          <h3 className="text-base font-bold text-slate-900">Chi tiết loại nhiệm vụ</h3>
           <button
             type="button"
             onClick={onClose}
@@ -601,19 +559,14 @@ function TaskTypeDetailDialog({ taskType, loading, onClose }) {
           </div>
         ) : (
           <div className="space-y-3 text-xs">
-            <div>
-              <span className="text-[11px] font-mono font-bold bg-violet-50 text-violet-700 px-2 py-0.5 rounded border border-violet-200">
-                {taskType.code}
-              </span>
-              <h4 className="text-sm font-bold text-slate-900 mt-1">
-                {taskType.name}
-              </h4>
-            </div>
+            <h4 className="text-sm font-bold text-slate-900">
+              {taskType.name}
+            </h4>
 
             <div className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200 font-semibold text-slate-700">
               <div className="flex justify-between">
                 <span className="text-slate-400">Xác minh:</span>
-                <span>{taskType.verificationMethod}</span>
+                <span>{verificationMethodLabel(taskType.verificationMethod)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Có câu hỏi:</span>
