@@ -11,6 +11,7 @@ import {
   Plus,
   RefreshCw,
   User,
+  Wallet,
   X,
   XCircle,
 } from "lucide-react";
@@ -66,6 +67,72 @@ function formatRate(rate) {
   const n = Number(rate);
   if (Number.isNaN(n)) return "—";
   return `${(n * 100).toFixed(2).replace(/\.00$/, "")}%`;
+}
+
+/**
+ * Tỷ lệ mà ĐỐI TÁC nhận được = 100% − tỷ lệ hoa hồng nền tảng.
+ * `commissionRate` trong DB là phần nền tảng giữ lại.
+ */
+function providerRate(rate) {
+  if (rate === null || rate === undefined) return null;
+  const n = Number(rate);
+  if (Number.isNaN(n)) return null;
+  return 1 - n;
+}
+
+/**
+ * Thanh chia tỷ lệ: nền tảng (hoa hồng) vs đối tác (nhận được).
+ * Dùng gradient để thị giác rõ phần chia, không dùng màu đen.
+ */
+function RateSplitBar({ rate }) {
+  const platform = rate === null || rate === undefined ? null : Number(rate);
+  const provider = providerRate(rate);
+  if (platform === null || Number.isNaN(platform)) {
+    return <span className="text-xs text-slate-400">—</span>;
+  }
+  const pct = Math.max(0, Math.min(100, platform * 100));
+  return (
+    <div className="flex h-2 w-full min-w-[120px] overflow-hidden rounded-full bg-emerald-200">
+      <div
+        className="h-full bg-amber-400"
+        style={{ width: `${pct}%` }}
+        title={`Nền tảng: ${formatRate(platform)}`}
+      />
+      <div
+        className="h-full flex-1 bg-emerald-500"
+        title={`Đối tác nhận: ${formatRate(provider)}`}
+      />
+    </div>
+  );
+}
+
+/** Chip hiển thị cả 2 tỷ lệ: nền tảng (hoa hồng) + đối tác (nhận được). */
+function RateChips({ rate, size = "sm" }) {
+  const platform = rate === null || rate === undefined ? null : Number(rate);
+  const provider = providerRate(rate);
+  const pad = size === "lg" ? "px-3 py-1 text-sm" : "px-2 py-0.5 text-xs";
+  const iconSize = size === "lg" ? 14 : 12;
+  if (platform === null || Number.isNaN(platform)) {
+    return <span className="text-xs text-slate-400">—</span>;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span
+        className={`inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 ${pad} font-bold text-amber-700`}
+        title="Phần hoa hồng nền tảng giữ lại từ mỗi đơn đặt tour"
+      >
+        <BadgePercent size={iconSize} />
+        Nền tảng {formatRate(platform)}
+      </span>
+      <span
+        className={`inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 ${pad} font-bold text-emerald-700`}
+        title="Phần doanh thu đối tác nhận được"
+      >
+        <Wallet size={iconSize} />
+        Đối tác {formatRate(provider)}
+      </span>
+    </div>
+  );
 }
 
 function getErrorMessage(err, fallback) {
@@ -220,9 +287,9 @@ export default function AdminCommissionPoliciesPage() {
               Quản lý chính sách hoa hồng
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Tỷ lệ hoa hồng mặc định của nền tảng. Chính sách đã hiệu lực là bất biến; chỉ
-              chính sách tương lai mới có thể hủy. Tất toán luôn dùng tỷ lệ chụp tại thời điểm
-              phát sinh doanh thu.
+              Tỷ lệ chia doanh thu giữa nền tảng và đối tác. Chính sách đã hiệu lực là bất
+              biến; chỉ chính sách tương lai mới có thể hủy. Tất toán luôn dùng tỷ lệ chụp
+              tại thời điểm phát sinh doanh thu.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -237,7 +304,7 @@ export default function AdminCommissionPoliciesPage() {
             <button
               type="button"
               onClick={() => setShowForm((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer"
             >
               {showForm ? <X size={14} /> : <Plus size={14} />}
               {showForm ? "Đóng" : "Tạo chính sách"}
@@ -251,9 +318,9 @@ export default function AdminCommissionPoliciesPage() {
             <div className="flex items-center gap-2">
               <BadgePercent size={18} className="text-emerald-600" />
               <span className="text-sm font-bold text-slate-900">
-                Tỷ lệ đang áp dụng:{" "}
-                <span className="text-emerald-700">{formatRate(current?.commissionRate)}</span>
+                Tỷ lệ đang áp dụng
               </span>
+              <RateChips rate={current?.commissionRate} size="lg" />
             </div>
             <div className="text-xs text-slate-600">
               {current
@@ -261,6 +328,23 @@ export default function AdminCommissionPoliciesPage() {
                 : "Chưa có chính sách nào đang hiệu lực — hãy tạo một chính sách."}
             </div>
           </div>
+
+          {/* Thanh chia tỷ lệ nền tảng / đối tác */}
+          {current?.commissionRate != null && (
+            <div className="mt-3">
+              <RateSplitBar rate={current.commissionRate} />
+              <div className="mt-1.5 flex items-center justify-between text-[11px] font-semibold">
+                <span className="inline-flex items-center gap-1 text-amber-700">
+                  <span className="h-2 w-2 rounded-full bg-amber-400" />
+                  Nền tảng thu {formatRate(current.commissionRate)} hoa hồng
+                </span>
+                <span className="inline-flex items-center gap-1 text-emerald-700">
+                  Đối tác nhận {formatRate(providerRate(current.commissionRate))}
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -287,7 +371,7 @@ export default function AdminCommissionPoliciesPage() {
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-semibold text-slate-700">
-                Tỷ lệ hoa hồng <span className="text-rose-500">*</span>
+                Tỷ lệ hoa hồng nền tảng <span className="text-rose-500">*</span>
               </span>
               <input
                 value={form.commissionRate}
@@ -298,6 +382,24 @@ export default function AdminCommissionPoliciesPage() {
                 inputMode="decimal"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-200/60"
               />
+              {/* Preview chia tỷ lệ — đối tác nhận phần còn lại */}
+              {Number.isFinite(Number(form.commissionRate)) && Number(form.commissionRate) > 0 && (
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                      <BadgePercent size={11} />
+                      Nền tảng {formatRate(Number(form.commissionRate))}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                      <Wallet size={11} />
+                      Đối tác {formatRate(providerRate(Number(form.commissionRate)))}
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <RateSplitBar rate={Number(form.commissionRate)} />
+                  </div>
+                </div>
+              )}
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-semibold text-slate-700">
@@ -351,7 +453,7 @@ export default function AdminCommissionPoliciesPage() {
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer disabled:opacity-50"
             >
               {saving && <Loader2 size={14} className="animate-spin" />}
               Tạo chính sách
@@ -383,7 +485,12 @@ export default function AdminCommissionPoliciesPage() {
               <thead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold">Tên chính sách</th>
-                  <th className="px-4 py-3 text-left font-semibold">Tỷ lệ</th>
+                  <th className="px-4 py-3 text-left font-semibold">
+                    Chia tỷ lệ
+                    <span className="block text-[10px] font-normal normal-case tracking-normal text-slate-400">
+                      Nền tảng · Đối tác
+                    </span>
+                  </th>
                   <th className="px-4 py-3 text-left font-semibold">Hiệu lực từ</th>
                   <th className="px-4 py-3 text-left font-semibold">Hiệu lực đến</th>
                   <th className="px-4 py-3 text-left font-semibold">Người thực hiện</th>
@@ -403,10 +510,10 @@ export default function AdminCommissionPoliciesPage() {
                         {p.name}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-2 py-0.5 text-xs font-bold text-white">
-                          <BadgePercent size={12} />
-                          {formatRate(p.commissionRate)}
-                        </span>
+                        <div className="flex flex-col gap-1.5">
+                          <RateChips rate={p.commissionRate} />
+                          <RateSplitBar rate={p.commissionRate} />
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-600">
                         {formatDateTime(p.effectiveFrom)}
@@ -457,7 +564,7 @@ export default function AdminCommissionPoliciesPage() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-6 right-6 z-[400] rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl max-w-sm">
+        <div className="fixed bottom-6 right-6 z-[400] rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-xl max-w-sm">
           {toast}
         </div>
       )}
