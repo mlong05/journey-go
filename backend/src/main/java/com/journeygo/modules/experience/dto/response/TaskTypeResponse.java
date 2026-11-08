@@ -14,9 +14,14 @@ public record TaskTypeResponse(
         @Schema(description = "Tên") String name,
         @Schema(description = "Có Question?") boolean hasQuestions,
         @Schema(description = "Cần location?") boolean requiresLocation,
-        @Schema(description = "Phương thức xác minh") VerificationMethod verificationMethod
+        @Schema(description = "Phương thức xác minh") VerificationMethod verificationMethod,
+        @Schema(description = "Điểm thưởng mỗi nhiệm vụ thuộc loại này (PointRule.basePoints); null = chưa cấu hình") Integer basePoints
 ) {
     public static TaskTypeResponse fromEntity(TaskType t) {
+        return fromEntity(t, null);
+    }
+
+    public static TaskTypeResponse fromEntity(TaskType t, Integer basePoints) {
         return TaskTypeResponse.builder()
                 .id(t.getId())
                 .code(t.getCode())
@@ -24,6 +29,7 @@ public record TaskTypeResponse(
                 .hasQuestions(t.isHasQuestions())
                 .requiresLocation(t.isRequiresLocation())
                 .verificationMethod(t.getVerificationMethod())
+                .basePoints(basePoints)
                 .build();
     }
 }

@@ -1,6 +1,7 @@
 package com.journeygo.modules.experience.controller;
 
 import com.journeygo.common.dto.ApiResponse;
+import com.journeygo.modules.experience.dto.request.SetBasePointsRequest;
 import com.journeygo.modules.experience.dto.request.SetPointRuleRequest;
 import com.journeygo.modules.experience.dto.response.PointRuleResponse;
 import com.journeygo.modules.experience.dto.response.UnlockConditionResponse;
@@ -42,6 +43,17 @@ public class RuleController {
         PointRuleResponse pr = pointRuleService.upsert(taskTypeId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Cập nhật PointRule thành công", pr));
+    }
+
+    @PutMapping("/task-types/{taskTypeId}/base-points")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Đặt điểm thưởng mỗi nhiệm vụ của loại này (ADMIN only) — dùng cho nhiệm vụ trong tour")
+    public ResponseEntity<ApiResponse<PointRuleResponse>> setBasePoints(
+            @PathVariable Long taskTypeId,
+            @Valid @RequestBody SetBasePointsRequest request) {
+        PointRuleResponse pr = pointRuleService.setBasePoints(taskTypeId, request.basePoints());
+        return ResponseEntity.ok(ApiResponse.success("Đã cập nhật điểm thưởng", pr));
     }
 
     @GetMapping("/tasks/{taskId}/unlock-condition")

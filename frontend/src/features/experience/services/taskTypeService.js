@@ -68,12 +68,22 @@ export async function updateTaskType(id, payload) {
   return unwrap(res);
 }
 
+/**
+ * Đặt điểm thưởng mỗi nhiệm vụ thuộc loại này (ADMIN only)
+ * PUT /api/v1/task-types/{id}/base-points
+ */
+export async function setTaskTypeBasePoints(id, basePoints) {
+  const res = await apiClient.put(`${ENDPOINTS.BY_ID(id)}/base-points`, { basePoints: Number(basePoints) });
+  return unwrap(res);
+}
+
 export const taskTypeService = {
   list: listTaskTypes,
   getById: getTaskTypeById,
   getByCode: getTaskTypeByCode,
   create: createTaskType,
   update: updateTaskType,
+  setBasePoints: setTaskTypeBasePoints,
 };
 
 export default taskTypeService;

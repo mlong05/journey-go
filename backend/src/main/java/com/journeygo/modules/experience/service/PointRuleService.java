@@ -52,6 +52,19 @@ public class PointRuleService {
     }
 
 
+    /** Chỉ đổi điểm nền; hệ số nhân / điều kiện bonus giữ nguyên (tạo mới thì hệ số 1.00). */
+    @Transactional
+    public PointRuleResponse setBasePoints(Long taskTypeId, int basePoints) {
+        TaskType taskType = taskTypeRepository.findById(taskTypeId)
+                .orElseThrow(() -> new ResourceNotFoundException("TaskType", taskTypeId));
+        PointRule pr = pointRuleRepository.findByTaskTypeId(taskTypeId)
+                .orElseGet(() -> PointRule.builder().taskType(taskType).build());
+        pr.setBasePoints(basePoints);
+        PointRule saved = pointRuleRepository.save(pr);
+        log.info("Set basePoints={} for TaskType={}", basePoints, taskTypeId);
+        return PointRuleResponse.fromEntity(saved);
+    }
+
     @Transactional(readOnly = true)
     public int computePoints(Long taskTypeId, int taskPointsReward, java.util.Set<String> matched) {
         PointRule pr = pointRuleRepository.findByTaskTypeId(taskTypeId).orElse(null);
