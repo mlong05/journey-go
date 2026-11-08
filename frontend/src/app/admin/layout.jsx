@@ -7,15 +7,13 @@ import {
   Users,
   CreditCard,
   Settings,
-  Route,
-  Receipt,
-  Award,
   HandCoins,
   ShieldAlert,
   Handshake,
   BadgePercent,
   Globe2,
   Tags,
+  Award,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -54,13 +52,6 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
-    id: "tours",
-    label: "Quản lý tour du lịch",
-    href: "/admin/tours",
-    icon: Route,
-    badge: null,
-  },
-  {
     id: "regions",
     label: "Quản lý khu vực",
     href: "/admin/regions",
@@ -81,7 +72,6 @@ const ADMIN_NAV_ITEMS = [
     icon: Award,
     badge: null,
   },
-
   {
     id: "finance",
     label: "Tài chính & Thanh toán",
@@ -94,13 +84,6 @@ const ADMIN_NAV_ITEMS = [
     label: "Tất toán doanh thu",
     href: "/admin/settlements",
     icon: HandCoins,
-    badge: null,
-  },
-  {
-    id: "bookings",
-    label: "Đơn đặt tour",
-    href: "/admin/bookings",
-    icon: Receipt,
     badge: null,
   },
   {
@@ -154,8 +137,7 @@ export default function AdminLayout({ children }) {
     pathname === "/admin" ||
     pathname?.startsWith("/admin/users") ||
     pathname?.startsWith("/admin/badges") ||
-    pathname?.startsWith("/admin/finance") ||
-    pathname?.startsWith("/admin/tours");
+    pathname?.startsWith("/admin/finance");
 
   // Xử lý tìm kiếm nhanh từ Topbar
   const handleTopSearchSubmit = (e) => {

@@ -23,7 +23,7 @@ public class ExperienceModerationController {
     private final ExperienceModerationService moderationService;
 
     @PatchMapping("/{experienceId}/approve")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Duyệt gói trải nghiệm (phát hành khi điểm đến đã được duyệt)")
     public ResponseEntity<ApiResponse<ExperienceResponse>> approve(@PathVariable Long experienceId,
             @Valid @RequestBody(required = false) ExperienceReviewDecisionRequest request) {
@@ -32,7 +32,7 @@ public class ExperienceModerationController {
     }
 
     @PatchMapping("/{experienceId}/reject")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Từ chối gói trải nghiệm, trả về bản nháp cho đối tác sửa")
     public ResponseEntity<ApiResponse<ExperienceResponse>> reject(@PathVariable Long experienceId,
             @Valid @RequestBody ExperienceReviewDecisionRequest request) {

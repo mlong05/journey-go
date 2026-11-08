@@ -78,12 +78,12 @@ public class ExperienceSecurity {
     }
 
     /**
-     * Người gọi được xem mã QR của trạm check-in: chủ trải nghiệm, ADMIN hoặc MODERATOR.
+     * Người gọi được xem mã QR của trạm check-in: chủ trải nghiệm hoặc MODERATOR.
      * Dùng trên endpoint công khai nên trả false (không ném lỗi) với khách chưa đăng nhập.
      */
     @Transactional(readOnly = true)
     public boolean canViewCheckInSecrets(Long experienceId) {
-        if (isAdmin() || com.journeygo.common.security.AuthorizationGuard.hasRole("CONTENT_MODERATOR")) return true;
+        if (com.journeygo.common.security.AuthorizationGuard.hasRole("CONTENT_MODERATOR")) return true;
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof com.journeygo.security.UserPrincipal)) return false;
         return experienceId != null && isOwnerOfExperience(experienceId);
