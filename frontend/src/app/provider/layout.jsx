@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  FileCheck,
   Route,
   Wallet,
   UserCog,
@@ -60,12 +59,6 @@ export default function ProviderLayout({ children }) {
       label: "Quản lý Tour Du Lịch",
       href: "/provider/tours",
       icon: Route,
-    },
-    {
-      id: "reviews",
-      label: "Tiến độ Thẩm định",
-      href: "/provider#reviews",
-      icon: FileCheck,
     },
     {
       id: "finance",
