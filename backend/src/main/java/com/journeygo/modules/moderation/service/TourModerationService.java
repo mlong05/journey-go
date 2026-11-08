@@ -21,8 +21,7 @@ import com.journeygo.modules.tour.dto.wizard.TourDetailResponse;
 import com.journeygo.modules.tour.dto.wizard.TourValidationIssue;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourStop;
-import com.journeygo.modules.tour.entity.TourStopExperience;
-import com.journeygo.modules.tour.entity.TourStopQuestion;
+import com.journeygo.modules.tour.entity.TourStopTask;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
 import com.journeygo.modules.tour.exception.TourValidationException;
 import com.journeygo.modules.tour.repository.TourRepository;
@@ -68,8 +67,8 @@ public class TourModerationService {
     private final NotificationPublisher notifications;
     private final TourSubmissionValidator validator;
     private final TourDetailMapper detailMapper;
-    private final TourSlotService slotService;
     private final RewardSettingService rewardSettingService;
+    private final TourSlotService slotService;
     private final TourModerationMailer mailer;
 
     // ── Gửi duyệt ────────────────────────────────────────────────────────────
@@ -401,13 +400,11 @@ public class TourModerationService {
         return created;
     }
 
-    /** Chốt điểm thưởng hiện hành của Admin vào quiz và trải nghiệm thực tế (đối tác không sửa được). */
+    /** Chốt điểm thưởng hiện hành của Admin (Điểm mỗi nhiệm vụ) vào từng nhiệm vụ; đối tác không sửa được. */
     private void snapshotRewardPoints(Tour tour) {
-        int quizPoints = rewardSettingService.pointsFor(RewardSettingCode.QUIZ_QUESTION);
-        int experiencePoints = rewardSettingService.pointsFor(RewardSettingCode.REAL_WORLD_EXPERIENCE);
+        int taskPoints = rewardSettingService.pointsFor(RewardSettingCode.TOUR_TASK);
         for (TourStop stop : tour.getStops()) {
-            for (TourStopQuestion question : stop.getQuizQuestions()) question.setPointsReward(quizPoints);
-            for (TourStopExperience experience : stop.getExperiences()) experience.setPointsReward(experiencePoints);
+            for (TourStopTask task : stop.getTasks()) task.setPointsReward(taskPoints);
         }
     }
 

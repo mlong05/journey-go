@@ -1,9 +1,9 @@
 package com.journeygo.modules.tour.service;
 
-import com.journeygo.modules.providerprofile.entity.ProviderProfile;
-import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
 import com.journeygo.modules.reward.entity.RewardSettingCode;
 import com.journeygo.modules.reward.service.RewardSettingService;
+import com.journeygo.modules.providerprofile.entity.ProviderProfile;
+import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
 import com.journeygo.modules.tour.dto.wizard.TourValidationIssue;
 import com.journeygo.modules.tour.entity.*;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +35,8 @@ public class TourSubmissionValidator {
     public static final int QUIZ_MAX = 4;
     public static final int EXPERIENCES_MIN = 1;
     public static final int EXPERIENCES_MAX = 5;
+    public static final int TASKS_MIN = 1;
+    public static final int TASKS_MAX = 5;
     public static final int RADIUS_MIN = 10;
     public static final int RADIUS_MAX = 500;
 
@@ -199,22 +201,38 @@ public class TourSubmissionValidator {
                 }
             }
 
-            int quizCount = stop.getQuizQuestions().size();
-            if (quizCount < QUIZ_MIN || quizCount > QUIZ_MAX) {
-                issues.add(TourValidationIssue.stop(i, "quiz", "Quiz cần từ " + QUIZ_MIN + " đến " + QUIZ_MAX + " câu"));
+            int taskCount = stop.getTasks().size();
+            if (taskCount < TASKS_MIN || taskCount > TASKS_MAX) {
+                issues.add(TourValidationIssue.stop(i, "tasks", "Cần từ " + TASKS_MIN + " đến " + TASKS_MAX + " nhiệm vụ"));
             }
-            for (int q = 0; q < quizCount; q++) {
-                validateQuestion(stop.getQuizQuestions().get(q), i, "quiz[" + q + "]", issues);
+            for (int t = 0; t < taskCount; t++) {
+                validateTask(stop.getTasks().get(t), i, "tasks[" + t + "]", issues);
             }
+        }
+    }
 
-            int experienceCount = stop.getExperiences().size();
-            if (experienceCount < EXPERIENCES_MIN || experienceCount > EXPERIENCES_MAX) {
-                issues.add(TourValidationIssue.stop(i, "experiences",
-                        "Cần từ " + EXPERIENCES_MIN + " đến " + EXPERIENCES_MAX + " trải nghiệm thực tế"));
-            }
-            for (int e = 0; e < experienceCount; e++) {
-                validateExperience(stop.getExperiences().get(e), i, "experiences[" + e + "]", issues);
-            }
+    /** Nhiệm vụ: tên, quiz 1–4 câu, trải nghiệm thực tế 1–5. */
+    private void validateTask(TourStopTask task, int stopIndex, String path, List<TourValidationIssue> issues) {
+        if (isBlank(task.getTitle())) {
+            issues.add(TourValidationIssue.stop(stopIndex, path + ".title", "Vui lòng nhập tên nhiệm vụ"));
+        }
+
+        int quizCount = task.getQuizQuestions().size();
+        if (quizCount < QUIZ_MIN || quizCount > QUIZ_MAX) {
+            issues.add(TourValidationIssue.stop(stopIndex, path + ".quiz",
+                    "Quiz cần từ " + QUIZ_MIN + " đến " + QUIZ_MAX + " câu"));
+        }
+        for (int q = 0; q < quizCount; q++) {
+            validateQuestion(task.getQuizQuestions().get(q), stopIndex, path + ".quiz[" + q + "]", issues);
+        }
+
+        int experienceCount = task.getExperiences().size();
+        if (experienceCount < EXPERIENCES_MIN || experienceCount > EXPERIENCES_MAX) {
+            issues.add(TourValidationIssue.stop(stopIndex, path + ".experiences",
+                    "Cần từ " + EXPERIENCES_MIN + " đến " + EXPERIENCES_MAX + " trải nghiệm thực tế"));
+        }
+        for (int e = 0; e < experienceCount; e++) {
+            validateExperience(task.getExperiences().get(e), stopIndex, path + ".experiences[" + e + "]", issues);
         }
     }
 

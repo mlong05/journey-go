@@ -45,7 +45,7 @@ class TourSubmissionValidatorTest {
     void setUp() {
         profile = ProviderProfile.builder().id(1L).active(true).build();
         when(providerProfileRepository.findByUser_Id(7L)).thenReturn(Optional.of(profile));
-        when(rewardSettingService.pointsFor(any())).thenReturn(10);
+        when(rewardSettingService.pointsFor(any())).thenReturn(50);
     }
 
     @Test
@@ -93,14 +93,61 @@ class TourSubmissionValidatorTest {
     }
 
     @Test
-    @DisplayName("Quiz có hai đáp án đúng bị báo lỗi kèm vị trí điểm đến")
+    @DisplayName("Quiz của nhiệm vụ có hai đáp án đúng bị báo lỗi kèm vị trí điểm đến")
     void quizMustHaveExactlyOneCorrectAnswer() {
         Tour tour = validTour();
-        tour.getStops().get(0).getQuizQuestions().get(0).getAnswers().get(1).setCorrect(true);
+        firstTask(tour).getQuizQuestions().get(0).getAnswers().get(1).setCorrect(true);
         TourValidationIssue issue = validator.validate(tour).stream()
-                .filter(i -> "quiz[0].answers".equals(i.field())).findFirst().orElseThrow();
+                .filter(i -> "tasks[0].quiz[0].answers".equals(i.field())).findFirst().orElseThrow();
         assertEquals("STOPS", issue.step());
         assertEquals(0, issue.stopIndex());
+    }
+
+    @Test
+    @DisplayName("Điểm đến không có nhiệm vụ nào thì bị báo lỗi")
+    void stopNeedsAtLeastOneTask() {
+        Tour tour = validTour();
+        tour.getStops().get(0).getTasks().clear();
+        assertTrue(hasIssue(validator.validate(tour), "STOPS", "tasks"));
+    }
+
+    @Test
+    @DisplayName("Nhiệm vụ chưa có tên thì bị báo lỗi")
+    void taskNeedsTitle() {
+        Tour tour = validTour();
+        firstTask(tour).setTitle(" ");
+        assertTrue(hasIssue(validator.validate(tour), "STOPS", "tasks[0].title"));
+    }
+
+    @Test
+    @DisplayName("Nhiệm vụ không có quiz thì bị báo lỗi")
+    void taskNeedsQuiz() {
+        Tour tour = validTour();
+        firstTask(tour).getQuizQuestions().clear();
+        assertTrue(hasIssue(validator.validate(tour), "STOPS", "tasks[0].quiz"));
+    }
+
+    @Test
+    @DisplayName("Nhiệm vụ không có trải nghiệm thực tế thì bị báo lỗi")
+    void taskNeedsExperience() {
+        Tour tour = validTour();
+        firstTask(tour).getExperiences().clear();
+        assertTrue(hasIssue(validator.validate(tour), "STOPS", "tasks[0].experiences"));
+    }
+
+    @Test
+    @DisplayName("Trải nghiệm thực tế thiếu câu hỏi sau trải nghiệm thì bị báo lỗi")
+    void experienceNeedsPostQuestion() {
+        Tour tour = validTour();
+        firstTask(tour).getExperiences().get(0).getQuestions().clear();
+        assertTrue(hasIssue(validator.validate(tour), "STOPS", "tasks[0].experiences[0].question"));
+    }
+
+    @Test
+    @DisplayName("Admin chưa cấu hình điểm mỗi nhiệm vụ thì bị báo lỗi")
+    void taskPointsMustBeConfigured() {
+        when(rewardSettingService.pointsFor(any())).thenReturn(0);
+        assertTrue(hasIssue(validator.validate(validTour()), "STOPS", "rewardPoints"));
     }
 
     @Test
@@ -172,21 +219,28 @@ class TourSubmissionValidatorTest {
 
         TourStop stop = TourStop.builder().tour(tour).sequenceOrder(1).name("Xưởng mộc Kim Bồng")
                 .shortDescription("Làng mộc 500 năm").culturalContent("Câu chuyện làng mộc").build();
+        TourStopTask task = TourStopTask.builder().stop(stop).sequenceOrder(1)
+                .title("Khám phá hoa văn gỗ").build();
         TourStopQuestion quiz = question(StopQuestionKind.QUIZ);
-        quiz.setStop(stop);
-        stop.getQuizQuestions().add(quiz);
-        TourStopExperience experience = TourStopExperience.builder().stop(stop).sequenceOrder(1)
+        quiz.setTask(task);
+        task.getQuizQuestions().add(quiz);
+        TourStopExperience experience = TourStopExperience.builder().stop(stop).task(task).sequenceOrder(1)
                 .activityName("Đục hoa văn").checkpointLatitude(new BigDecimal("15.8794"))
                 .checkpointLongitude(new BigDecimal("108.3350")).radiusMeters(50).durationSeconds(900).build();
         TourStopQuestion post = question(StopQuestionKind.POST_EXPERIENCE);
         post.setExperience(experience);
         experience.getQuestions().add(post);
-        stop.getExperiences().add(experience);
+        task.getExperiences().add(experience);
+        stop.getTasks().add(task);
         tour.getStops().add(stop);
 
         tour.getDepartureDates().add(TourDepartureDate.builder().tour(tour)
                 .departureDate(LocalDate.now(TourSubmissionValidator.ZONE).plusDays(7)).build());
         return tour;
+    }
+
+    private static TourStopTask firstTask(Tour tour) {
+        return tour.getStops().get(0).getTasks().get(0);
     }
 
     private static TourStopQuestion question(StopQuestionKind kind) {

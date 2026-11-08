@@ -26,14 +26,13 @@ public class TourDetailMapper {
 
     @Transactional(readOnly = true)
     public TourDetailResponse toResponse(Tour tour) {
-        int quizPoints = rewardSettingService.pointsFor(RewardSettingCode.QUIZ_QUESTION);
-        int experiencePoints = rewardSettingService.pointsFor(RewardSettingCode.REAL_WORLD_EXPERIENCE);
+        int taskPoints = rewardSettingService.pointsFor(RewardSettingCode.TOUR_TASK);
         boolean snapshot = tour.getPublishedAt() != null;
 
         List<TourDetailResponse.Stop> stops = new ArrayList<>();
         int maxTotal = 0;
         for (TourStop stop : tour.getStops()) {
-            TourDetailResponse.Stop mapped = toStop(stop, quizPoints, experiencePoints);
+            TourDetailResponse.Stop mapped = toStop(stop, taskPoints);
             maxTotal += mapped.maxPoints();
             stops.add(mapped);
         }
@@ -79,7 +78,7 @@ public class TourDetailMapper {
                 .maxGuestsPerSlot(tour.getMaxGuestsPerSlot())
                 .cancellationPolicy(tour.getCancellationPolicy())
                 .stops(stops)
-                .rewardPoints(new TourDetailResponse.RewardPoints(quizPoints, experiencePoints, maxTotal, snapshot))
+                .rewardPoints(new TourDetailResponse.RewardPoints(taskPoints, maxTotal, snapshot))
                 .departureDates(tour.getDepartureDates().stream().map(TourDepartureDate::getDepartureDate).sorted().toList())
                 .slots(slotRepository.findByTour_TourIdOrderBySlotDateAsc(tour.getTourId()).stream()
                         .map(s -> new TourDetailResponse.Slot(s.getId(), s.getSlotDate(), s.getCapacity(),
@@ -104,21 +103,12 @@ public class TourDetailMapper {
         return result;
     }
 
-    private TourDetailResponse.Stop toStop(TourStop stop, int quizPoints, int experiencePoints) {
-        List<TourDetailResponse.Question> quiz = stop.getQuizQuestions().stream()
-                .sorted(Comparator.comparingInt(TourStopQuestion::getSequenceOrder))
-                .map(q -> toQuestion(q, q.getPointsReward() != null ? q.getPointsReward() : quizPoints))
+    private TourDetailResponse.Stop toStop(TourStop stop, int taskPoints) {
+        List<TourDetailResponse.Task> tasks = stop.getTasks().stream()
+                .sorted(Comparator.comparingInt(TourStopTask::getSequenceOrder))
+                .map(t -> toTask(t, taskPoints))
                 .toList();
-        List<TourDetailResponse.Experience> experiences = stop.getExperiences().stream()
-                .sorted(Comparator.comparingInt(TourStopExperience::getSequenceOrder))
-                .map(e -> new TourDetailResponse.Experience(e.getId(), e.getActivityName(),
-                        e.getCheckpointLatitude(), e.getCheckpointLongitude(), e.getRadiusMeters(),
-                        e.getDurationSeconds(),
-                        e.getPointsReward() != null ? e.getPointsReward() : experiencePoints,
-                        e.getQuestion() == null ? null : toQuestion(e.getQuestion(), null)))
-                .toList();
-        int maxPoints = quiz.stream().mapToInt(q -> q.points() == null ? 0 : q.points()).sum()
-                + experiences.stream().mapToInt(e -> e.points() == null ? 0 : e.points()).sum();
+        int maxPoints = tasks.stream().mapToInt(t -> t.points() == null ? 0 : t.points()).sum();
         return new TourDetailResponse.Stop(stop.getId(), stop.getSequenceOrder(), stop.getName(),
                 stop.getShortDescription(), stop.getGuestNote(), stop.getImageUrl(),
                 stop.getVideoUrl(), stop.getVideoSource(), stop.getCulturalContent(),
@@ -128,11 +118,28 @@ public class TourDetailMapper {
                         .map(a -> new TourDetailResponse.Artifact(a.getId(), a.getName(), a.getImageUrl(),
                                 a.getShortDescription(), a.getVideoUrl(), a.getVideoSource()))
                         .toList(),
-                quiz, experiences, maxPoints);
+                tasks, maxPoints);
     }
 
-    private TourDetailResponse.Question toQuestion(TourStopQuestion q, Integer points) {
-        return new TourDetailResponse.Question(q.getId(), q.getKind(), q.getQuestionType(), q.getContent(), points,
+    /** Điểm: đã chốt lúc duyệt thì dùng điểm chốt, chưa thì theo cấu hình Admin hiện hành. */
+    private TourDetailResponse.Task toTask(TourStopTask t, int taskPoints) {
+        Integer points = t.getPointsReward() != null ? t.getPointsReward() : taskPoints;
+        List<TourDetailResponse.Question> quiz = t.getQuizQuestions().stream()
+                .sorted(Comparator.comparingInt(TourStopQuestion::getSequenceOrder))
+                .map(this::toQuestion)
+                .toList();
+        List<TourDetailResponse.Experience> experiences = t.getExperiences().stream()
+                .sorted(Comparator.comparingInt(TourStopExperience::getSequenceOrder))
+                .map(e -> new TourDetailResponse.Experience(e.getId(), e.getActivityName(),
+                        e.getCheckpointLatitude(), e.getCheckpointLongitude(), e.getRadiusMeters(),
+                        e.getDurationSeconds(), e.getQuestion() == null ? null : toQuestion(e.getQuestion())))
+                .toList();
+        return new TourDetailResponse.Task(t.getId(), t.getSequenceOrder(), t.getTitle(), t.getDescription(),
+                points, quiz, experiences);
+    }
+
+    private TourDetailResponse.Question toQuestion(TourStopQuestion q) {
+        return new TourDetailResponse.Question(q.getId(), q.getKind(), q.getQuestionType(), q.getContent(),
                 q.getAnswers().stream()
                         .sorted(Comparator.comparingInt(TourStopAnswer::getSequenceOrder))
                         .map(a -> new TourDetailResponse.Answer(a.getId(), a.getContent(), a.isCorrect()))

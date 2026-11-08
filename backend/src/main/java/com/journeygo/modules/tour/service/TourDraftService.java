@@ -228,19 +228,32 @@ public class TourDraftService {
                     .build());
         }
 
-        stop.getQuizQuestions().clear();
+        stop.getTasks().clear();
+        int t = 1;
+        for (TourWizardRequests.TaskItem taskItem : nullSafe(item.tasks())) {
+            stop.getTasks().add(buildTask(taskItem, stop, t++));
+        }
+    }
+
+    /** Nhiệm vụ = quiz + trải nghiệm thực tế. */
+    private TourStopTask buildTask(TourWizardRequests.TaskItem item, TourStop stop, int order) {
+        TourStopTask task = TourStopTask.builder()
+                .stop(stop).sequenceOrder(order)
+                .title(trimToNull(item.title()))
+                .description(trimToNull(item.description()))
+                .build();
+
         int q = 1;
         for (TourWizardRequests.QuestionItem question : nullSafe(item.quiz())) {
             TourStopQuestion entity = buildQuestion(question, StopQuestionKind.QUIZ, q++);
-            entity.setStop(stop);
-            stop.getQuizQuestions().add(entity);
+            entity.setTask(task);
+            task.getQuizQuestions().add(entity);
         }
 
-        stop.getExperiences().clear();
         int e = 1;
         for (TourWizardRequests.ExperienceItem experience : nullSafe(item.experiences())) {
             TourStopExperience entity = TourStopExperience.builder()
-                    .stop(stop).sequenceOrder(e++)
+                    .stop(stop).task(task).sequenceOrder(e++)
                     .activityName(trimToNull(experience.activityName()))
                     .checkpointLatitude(experience.checkpointLatitude())
                     .checkpointLongitude(experience.checkpointLongitude())
@@ -253,8 +266,9 @@ public class TourDraftService {
                 question.setExperience(entity);
                 entity.getQuestions().add(question);
             }
-            stop.getExperiences().add(entity);
+            task.getExperiences().add(entity);
         }
+        return task;
     }
 
     private TourStopQuestion buildQuestion(TourWizardRequests.QuestionItem item, StopQuestionKind kind, int order) {
@@ -493,10 +507,17 @@ public class TourDraftService {
                 s.getCulturalContent(), List.copyOf(s.getCulturalImages()),
                 s.getArtifacts().stream().map(a -> new TourWizardRequests.ArtifactItem(a.getName(), a.getImageUrl(),
                         a.getShortDescription(), a.getVideoUrl(), a.getVideoSource())).toList(),
-                s.getQuizQuestions().stream().map(TourDraftService::toQuestionItem).toList(),
-                s.getExperiences().stream().map(e -> new TourWizardRequests.ExperienceItem(e.getActivityName(),
+                s.getTasks().stream().map(TourDraftService::toTaskItem).toList());
+    }
+
+    private static TourWizardRequests.TaskItem toTaskItem(TourStopTask t) {
+        return new TourWizardRequests.TaskItem(
+                t.getTitle(), t.getDescription(),
+                t.getQuizQuestions().stream().map(TourDraftService::toQuestionItem).toList(),
+                t.getExperiences().stream().map(e -> new TourWizardRequests.ExperienceItem(e.getActivityName(),
                         e.getCheckpointLatitude(), e.getCheckpointLongitude(), e.getRadiusMeters(),
-                        e.getDurationSeconds(), e.getQuestion() == null ? null : toQuestionItem(e.getQuestion()))).toList());
+                        e.getDurationSeconds(), e.getQuestion() == null ? null : toQuestionItem(e.getQuestion())))
+                        .toList());
     }
 
     /**

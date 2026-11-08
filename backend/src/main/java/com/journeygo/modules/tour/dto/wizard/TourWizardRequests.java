@@ -120,6 +120,14 @@ public final class TourWizardRequests {
             @Valid QuestionItem question
     ) {}
 
+    @Schema(description = "Nhiệm vụ của điểm đến: gồm quiz và trải nghiệm thực tế")
+    public record TaskItem(
+            @Size(max = 200) String title,
+            @Size(max = 2000) String description,
+            @Valid @Size(max = 4, message = "Quiz tối đa 4 câu") List<QuestionItem> quiz,
+            @Valid @Size(max = 5, message = "Tối đa 5 trải nghiệm thực tế mỗi nhiệm vụ") List<ExperienceItem> experiences
+    ) {}
+
     @Schema(description = "Một điểm đến của tour. Có id = cập nhật điểm đến đã có; không có id = thêm mới")
     public record StopItem(
             Long id,
@@ -134,8 +142,8 @@ public final class TourWizardRequests {
             @Size(max = 20000) String culturalContent,
             @Size(max = 20) List<@Size(max = 1000) String> culturalImages,
             @Valid @Size(max = 20) List<ArtifactItem> artifacts,
-            @Valid @Size(max = 4, message = "Quiz tối đa 4 câu") List<QuestionItem> quiz,
-            @Valid @Size(max = 5, message = "Tối đa 5 trải nghiệm thực tế mỗi điểm đến") List<ExperienceItem> experiences
+            @Schema(description = "Nhiệm vụ của điểm đến (1–5 khi gửi duyệt)")
+            @Valid @Size(max = 5, message = "Tối đa 5 nhiệm vụ mỗi điểm đến") List<TaskItem> tasks
     ) {}
 
     @Schema(description = "Bước 3 — Danh sách điểm đến theo thứ tự (thứ tự trong mảng = thứ tự kéo thả)")

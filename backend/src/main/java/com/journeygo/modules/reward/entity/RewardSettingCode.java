@@ -2,10 +2,8 @@ package com.journeygo.modules.reward.entity;
 
 /** Các mức điểm thưởng Admin cấu hình cho tour. */
 public enum RewardSettingCode {
-    /** Điểm cho mỗi câu quiz trả lời đúng. */
-    QUIZ_QUESTION("Điểm mỗi câu hỏi trắc nghiệm", 10),
-    /** Điểm cho mỗi trải nghiệm thực tế hoàn thành (trả lời đúng câu hỏi sau trải nghiệm). */
-    REAL_WORLD_EXPERIENCE("Điểm mỗi trải nghiệm thực tế", 50);
+    /** Điểm cho mỗi nhiệm vụ của điểm đến (gồm quiz và trải nghiệm thực tế) khách hoàn thành. */
+    TOUR_TASK("Điểm mỗi nhiệm vụ", 50);
 
     private final String label;
     private final int defaultPoints;

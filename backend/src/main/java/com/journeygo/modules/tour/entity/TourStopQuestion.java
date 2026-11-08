@@ -7,8 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Câu hỏi của điểm đến.
- * QUIZ thuộc điểm đến ({@code stop}); POST_EXPERIENCE thuộc trải nghiệm ({@code experience}).
+ * Câu hỏi trong nhiệm vụ của điểm đến.
+ * QUIZ thuộc nhiệm vụ ({@code task}); POST_EXPERIENCE thuộc trải nghiệm thực tế ({@code experience}).
  * Cả hai đều là trắc nghiệm (4 đáp án, 1 đúng) hoặc tự luận ({@link QuestionType}).
  */
 @Entity
@@ -26,9 +26,14 @@ public class TourStopQuestion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Dữ liệu cũ: quiz trước đây gắn thẳng vào điểm đến. Câu hỏi mới để trống. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "stop_id")
     private TourStop stop;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "task_id")
+    private TourStopTask task;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "experience_id")
@@ -57,7 +62,7 @@ public class TourStopQuestion {
         return questionType == QuestionType.TEXT;
     }
 
-    /** Quiz: điểm mỗi câu, chốt từ cấu hình Admin lúc duyệt. POST_EXPERIENCE: để trống (điểm nằm ở trải nghiệm). */
+    /** Không còn dùng: điểm thưởng tính theo nhiệm vụ (loại nhiệm vụ). Giữ cột cho dữ liệu cũ. */
     @Column(name = "points_reward")
     private Integer pointsReward;
 
