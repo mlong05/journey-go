@@ -5,6 +5,8 @@ import { Pencil, ChevronDown, ChevronUp, CheckCircle2, MapPin, Timer, Film, Cloc
 import { GUEST_TYPES } from "../constants";
 import NoticeAccordion from "./NoticeAccordion";
 import ItineraryView from "./ItineraryView";
+import StopsOverviewMap, { stopLocation, stopExperiences, googleMapsUrl } from "./stops/StopsOverviewMap";
+import CheckpointMap from "./stops/CheckpointMap";
 
 const money = (v) => (v == null ? "—" : `${Number(v).toLocaleString("vi-VN")} đ`);
 const fmtDate = (s) => { const [y, m, d] = (s || "").split("-"); return d ? `${d}/${m}/${y}` : s; };
@@ -150,16 +152,21 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
 
       <Section title={`3. Điểm đến (${(tour.stops || []).length})`} step="STOPS" onEdit={onEdit}>
         <p className="text-[11px] text-slate-500">
-          Điểm thưởng {rp.snapshot ? "đã chốt" : "theo cấu hình hiện tại"}: {rp.quizPerQuestion ?? "—"} điểm / câu quiz · {rp.perExperience ?? "—"} điểm / trải nghiệm · tối đa {rp.maxTotalPoints ?? 0} điểm
+          Điểm thưởng {rp.snapshot ? "đã chốt" : "theo cấu hình hiện tại"}: {rp.perTask ?? "—"} điểm / nhiệm vụ · tối đa {rp.maxTotalPoints ?? 0} điểm
         </p>
+        <div>
+          <p className="text-xs font-bold text-slate-500 mb-1.5 inline-flex items-center gap-1"><MapPin size={12} />Bản đồ hành trình</p>
+          <StopsOverviewMap stops={tour.stops || []} />
+        </div>
         {(tour.stops || []).map((s, i) => {
           const open = !collapsibleStops || openStops[s.id];
+          const loc = stopLocation(s);
           return (
             <div key={s.id} id={`stop-${s.id}`} className="rounded-xl border border-slate-200 overflow-hidden">
               <div className="px-3 py-2.5 bg-slate-50 flex items-center justify-between gap-2">
                 <span className="text-sm font-bold text-slate-800 truncate">{i + 1}. {s.name || "Chưa đặt tên"}</span>
                 <span className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] text-slate-500">{s.quiz?.length || 0} quiz · {s.experiences?.length || 0} trải nghiệm · +{s.maxPoints} điểm</span>
+                  <span className="text-[11px] text-slate-500">{s.tasks?.length || 0} nhiệm vụ · {stopExperiences(s).length} trải nghiệm · +{s.maxPoints} điểm</span>
                   {collapsibleStops && (
                     <button type="button" onClick={() => setOpenStops((o) => ({ ...o, [s.id]: !o[s.id] }))}
                       className="px-2 py-1 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-700 inline-flex items-center gap-1 cursor-pointer">
@@ -179,6 +186,14 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
                       <div className="space-y-1">
                         <p className="text-sm text-slate-700">{s.shortDescription}</p>
                         {s.guestNote && <p className="text-xs text-amber-800 bg-amber-50 px-2 py-1 rounded">Lưu ý: {s.guestNote}</p>}
+                        <p className="text-xs text-slate-500 inline-flex items-center gap-1">
+                          <MapPin size={11} className="shrink-0" />
+                          {loc ? (
+                            <a href={googleMapsUrl(loc.lat, loc.lng)} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 hover:underline">
+                              {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)} · Xem trên Google Maps
+                            </a>
+                          ) : <i className="text-slate-400">Chưa có vị trí (chưa chọn checkpoint trải nghiệm)</i>}
+                        </p>
                       </div>
                     </div>
                   </Block>
@@ -216,22 +231,34 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
                       </div>
                     )}
                   </Block>
-                  {(s.quiz || []).map((q, qi) => (
-                    <Block key={q.id || qi} anchor={{ step: "STOPS", stopId: s.id, field: `quiz[${qi}]` }} label={`Điểm ${i + 1} – Quiz câu ${qi + 1}`}>
-                      <QuestionView q={q} label={`Quiz câu ${qi + 1}`} points={q.points} />
-                    </Block>
-                  ))}
-                  {(s.experiences || []).map((e, ei) => (
-                    <Block key={e.id || ei} anchor={{ step: "STOPS", stopId: s.id, field: `experiences[${ei}]` }} label={`Điểm ${i + 1} – Trải nghiệm ${ei + 1}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-bold text-slate-800">Trải nghiệm {ei + 1}: {e.activityName || "—"}</p>
-                        <span className="text-[11px] font-bold text-slate-400 shrink-0">+{e.points ?? 0} điểm</span>
+                  {(s.tasks || []).length === 0 && <p className="text-xs italic text-slate-400">Chưa có nhiệm vụ.</p>}
+                  {(s.tasks || []).map((t, ti) => (
+                    <Block key={t.id || ti} anchor={{ step: "STOPS", stopId: s.id, field: `tasks[${ti}]` }} label={`Điểm ${i + 1} – Nhiệm vụ ${ti + 1}`}>
+                      <div className="rounded-lg border border-emerald-100 bg-emerald-50/30 p-2.5 space-y-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-bold text-slate-800">
+                            Nhiệm vụ {ti + 1}: {t.title || <i className="text-slate-400 font-normal">chưa nhập tên</i>}
+                          </p>
+                          <span className="text-[11px] font-bold text-slate-400 shrink-0">+{t.points ?? 0} điểm</span>
+                        </div>
+                        {t.description && <p className="text-xs text-slate-600 whitespace-pre-line">{t.description}</p>}
+
+                        {(t.quiz || []).map((q, qi) => (
+                          <QuestionView key={q.id || qi} q={q} label={`Quiz câu ${qi + 1}`} />
+                        ))}
+
+                        {(t.experiences || []).map((e, ei) => (
+                          <div key={e.id || ei} className="rounded-lg border border-slate-200 bg-white p-2.5">
+                            <p className="text-sm font-bold text-slate-800">Trải nghiệm {ei + 1}: {e.activityName || "—"}</p>
+                            <p className="text-xs text-slate-500 flex flex-wrap gap-3 my-1">
+                              <span className="inline-flex items-center gap-1"><MapPin size={11} />{e.checkpointLatitude ?? "—"}, {e.checkpointLongitude ?? "—"} · {e.radiusMeters}m</span>
+                              <span className="inline-flex items-center gap-1"><Timer size={11} />{e.durationSeconds ? `${Math.floor(e.durationSeconds / 60)} phút ${e.durationSeconds % 60 ? `${e.durationSeconds % 60} giây` : ""}` : "—"}</span>
+                            </p>
+                            <div className="mb-2"><CheckpointMap latitude={e.checkpointLatitude} longitude={e.checkpointLongitude} radius={e.radiusMeters} /></div>
+                            <QuestionView q={e.question} label="Câu hỏi sau trải nghiệm" />
+                          </div>
+                        ))}
                       </div>
-                      <p className="text-xs text-slate-500 flex flex-wrap gap-3 my-1">
-                        <span className="inline-flex items-center gap-1"><MapPin size={11} />{e.checkpointLatitude ?? "—"}, {e.checkpointLongitude ?? "—"} · {e.radiusMeters}m</span>
-                        <span className="inline-flex items-center gap-1"><Timer size={11} />{e.durationSeconds ? `${Math.floor(e.durationSeconds / 60)} phút ${e.durationSeconds % 60 ? `${e.durationSeconds % 60} giây` : ""}` : "—"}</span>
-                      </p>
-                      <QuestionView q={e.question} label="Câu hỏi sau trải nghiệm" />
                     </Block>
                   ))}
                 </div>

@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * Trải nghiệm thực tế: khách đến checkpoint (trong bán kính) → bấm Bắt đầu → đếm ngược
- * {@code durationSeconds} → hiện câu hỏi sau trải nghiệm.
+ * {@code durationSeconds} → hiện câu hỏi sau trải nghiệm. Thuộc một nhiệm vụ ({@link TourStopTask}).
  */
 @Entity
 @Table(name = "tour_stop_experiences")
@@ -30,6 +30,10 @@ public class TourStopExperience {
     @JoinColumn(name = "stop_id", nullable = false)
     private TourStop stop;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "task_id")
+    private TourStopTask task;
+
     @Column(name = "sequence_order", nullable = false)
     private int sequenceOrder;
 
@@ -49,10 +53,6 @@ public class TourStopExperience {
     /** Thời gian thực hiện trải nghiệm (đếm ngược trên mobile). */
     @Column(name = "duration_seconds")
     private Integer durationSeconds;
-
-    /** Điểm thưởng — chốt từ cấu hình Admin lúc tour được duyệt; đối tác không sửa. */
-    @Column(name = "points_reward")
-    private Integer pointsReward;
 
     /** Câu hỏi sau trải nghiệm (đúng 1 câu; dùng List để cascade / orphanRemoval ổn định). */
     @OneToMany(mappedBy = "experience", cascade = CascadeType.ALL, orphanRemoval = true)

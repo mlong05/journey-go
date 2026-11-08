@@ -2,28 +2,15 @@
 
 import React, { useRef, useState } from "react";
 import {
-  X, Plus, Trash2, MapPin, Info, BookOpen, Gamepad2, Timer, Save, Loader2, CheckCircle2, AlertCircle,
+  X, Plus, Trash2, Info, BookOpen, Gamepad2, Save, Loader2, CheckCircle2, AlertCircle,
   Check, ChevronRight, ArrowLeft, ArrowRight,
 } from "lucide-react";
-import GoongMapPickerModal from "@/features/destination/components/GoongMapPickerModal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { Field, TextInput, TextArea, NumberInput, SingleImage, ImageStrip, VideoField, PointsBadge } from "../FormKit";
-import QuestionEditor, { emptyQuestion } from "./QuestionEditor";
-import CheckpointMap from "./CheckpointMap";
-import { LIMITS } from "../../constants";
+import { Field, TextInput, TextArea, SingleImage, ImageStrip, VideoField } from "../FormKit";
+import TaskListEditor from "./TaskListEditor";
 
 let keySeq = 0;
 export const newKey = () => `k${Date.now().toString(36)}${(keySeq++).toString(36)}`;
-
-export const emptyExperience = () => ({
-  _key: newKey(),
-  activityName: "",
-  checkpointLatitude: null,
-  checkpointLongitude: null,
-  radiusMeters: LIMITS.RADIUS_DEFAULT,
-  durationSeconds: 600,
-  question: emptyQuestion(),
-});
 
 export const emptyArtifact = () => ({ _key: newKey(), name: "", imageUrl: "", shortDescription: "" });
 
@@ -31,7 +18,7 @@ export const emptyArtifact = () => ({ _key: newKey(), name: "", imageUrl: "", sh
 const TABS = [
   { key: "info", label: "Thông tin", Icon: Info, fields: ["name", "shortDescription", "guestNote", "imageUrl"] },
   { key: "culture", label: "Nội dung văn hóa", Icon: BookOpen, fields: ["videoUrl", "videoSource", "culturalContent", "culturalImages", "artifacts"] },
-  { key: "experience", label: "Trải nghiệm", Icon: Gamepad2, fields: ["quiz", "experiences"] },
+  { key: "experience", label: "Trải nghiệm", Icon: Gamepad2, fields: ["tasks"] },
 ];
 
 /** `field` là chính `path` hoặc nằm bên trong nó ("artifacts[0].name" thuộc "artifacts" / "artifacts[0]"). */
@@ -43,11 +30,10 @@ const tabOfField = (field) => TABS.findIndex((t) => t.fields.some((p) => within(
  * Chỉnh sửa trên bản nháp riêng; "Lưu & tiếp tục" ghi lên máy chủ, kiểm tra lại,
  * và chỉ sang bước sau khi bước hiện tại không còn lỗi.
  * onSave(stop) → Promise<{ ok, issues }> (issues: danh sách lỗi mới nhất của cả tour, hoặc null).
- * stopErr(field) trả lỗi backend của điểm đến này (field như "quiz[0].answers").
+ * stopErr(field) trả lỗi backend của điểm đến này (field như "tasks[0].quiz[0].answers").
  */
-export default function StopDrawer({ stop: savedStop, index, onSave, onClose, readOnly, rewardPoints, stopErr: serverErr }) {
+export default function StopDrawer({ stop: savedStop, index, onSave, onClose, readOnly, taskPoints, stopErr: serverErr }) {
   const [tab, setTab] = useState("info");
-  const [mapFor, setMapFor] = useState(null); // index trải nghiệm đang chọn checkpoint
   const [stop, setDraft] = useState(savedStop);
   const [dirty, setDirty] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved | error
@@ -119,17 +105,9 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
     }
     onClose();
   };
-  const quizPts = rewardPoints?.quizPerQuestion;
-  const expPts = rewardPoints?.perExperience;
 
   const tabHasError = (key) => TABS.find((t) => t.key === key).fields.some((f) => stopErr(f));
 
-  // Đánh dấu đúng ô con đã sửa (vd. "experiences[0].checkpoint") để chỉ ẩn lỗi của ô đó.
-  const setExperience = (i, patch) =>
-    set(
-      { experiences: stop.experiences.map((e, j) => (j === i ? { ...e, ...patch } : e)) },
-      Object.keys(patch).map((k) => `experiences[${i}].${k.startsWith("checkpoint") ? "checkpoint" : k}`),
-    );
   const setArtifact = (i, patch) =>
     set(
       { artifacts: stop.artifacts.map((a, j) => (j === i ? { ...a, ...patch } : a)) },
@@ -261,107 +239,10 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
         {tab === "experience" && (
           <>
             <p className="text-[11px] text-slate-500">
-              Thứ tự trên app: <b>Câu hỏi (quiz)</b> → <b>Trải nghiệm thực tế</b>. Mỗi câu hỏi chọn dạng <b>Trắc nghiệm</b> hoặc <b>Tự luận</b>. Điểm thưởng do Admin cấu hình, hiển thị để tham khảo.
+              Mỗi điểm đến gồm các <b>nhiệm vụ</b>. Thứ tự trên app trong mỗi nhiệm vụ: <b>Câu hỏi quiz</b> → <b>Trải nghiệm thực tế</b> (hết giờ thì hiện câu hỏi sau trải nghiệm). Mỗi câu hỏi chọn dạng <b>Trắc nghiệm</b> hoặc <b>Tự luận</b>. Điểm thưởng mỗi nhiệm vụ do Admin cấu hình, hiển thị để tham khảo.
             </p>
-
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-800">
-                  Câu hỏi (quiz) ({stop.quiz.length}/{LIMITS.QUIZ_MAX})
-                </h4>
-                {!readOnly && stop.quiz.length < LIMITS.QUIZ_MAX && (
-                  <button type="button" onClick={() => set({ quiz: [...stop.quiz, { ...emptyQuestion(), _key: newKey() }] })}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
-                    <Plus size={14} /> Thêm câu hỏi
-                  </button>
-                )}
-              </div>
-              {stopErr("quiz") && <p className="text-[11px] font-bold text-rose-600">{stopErr("quiz")}</p>}
-              {stop.quiz.map((q, i) => (
-                <QuestionEditor key={q._key} index={i} value={q} readOnly={readOnly} points={quizPts} allowTypes
-                  error={stopErr(`quiz[${i}]`)}
-                  onRemove={() => set({ quiz: stop.quiz.filter((_, j) => j !== i) })}
-                  onChange={(nq) => set({ quiz: stop.quiz.map((x, j) => (j === i ? { ...nq, _key: x._key } : x)) }, [`quiz[${i}]`])} />
-              ))}
-            </section>
-
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-800">
-                  Trải nghiệm thực tế ({stop.experiences.length}/{LIMITS.EXPERIENCES_MAX})
-                </h4>
-                {!readOnly && stop.experiences.length < LIMITS.EXPERIENCES_MAX && (
-                  <button type="button" onClick={() => set({ experiences: [...stop.experiences, emptyExperience()] })}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
-                    <Plus size={14} /> Thêm trải nghiệm
-                  </button>
-                )}
-              </div>
-              {stopErr("experiences") && <p className="text-[11px] font-bold text-rose-600">{stopErr("experiences")}</p>}
-
-              {stop.experiences.map((exp, i) => {
-                const p = `experiences[${i}]`;
-                const mins = exp.durationSeconds != null ? Math.floor(exp.durationSeconds / 60) : null;
-                const secs = exp.durationSeconds != null ? exp.durationSeconds % 60 : null;
-                const setDur = (m, s) => {
-                  const total = (m || 0) * 60 + (s || 0);
-                  setExperience(i, { durationSeconds: total > 0 ? total : null });
-                };
-                return (
-                  <div key={exp._key} className="p-3.5 rounded-xl border border-slate-200 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold text-slate-700">Trải nghiệm {i + 1}</span>
-                      <div className="flex items-center gap-2">
-                        <PointsBadge points={expPts} label="điểm / trải nghiệm" />
-                        {!readOnly && (
-                          <button type="button" title="Xóa trải nghiệm" onClick={() => set({ experiences: stop.experiences.filter((_, j) => j !== i) })}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer">
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <Field label="Tên hoạt động" required error={stopErr(`${p}.activityName`)}>
-                      <TextInput value={exp.activityName} disabled={readOnly} placeholder="Ví dụ: Đục hoa văn sen cùng nghệ nhân"
-                        onChange={(e) => setExperience(i, { activityName: e.target.value })} error={stopErr(`${p}.activityName`)} />
-                    </Field>
-
-                    <Field label="Checkpoint" required error={stopErr(`${p}.checkpoint`)}
-                      hint="Khách đi theo bản đồ trên app; khi vào trong bán kính sẽ hiện tên hoạt động và nút Bắt đầu.">
-                      <CheckpointMap latitude={exp.checkpointLatitude} longitude={exp.checkpointLongitude} radius={exp.radiusMeters} />
-                      {!readOnly && (
-                        <button type="button" onClick={() => setMapFor(i)}
-                          className="mt-2 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer hover:bg-emerald-100">
-                          <MapPin size={13} /> {exp.checkpointLatitude ? "Đổi vị trí trên bản đồ" : "Chọn vị trí trên bản đồ"}
-                        </button>
-                      )}
-                    </Field>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Field label="Phạm vi (bán kính)" required error={stopErr(`${p}.radiusMeters`)}
-                        hint={`Từ ${LIMITS.RADIUS_MIN}–${LIMITS.RADIUS_MAX} mét quanh checkpoint.`}>
-                        <NumberInput value={exp.radiusMeters} min={LIMITS.RADIUS_MIN} max={LIMITS.RADIUS_MAX} suffix="mét" disabled={readOnly}
-                          onChange={(v) => setExperience(i, { radiusMeters: v })} />
-                      </Field>
-                      <Field label="Thời gian trải nghiệm" required error={stopErr(`${p}.durationSeconds`)}
-                        hint="Đếm ngược trên app, hết giờ thì hiện câu hỏi.">
-                        <div className="grid grid-cols-2 gap-2">
-                          <NumberInput value={mins} min={0} max={1440} suffix="phút" disabled={readOnly} onChange={(m) => setDur(m, secs)} />
-                          <NumberInput value={secs} min={0} max={59} suffix="giây" disabled={readOnly} onChange={(s) => setDur(mins, s)} />
-                        </div>
-                      </Field>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
-                      <Timer size={12} /> Câu hỏi sau trải nghiệm (1 câu, trắc nghiệm hoặc tự luận)
-                    </div>
-                    <QuestionEditor label="Câu hỏi sau trải nghiệm" value={exp.question} readOnly={readOnly} allowTypes
-                      error={stopErr(`${p}.question`)}
-                      onChange={(question) => setExperience(i, { question })} />
-                  </div>
-                );
-              })}
-            </section>
+            <TaskListEditor tasks={stop.tasks} readOnly={readOnly} stopName={stop.name} stopErr={stopErr} taskPoints={taskPoints}
+              onChange={(tasks, paths) => set({ tasks }, paths)} />
           </>
         )}
       </div>
@@ -403,17 +284,6 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
         </div>
       </footer>
 
-      {mapFor != null && (
-        <GoongMapPickerModal
-          isOpen
-          onClose={() => setMapFor(null)}
-          placeName={stop.experiences[mapFor]?.activityName || stop.name}
-          initialLatitude={stop.experiences[mapFor]?.checkpointLatitude}
-          initialLongitude={stop.experiences[mapFor]?.checkpointLongitude}
-          onSelect={({ latitude, longitude }) =>
-            setExperience(mapFor, { checkpointLatitude: Number(latitude), checkpointLongitude: Number(longitude) })}
-        />
-      )}
     </aside>
     </>
   );
