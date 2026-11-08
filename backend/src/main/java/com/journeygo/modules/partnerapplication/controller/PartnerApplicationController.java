@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -157,7 +158,7 @@ public class PartnerApplicationController {
     @Operation(summary = "Hàng đợi duyệt đơn đăng ký (Admin)")
     public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<PartnerApplicationResponse>>> queue(
             @RequestParam(required = false) PartnerApplicationStatus status,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy hàng đợi duyệt thành công",
                 partnerApplicationService.getQueue(status, pageable)));
     }

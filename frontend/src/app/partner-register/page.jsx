@@ -50,6 +50,7 @@ import {
   PRIVACY_POLICY_SECTIONS,
   PRIVACY_POLICY_TITLE,
 } from "@/features/partnerapplication/constants/legalDocuments";
+import { BANKS } from "@/constants/banks";
 
 const STEPS = [
   { id: 1, label: "Thông tin người đại diện", icon: UserRound },
@@ -78,19 +79,6 @@ const POSITIONS = [
   { value: "LEGAL_REPRESENTATIVE", label: "Người đại diện pháp luật" },
   { value: "AUTHORIZED_EMPLOYEE", label: "Nhân viên được ủy quyền" },
   { value: "OTHER", label: "Khác" },
-];
-
-const BANKS = [
-  "Ngân hàng TMCP Ngoại thương Việt Nam (Vietcombank)",
-  "Ngân hàng TMCP Kỹ thương Việt Nam (Techcombank)",
-  "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV)",
-  "Ngân hàng TMCP Quân đội (MB)",
-  "Ngân hàng TMCP Á Châu (ACB)",
-  "Ngân hàng TMCP Sài Gòn – Hà Nội (SHB)",
-  "Ngân hàng TMCP Đông Á (DongA Bank)",
-  "Ngân hàng TMCP Bưu điện Liên Việt (LienVietPostBank)",
-  "Ngân hàng TMCP Nam Á (Nam A Bank)",
-  "Ngân hàng TMCP Đại Đồng Tiến (BIDV) / VietinBank",
 ];
 
 const EMPTY_FORM = {

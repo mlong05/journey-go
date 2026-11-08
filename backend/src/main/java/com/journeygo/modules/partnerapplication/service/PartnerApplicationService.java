@@ -679,12 +679,18 @@ public class PartnerApplicationService {
                 .map(a -> PartnerApplicationResponse.fromEntity(a, loadHistory(a.getId())));
     }
 
-    /** Danh sách đơn chờ duyệt — hàng đợi của Admin. */
+    /**
+     * Danh sách đơn — hàng đợi của Admin.
+     *
+     * <p>{@code status == null} ⇒ trả về <b>tất cả</b> các trạng thái (tab "Tất cả").
+     * Trạng thái {@code DRAFT} vẫn được lưu và hiển thị trong lịch sử kiểm duyệt nhưng
+     * không tách riêng thành tab trên màn hình làm việc.
+     */
     @Transactional(readOnly = true)
     public Page<PartnerApplicationResponse> getQueue(PartnerApplicationStatus status, Pageable pageable) {
         Page<PartnerApplication> page = (status != null)
                 ? applicationRepository.findByStatus(status, pageable)
-                : applicationRepository.findByStatus(PartnerApplicationStatus.PENDING, pageable);
+                : applicationRepository.findByStatusNot(PartnerApplicationStatus.DRAFT, pageable);
         return page.map(a -> PartnerApplicationResponse.fromEntity(a, List.of()));
     }
 
