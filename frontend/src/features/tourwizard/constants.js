@@ -90,3 +90,11 @@ export const STEP_LABEL = {
   REVIEW: "Bước 5 – Xem lại",
   ACCOUNT: "Tài khoản đối tác",
 };
+
+/** Bước 1 — "Những thông tin cần lưu ý" (không bắt buộc), hiển thị dạng mục xổ xuống cho khách. */
+export const NOTICE_SECTIONS = [
+  { key: "priceIncludes", label: "Giá tour bao gồm", max: 5000 },
+  { key: "priceExcludes", label: "Giá tour không bao gồm", max: 5000 },
+  { key: "forceMajeure", label: "Trường hợp bất khả kháng", max: 5000 },
+  { key: "contactInfo", label: "Liên hệ", max: 2000 },
+];

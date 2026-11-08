@@ -59,6 +59,19 @@ public class TourDetailMapper {
                         : new TourDetailResponse.Ref(tour.getTheme().getId(), tour.getTheme().getName()))
                 .description(tour.getDescription())
                 .highlights(List.copyOf(tour.getHighlights()))
+                .itinerary(java.util.stream.IntStream.range(0, tour.getItinerary().size())
+                        .mapToObj(i -> {
+                            // Ngày bỏ trống hoàn toàn: Hibernate không lưu dòng → nạp lại thành null.
+                            var d = tour.getItinerary().get(i);
+                            return d == null
+                                    ? new TourDetailResponse.ItineraryDay(i + 1, null, null, null)
+                                    : new TourDetailResponse.ItineraryDay(i + 1, d.getTitle(), d.getMainActivity(), d.getContent());
+                        })
+                        .toList())
+                .priceIncludes(tour.getPriceIncludes())
+                .priceExcludes(tour.getPriceExcludes())
+                .forceMajeure(tour.getForceMajeure())
+                .contactInfo(tour.getContactInfo())
                 .images(List.copyOf(tour.getImages()))
                 .coverImageUrl(tour.getCoverImageUrl())
                 .prices(toPrices(tour))

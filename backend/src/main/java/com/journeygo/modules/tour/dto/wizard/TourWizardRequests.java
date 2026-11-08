@@ -47,7 +47,24 @@ public final class TourWizardRequests {
             @Schema(description = "Ảnh của tour (ít nhất 5 ảnh khi gửi duyệt)")
             @Size(max = 30, message = "Tối đa 30 ảnh") List<@Size(max = 1000) String> images,
             @Schema(description = "Ảnh bìa — phải là một trong các ảnh ở trên")
-            @Size(max = 1000) String coverImageUrl
+            @Size(max = 1000) String coverImageUrl,
+            @Schema(description = "Lịch trình theo ngày (tour trong ngày: 1 mục)")
+            @Valid @Size(max = 60, message = "Tối đa 60 ngày") List<ItineraryDayItem> itinerary,
+            @Schema(description = "Những thông tin cần lưu ý — Giá tour bao gồm")
+            @Size(max = 5000) String priceIncludes,
+            @Schema(description = "Những thông tin cần lưu ý — Giá tour không bao gồm")
+            @Size(max = 5000) String priceExcludes,
+            @Schema(description = "Những thông tin cần lưu ý — Trường hợp bất khả kháng")
+            @Size(max = 5000) String forceMajeure,
+            @Schema(description = "Những thông tin cần lưu ý — Liên hệ")
+            @Size(max = 2000) String contactInfo
+    ) {}
+
+    @Schema(description = "Một ngày trong lịch trình (dạng chữ)")
+    public record ItineraryDayItem(
+            @Schema(description = "Chặng, ví dụ \"Sapa – Fansipan\"") @Size(max = 200) String title,
+            @Schema(description = "Hoạt động chính") @Size(max = 500) String mainActivity,
+            @Schema(description = "Nội dung: mỗi dòng một ý, **chữ** để in đậm") @Size(max = 5000) String content
     ) {}
 
     @Schema(description = "Giá của một loại khách")
