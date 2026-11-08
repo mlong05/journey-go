@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/dashboard/DashboardUI";
 import ThemeCatalogCard from "@/features/catalog/components/ThemeCatalogCard";
 
 /**
- * Quản lý chủ đề (ADMIN) — backend /api/v1/themes.
+ * Cấu hình chủ đề (ADMIN) — backend /api/v1/themes.
  * Chủ đề hiện trong dropdown "Chủ đề" ở bước 1 khi đối tác tạo tour.
  */
 export default function AdminThemesPage() {
