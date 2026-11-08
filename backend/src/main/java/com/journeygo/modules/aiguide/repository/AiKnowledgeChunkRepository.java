@@ -73,3 +73,4 @@ public interface AiKnowledgeChunkRepository extends JpaRepository<AiKnowledgeChu
     @Query("DELETE FROM AiKnowledgeChunk c WHERE c.destinationId = :destinationId")
     void deleteByDestinationId(@Param("destinationId") Long destinationId);
 }
+

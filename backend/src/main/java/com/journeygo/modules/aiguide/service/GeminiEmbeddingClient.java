@@ -185,3 +185,4 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
         return vector;
     }
 }
+

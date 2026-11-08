@@ -8,3 +8,4 @@ public record ContentInvalidatedEvent(
         Long contentId,
         String reason
 ) {}
+
