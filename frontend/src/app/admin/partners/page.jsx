@@ -38,11 +38,18 @@ import {
 
 const PAGE_SIZE = 10;
 
+/**
+ * Tab trạng thái trên màn hình làm việc.
+ *
+ * <p>Không có tab "Nháp": đơn nháp là trạng thái nội bộ khi người đăng ký đang điền, không
+ * có ý nghĩa với Admin nên không tách thành tab. Mốc chuyển trạng thái "Nháp → Chờ duyệt"
+ * vẫn được giữ nguyên trong Lịch sử kiểm duyệt.
+ */
 const STATUS_TABS = [
+  { id: "ALL", label: "Tất cả" },
   { id: "PENDING", label: "Chờ duyệt" },
   { id: "APPROVED", label: "Đã duyệt" },
   { id: "REJECTED", label: "Bị từ chối" },
-  { id: "DRAFT", label: "Nháp" },
 ];
 
 const STATUS_BADGE = {
@@ -111,7 +118,7 @@ function getErrorMessage(err, fallback) {
    ========================================================================= */
 
 export default function AdminPartnersPage() {
-  const [status, setStatus] = useState("PENDING");
+  const [status, setStatus] = useState("ALL");
   const [page, setPage] = useState(0);
   const [pageData, setPageData] = useState({
     content: [],
@@ -144,7 +151,11 @@ export default function AdminPartnersPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await getQueue({ status: status || undefined, page, size: PAGE_SIZE });
+      const res = await getQueue({
+        status: status && status !== "ALL" ? status : undefined,
+        page,
+        size: PAGE_SIZE,
+      });
       setPageData({
         content: res?.content ?? [],
         totalElements: res?.totalElements ?? 0,
@@ -315,7 +326,12 @@ export default function AdminPartnersPage() {
                 {t.label}
               </span>
               <span className="block text-lg font-bold">
-                {stats?.[t.id] ?? 0}
+                {t.id === "ALL"
+                  ? STATUS_TABS.filter((x) => x.id !== "ALL").reduce(
+                      (sum, x) => sum + Number(stats?.[x.id] ?? 0),
+                      0,
+                    )
+                  : stats?.[t.id] ?? 0}
               </span>
             </button>
           ))}
