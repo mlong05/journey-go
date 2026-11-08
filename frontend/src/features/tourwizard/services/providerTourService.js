@@ -32,6 +32,9 @@ export const providerTourService = {
   async saveStops(tourId, body) {
     return data(await apiClient.put(`${ROOT}/${tourId}/stops`, body));
   },
+  async saveItinerary(tourId, body) {
+    return data(await apiClient.put(`${ROOT}/${tourId}/itinerary`, body));
+  },
   async saveSchedule(tourId, body) {
     return data(await apiClient.put(`${ROOT}/${tourId}/schedule`, body));
   },

@@ -11,6 +11,7 @@ import TourStatusBanner from "./TourStatusBanner";
 import BasicInfoStep from "./steps/BasicInfoStep";
 import PricingStep from "./steps/PricingStep";
 import StopsStep from "./steps/StopsStep";
+import ItineraryStep from "./steps/ItineraryStep";
 import ScheduleStep from "./steps/ScheduleStep";
 import ReviewStep from "./steps/ReviewStep";
 
@@ -69,7 +70,7 @@ function SubmittedNotice({ onDone }) {
   );
 }
 
-/** Màn hình tạo / sửa tour 5 bước của Đối tác. */
+/** Màn hình tạo / sửa tour theo bước của Đối tác. */
 export default function TourWizard({ tourId, initialStep }) {
   const router = useRouter();
   const draft = useTourDraft(tourId);
@@ -279,7 +280,7 @@ export default function TourWizard({ tourId, initialStep }) {
             <ArrowLeft size={16} />
           </button>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide">Tạo tour – 5 bước</p>
+            <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide">Tạo tour – {WIZARD_STEPS.length} bước</p>
             <h1 className={`text-lg font-bold truncate ${tour.title ? "text-slate-900" : "text-slate-400 italic"}`}>{tour.title || "Tour chưa đặt tên"}</h1>
           </div>
           <span className={`px-2 py-0.5 rounded-md border text-[11px] font-bold shrink-0 ${meta.cls}`}>{meta.label}</span>
@@ -341,6 +342,10 @@ export default function TourWizard({ tourId, initialStep }) {
           {step === "STOPS" && (
             <StopsStep key={tour.tourId} {...common} readOnly={contentReadOnly} focus={focusStop} onFlush={flush} onValidate={refreshIssues}
               onSave={(body, onSaved) => queueSave("STOPS", body, onSaved)} />
+          )}
+          {step === "ITINERARY" && (
+            <ItineraryStep key={tour.tourId} {...common} readOnly={contentReadOnly}
+              onSave={(body) => queueSave("ITINERARY", body)} />
           )}
           {step === "SCHEDULE" && (
             <ScheduleStep key={tour.tourId} {...common} readOnly={pricingReadOnly} isLive={isLive}

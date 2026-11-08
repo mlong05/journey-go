@@ -9,6 +9,7 @@ const SAVERS = {
   BASIC_INFO: providerTourService.saveBasicInfo,
   PRICING: providerTourService.savePricing,
   STOPS: providerTourService.saveStops,
+  ITINERARY: providerTourService.saveItinerary,
   SCHEDULE: providerTourService.saveSchedule,
 };
 

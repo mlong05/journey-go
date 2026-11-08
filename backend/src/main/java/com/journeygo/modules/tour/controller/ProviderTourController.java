@@ -95,8 +95,17 @@ public class ProviderTourController {
                 service.updateStops(tourId, request, principal.getId())));
     }
 
+    @PutMapping("/{tourId}/itinerary")
+    @Operation(summary = "Lưu bước 4 – Lịch trình")
+    public ResponseEntity<ApiResponse<TourDetailResponse>> itinerary(@PathVariable Long tourId,
+            @Valid @RequestBody TourWizardRequests.Itinerary request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Đã lưu nháp",
+                service.updateItinerary(tourId, request, principal.getId())));
+    }
+
     @PutMapping("/{tourId}/schedule")
-    @Operation(summary = "Lưu bước 4 – Lịch khởi hành (sửa được cả khi tour đang bán)")
+    @Operation(summary = "Lưu bước 5 – Lịch khởi hành (sửa được cả khi tour đang bán)")
     public ResponseEntity<ApiResponse<TourDetailResponse>> schedule(@PathVariable Long tourId,
             @Valid @RequestBody TourWizardRequests.Schedule request,
             @AuthenticationPrincipal UserPrincipal principal) {

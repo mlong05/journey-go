@@ -5,6 +5,7 @@ public enum TourReviewStep {
     BASIC_INFO("Thông tin cơ bản"),
     PRICING("Giá vé"),
     STOPS("Điểm đến"),
+    ITINERARY("Lịch trình"),
     SCHEDULE("Lịch khởi hành");
 
     private final String label;
