@@ -126,6 +126,7 @@ public class TourDraftService {
         tour.setPriceIncludes(trimToNull(request.priceIncludes()));
         tour.setPriceExcludes(trimToNull(request.priceExcludes()));
         tour.setForceMajeure(trimToNull(request.forceMajeure()));
+        tour.setRefundPolicy(trimToNull(request.refundPolicy()));
         tour.setContactInfo(trimToNull(request.contactInfo()));
         return save(tour);
     }
@@ -349,6 +350,7 @@ public class TourDraftService {
                 .priceIncludes(source.getPriceIncludes())
                 .priceExcludes(source.getPriceExcludes())
                 .forceMajeure(source.getForceMajeure())
+                .refundPolicy(source.getRefundPolicy())
                 .contactInfo(source.getContactInfo())
                 .coverImageUrl(source.getCoverImageUrl())
                 .cancellationPolicy(source.getCancellationPolicy())

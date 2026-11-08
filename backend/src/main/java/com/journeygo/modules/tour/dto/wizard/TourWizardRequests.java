@@ -56,6 +56,8 @@ public final class TourWizardRequests {
             @Size(max = 5000) String priceExcludes,
             @Schema(description = "Những thông tin cần lưu ý — Trường hợp bất khả kháng")
             @Size(max = 5000) String forceMajeure,
+            @Schema(description = "Những thông tin cần lưu ý — Chính sách hỗ trợ hoàn tiền")
+            @Size(max = 5000) String refundPolicy,
             @Schema(description = "Những thông tin cần lưu ý — Liên hệ")
             @Size(max = 2000) String contactInfo
     ) {}

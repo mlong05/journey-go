@@ -135,6 +135,10 @@ public class Tour {
     @Column(name = "force_majeure", columnDefinition = "TEXT")
     private String forceMajeure;
 
+    /** Chính sách hỗ trợ hoàn tiền. */
+    @Column(name = "refund_policy", columnDefinition = "TEXT")
+    private String refundPolicy;
+
     /** Liên hệ. */
     @Column(name = "contact_info", columnDefinition = "TEXT")
     private String contactInfo;
