@@ -7,6 +7,7 @@ import {
   FileCheck,
   Route,
   Wallet,
+  UserCog,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -40,8 +41,11 @@ export default function ProviderLayout({ children }) {
 
   // Dynamic danh sách thông báo duyệt bài (sẵn sàng gắn API)
 
-  // Trang Quản lý Tour: khóa khung 100vh, cố định header & filter, chỉ phần nội dung tự cuộn
-  const isScrollLockedPage = pathname?.startsWith("/provider/tours");
+  // Trang Quản lý Tour & Thông tin đối tác: khóa khung 100vh, cố định header & filter,
+  // chỉ phần nội dung tự cuộn (trang Thông tin đối tác còn cuộn riêng cho khối lịch sử).
+  const isScrollLockedPage =
+    pathname?.startsWith("/provider/tours") ||
+    pathname?.startsWith("/provider/partner-info");
 
   // Danh mục điều hướng Sidebar của Đối tác
   const navMenuItems = [
@@ -68,6 +72,12 @@ export default function ProviderLayout({ children }) {
       label: "Tài chính & Doanh thu",
       href: "/provider/finance",
       icon: Wallet,
+    },
+    {
+      id: "partner-info",
+      label: "Thông tin đối tác",
+      href: "/provider/partner-info",
+      icon: UserCog,
     },
   ];
 
