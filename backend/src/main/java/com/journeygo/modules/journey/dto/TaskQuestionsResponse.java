@@ -32,7 +32,13 @@ public record TaskQuestionsResponse(
         // Mọi trạm của nhiệm vụ theo thứ tự câu hỏi; trạm chưa tới lượt chỉ có tên, không có tọa độ
         List<Station> stations,
         Integer distanceMeters,
-        List<Question> questions
+        List<Question> questions,
+        // Hoạt động thực địa (tour 5 bước): đếm ngược bao lâu trước khi được quét QR
+        Integer durationSeconds,
+        // true: câu hỏi chỉ mở khi quét đúng mã QR tại điểm (GPS không đủ)
+        boolean qrRequired,
+        // true: nộp một lần, đúng câu nào cộng điểm câu đó
+        boolean perQuestionPoints
 ) {
     public record Station(String name, BigDecimal latitude, BigDecimal longitude, Integer radiusMeters) {}
 

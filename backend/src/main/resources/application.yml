@@ -98,6 +98,10 @@ springdoc:
 
 # CORS, OAuth2 & Mail Configuration
 app:
+  # Hành trình du khách. skip-location-check CHỈ bật khi dev (thử ở nhà): bỏ kiểm tra khoảng cách GPS,
+  # mã QR vẫn bắt buộc. Bật bằng JOURNEY_SKIP_LOCATION_CHECK=true trong backend/.env.
+  journey:
+    skip-location-check: ${JOURNEY_SKIP_LOCATION_CHECK:false}
   cloudinary:
     cloud-name: ${CLOUDINARY_CLOUD_NAME:}
     api-key: ${CLOUDINARY_API_KEY:}
