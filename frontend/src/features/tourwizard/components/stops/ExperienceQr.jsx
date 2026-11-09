@@ -16,7 +16,7 @@ const fileName = (label) => `QR-${(label || "trai-nghiem").normalize("NFD").repl
 /**
  * Mã QR xác nhận hoàn thành trải nghiệm: đối tác in và dán tại điểm. Trên app, hết giờ đếm ngược khách quét mã
  * này rồi mới hiện câu hỏi sau trải nghiệm.
- * compact: chỉ ảnh nhỏ + mã (dùng trong màn xem lại / duyệt).
+ * compact: ảnh nhỏ + mã + nút tải (dùng trong màn xem lại / duyệt và khi tour đã bán, nội dung chỉ xem).
  */
 export default function ExperienceQr({ token, label, compact = false }) {
   const [src, setSrc] = useState("");
@@ -36,16 +36,22 @@ export default function ExperienceQr({ token, label, compact = false }) {
 
   if (compact) {
     return (
-      <div className="inline-flex items-center gap-2.5">
+      <span className="inline-flex items-center gap-2.5">
         {src
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={src} alt={`Mã QR ${token}`} className="w-16 h-16 rounded border border-slate-200 bg-white" />
           : <span className="w-16 h-16 rounded border border-slate-200 bg-slate-50" />}
         <span className="text-[11px] text-slate-500">
           <span className="block font-bold text-slate-700">Mã QR xác nhận hoàn thành</span>
-          <span className="font-mono">{token}</span>
+          <span className="block font-mono">{token}</span>
+          {src && (
+            <a href={src} download={fileName(label)}
+              className="mt-1 inline-flex items-center gap-1 font-bold text-emerald-700 hover:underline">
+              <Download size={11} /> Tải ảnh QR
+            </a>
+          )}
         </span>
-      </div>
+      </span>
     );
   }
 

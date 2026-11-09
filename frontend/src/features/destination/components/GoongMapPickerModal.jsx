@@ -16,6 +16,32 @@ const MAP_STYLES = [
   { id: "satellite", name: "Vệ tinh", url: "https://tiles.goong.io/assets/goong_satellite.json" },
 ];
 
+/**
+ * goong-js 1.0.9 coi mọi nguồn có `url` bắt đầu bằng https://tiles.goong.io là "nguồn Goong" và viết lại
+ * URL ô ảnh (.png → .webp / @2x.webp). satellite.goong.io không có bản .webp (404) → ô ảnh lỗi, nền trắng.
+ * Nên tự đọc TileJSON vệ tinh rồi đưa `tiles` trực tiếp vào style — goong-js giữ nguyên URL .png.
+ */
+const styleCache = {};
+async function resolveStyle(cfg) {
+  if (cfg.id !== "satellite") return cfg.url;
+  if (styleCache[cfg.id]) return styleCache[cfg.id];
+  const style = await (await fetch(`${cfg.url}?api_key=${MAPTILES_KEY}`)).json();
+  const src = style.sources?.satellite;
+  if (src?.url) {
+    const tj = await (await fetch(src.url)).json();
+    style.sources.satellite = {
+      type: "raster",
+      tiles: tj.tiles,
+      tileSize: src.tileSize || 256,
+      minzoom: tj.minzoom ?? 0,
+      maxzoom: tj.maxzoom ?? 20,
+      attribution: tj.attribution,
+    };
+  }
+  styleCache[cfg.id] = style;
+  return style;
+}
+
 // Mặc định Hà Nội khi chưa có tọa độ
 const DEFAULT_POS = { lat: 21.028511, lng: 105.854167 };
 
@@ -216,11 +242,18 @@ export default function GoongMapPickerModal({
     };
   }, [isOpen, initMap, placeName]);
 
-  const switchStyle = (id) => {
+  const switchStyle = async (id) => {
     const cfg = MAP_STYLES.find((s) => s.id === id);
     if (!cfg || !mapRef.current) return;
-    mapRef.current.setStyle(cfg.url);
     setStyleId(id);
+    try {
+      const style = await resolveStyle(cfg);
+      // diff: false — nạp lại cả style thay vì vá từng lớp giữa hai style gần như trùng id
+      mapRef.current?.setStyle(style, { diff: false });
+    } catch (err) {
+      console.error("[GoongMapPicker] style error", err);
+      setSearchError("Không tải được bản đồ vệ tinh, vui lòng thử lại.");
+    }
   };
 
   const flyTo = (lat, lng) => {

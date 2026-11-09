@@ -212,7 +212,8 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
             <MapPin size={13} /> {d.checkpointLatitude ? "Đổi vị trí trên bản đồ" : "Chọn vị trí trên bản đồ"}
           </button>
         </Field>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Gợi ý hai ô dài ngắn khác nhau: đẩy ô nhập xuống đáy để hai hàng input luôn thẳng nhau */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 [&>div]:flex [&>div]:flex-col [&>div>*:nth-child(3)]:mt-auto">
           <Field label="Phạm vi (bán kính)" required hint={`Từ ${LIMITS.RADIUS_MIN}–${LIMITS.RADIUS_MAX} mét quanh checkpoint.`}>
             <NumberInput value={d.radiusMeters} min={LIMITS.RADIUS_MIN} max={LIMITS.RADIUS_MAX} suffix="mét"
               onChange={(v) => setDraft({ radiusMeters: v })} />
@@ -294,7 +295,10 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
                     <span className="inline-flex items-center gap-1"><Timer size={11} />{durationText(e.durationSeconds)}</span>
                     <span>Câu hỏi: {e.question?.content || "—"}</span>
                     <span>Đáp án: {e.question?.referenceAnswer || "—"}</span>
-                    {e.qrToken && <span className="inline-flex items-center gap-1 font-mono"><QrCode size={11} />{e.qrToken}</span>}
+                    {e.qrToken && !readOnly && <span className="inline-flex items-center gap-1 font-mono"><QrCode size={11} />{e.qrToken}</span>}
+                    {e.qrToken && readOnly && (
+                      <span className="basis-full pt-1.5"><ExperienceQr token={e.qrToken} label={e.activityName} compact /></span>
+                    )}
                   </span>
                 }
                 points={experiencePoints} pointsLabel="điểm" error={stopErr(`experiences[${i}]`)}

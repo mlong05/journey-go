@@ -201,7 +201,9 @@ export default function TourReviewScreen({ tourId }) {
 
         {!pending && (
           <div className="shrink-0 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-600">
-            Tour không ở trạng thái Chờ duyệt — chỉ xem nội dung và lịch sử kiểm duyệt.
+            {tour.status === "PAUSED"
+              ? "Tour đã được duyệt, đối tác đang tạm ngừng bán (khách không đặt được). Chỉ xem nội dung và lịch sử kiểm duyệt."
+              : "Tour không ở trạng thái Chờ duyệt — chỉ xem nội dung và lịch sử kiểm duyệt."}
           </div>
         )}
 

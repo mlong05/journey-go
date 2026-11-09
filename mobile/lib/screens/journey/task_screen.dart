@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart' show Position;
 import 'package:latlong2/latlong.dart';
@@ -27,6 +28,9 @@ const int _compassRangeMeters = 250;
 
 /// Đi lệch khỏi điểm xuất phát của tuyến quá mức này thì tìm lại đường.
 const double _rerouteMeters = 60;
+
+/// Xa hơn mức này thì gợi ý đi xe tới gần trạm thay vì báo thời gian đi bộ hàng giờ.
+const int _walkableMeters = 2000;
 
 /// Một nhiệm vụ tại điểm đến: giới thiệu, (dẫn đường tới trạm nếu cần vị trí), trả lời câu hỏi, kết quả.
 ///
@@ -80,6 +84,7 @@ class _TaskScreenState extends State<TaskScreen> {
   DateTime? _walkRouteAt;
   bool _walkRouteLoading = false;
   DateTime? _lastAutoCheck;
+  bool _arrivedNotified = false;
   final GlobalKey<StationMapState> _mapKey = GlobalKey<StationMapState>();
   bool _satellite = false;
 
@@ -218,6 +223,13 @@ class _TaskScreenState extends State<TaskScreen> {
     // Vào trong bán kính: tự hỏi backend để mở câu hỏi (backend vẫn là nơi xác nhận).
     final distance = _liveDistance;
     final radius = _content?.station?.radiusMeters ?? 50;
+    // Rung nhẹ một lần khi vừa tới trạm; ra xa hẳn (chừa sai số GPS) thì lần tới lại rung.
+    if (distance != null && distance <= radius && !_arrivedNotified) {
+      _arrivedNotified = true;
+      HapticFeedback.mediumImpact();
+    } else if (distance != null && distance > radius + 20) {
+      _arrivedNotified = false;
+    }
     final now = DateTime.now();
     final cooledDown =
         _lastAutoCheck == null ||
@@ -237,9 +249,11 @@ class _TaskScreenState extends State<TaskScreen> {
   Future<void> _openDirections() async {
     final station = _stationPoint;
     if (station == null) return;
+    // Còn xa (trên ~2 km): chỉ đường xe máy thay vì đi bộ.
+    final far = (_liveDistance ?? 0) > _walkableMeters;
     final uri = Uri.parse(
       'https://www.google.com/maps/dir/?api=1'
-      '&destination=${station.latitude},${station.longitude}&travelmode=walking',
+      '&destination=${station.latitude},${station.longitude}&travelmode=${far ? 'two-wheeler' : 'walking'}',
     );
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && mounted) _snack('Không mở được ứng dụng bản đồ.');
@@ -1356,6 +1370,9 @@ class _TaskScreenState extends State<TaskScreen> {
     final walkRoute = distance != null && distance > _compassRangeMeters ? _walkRoute : null;
     final directionText = bearing == null
         ? 'Đang xác định vị trí của bạn...'
+        : distance != null && distance > _walkableMeters
+        ? 'Khá xa để đi bộ${walkRoute != null ? ' (~${formatDuration(walkRoute.durationSeconds)})' : ''}. '
+              'Hãy đi xe tới gần rồi đi bộ vào trạm.'
         : walkRoute != null
         ? 'Đi bộ ~${formatDuration(walkRoute.durationSeconds)} theo đường trên bản đồ'
         : heading != null
@@ -1458,6 +1475,10 @@ class _TaskScreenState extends State<TaskScreen> {
                   ),
                 ],
               ),
+              if (task.description.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _missionTeaser(task),
+              ],
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -1563,6 +1584,62 @@ class _TaskScreenState extends State<TaskScreen> {
               MapAttributionText(satellite: _satellite),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Lời dẫn nhiệm vụ ngay trên bảng dẫn đường (để du khách biết mình tới trạm để làm gì); chạm để đọc hết.
+  Widget _missionTeaser(TaskContent task) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.white,
+        showDragHandle: true,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        builder: (ctx) => SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(task.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text(widget.destinationName, style: const TextStyle(color: AppCultureColors.textMuted)),
+                  const SizedBox(height: 14),
+                  Text(task.description, style: const TextStyle(fontSize: 14.5, height: 1.55)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        decoration: BoxDecoration(
+          color: AppCultureColors.rewardBg.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppCultureColors.rewardBorder),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.auto_stories_rounded, size: 18, color: AppCultureColors.amberDark),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                task.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12.5, height: 1.4, color: AppCultureColors.rewardText),
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppCultureColors.amberDark),
+          ],
         ),
       ),
     );

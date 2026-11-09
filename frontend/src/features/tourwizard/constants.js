@@ -22,6 +22,13 @@ export const TOUR_STATUS = {
   PAUSED: { label: "Tạm ngừng bán", cls: "bg-slate-100 text-slate-500 border-slate-300" },
 };
 
+/** Hỏi lại trước khi tạm ngừng / mở bán lại — nút nhỏ nằm sát nút Xem nên rất dễ bấm nhầm. */
+export const saleToggleConfirm = (paused, title) => (paused
+  ? { tone: "success", icon: "check", title: "Mở bán lại tour?", subject: title || "Tour chưa đặt tên", confirmLabel: "Mở bán lại",
+      description: "Tour hiện lại cho khách đặt vé ngay và trạng thái chuyển về Đang bán." }
+  : { tone: "warning", icon: "warning", title: "Tạm ngừng bán tour?", subject: title || "Tour chưa đặt tên", confirmLabel: "Tạm ngừng bán",
+      description: "Khách không đặt được tour này nữa cho đến khi bạn mở bán lại. Vé đã bán vẫn giữ nguyên." });
+
 export const TOUR_STATUS_ORDER = ["DRAFT", "PENDING_REVIEW", "CHANGES_REQUESTED", "PUBLISHED", "PAUSED", "REJECTED"];
 
 /** Đối tác được sửa nội dung (bước 1, 3) ở các trạng thái này. */

@@ -16,6 +16,9 @@ class JourneyStop {
   final StopState state;
   final bool skipped;
 
+  /// Ảnh của điểm đến (tour 5 bước), hiện trong ghim của điểm đang mở / đã xong.
+  final String? imageUrl;
+
   const JourneyStop({
     required this.destinationId,
     required this.order,
@@ -23,6 +26,7 @@ class JourneyStop {
     required this.point,
     required this.state,
     this.skipped = false,
+    this.imageUrl,
   });
 }
 
@@ -113,6 +117,58 @@ class JourneyMapState extends State<JourneyMap> {
     if (user != null) _controller.move(user, 17.5);
   }
 
+  /// Ruột ghim: ảnh địa điểm (điểm đang mở / đã ghé) kèm dấu nhỏ, hoặc số thứ tự / dấu tích như cũ.
+  Widget _pinContent(JourneyStop s) {
+    final symbol = s.state == StopState.done
+        ? Icon(s.skipped ? Icons.skip_next_rounded : Icons.check_rounded, color: Colors.white, size: 20)
+        : Text(
+            '${s.order}',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: s.state == StopState.current ? 18 : 14,
+            ),
+          );
+    final image = s.imageUrl;
+    if (image == null || s.state == StopState.locked || s.skipped) return symbol;
+    return Stack(
+      fit: StackFit.expand,
+      clipBehavior: Clip.none,
+      children: [
+        ClipOval(
+          child: Image.network(
+            image,
+            fit: BoxFit.cover,
+            // Ảnh lỗi / đang tải: vẫn thấy số thứ tự
+            errorBuilder: (_, _, _) => Center(child: symbol),
+            loadingBuilder: (_, child, progress) => progress == null ? child : Center(child: symbol),
+          ),
+        ),
+        Positioned(
+          right: -6,
+          bottom: -6,
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: s.state == StopState.done ? AppCultureColors.heritageJade : AppCultureColors.oceanBlue,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: Center(
+              child: s.state == StopState.done
+                  ? const Icon(Icons.check_rounded, color: Colors.white, size: 12)
+                  : Text(
+                      '${s.order}',
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                    ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final stops = widget.stops;
@@ -201,15 +257,7 @@ class JourneyMapState extends State<JourneyMap> {
                   },
                   emphasized: s.state == StopState.current,
                   label: s.name,
-                  child: s.state == StopState.done
-                      ? Icon(s.skipped ? Icons.skip_next_rounded : Icons.check_rounded,
-                          color: Colors.white, size: 20)
-                      : Text('${s.order}',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: s.state == StopState.current ? 18 : 14,
-                          )),
+                  child: _pinContent(s),
                 ),
               ),
             ),

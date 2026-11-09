@@ -21,7 +21,11 @@ public record JourneyResponse(
         Instant startedAt,
         Instant completedAt,
         Instant createdAt,
-        List<JourneyDestinationProgressResponse> destinations
+        List<JourneyDestinationProgressResponse> destinations,
+        /** Điểm thưởng hoàn thành đã cộng (0 khi chưa xong hoặc có điểm đến bị bỏ qua). */
+        Integer completionBonusPoints,
+        /** PERFECT | COMPLETED | PARTIAL khi đã xong, null khi chưa xong (xem {@link Journey#completionRank()}). */
+        String completionRank
 ) {
     public static JourneyResponse fromEntity(Journey entity) {
         List<JourneyDestinationProgressResponse> destList = entity.getDestinations() != null
@@ -41,6 +45,8 @@ public record JourneyResponse(
                 .completedAt(entity.getCompletedAt())
                 .createdAt(entity.getCreatedAt())
                 .destinations(destList)
+                .completionBonusPoints(entity.completionBonusPoints())
+                .completionRank(entity.completionRank())
                 .build();
     }
 }

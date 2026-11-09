@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { ImagePlus, Loader2, Trash2, Star, Film, Link2, Upload, AlertCircle } from "lucide-react";
+import { ImagePlus, Loader2, Trash2, Star, Link2, Upload, AlertCircle } from "lucide-react";
 import { uploadMedia } from "../services/providerTourService";
 import { LIMITS, VIDEO_SOURCES } from "../constants";
+import VideoPreview from "./VideoPreview";
 
 /* ── Ô nhập có nhãn, gợi ý, lỗi ─────────────────────────────────────────── */
 
@@ -371,11 +372,6 @@ export function VideoField({ url, source, onChange, disabled }) {
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
             {busy ? "Đang tải video (có thể mất vài phút)…" : url ? "Đổi video" : "Chọn video ≤ 100MB"}
           </button>
-          {url && !busy && (
-            <a href={url} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-emerald-700 inline-flex items-center gap-1 hover:underline">
-              <Film size={12} /> Xem video đã tải
-            </a>
-          )}
         </div>
       ) : (
         <div className="relative">
@@ -387,6 +383,8 @@ export function VideoField({ url, source, onChange, disabled }) {
         </div>
       )}
       {error && <p className="text-[11px] font-bold text-rose-600">{error}</p>}
+      {/* Xem trước ngay dưới ô nhập: link YouTube / MP4 vừa dán hoặc video vừa tải lên */}
+      {!busy && <VideoPreview url={url} source={current} />}
     </div>
   );
 }

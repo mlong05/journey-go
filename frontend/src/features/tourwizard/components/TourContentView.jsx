@@ -8,6 +8,7 @@ import ItineraryView from "./ItineraryView";
 import StopsOverviewMap, { stopLocation, googleMapsUrl } from "./stops/StopsOverviewMap";
 import CheckpointMap from "./stops/CheckpointMap";
 import ExperienceQr from "./stops/ExperienceQr";
+import VideoPreview from "./VideoPreview";
 
 const money = (v) => (v == null ? "—" : `${Number(v).toLocaleString("vi-VN")} đ`);
 const fmtDate = (s) => { const [y, m, d] = (s || "").split("-"); return d ? `${d}/${m}/${y}` : s; };
@@ -197,10 +198,12 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
                   </Block>
                   <Block anchor={{ step: "STOPS", stopId: s.id, field: "culturalContent" }} label={`Điểm ${i + 1} – Nội dung văn hóa`}>
                     {s.videoUrl && (
-                      <a href={s.videoUrl} target="_blank" rel="noreferrer"
-                        className="mb-2 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline break-all">
-                        <Film size={13} className="shrink-0" />Video giới thiệu điểm đến
-                      </a>
+                      <div className="mb-3">
+                        <p className="text-xs font-bold text-slate-500 mb-1 inline-flex items-center gap-1">
+                          <Film size={13} className="shrink-0" />Video giới thiệu điểm đến
+                        </p>
+                        <VideoPreview url={s.videoUrl} source={s.videoSource} />
+                      </div>
                     )}
                     <p className="text-xs font-bold text-slate-500 mb-1">Câu chuyện (mở sau check-in)</p>
                     <p className="text-sm text-slate-700 whitespace-pre-line">{s.culturalContent || <i className="text-slate-400">Chưa nhập</i>}</p>

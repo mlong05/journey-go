@@ -8,7 +8,13 @@ export const themeService = {
   getAll: async () => list(await apiClient.get("/themes")),
   getDeleted: async () => list(await apiClient.get("/themes/deleted")),
   create: async ({ name, slug }) => data(await apiClient.post("/themes", { name: name.trim(), ...(slug ? { slug } : {}) })),
-  update: async (id, { name, slug }) => data(await apiClient.put(`/themes/${id}`, { name: name.trim(), ...(slug ? { slug } : {}) })),
+  // imageUrl / imageCredit: không truyền = giữ nguyên; "" = bỏ ảnh
+  update: async (id, { name, slug, imageUrl, imageCredit }) => data(await apiClient.put(`/themes/${id}`, {
+    name: name.trim(),
+    ...(slug ? { slug } : {}),
+    ...(imageUrl !== undefined ? { imageUrl } : {}),
+    ...(imageCredit !== undefined ? { imageCredit } : {}),
+  })),
   delete: async (id) => data(await apiClient.delete(`/themes/${id}`)),
   restore: async (id) => data(await apiClient.patch(`/themes/${id}/restore`, {})),
 };

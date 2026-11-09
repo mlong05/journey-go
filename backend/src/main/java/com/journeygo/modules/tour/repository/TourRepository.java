@@ -19,6 +19,9 @@ public interface TourRepository extends JpaRepository<Tour, Long>,
 
     Page<Tour> findAll(Pageable pageable);
 
+    /** Tour đã gửi duyệt trở đi — bản nháp là việc riêng của đối tác, kiểm duyệt viên không thấy. */
+    Page<Tour> findByStatusNot(com.journeygo.modules.tour.entity.enums.TourStatus status, Pageable pageable);
+
     Optional<Tour> findByTourId(Long tourId);
 
     Page<Tour> findByApprovedTrue(Pageable pageable);

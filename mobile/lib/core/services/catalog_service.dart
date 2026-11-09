@@ -6,13 +6,25 @@ class CatalogItem {
   final String name;
   final String slug;
 
-  const CatalogItem({required this.id, required this.name, required this.slug});
+  /// Ảnh đại diện (ảnh chụp thật, Admin tải lên); null thì trang chủ dùng ảnh bìa của một tour cùng danh mục.
+  final String? imageUrl;
 
-  factory CatalogItem.fromJson(Map<String, dynamic> json) => CatalogItem(
-        id: json['id'] is num ? (json['id'] as num).toInt() : int.tryParse('${json['id']}') ?? 0,
-        name: json['name']?.toString() ?? '',
-        slug: json['slug']?.toString() ?? '',
-      );
+  /// Ghi nguồn ảnh (tác giả · giấy phép) khi ảnh không phải của JourneyGo.
+  final String? imageCredit;
+
+  const CatalogItem({required this.id, required this.name, required this.slug, this.imageUrl, this.imageCredit});
+
+  factory CatalogItem.fromJson(Map<String, dynamic> json) {
+    final url = json['imageUrl']?.toString().trim();
+    final credit = json['imageCredit']?.toString().trim();
+    return CatalogItem(
+      id: json['id'] is num ? (json['id'] as num).toInt() : int.tryParse('${json['id']}') ?? 0,
+      name: json['name']?.toString() ?? '',
+      slug: json['slug']?.toString() ?? '',
+      imageUrl: (url != null && url.startsWith('https://')) ? url : null,
+      imageCredit: (credit == null || credit.isEmpty) ? null : credit,
+    );
+  }
 }
 
 /// Đọc danh mục vùng miền / chủ đề (GET công khai). Giữ trong bộ nhớ vì hiếm khi đổi.

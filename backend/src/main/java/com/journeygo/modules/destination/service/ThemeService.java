@@ -61,6 +61,8 @@ public class ThemeService {
         Theme theme = Theme.builder()
                 .name(request.name().trim())
                 .slug(slug)
+                .imageUrl(blankToNull(request.imageUrl()))
+                .imageCredit(blankToNull(request.imageCredit()))
                 .deleted(false)
                 .build();
 
@@ -84,6 +86,9 @@ public class ThemeService {
 
         theme.setName(request.name().trim());
         theme.setSlug(slug);
+        // null = giữ ảnh cũ (form đổi tên không gửi ảnh); chuỗi rỗng = bỏ ảnh
+        if (request.imageUrl() != null) theme.setImageUrl(blankToNull(request.imageUrl()));
+        if (request.imageCredit() != null) theme.setImageCredit(blankToNull(request.imageCredit()));
 
         Theme saved = themeRepository.save(theme);
         log.info("Updated theme id={}", saved.getId());
@@ -108,6 +113,10 @@ public class ThemeService {
         Theme saved = themeRepository.save(theme);
         log.info("Restored theme id={}", saved.getId());
         return ThemeResponse.fromEntity(saved);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private Theme findOrThrow(Long id) {
