@@ -55,7 +55,7 @@ export default function TaskTypeCatalogCard() {
           className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer self-start sm:self-auto transition-colors"
         >
           <Layers size={14} />
-          <span>Quản lý / Thêm mới</span>
+          <span>Quản lý</span>
         </button>
       </div>
 
@@ -84,16 +84,7 @@ export default function TaskTypeCatalogCard() {
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="font-bold text-slate-900 text-xs">{task.name}</h4>
-                  <button
-                    type="button"
-                    onClick={openModal}
-                    className="shrink-0 text-[11px] font-bold text-violet-700 hover:underline cursor-pointer"
-                  >
-                    Chỉnh sửa
-                  </button>
-                </div>
+                <h4 className="font-bold text-slate-900 text-xs">{task.name}</h4>
 
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
                   <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">

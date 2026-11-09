@@ -11,12 +11,9 @@ const validPoint = (e) =>
   e && e.checkpointLatitude != null && e.checkpointLongitude != null
   && Number.isFinite(Number(e.checkpointLatitude)) && Number.isFinite(Number(e.checkpointLongitude));
 
-/** Mọi trải nghiệm thực tế của điểm đến (nằm trong các nhiệm vụ), theo thứ tự nhiệm vụ. */
-export const stopExperiences = (stop) => (stop?.tasks || []).flatMap((t) => t.experiences || []);
-
 /** Vị trí đại diện của điểm đến = checkpoint của trải nghiệm đầu tiên có tọa độ. */
 export function stopLocation(stop) {
-  const e = stopExperiences(stop).find(validPoint);
+  const e = (stop?.experiences || []).find(validPoint);
   return e ? { lat: Number(e.checkpointLatitude), lng: Number(e.checkpointLongitude) } : null;
 }
 
@@ -35,7 +32,7 @@ export default function StopsOverviewMap({ stops = [] }) {
   const points = useMemo(
     () => stops
       .map((s, i) => ({ index: i + 1, name: s.name || "Chưa đặt tên", loc: stopLocation(s),
-        checkpoints: stopExperiences(s).filter(validPoint).map((e) => ({
+        checkpoints: (s.experiences || []).filter(validPoint).map((e) => ({
           lat: Number(e.checkpointLatitude), lng: Number(e.checkpointLongitude), name: e.activityName,
         })) }))
       .filter((p) => p.loc),

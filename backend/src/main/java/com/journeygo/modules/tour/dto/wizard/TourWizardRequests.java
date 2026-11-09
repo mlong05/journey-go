@@ -35,7 +35,7 @@ public final class TourWizardRequests {
             @Size(max = 80, message = "Tên tour tối đa 80 ký tự") String title,
             @Schema(description = "DAY_TRIP (trong ngày) hoặc MULTI_DAY (nhiều ngày)") TourFormat tourFormat,
             @Schema(description = "Thời lượng tour trong ngày (phút), ví dụ 270 = 4 giờ 30 phút")
-            @Min(value = 1, message = "Thời lượng phải lớn hơn 0") @Max(value = 1440, message = "Tour trong ngày tối đa 24 giờ")
+            @Min(value = 1, message = "Thời lượng phải lớn hơn 0") @Max(value = 1439, message = "Tour trong ngày phải dưới 24 giờ")
             Integer durationMinutes,
             @Min(value = 1, message = "Số ngày phải lớn hơn 0") @Max(value = 60) Integer durationDays,
             @Min(value = 0, message = "Số đêm không được âm") @Max(value = 60) Integer durationNights,
@@ -94,13 +94,14 @@ public final class TourWizardRequests {
             @Schema(description = "Đáp án đúng") Boolean correct
     ) {}
 
-    @Schema(description = "Câu hỏi trắc nghiệm 4 đáp án, đúng 1 đáp án đúng")
+    @Schema(description = "Câu hỏi. Quiz luôn là trắc nghiệm; câu hỏi sau trải nghiệm luôn là nhập chữ (trường type bị bỏ qua)")
     public record QuestionItem(
-            @Schema(description = "MULTIPLE_CHOICE (mặc định) hoặc TEXT (tự luận)")
+            @Schema(description = "Không dùng — dạng câu hỏi cố định theo vị trí câu hỏi")
             QuestionType type,
             @Size(max = 2000) String content,
+            @Schema(description = "Quiz (trắc nghiệm): đúng 4 đáp án, 1 đáp án đúng")
             @Valid @Size(max = 4, message = "Mỗi câu hỏi có đúng 4 đáp án") List<AnswerItem> answers,
-            @Schema(description = "Câu tự luận: đáp án gợi ý (không bắt buộc)")
+            @Schema(description = "Câu hỏi sau trải nghiệm (nhập chữ): đáp án đúng; nhiều đáp án chấp nhận cách nhau bằng dấu ;")
             @Size(max = 2000) String referenceAnswer
     ) {}
 
@@ -122,15 +123,10 @@ public final class TourWizardRequests {
             @Min(value = 10, message = "Bán kính tối thiểu 10m") @Max(value = 500, message = "Bán kính tối đa 500m") Integer radiusMeters,
             @Schema(description = "Thời gian trải nghiệm (giây), hết giờ thì hiện câu hỏi")
             @Min(value = 1, message = "Thời gian trải nghiệm phải lớn hơn 0") @Max(value = 86400) Integer durationSeconds,
+            @Schema(description = "Mã QR xác nhận hoàn thành (JGE- + 16 ký tự hex). Gửi lại mã cũ để giữ QR đã in; để trống thì sinh mã mới")
+            @Size(max = 40) String qrToken,
+            @Schema(description = "Câu hỏi sau trải nghiệm (nhập chữ)")
             @Valid QuestionItem question
-    ) {}
-
-    @Schema(description = "Nhiệm vụ của điểm đến: gồm quiz và trải nghiệm thực tế")
-    public record TaskItem(
-            @Size(max = 200) String title,
-            @Size(max = 2000) String description,
-            @Valid @Size(max = 4, message = "Quiz tối đa 4 câu") List<QuestionItem> quiz,
-            @Valid @Size(max = 5, message = "Tối đa 5 trải nghiệm thực tế mỗi nhiệm vụ") List<ExperienceItem> experiences
     ) {}
 
     @Schema(description = "Một điểm đến của tour. Có id = cập nhật điểm đến đã có; không có id = thêm mới")
@@ -147,8 +143,10 @@ public final class TourWizardRequests {
             @Size(max = 20000) String culturalContent,
             @Size(max = 20) List<@Size(max = 1000) String> culturalImages,
             @Valid @Size(max = 20) List<ArtifactItem> artifacts,
-            @Schema(description = "Nhiệm vụ của điểm đến (1–5 khi gửi duyệt)")
-            @Valid @Size(max = 5, message = "Tối đa 5 nhiệm vụ mỗi điểm đến") List<TaskItem> tasks
+            @Schema(description = "Quiz — câu hỏi trắc nghiệm (1–4 câu khi gửi duyệt)")
+            @Valid @Size(max = 4, message = "Quiz tối đa 4 câu") List<QuestionItem> quiz,
+            @Schema(description = "Trải nghiệm thực tế (1–5 khi gửi duyệt)")
+            @Valid @Size(max = 5, message = "Tối đa 5 trải nghiệm thực tế mỗi điểm đến") List<ExperienceItem> experiences
     ) {}
 
     @Schema(description = "Bước 3 — Danh sách điểm đến theo thứ tự (thứ tự trong mảng = thứ tự kéo thả)")

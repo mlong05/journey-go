@@ -6,14 +6,14 @@ import RewardSettingsCard from "@/features/catalog/components/RewardSettingsCard
 
 /**
  * Cấu hình trải nghiệm và điểm thưởng (ADMIN).
- *  - Điểm mỗi nhiệm vụ của tour — backend /api/v1/reward-settings (TOUR_TASK)
+ *  - Điểm mỗi câu quiz và mỗi trải nghiệm thực tế của tour — backend /api/v1/reward-settings
  *  - Loại nhiệm vụ trải nghiệm thực địa — backend /api/v1/task-types
  */
 export default function AdminExperienceRewardsPage() {
   return (
     <div className="space-y-4">
       <PageHeader eyebrow="Danh mục" title="Cấu Hình Trải Nghiệm Và Điểm Thưởng"
-        description="Đặt số điểm thưởng khách nhận được khi hoàn thành mỗi nhiệm vụ (gồm câu hỏi quiz và trải nghiệm thực tế), và quản lý các loại nhiệm vụ." />
+        description="Đặt điểm thưởng cho mỗi câu hỏi trắc nghiệm và mỗi trải nghiệm thực tế của tour, và quản lý các loại nhiệm vụ." />
       <RewardSettingsCard />
       <TaskTypeCatalogCard />
     </div>

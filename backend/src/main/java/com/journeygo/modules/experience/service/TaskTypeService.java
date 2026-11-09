@@ -7,8 +7,6 @@ import com.journeygo.modules.experience.entity.TaskType;
 import com.journeygo.modules.experience.entity.enums.VerificationMethod;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
-import com.journeygo.modules.experience.entity.PointRule;
-import com.journeygo.modules.experience.repository.PointRuleRepository;
 import com.journeygo.modules.experience.repository.TaskTypeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,8 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -25,37 +21,16 @@ import java.util.stream.Collectors;
 public class TaskTypeService {
 
     private final TaskTypeRepository taskTypeRepository;
-    private final PointRuleRepository pointRuleRepository;
 
 
     @Transactional(readOnly = true)
     public List<TaskTypeResponse> list() {
-        Map<Long, Integer> points = basePointsByTaskType();
-        return taskTypeRepository.findAll().stream()
-                .map(t -> TaskTypeResponse.fromEntity(t, points.get(t.getId())))
-                .toList();
+        return taskTypeRepository.findAll().stream().map(TaskTypeResponse::fromEntity).toList();
     }
 
     @Transactional(readOnly = true)
     public TaskTypeResponse getById(Long id) {
-        return TaskTypeResponse.fromEntity(findOrThrow(id), basePointsFor(id));
-    }
-
-    /** Điểm thưởng mỗi nhiệm vụ thuộc loại này (PointRule.basePoints); 0 nếu Admin chưa cấu hình. */
-    @Transactional(readOnly = true)
-    public int basePointsFor(Long taskTypeId) {
-        if (taskTypeId == null) return 0;
-        return pointRuleRepository.findByTaskTypeId(taskTypeId)
-                .map(PointRule::getBasePoints)
-                .orElse(0);
-    }
-
-    /** taskTypeId → basePoints cho mọi loại đã có PointRule. */
-    @Transactional(readOnly = true)
-    public Map<Long, Integer> basePointsByTaskType() {
-        return pointRuleRepository.findAll().stream()
-                .filter(pr -> pr.getTaskType() != null && pr.getBasePoints() != null)
-                .collect(Collectors.toMap(pr -> pr.getTaskType().getId(), PointRule::getBasePoints, (a, b) -> a));
+        return TaskTypeResponse.fromEntity(findOrThrow(id));
     }
 
     @Transactional(readOnly = true)

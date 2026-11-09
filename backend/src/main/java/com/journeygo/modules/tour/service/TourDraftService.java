@@ -237,57 +237,46 @@ public class TourDraftService {
                     .build());
         }
 
-        stop.getTasks().clear();
-        int t = 1;
-        for (TourWizardRequests.TaskItem taskItem : nullSafe(item.tasks())) {
-            stop.getTasks().add(buildTask(taskItem, stop, t++));
-        }
-    }
-
-    /** Nhiệm vụ = quiz + trải nghiệm thực tế. */
-    private TourStopTask buildTask(TourWizardRequests.TaskItem item, TourStop stop, int order) {
-        TourStopTask task = TourStopTask.builder()
-                .stop(stop).sequenceOrder(order)
-                .title(trimToNull(item.title()))
-                .description(trimToNull(item.description()))
-                .build();
-
+        // Quiz: luôn trắc nghiệm (4 đáp án, 1 đúng).
+        stop.getQuizQuestions().clear();
         int q = 1;
         for (TourWizardRequests.QuestionItem question : nullSafe(item.quiz())) {
-            TourStopQuestion entity = buildQuestion(question, StopQuestionKind.QUIZ, q++);
-            entity.setTask(task);
-            task.getQuizQuestions().add(entity);
+            TourStopQuestion entity = buildQuestion(question, StopQuestionKind.QUIZ, QuestionType.MULTIPLE_CHOICE, q++);
+            entity.setStop(stop);
+            stop.getQuizQuestions().add(entity);
         }
 
+        // Trải nghiệm thực tế: câu hỏi sau trải nghiệm luôn là nhập chữ (có đáp án đúng).
+        stop.getExperiences().clear();
         int e = 1;
         for (TourWizardRequests.ExperienceItem experience : nullSafe(item.experiences())) {
             TourStopExperience entity = TourStopExperience.builder()
-                    .stop(stop).task(task).sequenceOrder(e++)
+                    .stop(stop).sequenceOrder(e++)
                     .activityName(trimToNull(experience.activityName()))
                     .checkpointLatitude(experience.checkpointLatitude())
                     .checkpointLongitude(experience.checkpointLongitude())
                     .radiusMeters(experience.radiusMeters() == null
                             ? TourStopExperience.DEFAULT_RADIUS_METERS : experience.radiusMeters())
                     .durationSeconds(experience.durationSeconds())
+                    .qrToken(TourStopExperience.keepOrNewQrToken(experience.qrToken()))
                     .build();
             if (experience.question() != null) {
-                TourStopQuestion question = buildQuestion(experience.question(), StopQuestionKind.POST_EXPERIENCE, 1);
+                TourStopQuestion question = buildQuestion(experience.question(), StopQuestionKind.POST_EXPERIENCE,
+                        QuestionType.TEXT, 1);
                 question.setExperience(entity);
                 entity.getQuestions().add(question);
             }
-            task.getExperiences().add(entity);
+            stop.getExperiences().add(entity);
         }
-        return task;
     }
 
-    private TourStopQuestion buildQuestion(TourWizardRequests.QuestionItem item, StopQuestionKind kind, int order) {
-        // Quiz điểm đến và câu hỏi sau trải nghiệm đều chọn được trắc nghiệm hoặc tự luận.
-        QuestionType type = item.type() == QuestionType.TEXT ? QuestionType.TEXT : QuestionType.MULTIPLE_CHOICE;
+    private TourStopQuestion buildQuestion(TourWizardRequests.QuestionItem item, StopQuestionKind kind,
+                                           QuestionType type, int order) {
         TourStopQuestion question = TourStopQuestion.builder()
                 .kind(kind).questionType(type).sequenceOrder(order).content(trimToNull(item.content()))
                 .referenceAnswer(type == QuestionType.TEXT ? trimToNull(item.referenceAnswer()) : null)
                 .build();
-        if (type == QuestionType.TEXT) return question; // tự luận: không có đáp án lựa chọn
+        if (type == QuestionType.TEXT) return question; // nhập chữ: không có đáp án lựa chọn
         int n = 1;
         for (TourWizardRequests.AnswerItem answer : nullSafe(item.answers())) {
             question.getAnswers().add(TourStopAnswer.builder()
@@ -516,16 +505,11 @@ public class TourDraftService {
                 s.getCulturalContent(), List.copyOf(s.getCulturalImages()),
                 s.getArtifacts().stream().map(a -> new TourWizardRequests.ArtifactItem(a.getName(), a.getImageUrl(),
                         a.getShortDescription(), a.getVideoUrl(), a.getVideoSource())).toList(),
-                s.getTasks().stream().map(TourDraftService::toTaskItem).toList());
-    }
-
-    private static TourWizardRequests.TaskItem toTaskItem(TourStopTask t) {
-        return new TourWizardRequests.TaskItem(
-                t.getTitle(), t.getDescription(),
-                t.getQuizQuestions().stream().map(TourDraftService::toQuestionItem).toList(),
-                t.getExperiences().stream().map(e -> new TourWizardRequests.ExperienceItem(e.getActivityName(),
+                s.getQuizQuestions().stream().map(TourDraftService::toQuestionItem).toList(),
+                s.getExperiences().stream().map(e -> new TourWizardRequests.ExperienceItem(e.getActivityName(),
                         e.getCheckpointLatitude(), e.getCheckpointLongitude(), e.getRadiusMeters(),
-                        e.getDurationSeconds(), e.getQuestion() == null ? null : toQuestionItem(e.getQuestion())))
+                        e.getDurationSeconds(), null, // tour nhân bản: mã QR mới, không dùng chung QR với tour gốc
+                        e.getQuestion() == null ? null : toQuestionItem(e.getQuestion())))
                         .toList());
     }
 

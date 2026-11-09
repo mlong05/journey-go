@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Field, TextInput, TextArea, SingleImage, ImageStrip, VideoField } from "../FormKit";
-import TaskListEditor from "./TaskListEditor";
+import StopActivitiesEditor from "./StopActivitiesEditor";
 
 let keySeq = 0;
 export const newKey = () => `k${Date.now().toString(36)}${(keySeq++).toString(36)}`;
@@ -18,7 +18,7 @@ export const emptyArtifact = () => ({ _key: newKey(), name: "", imageUrl: "", sh
 const TABS = [
   { key: "info", label: "Thông tin", Icon: Info, fields: ["name", "shortDescription", "guestNote", "imageUrl"] },
   { key: "culture", label: "Nội dung văn hóa", Icon: BookOpen, fields: ["videoUrl", "videoSource", "culturalContent", "culturalImages", "artifacts"] },
-  { key: "experience", label: "Trải nghiệm", Icon: Gamepad2, fields: ["tasks"] },
+  { key: "experience", label: "Trải nghiệm", Icon: Gamepad2, fields: ["quiz", "experiences"] },
 ];
 
 /** `field` là chính `path` hoặc nằm bên trong nó ("artifacts[0].name" thuộc "artifacts" / "artifacts[0]"). */
@@ -30,14 +30,17 @@ const tabOfField = (field) => TABS.findIndex((t) => t.fields.some((p) => within(
  * Chỉnh sửa trên bản nháp riêng; "Lưu & tiếp tục" ghi lên máy chủ, kiểm tra lại,
  * và chỉ sang bước sau khi bước hiện tại không còn lỗi.
  * onSave(stop) → Promise<{ ok, issues }> (issues: danh sách lỗi mới nhất của cả tour, hoặc null).
- * stopErr(field) trả lỗi backend của điểm đến này (field như "tasks[0].quiz[0].answers").
+ * stopErr(field) trả lỗi backend của điểm đến này (field như "quiz[0].answers").
+ * rewardPoints: { quizPerQuestion, perExperience } — điểm Admin cấu hình, chỉ hiển thị.
  */
-export default function StopDrawer({ stop: savedStop, index, onSave, onClose, readOnly, taskPoints, stopErr: serverErr }) {
+export default function StopDrawer({ stop: savedStop, index, onSave, onClose, readOnly, rewardPoints, stopErr: serverErr }) {
   const [tab, setTab] = useState("info");
   const [stop, setDraft] = useState(savedStop);
   const [dirty, setDirty] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved | error
   const [stepNotice, setStepNotice] = useState("");
+  // Còn form câu hỏi / trải nghiệm đang soạn (chưa bấm "Lưu câu hỏi" / "Lưu trải nghiệm").
+  const [activityFormOpen, setActivityFormOpen] = useState(false);
   // Các ô đã sửa từ lần lưu gần nhất: ẩn lỗi cũ của máy chủ cho tới khi lưu và kiểm tra lại.
   const [touched, setTouched] = useState(() => new Set());
   const bodyRef = useRef(null);
@@ -62,6 +65,10 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
   /** Lưu bản nháp; nếu có `target` thì sang bước đó khi các bước trước không còn lỗi. */
   const saveAndGo = async (target = null) => {
     if (readOnly || saveStatus === "saving") return;
+    if (activityFormOpen) {
+      setStepNotice("Bạn còn câu hỏi / trải nghiệm đang soạn — bấm \"Lưu\" hoặc \"Hủy\" trong form đó trước.");
+      return;
+    }
     setSaveStatus("saving");
     setStepNotice("");
     const { ok, issues } = await onSave(stop);
@@ -95,7 +102,7 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
   };
 
   const requestClose = async () => {
-    if (dirty && !readOnly) {
+    if ((dirty || activityFormOpen) && !readOnly) {
       const discard = await confirm({
         tone: "danger", title: "Đóng mà không lưu?", subject: stop.name || `Điểm đến ${index + 1}`,
         description: "Các thay đổi chưa bấm Lưu của điểm đến này sẽ bị bỏ.",
@@ -239,10 +246,12 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
         {tab === "experience" && (
           <>
             <p className="text-[11px] text-slate-500">
-              Mỗi điểm đến gồm các <b>nhiệm vụ</b>. Thứ tự trên app trong mỗi nhiệm vụ: <b>Câu hỏi quiz</b> → <b>Trải nghiệm thực tế</b> (hết giờ thì hiện câu hỏi sau trải nghiệm). Mỗi câu hỏi chọn dạng <b>Trắc nghiệm</b> hoặc <b>Tự luận</b>. Điểm thưởng mỗi nhiệm vụ do Admin cấu hình, hiển thị để tham khảo.
+              Thứ tự trên app: <b>Câu hỏi (quiz)</b> → <b>Trải nghiệm thực tế</b>. Quiz chỉ là câu <b>trắc nghiệm</b>. Trải nghiệm thực tế: đến <b>checkpoint</b> → <b>đếm ngược</b> → quét <b>mã QR</b> tại điểm → trả lời câu hỏi <b>tự luận</b> (khách nhập chữ). Bấm <b>Thêm</b> để soạn từng mục. Điểm thưởng do Admin cấu hình, hiển thị để tham khảo.
             </p>
-            <TaskListEditor tasks={stop.tasks} readOnly={readOnly} stopName={stop.name} stopErr={stopErr} taskPoints={taskPoints}
-              onChange={(tasks, paths) => set({ tasks }, paths)} />
+            <StopActivitiesEditor stop={stop} readOnly={readOnly} stopErr={stopErr}
+              quizPoints={rewardPoints?.quizPerQuestion} experiencePoints={rewardPoints?.perExperience}
+              onEditingChange={setActivityFormOpen}
+              onChange={(patch, paths) => set(patch, paths)} />
           </>
         )}
       </div>

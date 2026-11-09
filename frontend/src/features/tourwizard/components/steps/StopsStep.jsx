@@ -4,7 +4,7 @@ import React, { useRef, useState } from "react";
 import { Plus, GripVertical, ChevronUp, ChevronDown, Trash2, AlertCircle, MapPin } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import StopDrawer, { newKey } from "../stops/StopDrawer";
-import { taskFromServer, taskBody } from "../stops/TaskListEditor";
+import { normalizeQuestion, questionBody } from "../stops/QuestionEditor";
 import { issueFor } from "../../hooks/useTourDraft";
 
 /* ── Chuyển đổi dữ liệu server <-> form ─────────────────────────────────── */
@@ -23,13 +23,25 @@ const stopFromServer = (s) => ({
   artifacts: (s.artifacts || []).map((a) => ({
     _key: newKey(), name: a.name || "", imageUrl: a.imageUrl || "", shortDescription: a.shortDescription || "",
   })),
-  tasks: (s.tasks || []).map(taskFromServer),
+  quiz: (s.quiz || []).map((q) => ({ ...normalizeQuestion(q), _key: newKey() })),
+  experiences: (s.experiences || []).map((e) => ({
+    _key: newKey(),
+    activityName: e.activityName || "",
+    checkpointLatitude: e.checkpointLatitude ?? null,
+    checkpointLongitude: e.checkpointLongitude ?? null,
+    radiusMeters: e.radiusMeters ?? 50,
+    durationSeconds: e.durationSeconds ?? null,
+    qrToken: e.qrToken || null,
+    question: normalizeQuestion(e.question),
+  })),
 });
 
 const emptyStop = () => ({
   _key: newKey(), id: null, name: "", shortDescription: "", guestNote: "", imageUrl: "",
   videoUrl: "", videoSource: "YOUTUBE", culturalContent: "", culturalImages: [], artifacts: [],
-  tasks: [],
+  // Điểm đến mới chưa có câu hỏi / trải nghiệm nào — đối tác bấm "Thêm" để soạn từng mục.
+  quiz: [],
+  experiences: [],
 });
 
 const stopsBody = (stops) => ({
@@ -45,7 +57,8 @@ const stopsBody = (stops) => ({
     culturalImages: s.culturalImages,
     // Video đã chuyển lên cấp điểm đến — cổ vật không còn video riêng.
     artifacts: s.artifacts.map(({ _key, ...a }) => ({ ...a, videoUrl: null, videoSource: null })),
-    tasks: (s.tasks || []).map(taskBody),
+    quiz: s.quiz.map(questionBody),
+    experiences: s.experiences.map(({ _key, question, ...e }) => ({ ...e, question: question ? questionBody(question) : null })),
   })),
 });
 
@@ -107,7 +120,7 @@ export default function StopsStep({ tour, issues, readOnly, onSave, onFlush, onV
     const ok = await confirm({
       tone: "danger", icon: "trash", title: "Xóa điểm đến này?",
       subject: stops[i].name || `Điểm đến ${i + 1}`,
-      description: "Toàn bộ nội dung văn hóa, cổ vật và các nhiệm vụ (quiz, trải nghiệm) của điểm đến sẽ bị xóa.",
+      description: "Toàn bộ nội dung văn hóa, cổ vật, quiz và trải nghiệm của điểm đến sẽ bị xóa.",
       confirmLabel: "Xóa điểm đến",
     });
     if (!ok) return;
@@ -118,7 +131,8 @@ export default function StopsStep({ tour, issues, readOnly, onSave, onFlush, onV
   const openIndex = stops.findIndex((s) => s._key === openKey);
   const stopErrAt = (i) => (field) => issueFor(issues, "STOPS", field, i);
   const stopHasError = (i) => (issues || []).some((x) => x.step === "STOPS" && x.stopIndex === i);
-  const listError = issueFor(issues, "STOPS", "stops") || issueFor(issues, "STOPS", "rewardPoints");
+  const listError = issueFor(issues, "STOPS", "stops");
+  const rewardError = issueFor(issues, "STOPS", "rewardPoints");
 
   return (
     <div className="space-y-4">
@@ -136,8 +150,8 @@ export default function StopsStep({ tour, issues, readOnly, onSave, onFlush, onV
         )}
       </div>
 
-      {listError && (
-        <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1"><AlertCircle size={12} />{listError}</p>
+      {(listError || rewardError) && (
+        <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1"><AlertCircle size={12} />{listError || rewardError}</p>
       )}
 
       {stops.length === 0 ? (
@@ -183,8 +197,8 @@ export default function StopsStep({ tour, issues, readOnly, onSave, onFlush, onV
           stop={stops[openIndex]}
           index={openIndex}
           readOnly={readOnly}
+          rewardPoints={tour.rewardPoints}
           stopErr={stopErrAt(openIndex)}
-          taskPoints={tour.rewardPoints?.perTask}
           onClose={() => setOpenKey(null)}
           onSave={saveStop}
         />

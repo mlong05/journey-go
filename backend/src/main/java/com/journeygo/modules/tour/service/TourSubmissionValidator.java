@@ -1,9 +1,9 @@
 package com.journeygo.modules.tour.service;
 
-import com.journeygo.modules.reward.entity.RewardSettingCode;
-import com.journeygo.modules.reward.service.RewardSettingService;
 import com.journeygo.modules.providerprofile.entity.ProviderProfile;
 import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
+import com.journeygo.modules.reward.entity.RewardSettingCode;
+import com.journeygo.modules.reward.service.RewardSettingService;
 import com.journeygo.modules.tour.dto.wizard.TourValidationIssue;
 import com.journeygo.modules.tour.entity.*;
 import lombok.RequiredArgsConstructor;
@@ -31,12 +31,12 @@ public class TourSubmissionValidator {
     public static final int HIGHLIGHTS_MIN = 3;
     public static final int HIGHLIGHTS_MAX = 5;
     public static final int IMAGES_MIN = 5;
+    /** Tour trong ngày phải dưới 24 giờ (tối đa 23 giờ 59 phút). */
+    public static final int DAY_TRIP_MAX_MINUTES = 24 * 60;
     public static final int QUIZ_MIN = 1;
     public static final int QUIZ_MAX = 4;
     public static final int EXPERIENCES_MIN = 1;
     public static final int EXPERIENCES_MAX = 5;
-    public static final int TASKS_MIN = 1;
-    public static final int TASKS_MAX = 5;
     public static final int RADIUS_MIN = 10;
     public static final int RADIUS_MAX = 500;
 
@@ -98,6 +98,9 @@ public class TourSubmissionValidator {
         } else if (tour.getTourFormat() == TourFormat.DAY_TRIP) {
             if (tour.getDurationMinutes() == null || tour.getDurationMinutes() <= 0) {
                 issues.add(TourValidationIssue.of(step, "durationMinutes", "Vui lòng nhập thời lượng tour"));
+            } else if (tour.getDurationMinutes() >= DAY_TRIP_MAX_MINUTES) {
+                issues.add(TourValidationIssue.of(step, "durationMinutes",
+                        "Tour trong ngày phải dưới 24 giờ — tour dài hơn hãy chọn \"Nhiều ngày\""));
             }
         } else {
             Integer days = tour.getDurationDays() > 0 ? tour.getDurationDays() : null;
@@ -201,38 +204,27 @@ public class TourSubmissionValidator {
                 }
             }
 
-            int taskCount = stop.getTasks().size();
-            if (taskCount < TASKS_MIN || taskCount > TASKS_MAX) {
-                issues.add(TourValidationIssue.stop(i, "tasks", "Cần từ " + TASKS_MIN + " đến " + TASKS_MAX + " nhiệm vụ"));
+            int quizCount = stop.getQuizQuestions().size();
+            if (quizCount < QUIZ_MIN || quizCount > QUIZ_MAX) {
+                issues.add(TourValidationIssue.stop(i, "quiz", "Quiz cần từ " + QUIZ_MIN + " đến " + QUIZ_MAX + " câu"));
             }
-            for (int t = 0; t < taskCount; t++) {
-                validateTask(stop.getTasks().get(t), i, "tasks[" + t + "]", issues);
+            for (int q = 0; q < quizCount; q++) {
+                TourStopQuestion question = stop.getQuizQuestions().get(q);
+                if (question.isTextQuestion()) {
+                    issues.add(TourValidationIssue.stop(i, "quiz[" + q + "]", "Câu hỏi quiz phải là trắc nghiệm"));
+                    continue;
+                }
+                validateQuestion(question, i, "quiz[" + q + "]", issues);
             }
-        }
-    }
 
-    /** Nhiệm vụ: tên, quiz 1–4 câu, trải nghiệm thực tế 1–5. */
-    private void validateTask(TourStopTask task, int stopIndex, String path, List<TourValidationIssue> issues) {
-        if (isBlank(task.getTitle())) {
-            issues.add(TourValidationIssue.stop(stopIndex, path + ".title", "Vui lòng nhập tên nhiệm vụ"));
-        }
-
-        int quizCount = task.getQuizQuestions().size();
-        if (quizCount < QUIZ_MIN || quizCount > QUIZ_MAX) {
-            issues.add(TourValidationIssue.stop(stopIndex, path + ".quiz",
-                    "Quiz cần từ " + QUIZ_MIN + " đến " + QUIZ_MAX + " câu"));
-        }
-        for (int q = 0; q < quizCount; q++) {
-            validateQuestion(task.getQuizQuestions().get(q), stopIndex, path + ".quiz[" + q + "]", issues);
-        }
-
-        int experienceCount = task.getExperiences().size();
-        if (experienceCount < EXPERIENCES_MIN || experienceCount > EXPERIENCES_MAX) {
-            issues.add(TourValidationIssue.stop(stopIndex, path + ".experiences",
-                    "Cần từ " + EXPERIENCES_MIN + " đến " + EXPERIENCES_MAX + " trải nghiệm thực tế"));
-        }
-        for (int e = 0; e < experienceCount; e++) {
-            validateExperience(task.getExperiences().get(e), stopIndex, path + ".experiences[" + e + "]", issues);
+            int experienceCount = stop.getExperiences().size();
+            if (experienceCount < EXPERIENCES_MIN || experienceCount > EXPERIENCES_MAX) {
+                issues.add(TourValidationIssue.stop(i, "experiences",
+                        "Cần từ " + EXPERIENCES_MIN + " đến " + EXPERIENCES_MAX + " trải nghiệm thực tế"));
+            }
+            for (int e = 0; e < experienceCount; e++) {
+                validateExperience(stop.getExperiences().get(e), i, "experiences[" + e + "]", issues);
+            }
         }
     }
 
@@ -252,8 +244,11 @@ public class TourSubmissionValidator {
         if (exp.getDurationSeconds() == null || exp.getDurationSeconds() <= 0) {
             issues.add(TourValidationIssue.stop(stopIndex, path + ".durationSeconds", "Vui lòng nhập thời gian trải nghiệm"));
         }
+        // Câu hỏi sau trải nghiệm: đúng 1 câu, khách nhập chữ, có đáp án đúng.
         if (exp.getQuestions().size() != 1) {
             issues.add(TourValidationIssue.stop(stopIndex, path + ".question", "Cần đúng 1 câu hỏi sau trải nghiệm"));
+        } else if (!exp.getQuestion().isTextQuestion()) {
+            issues.add(TourValidationIssue.stop(stopIndex, path + ".question", "Câu hỏi sau trải nghiệm phải là dạng nhập chữ"));
         } else {
             validateQuestion(exp.getQuestion(), stopIndex, path + ".question", issues);
         }
@@ -263,7 +258,12 @@ public class TourSubmissionValidator {
         if (isBlank(question.getContent())) {
             issues.add(TourValidationIssue.stop(stopIndex, path + ".content", "Vui lòng nhập nội dung câu hỏi"));
         }
-        if (question.isTextQuestion()) return; // tự luận: chỉ cần nội dung câu hỏi
+        if (question.isTextQuestion()) {
+            if (TextAnswerMatcher.acceptedAnswers(question.getReferenceAnswer()).isEmpty()) {
+                issues.add(TourValidationIssue.stop(stopIndex, path + ".referenceAnswer", "Vui lòng nhập đáp án đúng"));
+            }
+            return;
+        }
         List<TourStopAnswer> answers = question.getAnswers();
         if (answers.size() != TourStopQuestion.ANSWER_COUNT || answers.stream().anyMatch(a -> isBlank(a.getContent()))) {
             issues.add(TourValidationIssue.stop(stopIndex, path + ".answers", "Câu hỏi cần đủ 4 đáp án"));
