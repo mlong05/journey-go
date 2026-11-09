@@ -5,11 +5,12 @@ import { Gift, Loader2, Save, CheckCircle2 } from "lucide-react";
 import { rewardSettingService } from "../services/catalogAdminService";
 
 const EXAMPLE = {
-  TOUR_TASK: (p) => `Điểm đến có 3 nhiệm vụ ⇒ mỗi nhiệm vụ ${p} điểm, tối đa ${p * 3} điểm. Khách hoàn thành nhiệm vụ (quiz và trải nghiệm thực tế) thì nhận điểm.`,
+  QUIZ_QUESTION: (p) => `Đối tác tạo 4 câu quiz ⇒ mỗi câu ${p} điểm, tối đa ${p * 4} điểm. Khách trả lời đúng câu nào nhận điểm câu đó.`,
+  REAL_WORLD_EXPERIENCE: (p) => `Đối tác tạo 3 trải nghiệm ⇒ mỗi trải nghiệm ${p} điểm, tối đa ${p * 3} điểm. Khách hoàn thành và trả lời đúng câu hỏi thì nhận điểm.`,
 };
 
 /**
- * Quản lý điểm thưởng (Admin): điểm mỗi nhiệm vụ của điểm đến (gồm quiz và trải nghiệm thực tế).
+ * Quản lý điểm thưởng (Admin): điểm mỗi câu quiz và mỗi trải nghiệm thực tế.
  * Đối tác chỉ xem (hiển thị mờ); điểm được chốt vào tour khi Moderator duyệt.
  */
 export default function RewardSettingsCard() {
@@ -58,7 +59,7 @@ export default function RewardSettingsCard() {
           <h3 className="text-sm font-bold text-slate-900">Quản Lý Điểm Thưởng Tour</h3>
         </div>
         <p className="text-xs text-slate-400 mt-0.5">
-          Áp dụng cho mỗi nhiệm vụ của điểm đến (gồm câu hỏi quiz và trải nghiệm thực tế). Điểm được chốt vào tour khi Moderator duyệt. Đối tác thấy điểm khi tạo tour nhưng không sửa được.
+          Áp dụng cho quiz và trải nghiệm thực tế trong tour. Đối tác thấy điểm khi tạo tour nhưng không sửa được.
         </p>
       </div>
 

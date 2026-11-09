@@ -45,10 +45,12 @@ export const questionBody = (q) => (q.type === "TEXT"
  * Soạn một câu hỏi.
  * - Trắc nghiệm: 4 đáp án, chọn đúng 1 đáp án đúng.
  * - Tự luận (khi allowTypes): khách nhập câu trả lời; đối tác ghi đáp án gợi ý nếu muốn.
+ * - fixedType ("MULTIPLE_CHOICE" | "TEXT"): dạng do loại nhiệm vụ quyết định, không cho đổi.
+ *   Dạng nhập chữ khi đó bắt buộc "Đáp án đúng" (nhiều đáp án chấp nhận cách nhau bằng dấu ;).
  */
-export default function QuestionEditor({ index, label, value, onChange, onRemove, readOnly, points, error, allowTypes = false }) {
+export default function QuestionEditor({ index, label, value, onChange, onRemove, readOnly, points, error, allowTypes = false, fixedType = null }) {
   const q = value || emptyQuestion();
-  const isText = allowTypes && q.type === "TEXT";
+  const isText = fixedType ? fixedType === "TEXT" : allowTypes && q.type === "TEXT";
   const setAnswer = (i, patch) =>
     onChange({ ...q, answers: q.answers.map((a, j) => (j === i ? { ...a, ...patch } : a)) });
   const markCorrect = (i) => onChange({ ...q, answers: q.answers.map((a, j) => ({ ...a, correct: j === i })) });
@@ -69,7 +71,7 @@ export default function QuestionEditor({ index, label, value, onChange, onRemove
         </div>
       </div>
 
-      {allowTypes && (
+      {allowTypes && !fixedType && (
         <div className="inline-flex p-0.5 rounded-lg bg-slate-100" role="radiogroup" aria-label="Dạng câu hỏi">
           {QUESTION_TYPES.map(({ key, label: typeLabel, Icon }) => {
             const active = (q.type || "MULTIPLE_CHOICE") === key;
@@ -87,7 +89,19 @@ export default function QuestionEditor({ index, label, value, onChange, onRemove
       <TextInput value={q.content} disabled={readOnly} placeholder={isText ? "Nội dung câu hỏi tự luận" : "Nội dung câu hỏi"}
         onChange={(e) => onChange({ ...q, content: e.target.value })} />
 
-      {isText ? (
+      {isText && fixedType ? (
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-bold text-slate-700">
+            Đáp án đúng <span className="text-rose-500">*</span>
+          </label>
+          <TextInput value={q.referenceAnswer || ""} disabled={readOnly} maxLength={2000}
+            placeholder="Vd: Lý Thái Tổ; Lý Công Uẩn" error={!!error}
+            onChange={(e) => onChange({ ...q, referenceAnswer: e.target.value })} />
+          <p className="text-[11px] text-slate-500">
+            Khách nhập câu trả lời bằng chữ. Chấm không phân biệt hoa thường, dấu và khoảng trắng; nhiều đáp án chấp nhận cách nhau bằng dấu <b>;</b>
+          </p>
+        </div>
+      ) : isText ? (
         <div className="space-y-1.5">
           <div className="px-3 py-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-[11px] text-slate-500">
             Khách sẽ nhập câu trả lời bằng chữ trên app.

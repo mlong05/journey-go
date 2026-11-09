@@ -152,60 +152,6 @@ public class SchemaMigration {
     }
 
     /**
-     * Cấu trúc mới: điểm đến → nhiệm vụ → (quiz, trải nghiệm thực tế → câu hỏi sau trải nghiệm).
-     * <ol>
-     *   <li>Hoàn tác bản tạm V15 (nhiệm vụ nằm trong trải nghiệm, câu hỏi kind = TASK): câu hỏi trở lại
-     *       thành câu hỏi sau trải nghiệm, xóa các nhiệm vụ tạm đó.</li>
-     *   <li>Điểm đến còn quiz / trải nghiệm gắn thẳng vào điểm đến: tạo "Nhiệm vụ 1"
-     *       và chuyển toàn bộ quiz, trải nghiệm vào nhiệm vụ đó.</li>
-     * </ol>
-     * Mỗi câu lệnh chỉ xử lý dòng chưa chuyển nên chạy lại nhiều lần vẫn an toàn.
-     */
-    @Bean
-    public CommandLineRunner migrateTourStopsToTasks() {
-        return args -> {
-            if (!columnExists("tour_stop_tasks", "stop_id") || !columnExists("tour_stop_experiences", "task_id")) {
-                return;
-            }
-            int reverted = jdbcTemplate.update("""
-                    UPDATE tour_stop_questions q
-                    SET experience_id = t.experience_id, task_id = NULL, kind = 'POST_EXPERIENCE'
-                    FROM tour_stop_tasks t
-                    WHERE q.task_id = t.id AND t.experience_id IS NOT NULL AND t.stop_id IS NULL
-                    """);
-            jdbcTemplate.update("DELETE FROM tour_stop_tasks WHERE experience_id IS NOT NULL AND stop_id IS NULL");
-
-            int created = jdbcTemplate.update("""
-                    INSERT INTO tour_stop_tasks (stop_id, sequence_order, title)
-                    SELECT s.id, 1, 'Nhiệm vụ 1'
-                    FROM tour_stops s
-                    WHERE NOT EXISTS (SELECT 1 FROM tour_stop_tasks t WHERE t.stop_id = s.id)
-                      AND (EXISTS (SELECT 1 FROM tour_stop_questions q
-                                   WHERE q.stop_id = s.id AND q.kind = 'QUIZ' AND q.task_id IS NULL)
-                        OR EXISTS (SELECT 1 FROM tour_stop_experiences e
-                                   WHERE e.stop_id = s.id AND e.task_id IS NULL))
-                    """);
-            int quiz = jdbcTemplate.update("""
-                    UPDATE tour_stop_questions q
-                    SET task_id = (SELECT t.id FROM tour_stop_tasks t WHERE t.stop_id = q.stop_id
-                                   ORDER BY t.sequence_order, t.id LIMIT 1),
-                        stop_id = NULL
-                    WHERE q.kind = 'QUIZ' AND q.task_id IS NULL AND q.stop_id IS NOT NULL
-                    """);
-            int experiences = jdbcTemplate.update("""
-                    UPDATE tour_stop_experiences e
-                    SET task_id = (SELECT t.id FROM tour_stop_tasks t WHERE t.stop_id = e.stop_id
-                                   ORDER BY t.sequence_order, t.id LIMIT 1)
-                    WHERE e.task_id IS NULL
-                    """);
-            if (reverted + created + quiz + experiences > 0) {
-                log.info("[Migration] Chuyển sang nhiệm vụ: hoàn tác {} câu hỏi tạm, tạo {} nhiệm vụ, chuyển {} câu quiz và {} trải nghiệm.",
-                        reverted, created, quiz, experiences);
-            }
-        };
-    }
-
-    /**
      * Kiểm tra cột có tồn tại trong bảng hay không (PostgreSQL).
      */
     private boolean columnExists(String tableName, String columnName) {

@@ -337,12 +337,12 @@ public class DataInitializer {
                 if (existing == null) {
                     TaskType tt = switch (code) {
                         case "QUIZ" -> TaskType.builder()
-                                .code("QUIZ").name("Câu hỏi trắc nghiệm / text (4 phương án)")
+                                .code("QUIZ").name("Quiz – câu hỏi trắc nghiệm")
                                 .hasQuestions(true).requiresLocation(false)
                                 .verificationMethod(VerificationMethod.ANSWER_MATCH)
                                 .build();
                         case "REAL_WORLD_INTERACTIVE" -> TaskType.builder()
-                                .code("REAL_WORLD_INTERACTIVE").name("Câu hỏi tương tác ngoài thực tế (GPS check-in trước khi trả lời)")
+                                .code("REAL_WORLD_INTERACTIVE").name("Tương tác thực tế")
                                 .hasQuestions(true).requiresLocation(true)
                                 .verificationMethod(VerificationMethod.ANSWER_MATCH)
                                 .build();
@@ -378,7 +378,7 @@ public class DataInitializer {
                                 .conditions(Map.of("firstAttempt", 1.5, "perfectScore", 1.2))
                                 .build());
                         case "REAL_WORLD_INTERACTIVE" -> pointRuleRepository.save(PointRule.builder()
-                                .taskType(tt).basePoints(20)
+                                .taskType(tt).basePoints(50)
                                 .bonusMultiplier(new BigDecimal("2.00"))
                                 .conditions(Map.of("firstAttempt", 2.0, "onSiteVerified", 1.3, "perfectScore", 1.2))
                                 .build());

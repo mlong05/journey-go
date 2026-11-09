@@ -79,7 +79,7 @@ public record TourDetailResponse(
     /** dayNumber bắt đầu từ 1. */
     public record ItineraryDay(int dayNumber, String title, String mainActivity, String content) {}
 
-    public record Question(Long id, StopQuestionKind kind, QuestionType type, String content,
+    public record Question(Long id, StopQuestionKind kind, QuestionType type, String content, Integer points,
                            List<Answer> answers, String referenceAnswer) {}
 
     public record Artifact(Long id, String name, String imageUrl, String shortDescription,
@@ -87,24 +87,19 @@ public record TourDetailResponse(
 
     public record Experience(Long id, String activityName, BigDecimal checkpointLatitude,
                              BigDecimal checkpointLongitude, Integer radiusMeters, Integer durationSeconds,
-                             Question question) {}
-
-    /** Nhiệm vụ của điểm đến: quiz (1–4 câu) + trải nghiệm thực tế (1–5). */
-    public record Task(Long id, int sequenceOrder, String title, String description,
-                       @Schema(description = "Điểm thưởng (chốt lúc duyệt)") Integer points,
-                       List<Question> quiz, List<Experience> experiences) {}
+                             @Schema(description = "Mã QR xác nhận hoàn thành (in và dán tại điểm)") String qrToken,
+                             Integer points, Question question) {}
 
     public record Stop(Long id, int sequenceOrder, String name, String shortDescription, String guestNote,
                        String imageUrl, String videoUrl, VideoSource videoSource,
                        String culturalContent, List<String> culturalImages,
-                       List<Artifact> artifacts, List<Task> tasks,
-                       @Schema(description = "Tổng điểm tối đa của điểm đến (tổng điểm các nhiệm vụ)") int maxPoints) {}
+                       List<Artifact> artifacts, List<Question> quiz, List<Experience> experiences,
+                       @Schema(description = "Tổng điểm tối đa của điểm đến") int maxPoints) {}
 
     /**
-     * @param perTask  điểm mỗi nhiệm vụ theo cấu hình Admin hiện hành
-     * @param snapshot true = điểm đã chốt lúc duyệt; false = đang hiển thị theo cấu hình Admin hiện hành.
+     * @param snapshot true = điểm đã chốt lúc duyệt; false = đang hiển thị theo cấu hình Admin hiện hành
      */
-    public record RewardPoints(int perTask, int maxTotalPoints, boolean snapshot) {}
+    public record RewardPoints(int quizPerQuestion, int perExperience, int maxTotalPoints, boolean snapshot) {}
 
     public record Slot(Long id, LocalDate slotDate, int capacity, int bookedCount, TourSlotStatus status) {}
 

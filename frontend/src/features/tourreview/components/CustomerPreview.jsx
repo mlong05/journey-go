@@ -7,7 +7,6 @@ import {
 import { durationText } from "@/features/tourwizard/components/TourContentView";
 import NoticeAccordion from "@/features/tourwizard/components/NoticeAccordion";
 import ItineraryView from "@/features/tourwizard/components/ItineraryView";
-import { stopExperiences } from "@/features/tourwizard/components/stops/StopsOverviewMap";
 
 const HIDE_SCROLLBAR = "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
@@ -132,7 +131,7 @@ export default function CustomerPreview({ tour }) {
                         <p className="text-xs font-bold text-slate-800 break-words">{s.name || "Điểm đến chưa đặt tên"}</p>
                         {s.shortDescription && <p className="text-[11px] text-slate-500 leading-snug mt-0.5">{s.shortDescription}</p>}
                         <p className="text-[10px] text-slate-400 mt-1 inline-flex items-center gap-1">
-                          <Lock size={9} />Mở câu chuyện khi check-in · {s.tasks?.length || 0} nhiệm vụ · {stopExperiences(s).length} trải nghiệm
+                          <Lock size={9} />Mở câu chuyện khi check-in · {s.quiz?.length || 0} câu hỏi · {s.experiences?.length || 0} trải nghiệm
                         </p>
                       </div>
                     </li>

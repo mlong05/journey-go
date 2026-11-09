@@ -70,11 +70,17 @@ public class TourStop {
     @Builder.Default
     private List<TourStopArtifact> artifacts = new ArrayList<>();
 
-    /** Nhiệm vụ của điểm đến (1–5); mỗi nhiệm vụ gồm quiz và trải nghiệm thực tế. */
+    /** Quiz của điểm đến (kind = QUIZ). */
     @OneToMany(mappedBy = "stop", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequenceOrder ASC")
     @Builder.Default
-    private List<TourStopTask> tasks = new ArrayList<>();
+    private List<TourStopQuestion> quizQuestions = new ArrayList<>();
+
+    /** Trải nghiệm thực tế — làm sau quiz. */
+    @OneToMany(mappedBy = "stop", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sequenceOrder ASC")
+    @Builder.Default
+    private List<TourStopExperience> experiences = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
