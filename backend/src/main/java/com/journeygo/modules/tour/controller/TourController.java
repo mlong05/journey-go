@@ -3,7 +3,10 @@ package com.journeygo.modules.tour.controller;
 import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.modules.tour.dto.TourRequest;
+import com.journeygo.modules.tour.dto.TourPublicDetailResponse;
 import com.journeygo.modules.tour.dto.TourResponse;
+import com.journeygo.modules.tour.dto.TourSearchFilter;
+import com.journeygo.modules.tour.entity.TourFormat;
 import com.journeygo.modules.tour.service.TourService;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.security.UserPrincipal;
@@ -34,11 +37,28 @@ public class TourController {
 
     @GetMapping("/published")
     @Operation(summary = "Lấy danh sách tour đã xuất bản (công khai)",
-            description = "Trả về danh sách tour đã được phê duyệt và xuất bản, hỗ trợ phân trang")
+            description = "Trả về danh sách tour đã được phê duyệt và xuất bản, hỗ trợ phân trang. "
+                    + "Lọc tùy chọn: q (tên / vùng miền / chủ đề, không phân biệt dấu), regionId, themeId, "
+                    + "format (DAY_TRIP, MULTI_DAY); order: NEWEST (mặc định), PRICE_ASC, PRICE_DESC, DEPARTURE")
     public ResponseEntity<ApiResponse<PageResponse<TourResponse>>> getPublished(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long regionId,
+            @RequestParam(required = false) Long themeId,
+            @RequestParam(required = false) TourFormat format,
+            @RequestParam(required = false) TourSearchFilter.Order order,
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        TourSearchFilter filter = new TourSearchFilter(q, regionId, themeId, format, order);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tour đã xuất bản thành công",
-                tourService.getPublished(pageable)));
+                tourService.searchPublished(filter, pageable)));
+    }
+
+    @GetMapping("/{tourId}/public-detail")
+    @Operation(summary = "Chi tiết tour cho du khách (công khai)",
+            description = "Mô tả, điểm nổi bật, ảnh, lịch trình, bảng giá, chính sách và các điểm dừng. "
+                    + "Không trả đáp án quiz, mã QR hay ghi chú kiểm duyệt. Chỉ tour đã duyệt.")
+    public ResponseEntity<ApiResponse<TourPublicDetailResponse>> getPublicDetail(@PathVariable Long tourId) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tour thành công",
+                tourService.getPublicDetail(tourId)));
     }
 
     @GetMapping("/{tourId}")
