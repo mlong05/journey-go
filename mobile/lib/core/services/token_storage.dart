@@ -135,29 +135,13 @@ class TokenStorage {
 
   // ── SharedPreferences: cấu hình không nhạy cảm ───────────────────────────
 
-  /// Lấy cấu hình Base URL máy chủ: địa chỉ đã lưu, nếu chưa lưu thì tự dò địa chỉ đang trả lời.
+  /// Base URL máy chủ: luôn dùng cấu hình mặc định (API_BASE_URL trong .env, máy ảo, USB),
+  /// tự dò địa chỉ đang trả lời. Không còn cho đổi địa chỉ trong app.
   static Future<String> getBaseUrl() async {
     final prefs = await _getPrefs();
-    return prefs.getString(_keyBaseUrl) ?? await ServerFinder.find();
-  }
-
-  /// Người dùng đã tự lưu địa chỉ máy chủ chưa (chưa thì app tự dò).
-  static Future<bool> hasCustomBaseUrl() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyBaseUrl) != null;
-  }
-
-  /// Thiết lập cấu hình Base URL máy chủ.
-  static Future<void> setBaseUrl(String url) async {
-    final prefs = await _getPrefs();
-    await prefs.setString(_keyBaseUrl, url.trim());
-  }
-
-  /// Khôi phục Base URL về mặc định.
-  static Future<void> resetBaseUrl() async {
-    final prefs = await _getPrefs();
-    await prefs.remove(_keyBaseUrl);
-    ServerFinder.reset();
+    // Địa chỉ từng lưu tay ở bản cũ (vd 127.0.0.1) sẽ chặn cấu hình mặc định: xoá đi.
+    if (prefs.containsKey(_keyBaseUrl)) await prefs.remove(_keyBaseUrl);
+    return ServerFinder.find();
   }
 
   /// Lưu tuỳ chọn ghi nhớ đăng nhập.
