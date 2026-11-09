@@ -7,9 +7,9 @@ import '../core/services/notification_service.dart';
 import 'journey/journey_launcher.dart';
 import 'modals/notification_dialog.dart';
 import 'tabs/community_tab.dart';
-import 'tabs/explore_tab.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/profile_tab.dart';
+import 'tabs/trips_tab.dart';
 
 class TouristHomeScreen extends StatefulWidget {
   final UserModel initialUser;
@@ -26,7 +26,7 @@ class TouristHomeScreen extends StatefulWidget {
 class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindingObserver {
   late UserModel _currentUser;
   StreamSubscription<AppNotification>? _incomingSub;
-  int _currentIndex = 0; // 0: Home, 1: Explore, 2: Community, 3: Profile
+  int _currentIndex = 0; // 0: Trang chủ, 1: Chuyến đi, 2: Diễn đàn, 3: Tài khoản
 
   /// Báo cho các tab biết tab nào đang mở để tự làm mới khi du khách quay lại.
   final ValueNotifier<int> _selectedTab = ValueNotifier(0);
@@ -83,7 +83,7 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
             onNavigateToTab: _selectTab,
             selectedTab: _selectedTab,
           ),
-          ExploreTab(selectedTab: _selectedTab),
+          TripsTab(selectedTab: _selectedTab),
           CommunityTab(currentUser: _currentUser, selectedTab: _selectedTab),
           ProfileTab(
             currentUser: _currentUser,
@@ -170,9 +170,9 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
               ),
               _buildNavItem(
                 index: 1,
-                icon: Icons.explore_rounded,
-                unselectedIcon: Icons.explore_outlined,
-                label: 'Lộ trình',
+                icon: Icons.confirmation_number_rounded,
+                unselectedIcon: Icons.confirmation_number_outlined,
+                label: 'Chuyến đi',
               ),
               // Empty space for the center floating Check-In button
               const SizedBox(width: 56),
