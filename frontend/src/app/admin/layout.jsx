@@ -12,7 +12,6 @@ import {
   BadgePercent,
   Globe2,
   Tags,
-  Award,
   UserCog,
   Sparkles,
   Medal,
@@ -89,13 +88,6 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
-    id: "badges",
-    label: "Huy hiệu di sản",
-    href: "/admin/badges",
-    icon: Award,
-    badge: null,
-  },
-  {
     id: "finance",
     label: "Tài chính & Thanh toán",
     href: "/admin/finance",
@@ -152,7 +144,6 @@ export default function AdminLayout({ children }) {
   const isScrollLockedPage =
     pathname === "/admin" ||
     pathname?.startsWith("/admin/users") ||
-    pathname?.startsWith("/admin/badges") ||
     pathname?.startsWith("/admin/finance");
 
   // Xử lý tìm kiếm nhanh từ Topbar
