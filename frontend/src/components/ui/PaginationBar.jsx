@@ -13,6 +13,9 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-r
  * @param {number}   totalElements tổng số bản ghi
  * @param {string}   unit         tên đơn vị tiếng Việt (vd. "giao dịch")
  * @param {Function} onChange     nhận trang mới (0-based)
+ * @param {number}   [pageSize]   số dòng/trang hiện tại — có cùng onSizeChange thì hiện ô "Số dòng/trang"
+ * @param {number[]} [sizeOptions] các lựa chọn số dòng/trang
+ * @param {Function} [onSizeChange] nhận số dòng/trang mới
  */
 export default function PaginationBar({
   page,
@@ -20,6 +23,9 @@ export default function PaginationBar({
   totalElements,
   unit = "bản ghi",
   onChange,
+  pageSize,
+  sizeOptions = [5, 10, 20, 50],
+  onSizeChange,
 }) {
   const total = Math.max(Number(totalPages) || 0, 1);
   const current = Math.min(Math.max((Number(page) || 0) + 1, 1), total);
@@ -53,16 +59,32 @@ export default function PaginationBar({
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-3 bg-slate-50/60 border-t border-slate-100">
-      {/* Bên trái: thông tin tổng số bản ghi */}
-      <span className="text-xs text-slate-600">
-        Đang xem trang{" "}
-        <strong className="text-slate-900">{current}</strong> /{" "}
-        <strong className="text-slate-900">{total}</strong>{" "}
-        <span className="text-slate-400">
-          (Tổng <strong className="text-slate-700">{count.toLocaleString("vi-VN")}</strong>{" "}
-          {unit})
+      {/* Bên trái: thông tin tổng số bản ghi (+ chọn số dòng/trang nếu có) */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+        <span className="text-xs text-slate-600">
+          Đang xem trang{" "}
+          <strong className="text-slate-900">{current}</strong> /{" "}
+          <strong className="text-slate-900">{total}</strong>{" "}
+          <span className="text-slate-400">
+            (Tổng <strong className="text-slate-700">{count.toLocaleString("vi-VN")}</strong>{" "}
+            {unit})
+          </span>
         </span>
-      </span>
+        {onSizeChange && pageSize != null && (
+          <label className="flex items-center gap-1.5">
+            <span className="text-[11px] text-slate-600 font-bold">Số dòng/trang:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => onSizeChange(Number(e.target.value))}
+              className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/20 cursor-pointer"
+            >
+              {sizeOptions.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
 
       {/* Bên phải: nút điều hướng + số trang */}
       <div className="flex items-center gap-1">
