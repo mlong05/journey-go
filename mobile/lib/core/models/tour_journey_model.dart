@@ -273,6 +273,15 @@ class TaskContent {
   final int? distanceMeters;
   final List<TaskQuestion> questions;
 
+  /// Hoạt động thực địa (tour 5 bước): đếm ngược bao lâu (giây) trước khi được quét QR; null = không đếm.
+  final int? durationSeconds;
+
+  /// Câu hỏi chỉ mở khi quét đúng mã QR tại điểm (tới nơi bằng GPS thôi chưa đủ).
+  final bool qrRequired;
+
+  /// Nộp một lần, đúng câu nào cộng điểm câu đó (câu đố tour 5 bước).
+  final bool perQuestionPoints;
+
   const TaskContent({
     required this.taskId,
     required this.name,
@@ -292,6 +301,9 @@ class TaskContent {
     this.stations = const [],
     required this.distanceMeters,
     required this.questions,
+    this.durationSeconds,
+    this.qrRequired = false,
+    this.perQuestionPoints = false,
   });
 
   factory TaskContent.fromJson(Map<String, dynamic> j) {
@@ -315,6 +327,9 @@ class TaskContent {
       stations: _maps(j['stations']).map(TaskStation.fromJson).toList(),
       distanceMeters: _intOrNull(j['distanceMeters']),
       questions: _maps(j['questions']).map(TaskQuestion.fromJson).toList(),
+      durationSeconds: _intOrNull(j['durationSeconds']),
+      qrRequired: j['qrRequired'] == true,
+      perQuestionPoints: j['perQuestionPoints'] == true,
     );
   }
 

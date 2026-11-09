@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' show Position;
 import 'package:latlong2/latlong.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/models/tour_detail_model.dart';
 import '../../core/models/tour_journey_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/destination_service.dart';
 import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/route_service.dart';
+import '../../core/services/tour_service.dart';
 import '../culture/cultural_stories.dart';
+import '../tours/tour_detail_sections.dart' show showStopPreview;
 import 'journey_map.dart';
 import 'journey_widgets.dart';
 import 'map_kit.dart';
@@ -43,6 +46,15 @@ class _JourneyScreenState extends State<JourneyScreen> {
   bool _loading = true;
   String? _error;
   int? _busyDestinationId;
+
+  /// Chi tiết công khai của tour; với tour 5 bước dùng để lấy toạ độ, ảnh và nội dung văn hoá của điểm dừng.
+  TourDetailModel? _tourDetail;
+
+  bool get _isWizard => _tourDetail?.wizardTour ?? false;
+
+  /// Điểm dừng của tour 5 bước ứng với một trạm hành trình (destinationId = id điểm dừng).
+  TourStopModel? _stopOf(JourneyDestination dest) =>
+      _isWizard ? _tourDetail!.stops.where((s) => s.id == dest.destinationId).firstOrNull : null;
 
   // Bản đồ hành trình
   final DestinationService _destinationService = DestinationService();
@@ -91,6 +103,14 @@ class _JourneyScreenState extends State<JourneyScreen> {
           : await _service.getById(_journey?.id ?? widget.journeyId!);
       if (!mounted) return;
       final firstLoad = _journey == null;
+      if (_tourDetail == null) {
+        try {
+          _tourDetail = await TourService().getPublicDetail(journey.tourId);
+        } catch (_) {
+          // Không có chi tiết thì vẫn hiện hành trình như tour thường.
+        }
+        if (!mounted) return;
+      }
       setState(() {
         _journey = journey;
         _error = null;
@@ -360,6 +380,17 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
   /// Tải tọa độ các điểm đến (GET /destinations/{id}); điểm lỗi thì bỏ qua, không chặn màn hình.
   Future<void> _loadCoords(TourJourney journey) async {
+    // Tour 5 bước: toạ độ điểm dừng (checkpoint đầu tiên) đã có trong chi tiết tour.
+    if (_isWizard) {
+      setState(() {
+        for (final d in journey.destinations) {
+          final stop = _stopOf(d);
+          if (stop != null && stop.hasLocation) _coords[d.destinationId] = LatLng(stop.latitude!, stop.longitude!);
+        }
+        _coordsLoaded = true;
+      });
+      return;
+    }
     final missing = journey.destinations.where((d) => !_coords.containsKey(d.destinationId)).toList();
     if (missing.isEmpty) {
       if (!_coordsLoaded && mounted) setState(() => _coordsLoaded = true);
@@ -1172,13 +1203,26 @@ class _JourneyScreenState extends State<JourneyScreen> {
       );
     }
 
+    final stop = _stopOf(dest);
+
     if (!dest.checkedIn) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Hãy đến địa điểm này và check-in bằng GPS để mở khóa nhiệm vụ và nhận huy hiệu di sản.',
-            style: TextStyle(fontSize: 12.5, height: 1.45, color: AppCultureColors.textMuted),
+          if (stop?.shortDescription != null) ...[
+            Text(
+              stop!.shortDescription!,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13, height: 1.45, color: AppCultureColors.textDark),
+            ),
+            const SizedBox(height: 6),
+          ],
+          Text(
+            _isWizard
+                ? 'Đến điểm dừng này (trong bán kính 300 m) và check-in bằng GPS để mở câu chuyện văn hóa và thử thách.'
+                : 'Hãy đến địa điểm này và check-in bằng GPS để mở khóa nhiệm vụ và nhận huy hiệu di sản.',
+            style: const TextStyle(fontSize: 12.5, height: 1.45, color: AppCultureColors.textMuted),
           ),
           const SizedBox(height: 14),
           if (dest.isCurrent && _coords[dest.destinationId] != null) ...[
@@ -1200,18 +1244,21 @@ class _JourneyScreenState extends State<JourneyScreen> {
             loading: busy,
             onPressed: () => _checkIn(dest),
           ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: busy ? null : () => _checkInQr(dest),
-            icon: const Icon(Icons.qr_code_scanner_rounded),
-            label: const Text('Quét mã QR', style: TextStyle(fontWeight: FontWeight.w700)),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              foregroundColor: AppCultureColors.jadeDark,
-              side: const BorderSide(color: AppCultureColors.heritageJade),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          // Điểm dừng của tour 5 bước không có QR check-in (QR nằm ở từng hoạt động).
+          if (!_isWizard) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: busy ? null : () => _checkInQr(dest),
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('Quét mã QR', style: TextStyle(fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+                foregroundColor: AppCultureColors.jadeDark,
+                side: const BorderSide(color: AppCultureColors.heritageJade),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
             ),
-          ),
+          ],
           Align(
             alignment: Alignment.center,
             child: TextButton(
@@ -1219,7 +1266,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
               child: const Text('Bỏ qua điểm này', style: TextStyle(color: AppCultureColors.textMuted, fontSize: 12.5)),
             ),
           ),
-          CulturalStoriesSection(destinationId: dest.destinationId, hideWhenEmpty: true),
+          if (!_isWizard) CulturalStoriesSection(destinationId: dest.destinationId, hideWhenEmpty: true),
         ],
       );
     }
@@ -1240,12 +1287,74 @@ class _JourneyScreenState extends State<JourneyScreen> {
           ],
         ),
         const SizedBox(height: 14),
-        _sectionLabel('Câu chuyện văn hóa'),
-        const SizedBox(height: 8),
-        CulturalStoriesSection(destinationId: dest.destinationId, unlocked: true, showTeaser: true),
+        if (stop != null) ...[
+          if (stop.hasCulture || stop.shortDescription != null) ...[
+            _sectionLabel('Câu chuyện văn hóa'),
+            const SizedBox(height: 8),
+            _buildStopCulture(stop),
+          ],
+        ] else ...[
+          _sectionLabel('Câu chuyện văn hóa'),
+          const SizedBox(height: 8),
+          CulturalStoriesSection(destinationId: dest.destinationId, unlocked: true, showTeaser: true),
+        ],
         if (dest.tasks.isNotEmpty) ...[const SizedBox(height: 6), _sectionLabel('Nhiệm vụ'), const SizedBox(height: 8)],
         for (final task in dest.tasks) _buildTask(dest, task),
       ],
+    );
+  }
+
+  /// Nội dung văn hoá của điểm dừng (tour 5 bước), mở sau khi check-in. Bấm để xem đủ ảnh, video, hiện vật.
+  Widget _buildStopCulture(TourStopModel stop) {
+    final text = stop.culturalContent ?? stop.shortDescription;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => showStopPreview(context, stop),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppCultureColors.rewardBg.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppCultureColors.rewardBorder),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (stop.imageUrl != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(stop.imageUrl!, width: 64, height: 64, fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox(width: 64, height: 64)),
+              ),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (text != null)
+                    Text(
+                      text,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13, height: 1.45, color: AppCultureColors.textDark),
+                    ),
+                  const SizedBox(height: 4),
+                  Text(
+                    [
+                      'Đọc tiếp',
+                      if (stop.artifacts.isNotEmpty) '${stop.artifacts.length} hiện vật',
+                      if (stop.videoUrl != null) 'video',
+                    ].join(' · '),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppCultureColors.amberDark),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1263,6 +1372,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
     final done = task.isCompleted;
     final failed = task.isFailed;
     final icon = switch (task.type.toUpperCase()) {
+      final t when t.contains('REAL_WORLD') => Icons.directions_walk_rounded,
       final t when t.contains('PUZZLE') || t.contains('GPS') => Icons.explore_rounded,
       final t when t.contains('QUIZ') => Icons.quiz_rounded,
       _ => Icons.flag_rounded,

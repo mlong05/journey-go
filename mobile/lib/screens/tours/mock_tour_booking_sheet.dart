@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/gamification_model.dart' show formatThousands;
 import '../../core/models/tour_detail_model.dart';
 import '../../core/services/mock_tour_booking_store.dart';
+import '../journey/journey_screen.dart';
 
 /// Đặt tour 5 bước GIẢ LẬP: chọn ngày khởi hành và số khách, rồi báo đặt thành công.
 /// Không gọi server, không thu tiền; vé chỉ lưu trên máy (xem [MockTourBookingStore]).
@@ -17,8 +18,15 @@ Future<MockTourBooking?> startMockTourBooking(BuildContext context, TourDetailMo
   );
   if (booking == null || !context.mounted) return booking;
   await MockTourBookingStore.add(booking);
-  if (context.mounted) await _showSuccess(context, booking);
+  if (!context.mounted) return booking;
+  final startNow = await _showSuccess(context, booking);
+  if (startNow == true && context.mounted) await startMockTourJourney(context, booking.tourId);
   return booking;
+}
+
+/// Bắt đầu (hoặc tiếp tục) hành trình của tour từ vé giả lập: hành trình không gắn đơn đặt tour.
+Future<void> startMockTourJourney(BuildContext context, int tourId) {
+  return Navigator.of(context).push(MaterialPageRoute(builder: (_) => JourneyScreen(tourId: tourId)));
 }
 
 String _vnd(double v) => v <= 0 ? 'Miễn phí' : '${formatThousands(v)} đ';
@@ -297,8 +305,9 @@ class _MockNotice extends StatelessWidget {
   }
 }
 
-Future<void> _showSuccess(BuildContext context, MockTourBooking b) {
-  return showDialog<void>(
+/// Trả về true khi du khách chọn "Bắt đầu trải nghiệm".
+Future<bool?> _showSuccess(BuildContext context, MockTourBooking b) {
+  return showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -335,14 +344,20 @@ Future<void> _showSuccess(BuildContext context, MockTourBooking b) {
           SizedBox(
             width: double.infinity,
             height: 46,
-            child: FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(),
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Bắt đầu trải nghiệm', style: TextStyle(fontWeight: FontWeight.w700)),
               style: FilledButton.styleFrom(
                 backgroundColor: AppCultureColors.heritageJade,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-              child: const Text('Xong', style: TextStyle(fontWeight: FontWeight.w700)),
             ),
+          ),
+          const SizedBox(height: 6),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Để sau'),
           ),
         ],
       ),

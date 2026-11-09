@@ -6,6 +6,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/mock_tour_booking_store.dart';
 import '../../core/services/tour_service.dart';
 import '../common/tab_refresh.dart';
+import '../tours/mock_tour_booking_sheet.dart' show startMockTourJourney;
 import '../tours/my_tours_view.dart';
 import '../tours/tour_list_screen.dart';
 
@@ -166,6 +167,14 @@ class _MockBookingListState extends State<_MockBookingList> {
     if (_items.isEmpty && mounted) Navigator.of(context).pop();
   }
 
+  /// Bắt đầu / tiếp tục hành trình của vé; xong thì đóng bảng để tab Chuyến đi tải lại.
+  Future<void> _start(MockTourBooking b) async {
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    await startMockTourJourney(navigator.context, b.tourId);
+    widget.onChanged();
+  }
+
   Future<void> _openTour(MockTourBooking b) async {
     try {
       final tour = await TourService().getTourById(b.tourId);
@@ -255,10 +264,21 @@ class _MockBookingListState extends State<_MockBookingList> {
                                 ],
                               ),
                             ),
-                            IconButton(
-                              tooltip: 'Xoá vé giả lập',
-                              onPressed: () => _remove(b),
-                              icon: const Icon(Icons.delete_outline_rounded, color: AppCultureColors.error),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton.filled(
+                                  tooltip: 'Bắt đầu trải nghiệm',
+                                  onPressed: () => _start(b),
+                                  icon: const Icon(Icons.play_arrow_rounded),
+                                  style: IconButton.styleFrom(backgroundColor: AppCultureColors.heritageJade),
+                                ),
+                                IconButton(
+                                  tooltip: 'Xoá vé giả lập',
+                                  onPressed: () => _remove(b),
+                                  icon: const Icon(Icons.delete_outline_rounded, color: AppCultureColors.error),
+                                ),
+                              ],
                             ),
                           ],
                         ),
