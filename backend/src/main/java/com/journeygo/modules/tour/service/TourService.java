@@ -15,14 +15,20 @@ import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -36,6 +42,7 @@ public class TourService {
     private final DestinationRepository destinationRepository;
     private final TourModerationService moderationService;
     private final TourPricingService pricingService;
+    private final TourDetailMapper detailMapper;
     private final com.journeygo.modules.providerprofile.service.ProviderProfileService providerProfileService;
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
@@ -55,8 +62,76 @@ public class TourService {
     /** All published / approved tours (public API, paginated). */
     @Transactional(readOnly = true)
     public PageResponse<TourResponse> getPublished(Pageable pageable) {
-        Page<Tour> page = tourRepository.findByApprovedTrue(sanitizePageable(pageable));
-        return toPageResponse(page);
+        return searchPublished(TourSearchFilter.none(), pageable);
+    }
+
+    /**
+     * Tour đã xuất bản theo bộ lọc. Lọc vùng miền / chủ đề / hình thức chạy trong DB; tìm theo từ khóa
+     * (không dấu) và sắp theo giá / ngày khởi hành — hai giá trị được tính, không phải cột — chạy trên
+     * danh sách đã lọc rồi mới phân trang. Số tour xuất bản nhỏ nên cách này đủ nhanh.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<TourResponse> searchPublished(TourSearchFilter filter, Pageable pageable) {
+        Pageable paging = sanitizePageable(pageable);
+        Specification<Tour> spec = publishedSpec(filter);
+        if (filter.databaseOnly()) {
+            return toPageResponse(tourRepository.findAll(spec, paging));
+        }
+
+        List<Tour> tours = tourRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
+        if (filter.q() != null) {
+            String keyword = TextAnswerMatcher.normalize(filter.q());
+            tours = tours.stream().filter(t -> searchText(t).contains(keyword)).toList();
+        }
+        List<TourResponse> responses = new ArrayList<>(tours.stream().map(pricingService.mapperFor(tours)).toList());
+        switch (filter.order()) {
+            case PRICE_ASC -> responses.sort(Comparator.comparing(TourService::priceOf));
+            case PRICE_DESC -> responses.sort(Comparator.comparing(TourService::priceOf).reversed());
+            case DEPARTURE -> responses.sort(Comparator.comparing(TourResponse::nextDepartureDate,
+                    Comparator.nullsLast(Comparator.naturalOrder())));
+            case NEWEST -> { /* đã sắp theo createdAt */ }
+        }
+
+        int from = (int) Math.min(paging.getOffset(), responses.size());
+        int to = Math.min(from + paging.getPageSize(), responses.size());
+        Page<TourResponse> page = new PageImpl<>(responses.subList(from, to),
+                PageRequest.of(paging.getPageNumber(), paging.getPageSize()), responses.size());
+        return PageResponse.from(page);
+    }
+
+    /** Chi tiết tour công khai cho du khách (chỉ tour đã duyệt). */
+    @Transactional(readOnly = true)
+    public TourPublicDetailResponse getPublicDetail(Long tourId) {
+        moderationService.requireApproved(tourId);
+        Tour tour = findOrThrow(tourId);
+        TourResponse summary = pricingService.toResponse(tour);
+        if (!tour.isWizardTour()) {
+            return TourPublicDetailResponse.fromLegacy(summary);
+        }
+        return TourPublicDetailResponse.fromWizard(detailMapper.toResponse(tour), summary.price(), LocalDate.now());
+    }
+
+    private static Specification<Tour> publishedSpec(TourSearchFilter filter) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.isTrue(root.get("approved")));
+            if (filter.regionId() != null) predicates.add(cb.equal(root.get("region").get("id"), filter.regionId()));
+            if (filter.themeId() != null) predicates.add(cb.equal(root.get("theme").get("id"), filter.themeId()));
+            if (filter.format() != null) predicates.add(cb.equal(root.get("tourFormat"), filter.format()));
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    /** Chuỗi để tìm kiếm: tên tour, vùng miền, chủ đề (đã bỏ dấu). */
+    private static String searchText(Tour tour) {
+        StringBuilder text = new StringBuilder(tour.getTitle() == null ? "" : tour.getTitle());
+        if (tour.getRegion() != null) text.append(' ').append(tour.getRegion().getName());
+        if (tour.getTheme() != null) text.append(' ').append(tour.getTheme().getName());
+        return TextAnswerMatcher.normalize(text.toString());
+    }
+
+    private static BigDecimal priceOf(TourResponse tour) {
+        return tour.price() == null ? BigDecimal.ZERO : tour.price();
     }
 
     /** Tours created by a specific user (paginated). */

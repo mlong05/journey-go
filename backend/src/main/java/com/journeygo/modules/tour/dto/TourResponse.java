@@ -42,6 +42,12 @@ public record TourResponse(
         @Schema(description = "Tour 5 bước: DAY_TRIP (trong ngày) hoặc MULTI_DAY; null với tour luồng cũ") TourFormat tourFormat,
         @Schema(description = "Tour trong ngày: thời lượng (phút)") Integer durationMinutes,
         @Schema(description = "Tour nhiều ngày: số đêm") Integer durationNights,
+        @Schema(description = "Vùng miền (tour 5 bước)") Long regionId,
+        @Schema(description = "Tên vùng miền") String regionName,
+        @Schema(description = "Chủ đề (tour 5 bước)") Long themeId,
+        @Schema(description = "Tên chủ đề") String themeName,
+        @Schema(description = "Số điểm dừng của tour 5 bước (0 với tour luồng cũ)") int stopCount,
+        @Schema(description = "Ngày khởi hành gần nhất tính từ hôm nay (null nếu không còn ngày nào)") LocalDate nextDepartureDate,
         @Schema(description = "Thời gian tạo") Instant createdAt,
         @Schema(description = "Thời gian cập nhật") Instant updatedAt
 ) {
@@ -80,6 +86,11 @@ public record TourResponse(
                 .tourFormat(t.getTourFormat())
                 .durationMinutes(t.getDurationMinutes())
                 .durationNights(t.getDurationNights())
+                .regionId(t.getRegion() != null ? t.getRegion().getId() : null)
+                .regionName(t.getRegion() != null ? t.getRegion().getName() : null)
+                .themeId(t.getTheme() != null ? t.getTheme().getId() : null)
+                .themeName(t.getTheme() != null ? t.getTheme().getName() : null)
+                .stopCount(t.isWizardTour() ? t.getStops().size() : 0)
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
                 .build();

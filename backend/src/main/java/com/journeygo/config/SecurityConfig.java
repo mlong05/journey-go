@@ -61,6 +61,9 @@ public class SecurityConfig {
     private static final String[] PUBLIC_GET_ENDPOINTS = {
             "/api/v1/destinations/**",
             "/api/v1/experiences/**",
+            // Danh mục tour cho du khách: danh sách tour đã xuất bản và trang chi tiết công khai
+            "/api/v1/tours/published",
+            "/api/v1/tours/*/public-detail",
             // Master data: public read, admin write
             "/api/v1/task-types",
             "/api/v1/task-types/*",

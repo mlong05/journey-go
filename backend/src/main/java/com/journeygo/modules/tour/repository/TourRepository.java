@@ -12,7 +12,8 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface TourRepository extends JpaRepository<Tour, Long> {
+public interface TourRepository extends JpaRepository<Tour, Long>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<Tour> {
 
     // ── Standard queries — @SQLRestriction("deleted = false") auto-applied ────
 
@@ -63,6 +64,37 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
             GROUP BY td.tour.tourId
             """)
     List<Object[]> countDisabledBadgesByTourIds(@Param("tourIds") List<Long> tourIds);
+
+    // ── Tour 5 bước: phần thưởng và ngày khởi hành hiển thị trên thẻ tour ─────
+
+    /** Câu quiz của các điểm dừng: [tourId, số câu, tổng điểm đã chốt]. */
+    @Query("""
+            SELECT q.stop.tour.tourId, COUNT(q), COALESCE(SUM(q.pointsReward), 0)
+            FROM TourStopQuestion q
+            WHERE q.kind = com.journeygo.modules.tour.entity.StopQuestionKind.QUIZ
+              AND q.stop.tour.tourId IN :tourIds
+            GROUP BY q.stop.tour.tourId
+            """)
+    List<Object[]> sumStopQuizByTourIds(@Param("tourIds") List<Long> tourIds);
+
+    /** Hoạt động thực địa của các điểm dừng: [tourId, số hoạt động, tổng điểm đã chốt]. */
+    @Query("""
+            SELECT e.stop.tour.tourId, COUNT(e), COALESCE(SUM(e.pointsReward), 0)
+            FROM TourStopExperience e
+            WHERE e.stop.tour.tourId IN :tourIds
+            GROUP BY e.stop.tour.tourId
+            """)
+    List<Object[]> sumStopExperiencesByTourIds(@Param("tourIds") List<Long> tourIds);
+
+    /** Ngày khởi hành gần nhất từ {@code from}: [tourId, ngày]. */
+    @Query("""
+            SELECT d.tour.tourId, MIN(d.departureDate)
+            FROM TourDepartureDate d
+            WHERE d.departureDate >= :from AND d.tour.tourId IN :tourIds
+            GROUP BY d.tour.tourId
+            """)
+    List<Object[]> findNextDepartureByTourIds(@Param("tourIds") List<Long> tourIds,
+                                              @Param("from") java.time.LocalDate from);
 
     boolean existsByTitle(String title);
 
