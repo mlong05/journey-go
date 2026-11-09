@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import '../common/inline_video.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/cultural_content_model.dart';
 import '../../core/services/api_client.dart';
@@ -671,7 +672,7 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
                     ],
                   ),
                 ],
-                // Video chính: YouTube phát ngay trong app, video khác mở trình phát của máy
+                // Video chính phát ngay trong app: YouTube qua trình phát nhúng, MP4 / video tải lên qua InlineVideo
                 if (c.hasPlayableMedia && c.isVideo) ...[
                   const SizedBox(height: 18),
                   _sectionTitle(Icons.smart_display_rounded, 'Video'),
@@ -681,12 +682,14 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
                       borderRadius: BorderRadius.circular(18),
                       child: YoutubePlayer(controller: _youTube!),
                     )
+                  else if (c.youTubeId == null)
+                    InlineVideo(url: c.mediaUrl)
                   else
                     _VideoCard(
                       thumbnail: c.videoThumbnail,
                       color: meta.color,
                       durationLabel: c.durationLabel,
-                      onTap: c.youTubeId != null ? _startYouTube : _playMedia,
+                      onTap: _startYouTube,
                     ),
                 ] else if (c.hasPlayableMedia) ...[
                   const SizedBox(height: 18),

@@ -74,7 +74,7 @@ public class TourController {
     @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Lấy tất cả tour (CONTENT_MODERATOR)",
-            description = "Bao gồm các tour chưa xuất bản, hỗ trợ phân trang và sắp xếp. "
+            description = "Gồm tour chờ duyệt, bị từ chối, đã xuất bản… (không gồm bản nháp), hỗ trợ phân trang và sắp xếp. "
                     + "ADMIN không quản lý tour — việc này thuộc Kiểm duyệt viên.")
     public ResponseEntity<ApiResponse<PageResponse<TourResponse>>> getAll(
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {

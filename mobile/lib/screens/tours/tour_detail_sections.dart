@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/tour_detail_model.dart';
+import '../common/inline_video.dart';
 import 'tour_cards.dart' show TourMeta, ImageBadge, themeIcon;
 import 'tour_route_map.dart';
 import 'tour_style.dart';
@@ -62,6 +62,10 @@ class _TourWizardDetailBodyState extends State<TourWizardDetailBody> {
                 ),
             ],
           )),
+        ],
+        if (d.images.isNotEmpty) ...[
+          _SectionTitle('Ảnh tour (${d.images.length})'),
+          _PhotoStrip(images: d.images),
         ],
         if (d.description != null) ...[
           const _SectionTitle('Giới thiệu'),
@@ -288,6 +292,43 @@ class _GalleryState extends State<_Gallery> {
         ),
       ),
     ));
+  }
+}
+
+/// Dải ảnh nhỏ vuốt ngang để thấy cả album ngay trên trang; bấm ảnh để xem toàn màn hình.
+class _PhotoStrip extends StatelessWidget {
+  final List<String> images;
+  const _PhotoStrip({required this.images});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 96,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: images.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) => Semantics(
+          button: true,
+          label: 'Xem ảnh ${i + 1} trên ${images.length}',
+          child: GestureDetector(
+            onTap: () => _GalleryState._openViewer(context, images, i),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                images[i],
+                width: 96,
+                height: 96,
+                fit: BoxFit.cover,
+                cacheWidth: 288,
+                errorBuilder: (_, _, _) => Container(width: 96, color: AppCultureColors.surfaceSubtle),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -597,17 +638,11 @@ Future<void> showStopPreview(BuildContext context, TourStopModel stop) {
             ),
           ],
           if (stop.videoUrl != null) ...[
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => launchUrl(Uri.parse(stop.videoUrl!), mode: LaunchMode.externalApplication),
-              icon: const Icon(Icons.play_circle_rounded),
-              label: const Text('Xem video giới thiệu'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppCultureColors.oceanBlue,
-                minimumSize: const Size.fromHeight(44),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
+            const SizedBox(height: 16),
+            const Text('Video giới thiệu', style: _bodyStrong),
+            const SizedBox(height: 8),
+            // Phát ngay trong app (YouTube nhúng, MP4 / video tải lên qua video_player)
+            InlineVideo(url: stop.videoUrl!),
           ],
           if (stop.culturalContent != null || stop.culturalImages.isNotEmpty) ...[
             const SizedBox(height: 20),

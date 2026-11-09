@@ -52,10 +52,10 @@ public class TourService {
 
     // ── Public / read-only queries ────────────────────────────────────────────
 
-    /** All non-deleted tours (paginated). */
+    /** Tour chưa xóa, trừ bản nháp (chưa gửi duyệt thì kiểm duyệt viên không cần thấy). */
     @Transactional(readOnly = true)
     public PageResponse<TourResponse> getAll(Pageable pageable) {
-        Page<Tour> page = tourRepository.findAll(sanitizePageable(pageable));
+        Page<Tour> page = tourRepository.findByStatusNot(com.journeygo.modules.tour.entity.enums.TourStatus.DRAFT, sanitizePageable(pageable));
         return toPageResponse(page);
     }
 

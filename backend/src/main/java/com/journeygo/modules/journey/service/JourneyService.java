@@ -556,15 +556,26 @@ public class JourneyService {
                 .count();
 
         if (completedDests >= journey.getTotalDestinations()) {
-            journey.setStatus(JourneyStatus.COMPLETED);
-            journey.setCompletedAt(Instant.now());
-            log.info("Chúc mừng! Du khách {} đã hoàn thành toàn bộ hành trình Tour {}", userId, journey.getTourName());
+            completeJourney(journey, userId);
+        }
+    }
 
-            markBookingCompleted(journey, journey.getCompletedAt());
+    /**
+     * Kết thúc hành trình (dù điểm cuối xong bằng nhiệm vụ hay bị bỏ qua): đánh dấu booking hoàn thành
+     * và cộng thưởng hoàn thành — chỉ khi du khách không bỏ qua điểm đến nào.
+     */
+    private void completeJourney(Journey journey, Long userId) {
+        journey.setStatus(JourneyStatus.COMPLETED);
+        journey.setCompletedAt(Instant.now());
+        log.info("Du khách {} đã đi hết hành trình Tour {} (mức {})", userId, journey.getTourName(), journey.completionRank());
 
+        markBookingCompleted(journey, journey.getCompletedAt());
+
+        int bonus = journey.completionBonusPoints();
+        if (bonus > 0) {
             gamificationService.awardPoints(
                     userId,
-                    50,
+                    bonus,
                     PointTransactionType.EARNED_TOUR,
                     "TOUR_COMPLETION_" + journey.getId(),
                     "Thưởng hoàn thành trọn vẹn hành trình " + journey.getTourName()
@@ -792,9 +803,7 @@ public class JourneyService {
                 .count();
 
         if (completedDests >= journey.getTotalDestinations()) {
-            journey.setStatus(JourneyStatus.COMPLETED);
-            journey.setCompletedAt(Instant.now());
-            markBookingCompleted(journey, journey.getCompletedAt());
+            completeJourney(journey, userId);
         }
 
         destinationProgressRepository.save(destProgress);

@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Plus, Loader2, Trash2, RotateCcw, Pencil, Check, X } from "lucide-react";
+import { Plus, Loader2, Trash2, RotateCcw, Pencil, Check, X, ImagePlus } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import PaginationBar from "@/components/ui/PaginationBar";
+import CoverImageField from "@/features/destination/components/CoverImageField";
 
 /** Bộ màu cố định (Tailwind cần class tĩnh). */
 const ACCENTS = {
@@ -36,6 +37,7 @@ export default function CatalogCard({
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [editing, setEditing] = useState(null); // { id, name }
+  const [photo, setPhoto] = useState(null); // { id, name, imageUrl, imageCredit } — đang sửa ảnh đại diện
   const [error, setError] = useState("");
   const [page, setPage] = useState(0); // 0-based
   const [pageSize, setPageSize] = useState(10);
@@ -94,12 +96,27 @@ export default function CatalogCard({
     if (await run(() => service.update(editing.id, { name: editing.name }))) setEditing(null);
   };
 
+  const savePhoto = async () => {
+    if (!photo) return;
+    const changed = (photo.imageUrl || "") !== photo.originalUrl;
+    const ok = await run(() => service.update(photo.id, {
+      name: photo.name,
+      imageUrl: photo.imageUrl || "",
+      // Đổi / bỏ ảnh thì xóa ghi nguồn cũ (thuộc ảnh trước); giữ nguyên ảnh thì không đụng tới
+      ...(changed ? { imageCredit: "" } : {}),
+    }));
+    if (ok) setPhoto(null);
+  };
+
   const rows = tab === "active" ? items : deleted;
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(page, totalPages - 1); // xóa bớt dòng ở trang cuối → tự lùi trang
   const pageRows = rows.slice(safePage * pageSize, safePage * pageSize + pageSize);
   const editingId = editing?.id ?? null;
-  const switchTab = (next) => { setTab(next); setPage(0); setEditing(null); };
+  const switchTab = (next) => { setTab(next); setPage(0); setEditing(null); setPhoto(null); };
+  const openPhoto = (item) => setPhoto(photo?.id === item.id ? null : {
+    id: item.id, name: item.name, imageUrl: item.imageUrl || "", originalUrl: item.imageUrl || "",
+  });
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-4 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs">
@@ -147,9 +164,19 @@ export default function CatalogCard({
         {/* Danh sách tự cuộn khi dài; thanh phân trang luôn ở dưới */}
         <ul className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
           {pageRows.map((item, idx) => (
-            <li key={item.id}
-              className={`px-4 py-3 flex items-center gap-3 transition-colors ${item.deleted ? "bg-rose-50/30" : "bg-white hover:bg-slate-50/70"}`}>
+            <li key={item.id} className={item.deleted ? "bg-rose-50/30" : "bg-white"}>
+            <div className={`px-4 py-3 flex items-center gap-3 transition-colors ${item.deleted ? "" : "hover:bg-slate-50/70"}`}>
               <span className="w-7 shrink-0 text-xs font-bold text-slate-400 tabular-nums">{safePage * pageSize + idx + 1}</span>
+              {/* Ảnh đại diện (hiện trên trang chủ app); bấm để đổi */}
+              <button type="button" disabled={item.deleted} onClick={() => openPhoto(item)}
+                title={item.imageUrl ? "Đổi ảnh đại diện" : "Thêm ảnh đại diện"}
+                aria-label={item.imageUrl ? `Đổi ảnh đại diện của ${item.name}` : `Thêm ảnh đại diện cho ${item.name}`}
+                className={`w-14 h-10 shrink-0 rounded-lg overflow-hidden border cursor-pointer disabled:cursor-default ${item.imageUrl ? "border-slate-200" : "border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:text-slate-600"} ${photo?.id === item.id ? "ring-2 ring-offset-1 ring-slate-400" : ""}`}>
+                {item.imageUrl
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
+                  : <ImagePlus size={15} className="mx-auto" />}
+              </button>
               {editingId === item.id ? (
                 <input autoFocus value={editing.name} maxLength={150}
                   onChange={(e) => setEditing({ ...editing, name: e.target.value })}
@@ -185,6 +212,27 @@ export default function CatalogCard({
                   </>
                 )}
               </div>
+            </div>
+            {photo?.id === item.id && (
+              <div className="px-4 pb-4 pl-[4.5rem] max-w-[400px] space-y-3">
+                <CoverImageField value={photo.imageUrl} onChange={(url) => setPhoto({ ...photo, imageUrl: url })}
+                  disabled={busy} label="Ảnh đại diện" folder="journeygo/catalog" iconClassName={a.icon}
+                  hint="Dùng ảnh chụp thật, khổ ngang. Hiện trên trang chủ app du khách."
+                  emptyText="Tải ảnh đại diện lên" emptyHint="Ảnh ngang, tối đa 10MB · hiện ở trang chủ app" />
+                <div>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={busy} onClick={savePhoto}
+                      className={`px-3.5 py-1.5 rounded-xl ${a.btn} text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}>
+                      {busy ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />} Lưu ảnh
+                    </button>
+                    <button type="button" onClick={() => setPhoto(null)}
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs cursor-pointer">
+                      Hủy
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             </li>
           ))}
         </ul>

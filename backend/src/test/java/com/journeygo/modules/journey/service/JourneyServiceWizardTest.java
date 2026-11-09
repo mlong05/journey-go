@@ -239,4 +239,51 @@ class JourneyServiceWizardTest {
                 () -> journeyService.submitTask(50L, 5L, submit, 10L));
         assertEquals("QR-INVALID", ex.getCode());
     }
+
+    // ── Hoàn thành hành trình ─────────────────────────────────────────────────
+
+    private void finishActivityLast(boolean quizAllCorrect) {
+        stop.setCheckedIn(true);
+        quizProgress.setStatus(TaskProgressStatus.COMPLETED);
+        quizProgress.setIsCorrect(quizAllCorrect);
+        stop.setTasksCompleted(1);
+        stubTasks(tourInfo(LAT, LNG));
+        var submit = new SubmitTaskRequest(List.of(new SubmitTaskRequest.QuestionAnswer(3L, null, "Lý Thái Tổ")),
+                null, null, QR);
+        journeyService.submitTask(50L, 5L, submit, 10L);
+    }
+
+    @Test
+    void lastTask_AllCorrect_ShouldCompleteJourneyAsPerfectWithBonus() {
+        finishActivityLast(true);
+
+        assertEquals(JourneyStatus.COMPLETED, journey.getStatus());
+        assertEquals("PERFECT", journey.completionRank());
+        assertEquals(Journey.COMPLETION_BONUS_POINTS, journey.completionBonusPoints());
+        verify(gamificationService).awardPoints(eq(10L), eq(Journey.COMPLETION_BONUS_POINTS), any(),
+                eq("TOUR_COMPLETION_50"), anyString());
+    }
+
+    @Test
+    void lastTask_QuizHadWrongAnswers_ShouldCompleteWithBonusButNotPerfect() {
+        finishActivityLast(false);
+
+        assertEquals(JourneyStatus.COMPLETED, journey.getStatus());
+        assertEquals("COMPLETED", journey.completionRank());
+        verify(gamificationService).awardPoints(eq(10L), eq(Journey.COMPLETION_BONUS_POINTS), any(),
+                eq("TOUR_COMPLETION_50"), anyString());
+    }
+
+    @Test
+    void skipLastDestination_ShouldCompleteJourneyWithoutBonus() {
+        when(journeyRepository.findByIdWithDestinations(50L)).thenReturn(Optional.of(journey));
+        when(destinationProgressRepository.findByJourneyIdAndDestinationId(50L, 7L)).thenReturn(Optional.of(stop));
+
+        journeyService.skipDestination(50L, 7L, 10L);
+
+        assertEquals(JourneyStatus.COMPLETED, journey.getStatus());
+        assertEquals("PARTIAL", journey.completionRank());
+        assertEquals(0, journey.completionBonusPoints());
+        verify(gamificationService, never()).awardPoints(anyLong(), anyInt(), any(), anyString(), anyString());
+    }
 }

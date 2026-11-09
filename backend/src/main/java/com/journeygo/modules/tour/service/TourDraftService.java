@@ -410,6 +410,7 @@ public class TourDraftService {
         }
         tour.setStatus(TourStatus.PAUSED);
         tour.setApproved(false);
+        log.info("[TourDraft] user={} tạm ngừng bán tour={}", userId, tourId);
         return save(tour);
     }
 
@@ -422,6 +423,7 @@ public class TourDraftService {
         providerProfileService.requireCanManageTours(userId);
         tour.setStatus(TourStatus.PUBLISHED);
         tour.setApproved(true);
+        log.info("[TourDraft] user={} mở bán lại tour={}", userId, tourId);
         TourDetailResponse response = save(tour);
         slotService.syncSlots(tour);
         return response;

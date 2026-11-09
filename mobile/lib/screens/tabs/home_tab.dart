@@ -17,24 +17,19 @@ import '../journey/journey_launcher.dart';
 import '../journey/task_screen.dart';
 import '../modals/notification_dialog.dart';
 import '../common/heritage_motion.dart';
+import '../common/ink.dart';
 import '../common/tab_refresh.dart';
 import '../tours/tour_list_screen.dart';
 import 'home/home_sections.dart';
-import 'home/journey_card.dart';
 
-/// Trang chủ du khách: tìm kiếm, tour nổi bật, chủ đề, vùng miền và các dải tour.
-/// Hành trình đang đi (nếu có) hiện ở đầu trang để quay lại nhanh.
+/// Trang chủ du khách: tìm kiếm, hành trình đang đi, khởi hành sắp tới, chủ đề, vùng miền và các dải tour.
+/// Ảnh là ảnh chụp thật (ảnh bìa tour, ảnh Admin gắn cho chủ đề / vùng miền); thiếu ảnh thì nền trung tính.
 class HomeTab extends StatefulWidget {
   final UserModel currentUser;
   final Function(int) onNavigateToTab;
   final ValueListenable<int>? selectedTab;
 
-  const HomeTab({
-    super.key,
-    required this.currentUser,
-    required this.onNavigateToTab,
-    this.selectedTab,
-  });
+  const HomeTab({super.key, required this.currentUser, required this.onNavigateToTab, this.selectedTab});
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -69,6 +64,9 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
   List<JourneyMission> _missions = [];
   TourJourney? _journey;
   double? _nextDistance;
+
+  /// Ảnh trạm hiện tại của hành trình đang đi (ảnh điểm dừng, không có thì ảnh bìa tour).
+  String? _journeyImage;
 
   /// Tỉnh/thành du khách đang đứng (GPS + Goong); null thì ẩn nhãn vị trí.
   String? _area;
@@ -128,7 +126,35 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
       _firstLoad = false;
     });
     _updateNextDistance();
+    _loadJourneyImage();
     _loadArea();
+  }
+
+  /// Ảnh cho thẻ hành trình: ảnh điểm dừng đang mở (tour 5 bước) → ảnh bìa tour.
+  Future<void> _loadJourneyImage() async {
+    final journey = _journey;
+    if (journey == null) {
+      if (_journeyImage != null) setState(() => _journeyImage = null);
+      return;
+    }
+    final fromList = _tours.where((t) => t.id == journey.tourId).firstOrNull?.coverImageUrl;
+    String? image = fromList;
+    try {
+      final detail = await _tourService.getPublicDetail(journey.tourId);
+      final next = HomeJourneyCard.nextStop(journey);
+      final stop = next == null ? null : detail.stops.where((s) => s.id == next.destinationId).firstOrNull;
+      image = stop?.imageUrl ?? detail.coverImageUrl ?? fromList;
+    } catch (_) {
+      // Không tải được chi tiết: giữ ảnh bìa từ danh sách tour.
+    }
+    if (mounted && image != _journeyImage) setState(() => _journeyImage = image);
+  }
+
+  /// Ảnh cho ô chủ đề / vùng miền: ảnh Admin gắn → ảnh bìa một tour cùng danh mục → không có (nền trung tính).
+  PhotoRef _catalogPhoto(CatalogItem item, bool Function(TourModel) belongs) {
+    if (item.imageUrl != null) return (url: item.imageUrl, credit: item.imageCredit);
+    final tour = _tours.where((t) => belongs(t) && t.coverImageUrl != null).firstOrNull;
+    return (url: tour?.coverImageUrl, credit: null);
   }
 
   Future<void> _loadArea() async {
@@ -137,12 +163,6 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
   }
 
   // ── Các dải tour, chia từ danh sách đã tải (mới nhất trước) ────────────────
-
-  /// Tour nổi bật: 5 tour mới nhất, ưu tiên tour có ảnh bìa.
-  List<TourModel> get _featured {
-    final withCover = _tours.where((t) => t.coverImageUrl != null).toList();
-    return (withCover.isNotEmpty ? withCover : _tours).take(5).toList();
-  }
 
   List<TourModel> _byFormat(String format) => _tours.where((t) => t.tourFormat == format).take(10).toList();
 
@@ -175,7 +195,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
   /// chỉ tính khi máy đã cấp quyền vị trí, trang chủ không tự xin quyền.
   Future<void> _updateNextDistance() async {
     final journey = _journey;
-    final next = journey == null ? null : JourneyCard.nextStop(journey);
+    final next = journey == null ? null : HomeJourneyCard.nextStop(journey);
     if (next == null) {
       if (_nextDistance != null) setState(() => _nextDistance = null);
       return;
@@ -225,139 +245,191 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _loadAllData,
-      color: AppCultureColors.heritageJade,
-      edgeOffset: 140 + MediaQuery.paddingOf(context).top,
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          _buildHeader(),
-          if (_firstLoad)
-            const SliverToBoxAdapter(child: HomeSkeleton())
-          else
-            ..._buildSections(),
-          // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
-          const SliverToBoxAdapter(child: SizedBox(height: 110)),
-        ],
+    return ColoredBox(
+      color: Colors.white,
+      child: RefreshIndicator(
+        onRefresh: _loadAllData,
+        color: AppInk.accent,
+        edgeOffset: 144 + MediaQuery.paddingOf(context).top,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            _buildHeader(),
+            if (_firstLoad) const SliverToBoxAdapter(child: HomeSkeleton()) else ..._buildSections(),
+            // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
+            const SliverToBoxAdapter(child: SizedBox(height: 110)),
+          ],
+        ),
       ),
     );
   }
 
   List<Widget> _buildSections() {
     var order = 0;
-    Widget block(Widget child) => SliverToBoxAdapter(child: Reveal(order: order++, child: child));
+    Widget block(Widget child) => SliverToBoxAdapter(
+      child: Reveal(order: order++, child: child),
+    );
 
     final dayTrips = _byFormat('DAY_TRIP');
     final multiDays = _byFormat('MULTI_DAY');
     final upcoming = _upcoming;
     final regions = _visibleRegions;
 
+    final journey = _journey;
+
     return [
-      if (_journey != null)
-        block(Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-          child: JourneyCard(
-            journey: _journey,
-            nextDistance: _nextDistance,
-            onContinue: _continueJourney,
-            onExplore: _openList,
+      block(
+        HomeQuickTabs(
+          tabs: [
+            (
+              label: 'Trong ngày',
+              onTap: () => _openList(
+                filter: const TourFilter(format: 'DAY_TRIP'),
+                title: 'Tour trong ngày',
+              ),
+            ),
+            (
+              label: 'Nhiều ngày',
+              onTap: () => _openList(
+                filter: const TourFilter(format: 'MULTI_DAY'),
+                title: 'Tour nhiều ngày',
+              ),
+            ),
+            (
+              label: 'Sắp khởi hành',
+              onTap: () => _openList(
+                filter: const TourFilter(order: TourOrder.departure),
+                title: 'Khởi hành sắp tới',
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (journey != null)
+        block(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: HomeJourneyCard(
+              journey: journey,
+              imageUrl: _journeyImage,
+              distance: _nextDistance,
+              mission: _missions.firstOrNull,
+              missionCount: _missions.length,
+              onContinue: _continueJourney,
+              onMission: _missions.isEmpty ? null : () => _openMission(_missions.first),
+            ),
           ),
-        )),
-      if (_missions.isNotEmpty)
-        block(_section(
-          header: SectionHeader(
-            title: 'Nhiệm vụ đang chờ',
-            subtitle: '${_missions.length} thử thách tại các trạm đã check-in',
-          ),
-          child: MissionStrip(missions: _missions, onOpen: _openMission),
-        )),
+        ),
       if (_toursError != null && _tours.isEmpty)
         block(_buildToursError())
       else if (_tours.isEmpty)
         block(_buildNoTours())
       else ...[
-        block(Padding(
-          padding: const EdgeInsets.only(top: 18),
-          child: FeaturedTourBanner(tours: _featured, onOpen: _openTour),
-        )),
-        if (_themes.isNotEmpty)
-          block(_section(
-            header: const SectionHeader(title: 'Khám phá theo chủ đề'),
-            child: ThemeRow(
-              themes: _themes,
-              onOpen: (t) => _openList(filter: TourFilter(themeId: t.id), title: t.name),
-            ),
-          )),
-        if (regions.isNotEmpty)
-          block(_section(
-            header: const SectionHeader(title: 'Điểm đến theo vùng miền'),
-            child: RegionCards(
-              regions: regions,
-              tourCounts: _regionCounts,
-              onOpen: (r) => _openList(filter: TourFilter(regionId: r.id), title: r.name),
-            ),
-          )),
         if (upcoming.isNotEmpty)
-          block(_section(
-            header: SectionHeader(
+          block(
+            _section(
               title: 'Khởi hành sắp tới',
-              subtitle: 'Còn ngày khởi hành gần nhất',
-              actionLabel: 'Xem tất cả',
-              onAction: () => _openList(
+              onAll: () => _openList(
                 filter: const TourFilter(order: TourOrder.departure),
                 title: 'Khởi hành sắp tới',
               ),
-            ),
-            child: TourStrip(tours: upcoming, onOpen: _openTour, showDeparture: true),
-          )),
-        if (dayTrips.isNotEmpty)
-          block(_section(
-            header: SectionHeader(
-              title: 'Tour trong ngày',
-              subtitle: 'Đi và về trong một ngày',
-              actionLabel: 'Xem tất cả',
-              onAction: () => _openList(filter: const TourFilter(format: 'DAY_TRIP'), title: 'Tour trong ngày'),
-            ),
-            child: TourStrip(tours: dayTrips, onOpen: _openTour),
-          )),
-        if (multiDays.isNotEmpty)
-          block(_section(
-            header: SectionHeader(
-              title: 'Tour nhiều ngày',
-              subtitle: 'Hành trình dài ngày khám phá sâu',
-              actionLabel: 'Xem tất cả',
-              onAction: () => _openList(filter: const TourFilter(format: 'MULTI_DAY'), title: 'Tour nhiều ngày'),
-            ),
-            child: TourStrip(tours: multiDays, onOpen: _openTour),
-          )),
-        block(Padding(
-          padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
-          child: OutlinedButton.icon(
-            onPressed: _openList,
-            icon: const Icon(Icons.travel_explore_rounded, size: 19),
-            label: Text(
-              _allLoaded ? 'Xem tất cả ${_tours.length} tour' : 'Xem tất cả tour',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppCultureColors.jadeDark,
-              side: const BorderSide(color: AppCultureColors.heritageJade),
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              child: TourPhotoStrip(tours: upcoming, onOpen: _openTour),
             ),
           ),
-        )),
+        if (_themes.isNotEmpty)
+          block(
+            _section(
+              title: 'Khám phá theo chủ đề',
+              child: ThemePhotoGrid(
+                themes: _themes,
+                photoOf: (t) => _catalogPhoto(t, (tour) => tour.themeId == t.id),
+                onOpen: (t) => _openList(
+                  filter: TourFilter(themeId: t.id),
+                  title: t.name,
+                ),
+              ),
+            ),
+          ),
+        if (regions.isNotEmpty)
+          block(
+            _section(
+              title: 'Điểm đến theo vùng miền',
+              child: RegionPhotoStrip(
+                regions: regions,
+                tourCounts: _regionCounts,
+                photoOf: (r) => _catalogPhoto(r, (tour) => tour.regionId == r.id),
+                onOpen: (r) => _openList(
+                  filter: TourFilter(regionId: r.id),
+                  title: r.name,
+                ),
+              ),
+            ),
+          ),
+        if (dayTrips.isNotEmpty)
+          block(
+            _section(
+              title: 'Tour trong ngày',
+              onAll: () => _openList(
+                filter: const TourFilter(format: 'DAY_TRIP'),
+                title: 'Tour trong ngày',
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    for (var i = 0; i < dayTrips.length && i < 4; i++)
+                      TourRow(
+                        tour: dayTrips[i],
+                        onTap: () => _openTour(dayTrips[i]),
+                        divider: i < dayTrips.length - 1 && i < 3,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (multiDays.isNotEmpty)
+          block(
+            _section(
+              title: 'Tour nhiều ngày',
+              onAll: () => _openList(
+                filter: const TourFilter(format: 'MULTI_DAY'),
+                title: 'Tour nhiều ngày',
+              ),
+              child: TourPhotoStrip(tours: multiDays, onOpen: _openTour),
+            ),
+          ),
+        block(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
+            child: OutlinedButton(
+              onPressed: _openList,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppInk.ink,
+                side: const BorderSide(color: AppInk.ink),
+                minimumSize: const Size.fromHeight(48),
+                shape: const StadiumBorder(),
+              ),
+              child: Text(
+                _allLoaded ? 'Xem tất cả ${_tours.length} tour' : 'Xem tất cả tour',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ),
       ],
     ];
   }
 
-  Widget _section({required Widget header, required Widget child}) {
+  Widget _section({required String title, VoidCallback? onAll, required Widget child}) {
     return Padding(
-      padding: const EdgeInsets.only(top: 26),
+      padding: const EdgeInsets.only(top: 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [header, const SizedBox(height: 12), child],
+        children: [
+          HomeSectionTitle(title: title, actionLabel: onAll == null ? null : 'Xem tất cả', onAction: onAll),
+          child,
+        ],
       ),
     );
   }
@@ -413,64 +485,39 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
     );
   }
 
-  /// Đầu trang gọn: lời chào, vị trí, điểm thưởng, chuông; ô tìm kiếm luôn ghim khi cuộn.
+  /// Tên gọi trong lời chào: tên riêng (từ cuối của họ tên), bỏ phần trong ngoặc. "Nguyễn Văn Long (SE…)" → "Long".
+  String get _firstName {
+    final name = widget.currentUser.fullName.replaceAll(RegExp(r'\(.*?\)'), '').trim();
+    final parts = name.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    return parts.isEmpty ? 'bạn' : parts.last;
+  }
+
+  /// Đầu trang nền trắng: lời chào + khu vực, điểm thưởng, chuông; ô tìm kiếm lớn luôn ghim khi cuộn.
   Widget _buildHeader() {
     return SliverAppBar(
       pinned: true,
       automaticallyImplyLeading: false,
-      backgroundColor: AppCultureColors.jadeDark,
+      backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      toolbarHeight: 64,
+      scrolledUnderElevation: 0,
+      toolbarHeight: 68,
       titleSpacing: 16,
-      flexibleSpace: ClipRect(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppCultureColors.jadeDark, AppCultureColors.oceanBlue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-            ),
-            Positioned(
-              right: -50,
-              top: -40,
-              child: DrumMotif(size: 170, color: Colors.white.withValues(alpha: 0.12)),
-            ),
-          ],
-        ),
-      ),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Xin chào, ${widget.currentUser.fullName}',
+            'Xin chào, $_firstName',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+            style: const TextStyle(color: AppInk.muted, fontSize: 13, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 2),
-          Row(
-            children: [
-              Icon(
-                _area == null ? Icons.travel_explore_rounded : Icons.location_on_rounded,
-                size: 13,
-                color: Colors.white70,
-              ),
-              const SizedBox(width: 3),
-              Flexible(
-                child: Text(
-                  _area ?? 'Hôm nay bạn muốn đi đâu?',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w500),
-                ),
-              ),
-            ],
+          Text(
+            _area ?? 'Hôm nay bạn muốn đi đâu?',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppInk.ink, fontSize: 17, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -480,33 +527,53 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
         Padding(padding: const EdgeInsets.only(right: 12), child: _buildBell()),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(64),
+        preferredSize: const Size.fromHeight(76),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-          child: Pressable(
-            onTap: () => _openList(focusSearch: true),
-            child: Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4)),
-                ],
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.search_rounded, color: AppCultureColors.textMuted),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Tìm tour, vùng miền, chủ đề...',
-                      style: TextStyle(fontSize: 14, color: AppCultureColors.textLight),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: Semantics(
+            button: true,
+            label: 'Tìm tour, điểm đến, chủ đề',
+            child: Pressable(
+              onTap: () => _openList(focusSearch: true),
+              child: Container(
+                height: 60,
+                padding: const EdgeInsets.only(left: 18, right: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: AppInk.border),
+                  boxShadow: [
+                    BoxShadow(color: AppInk.ink.withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, 6)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.search_rounded, color: AppInk.ink),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Bạn muốn khám phá ở đâu?',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppInk.ink),
+                          ),
+                          Text('Tour · Điểm đến · Chủ đề', style: TextStyle(fontSize: 12, color: AppInk.muted)),
+                        ],
+                      ),
                     ),
-                  ),
-                  Icon(Icons.tune_rounded, color: AppCultureColors.heritageJade, size: 20),
-                ],
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppInk.border),
+                      ),
+                      child: const Icon(Icons.tune_rounded, size: 19, color: AppInk.ink),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -518,38 +585,37 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
   Widget _buildPointsPill() {
     return Center(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppInk.border),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.star_rounded, size: 15, color: AppCultureColors.gold),
-            const SizedBox(width: 4),
-            Text(
-              formatThousands(_userPoints),
-              style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700),
-            ),
-          ],
+        child: Text(
+          '${formatThousands(_userPoints)} điểm',
+          style: const TextStyle(color: AppInk.ink, fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
     );
   }
 
   Widget _buildBell() {
-    return GestureDetector(
-      onTap: () => showNotificationSheet(context),
-      child: Container(
-        padding: const EdgeInsets.all(9),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.18),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white24),
+    return Semantics(
+      button: true,
+      label: 'Thông báo',
+      child: GestureDetector(
+        onTap: () => showNotificationSheet(context),
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppInk.border),
+          ),
+          child: const NotificationBellIcon(size: 20, color: AppInk.ink),
         ),
-        child: const NotificationBellIcon(size: 20),
       ),
     );
   }

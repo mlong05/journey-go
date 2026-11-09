@@ -353,7 +353,10 @@ export default function ToursManager({
       ...(Array.isArray(deletedRes.value) ? deletedRes.value : []),
     ];
 
-    return merged.map(normalizeTour).filter(Boolean);
+    // Bản nháp chưa gửi duyệt là việc riêng của đối tác: kiểm duyệt viên không thấy.
+    return merged
+      .map(normalizeTour)
+      .filter((t) => t && (isProvider || t.status !== "DRAFT"));
   }, [source, showDeletedFilter]);
 
   /**
@@ -656,7 +659,7 @@ export default function ToursManager({
       >
         Tất cả ({counts.all})
       </button>
-      {TOUR_STATUS_ORDER.map((status) => {
+      {TOUR_STATUS_ORDER.filter((s) => source === "mine" || s !== "DRAFT").map((status) => {
         const meta = TOUR_STATUS_META[status];
         const isActive = statusTab === status;
         const isPending = status === "PENDING_REVIEW";

@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vector_map_tiles/vector_map_tiles.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/goong_map_style.dart';
 
 // Bộ phận dùng chung cho các bản đồ trải nghiệm (hành trình, dẫn đường tới trạm).
 
 // ── Nguồn ảnh bản đồ ──────────────────────────────────────────────────────────
-// Đã kiểm tra tại Việt Nam, không cần khóa API:
+// Đường phố: Goong (bản đồ vector Việt Nam) khi có GOONG_MAPTILES_KEY, xem GoongMapStyle.
+// Dự phòng và ảnh vệ tinh — đã kiểm tra tại Việt Nam, không cần khóa API:
 //  - tile.openstreetmap.org bị chặn trên một số mạng (Connection refused).
 //  - CARTO trả ảnh "API KEY REQUIRED" cho yêu cầu từ ứng dụng không có khóa.
 //  - Esri World Street Map: đường phố có tên tiếng Việt; World Imagery: ảnh vệ tinh.
@@ -21,8 +24,13 @@ const _satelliteLabelsUrl =
 
 const mapBackground = Color(0xFFEFF3F1);
 
-/// Lớp nền: đường phố hoặc ảnh vệ tinh (kèm tên địa danh).
-List<Widget> baseTileLayers({required bool satellite}) => satellite
+/// Lớp nền: đường phố (Goong nếu đã cấu hình khóa, không thì Esri) hoặc ảnh vệ tinh Esri (kèm tên địa danh).
+List<Widget> baseTileLayers({required bool satellite}) =>
+    !satellite && GoongMapStyle.configured
+        ? const [_StreetLayer(key: ValueKey('street-goong'))]
+        : _esriLayers(satellite: satellite);
+
+List<Widget> _esriLayers({required bool satellite}) => satellite
     ? [
         TileLayer(
           key: const ValueKey('satellite'),
@@ -46,7 +54,39 @@ List<Widget> baseTileLayers({required bool satellite}) => satellite
         ),
       ];
 
-/// Ghi nguồn bản đồ (bắt buộc theo điều khoản Esri). Đặt trong bảng trượt vì bảng che góc dưới bản đồ.
+/// Đường phố của Goong; trong lúc tải style (hoặc khi lỗi) thì hiện ảnh nền Esri để bản đồ không trống.
+class _StreetLayer extends StatefulWidget {
+  const _StreetLayer({super.key});
+
+  @override
+  State<_StreetLayer> createState() => _StreetLayerState();
+}
+
+class _StreetLayerState extends State<_StreetLayer> {
+  late final Future<Style?> _style = GoongMapStyle.street();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Style?>(
+      future: _style,
+      builder: (context, snap) {
+        final style = snap.data;
+        if (style == null) return _esriLayers(satellite: false).first;
+        return VectorTileLayer(
+          key: const ValueKey('goong-vector'),
+          theme: style.theme,
+          sprites: style.sprites,
+          tileProviders: style.providers,
+          // Vẽ dạng vector: chữ và đường nét sắc khi phóng to, xoay/thu phóng mượt hơn.
+          layerMode: VectorTileLayerMode.vector,
+          maximumZoom: 20,
+        );
+      },
+    );
+  }
+}
+
+/// Ghi nguồn bản đồ (bắt buộc theo điều khoản Goong / Esri). Đặt trong bảng trượt vì bảng che góc dưới bản đồ.
 class MapAttributionText extends StatelessWidget {
   final bool satellite;
 
@@ -54,16 +94,22 @@ class MapAttributionText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => launchUrl(
-        Uri.parse('https://www.esri.com/en-us/legal/terms/data-attributions'),
-        mode: LaunchMode.externalApplication,
-      ),
-      child: Text(
-        'Bản đồ: ${satellite ? 'Esri, Maxar, Earthstar Geographics' : 'Esri, HERE, Garmin, OpenStreetMap'}',
-        textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 10.5, color: AppCultureColors.textLight),
-      ),
+    return ValueListenableBuilder<bool>(
+      valueListenable: GoongMapStyle.active,
+      builder: (context, goong, _) {
+        final useGoong = goong && !satellite;
+        return GestureDetector(
+          onTap: () => launchUrl(
+            Uri.parse(useGoong ? 'https://goong.io' : 'https://www.esri.com/en-us/legal/terms/data-attributions'),
+            mode: LaunchMode.externalApplication,
+          ),
+          child: Text(
+            'Bản đồ: ${useGoong ? '© Goong' : satellite ? 'Esri, Maxar, Earthstar Geographics' : 'Esri, HERE, Garmin, OpenStreetMap'}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 10.5, color: AppCultureColors.textLight),
+          ),
+        );
+      },
     );
   }
 }

@@ -59,7 +59,7 @@ export async function createRegion(payload) {
 /**
  * Cập nhật khu vực (ADMIN / MODERATOR)
  * PUT /api/v1/regions/{id}
- * Payload: { name, slug? }
+ * Payload: { name, slug?, imageUrl?, imageCredit? } — ảnh không truyền = giữ nguyên, "" = bỏ ảnh
  */
 export async function updateRegion(id, payload) {
   const body = {
@@ -68,6 +68,8 @@ export async function updateRegion(id, payload) {
   if (payload.slug && String(payload.slug).trim()) {
     body.slug = String(payload.slug).trim().toLowerCase();
   }
+  if (payload.imageUrl !== undefined) body.imageUrl = payload.imageUrl;
+  if (payload.imageCredit !== undefined) body.imageCredit = payload.imageCredit;
   const res = await apiClient.put(ENDPOINTS.BY_ID(id), body);
   return unwrap(res);
 }
