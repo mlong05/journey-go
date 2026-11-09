@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Plus, Loader2, Trash2, RotateCcw, Pencil, Check, X } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import PaginationBar from "@/components/ui/PaginationBar";
 
 /** Bộ màu cố định (Tailwind cần class tĩnh). */
 const ACCENTS = {
@@ -36,6 +37,8 @@ export default function CatalogCard({
   const [name, setName] = useState("");
   const [editing, setEditing] = useState(null); // { id, name }
   const [error, setError] = useState("");
+  const [page, setPage] = useState(0); // 0-based
+  const [pageSize, setPageSize] = useState(10);
   const inputRef = useRef(null);
   const { confirm, confirmDialog } = useConfirm();
 
@@ -92,6 +95,11 @@ export default function CatalogCard({
   };
 
   const rows = tab === "active" ? items : deleted;
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1); // xóa bớt dòng ở trang cuối → tự lùi trang
+  const pageRows = rows.slice(safePage * pageSize, safePage * pageSize + pageSize);
+  const editingId = editing?.id ?? null;
+  const switchTab = (next) => { setTab(next); setPage(0); setEditing(null); };
 
   return (
     <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
@@ -117,11 +125,11 @@ export default function CatalogCard({
       </div>
 
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => setTab("active")}
+        <button type="button" onClick={() => switchTab("active")}
           className={`px-3 py-1 rounded-xl text-xs font-bold cursor-pointer ${tab === "active" ? `${a.tab} text-white` : "bg-slate-100 text-slate-600"}`}>
           Đang hoạt động ({items.length})
         </button>
-        <button type="button" onClick={() => setTab("deleted")}
+        <button type="button" onClick={() => switchTab("deleted")}
           className={`px-3 py-1 rounded-xl text-xs font-bold cursor-pointer inline-flex items-center gap-1 ${tab === "deleted" ? "bg-rose-600 text-white" : "bg-slate-100 text-slate-600"}`}>
           <Trash2 size={12} /> Thùng rác ({deleted.length})
         </button>
@@ -135,21 +143,20 @@ export default function CatalogCard({
           {tab === "active" ? `Chưa có ${noun} nào. Nhập tên ở trên để thêm.` : "Thùng rác trống."}
         </div>
       ) : (
-        <ul className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
-          {rows.map((item, idx) => (
+        <div className="rounded-xl border border-slate-200 overflow-hidden">
+        {/* Danh sách tự cuộn khi dài; thanh phân trang luôn ở dưới */}
+        <ul className="max-h-[460px] overflow-y-auto divide-y divide-slate-100">
+          {pageRows.map((item, idx) => (
             <li key={item.id}
               className={`px-4 py-3 flex items-center gap-3 transition-colors ${item.deleted ? "bg-rose-50/30" : "bg-white hover:bg-slate-50/70"}`}>
-              <span className="w-7 shrink-0 text-xs font-bold text-slate-400 tabular-nums">{idx + 1}</span>
-              {editing?.id === item.id ? (
+              <span className="w-7 shrink-0 text-xs font-bold text-slate-400 tabular-nums">{safePage * pageSize + idx + 1}</span>
+              {editingId === item.id ? (
                 <input autoFocus value={editing.name} maxLength={150}
                   onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditing(null); }}
                   className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 ${a.ring}`} />
               ) : (
-                <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center sm:gap-3">
-                  <p className="font-bold text-slate-900 text-sm truncate">{item.name}</p>
-                  <p className="text-[11px] font-mono text-slate-400 truncate">{item.slug}</p>
-                </div>
+                <p className="flex-1 min-w-0 font-bold text-slate-900 text-sm truncate">{item.name}</p>
               )}
               <div className="flex items-center gap-1.5 shrink-0">
                 {item.deleted ? (
@@ -157,7 +164,7 @@ export default function CatalogCard({
                     className="text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200">
                     <RotateCcw size={14} />
                   </IconButton>
-                ) : editing?.id === item.id ? (
+                ) : editingId === item.id ? (
                   <>
                     <IconButton title="Lưu" onClick={saveEdit} className="text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200">
                       <Check size={15} />
@@ -181,6 +188,10 @@ export default function CatalogCard({
             </li>
           ))}
         </ul>
+        <PaginationBar page={safePage} totalPages={totalPages} totalElements={rows.length} unit={noun}
+          onChange={setPage} pageSize={pageSize} sizeOptions={[5, 10, 20, 50]}
+          onSizeChange={(size) => { setPageSize(size); setPage(0); }} />
+        </div>
       )}
     </div>
   );
