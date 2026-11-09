@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart' show Position;
@@ -17,7 +18,8 @@ import 'navigation.dart' show formatDuration;
 import 'reward_effects.dart';
 import 'station_map.dart';
 
-enum _Phase { loading, intro, locked, quiz, result, error }
+/// `activity`: hoạt động thực địa của tour 5 bước — đếm ngược rồi quét QR tại điểm để mở câu hỏi.
+enum _Phase { loading, intro, locked, activity, quiz, result, error }
 
 /// Trong khoảng này tới trạm thì bỏ tuyến đường, chỉ còn la bàn + khoảng cách đường chim bay
 /// (lối đi trong khuôn viên di tích hầu như không có trên bản đồ).
@@ -85,6 +87,13 @@ class _TaskScreenState extends State<TaskScreen> {
   final Map<int, int> _choices = {};
   final Map<int, TextEditingController> _texts = {};
 
+  // Hoạt động thực địa: đếm ngược trước khi được quét QR.
+  Timer? _activityTimer;
+  int _secondsLeft = 0;
+
+  /// Đã đếm ngược xong (hoặc hoạt động không đếm giờ): được quét QR. Giữ nguyên khi làm lại câu hỏi.
+  bool _activityDone = false;
+
   @override
   void initState() {
     super.initState();
@@ -93,6 +102,7 @@ class _TaskScreenState extends State<TaskScreen> {
 
   @override
   void dispose() {
+    _activityTimer?.cancel();
     _positionSub?.cancel();
     _compassSub?.cancel();
     for (final c in _texts.values) {
@@ -212,11 +222,13 @@ class _TaskScreenState extends State<TaskScreen> {
     final cooledDown =
         _lastAutoCheck == null ||
         now.difference(_lastAutoCheck!) > const Duration(seconds: 8);
+    // Hoạt động bắt buộc QR không tự mở được bằng GPS: du khách bấm "Bắt đầu hoạt động".
     if (distance != null &&
         distance <= radius &&
         !_busy &&
         cooledDown &&
-        _phase == _Phase.locked) {
+        _phase == _Phase.locked &&
+        !(_content?.qrRequired ?? false)) {
       _lastAutoCheck = now;
       _locateAndOpen();
     }
@@ -279,13 +291,18 @@ class _TaskScreenState extends State<TaskScreen> {
       if (!mounted) return;
       _qr = (qr != null && content.unlocked) ? qr : null;
       if (qr != null && !content.unlocked && !content.isFinished) {
-        _snack('Mã QR không khớp với trạm này. Hãy thử lại.');
+        _snack(content.qrRequired
+            ? 'Mã QR không khớp với điểm hoạt động này. Hãy quét đúng mã tại chỗ.'
+            : 'Mã QR không khớp với trạm này. Hãy thử lại.');
       }
       setState(() {
         _content = content;
         _phase = content.isFinished
             ? _Phase.intro
-            : (content.unlocked ? _Phase.quiz : _Phase.locked);
+            : content.unlocked
+                ? _Phase.quiz
+                // Đã làm xong hoạt động mà QR sai: ở lại bước quét QR, không bắt đếm ngược lại.
+                : (content.qrRequired && _activityDone ? _Phase.activity : _Phase.locked);
         _index = 0;
       });
     } on LocationException catch (e) {
@@ -308,7 +325,7 @@ class _TaskScreenState extends State<TaskScreen> {
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => QrScanScreen(
-          title: 'Quét QR tại trạm',
+          title: _task.qrRequired ? 'Quét QR xác nhận hoàn thành' : 'Quét QR tại trạm',
           hint: _task.station != null
               ? 'Quét mã QR tại ${_task.station!.name}'
               : 'Quét mã QR tại trạm kế tiếp',
@@ -316,6 +333,41 @@ class _TaskScreenState extends State<TaskScreen> {
       ),
     );
     if (value != null && mounted) await _locateAndOpen(qr: value);
+  }
+
+  // ── Hoạt động thực địa (tour 5 bước) ───────────────────────────────────────
+
+  /// Bắt đầu hoạt động tại checkpoint: đếm ngược theo thời gian quy định, hết giờ mới được quét QR.
+  void _startActivity() {
+    final seconds = _task.durationSeconds ?? 0;
+    _activityTimer?.cancel();
+    setState(() {
+      _phase = _Phase.activity;
+      _secondsLeft = seconds;
+      _activityDone = seconds <= 0;
+    });
+    _syncTracking();
+    if (seconds <= 0) return;
+    _activityTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      setState(() {
+        _secondsLeft = (_secondsLeft - 1).clamp(0, seconds);
+        if (_secondsLeft == 0) {
+          _activityDone = true;
+          t.cancel();
+        }
+      });
+      if (_secondsLeft == 0) showPointsBurst(context, text: 'Hết giờ!', icon: Icons.alarm_on_rounded);
+    });
+  }
+
+  /// CHỈ BẢN DEBUG: bỏ qua đếm ngược để thử nhanh.
+  void _skipCountdown() {
+    _activityTimer?.cancel();
+    setState(() {
+      _secondsLeft = 0;
+      _activityDone = true;
+    });
   }
 
   void _start() {
@@ -374,7 +426,8 @@ class _TaskScreenState extends State<TaskScreen> {
       });
       _syncTracking();
       if (result.completed) {
-        final earned = result.pointsEarned > 0
+        // Câu đố chấm theo câu có thể nhận một phần (hoặc 0) điểm: hiện đúng số điểm nhận được.
+        final earned = task.perQuestionPoints || result.pointsEarned > 0
             ? result.pointsEarned
             : task.pointsReward;
         if (earned > 0) showPointsBurst(context, text: '+$earned điểm');
@@ -400,6 +453,11 @@ class _TaskScreenState extends State<TaskScreen> {
     _result = null;
     _qr = null;
     _index = 0;
+    // Hoạt động đã làm xong, chỉ trả lời sai: quét lại QR để trả lời lại, không phải đếm ngược lại.
+    if ((_content?.qrRequired ?? false) && _activityDone) {
+      setState(() => _phase = _Phase.activity);
+      return;
+    }
     _load();
   }
 
@@ -569,6 +627,8 @@ class _TaskScreenState extends State<TaskScreen> {
         return _buildIntro();
       case _Phase.locked:
         return _buildLocked();
+      case _Phase.activity:
+        return _buildActivity();
       case _Phase.quiz:
         return _buildQuiz();
       case _Phase.result:
@@ -1286,6 +1346,7 @@ class _TaskScreenState extends State<TaskScreen> {
     required bool arrived,
     required double closeness,
   }) {
+    final task = _task;
     // Mũi tên: chỉ hướng tới trạm; khi đang đi thì tính so với hướng đang đi.
     // Hướng đang đi (GPS) khi di chuyển, hướng điện thoại (la bàn) khi đứng yên.
     final heading = _effectiveHeading;
@@ -1380,9 +1441,11 @@ class _TaskScreenState extends State<TaskScreen> {
                         const SizedBox(height: 4),
                         Text(
                           arrived
-                              ? (_busy
-                                    ? 'Đang mở câu hỏi...'
-                                    : 'Câu hỏi sẽ tự mở')
+                              ? (task.qrRequired
+                                    ? 'Bấm "Bắt đầu hoạt động"'
+                                    : _busy
+                                        ? 'Đang mở câu hỏi...'
+                                        : 'Câu hỏi sẽ tự mở')
                               : directionText,
                           style: const TextStyle(
                             fontSize: 13.5,
@@ -1452,7 +1515,14 @@ class _TaskScreenState extends State<TaskScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: arrived
+                    child: task.qrRequired
+                        // Hoạt động thực địa: tới checkpoint rồi bấm bắt đầu (bản debug cho bấm từ xa để thử).
+                        ? PrimaryButton(
+                            label: arrived || !kDebugMode ? 'Bắt đầu hoạt động' : 'Bắt đầu (dev, chưa tới nơi)',
+                            icon: Icons.play_arrow_rounded,
+                            onPressed: arrived || kDebugMode ? _startActivity : null,
+                          )
+                        : arrived
                         ? PrimaryButton(
                             label: 'Mở câu hỏi',
                             icon: Icons.quiz_rounded,
@@ -1579,12 +1649,19 @@ class _TaskScreenState extends State<TaskScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        PrimaryButton(
-          label: 'Quét QR tại trạm',
-          icon: Icons.qr_code_scanner_rounded,
-          loading: _busy,
-          onPressed: _scanQr,
-        ),
+        if (task.qrRequired)
+          PrimaryButton(
+            label: 'Bắt đầu hoạt động',
+            icon: Icons.play_arrow_rounded,
+            onPressed: _startActivity,
+          )
+        else
+          PrimaryButton(
+            label: 'Quét QR tại trạm',
+            icon: Icons.qr_code_scanner_rounded,
+            loading: _busy,
+            onPressed: _scanQr,
+          ),
         const SizedBox(height: 6),
         Center(
           child: TextButton.icon(
@@ -1593,6 +1670,95 @@ class _TaskScreenState extends State<TaskScreen> {
             label: const Text('Xem manh mối'),
           ),
         ),
+      ],
+    );
+  }
+
+  /// Bước hoạt động: đồng hồ đếm ngược lớn; hết giờ thì quét mã QR tại điểm để mở câu hỏi.
+  Widget _buildActivity() {
+    final task = _task;
+    final total = task.durationSeconds ?? 0;
+    final progress = total <= 0 ? 1.0 : 1 - _secondsLeft / total;
+    final mm = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
+    final ss = (_secondsLeft % 60).toString().padLeft(2, '0');
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        SoftCard(
+          elevated: true,
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            children: [
+              Text(
+                task.station?.name ?? task.name,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, height: 1.25),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _activityDone
+                    ? 'Hoàn thành hoạt động! Quét mã QR tại điểm để trả lời câu hỏi.'
+                    : 'Thực hiện hoạt động tại chỗ. Hết giờ bạn sẽ được quét mã QR.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13.5, height: 1.45, color: AppCultureColors.textMuted),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: 190,
+                height: 190,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress.clamp(0.0, 1.0),
+                      strokeWidth: 12,
+                      strokeCap: StrokeCap.round,
+                      backgroundColor: AppCultureColors.surfaceSubtle,
+                      color: _activityDone ? AppCultureColors.heritageJade : AppCultureColors.oceanBlue,
+                    ),
+                    Center(
+                      child: _activityDone
+                          ? const Icon(Icons.check_rounded, size: 84, color: AppCultureColors.heritageJade)
+                          : Text(
+                              '$mm:$ss',
+                              style: const TextStyle(
+                                fontSize: 44,
+                                fontWeight: FontWeight.w800,
+                                fontFeatures: [FontFeature.tabularFigures()],
+                                color: AppCultureColors.textDark,
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              if (task.pointsReward > 0) ...[
+                const SizedBox(height: 18),
+                InfoChip(
+                  icon: Icons.stars_rounded,
+                  text: 'Trả lời đúng nhận +${task.pointsReward} điểm',
+                  background: AppCultureColors.rewardBg,
+                  foreground: AppCultureColors.rewardText,
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        PrimaryButton(
+          label: 'Quét mã QR tại điểm',
+          icon: Icons.qr_code_scanner_rounded,
+          loading: _busy,
+          onPressed: _activityDone ? _scanQr : null,
+        ),
+        if (kDebugMode && !_activityDone)
+          Center(
+            child: TextButton.icon(
+              onPressed: _skipCountdown,
+              icon: const Icon(Icons.fast_forward_rounded, size: 18),
+              label: const Text('Bỏ qua đếm ngược (dev)'),
+            ),
+          ),
       ],
     );
   }
@@ -1903,7 +2069,14 @@ class _TaskScreenState extends State<TaskScreen> {
     late final String title;
     late final String body;
 
-    if (success) {
+    if (success && task.perQuestionPoints) {
+      // Câu đố chấm theo câu: luôn hoàn thành sau một lần nộp, điểm theo số câu đúng.
+      final perfect = result.correctCount >= result.totalQuestions;
+      icon = perfect ? Icons.emoji_events_rounded : Icons.fact_check_rounded;
+      tone = result.correctCount > 0 ? AppCultureColors.heritageJade : AppCultureColors.amberDark;
+      title = perfect ? 'Xuất sắc!' : (result.correctCount > 0 ? 'Hoàn thành!' : 'Đã nộp bài');
+      body = 'Bạn trả lời đúng ${result.correctCount}/${result.totalQuestions} câu của "${task.name}".';
+    } else if (success) {
       icon = Icons.emoji_events_rounded;
       tone = AppCultureColors.heritageJade;
       title = 'Xuất sắc!';
@@ -1925,7 +2098,7 @@ class _TaskScreenState extends State<TaskScreen> {
                 'Cần đúng tất cả để nhận điểm. Còn ${result.attemptsRemaining} lượt làm lại.';
     }
 
-    final earned = result.pointsEarned > 0
+    final earned = task.perQuestionPoints || result.pointsEarned > 0
         ? result.pointsEarned
         : task.pointsReward;
 
