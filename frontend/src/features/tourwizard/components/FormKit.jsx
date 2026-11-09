@@ -52,16 +52,40 @@ export function Select({ error, children, className = "", ...props }) {
   );
 }
 
-export function NumberInput({ value, onChange, error, suffix, min, max, ...props }) {
+/** Phím không hợp lệ với ô số nguyên không âm (trình duyệt vẫn cho gõ "e", "-", "." vào type=number). */
+const NON_INTEGER_KEYS = ["e", "E", "+", "-", ".", ","];
+
+/**
+ * Ô nhập số nguyên không âm.
+ * - Gõ vượt `max` → tự hạ về `max` ngay (vd. giờ trong ngày không quá 23).
+ * - Nhỏ hơn `min` → nâng lên `min` khi rời ô (không ép lúc đang gõ, để gõ "50" khi min = 10 vẫn được).
+ */
+export function NumberInput({ value, onChange, error, suffix, min, max, onBlur, onKeyDown, ...props }) {
+  const handleChange = (e) => {
+    const raw = e.target.value;
+    if (raw === "") return onChange(null);
+    const n = Math.trunc(Number(raw));
+    if (!Number.isFinite(n) || n < 0) return;
+    onChange(max != null && n > max ? max : n);
+  };
   return (
     <div className="relative">
       <input
         type="number"
         inputMode="numeric"
+        step={1}
         min={min}
         max={max}
         value={value ?? ""}
-        onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+        onChange={handleChange}
+        onKeyDown={(e) => {
+          if (NON_INTEGER_KEYS.includes(e.key)) e.preventDefault();
+          onKeyDown?.(e);
+        }}
+        onBlur={(e) => {
+          if (min != null && value != null && value < min) onChange(min);
+          onBlur?.(e);
+        }}
         {...props}
         className={`${inputCls(error)} ${suffix ? "pr-14" : ""}`}
       />

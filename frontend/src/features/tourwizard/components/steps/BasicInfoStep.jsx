@@ -112,9 +112,10 @@ export default function BasicInfoStep({ tour, regions, themes, issues, readOnly,
         </Field>
 
         {form.tourFormat === "DAY_TRIP" ? (
-          <Field label="Thời lượng" required error={err("durationMinutes")}>
+          <Field label="Thời lượng" required error={err("durationMinutes")}
+            hint='Tour trong ngày: tối đa 23 giờ 59 phút. Tour dài hơn hãy chọn "Nhiều ngày".'>
             <div className="grid grid-cols-2 gap-2.5 max-w-sm">
-              <NumberInput value={hours} min={0} max={24} suffix="giờ" disabled={readOnly}
+              <NumberInput value={hours} min={0} max={23} suffix="giờ" disabled={readOnly}
                 onChange={(h) => setDuration(h, minutes)} />
               <NumberInput value={minutes} min={0} max={59} suffix="phút" disabled={readOnly}
                 onChange={(m) => setDuration(hours, m)} />
@@ -127,7 +128,7 @@ export default function BasicInfoStep({ tour, regions, themes, issues, readOnly,
                 onChange={(v) => update({ durationDays: v })} />
             </Field>
             <Field label="Số đêm" required error={nightsError || err("durationNights")}>
-              <NumberInput value={form.durationNights} min={0} max={60} suffix="đêm" disabled={readOnly}
+              <NumberInput value={form.durationNights} min={0} max={form.durationDays || 60} suffix="đêm" disabled={readOnly}
                 onChange={(v) => update({ durationNights: v })} />
             </Field>
           </div>
