@@ -144,6 +144,8 @@ export default function AdminLayout({ children }) {
   const isScrollLockedPage =
     pathname === "/admin" ||
     pathname?.startsWith("/admin/users") ||
+    pathname?.startsWith("/admin/regions") ||
+    pathname?.startsWith("/admin/themes") ||
     pathname?.startsWith("/admin/finance");
 
   // Xử lý tìm kiếm nhanh từ Topbar
