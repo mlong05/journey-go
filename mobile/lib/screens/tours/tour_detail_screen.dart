@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/experience_model.dart';
+import '../../core/models/tour_detail_model.dart';
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
@@ -12,6 +13,8 @@ import '../journey/journey_screen.dart';
 import 'tour_progress.dart';
 import '../culture/cultural_stories.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
+import 'mock_tour_booking_sheet.dart';
+import 'tour_detail_sections.dart';
 import 'tour_route_map.dart';
 import 'tour_style.dart';
 import 'experience_date_calendar.dart';
@@ -38,6 +41,14 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   final Map<int, GlobalKey> _stopKeys = {};
 
   late TourModel _tour = widget.tour;
+
+  /// Chi tiết công khai (mô tả, ảnh, lịch trình, điểm dừng...); null khi chưa tải được.
+  TourDetailModel? _detail;
+  String? _detailError;
+
+  /// Tour 5 bước hiển thị theo dữ liệu chi tiết công khai thay cho danh sách điểm đến.
+  bool get _isWizard => _detail?.wizardTour ?? _tour.wizardTour;
+
   // Trải nghiệm theo destinationId; null nghĩa là điểm đó tải lỗi.
   final Map<int, List<ExperienceModel>?> _experiences = {};
   bool _loading = true;
@@ -61,13 +72,18 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     _loadMyProgress();
 
     // Làm mới thông tin tour (giá có thể đã đổi), nếu lỗi thì dùng bản từ danh sách.
+    final detailFuture = _loadDetail();
     try {
       _tour = await _service.getTourById(widget.tour.id);
     } on ApiException {
       // giữ dữ liệu đã có
     }
+    await detailFuture;
 
-    final entries = await Future.wait(
+    // Tour 5 bước không có điểm đến chung nên không cần tải trải nghiệm theo điểm đến.
+    final entries = _isWizard
+        ? const <MapEntry<int, List<ExperienceModel>?>>[]
+        : await Future.wait(
       _tour.destinations.map((d) async {
         try {
           final list = await _service.getDestinationExperiences(
@@ -89,6 +105,16 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     });
 
     _loadAvailableDates();
+  }
+
+  Future<void> _loadDetail() async {
+    try {
+      final detail = await _service.getPublicDetail(widget.tour.id);
+      _detail = detail;
+      _detailError = null;
+    } on ApiException catch (e) {
+      _detailError = e.message;
+    }
   }
 
   /// Tải các ngày còn chỗ (mọi experience của tour đều phải còn slot).
@@ -159,6 +185,13 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   /// ⇒ Khi không có ngày nào, ta báo rõ ràng cho khách và KHÔNG tạo booking.
   Future<void> _onBook() async {
     if (_bookingInProgress) return;
+
+    // TẠM THỜI: booking thật chưa hỗ trợ tour 5 bước ⇒ đặt giả lập (không gọi server).
+    final detail = _detail;
+    if (_isWizard && detail != null) {
+      await startMockTourBooking(context, detail);
+      return;
+    }
 
     final bookedDate = await _pickExperienceDate();
     if (bookedDate == null || !mounted) return;
@@ -340,7 +373,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       body: RefreshIndicator(
         color: AppCultureColors.heritageJade,
         onRefresh: _load,
-        child: ListView(
+        child: _isWizard ? _buildWizardBody() : ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
@@ -378,6 +411,40 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         ),
       ),
       bottomNavigationBar: _buildBookBar(),
+    );
+  }
+
+  /// Tour 5 bước: thân trang dựng từ chi tiết công khai.
+  Widget _buildWizardBody() {
+    final detail = _detail;
+    if (detail != null) {
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: TourWizardDetailBody(detail: detail),
+      );
+    }
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        _buildHeader(),
+        const SizedBox(height: 32),
+        if (_loading)
+          const Center(child: CircularProgressIndicator(strokeWidth: 2.4))
+        else
+          Column(
+            children: [
+              const Icon(Icons.cloud_off_rounded, size: 36, color: AppCultureColors.textLight),
+              const SizedBox(height: 8),
+              Text(
+                _detailError ?? 'Không tải được chi tiết tour.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppCultureColors.textMuted),
+              ),
+              TextButton(onPressed: _load, child: const Text('Thử lại')),
+            ],
+          ),
+      ],
     );
   }
 
@@ -788,9 +855,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Tổng thanh toán',
-                        style: TextStyle(
+                      Text(
+                        // Tour 5 bước: giá hiển thị là giá người lớn, giá theo loại khách nằm ở bảng giá.
+                        _isWizard ? 'Giá từ (người lớn)' : 'Tổng thanh toán',
+                        style: const TextStyle(
                           fontSize: 11.5,
                           color: AppCultureColors.textMuted,
                         ),

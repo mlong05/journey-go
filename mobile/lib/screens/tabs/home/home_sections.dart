@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/models/destination_model.dart';
-import '../../../core/models/experience_model.dart';
 import '../../../core/models/tour_journey_model.dart';
+import '../../../core/models/tour_model.dart';
+import '../../../core/services/catalog_service.dart';
 import '../../common/heritage_motion.dart';
+import '../../tours/tour_cards.dart';
 
 /// Nhiệm vụ đang mở của hành trình, kéo ngang.
 class MissionStrip extends StatelessWidget {
@@ -82,80 +84,132 @@ class MissionStrip extends StatelessWidget {
   }
 }
 
-/// Băng chuyền gói tour: thẻ giữa nổi bật, thẻ hai bên nhỏ và mờ hơn, có chấm trang.
-class ExperienceCarousel extends StatefulWidget {
-  final List<ExperienceModel> experiences;
-  final VoidCallback onOpen;
+/// Banner tour nổi bật: ảnh bìa lớn tự trượt, có chấm trang. Bấm để mở chi tiết.
+class FeaturedTourBanner extends StatefulWidget {
+  final List<TourModel> tours;
+  final ValueChanged<TourModel> onOpen;
 
-  const ExperienceCarousel({super.key, required this.experiences, required this.onOpen});
+  const FeaturedTourBanner({super.key, required this.tours, required this.onOpen});
 
   @override
-  State<ExperienceCarousel> createState() => _ExperienceCarouselState();
+  State<FeaturedTourBanner> createState() => _FeaturedTourBannerState();
 }
 
-class _ExperienceCarouselState extends State<ExperienceCarousel> {
-  final PageController _page = PageController(viewportFraction: 0.84);
-  int _current = 0;
+class _FeaturedTourBannerState extends State<FeaturedTourBanner> {
+  final PageController _controller = PageController(viewportFraction: 0.92);
+  Timer? _timer;
+  int _index = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _timer?.cancel();
+    if (!reduceMotion(context) && widget.tours.length > 1) {
+      _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (!_controller.hasClients) return;
+        final next = (_index + 1) % widget.tours.length;
+        _controller.animateToPage(next, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+      });
+    }
+  }
 
   @override
   void dispose() {
-    _page.dispose();
+    _timer?.cancel();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final items = widget.experiences;
-    if (items.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: Text(
-          'Đang cập nhật các gói tour di sản mới…',
-          style: TextStyle(fontSize: 13, color: AppCultureColors.textMuted),
-        ),
-      );
-    }
-
+    final tours = widget.tours;
     return Column(
       children: [
         SizedBox(
-          height: 262,
+          height: 190,
           child: PageView.builder(
-            controller: _page,
-            itemCount: items.length,
-            onPageChanged: (i) => setState(() => _current = i),
-            itemBuilder: (_, i) => AnimatedBuilder(
-              animation: _page,
-              builder: (_, child) {
-                final page = _page.hasClients && _page.position.haveDimensions
-                    ? _page.page ?? _current.toDouble()
-                    : _current.toDouble();
-                final d = (page - i).abs().clamp(0.0, 1.0);
-                return Opacity(
-                  opacity: 1 - 0.35 * d,
-                  child: Transform.scale(scale: 1 - 0.07 * d, child: child),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: _ExperienceCard(exp: items[i], onTap: widget.onOpen),
-              ),
-            ),
+            controller: _controller,
+            itemCount: tours.length,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (_, i) {
+              final tour = tours[i];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                child: Pressable(
+                  onTap: () => widget.onOpen(tour),
+                  child: TourThumb(
+                    tour: tour,
+                    borderRadius: BorderRadius.circular(22),
+                    overlays: [
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Color(0xB3000000)],
+                            stops: [0.35, 1],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 14,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 6,
+                              children: [
+                                if (tour.regionName != null)
+                                  ImageBadge(icon: Icons.place_rounded, label: tour.regionName!),
+                                ImageBadge(icon: Icons.schedule_rounded, label: tour.formattedDuration),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              tour.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                height: 1.25,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              priceFromLabel(tour),
+                              style: const TextStyle(
+                                color: Color(0xFFFDE68A),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ),
-        if (items.length > 1) ...[
+        if (tours.length > 1) ...[
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              for (var i = 0; i < items.length; i++)
+              for (var i = 0; i < tours.length; i++)
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
                   margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: i == _current ? 18 : 6,
+                  width: i == _index ? 18 : 6,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: i == _current ? AppCultureColors.heritageJade : AppCultureColors.border,
+                    color: i == _index ? AppCultureColors.heritageJade : AppCultureColors.border,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -167,308 +221,170 @@ class _ExperienceCarouselState extends State<ExperienceCarousel> {
   }
 }
 
-class _ExperienceCard extends StatelessWidget {
-  final ExperienceModel exp;
-  final VoidCallback onTap;
+/// Hàng chủ đề dạng biểu tượng tròn (giống mục danh mục của các trang du lịch).
+class ThemeRow extends StatelessWidget {
+  final List<CatalogItem> themes;
+  final ValueChanged<CatalogItem> onOpen;
 
-  const _ExperienceCard({required this.exp, required this.onTap});
+  const ThemeRow({super.key, required this.themes, required this.onOpen});
+
+  static const _tints = [
+    (AppCultureColors.jadeLight, AppCultureColors.jadeDark),
+    (AppCultureColors.oceanLight, AppCultureColors.oceanDark),
+    (AppCultureColors.rewardBg, AppCultureColors.amberDark),
+    (Color(0xFFFCE7F3), Color(0xFFBE185D)),
+    (Color(0xFFEDE9FE), Color(0xFF6D28D9)),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: AppCultureColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
+    return SizedBox(
+      height: 92,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: themes.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final theme = themes[i];
+          final (bg, fg) = _tints[i % _tints.length];
+          return Pressable(
+            onTap: () => onOpen(theme),
+            child: SizedBox(
+              width: 72,
+              child: Column(
                 children: [
-                  Image.asset(exp.coverImage, fit: BoxFit.cover),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.5)],
-                        begin: Alignment.center,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(18)),
+                    child: Icon(themeIcon('${theme.slug} ${theme.name}'), color: fg, size: 26),
                   ),
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: _Pill(
-                      text: exp.formattedPrice,
-                      background: exp.price > 0 ? Colors.white : AppCultureColors.heritageJade,
-                      foreground: exp.price > 0 ? AppCultureColors.textDark : Colors.white,
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 10,
-                    left: 10,
-                    child: _Pill(
-                      icon: Icons.schedule_rounded,
-                      text: exp.formattedDuration,
-                      background: Colors.black.withValues(alpha: 0.55),
-                      foreground: Colors.white,
+                  const SizedBox(height: 6),
+                  Text(
+                    theme.name,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      height: 1.2,
+                      fontWeight: FontWeight.w600,
+                      color: AppCultureColors.textDark,
                     ),
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Thẻ vùng miền kéo ngang: nền gradient (danh mục chưa có ảnh) kèm tên và số tour.
+class RegionCards extends StatelessWidget {
+  final List<CatalogItem> regions;
+
+  /// Số tour đang có của từng vùng (đếm từ các tour đã tải); không có thì ẩn dòng số tour.
+  final Map<int, int> tourCounts;
+  final ValueChanged<CatalogItem> onOpen;
+
+  const RegionCards({super.key, required this.regions, required this.tourCounts, required this.onOpen});
+
+  static const _gradients = [
+    [Color(0xFF00A86B), Color(0xFF0288D1)],
+    [Color(0xFFB45309), Color(0xFFE11D48)],
+    [Color(0xFF0F766E), Color(0xFF134E4A)],
+    [Color(0xFF6D28D9), Color(0xFF0288D1)],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 96,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: regions.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (_, i) {
+          final region = regions[i];
+          final count = tourCounts[region.id];
+          return Pressable(
+            onTap: () => onOpen(region),
+            child: Container(
+              width: 150,
+              clipBehavior: Clip.antiAlias,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: LinearGradient(
+                  colors: _gradients[i % _gradients.length],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Stack(
                 children: [
-                  Text(
-                    exp.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppCultureColors.textDark,
-                    ),
+                  Positioned(
+                    right: -30,
+                    bottom: -30,
+                    child: DrumMotif(size: 90, color: Colors.white.withValues(alpha: 0.16)),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Flexible(child: _Meta(icon: Icons.extension_rounded, text: '${exp.taskCount} thử thách')),
-                            const SizedBox(width: 12),
-                            Flexible(child: _Meta(icon: Icons.location_on_rounded, text: '${exp.checkInPointCount} trạm')),
-                          ],
-                        ),
+                      const Icon(Icons.map_rounded, color: Colors.white70, size: 18),
+                      const Spacer(),
+                      Text(
+                        region.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Xem tour',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppCultureColors.heritageJade,
+                      if (count != null && count > 0)
+                        Text(
+                          '$count tour',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
                         ),
-                      ),
-                      const Icon(Icons.arrow_forward_rounded, size: 16, color: AppCultureColors.heritageJade),
                     ],
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
-/// Số trải nghiệm và thử thách thật của một điểm đến (tính từ danh sách trải nghiệm đã xuất bản).
-typedef DestinationStats = ({int experiences, int tasks});
+/// Dải tour kéo ngang (tour trong ngày, nhiều ngày, sắp khởi hành...).
+class TourStrip extends StatelessWidget {
+  final List<TourModel> tours;
+  final ValueChanged<TourModel> onOpen;
+  final bool showDeparture;
 
-/// Lộ trình gợi ý: thẻ ảnh rộng có chữ đè lên ảnh, khác kiểu với thẻ tour.
-class RouteCardList extends StatelessWidget {
-  final List<DestinationModel> routes;
-  final Map<int, DestinationStats> stats;
-  final VoidCallback onOpen;
-
-  const RouteCardList({super.key, required this.routes, required this.stats, required this.onOpen});
+  const TourStrip({super.key, required this.tours, required this.onOpen, this.showDeparture = false});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 178,
+      height: 278,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: routes.length,
+        itemCount: tours.length,
         separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => _RouteCard(
-          route: routes[i],
-          stats: stats[routes[i].id] ?? (experiences: 0, tasks: 0),
-          onTap: onOpen,
+        itemBuilder: (_, i) => TourCard(
+          tour: tours[i],
+          showDeparture: showDeparture,
+          onTap: () => onOpen(tours[i]),
         ),
       ),
-    );
-  }
-}
-
-class _RouteCard extends StatelessWidget {
-  final DestinationModel route;
-  final DestinationStats stats;
-  final VoidCallback onTap;
-
-  const _RouteCard({required this.route, required this.stats, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final city = route.address.split(',').last.trim();
-    final fallback = Image.asset(route.coverImage, fit: BoxFit.cover);
-    return Pressable(
-      onTap: onTap,
-      child: Container(
-        width: 270,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(22)),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Ảnh thật của điểm đến; chưa có hoặc lỗi thì dùng ảnh minh hoạ
-            route.coverImageUrl == null
-                ? fallback
-                : Image.network(
-                    route.coverImageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => fallback,
-                  ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.transparent, Colors.black.withValues(alpha: 0.75)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: const [0.3, 1],
-                ),
-              ),
-            ),
-            Positioned(
-              left: 14,
-              right: 14,
-              bottom: 12,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (city.isNotEmpty)
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined, size: 13, color: Colors.white70),
-                        const SizedBox(width: 3),
-                        Flexible(
-                          child: Text(
-                            city,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12, color: Colors.white70),
-                          ),
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 2),
-                  Text(
-                    route.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: stats.experiences == 0
-                        ? [
-                            _Pill(
-                              icon: Icons.hourglass_empty_rounded,
-                              text: 'Đang cập nhật trải nghiệm',
-                              background: Colors.white.withValues(alpha: 0.18),
-                              foreground: Colors.white,
-                            ),
-                          ]
-                        : [
-                            _Pill(
-                              icon: Icons.temple_buddhist_rounded,
-                              text: '${stats.experiences} trải nghiệm',
-                              background: Colors.white.withValues(alpha: 0.18),
-                              foreground: Colors.white,
-                            ),
-                            if (stats.tasks > 0)
-                              _Pill(
-                                icon: Icons.extension_rounded,
-                                text: '${stats.tasks} thử thách',
-                                background: AppCultureColors.rewardBg,
-                                foreground: AppCultureColors.rewardText,
-                              ),
-                          ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  final IconData? icon;
-  final String text;
-  final Color background;
-  final Color foreground;
-
-  const _Pill({
-    this.icon,
-    required this.text,
-    required this.background,
-    required this.foreground,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(10)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 13, color: foreground),
-            const SizedBox(width: 3),
-          ],
-          Text(text, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: foreground)),
-        ],
-      ),
-    );
-  }
-}
-
-class _Meta extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _Meta({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: AppCultureColors.textLight),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
-          ),
-        ),
-      ],
     );
   }
 }
