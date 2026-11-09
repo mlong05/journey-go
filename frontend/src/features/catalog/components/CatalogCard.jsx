@@ -10,6 +10,16 @@ const ACCENTS = {
   indigo: { icon: "text-indigo-600", btn: "bg-indigo-600 hover:bg-indigo-700", tab: "bg-indigo-700", ring: "focus:ring-indigo-500/20", hover: "hover:text-indigo-700 hover:bg-indigo-50" },
 };
 
+/** Nút thao tác dạng icon ở cuối mỗi dòng (có tooltip + aria-label). */
+function IconButton({ title, onClick, className = "", children }) {
+  return (
+    <button type="button" title={title} aria-label={title} onClick={onClick}
+      className={`w-8 h-8 rounded-lg border border-slate-200 bg-white inline-flex items-center justify-center transition-colors cursor-pointer ${className}`}>
+      {children}
+    </button>
+  );
+}
+
 /**
  * Quản lý một danh mục dạng tên + slug (khu vực, chủ đề): thêm, đổi tên, xóa mềm, khôi phục.
  * service: { getAll, getDeleted, create({name}), update(id, {name}), delete(id), restore(id) }
@@ -125,40 +135,52 @@ export default function CatalogCard({
           {tab === "active" ? `Chưa có ${noun} nào. Nhập tên ở trên để thêm.` : "Thùng rác trống."}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {rows.map((item) => (
-            <div key={item.id} className={`p-3.5 rounded-xl border flex items-center justify-between gap-2 ${item.deleted ? "bg-rose-50/40 border-rose-200" : "bg-slate-50/80 border-slate-200"}`}>
+        <ul className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+          {rows.map((item, idx) => (
+            <li key={item.id}
+              className={`px-4 py-3 flex items-center gap-3 transition-colors ${item.deleted ? "bg-rose-50/30" : "bg-white hover:bg-slate-50/70"}`}>
+              <span className="w-7 shrink-0 text-xs font-bold text-slate-400 tabular-nums">{idx + 1}</span>
               {editing?.id === item.id ? (
-                <input autoFocus value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                <input autoFocus value={editing.name} maxLength={150}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditing(null); }}
-                  className="flex-1 min-w-0 px-2 py-1 rounded-lg border border-slate-200 text-sm" />
+                  className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 ${a.ring}`} />
               ) : (
-                <div className="min-w-0">
+                <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center sm:gap-3">
                   <p className="font-bold text-slate-900 text-sm truncate">{item.name}</p>
-                  <p className="text-[11px] font-mono text-slate-400">#{item.id} · {item.slug}</p>
+                  <p className="text-[11px] font-mono text-slate-400 truncate">{item.slug}</p>
                 </div>
               )}
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {item.deleted ? (
-                  <button type="button" onClick={() => run(() => service.restore(item.id))}
-                    className="px-2 py-1 rounded-lg text-emerald-800 bg-emerald-50 border border-emerald-200 text-xs font-bold inline-flex items-center gap-1 cursor-pointer">
-                    <RotateCcw size={12} /> Khôi phục
-                  </button>
+                  <IconButton title="Khôi phục" onClick={() => run(() => service.restore(item.id))}
+                    className="text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200">
+                    <RotateCcw size={14} />
+                  </IconButton>
                 ) : editing?.id === item.id ? (
                   <>
-                    <button type="button" onClick={saveEdit} className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-50 cursor-pointer" aria-label="Lưu"><Check size={15} /></button>
-                    <button type="button" onClick={() => setEditing(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer" aria-label="Hủy"><X size={15} /></button>
+                    <IconButton title="Lưu" onClick={saveEdit} className="text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200">
+                      <Check size={15} />
+                    </IconButton>
+                    <IconButton title="Hủy" onClick={() => setEditing(null)} className="text-slate-500 hover:bg-slate-100">
+                      <X size={15} />
+                    </IconButton>
                   </>
                 ) : (
                   <>
-                    <button type="button" onClick={() => setEditing({ id: item.id, name: item.name })} className={`p-1.5 rounded-lg text-slate-400 ${a.hover} cursor-pointer`} title="Đổi tên"><Pencil size={14} /></button>
-                    <button type="button" onClick={() => remove(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-50 cursor-pointer" title="Chuyển vào thùng rác"><Trash2 size={14} /></button>
+                    <IconButton title="Đổi tên" onClick={() => setEditing({ id: item.id, name: item.name })} className={`text-slate-500 ${a.hover}`}>
+                      <Pencil size={14} />
+                    </IconButton>
+                    <IconButton title="Chuyển vào thùng rác" onClick={() => remove(item)}
+                      className="text-slate-500 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-200">
+                      <Trash2 size={14} />
+                    </IconButton>
                   </>
                 )}
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
