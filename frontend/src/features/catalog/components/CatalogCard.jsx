@@ -102,9 +102,9 @@ export default function CatalogCard({
   const switchTab = (next) => { setTab(next); setPage(0); setEditing(null); };
 
   return (
-    <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
+    <div className="h-full min-h-0 flex flex-col gap-4 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs">
       {confirmDialog}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+      <div className="shrink-0 flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2">
             {Icon && <Icon size={16} className={a.icon} />}
@@ -124,7 +124,7 @@ export default function CatalogCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="shrink-0 flex items-center gap-2">
         <button type="button" onClick={() => switchTab("active")}
           className={`px-3 py-1 rounded-xl text-xs font-bold cursor-pointer ${tab === "active" ? `${a.tab} text-white` : "bg-slate-100 text-slate-600"}`}>
           Đang hoạt động ({items.length})
@@ -134,7 +134,7 @@ export default function CatalogCard({
           <Trash2 size={12} /> Thùng rác ({deleted.length})
         </button>
       </div>
-      {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
+      {error && <p className="shrink-0 text-xs font-bold text-rose-600">{error}</p>}
 
       {loading ? (
         <div className="py-8 flex items-center justify-center gap-2 text-slate-400 text-xs font-bold"><Loader2 size={16} className="animate-spin" />Đang tải…</div>
@@ -143,9 +143,9 @@ export default function CatalogCard({
           {tab === "active" ? `Chưa có ${noun} nào. Nhập tên ở trên để thêm.` : "Thùng rác trống."}
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-slate-200 overflow-hidden">
         {/* Danh sách tự cuộn khi dài; thanh phân trang luôn ở dưới */}
-        <ul className="max-h-[460px] overflow-y-auto divide-y divide-slate-100">
+        <ul className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
           {pageRows.map((item, idx) => (
             <li key={item.id}
               className={`px-4 py-3 flex items-center gap-3 transition-colors ${item.deleted ? "bg-rose-50/30" : "bg-white hover:bg-slate-50/70"}`}>
@@ -188,9 +188,11 @@ export default function CatalogCard({
             </li>
           ))}
         </ul>
-        <PaginationBar page={safePage} totalPages={totalPages} totalElements={rows.length} unit={noun}
+        <div className="shrink-0">
+          <PaginationBar page={safePage} totalPages={totalPages} totalElements={rows.length} unit={noun}
           onChange={setPage} pageSize={pageSize} sizeOptions={[5, 10, 20, 50]}
           onSizeChange={(size) => { setPageSize(size); setPage(0); }} />
+        </div>
         </div>
       )}
     </div>
