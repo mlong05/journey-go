@@ -4,11 +4,12 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Layers, Pencil, Clock, Store, Loader2, Eye, PauseCircle, PlayCircle, Trash2, MapPin, ImageOff,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileSpreadsheet,
 } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { providerTourService } from "../services/providerTourService";
+import TourImportDialog from "./TourImportDialog";
 import { TOUR_STATUS, TOUR_STATUS_ORDER, CONTENT_EDITABLE, saleToggleConfirm } from "../constants";
 
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
@@ -43,6 +44,7 @@ export default function ProviderToursList() {
   const [filter, setFilter] = useState("all");
   const [busyId, setBusyId] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]); // mặc định 4 tour / trang
@@ -120,6 +122,10 @@ export default function ProviderToursList() {
 
   const header = (
     <PageHeader compact title="Tour Du Lịch Của Tôi">
+      <button type="button" onClick={() => setImportOpen(true)}
+        className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-xs text-[13px] cursor-pointer transition-all duration-200 active:scale-[0.97]">
+        <FileSpreadsheet size={16} className="text-emerald-600" /> Nhập từ Excel
+      </button>
       <button type="button" onClick={createTour} disabled={creating}
         className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-9 px-4 rounded-lg flex items-center gap-1.5 shadow-xs text-[13px] cursor-pointer transition-all duration-200 active:scale-[0.97] disabled:opacity-70 disabled:cursor-wait">
         {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Tạo tour mới
@@ -130,6 +136,12 @@ export default function ProviderToursList() {
   return (
     <div className="h-full min-h-0 flex flex-col gap-3 overflow-y-auto">
       {confirmDialog}
+      <TourImportDialog open={importOpen} onClose={() => setImportOpen(false)}
+        onCreated={(tourId) => {
+          setImportOpen(false);
+          if (tourId) router.push(`/provider/tours/${tourId}/edit`);
+          else load();
+        }} />
       {toast && (
         <div className="fixed top-4 right-4 z-50 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-lg">{toast}</div>
       )}

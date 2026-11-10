@@ -58,6 +58,47 @@ export const providerTourService = {
   },
 };
 
+/**
+ * Nhập tour từ Excel — backend: /api/v1/provider/tours/import/*
+ * Kết quả kiểm tra: { valid, tourId, summary, errors: [{ sheet, row, column, message }], warnings: [...] }
+ */
+export const tourImportService = {
+  /** Tải file mẫu (sample = true: file đã điền sẵn tour ví dụ) và lưu về máy. */
+  async downloadTemplate({ sample = false } = {}) {
+    const url = `${apiClient.baseUrl}${ROOT}/import/template?sample=${sample}`;
+    const fetchFile = (token) => fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    let res = await fetchFile(apiClient.getAccessToken());
+    if (res.status === 401) {
+      const token = await apiClient.ensureFreshToken();
+      if (token) res = await fetchFile(token);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.message || "Không tải được file mẫu.");
+    }
+    const blob = await res.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = sample ? "vi-du-nhap-tour.xlsx" : "mau-nhap-tour.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  },
+  /** Kiểm tra file, không lưu gì. */
+  async preview(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return data(await apiClient.upload(`${ROOT}/import/preview`, formData));
+  },
+  /** Tạo bản nháp. File còn lỗi: ApiError 400 có `payload.data` = kết quả kiểm tra. */
+  async importTour(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return data(await apiClient.upload(`${ROOT}/import`, formData));
+  },
+};
+
 /** Danh mục dùng cho dropdown + điểm thưởng (chỉ đọc với đối tác). */
 export const catalogService = {
   async regions() {
