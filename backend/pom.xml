@@ -132,6 +132,13 @@
             <version>1.36.0</version>
         </dependency>
 
+        <!-- Apache POI — đọc / sinh file Excel (nhập tour từ file mẫu) -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.5.0</version>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
