@@ -24,6 +24,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/bookings")
 @RequiredArgsConstructor
@@ -55,6 +57,18 @@ public class BookingController {
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách booking thành công",
                 bookingService.getMyBookings(userPrincipal.getId(), pageable)));
+    }
+
+    @GetMapping("/accessible")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Danh sách booking tôi có quyền xem",
+            description = "Gồm booking tôi đặt và booking tôi được mời tham gia (hành khách được mời). "
+                    + "Hành khách được mời không thấy thông tin cá nhân của hành khách khác.")
+    public ResponseEntity<ApiResponse<List<BookingResponse>>> getAccessibleBookings(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách booking thành công",
+                bookingService.getAccessibleBookings(userPrincipal.getId())));
     }
 
     @GetMapping("/{bookingId}")

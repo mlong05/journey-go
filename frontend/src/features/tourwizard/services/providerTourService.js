@@ -47,12 +47,6 @@ export const providerTourService = {
   async duplicate(tourId) {
     return data(await apiClient.post(`${ROOT}/${tourId}/duplicate`, {}));
   },
-  async pause(tourId) {
-    return data(await apiClient.patch(`${ROOT}/${tourId}/pause`, {}));
-  },
-  async resume(tourId) {
-    return data(await apiClient.patch(`${ROOT}/${tourId}/resume`, {}));
-  },
   async remove(tourId) {
     return data(await apiClient.delete(`${ROOT}/${tourId}`));
   },

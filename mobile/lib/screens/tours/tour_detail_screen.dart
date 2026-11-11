@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/models/booking_model.dart';
 import '../../core/models/experience_model.dart';
 import '../../core/models/tour_detail_model.dart';
 import '../../core/models/tour_model.dart';
@@ -7,23 +8,32 @@ import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
 import '../../core/services/tour_availability_service.dart';
 import '../../core/services/tour_service.dart';
+import '../../core/services/token_storage.dart';
 import '../../core/utils/formatters.dart' show formatLocalDateString;
 import '../bookings/booking_checkout_screen.dart';
+import '../chat/provider_chat_screen.dart';
 import '../journey/journey_screen.dart';
 import 'tour_progress.dart';
 import '../culture/cultural_stories.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
-import 'mock_tour_booking_sheet.dart';
+import 'booking_group_sheet.dart';
 import 'tour_detail_sections.dart';
 import 'tour_route_map.dart';
 import 'tour_style.dart';
 import 'experience_date_calendar.dart';
 
 /// Chi tiết tour: hành trình theo thứ tự điểm đến, trải nghiệm của từng điểm và giá trọn gói.
+///
+/// [bookedBooking] = booking đã mua của du khách (nếu có) ⇒ thanh đặt tour hiển thị
+/// trạng thái "đã mua" + đếm ngược ngày trải nghiệm thay vì nút "Đặt tour"
+/// (tránh đặt trùng tour đã mua).
 class TourDetailScreen extends StatefulWidget {
   final TourModel tour;
 
-  const TourDetailScreen({super.key, required this.tour});
+  /// Booking đã mua (du khách đã thanh toán) — dùng để hiện trạng thái vé.
+  final BookingModel? bookedBooking;
+
+  const TourDetailScreen({super.key, required this.tour, this.bookedBooking});
 
   @override
   State<TourDetailScreen> createState() => _TourDetailScreenState();
@@ -122,7 +132,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     if (!mounted) return;
     setState(() => _loadingDates = true);
     try {
-      final dates = await _availabilityService.getTourAvailableDates(_tour);
+      final dates = await _availabilityService.getTourAvailableDates(_tour.id);
       if (!mounted) return;
       setState(() {
         _availableDates = dates;
@@ -186,21 +196,38 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   Future<void> _onBook() async {
     if (_bookingInProgress) return;
 
-    // TẠM THỜI: booking thật chưa hỗ trợ tour 5 bước ⇒ đặt giả lập (không gọi server).
-    final detail = _detail;
-    if (_isWizard && detail != null) {
-      await startMockTourBooking(context, detail);
-      return;
-    }
-
+    // 1) Chọn ngày trải nghiệm còn chỗ.
     final bookedDate = await _pickExperienceDate();
     if (bookedDate == null || !mounted) return;
 
+    // 2) Nhập thông tin hành khách (người đặt + nhóm đi kèm).
+    //    Form này dùng chung cho tour luồng 5 bước và tour luồng cũ — cả hai đều
+    //    đặt tour theo "người đặt + danh sách hành khách" theo tài liệu.
+    final detail = _detail;
+    final accountEmail = await _accountEmail();
+    if (!mounted) return;
+    final group = await showBookingGroupSheet(
+      context: context,
+      detail: detail ??
+          TourDetailModel(
+            id: _tour.id,
+            title: _tour.title,
+            wizardTour: _isWizard,
+            price: _tour.price,
+          ),
+      experienceDate: bookedDate,
+      remainingSlots: _remainingFor(bookedDate),
+      accountEmail: accountEmail,
+    );
+    if (group == null || !mounted) return;
+
+    // 3) Tạo booking thật (giữ chỗ 10 phút) rồi sang màn thanh toán VNPay.
     setState(() => _bookingInProgress = true);
     try {
       final booking = await _bookingService.createBooking(
         tourId: _tour.id,
         experienceDate: bookedDate,
+        passengers: group.passengers,
       );
       if (!mounted) return;
       // Đơn chưa thanh toán vẫn nằm ở "Đơn đặt tour > Chờ thanh toán" nếu khách thoát giữa chừng.
@@ -218,6 +245,67 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       _loadAvailableDates();
     } finally {
       if (mounted) setState(() => _bookingInProgress = false);
+    }
+  }
+
+  /// Mở màn chat với nhà tour — dùng TRƯỚC khi mua tour.
+  ///
+  /// Chat gắn với tài khoản du khách ⇒ cần đăng nhập trước. Nếu chưa đăng nhập
+  /// thì báo rõ để khách biết (không tự mở form đăng nhập giữa lúc xem tour).
+  Future<void> _openProviderChat(TourDetailModel detail) async {
+    final providerName = detail.providerName ?? _tour.providerName;
+    if (providerName == null || providerName.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tour này chưa có nhà tour liên hệ.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!await TokenStorage.hasValidSession()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng đăng nhập để nhắn tin cho nhà tour.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProviderChatScreen(
+          tourId: _tour.id,
+          providerId: detail.providerId ?? _tour.providerId,
+          providerName: providerName,
+          tourTitle: _tour.title,
+        ),
+      ),
+    );
+  }
+
+  /// Số chỗ còn của một ngày (null nếu ngày không mở bán).
+  int? _remainingFor(String date) {
+    for (final d in _availableDates) {
+      if (d.date == date) return d.remaining;
+    }
+    return null;
+  }
+
+  /// Email tài khoản hiện tại — dùng làm email của hành khách đầu tiên (người đặt).
+  Future<String> _accountEmail() async {
+    try {
+      final profile = await ApiClient.request('GET', '/auth/me');
+      final map = profile is Map ? profile : const {};
+      final email = map['email']?.toString().trim();
+      return (email != null && email.isNotEmpty) ? email : '';
+    } catch (_) {
+      return '';
     }
   }
 
@@ -378,6 +466,23 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
             _buildHeader(),
+            if (_tour.providerName != null) ...[
+              const SizedBox(height: 12),
+              _ProviderChatRow(
+                providerName: _tour.providerName!,
+                onTap: () => _openProviderChat(
+                  _detail ??
+                      TourDetailModel(
+                        id: _tour.id,
+                        title: _tour.title,
+                        wizardTour: _isWizard,
+                        price: _tour.price,
+                        providerName: _tour.providerName,
+                        providerId: _tour.providerId,
+                      ),
+                ),
+              ),
+            ],
             if (_tour.destinations.any((d) => d.hasLocation)) ...[
               const SizedBox(height: 22),
               _buildSectionTitle('Bản đồ lộ trình'),
@@ -420,7 +525,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     if (detail != null) {
       return SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        child: TourWizardDetailBody(detail: detail),
+        child: TourWizardDetailBody(
+          detail: detail,
+          onChatProvider: () => _openProviderChat(detail),
+        ),
       );
     }
     return ListView(
@@ -818,6 +926,90 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   Widget _buildBookBar() {
     final progress = _myProgress;
     final active = progress?.inProgress ?? false;
+    final booked = widget.bookedBooking;
+
+    // Đã mua tour ⇒ hiện vé (không cho đặt lại ⇒ tránh mua trùng).
+    if (booked != null && !active) {
+      return SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: AppCultureColors.border)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppCultureColors.jadeLight,
+                ),
+                child: const Icon(
+                  Icons.confirmation_number_rounded,
+                  size: 20,
+                  color: AppCultureColors.heritageJade,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Bạn đã mua tour này',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppCultureColors.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      booked.isTourLocked
+                          ? 'Còn ${booked.daysUntilStart} ngày nữa lên đường!'
+                          : 'Ngày trải nghiệm: ${formatLocalDateString(booked.experienceDate?.toIso8601String())}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppCultureColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!booked.isTourLocked) ...[
+                const SizedBox(width: 10),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => JourneyScreen(
+                        tourId: booked.tourId,
+                        bookingId: booked.id,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.explore_rounded, size: 18),
+                  label: const Text(
+                    'Bắt đầu trải nghiệm',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppCultureColors.heritageJade,
+                    minimumSize: const Size(0, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -926,6 +1118,56 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Hàng "Chat với bên `Tên đối tác`" cho tour luồng cũ (không có thân trang 5 bước).
+class _ProviderChatRow extends StatelessWidget {
+  final String providerName;
+  final VoidCallback onTap;
+
+  const _ProviderChatRow({required this.providerName, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppCultureColors.oceanLight,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.chat_rounded,
+                size: 18,
+                color: AppCultureColors.oceanDark,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Chat với bên $providerName',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppCultureColors.oceanDark,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppCultureColors.oceanBlue,
+              ),
+            ],
+          ),
         ),
       ),
     );

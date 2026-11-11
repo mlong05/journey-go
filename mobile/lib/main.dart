@@ -4,8 +4,10 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/constants/app_colors.dart';
 import 'core/models/auth_models.dart';
 import 'core/services/google_auth_service.dart';
+import 'core/services/invitation_deep_link_service.dart';
 import 'core/services/payment_result_service.dart';
 import 'core/services/token_storage.dart';
+import 'screens/booking/invitation_deep_link_host.dart';
 import 'screens/booking/pending_payment_host.dart';
 import 'screens/tourist_home_screen.dart';
 import 'tourist_auth_screen.dart';
@@ -50,6 +52,17 @@ void main() async {
     debugPrint('PaymentResultService.init() lỗi: $e');
   }
 
+  // Bắt deep link `journeygo://booking/invitations/accept?token=...` TRƯỚC KHI render app.
+  //
+  // ⚠️ Phải khởi tạo sớm: khi khách bấm link trong email mà app đang tắt, hệ điều
+  // mở app ⇒ deep link đến TRƯỚC khi có listener. `InvitationDeepLinkService` giữ
+  // deep link đó lại và phát lại khi có listener ⇒ không bị mất.
+  try {
+    await InvitationDeepLinkService().init();
+  } catch (e) {
+    debugPrint('InvitationDeepLinkService.init() lỗi: $e');
+  }
+
   // Kiểm tra phiên đăng nhập đã lưu
   UserModel? savedUser;
   final bool isLoggedIn = await TokenStorage.hasValidSession();
@@ -69,16 +82,31 @@ void main() async {
   runApp(JourneyGoTouristApp(initialUser: savedUser));
 }
 
-class JourneyGoTouristApp extends StatelessWidget {
+class JourneyGoTouristApp extends StatefulWidget {
   final UserModel? initialUser;
 
   const JourneyGoTouristApp({super.key, this.initialUser});
+
+  @override
+  State<JourneyGoTouristApp> createState() => _JourneyGoTouristAppState();
+}
+
+class _JourneyGoTouristAppState extends State<JourneyGoTouristApp> {
+  /// Navigator gốc — cần để mở màn xác nhận lời mời từ `InvitationDeepLinkHost`
+  /// (host nằm ngoài Navigator nên không dùng được `Navigator.of(context)`).
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
+  /// ScaffoldMessenger gốc — tương tự, để hiện thông báo "vui lòng đăng nhập".
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Journey Go - Cổng Du Lịch Văn Hóa Việt Nam',
       debugShowCheckedModeBanner: false,
+      navigatorKey: _navigatorKey,
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: AppCultureColors.background,
@@ -89,12 +117,20 @@ class JourneyGoTouristApp extends StatelessWidget {
           surface: AppCultureColors.background,
         ),
       ),
+      // ⚠️ `InvitationDeepLinkHost` đặt trong `builder` (NGOÀI Navigator) vì deep
+      // link lời mời có thể mở app khi khách CHƯA đăng nhập; nếu bọc trong `home`
+      // thì route gốc bị `pushReplacement` khi đăng nhập ⇒ mất listener.
+      builder: (context, child) => InvitationDeepLinkHost(
+        navigatorKey: _navigatorKey,
+        scaffoldMessengerKey: _scaffoldMessengerKey,
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: PendingPaymentHost(
         // ⚠️ `PendingPaymentHost` bọc TOÀN BỘ app (kể cả màn đăng nhập) vì deep
         // link thanh toán có thể mở app khi khách CHƯA đăng nhập (endpoint
         // `/return-result` là public). Kết quả được giữ lại và phát lại sau.
-        child: initialUser != null
-            ? TouristHomeScreen(initialUser: initialUser!)
+        child: widget.initialUser != null
+            ? TouristHomeScreen(initialUser: widget.initialUser!)
             : const TouristAuthScreen(),
       ),
     );

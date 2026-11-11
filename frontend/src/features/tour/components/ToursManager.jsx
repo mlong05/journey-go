@@ -583,7 +583,6 @@ export default function ToursManager({
       PENDING_REVIEW: baseTours.filter((t) => t.status === "PENDING_REVIEW").length,
       CHANGES_REQUESTED: baseTours.filter((t) => t.status === "CHANGES_REQUESTED").length,
       PUBLISHED: baseTours.filter((t) => t.status === "PUBLISHED").length,
-      PAUSED: baseTours.filter((t) => t.status === "PAUSED").length,
       REJECTED: baseTours.filter((t) => t.status === "REJECTED").length,
       DELETED: baseTours.filter((t) => t.deleted).length,
     }),

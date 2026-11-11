@@ -1,4 +1,3 @@
-import '../constants/api_constants.dart';
 import '../models/booking_model.dart' show BookingModel;
 import '../models/gamification_model.dart'
     show
@@ -14,7 +13,6 @@ import '../models/tour_journey_model.dart';
 import 'booking_service.dart';
 import 'gamification_service.dart';
 import 'journey_service.dart';
-import 'mock_payment_store.dart';
 
 /// Tiến độ của du khách lấy từ backend: điểm, huy hiệu, nhật ký check-in, nhiệm vụ, vé.
 /// Mọi hàm ném lỗi gốc (ApiException / GamificationException) để giao diện báo đúng thay vì
@@ -108,10 +106,9 @@ class ProgressService {
     ];
   }
 
-  /// Booking đã thanh toán (vé), gồm cả đơn "thanh toán giả lập" khi bật cờ dev.
+  /// Booking đã thanh toán (vé).
   Future<List<BookingModel>> getTickets() async {
     final bookings = await _bookings.getMine();
-    final mockPaid = ApiConstants.mockPayment ? await MockPaymentStore.paidIds() : <int>{};
-    return bookings.where((b) => b.isPaid || mockPaid.contains(b.id)).toList();
+    return bookings.where((b) => b.isPaid).toList();
   }
 }

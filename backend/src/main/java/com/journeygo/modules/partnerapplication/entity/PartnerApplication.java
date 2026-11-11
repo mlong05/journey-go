@@ -99,12 +99,11 @@ public class PartnerApplication {
     @Column(name = "business_registration_url", columnDefinition = "TEXT")
     private String businessRegistrationUrl;
 
+    /** Tỉnh / Thành phố — theo mô hình hành chính 2 cấp mới (sau sáp nhập). */
     @Column(length = 100)
     private String province;
 
-    @Column(length = 100)
-    private String district;
-
+    /** Phường / Xã trực thuộc tỉnh (không còn cấp quận/huyện). */
     @Column(length = 100)
     private String ward;
 

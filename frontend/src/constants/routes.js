@@ -1,42 +1,27 @@
 /**
- * Định nghĩa tập trung các đường dẫn (routes) trong ứng dụng
+ * Định nghĩa tập trung các đường dẫn (routes) trong ứng dụng.
+ *
+ * ── Lưu ý về vai trò ──
+ * WEB chỉ phục vụ ADMIN / ĐỐI TÁC (provider) / MODERATOR.
+ * Toàn bộ luồng DU KHÁCH (xem tour → đặt tour → thanh toán → hành trình)
+ * nằm trên MOBILE. Vì vậy các route `/tours`, `/bookings`, `/checkout`,
+ * `/payments`, `/payment/*`, `/trips`, `/journeys` KHÔNG tồn tại trên web.
  */
 export const ROUTES = {
   HOME: "/",
   LOGIN: "/login",
   REGISTER: "/register",
-  DASHBOARD: "/dashboard",
 
-  // ── Chuyến đi / Tour (nhóm dashboard của team) ────────────────────────────
-  TRIPS: "/trips",
-  TRIP_DETAIL: (id) => `/trips/${id}`,
-  TOURS: "/tours",
-  TOUR_DETAIL: (id) => `/tours/${id}`,
+  // ── Chuyến đi / Tour (chỉ có trên MOBILE) ────────────────────────────────
+  // Web không phục vụ du khách ⇒ các route dưới đây đã bị gỡ.
+  // Xem `mobile/lib/screens/tours/` cho phần tương ứng của app.
 
-  // ── Đơn đặt của tôi ───────────────────────────────────────────────────────
-  BOOKINGS: "/bookings",
-  BOOKING_DETAIL: (id) => `/bookings/${id}`,
-  BOOKING_REFUND: (id) => `/bookings/${id}/refund`,
-  REFUNDS: "/refunds",
+  // ── Thanh toán (chỉ có trên MOBILE) ───────────────────────────────────────
+  // Web không có checkout/payment ⇒ xem `mobile/lib/screens/bookings/`.
 
-  // ── Thanh toán ─────────────────────────────────────────────────────────────
-  /** Checkout trong nhóm dashboard (màn checkout của team). */
-  CHECKOUT: (bookingId) => `/bookings/${bookingId}/checkout`,
-  /** Checkout độc lập (màn checkout mới có luồng VNPay đầy đủ). */
-  CHECKOUT_STANDALONE: (bookingId) => `/checkout/${bookingId}`,
-  PAYMENTS: "/payments",
-  PAYMENT_RESULT: "/payment/result",
-  PAYMENT_RETURN: "/payment/return",
+  // ── Hành trình (chỉ có trên MOBILE) ──────────────────────────────────────
 
-  // ── Hành trình ─────────────────────────────────────────────────────────────
-  JOURNEYS: "/journeys",
-  JOURNEY: (id) => `/journeys/${id}`,
-  JOURNEY_TASK: (journeyId, taskId) => `/journeys/${journeyId}/tasks/${taskId}`,
-
-  PROFILE: "/profile",
-  SETTINGS: "/settings",
-
-  // ── Đăng ký trở thành đối tác ─────────────────────────────────────────────
+  // ── Đăng ký thành đối tác ─────────────────────────────────────────────────
   /** Luồng đăng ký đối tác (4 giai đoạn) — link đặt ở footer trang chủ. */
   PARTNER_REGISTER: "/partner-register",
   PARTNER_REGISTER_SUCCESS: "/partner-register/success",
@@ -65,6 +50,10 @@ export const ROUTES = {
   PROVIDER_TOURS: "/provider/tours",
   /** Đối tác — tab "Thông tin đối tác" (hồ sơ đăng ký + yêu cầu đổi thông tin). */
   PROVIDER_PARTNER_INFO: "/provider/partner-info",
+  /** Đối tác — danh sách khách hàng đã đặt tour + duyệt thay đổi hành khách. */
+  PROVIDER_BOOKINGS: "/provider/bookings",
+  /** Đối tác — tab "Hỗ trợ khách hàng": xem & phản hồi tin nhắn khách gửi trước khi đặt tour. */
+  PROVIDER_SUPPORT: "/provider/support",
 
   // ── Khu vực tài chính của đối tác (CONTENT_PROVIDER) ──────────────────────
   PROVIDER_FINANCE: "/provider/finance",

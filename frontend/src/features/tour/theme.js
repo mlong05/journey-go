@@ -91,11 +91,6 @@ export const TOUR_STATUS_META = {
     cls: "bg-orange-50 text-orange-700 border-orange-200",
     dot: "bg-orange-500",
   },
-  PAUSED: {
-    label: "Tạm ngừng bán",
-    cls: "bg-slate-100 text-slate-600 border-slate-300",
-    dot: "bg-slate-400",
-  },
   DELETED: {
     label: "Đã xoá",
     cls: "bg-slate-100 text-slate-500 border-slate-300",
@@ -123,7 +118,7 @@ export const TOUR_TYPE_OPTIONS = Object.entries(TOUR_TYPE_META).map(
 /**
  * Thứ tự hiển thị của bảng điều khiển lọc, khớp thứ tự khai báo trong enum backend.
  */
-export const TOUR_STATUS_ORDER = ["DRAFT", "PENDING_REVIEW", "CHANGES_REQUESTED", "PUBLISHED", "PAUSED", "REJECTED"];
+export const TOUR_STATUS_ORDER = ["DRAFT", "PENDING_REVIEW", "CHANGES_REQUESTED", "PUBLISHED", "REJECTED"];
 
 /** Trạng thái mà một tour được phép gửi duyệt (submit). */
 export const SUBMITTABLE_STATUSES = ["DRAFT", "REJECTED"];
@@ -196,7 +191,7 @@ export function formatTourDuration(tour) {
 /**
  * Chuẩn hoá response thô của backend về dạng dùng chung cho UI.
  * Hỗ trợ cả TourResponse trực tiếp và TourReviewResponse từ moderation.
- * Backend trả `status` (DRAFT/PENDING_REVIEW/CHANGES_REQUESTED/REJECTED/PUBLISHED/PAUSED) kèm cờ `deleted`.
+ * Backend trả `status` (DRAFT/PENDING_REVIEW/CHANGES_REQUESTED/REJECTED/PUBLISHED) kèm cờ `deleted`.
  */
 export function normalizeTour(raw) {
   if (!raw || typeof raw !== "object") return null;

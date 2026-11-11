@@ -135,7 +135,8 @@ public class VnPayClient {
      * {@code vnp_*} mới được hash) ⇒ thêm sau khi ký vẫn an toàn. Backend cũng phải
      * bỏ qua mọi tham số không phải {@code vnp_*} khi xác minh chữ ký.
      *
-     * @param appRedirect true = gắn {@code app_redirect=1} vào Return URL (deep link về app)
+     * @param appRedirect giữ lại để tương thích với client cũ — KHÔNG còn ảnh hưởng
+     *                   tới Return URL (luôn dùng deep link của app).
      */
     public String buildPaymentUrl(String txnRef, BigDecimal amount, String orderInfo,
                                   LocalDateTime createDate, LocalDateTime expireDate, String clientIp,
@@ -152,7 +153,7 @@ public class VnPayClient {
         params.put("vnp_OrderInfo", orderInfo);
         params.put("vnp_OrderType", properties.getOrderType());
         params.put("vnp_Locale", properties.getLocale());
-        params.put("vnp_ReturnUrl", buildReturnUrl(appRedirect));
+        params.put("vnp_ReturnUrl", buildReturnUrl());
         params.put("vnp_IpAddr", clientIp != null && !clientIp.isBlank() ? clientIp : properties.getIpAddr());
         params.put("vnp_CreateDate", formatDate(createDate));
         params.put("vnp_ExpireDate", formatDate(expireDate));
@@ -178,33 +179,30 @@ public class VnPayClient {
     /**
      * Return URL gửi lên VNPay.
      *
-     * <p>3 chế độ (theo thứ tự ưu tiên):
+     * <p>⚠️ Thanh toán CHỈ diễn ra trên ứng dụng MOBILE. Web không có màn checkout
+     * ⇒ không còn nhánh WEB riêng.
+     *
+     * <p>2 chế độ (theo thứ tự ưu tiên):
      * <ul>
-     *   <li><b>MOBILE</b> ({@code appRedirect=true}) + {@code appReturnUrl} được cấu hình
-     *       → CUSTOM SCHEME ({@code journeygo://payment/return}) ⇒ VNPay chuyển thẳng
+     *   <li><b>CUSTOM SCHEME</b> ({@code appReturnUrl} được cấu hình)
+     *       → {@code journeygo://payment/return} ⇒ VNPay chuyển thẳng
      *       trình duyệt về app kèm TOÀN BỘ tham số kết quả ĐÃ KÝ ⇒ app gửi lại
      *       {@code POST /payments/return-result} ⇒ backend kiểm tra chữ ký rồi áp dụng.
      *       <br>⚠️ Ưu tiên này là BẮT BUỘC với tunnel ngrok miễn phí: ngrok chặn
      *       trình duyệt thật bằng trang cảnh báo (ERR_NGROK_6024) ⇒ trang
      *       {@code /payments/return-page} không bao giờ tới được khách ⇒ deep link
      *       không bao giờ được mở.</li>
-     *   <li><b>MOBILE</b> ({@code appRedirect=true}) không có {@code appReturnUrl} mà
-     *       {@code returnUrl} là HTTPS → Return URL của backend
-     *       ({@code /payments/return-page}) + {@code app_redirect=1} → trang kết quả
-     *       chuyển hướng trình duyệt về app (deep link
+     *   <li><b>FALLBACK</b> — không có {@code appReturnUrl} mà {@code returnUrl} là HTTPS
+     *       → Return URL của backend ({@code /payments/return-page}) + {@code app_redirect=1}
+     *       → trang kết quả chuyển hướng trình duyệt về app (deep link
      *       {@code journeygo://payment/return?...}).</li>
-     *   <li><b>WEB</b> ({@code appRedirect=false}) nếu {@code webReturnUrl} được cấu hình
-     *       → redirect thẳng về trang kết quả của frontend.</li>
-     *   <li><b>WEB</b> (mặc định) → Return URL của backend ({@code /payments/return-page}),
-     *       hiển thị trang kết quả tĩnh, không chuyển hướng về app.</li>
      * </ul>
      *
      * <p>⚠️ Tham số {@code app_redirect} KHÔNG nằm trong chuỗi hash của VNPay (chỉ
      * {@code vnp_*} mới được hash) ⇒ thêm/sửa sau khi ký vẫn an toàn. Xem
      * {@link #isValidSignature(Map)}.
      */
-    private String buildReturnUrl(boolean appRedirect) {
-        // ── MOBILE (appRedirect=true) ────────────────────────────────────────
+    private String buildReturnUrl() {
         // ƯU TIÊN: CUSTOM SCHEME (`journeygo://payment/return`) nếu được cấu hình.
         //
         // ⚠️ VÌ SAO ưu tiên custom scheme thay vì Return URL HTTPS của backend?
@@ -230,26 +228,18 @@ public class VnPayClient {
         boolean hasHttpsBase = base != null && !base.isBlank()
                 && (base.startsWith("http://") || base.startsWith("https://"));
 
-        if (appRedirect) {
-            String appSchemeUrl = properties.getAppReturnUrl();
-            if (appSchemeUrl != null && !appSchemeUrl.isBlank()) {
-                return appSchemeUrl;
-            }
-
-            // Không có custom scheme ⇒ dùng Return URL HTTPS + `app_redirect=1`
-            // (trang kết quả tự chuyển hướng trình duyệt về app).
-            if (hasHttpsBase) {
-                // Chỉ chuyển hướng về app khi trang kết quả đã xác minh xong.
-                String separator = base.contains("?") ? "&" : "?";
-                return base + separator + "app_redirect=1";
-            }
-            return base;
+        // CUSTOM SCHEME — luôn ưu tiên (thanh toán chỉ có trên mobile).
+        String appSchemeUrl = properties.getAppReturnUrl();
+        if (appSchemeUrl != null && !appSchemeUrl.isBlank()) {
+            return appSchemeUrl;
         }
 
-        // ── WEB (appRedirect=false) ───────────────────────────────────────────
-        String web = properties.getWebReturnUrl();
-        if (web != null && !web.isBlank()) {
-            return web;
+        // Không có custom scheme ⇒ dùng Return URL HTTPS + `app_redirect=1`
+        // (trang kết quả tự chuyển hướng trình duyệt về app).
+        if (hasHttpsBase) {
+            // Chỉ chuyển hướng về app khi trang kết quả đã xác minh xong.
+            String separator = base.contains("?") ? "&" : "?";
+            return base + separator + "app_redirect=1";
         }
         return base;
     }

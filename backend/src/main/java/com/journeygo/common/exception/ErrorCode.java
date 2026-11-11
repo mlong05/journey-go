@@ -132,7 +132,29 @@ public enum ErrorCode {
     COMMISSION_POLICY_REASON_REQUIRED("Lý do thay đổi không được để trống", HttpStatus.BAD_REQUEST),
 
     // ── Notification ──────────────────────────────────────────────────────────
-    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại", HttpStatus.NOT_FOUND);
+    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại", HttpStatus.NOT_FOUND),
+
+    // ── Booking nhóm (Đặt - Thanh toán tour) ────────────────────────────────
+    BOOKING_GUEST_TYPE_NOT_AVAILABLE("Tour hiện không bán vé cho loại khách này", HttpStatus.BAD_REQUEST),
+    BOOKING_PASSENGER_NOT_FOUND("Hành khách không tồn tại trong đơn đặt này", HttpStatus.NOT_FOUND),
+    BOOKING_PASSENGER_EMAIL_REQUIRED("Hành khách người lớn bắt buộc phải có email", HttpStatus.BAD_REQUEST),
+    BOOKING_PASSENGER_DUPLICATE_EMAIL("Trong nhóm đang có nhiều hành khách dùng cùng một email", HttpStatus.BAD_REQUEST),
+    BOOKING_PASSENGER_CHANGE_NOT_FOUND("Yêu cầu thay đổi hành khách không tồn tại", HttpStatus.NOT_FOUND),
+    BOOKING_PASSENGER_CHANGE_PENDING("Đang có một yêu cầu thay đổi hành khách chờ xử lý", HttpStatus.CONFLICT),
+    BOOKING_PASSENGER_CHANGE_NOT_ALLOWED("Không thể thay đổi hành khách của booking đã hoàn thành trải nghiệm", HttpStatus.CONFLICT),
+    BOOKING_PASSENGER_CHANGE_PRICE_DIFF("Chênh lệch giá chưa được xử lý — vui lòng điều chỉnh trước khi áp dụng", HttpStatus.CONFLICT),
+    BOOKING_PASSENGER_CHANGE_NOT_OWNER("Chỉ người đặt tour mới được gửi yêu cầu thay đổi hành khách", HttpStatus.FORBIDDEN),
+    BOOKING_INVITATION_NOT_FOUND("Lời mời không tồn tại", HttpStatus.NOT_FOUND),
+    BOOKING_INVITATION_EXPIRED("Lời mời đã hết hạn — vui lòng yêu cầu gửi lại", HttpStatus.BAD_REQUEST),
+    BOOKING_INVITATION_ALREADY_USED("Lời mời đã được sử dụng", HttpStatus.CONFLICT),
+    BOOKING_INVITATION_EMAIL_MISMATCH("Bạn đang đăng nhập bằng email khác với email được mời", HttpStatus.BAD_REQUEST),
+    BOOKING_INVITATION_NO_EMAIL("Hành khách này không có email nên không thể nhận lời mời", HttpStatus.BAD_REQUEST),
+    BOOKING_INVITATION_ALREADY_PENDING("Hành khách này đang có một lời mời chờ xác nhận", HttpStatus.CONFLICT),
+    BOOKING_MESSAGE_EMPTY("Nội dung tin nhắn không được để trống", HttpStatus.BAD_REQUEST),
+    BOOKING_TOUR_LOCKED("Tour chỉ mở từ ngày trải nghiệm — chưa thể bắt đầu hành trình", HttpStatus.CONFLICT),
+    PROVIDER_CHAT_CONVERSATION_NOT_FOUND("Cuộc trò chuyện không tồn tại", HttpStatus.NOT_FOUND),
+    PROVIDER_CHAT_TARGET_REQUIRED("Cần chọn tour hoặc nhà tour để bắt đầu trò chuyện", HttpStatus.BAD_REQUEST),
+    PROVIDER_CHAT_NO_PROVIDER("Tour này chưa có nhà tour liên hệ", HttpStatus.BAD_REQUEST);
 
     private final String message;
     private final HttpStatus httpStatus;

@@ -3,14 +3,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Plus, Layers, Pencil, Clock, Store, Loader2, Eye, PauseCircle, PlayCircle, Trash2, MapPin, ImageOff,
+  Plus, Layers, Pencil, Clock, Store, Loader2, Eye, Trash2, MapPin, ImageOff,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileSpreadsheet,
 } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { providerTourService } from "../services/providerTourService";
 import TourImportDialog from "./TourImportDialog";
-import { TOUR_STATUS, TOUR_STATUS_ORDER, CONTENT_EDITABLE, saleToggleConfirm } from "../constants";
+import { TOUR_STATUS, TOUR_STATUS_ORDER, CONTENT_EDITABLE } from "../constants";
 
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
 
@@ -223,18 +223,6 @@ export default function ProviderToursList() {
                   {/* Thao tác chỉ là biểu tượng: [ô phụ cố định] [xem / sửa] → luôn thẳng cột */}
                   <div className="col-span-2 md:col-span-1 flex items-center gap-1.5 justify-end">
                     <span className="w-8 h-8 flex items-center justify-center shrink-0">
-                      {t.status === "PUBLISHED" && (
-                        <button type="button" title="Tạm ngừng bán" disabled={busy} onClick={async () => { if (await confirm(saleToggleConfirm(false, t.title))) act(t, () => providerTourService.pause(t.tourId), "Đã tạm ngừng bán"); }}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-50">
-                          {busy ? <Loader2 size={14} className="animate-spin" /> : <PauseCircle size={15} />}
-                        </button>
-                      )}
-                      {t.status === "PAUSED" && (
-                        <button type="button" title="Mở bán lại" disabled={busy} onClick={async () => { if (await confirm(saleToggleConfirm(true, t.title))) act(t, () => providerTourService.resume(t.tourId), "Đã mở bán lại"); }}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 cursor-pointer disabled:opacity-50">
-                          {busy ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={15} />}
-                        </button>
-                      )}
                       {t.status === "DRAFT" && (
                         <button type="button" title="Xóa bản nháp" disabled={busy} onClick={() => remove(t)}
                           className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 cursor-pointer disabled:opacity-50">

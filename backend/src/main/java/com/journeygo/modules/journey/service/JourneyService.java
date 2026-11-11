@@ -55,6 +55,12 @@ public class JourneyService {
 
     @Transactional
     public JourneyResponse startJourney(Long userId, StartJourneyRequest request) {
+        // Tour bị khoá cho tới ngày trải nghiệm: chỉ người đặt / hành khách đã liên kết
+        // mới được bắt đầu, và chỉ từ ngày trải nghiệm trở đi.
+        if (request.bookingId() != null) {
+            bookingService.assertJourneyAllowed(request.bookingId(), userId);
+        }
+
         // Mỗi đơn đặt tour chỉ có một hành trình: đã đi xong thì mở lại hành trình cũ, không tạo mới để check-in lại.
         if (request.bookingId() != null) {
             var byBooking = journeyRepository.findFirstByUserIdAndBookingIdOrderByCreatedAtDesc(userId, request.bookingId());

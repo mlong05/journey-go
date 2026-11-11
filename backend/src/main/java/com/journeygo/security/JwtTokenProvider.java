@@ -75,6 +75,26 @@ public class JwtTokenProvider {
         return claims.getSubject();
     }
 
+    /**
+     * Lấy {@code userId} trong claims của access token.
+     *
+     * <p>Dùng cho WebSocket: sau khi xác thực token ở bước STOMP CONNECT, server cần biết
+     * id người dùng để định tuyến tin nhắn tới đúng hội thoại.
+     */
+    public Long getUserIdFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        Object userId = claims.get("userId");
+        if (userId == null) {
+            return null;
+        }
+        return userId instanceof Number number ? number.longValue() : Long.valueOf(userId.toString());
+    }
+
     public Date getExpirationFromToken(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(getSigningKey())

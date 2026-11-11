@@ -140,20 +140,6 @@ public class ProviderTourController {
                 .body(ApiResponse.success("Đã tạo bản nháp từ tour", service.duplicate(tourId, principal.getId())));
     }
 
-    @PatchMapping("/{tourId}/pause")
-    @Operation(summary = "Tạm ngừng bán tour (PUBLISHED → PAUSED)")
-    public ResponseEntity<ApiResponse<TourDetailResponse>> pause(@PathVariable Long tourId,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.success("Đã tạm ngừng bán tour", service.pause(tourId, principal.getId())));
-    }
-
-    @PatchMapping("/{tourId}/resume")
-    @Operation(summary = "Mở bán lại tour (PAUSED → PUBLISHED)")
-    public ResponseEntity<ApiResponse<TourDetailResponse>> resume(@PathVariable Long tourId,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.success("Đã mở bán lại tour", service.resume(tourId, principal.getId())));
-    }
-
     @DeleteMapping("/{tourId}")
     @Operation(summary = "Xóa bản nháp (chỉ DRAFT)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long tourId,

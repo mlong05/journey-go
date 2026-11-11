@@ -118,6 +118,10 @@ class TourModel {
   /// Ngày khởi hành gần nhất từ hôm nay; null nếu không còn ngày nào.
   final DateTime? nextDepartureDate;
 
+  /// Nhà tour cung cấp tour (tên + id) — dùng cho nút chat hỗ trợ trước khi mua.
+  final String? providerName;
+  final int? providerId;
+
   const TourModel({
     required this.id,
     required this.title,
@@ -139,6 +143,8 @@ class TourModel {
     this.themeName,
     this.stopCount = 0,
     this.nextDepartureDate,
+    this.providerName,
+    this.providerId,
   });
 
   factory TourModel.fromJson(Map<String, dynamic> json) {
@@ -171,6 +177,9 @@ class TourModel {
       themeName: _textOrNull(json['themeName']),
       stopCount: _asInt(json['stopCount']),
       nextDepartureDate: DateTime.tryParse(json['nextDepartureDate']?.toString() ?? ''),
+      providerName: json['providerName']?.toString() ??
+          json['createdBy']?.toString(),
+      providerId: _asIntOrNull(json['providerId']),
     );
   }
 

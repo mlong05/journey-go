@@ -1,12 +1,9 @@
 package com.journeygo.modules.booking.service;
 
-import com.journeygo.modules.experience.entity.Experience;
-import com.journeygo.modules.experience.entity.ExperienceSlot;
-import com.journeygo.modules.experience.entity.enums.ExperienceStatus;
-import com.journeygo.modules.experience.repository.ExperienceRepository;
-import com.journeygo.modules.experience.repository.ExperienceSlotRepository;
+import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.Tour;
-import com.journeygo.modules.tour.entity.TourDestination;
+import com.journeygo.modules.tour.entity.TourPrice;
+import com.journeygo.modules.tour.repository.TourPriceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,82 +11,139 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
- * Tra cứu thông tin giá và slot của một Tour phục vụ luồng Booking.
+ * Tra cứu bảng giá và quy tắc slot của một Tour phục vụ luồng Booking.
  *
- * <p>Giá tour được tính động từ các Experience thuộc các điểm đến trong hành trình
- * (giống {@code TourRepository.calculateTotalPriceByTourId}) — nhưng ở đây trả về danh sách
- * chi tiết để Booking có thể chốt giá từng Experience và giữ slot tương ứng.
+ * <p>⚠️ Vì sao KHÔNG dùng giá của Experience nữa?
+ * <p>Cấu trúc tour đã được hội đồng review đổi: tour luồng 5 bước định nghĩa giá theo
+ * <b>loại khách</b> trong {@code tour_prices} ({@link TourPrice}) chứ không phải theo trải
+ * nghiệm. Booking cũ lấy giá = tổng giá Experience của các điểm đến ⇒ không còn khớp với
+ * bảng giá đối tác khai báo và cho tour mới không đặt được.
+ *
+ * <p>Bảng giá theo loại khách được đọc từ {@code tour_prices}:
+ * <ul>
+ *   <li>{@code price} — giá vé của loại khách đó.</li>
+ *   <li>{@code countsTowardSlot} — loại khách này có chiếm 1 chỗ trong slot hay không
+ *       (em bé thường không chiếm).</li>
+ * </ul>
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class TourBookingCatalogService {
 
-    private final ExperienceRepository experienceRepository;
-    private final ExperienceSlotRepository slotRepository;
+    private final TourPriceRepository tourPriceRepository;
+    private final com.journeygo.modules.tour.repository.TourRepository tourRepository;
 
     /**
-     * Một Experience kèm giá và slot tương ứng với ngày trải nghiệm.
+     * Bảng giá của một tour theo loại khách.
+     *
+     * @param prices map {@link GuestType} → {@link TourPrice}
      */
-    public record ExperienceQuote(Long experienceId, String title, BigDecimal price,
-                                   ExperienceSlot slot, boolean hasCapacity) {}
+    public record PriceTable(Map<GuestType, TourPrice> prices) {
 
-    /**
-     * Lấy danh sách Experience của tour kèm giá và slot theo ngày.
-     */
-    @Transactional(readOnly = true)
-    public List<ExperienceQuote> quoteExperiences(Tour tour, LocalDate experienceDate) {
-        List<Long> destinationIds = tour.getTourDestinations() == null
-                ? List.of()
-                : tour.getTourDestinations().stream()
-                        .map(TourDestination::getDestination)
-                        .filter(d -> d != null)
-                        .map(d -> d.getId())
-                        .toList();
-
-        if (destinationIds.isEmpty()) {
-            return List.of();
+        /** Giá của một loại khách (0 nếu tour không bán loại khách đó). */
+        public BigDecimal priceOf(GuestType guestType) {
+            TourPrice p = prices.get(guestType);
+            return p == null || p.getPrice() == null ? BigDecimal.ZERO : p.getPrice();
         }
 
-        List<Experience> experiences = experienceRepository
-                .findByDestination_IdInOrderById(destinationIds);
-
-        List<ExperienceQuote> quotes = new ArrayList<>();
-        for (Experience exp : experiences) {
-            if (exp.getStatus() == ExperienceStatus.INACTIVE) {
-                continue;
+        /** Loại khách này có chiếm slot hay không (mặc định: có). */
+        public boolean countsTowardSlot(GuestType guestType) {
+            // Em bé luôn miễn phí và không chiếm chỗ — bất kể đối tác khai báo thế nào.
+            if (guestType != null && guestType.isAlwaysFree()) {
+                return false;
             }
-            ExperienceSlot slot = slotRepository
-                    .findByExperienceIdAndSlotDate(exp.getId(), experienceDate)
-                    .orElse(null);
-
-            boolean hasCapacity = slot != null
-                    && slot.getMaxTourPerDay() != null
-                    && slot.getMaxTourPerDay() > 0
-                    && slot.getBookedTourCount() != null
-                    && slot.getBookedTourCount() < slot.getMaxTourPerDay();
-
-            quotes.add(new ExperienceQuote(exp.getId(), exp.getTitle(),
-                    exp.getPrice() != null ? exp.getPrice() : BigDecimal.ZERO,
-                    slot, hasCapacity));
+            TourPrice p = prices.get(guestType);
+            return p == null || p.isCountsTowardSlot();
         }
 
-        quotes.sort(Comparator.comparing(ExperienceQuote::experienceId));
-        return quotes;
+        /** Tour có bán loại khách này không. */
+        public boolean sells(GuestType guestType) {
+            return prices.containsKey(guestType);
+        }
+
+        /** Các loại khách tour đang bán. */
+        public List<GuestType> soldGuestTypes() {
+            return prices.keySet().stream().sorted(java.util.Comparator.comparing(Enum::ordinal)).toList();
+        }
     }
 
     /**
-     * Tổng giá tour tại ngày trải nghiệm — cơ sở để chốt giá khi tạo Booking.
+     * Đọc bảng giá của tour.
+     *
+     * <p>Tour luồng 5 bước có {@code tour_prices}; tour cũ (không có) coi như một bảng
+     * rỗng ⇒ phần giá sẽ do tầng trên xử lý.
      */
     @Transactional(readOnly = true)
-    public BigDecimal calculateTotalPrice(Tour tour, LocalDate experienceDate) {
-        return quoteExperiences(tour, experienceDate).stream()
-                .map(ExperienceQuote::price)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    public PriceTable priceTable(Tour tour) {
+        Map<GuestType, TourPrice> map = new EnumMap<>(GuestType.class);
+        if (tour == null || tour.getTourId() == null) {
+            return new PriceTable(map);
+        }
+        List<TourPrice> rows = tourPriceRepository.findByTour_TourId(tour.getTourId());
+        for (TourPrice p : rows) {
+            if (p.getGuestType() != null) {
+                map.put(p.getGuestType(), p);
+            }
+        }
+        return new PriceTable(map);
+    }
+
+    /**
+     * Bảng giá mặc định khi tour KHÔNG khai báo giá theo loại khách (tour luồng cũ).
+     *
+     * <p>Mọi loại khách có cùng một mức giá — giá trả trước đây của tour. Giá này do
+     * {@code TourPricingService} tính từ tổng giá các Experience PUBLISHED của các điểm đến
+     * trong tour.
+     */
+    public PriceTable legacyFlatPriceTable(BigDecimal flatPrice) {        Map<GuestType, TourPrice> map = new EnumMap<>(GuestType.class);
+        BigDecimal value = flatPrice == null ? BigDecimal.ZERO : flatPrice;
+        for (GuestType g : GuestType.values()) {
+            map.put(g, TourPrice.builder()
+                    .guestType(g)
+                    .price(value)
+                    // Em bé luôn miễn phí và KHÔNG chiếm chỗ (theo quy định nền tảng).
+                    .countsTowardSlot(!g.isAlwaysFree())
+                    .build());
+        }
+        return new PriceTable(map);
+    }
+
+    /**
+     * Giá trả trước đây của tour luồng cũ = tổng giá các Experience PUBLISHED trong hành trình.
+     *
+     * <p>Tour luồng 5 bước không dùng hàm này (giá lấy từ {@code tour_prices}).
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal flatPriceOf(Tour tour) {
+        if (tour == null || tour.getTourId() == null) {
+            return BigDecimal.ZERO;
+        }
+        return tourRepository.sumExperiencePricesByTourIds(List.of(tour.getTourId())).stream()
+                .findFirst()
+                .map(com.journeygo.modules.tour.repository.TourPriceProjection::totalPrice)
+                .orElse(BigDecimal.ZERO);
+    }
+
+    /**
+     * Ngày khởi hành còn mở của tour (đã cấu hình trong bước 4 của luồng tạo tour).
+     *
+     * <p>Dùng để kiểm tra ngày trải nghiệm có hợp lệ không.
+     */
+    @Transactional(readOnly = true)
+    public Optional<LocalDate> findDepartureDate(Tour tour, LocalDate date) {
+        if (tour == null || tour.getDepartureDates() == null) {
+            return Optional.empty();
+        }
+        return tour.getDepartureDates().stream()
+                .map(d -> d.getDepartureDate())
+                .filter(d -> d != null && d.equals(date))
+                .findFirst();
     }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Lock, MessageSquareWarning, XCircle, Copy, PauseCircle, PlayCircle, Store, ChevronRight, Loader2 } from "lucide-react";
+import { Lock, MessageSquareWarning, XCircle, Copy, Store, ChevronRight, Loader2 } from "lucide-react";
 import { STEP_LABEL, REJECTION_REASONS } from "../constants";
 
 const reasonText = (review) => {
@@ -12,10 +12,9 @@ const reasonText = (review) => {
 };
 
 /**
- * Banner theo trạng thái tour (mục 8 tài liệu): khóa nội dung, ghi chú Moderator, lý do từ chối,
- * thao tác tạm ngừng / mở bán lại / nhân bản.
+ * Banner theo trạng thái tour (mục 8 tài liệu): khóa nội dung, ghi chú Moderator, lý do từ chối.
  */
-export default function TourStatusBanner({ tour, busy, onJumpNote, onDuplicate, onPause, onResume }) {
+export default function TourStatusBanner({ tour, busy, onJumpNote, onDuplicate }) {
   const review = tour.latestReview;
   const stopIndexOf = (stopId) => (tour.stops || []).findIndex((s) => s.id === stopId);
 
@@ -83,24 +82,18 @@ export default function TourStatusBanner({ tour, busy, onJumpNote, onDuplicate, 
     );
   }
 
-  if (tour.status === "PUBLISHED" || tour.status === "PAUSED") {
-    const paused = tour.status === "PAUSED";
+  if (tour.status === "PUBLISHED") {
     return (
-      <div className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between ${paused ? "border-slate-300 bg-slate-50" : "border-emerald-200 bg-emerald-50"}`}>
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
         <div className="flex items-start gap-3">
-          <Store size={18} className={`${paused ? "text-slate-500" : "text-emerald-600"} mt-0.5 shrink-0`} />
-          <div className={`text-sm ${paused ? "text-slate-700" : "text-emerald-900"}`}>
-            <p className="font-bold">{paused ? "Tour đang tạm ngừng bán" : "Tour đã được duyệt và đang bán"}</p>
+          <Store size={18} className="text-emerald-600 mt-0.5 shrink-0" />
+          <div className="text-sm text-emerald-900">
+            <p className="font-bold">Tour đã được duyệt và đang bán</p>
             <p className="text-xs mt-0.5">
               Được sửa <b>giá vé</b> và <b>lịch khởi hành</b> mà không cần duyệt lại. Sửa nội dung (thông tin, điểm đến) cần tạo phiên bản mới — chưa hỗ trợ.
             </p>
           </div>
         </div>
-        <button type="button" onClick={paused ? onResume : onPause} disabled={busy}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-60 ${paused ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"}`}>
-          {busy ? <Loader2 size={14} className="animate-spin" /> : paused ? <PlayCircle size={14} /> : <PauseCircle size={14} />}
-          {paused ? "Mở bán lại" : "Tạm ngừng bán"}
-        </button>
       </div>
     );
   }
