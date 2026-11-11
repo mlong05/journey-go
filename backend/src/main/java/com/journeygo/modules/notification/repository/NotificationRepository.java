@@ -22,6 +22,18 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     Optional<Notification> findByIdAndRecipientId(Long id, Long recipientId);
 
+    /**
+     * Đã có thông báo cho (người nhận, loại, đối tượng) chưa?
+     *
+     * <p>Dùng để tránh tạo trùng thông báo lời mời tour: mỗi lời mời chỉ nên
+     * báo cho người nhận một lần, dù họ đăng nhập/đăng ký bao nhiêu lần.
+     */
+    boolean existsByRecipientIdAndTypeAndRefTypeAndRefId(
+            Long recipientId,
+            com.journeygo.modules.notification.entity.enums.NotificationType type,
+            String refType,
+            Long refId);
+
     @Modifying
     @Query("update Notification n set n.readAt = :now where n.recipientId = :recipientId and n.readAt is null")
     int markAllRead(@Param("recipientId") Long recipientId, @Param("now") Instant now);
