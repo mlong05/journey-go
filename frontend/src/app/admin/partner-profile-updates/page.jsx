@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import PaginationBar from "@/components/ui/PaginationBar";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Tooltip } from "@/components/ui";
 import PartnerProfileFieldTable from "@/features/partnerprofileupdate/components/PartnerProfileFieldTable";
 import {
   approveUpdate,
@@ -522,9 +523,11 @@ function CompareModal({ request, loading, busy, onClose, onApprove, onReject }) 
       <div className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-slate-50 shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-bold text-slate-900">
-              {r?.businessName || r?.partnerName || "Chi tiết yêu cầu đổi thông tin"}
-            </h3>
+            <Tooltip content={r?.businessName || r?.partnerName || "Chi tiết yêu cầu đổi thông tin"}>
+              <h3 className="truncate text-lg font-bold text-slate-900">
+                {r?.businessName || r?.partnerName || "Chi tiết yêu cầu đổi thông tin"}
+              </h3>
+            </Tooltip>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span>#{r?.id}</span>
               {r?.status && (
