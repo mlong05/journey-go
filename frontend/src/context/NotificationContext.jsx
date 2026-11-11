@@ -6,6 +6,7 @@ import {
   refreshAccessToken,
   streamNotifications,
 } from "@/services/notificationService";
+import { subscribeRealtime } from "@/services/realtimeService";
 
 /**
  * Thông báo thời gian thực cho dashboard (admin / provider / moderator).
@@ -59,6 +60,29 @@ export function NotificationProvider({ children }) {
   }, []);
 
   const dismissToast = useCallback((id) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
+
+  // ── WebSocket/STOMP: thông báo tới tức thì (bổ sung cho luồng SSE) ──────────
+  // Thông báo có thể tới qua CẢ SSE lẫn WebSocket ⇒ chống trùng theo `id`.
+  useEffect(() => {
+    const unsubscribe = subscribeRealtime({
+      onMessage: () => {},
+      onNotification: (payload) => {
+        const n = payload?.notification;
+        if (!n?.id) return;
+        setItems((prev) => (prev.some((x) => x.id === n.id) ? prev : [n, ...prev]));
+        setToasts((prev) => [n, ...prev.filter((t) => t.id !== n.id)].slice(0, MAX_TOASTS));
+        // Đồng bộ số chưa đọc từ server (SSE cũng gửi unread-count ⇒ không cộng tay để tránh trùng)
+        notificationService
+          .unreadCount()
+          .then((res) => {
+            const count = res?.data?.count;
+            if (typeof count === "number") setUnread(count);
+          })
+          .catch(() => {});
+      },
+    });
+    return unsubscribe;
+  }, []);
 
   // ── Luồng SSE: tự kết nối lại với thời gian chờ tăng dần, làm mới token khi hết hạn ──
   useEffect(() => {

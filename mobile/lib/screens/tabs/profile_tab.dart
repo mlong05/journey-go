@@ -12,6 +12,7 @@ import '../../core/models/refund_model.dart';
 import '../../core/services/progress_service.dart';
 import '../../core/services/refund_service.dart';
 import '../../core/services/notification_service.dart';
+import '../../core/services/realtime_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../tourist_auth_screen.dart' show TouristAuthScreen;
 import '../account/password_screens.dart';
@@ -24,6 +25,7 @@ import '../rewards/badges_screen.dart';
 import '../rewards/rewards_widgets.dart' show BadgeIcon, PointTransactionTile;
 import '../rewards/wallet_screen.dart';
 import '../booking/bookings_screen.dart';
+import '../chat/provider_chat_list_screen.dart';
 import '../refunds_screen.dart';
 import '../tickets_screen.dart';
 
@@ -123,6 +125,13 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
       context,
     ).push(MaterialPageRoute(builder: (_) => const RefundsScreen()));
     if (mounted) _loadProfileData();
+  }
+
+  /// Mở "Hỗ trợ từ nhà tour" — lịch sử chat với các nhà tour khác nhau.
+  void _openProviderChats() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ProviderChatListScreen()),
+    );
   }
 
   void _openTickets() {
@@ -236,6 +245,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
     if (confirm == true) {
       // Ngắt luồng và xoá thông báo của tài khoản này trước khi rời phiên
       NotificationCenter.instance.clear();
+      // Ngắt kết nối chat tức thời (WebSocket) của tài khoản cũ
+      await RealtimeService.instance.disconnect();
       try {
         await _authService.logout();
       } catch (_) {
@@ -1025,6 +1036,16 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
               AppCultureColors.jadeDark,
             ),
             onTap: _openTickets,
+          ),
+          _tileDivider(),
+          _tileDivider(),
+          _buildSettingTile(
+            icon: Icons.forum_rounded,
+            iconColor: AppCultureColors.oceanDark,
+            iconBg: AppCultureColors.oceanLight,
+            title: 'Hỗ trợ từ nhà tour',
+            subtitle: 'Lịch sử chat với các nhà tour (nhắn trước khi đặt vé)',
+            onTap: _openProviderChats,
           ),
           _tileDivider(),
           _buildSettingTile(

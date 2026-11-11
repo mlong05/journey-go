@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../core/constants/api_constants.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
-import '../../core/services/mock_payment_store.dart';
 import '../../core/services/payment_result_service.dart';
 import '../../core/services/payment_service.dart';
 import '../../core/services/token_storage.dart';
@@ -15,6 +13,7 @@ import '../booking/payment_success_dialog.dart';
 import '../journey/journey_screen.dart';
 import '../journey/journey_widgets.dart' show PrimaryButton;
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
+import '../tours/tour_detail_opener.dart';
 
 /// Thanh toán một booking qua VNPay.
 ///
@@ -72,9 +71,6 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
   String? _notice;
   String? _error;
 
-  // Chỉ dùng khi ApiConstants.mockPayment bật: coi như đã thanh toán, server không đổi.
-  bool _mockPaid = false;
-
   bool _awaiting = false; // đã mở VNPay, đang chờ kết quả
   DateTime _awaitStart = DateTime.now();
   bool _queried = false;
@@ -131,10 +127,8 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
       final booking = await _bookings.getById(widget.bookingId);
       final methods = await _payments.getMethods().catchError((_) => <PaymentMethodModel>[]);
       final attempts = await _payments.getByBooking(widget.bookingId).catchError((_) => <PaymentModel>[]);
-      final mockPaid = ApiConstants.mockPayment && (await MockPaymentStore.paidIds()).contains(widget.bookingId);
       if (!mounted) return;
       setState(() {
-        _mockPaid = mockPaid;
         _booking = booking;
         _methods = methods;
         _attempts = attempts;
@@ -173,25 +167,18 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
     return null;
   }
 
-  /// Thanh toán giả lập (chỉ khi bật cờ dev): chờ một chút rồi coi như thành công.
-  Future<void> _mockPay() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-      _notice = 'Đang xử lý thanh toán (giả lập)...';
-    });
-    await Future<void>.delayed(const Duration(milliseconds: 1600));
-    await MockPaymentStore.markPaid(widget.bookingId);
-    if (!mounted) return;
-    setState(() {
-      _mockPaid = true;
-      _busy = false;
-      _notice = null;
-    });
-  }
-
+  /// Mở hành trình — nhưng nếu ngày trải nghiệm còn ở tương lai thì mở màn CHI TIẾT
+  /// TOUR (không vào hành trình vì backend đang khoá tour tới ngày đó).
   void _startExperience() {
     final booking = _booking!;
+    if (booking.isTourLocked) {
+      openTourDetailScreen(
+        context,
+        tourId: booking.tourId,
+        bookedBooking: booking,
+      );
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => JourneyScreen(tourId: booking.tourId, bookingId: booking.id),
@@ -246,9 +233,14 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
       amount: _booking?.totalAmount,
       onViewBooking: () {
         if (!mounted) return;
+        // ⚠️ `popToHomeOnBack: true` ⇒ bấm nút quay lại ở chi tiết đơn sẽ quay
+        // thẳng về Trang chủ, KHÔNG quay lại màn đặt tour / checkout đã xong.
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => BookingDetailScreen(bookingId: widget.bookingId),
+            builder: (_) => BookingDetailScreen(
+              bookingId: widget.bookingId,
+              popToHomeOnBack: true,
+            ),
           ),
         );
       },
@@ -256,7 +248,6 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
   }
 
   Future<void> _pay() async {
-    if (ApiConstants.mockPayment) return _mockPay();
     setState(() {
       _busy = true;
       _error = null;
@@ -451,8 +442,8 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
   }
 
   List<Widget> _buildContent(BookingModel booking) {
-    final paid = booking.isPaid || _mockPaid;
-    final pending = booking.status == BookingStatus.pendingPayment && !_mockPaid;
+    final paid = booking.isPaid;
+    final pending = booking.status == BookingStatus.pendingPayment;
     final expired = pending && _remaining == Duration.zero;
     final canPay = pending && !expired;
 
@@ -467,9 +458,8 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
                 Text(booking.bookingCode,
                     style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
                 _badge(
-                    BookingStatus.label(_mockPaid
-                        ? BookingStatus.confirmed
-                        : (expired ? BookingStatus.expired : booking.status)),
+                    BookingStatus.label(
+                        expired ? BookingStatus.expired : booking.status),
                     paid: paid),
               ],
             ),
@@ -531,7 +521,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
           child: Text(
             _busy
                 ? 'Đang xử lý...'
-                : 'Thanh toán ${formatMoney(booking.totalAmount)}${ApiConstants.mockPayment ? ' (giả lập)' : ''}',
+                : 'Thanh toán ${formatMoney(booking.totalAmount)}',
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
@@ -590,16 +580,17 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
           const SizedBox(height: 6),
           Text(
-            _mockPaid
-                ? 'Đơn được ghi nhận thanh toán giả lập để thử trải nghiệm.'
-                : 'Đơn đặt của bạn đã được xác nhận. Chúc bạn có chuyến đi đầy cảm hứng!',
+            'Đơn đặt của bạn đã được xác nhận. Chúc bạn có chuyến đi đầy cảm hứng!',
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13, height: 1.45, color: AppCultureColors.textMuted),
           ),
           const SizedBox(height: 16),
           PrimaryButton(
-            label: 'Bắt đầu trải nghiệm',
-            icon: Icons.explore_rounded,
+            // Ngày trải nghiệm còn ở tương lai ⇒ đếm ngược thay cho "Bắt đầu trải nghiệm".
+            label: booking.isTourLocked
+                ? '${booking.daysUntilStart} ngày nữa lên đường!'
+                : 'Bắt đầu trải nghiệm',
+            icon: booking.isTourLocked ? Icons.schedule_rounded : Icons.explore_rounded,
             onPressed: _startExperience,
           ),
         ],

@@ -1,0 +1,22 @@
+-- =====================================================================================
+-- V22 — Bỏ cột "district" (Quận / Huyện) khỏi hồ sơ đối tác.
+--
+--   LÝ DO:
+--   Từ 01/07/2025 (Nghị quyết 202/2025/QH15) và các đợt sáp nhập tiếp theo, cấp
+--   huyện (quận/huyện) đã bị giải thể và gộp lên cấp tỉnh. Mô hình hành chính
+--   hiện hành là 2 cấp:  Tỉnh / Thành phố  →  Phường / Xã.
+--   ⇒ Cột "district" không còn được dùng và không còn ý nghĩa.
+--
+--   DỮ LIỆU CŨ:
+--   Vài hồ sơ đăng ký cũ có thể đã lưu giá trị ở cột này. Giá trị đó là tên
+--   quận/huyện theo mô hình CŨ và không còn khớp với phường/xã mới, nên bị xoá.
+--   Hành động này không xoá dữ liệu nào khác (email, tên doanh nghiệp, giấy tờ,
+--   thông tin ngân hàng…) và không ảnh hưởng tới bảng `users` / `provider_profiles`.
+--
+--   BẢNG `partner_profile_update_requests` lưu old_data / new_data dưới dạng JSON
+--   ⇒ các khoá "district" cũ nằm trong chuỗi JSON, không phải cột riêng, nên
+--   không cần migration cho bảng đó. Khi đối tác gửi yêu cầu sửa mới, JSON sẽ
+--   không còn khoá "district" nữa.
+-- =====================================================================================
+
+ALTER TABLE partner_applications DROP COLUMN IF EXISTS district;

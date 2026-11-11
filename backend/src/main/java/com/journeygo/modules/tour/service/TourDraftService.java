@@ -403,33 +403,6 @@ public class TourDraftService {
     }
 
     @Transactional
-    public TourDetailResponse pause(Long tourId, Long userId) {
-        Tour tour = findOwnedTour(tourId, userId);
-        if (tour.getStatus() != TourStatus.PUBLISHED) {
-            throw new AppException(ErrorCode.INVALID_TOUR_STATUS, "Chỉ tạm ngừng được tour đang bán");
-        }
-        tour.setStatus(TourStatus.PAUSED);
-        tour.setApproved(false);
-        log.info("[TourDraft] user={} tạm ngừng bán tour={}", userId, tourId);
-        return save(tour);
-    }
-
-    @Transactional
-    public TourDetailResponse resume(Long tourId, Long userId) {
-        Tour tour = findOwnedTour(tourId, userId);
-        if (tour.getStatus() != TourStatus.PAUSED) {
-            throw new AppException(ErrorCode.INVALID_TOUR_STATUS, "Chỉ mở bán lại được tour đang tạm ngừng");
-        }
-        providerProfileService.requireCanManageTours(userId);
-        tour.setStatus(TourStatus.PUBLISHED);
-        tour.setApproved(true);
-        log.info("[TourDraft] user={} mở bán lại tour={}", userId, tourId);
-        TourDetailResponse response = save(tour);
-        slotService.syncSlots(tour);
-        return response;
-    }
-
-    @Transactional
     public void deleteDraft(Long tourId, Long userId) {
         Tour tour = findOwnedTour(tourId, userId);
         if (tour.getStatus() != TourStatus.DRAFT) {
@@ -474,7 +447,7 @@ public class TourDraftService {
     private static AppException lockedException(Tour tour) {
         String message = switch (tour.getStatus()) {
             case PENDING_REVIEW -> "Tour đang chờ duyệt, nội dung bị khóa";
-            case PUBLISHED, PAUSED -> "Tour đã được duyệt: chỉ sửa được giá và lịch. "
+            case PUBLISHED -> "Tour đã được duyệt: chỉ sửa được giá và lịch. "
                     + "Sửa nội dung sẽ cần tạo phiên bản mới (chưa hỗ trợ)";
             case REJECTED -> "Tour đã bị từ chối, hãy nhân bản thành bản nháp mới để chỉnh sửa";
             default -> "Không thể sửa tour ở trạng thái hiện tại";
@@ -483,7 +456,7 @@ public class TourDraftService {
     }
 
     private static boolean isLive(Tour tour) {
-        return tour.getStatus() == TourStatus.PUBLISHED || tour.getStatus() == TourStatus.PAUSED;
+        return tour.getStatus() == TourStatus.PUBLISHED;
     }
 
     private static void requireValidTitle(String title) {

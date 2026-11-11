@@ -19,7 +19,9 @@ import '../../core/services/booking_service.dart';
 import '../../core/services/payment_service.dart';
 import '../../core/services/payment_sync_service.dart';
 import '../../core/services/refund_service.dart';
+import '../../core/services/token_storage.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/navigation.dart';
 import 'payment_screen.dart';
 import 'refund_form_screen.dart';
 
@@ -27,7 +29,19 @@ class BookingDetailScreen extends StatefulWidget {
   final int bookingId;
   final BookingModel? booking;
 
-  const BookingDetailScreen({super.key, required this.bookingId, this.booking});
+  /// Bấm nút quay lại (góc trái) ⇒ quay thẳng về TRANG CHỦ thay vì màn trước đó.
+  ///
+  /// ⚠️ Dùng sau khi thanh toán xong: stack lúc đó là
+  /// [Trang chủ → Chi tiết tour → Đặt tour → Checkout → Chi tiết đơn]
+  /// ⇒ bấm quay lại sẽ quay về màn checkout/đặt tour — không mong muốn.
+  final bool popToHomeOnBack;
+
+  const BookingDetailScreen({
+    super.key,
+    required this.bookingId,
+    this.booking,
+    this.popToHomeOnBack = false,
+  });
 
   @override
   State<BookingDetailScreen> createState() => _BookingDetailScreenState();
@@ -42,6 +56,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   BookingModel? _booking;
   List<PaymentModel> _payments = [];
   List<RefundModel> _refunds = [];
+
+  /// Id người đang đăng nhập — dùng để biết mình có phải người đặt tour không.
+  int? _myUserId;
 
   bool _loading = true;
   bool _busy = false;
@@ -63,6 +80,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     });
 
     try {
+      final myUser = await TokenStorage.getUser();
+      if (!mounted) return;
+      _myUserId = myUser?.id;
+
       final booking =
           widget.booking ?? await _bookingService.getBookingById(widget.bookingId);
       final payments = await _paymentService.getPaymentsByBooking(widget.bookingId);
@@ -351,7 +372,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               size: 18, color: AppCultureColors.textDark),
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () {
+            if (widget.popToHomeOnBack) {
+              // Sau khi thanh toán ⇒ quay thẳng về Trang chủ (không quay lại
+              // màn đặt tour / checkout đã hoàn tất).
+              returnToHome(context);
+              return;
+            }
+            Navigator.of(context).pop(true);
+          },
         ),
         title: const Text(
           'Chi Tiết Đơn',
@@ -497,6 +526,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         _buildHeroHeader(booking),
         const SizedBox(height: 14),
         _buildStatusTimeline(booking),
+        const SizedBox(height: 14),
+        _buildPassengersCard(booking),
         const SizedBox(height: 14),
         _buildExperiencesCard(booking),
         const SizedBox(height: 14),
@@ -1023,6 +1054,328 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           const SizedBox(height: 4),
           const Divider(height: 16, color: AppCultureColors.borderLight),
           _buildInfoRow('Tổng thanh toán', booking.formattedTotal, bold: true),
+        ],
+      ),
+    );
+  }
+
+  // ── Hành khách trong nhóm + Mời tham gia ─────────────────────────────────
+
+  /// Người đang xem có phải NGƯỜI ĐẶT TOUR (Booking Customer) không.
+  ///
+  /// ⚠️ Hành khách được mời KHÔNG được quyền gửi lời mời / quản lý nhóm.
+  bool get _isBookingCustomer {
+    final booking = _booking;
+    if (booking == null) return false;
+    final myId = _myUserId;
+    if (myId != null && booking.touristId != null) return myId == booking.touristId;
+    // Dự phòng: booking không có touristId ⇒ coi như người đặt khi chính họ đặt.
+    return booking.passengers.any((p) => p.bookingCustomer);
+  }
+
+  /// Card "Hành khách trong nhóm" — hiển thị số người tham gia + nút "Mời tham gia".
+  Widget _buildPassengersCard(BookingModel booking) {
+    final passengers = booking.passengers;
+    if (passengers.isEmpty) return const SizedBox.shrink();
+
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const _CardTitle(
+                  icon: Icons.groups_rounded, text: 'Hành khách trong nhóm'),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppCultureColors.oceanLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${passengers.length} người',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppCultureColors.oceanDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Số người tham gia đã nhập khi đặt tour.',
+            style: const TextStyle(
+                fontSize: 11.5, color: AppCultureColors.textMuted),
+          ),
+          const SizedBox(height: 12),
+          for (var i = 0; i < passengers.length; i++) ...[
+            _buildPassengerRow(booking, passengers[i]),
+            if (i < passengers.length - 1)
+              const Divider(height: 18, color: AppCultureColors.borderLight),
+          ],
+          if (_isBookingCustomer && passengers.any((p) => p.canBeInvited || p.invitationExpired))
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppCultureColors.jadeLight.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.mark_email_read_outlined,
+                        size: 16, color: AppCultureColors.jadeDark),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Gửi lời mời để hành khách tạo tài khoản JourneyGo và xem tour cùng nhóm. '
+                        'Lời mời hết hạn sau 24 giờ.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.4,
+                          color: AppCultureColors.jadeDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPassengerRow(BookingModel booking, BookingPassengerModel p) {
+    final masked = !p.personalInfoVisible;
+    final canInvite = _isBookingCustomer && (p.canBeInvited || p.invitationExpired);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: p.bookingCustomer
+                ? AppCultureColors.jadeLight
+                : AppCultureColors.surfaceSubtle,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            p.hasAccount
+                ? Icons.verified_user_rounded
+                : Icons.person_outline_rounded,
+            size: 17,
+            color: p.bookingCustomer
+                ? AppCultureColors.jadeDark
+                : AppCultureColors.textMuted,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      p.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppCultureColors.textDark,
+                      ),
+                    ),
+                  ),
+                  if (p.bookingCustomer) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppCultureColors.jadeLight,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Người đặt',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppCultureColors.jadeDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(
+                _passengerSubtitle(p, masked),
+                style: const TextStyle(
+                    fontSize: 11.5, color: AppCultureColors.textMuted),
+              ),
+              if (p.invitationLabel.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                _invitationTag(p),
+              ],
+              if (canInvite) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : () => _invitePassenger(booking, p),
+                  icon: const Icon(Icons.mail_outline_rounded, size: 15),
+                  label: Text(p.invitationExpired ? 'Gửi lại lời mời' : 'Mời tham gia'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppCultureColors.heritageJade,
+                    side: const BorderSide(color: AppCultureColors.heritageJade),
+                    minimumSize: const Size(0, 34),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    textStyle: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _passengerSubtitle(BookingPassengerModel p, bool masked) {
+    final parts = <String>[
+      if (p.guestTypeLabel.isNotEmpty) p.guestTypeLabel,
+      if (p.ageAtExperience != null) '${p.ageAtExperience} tuổi',
+    ];
+    if (masked) {
+      parts.add('Thông tin cá nhân được ẩn');
+    } else if (p.email != null && p.email!.isNotEmpty) {
+      parts.add(p.email!);
+    } else if (p.emailRequired) {
+      parts.add('Chưa có email');
+    }
+    return parts.join(' · ');
+  }
+
+  Widget _invitationTag(BookingPassengerModel p) {
+    final (color, bg, icon) = switch (p.invitationStatus) {
+      'ACCEPTED' => (
+          AppCultureColors.jadeDark,
+          AppCultureColors.jadeLight,
+          Icons.check_circle_rounded
+        ),
+      'PENDING' => (
+          AppCultureColors.oceanDark,
+          AppCultureColors.oceanLight,
+          Icons.schedule_rounded
+        ),
+      'EXPIRED' => (
+          AppCultureColors.amberDark,
+          AppCultureColors.rewardBg,
+          Icons.timer_off_rounded
+        ),
+      _ => (
+          AppCultureColors.textMuted,
+          AppCultureColors.surfaceSubtle,
+          Icons.block_rounded
+        ),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            p.invitationLabel,
+            style: TextStyle(
+                fontSize: 10.5, fontWeight: FontWeight.w700, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Gửi lời mời tham gia tour cho một hành khách.
+  Future<void> _invitePassenger(
+      BookingModel booking, BookingPassengerModel passenger) async {
+    var email = passenger.email ?? '';
+    if (email.isEmpty) {
+      final entered = await _askEmail();
+      if (entered == null || entered.trim().isEmpty) return;
+      email = entered.trim();
+    }
+
+    setState(() => _busy = true);
+    try {
+      await _bookingService.invitePassenger(
+        booking.id,
+        passenger.id,
+        email: email,
+      );
+      if (!mounted) return;
+      _load();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã gửi lời mời tới $email'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppCultureColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Hộp thoại nhập email cho hành khách chưa có email trong đơn.
+  Future<String?> _askEmail() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nhập email người được mời'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+            labelText: 'Email',
+            hintText: 'vidu@gmail.com',
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text('Gửi lời mời'),
+          ),
         ],
       ),
     );
