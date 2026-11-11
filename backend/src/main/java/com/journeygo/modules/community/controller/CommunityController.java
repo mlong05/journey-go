@@ -3,6 +3,7 @@ package com.journeygo.modules.community.controller;
 import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.community.dto.*;
 import com.journeygo.modules.community.entity.enums.ReportStatus;
+import com.journeygo.modules.community.service.CommentReportService;
 import com.journeygo.modules.community.service.CommunityService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 public class CommunityController {
 
     private final CommunityService communityService;
+    private final CommentReportService commentReportService;
 
     // ── PUBLIC / FEED ───────────────────────────────────────────────────────────
 
@@ -182,6 +184,19 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.success("Đã gửi báo cáo vi phạm, cảm ơn bạn đã đóng góp xây dựng cộng đồng", report));
     }
 
+    @PostMapping("/comments/{id}/report")
+    @PreAuthorize("isAuthenticated()")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Báo cáo bình luận vi phạm", description = "Gửi báo cáo bình luận có nội dung không phù hợp cho kiểm duyệt viên")
+    public ResponseEntity<ApiResponse<CommentReportResponse>> reportComment(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateReportRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi báo cáo bình luận, cảm ơn bạn đã góp phần xây dựng cộng đồng",
+                commentReportService.reportComment(id, userPrincipal.getId(), request)));
+    }
+
     // ── MODERATOR ENDPOINTS ─────────────────────────────────────────────────────
 
     @GetMapping("/moderation/pending")
@@ -232,6 +247,45 @@ public class CommunityController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(hidden ? "Đã ẩn bình luận" : "Đã hiện lại bình luận",
                 communityService.setCommentHidden(id, userPrincipal.getId(), hidden)));
+    }
+
+    @GetMapping("/moderation/comment-reports")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Xem báo cáo bình luận (Moderator)", description = "Báo cáo bình luận kèm nội dung bình luận và bài chứa nó")
+    public ResponseEntity<ApiResponse<Page<CommentReportResponse>>> getCommentReports(
+            @RequestParam(required = false) ReportStatus status,
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách báo cáo bình luận thành công",
+                commentReportService.getReports(status, pageable)));
+    }
+
+    @PatchMapping("/moderation/comment-reports/{id}/resolve")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Xử lý báo cáo bình luận (Moderator)", description = "Xác nhận vi phạm và tuỳ chọn ẩn bình luận")
+    public ResponseEntity<ApiResponse<CommentReportResponse>> resolveCommentReport(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "true") boolean hideComment,
+            @RequestParam(required = false) String note,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Xử lý báo cáo bình luận thành công",
+                commentReportService.resolve(id, userPrincipal.getId(), hideComment, note)));
+    }
+
+    @PatchMapping("/moderation/comment-reports/{id}/dismiss")
+    @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Bác bỏ báo cáo bình luận (Moderator)", description = "Bình luận không vi phạm; giữ nguyên")
+    public ResponseEntity<ApiResponse<CommentReportResponse>> dismissCommentReport(
+            @PathVariable Long id,
+            @RequestParam(required = false) String note,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Đã bác bỏ báo cáo bình luận",
+                commentReportService.dismiss(id, userPrincipal.getId(), note)));
     }
 
     @GetMapping("/moderation/reports")
