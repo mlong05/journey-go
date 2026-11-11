@@ -53,7 +53,8 @@ class _BookingsScreenState extends State<BookingsScreen> {
     });
 
     try {
-      final list = await _service.getMyBookings(page: 0, size: 50);
+      // Gồm cả booking mà user được mời tham gia (hành khách được mời).
+      final list = await _service.getAccessibleBookings();
       if (!mounted) return;
       setState(() {
         _bookings = list;
