@@ -31,7 +31,8 @@ class TourPublicDetailResponseTest {
                 new BigDecimal("21.0293"), new BigDecimal("105.8356"), 50, 300,
                 "JGE-0123456789ABCDEF", 20, postQuestion);
         var stop = new TourDetailResponse.Stop(7L, 1, "Văn Miếu", "Trường đại học đầu tiên", null,
-                "https://img/stop.jpg", null, null, "Nội dung văn hoá", List.of(), List.of(),
+                "https://img/stop.jpg", null, null, "SECRET-CULTURE-STORY", List.of("https://img/culture-1.jpg"),
+                List.of(new TourDetailResponse.Artifact(3L, "Bia tiến sĩ", "https://img/artifact.jpg", "Bia đá", null, null)),
                 List.of(quiz), List.of(experience), 30);
         return TourDetailResponse.builder()
                 .tourId(99L)
@@ -65,6 +66,21 @@ class TourPublicDetailResponseTest {
                 .doesNotContain("SECRET-ANSWER")
                 .doesNotContain("\"correct\"")
                 .doesNotContain("ghi chú nội bộ");
+    }
+
+    @Test
+    void fromWizard_locksCulturalContentAndKeepsOnlyCounts() throws Exception {
+        var result = TourPublicDetailResponse.fromWizard(wizardDetail(), new BigDecimal("450000"), TODAY);
+
+        String json = new ObjectMapper().registerModule(new JavaTimeModule()).writeValueAsString(result);
+        assertThat(json)
+                .doesNotContain("SECRET-CULTURE-STORY")
+                .doesNotContain("https://img/culture-1.jpg")
+                .doesNotContain("https://img/artifact.jpg");
+        var stop = result.stops().get(0);
+        assertThat(stop.hasCulturalStory()).isTrue();
+        assertThat(stop.culturalImageCount()).isEqualTo(1);
+        assertThat(stop.artifactCount()).isEqualTo(1);
     }
 
     @Test

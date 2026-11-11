@@ -16,7 +16,9 @@ import java.util.Objects;
  * Chi tiết tour cho du khách (trang chi tiết trên mobile/web).
  *
  * <p>Chỉ chứa thông tin công khai: KHÔNG có đáp án quiz, đáp án tự luận, mã QR của hoạt động
- * hay ghi chú kiểm duyệt. Tour luồng cũ ({@code wizardTour = false}) chỉ có phần thông tin chung.
+ * hay ghi chú kiểm duyệt. Nội dung văn hoá của điểm dừng (câu chuyện, ảnh tư liệu, hiện vật) cũng bị ẩn: du khách
+ * chỉ nhận được sau khi check-in, qua {@code GET /journeys/{id}/destinations/{stopId}/culture}; ở đây chỉ còn
+ * số lượng để app giới thiệu trước. Tour luồng cũ ({@code wizardTour = false}) chỉ có phần thông tin chung.
  */
 @Builder
 @Schema(description = "Chi tiết tour công khai cho du khách")
@@ -57,8 +59,9 @@ public record TourPublicDetailResponse(
 
     public record Stop(Long id, int sequenceOrder, String name, String shortDescription, String guestNote,
                        String imageUrl, String videoUrl, VideoSource videoSource,
-                       String culturalContent, List<String> culturalImages,
-                       List<TourDetailResponse.Artifact> artifacts,
+                       @Schema(description = "Có câu chuyện văn hoá (nội dung mở khi check-in)") boolean hasCulturalStory,
+                       @Schema(description = "Số ảnh tư liệu văn hoá") int culturalImageCount,
+                       @Schema(description = "Số hiện vật") int artifactCount,
                        @Schema(description = "Số câu quiz tại điểm dừng") int quizCount,
                        List<Activity> activities,
                        @Schema(description = "Toạ độ checkpoint đầu tiên có toạ độ (để vẽ bản đồ)") BigDecimal latitude,
@@ -117,8 +120,11 @@ public record TourPublicDetailResponse(
                 .filter(e -> e.checkpointLatitude() != null && e.checkpointLongitude() != null)
                 .findFirst().orElse(null);
         return new Stop(s.id(), s.sequenceOrder(), s.name(), s.shortDescription(), s.guestNote(),
-                s.imageUrl(), s.videoUrl(), s.videoSource(), s.culturalContent(), s.culturalImages(),
-                s.artifacts(), s.quiz().size(),
+                s.imageUrl(), s.videoUrl(), s.videoSource(),
+                s.culturalContent() != null && !s.culturalContent().isBlank(),
+                s.culturalImages() == null ? 0 : s.culturalImages().size(),
+                s.artifacts() == null ? 0 : s.artifacts().size(),
+                s.quiz().size(),
                 s.experiences().stream()
                         .map(e -> new Activity(e.activityName(), e.durationSeconds(), e.points()))
                         .toList(),

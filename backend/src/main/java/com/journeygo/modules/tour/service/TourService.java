@@ -111,6 +111,23 @@ public class TourService {
         return TourPublicDetailResponse.fromWizard(detailMapper.toResponse(tour), summary.price(), LocalDate.now());
     }
 
+    /**
+     * Nội dung văn hoá của một điểm dừng (tour 5 bước). Không kiểm tra quyền: nơi gọi phải bảo đảm
+     * du khách đã check-in tại điểm dừng này.
+     */
+    @Transactional(readOnly = true)
+    public StopCultureResponse getStopCulture(Long tourId, Long stopId) {
+        Tour tour = findOrThrow(tourId);
+        if (!tour.isWizardTour()) {
+            throw new AppException(ErrorCode.TOUR_NOT_FOUND);
+        }
+        return detailMapper.toResponse(tour).stops().stream()
+                .filter(s -> s.id().equals(stopId))
+                .findFirst()
+                .map(StopCultureResponse::from)
+                .orElseThrow(() -> new AppException(ErrorCode.TOUR_NOT_FOUND));
+    }
+
     private static Specification<Tour> publishedSpec(TourSearchFilter filter) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();

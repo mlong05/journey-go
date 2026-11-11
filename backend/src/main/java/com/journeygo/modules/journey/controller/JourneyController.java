@@ -129,6 +129,18 @@ public class JourneyController {
         return ResponseEntity.ok(ApiResponse.success(msg, response));
     }
 
+    @GetMapping("/{id}/destinations/{destinationId}/culture")
+    @Operation(summary = "Nội dung văn hóa của điểm dừng",
+            description = "Câu chuyện, ảnh tư liệu, video và hiện vật của điểm dừng; chỉ mở sau khi check-in tại điểm đó")
+    public ResponseEntity<ApiResponse<com.journeygo.modules.tour.dto.StopCultureResponse>> getDestinationCulture(
+            @PathVariable Long id,
+            @PathVariable Long destinationId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                journeyService.getDestinationCulture(id, destinationId, userPrincipal.getId())));
+    }
+
     @PatchMapping("/{id}/destinations/{destinationId}/skip")
     @Operation(summary = "Bỏ qua điểm đến", description = "Bỏ qua điểm đến khi du khách bị nhỡ lịch hẹn để tiếp tục hành trình")
     public ResponseEntity<ApiResponse<JourneyDestinationProgressResponse>> skipDestination(
