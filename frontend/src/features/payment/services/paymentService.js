@@ -1,22 +1,22 @@
 /**
- * Service cho module Payment (VNPay).
+ * Service cho module Payment (VNPay) — phía WEB.
  *
- * ── Contract ──
- *  • POST /payments/bookings/{bookingId}/init?bankCode=   → 201 PaymentInitResponse
- *  • GET  /payments/methods                              → PaymentMethodResponse
- *  • GET  /payments/{paymentId}                          → PaymentResponse
- *  • GET  /payments/my                                   → PageResponse<PaymentResponse>
- *  • GET  /payments/bookings/{bookingId}                 → PageResponse<PaymentResponse>
- *  • POST /payments/{paymentId}/query                    → { outcome, message }
- *  • GET  /payments/return?<vnp_* params>                → PaymentVerificationResponse (public)
+ * ── Phạm vi ──
+ * THANH TOÁN DIỄN RA TRÊN MOBILE (du khách đặt tour và thanh toán trong app).
+ * Web KHÔNG có màn checkout / trang kết quả thanh toán.
+ *
+ * Web chỉ dùng API thanh toán ở góc nhìn QUẢN TRỊ:
+ *  • `GET /payments`               → danh sách giao dịch toàn hệ thống (ADMIN)
+ *  • `GET /payments/{id}`          → chi tiết giao dịch
+ *  • `GET /payments/summary`       → tổng hợp doanh thu (ADMIN)
+ *  • `POST /payments/{id}/query`   → tra cứu QueryDR
+ *  • `GET /payments/bookings/{id}` → các lần thử của một booking
  *
  * ── Luật nghiệp vụ ──
- *  • Mỗi lần gọi `init` tạo một `txnRef` riêng, KHÔNG gia hạn deadline 10 phút.
  *  • Trạng thái: PENDING / PROCESSING / SUCCESS / FAILED / CANCELLED / EXPIRED.
  *    `PROCESSING` KHÔNG phải thất bại — tuyệt đối không hiển thị như lỗi.
  *  • Nếu lần thử trước chưa rõ kết quả, backend trả 409 `PAYMENT_NOT_RETRYABLE` →
  *    phải gọi `POST /payments/{id}/query` (QueryDR) rồi mới cho phép thử lại.
- *  • `GET /payments/return` xác minh chữ ký rồi QueryDR nếu chưa rõ → trả trạng thái cuối.
  */
 import { apiClient } from "@/services/apiClient";
 import { normalizePage, paymentMatchesKeyword } from "@/lib/money";
@@ -30,26 +30,9 @@ export async function getPaymentMethods() {
   return res?.data ?? res;
 }
 
-/**
- * Khởi tạo thanh toán (hoặc thử lại).
- * @param {number} bookingId
- * @param {string|null} bankCode mã vnp_BankCode; null = khách tự chọn trên trang VNPay
- */
-export async function initiatePayment(bookingId, bankCode = null) {
-  const query = bankCode ? `?bankCode=${encodeURIComponent(bankCode)}` : "";
-  const res = await apiClient.post(`${ENDPOINT}/bookings/${bookingId}/init${query}`);
-  return res?.data ?? res;
-}
-
 /** Chi tiết một giao dịch thanh toán. */
 export async function getPaymentById(paymentId) {
   const res = await apiClient.get(`${ENDPOINT}/${paymentId}`);
-  return res?.data ?? res;
-}
-
-/** Lịch sử thanh toán của tôi. */
-export async function getMyPayments({ page = 0, size = 10 } = {}) {
-  const res = await apiClient.get(`${ENDPOINT}/my?page=${page}&size=${size}`);
   return res?.data ?? res;
 }
 
@@ -67,20 +50,6 @@ export async function getPaymentsByBooking(bookingId, { page = 0, size = 10 } = 
  */
 export async function queryPayment(paymentId) {
   const res = await apiClient.post(`${ENDPOINT}/${paymentId}/query`);
-  return res?.data ?? res;
-}
-
-/**
- * Xử lý Return URL của VNPay (public — không cần token).
- * Backend tự xác minh chữ ký và QueryDR nếu chưa rõ kết quả.
- * @param {string|URLSearchParams|Record<string,string>} query toàn bộ query string VNPay gửi về
- */
-export async function verifyPaymentReturn(query) {
-  const search =
-    query instanceof URLSearchParams
-      ? query.toString()
-      : new URLSearchParams(query ?? {}).toString();
-  const res = await apiClient.get(`${ENDPOINT}/return?${search}`);
   return res?.data ?? res;
 }
 
@@ -222,18 +191,15 @@ export function isRetryable(status) {
 /**
  * Service dạng object (default export) — dùng bởi code gọi `paymentService.xxx`.
  *
- * Lưu ý: `getMine` / `getByBooking` trả về dạng chuẩn hoá `{ items, page, totalPages,
+ * Lưu ý: `getByBooking` trả về dạng chuẩn hoá `{ items, page, totalPages,
  * totalElements }` (qua `toPage`) để tương thích với code đang dùng
  * `paymentService.getByBooking(...).items`.
  */
 const paymentService = {
   getMethods: getPaymentMethods,
-  init: initiatePayment,
   getById: getPaymentById,
-  getMine: (options) => toPage(getMyPayments(options)),
   getByBooking: (bookingId, options) => toPage(getPaymentsByBooking(bookingId, options)),
   query: queryPayment,
-  processReturn: verifyPaymentReturn,
   getAll: (options) => toPage(getAllPayments(options)),
   search: searchPayments,
   summary: getPaymentSummary,
