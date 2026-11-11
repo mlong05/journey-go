@@ -86,7 +86,53 @@ class JourneyGoTouristApp extends StatelessWidget {
           seedColor: AppCultureColors.heritageJade,
           primary: AppCultureColors.heritageJade,
           secondary: AppCultureColors.oceanBlue,
+          tertiary: AppCultureColors.lacquer,
+          error: AppCultureColors.error,
           surface: AppCultureColors.background,
+          onSurface: AppCultureColors.textDark,
+        ),
+        // Tiêu đề lớn dùng font có chân; thân bài giữ font hệ thống cho dễ đọc
+        textTheme: const TextTheme(
+          displayLarge: TextStyle(fontFamily: AppType.serif),
+          displayMedium: TextStyle(fontFamily: AppType.serif),
+          displaySmall: TextStyle(fontFamily: AppType.serif),
+          headlineLarge: TextStyle(fontFamily: AppType.serif, fontWeight: FontWeight.w700),
+          headlineMedium: TextStyle(fontFamily: AppType.serif, fontWeight: FontWeight.w700),
+          headlineSmall: TextStyle(fontFamily: AppType.serif, fontWeight: FontWeight.w700),
+          titleLarge: TextStyle(fontFamily: AppType.serif, fontWeight: FontWeight.w700),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: AppCultureColors.background,
+          foregroundColor: AppCultureColors.textDark,
+          surfaceTintColor: Colors.transparent,
+          titleTextStyle: TextStyle(
+            fontFamily: AppType.serif,
+            fontSize: 19,
+            fontWeight: FontWeight.w700,
+            color: AppCultureColors.textDark,
+          ),
+        ),
+        dividerTheme: const DividerThemeData(color: AppCultureColors.border, thickness: 1),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: AppCultureColors.surface,
+          surfaceTintColor: Colors.transparent,
+        ),
+        dialogTheme: const DialogThemeData(
+          backgroundColor: AppCultureColors.surface,
+          surfaceTintColor: Colors.transparent,
+        ),
+        cardTheme: const CardThemeData(color: AppCultureColors.surface, surfaceTintColor: Colors.transparent),
+        snackBarTheme: const SnackBarThemeData(backgroundColor: AppCultureColors.textDark),
+        navigationBarTheme: const NavigationBarThemeData(
+          backgroundColor: AppCultureColors.surface,
+          indicatorColor: AppCultureColors.jadeLight,
+          surfaceTintColor: Colors.transparent,
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppCultureColors.heritageJade,
+            foregroundColor: Colors.white,
+          ),
         ),
       ),
       home: PendingPaymentHost(

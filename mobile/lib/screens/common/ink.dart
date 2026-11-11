@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
-/// Bảng màu giao diện mới (trang chủ, lộ trình): nền trắng, chữ đậm, một màu nhấn xanh ngọc.
+/// Bảng màu giao diện mới (trang chủ, lộ trình): đồng bộ với [AppCultureColors] — nền giấy, chữ mực, nhấn xanh ngọc.
 class AppInk {
-  static const ink = Color(0xFF16181D);
-  static const muted = Color(0xFF5B6170);
-  static const border = Color(0xFFE4E2DD);
-  static const line = Color(0xFFEFEDE8);
-  static const soft = Color(0xFFF3F2EE);
-  static const accent = Color(0xFF0B7A53);
+  static const ink = Color(0xFF1E1A14);
+  static const muted = Color(0xFF6B6357);
+  static const border = Color(0xFFE3DACA);
+  static const line = Color(0xFFEEE7DA);
+  static const soft = Color(0xFFF1EBDF);
+  static const accent = Color(0xFF1F6F54);
+  static const paper = Color(0xFFF7F3EA);
+  static const lacquer = Color(0xFF9E2B25);
+  static const brass = Color(0xFFB8862B);
 }
