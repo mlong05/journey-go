@@ -19,6 +19,8 @@ import com.journeygo.modules.journey.provider.TourInfoProvider;
 import com.journeygo.modules.journey.repository.JourneyDestinationProgressRepository;
 import com.journeygo.modules.journey.repository.JourneyRepository;
 import com.journeygo.modules.journey.repository.JourneyTaskProgressRepository;
+import com.journeygo.modules.tour.dto.StopCultureResponse;
+import com.journeygo.modules.tour.service.TourService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +51,7 @@ class JourneyServiceWizardTest {
     @Mock private JourneyTaskProgressRepository taskProgressRepository;
     @Mock private TourInfoProvider tourInfoProvider;
     @Mock private GamificationService gamificationService;
+    @Mock private TourService tourService;
 
     @InjectMocks private JourneyService journeyService;
 
@@ -113,6 +116,38 @@ class JourneyServiceWizardTest {
         when(journeyRepository.findByIdWithDestinations(50L)).thenReturn(Optional.of(journey));
         when(destinationProgressRepository.findByJourneyIdAndDestinationId(50L, 7L)).thenReturn(Optional.of(stop));
         when(tourInfoProvider.getTourInfo(1L)).thenReturn(info);
+    }
+
+    // ── Nội dung văn hoá ──────────────────────────────────────────────────────
+
+    @Test
+    void culture_lockedUntilCheckIn() {
+        when(journeyRepository.findByIdWithDestinations(50L)).thenReturn(Optional.of(journey));
+        when(destinationProgressRepository.findByJourneyIdAndDestinationId(50L, 7L)).thenReturn(Optional.of(stop));
+
+        var ex = assertThrows(BusinessException.class, () -> journeyService.getDestinationCulture(50L, 7L, 10L));
+        assertTrue(ex.getMessage().contains("check-in"));
+        verifyNoInteractions(tourService);
+    }
+
+    @Test
+    void culture_openAfterCheckIn() {
+        stop.setCheckedIn(true);
+        var culture = new StopCultureResponse(7L, 1, "Văn Miếu", null, null, null, null,
+                "Câu chuyện", List.of(), List.of());
+        when(journeyRepository.findByIdWithDestinations(50L)).thenReturn(Optional.of(journey));
+        when(destinationProgressRepository.findByJourneyIdAndDestinationId(50L, 7L)).thenReturn(Optional.of(stop));
+        when(tourService.getStopCulture(1L, 7L)).thenReturn(culture);
+
+        assertSame(culture, journeyService.getDestinationCulture(50L, 7L, 10L));
+    }
+
+    @Test
+    void culture_forbiddenForOtherTourist() {
+        when(journeyRepository.findByIdWithDestinations(50L)).thenReturn(Optional.of(journey));
+
+        assertThrows(BusinessException.class, () -> journeyService.getDestinationCulture(50L, 7L, 99L));
+        verifyNoInteractions(tourService);
     }
 
     // ── Check-in điểm dừng ────────────────────────────────────────────────────

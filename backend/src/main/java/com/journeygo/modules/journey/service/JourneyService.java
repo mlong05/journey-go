@@ -20,7 +20,9 @@ import com.journeygo.modules.journey.provider.TourInfoProvider;
 import com.journeygo.modules.journey.repository.JourneyDestinationProgressRepository;
 import com.journeygo.modules.journey.repository.JourneyRepository;
 import com.journeygo.modules.journey.repository.JourneyTaskProgressRepository;
+import com.journeygo.modules.tour.dto.StopCultureResponse;
 import com.journeygo.modules.tour.service.TextAnswerMatcher;
+import com.journeygo.modules.tour.service.TourService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,7 @@ public class JourneyService {
     private final TourInfoProvider tourInfoProvider;
     private final GamificationService gamificationService;
     private final BookingService bookingService;
+    private final TourService tourService;
 
     /**
      * CHỈ DÙNG KHI DEV: bỏ kiểm tra khoảng cách GPS (check-in trạm, mở câu hỏi theo vị trí) để thử hành trình
@@ -137,6 +140,22 @@ public class JourneyService {
     public JourneyResponse getJourneyDetail(Long journeyId, Long userId) {
         Journey journey = findJourneyAndVerifyOwner(journeyId, userId);
         return JourneyResponse.fromEntity(journey);
+    }
+
+    /**
+     * Nội dung văn hoá của điểm dừng: chỉ mở khi du khách đã check-in tại điểm đó trong hành trình của mình.
+     */
+    @Transactional(readOnly = true)
+    public StopCultureResponse getDestinationCulture(Long journeyId, Long destinationId, Long userId) {
+        Journey journey = findJourneyAndVerifyOwner(journeyId, userId);
+        JourneyDestinationProgress destProgress = destinationProgressRepository
+                .findByJourneyIdAndDestinationId(journeyId, destinationId)
+                .orElseThrow(() -> new ResourceNotFoundException("JourneyDestinationProgress", destinationId));
+        if (!destProgress.isCheckedIn()) {
+            throw new BusinessException("CULTURE-LOCKED",
+                    "Hãy check-in tại " + destProgress.getDestinationName() + " để mở khóa nội dung văn hóa");
+        }
+        return tourService.getStopCulture(journey.getTourId(), destinationId);
     }
 
     // ── CHECK-IN LOGIC ──────────────────────────────────────────────────────────
