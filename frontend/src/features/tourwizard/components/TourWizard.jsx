@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, AlertCircle, Loader2, CloudOff, CheckCircle2, RotateCw, PartyPopper, Lock } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -87,6 +87,12 @@ export default function TourWizard({ tourId, initialStep }) {
   const contentRef = useRef(null);
   // Tải trước danh sách tour để sau khi gửi duyệt chuyển trang gần như tức thì.
   useEffect(() => { router.prefetch(AFTER_SUBMIT_HREF); }, [router]);
+  // Cache Components giữ state trang khi điều hướng (React <Activity>): gửi duyệt xong rồi mở lại tour
+  // thì hộp "đã gửi" hiện lại và tự chuyển trang. Xoá cờ ngay khi trang bị ẩn.
+  useLayoutEffect(() => {
+    if (!submitted) return undefined;
+    return () => setSubmitted(false);
+  }, [submitted]);
   const focusSeq = useRef(0); // mã duy nhất cho mỗi lần nhảy tới một điểm đến
   const leaveRef = useRef(null); // hàm rời trang mới nhất (cho trình nghe click link)
   const leavingRef = useRef(false); // đang hỏi xác nhận rời trang

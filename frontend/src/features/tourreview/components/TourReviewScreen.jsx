@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, Flag, BadgeCheck, MessageSquareWarning, Ban, Eye, FileText, History, CheckCircle2, XCircle, AlertTriangle, Info,
@@ -109,6 +109,24 @@ export default function TourReviewScreen({ tourId }) {
 
   // Tải trước Bàn làm việc để sau khi duyệt chuyển trang gần như tức thì.
   useEffect(() => { router.prefetch(AFTER_DECISION_HREF); }, [router]);
+
+  // Cache Components giữ nguyên state của trang khi điều hướng đi rồi quay lại (React <Activity> ẩn trang
+  // thay vì gỡ). Nếu không xoá, mở lại tour vừa duyệt sẽ hiện lại hộp "Đã duyệt tour thành công" và tự
+  // chuyển về Bàn làm việc, không xem được tour. Cleanup chạy đồng bộ ngay khi trang bị ẩn.
+  useLayoutEffect(() => {
+    if (!done) return undefined;
+    return () => {
+      setDone(null);
+      setNotes([]);
+      setCriteria({});
+      setGeneralNote("");
+      setRejectMode(false);
+      setReasons([]);
+      setOtherReason("");
+      setActionError("");
+      setTab("content");
+    };
+  }, [done]);
 
   useEffect(() => {
     let alive = true;
