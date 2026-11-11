@@ -191,7 +191,7 @@ class _MyToursViewState extends State<MyToursView> {
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
         children: [
           Reveal(order: 0, child: _buildHeader(active.length, ready.length, done.length)),
           if (_items.isEmpty)

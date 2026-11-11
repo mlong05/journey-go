@@ -571,7 +571,9 @@ class TourRow extends StatelessWidget {
         decoration: BoxDecoration(
           border: divider ? const Border(bottom: BorderSide(color: AppInk.line)) : null,
         ),
-        child: Row(
+        // Cao tối thiểu bằng ảnh; tên tour 2 dòng + số trạm thì thẻ tự cao thêm thay vì tràn chữ giá.
+        child: IntrinsicHeight(
+          child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
@@ -581,8 +583,8 @@ class TourRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: SizedBox(
-                height: 96,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 96),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -609,12 +611,14 @@ class TourRow extends StatelessWidget {
                       Text('$stops trạm', style: const TextStyle(fontSize: 12, color: AppInk.muted)),
                     ],
                     const Spacer(),
+                    const SizedBox(height: 4),
                     _PriceText(tour: tour),
                   ],
                 ),
               ),
             ),
           ],
+          ),
         ),
       ),
     );
