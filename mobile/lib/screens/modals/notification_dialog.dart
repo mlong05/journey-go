@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/notification_model.dart';
 import '../../core/services/notification_service.dart';
-import '../bookings/my_bookings_screen.dart';
+import '../booking/bookings_screen.dart';
 import '../common/heritage_motion.dart';
+import '../common/live_time.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/forum_service.dart';
 import '../forum/my_posts_screen.dart';
@@ -59,7 +60,7 @@ const _openPostDetailTypes = {'POST_COMMENTED', 'POST_APPROVED', 'POST_RESTORED'
 Future<void> openNotificationTarget(NavigatorState navigator, AppNotification n) async {
   NotificationCenter.instance.markRead(n);
   Widget? screen = switch (n.refType) {
-    'BOOKING' => const MyBookingsScreen(),
+    'BOOKING' => const BookingsScreen(),
     'REFUND' => const RefundsScreen(),
     'BADGE' => const BadgesScreen(),
     'POST' => const MyPostsScreen(),
@@ -348,9 +349,11 @@ class _NotificationTile extends StatelessWidget {
                       ),
                     ],
                     const SizedBox(height: 6),
-                    Text(
-                      '${style.label} · ${_timeAgo(n.createdAt)}',
-                      style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
+                    LiveTime(
+                      builder: (_) => Text(
+                        '${style.label} · ${_timeAgo(n.createdAt)}',
+                        style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
+                      ),
                     ),
                   ],
                 ),

@@ -1,24 +1,34 @@
-/// Màn "Đơn Của Tôi" (Bookings) — Mobile.
+/// Màn "Đơn đặt tour" — màn DUY NHẤT cho đơn đặt tour & vé trên mobile
+/// (Tài khoản → Đơn đặt tour / Ví vé, và khi chạm thông báo về đơn đặt).
 ///
 /// Liệt kê booking của người dùng từ `GET /bookings/my`, có bộ lọc theo trạng thái:
 ///  • Tất cả / Chờ thanh toán / Đã xác nhận / Đã hoàn thành / Đã hủy
 ///
 /// Mỗi thẻ đơn cho phép:
-///  • Thanh toán tiếp (nếu còn trong hạn 10 phút) → mở `PaymentScreen`.
-///  • Xem chi tiết → `BookingDetailScreen`.
+///  • Thanh toán tiếp (nếu còn trong hạn 10 phút) → `BookingCheckoutScreen` (cùng luồng với lúc đặt tour).
+///  • Vào trải nghiệm (vé đã thanh toán) → `JourneyScreen`.
+///  • Xem chi tiết (mã QR, hoàn tiền) → `BookingDetailScreen`.
+/// Nút "Lịch sử giao dịch" trên thanh tiêu đề liệt kê các lần thanh toán.
 library;
 
 import 'package:flutter/material.dart';
 
+import '../../core/constants/api_constants.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
+import '../../core/services/mock_payment_store.dart';
+import '../../core/services/payment_service.dart';
+import '../bookings/booking_checkout_screen.dart';
+import '../journey/journey_screen.dart';
 import 'booking_detail_screen.dart';
-import 'payment_screen.dart';
 
 class BookingsScreen extends StatefulWidget {
-  const BookingsScreen({super.key});
+  /// Bộ lọc mở sẵn, vd 'CONFIRMED' khi vào từ "Ví vé".
+  final String initialFilter;
+
+  const BookingsScreen({super.key, this.initialFilter = 'ALL'});
 
   @override
   State<BookingsScreen> createState() => _BookingsScreenState();
@@ -30,7 +40,10 @@ class _BookingsScreenState extends State<BookingsScreen> {
   List<BookingModel> _bookings = [];
   bool _loading = true;
   String _error = '';
-  String _filter = 'ALL';
+  late String _filter = widget.initialFilter;
+
+  /// Đơn đã "thanh toán giả lập" (chỉ khi bật MOCK_PAYMENT khi dev): coi như vé đã thanh toán.
+  Set<int> _mockPaid = const {};
 
   static const List<String> _filters = [
     'ALL',
@@ -54,9 +67,11 @@ class _BookingsScreenState extends State<BookingsScreen> {
 
     try {
       final list = await _service.getMyBookings(page: 0, size: 50);
+      final mockPaid = ApiConstants.mockPayment ? await MockPaymentStore.paidIds() : <int>{};
       if (!mounted) return;
       setState(() {
         _bookings = list;
+        _mockPaid = mockPaid;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -74,9 +89,16 @@ class _BookingsScreenState extends State<BookingsScreen> {
     }
   }
 
+  /// Đơn thanh toán giả lập vẫn "Chờ thanh toán" ở server nhưng hiển thị như đã xác nhận.
+  String _statusOf(BookingModel b) =>
+      b.isPendingPayment && _mockPaid.contains(b.id) ? BookingStatus.confirmed : b.status;
+
+  /// Vé dùng được: đã thanh toán (thật hoặc giả lập khi dev) → vào trải nghiệm được.
+  bool _isTicket(BookingModel b) => b.isPaid || _mockPaid.contains(b.id);
+
   List<BookingModel> get _filtered {
     if (_filter == 'ALL') return _bookings;
-    return _bookings.where((b) => b.status == _filter).toList();
+    return _bookings.where((b) => _statusOf(b) == _filter).toList();
   }
 
   @override
@@ -93,7 +115,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Đơn Của Tôi',
+          'Đơn đặt tour',
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
@@ -102,6 +124,12 @@ class _BookingsScreenState extends State<BookingsScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Lịch sử giao dịch',
+            onPressed: _showPayments,
+            icon: const Icon(Icons.receipt_long_rounded, size: 20, color: AppCultureColors.textDark),
+          ),
+          IconButton(
+            tooltip: 'Làm mới',
             onPressed: _load,
             icon: const Icon(Icons.refresh_rounded,
                 size: 20, color: AppCultureColors.textDark),
@@ -121,7 +149,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                   final isSelected = _filter == f;
                   final count = f == 'ALL'
                       ? _bookings.length
-                      : _bookings.where((b) => b.status == f).length;
+                      : _bookings.where((b) => _statusOf(b) == f).length;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: GestureDetector(
@@ -246,7 +274,9 @@ class _BookingsScreenState extends State<BookingsScreen> {
   }
 
   Widget _buildBookingCard(BookingModel booking) {
-    final badge = _statusBadge(booking.status);
+    final status = _statusOf(booking);
+    final badge = _statusBadge(status);
+    final mockPaid = status != booking.status;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -289,7 +319,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        booking.statusLabel,
+                        mockPaid ? 'Đã thanh toán (giả lập)' : booking.statusLabel,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -332,7 +362,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                     ),
                   ],
                 ),
-                if (booking.isPendingPayment && booking.isPaymentWindowOpen) ...[
+                if (!mockPaid && booking.isPendingPayment && booking.isPaymentWindowOpen) ...[
                   const SizedBox(height: 10),
                   Row(
                     children: [
@@ -359,20 +389,33 @@ class _BookingsScreenState extends State<BookingsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Tạo lúc ${booking.formattedCreatedAt}',
-                  style: const TextStyle(
-                      fontSize: 11.5, color: AppCultureColors.textLight),
+                Flexible(
+                  child: Text(
+                    'Tạo lúc ${booking.formattedCreatedAt}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Row(
                   children: [
-                    if (booking.isPendingPayment && booking.isPaymentWindowOpen)
+                    if (!mockPaid && booking.isPendingPayment && booking.isPaymentWindowOpen)
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: _buildActionButton(
                           label: 'Thanh toán',
                           primary: true,
                           onTap: () => _openPayment(booking),
+                        ),
+                      ),
+                    if (_isTicket(booking) && booking.status != BookingStatus.completed)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: _buildActionButton(
+                          label: 'Vào trải nghiệm',
+                          primary: true,
+                          onTap: () => _startExperience(booking),
                         ),
                       ),
                     _buildActionButton(
@@ -416,14 +459,112 @@ class _BookingsScreenState extends State<BookingsScreen> {
     );
   }
 
+  /// Thanh toán tiếp bằng đúng màn thanh toán dùng lúc đặt tour (VNPay; giả lập khi bật cờ dev).
   Future<void> _openPayment(BookingModel booking) async {
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => PaymentScreen(bookingId: booking.id, booking: booking),
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => BookingCheckoutScreen(bookingId: booking.id)),
+    );
+    if (mounted) _load(); // trạng thái có thể đã đổi trong lúc thanh toán
+  }
+
+  void _startExperience(BookingModel booking) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => JourneyScreen(tourId: booking.tourId, bookingId: booking.id)),
+    );
+  }
+
+  /// Lịch sử giao dịch thanh toán (thành công, thất bại, đang xử lý).
+  void _showPayments() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppCultureColors.surface,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.92,
+        builder: (_, controller) => FutureBuilder<List<PaymentModel>>(
+          future: PaymentService().getMine(),
+          builder: (context, snap) {
+            final header = const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                'Lịch sử giao dịch',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
+              ),
+            );
+            if (snap.connectionState != ConnectionState.done) {
+              return ListView(controller: controller, children: [
+                header,
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator(color: AppCultureColors.heritageJade)),
+                ),
+              ]);
+            }
+            final items = snap.data ?? const <PaymentModel>[];
+            return ListView(
+              controller: controller,
+              padding: const EdgeInsets.only(bottom: 24),
+              children: [
+                header,
+                if (snap.hasError)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('Không tải được lịch sử giao dịch.',
+                        textAlign: TextAlign.center, style: TextStyle(color: AppCultureColors.textMuted)),
+                  )
+                else if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('Chưa có giao dịch nào.',
+                        textAlign: TextAlign.center, style: TextStyle(color: AppCultureColors.textMuted)),
+                  )
+                else
+                  for (final p in items) _paymentTile(p),
+              ],
+            );
+          },
+        ),
       ),
     );
-    if (result == true) _load();
   }
+
+  Widget _paymentTile(PaymentModel p) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppCultureColors.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(formatMoney(p.amount), style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text('Đơn ${p.bookingCode} · ${formatDateTime(p.createdAt)}',
+                      style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
+                  if (p.duplicatePayment)
+                    const Text('Giao dịch trùng với một giao dịch đã thanh toán',
+                        style: TextStyle(fontSize: 11, color: AppCultureColors.amberDark)),
+                ],
+              ),
+            ),
+            Text(
+              PaymentStatus.label(p.status),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: p.status == PaymentStatus.success ? AppCultureColors.jadeDark : AppCultureColors.textMuted,
+              ),
+            ),
+          ],
+        ),
+      );
 
   Future<void> _openDetail(BookingModel booking) async {
     final changed = await Navigator.of(context).push<bool>(

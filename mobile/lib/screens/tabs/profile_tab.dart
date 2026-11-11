@@ -25,7 +25,6 @@ import '../rewards/rewards_widgets.dart' show BadgeIcon, PointTransactionTile;
 import '../rewards/wallet_screen.dart';
 import '../booking/bookings_screen.dart';
 import '../refunds_screen.dart';
-import '../tickets_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   final UserModel currentUser;
@@ -125,10 +124,11 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
     if (mounted) _loadProfileData();
   }
 
+  /// Ví vé: cùng màn đơn đặt tour, mở sẵn bộ lọc vé đã xác nhận.
   void _openTickets() {
     Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const TicketsScreen()));
+    ).push(MaterialPageRoute(builder: (_) => const BookingsScreen(initialFilter: 'CONFIRMED')));
   }
 
   /// Mở danh sách đơn đặt tour (luồng booking + thanh toán + QR trải nghiệm).
@@ -273,7 +273,7 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 110),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 40),
                   children: [
                     Reveal(order: 0, child: _buildProfileHeroCard()),
                     const SizedBox(height: 26),
