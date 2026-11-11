@@ -9,6 +9,9 @@ import { apiClient } from "@/services/apiClient";
  *  - GET   /community/moderation/reports                : báo cáo vi phạm
  *  - PATCH /community/moderation/reports/{id}/resolve   : xác nhận báo cáo đúng
  *  - PATCH /community/moderation/reports/{id}/dismiss   : bác bỏ báo cáo
+ *  - GET   /community/moderation/comment-reports                : báo cáo bình luận
+ *  - PATCH /community/moderation/comment-reports/{id}/resolve   : xác nhận (tuỳ chọn ẩn bình luận)
+ *  - PATCH /community/moderation/comment-reports/{id}/dismiss   : bác bỏ báo cáo bình luận
  */
 
 const BASE = "/community/moderation";
@@ -78,6 +81,27 @@ export async function dismissReport(reportId, note) {
   return unwrap(res);
 }
 
+/** Báo cáo bình luận. status: "PENDING" | "RESOLVED" | "DISMISSED" */
+export async function getCommentReports({ status = "PENDING", page = 0, size = 10 } = {}) {
+  const res = await apiClient.get(`${BASE}/comment-reports?${query({ status, page, size })}`);
+  return toPage(await unwrap(res));
+}
+
+/** Xác nhận bình luận vi phạm; hideComment = true thì ẩn bình luận và đóng mọi báo cáo chờ của nó. */
+export async function resolveCommentReport(reportId, { hideComment, note }) {
+  const res = await apiClient.patch(
+    `${BASE}/comment-reports/${reportId}/resolve?${query({ hideComment, note: note?.trim() })}`
+  );
+  return unwrap(res);
+}
+
+export async function dismissCommentReport(reportId, note) {
+  const res = await apiClient.patch(
+    `${BASE}/comment-reports/${reportId}/dismiss?${query({ note: note?.trim() })}`
+  );
+  return unwrap(res);
+}
+
 export const communityModerationService = {
   getPendingPosts,
   moderatePost,
@@ -85,6 +109,9 @@ export const communityModerationService = {
   getReports,
   resolveReport,
   dismissReport,
+  getCommentReports,
+  resolveCommentReport,
+  dismissCommentReport,
 };
 
 export default communityModerationService;
