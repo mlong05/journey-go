@@ -4,7 +4,7 @@ package com.journeygo.modules.tour.entity.enums;
  * Trạng thái tour.
  *
  * <pre>
- * DRAFT ──gửi duyệt──▶ PENDING_REVIEW ──duyệt──▶ PUBLISHED ◀──▶ PAUSED
+ * DRAFT ──gửi duyệt──▶ PENDING_REVIEW ──duyệt──▶ PUBLISHED
  *   ▲                     │      │
  *   │                     │      └─từ chối──▶ REJECTED (nhân bản thành bản nháp mới)
  *   │                     └─yêu cầu sửa──▶ CHANGES_REQUESTED ──gửi lại──▶ PENDING_REVIEW
@@ -19,10 +19,8 @@ public enum TourStatus {
     CHANGES_REQUESTED,
     /** Bị từ chối: chỉ xem lý do, có thể nhân bản thành bản nháp mới. */
     REJECTED,
-    /** Đã duyệt, đang bán: được tạm ngừng, sửa giá và lịch. */
-    PUBLISHED,
-    /** Tạm ngừng bán: mở bán lại được. */
-    PAUSED;
+    /** Đã duyệt, đang bán: được sửa giá và lịch. */
+    PUBLISHED;
 
     /** Đối tác được sửa nội dung tour ở trạng thái này. */
     public boolean isContentEditable() {
@@ -31,6 +29,6 @@ public enum TourStatus {
 
     /** Đối tác được sửa giá / lịch ở trạng thái này (BR-05). */
     public boolean isPricingEditable() {
-        return isContentEditable() || this == PUBLISHED || this == PAUSED;
+        return isContentEditable() || this == PUBLISHED;
     }
 }
