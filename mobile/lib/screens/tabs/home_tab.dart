@@ -257,7 +257,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
             _buildHeader(),
             if (_firstLoad) const SliverToBoxAdapter(child: HomeSkeleton()) else ..._buildSections(),
             // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
-            const SliverToBoxAdapter(child: SizedBox(height: 110)),
+            const SliverToBoxAdapter(child: SizedBox(height: 40)),
           ],
         ),
       ),
