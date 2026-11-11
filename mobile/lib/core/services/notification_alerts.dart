@@ -44,6 +44,9 @@ class NotificationAlerts {
     }
   }
 
+  /// Chỉ rung nhẹ, không âm thanh, không banner (dùng cho tin nhắn chat).
+  void vibrateOnly() => HapticFeedback.lightImpact();
+
   /// Phát âm thanh + rung cho thông báo mới. Trả về true khi đã hiện thông báo hệ thống
   /// (khi đó màn chính không cần hiện thêm banner trong app).
   Future<bool> alert(AppNotification n) async {

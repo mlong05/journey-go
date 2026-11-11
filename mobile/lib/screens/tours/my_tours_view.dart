@@ -10,6 +10,7 @@ import '../common/heritage_motion.dart';
 import '../journey/journey_screen.dart';
 import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeletonList;
 import 'tour_detail_screen.dart';
+import 'tour_detail_opener.dart';
 import 'tour_style.dart';
 
 enum _Stage { active, ready, done }
@@ -155,6 +156,20 @@ class _MyToursViewState extends State<MyToursView> {
   Future<void> _openJourney(_MyTour item) async {
     final journey = item.journey;
     final booking = item.booking;
+
+    // Tour đã mua nhưng ngày trải nghiệm còn ở tương lai ⇒ mở màn CHI TIẾT TOUR
+    // (giống hệt lúc chưa mua) thay vì màn hành trình (backend sẽ khoá tour).
+    if (journey == null && booking != null && booking.isTourLocked) {
+      await openTourDetailScreen(
+        context,
+        tourId: item.tourId,
+        tour: item.tour,
+        bookedBooking: booking,
+      );
+      if (mounted) _load();
+      return;
+    }
+
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => journey != null && item.stage != _Stage.ready
           ? JourneyScreen(journeyId: journey.id)
@@ -494,13 +509,19 @@ class _TicketCard extends StatelessWidget {
           ),
         );
       case _Stage.ready:
+        // Tour chưa tới ngày trải nghiệm ⇒ đếm ngược thay cho "Bắt đầu trải nghiệm".
+        final booking = item.booking;
+        final locked = booking?.isTourLocked ?? false;
         return SizedBox(
           width: double.infinity,
           height: 48,
           child: FilledButton.icon(
             onPressed: onJourney,
-            icon: const Icon(Icons.explore_rounded, size: 19),
-            label: const Text('Bắt đầu trải nghiệm', style: TextStyle(fontWeight: FontWeight.w600)),
+            icon: Icon(locked ? Icons.schedule_rounded : Icons.explore_rounded, size: 19),
+            label: Text(
+              locked ? '${booking!.daysUntilStart} ngày nữa lên đường!' : 'Bắt đầu trải nghiệm',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
             style: FilledButton.styleFrom(backgroundColor: AppCultureColors.heritageJade, shape: shape),
           ),
         );
@@ -547,7 +568,9 @@ class _TicketCard extends StatelessWidget {
   /// "05/11/2026 · còn 5 ngày" / "Hôm nay" cho vé chưa đi.
   String _dateLine(DateTime d) {
     if (item.stage != _Stage.ready) return _date(d);
-    final today = DateUtils.dateOnly(DateTime.now());
+    // Đếm ngày theo giờ Việt Nam — khớp với cách backend tính "còn N ngày".
+    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+    final today = DateUtils.dateOnly(now);
     final days = DateUtils.dateOnly(d).difference(today).inDays;
     if (days == 0) return '${_date(d)} · hôm nay';
     if (days > 0) return '${_date(d)} · còn $days ngày';

@@ -29,6 +29,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Panel, StatusChip } from "@/components/dashboard/DashboardUI";
+import { Tooltip } from "@/components/ui";
 import { BANKS } from "@/constants/banks";
 import PartnerAddressFields from "@/features/partnerapplication/components/PartnerAddressFields";
 import PartnerProfileGroups from "@/features/partnerprofileupdate/components/PartnerProfileGroups";
@@ -176,7 +177,6 @@ export default function ProviderPartnerInfoPage() {
       taxCode: profile.taxCode ?? "",
       businessRegistrationInfo: profile.businessRegistrationInfo ?? "",
       province: profile.province ?? "",
-      district: profile.district ?? "",
       ward: profile.ward ?? "",
       addressDetail: profile.addressDetail ?? "",
       businessScope: profile.businessScope ?? "",
@@ -217,7 +217,6 @@ export default function ProviderPartnerInfoPage() {
         taxCode: form.taxCode.trim() || null,
         businessRegistrationInfo: form.businessRegistrationInfo.trim() || null,
         province: form.province || null,
-        district: form.district || null,
         ward: form.ward || null,
         addressDetail: form.addressDetail.trim() || null,
         businessScope: form.businessScope.trim() || null,
@@ -369,7 +368,6 @@ export default function ProviderPartnerInfoPage() {
             setForm((prev) => ({
               ...prev,
               province: next.province ?? "",
-              district: next.district ?? "",
               ward: next.ward ?? "",
             }))
           }
@@ -593,7 +591,6 @@ function ProfileEditModal({
                 <PartnerAddressFields
                   value={{
                     province: form.province,
-                    district: form.district,
                     ward: form.ward,
                   }}
                   onChange={onAddressChange}
@@ -626,23 +623,28 @@ function ProfileEditModal({
               </h4>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Field label="Ngân hàng thụ hưởng" error={errors.bankName}>
-                  <select
-                    value={form.bankName}
-                    onChange={(e) => onChange("bankName", e.target.value)}
-                    className={inputCls}
-                  >
-                    <option value="">-- Chọn ngân hàng --</option>
-                    {BANKS.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
-                    {/* Ngân hàng cũ không còn trong danh sách → vẫn hiển thị để không mất dữ liệu. */}
-                    {form.bankName &&
-                      !BANKS.includes(form.bankName) && (
-                        <option value={form.bankName}>{form.bankName}</option>
-                      )}
-                  </select>
+                  {/* Tên ngân hàng dài bị cắt trong ô chọn → rê chuột để xem đầy đủ. */}
+                  <Tooltip content={form.bankName} className="block" focusable={false}>
+                    <span className="relative block">
+                      <select
+                        value={form.bankName}
+                        onChange={(e) => onChange("bankName", e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">-- Chọn ngân hàng --</option>
+                        {BANKS.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                        {/* Ngân hàng cũ không còn trong danh sách → vẫn hiển thị để không mất dữ liệu. */}
+                        {form.bankName &&
+                          !BANKS.includes(form.bankName) && (
+                            <option value={form.bankName}>{form.bankName}</option>
+                          )}
+                      </select>
+                    </span>
+                  </Tooltip>
                 </Field>
                 <Field label="Số tài khoản">
                   <input

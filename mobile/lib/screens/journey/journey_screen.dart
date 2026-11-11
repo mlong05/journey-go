@@ -15,6 +15,7 @@ import '../../core/services/tour_service.dart';
 import '../common/ink.dart';
 import '../common/photo.dart';
 import '../tours/tour_detail_sections.dart' show showStopPreview;
+import '../tours/tour_detail_opener.dart';
 import 'journey_map.dart';
 import 'journey_summary_screen.dart';
 import 'journey_widgets.dart';
@@ -157,12 +158,41 @@ class _JourneyScreenState extends State<JourneyScreen> {
       }
     } on ApiException catch (e) {
       if (!mounted) return;
+      // Tour chưa tới ngày trải nghiệm (HTTP 409 BOOKING_TOUR_LOCKED):
+      // KHÔNG hiện màn lỗi "Thử lại / Quay lại" ⇒ chuyển thẳng sang màn chi tiết
+      // tour để du khách xem được thông tin tour đã mua.
+      if (_isTourLockedError(e)) {
+        final tourId = widget.tourId;
+        if (tourId == null) {
+          setState(() {
+            _error = e.message;
+            _loading = false;
+          });
+          return;
+        }
+        await openTourDetailScreen(
+          context,
+          tourId: tourId,
+          bookingId: widget.bookingId,
+          replace: true,
+        );
+        return;
+      }
       setState(() {
         // Lỗi mạng khi làm mới: giữ dữ liệu đang có, chỉ báo lỗi.
         _error = e.message;
         _loading = false;
       });
     }
+  }
+
+  /// Backend từ chối vì tour chưa mở (`BOOKING_TOUR_LOCKED`, HTTP 409).
+  ///
+  /// ⚠️ Backend trả `code` = mã HTTP (409) chứ không phải tên lỗi ⇒ ta dò theo
+  /// câu báo để KHÔNG nhầm các lỗi 409 khác (hết chỗ, thanh toán...).
+  static bool _isTourLockedError(ApiException e) {
+    final message = e.message.toLowerCase();
+    return message.contains('ngày trải nghiệm') || message.contains('tour chỉ mở');
   }
 
   Future<void> _checkIn(JourneyDestination dest) async {

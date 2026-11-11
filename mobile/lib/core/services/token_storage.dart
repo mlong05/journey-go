@@ -22,6 +22,9 @@ class TokenStorage {
   static const String _keyRememberMe = 'jg_mobile_remember_me';
   static const String _keySavedEmail = 'jg_mobile_saved_email';
 
+  /// Token lời mời đang chờ xác nhận (từ deep link khi chưa đăng nhập).
+  static const String _keyPendingInvitationToken = 'jg_mobile_pending_invitation_token';
+
   /// Tiền tố khoá lưu giao dịch thanh toán đang chờ, theo từng booking.
   ///
   /// Không nhạy cảm (chỉ là id + URL) ⇒ lưu trong `shared_preferences`.
@@ -161,8 +164,33 @@ class TokenStorage {
     return prefs.getString(_keySavedEmail);
   }
 
-  // ── Giao dịch thanh toán đang chờ ────────────────────────────────────────
+  // ── Lời mời tham gia tour đang chờ ──────────────────────────────────────
 
+  /// Nhớ token lời mời từ deep link khi khách CHƯA đăng nhập.
+  ///
+  /// Sau khi đăng nhập xong, app đọc lại token này để mở màn xác nhận lời mời.
+  /// Token không nhạy cảm (chỉ là chuỗi ngẫu nhiên đã hash ở backend) ⇒ lưu
+  /// trong `shared_preferences`.
+  static Future<void> savePendingInvitationToken(String token) async {
+    final prefs = await _getPrefs();
+    await prefs.setString(_keyPendingInvitationToken, token);
+  }
+
+  /// Lấy token lời mời đang chờ (null nếu không có).
+  static Future<String?> getPendingInvitationToken() async {
+    final prefs = await _getPrefs();
+    final token = prefs.getString(_keyPendingInvitationToken);
+    if (token == null || token.isEmpty) return null;
+    return token;
+  }
+
+  /// Xoá token lời mời đang chờ (sau khi đã xác nhận hoặc huỷ).
+  static Future<void> clearPendingInvitationToken() async {
+    final prefs = await _getPrefs();
+    await prefs.remove(_keyPendingInvitationToken);
+  }
+
+  // ── Giao dịch thanh toán đang chờ ────────────────────────────────────────
   /// Nhớ giao dịch thanh toán đang chờ kết quả cho một booking.
   ///
   /// [paymentId] là id giao dịch trên backend, [bookingId] là booking tương ứng.

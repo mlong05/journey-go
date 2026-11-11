@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Route,
+  Users,
+  Headphones,
   Wallet,
   UserCog,
 } from "lucide-react";
@@ -44,6 +46,8 @@ export default function ProviderLayout({ children }) {
   // chỉ phần nội dung tự cuộn (trang Thông tin đối tác còn cuộn riêng cho khối lịch sử).
   const isScrollLockedPage =
     pathname?.startsWith("/provider/tours") ||
+    pathname?.startsWith("/provider/bookings") ||
+    pathname?.startsWith("/provider/support") ||
     pathname?.startsWith("/provider/partner-info");
 
   // Danh mục điều hướng Sidebar của Đối tác
@@ -59,6 +63,18 @@ export default function ProviderLayout({ children }) {
       label: "Quản lý Tour Du Lịch",
       href: "/provider/tours",
       icon: Route,
+    },
+    {
+      id: "bookings",
+      label: "Khách hàng đã đặt tour",
+      href: "/provider/bookings",
+      icon: Users,
+    },
+    {
+      id: "support",
+      label: "Hỗ trợ khách hàng",
+      href: "/provider/support",
+      icon: Headphones,
     },
     {
       id: "finance",

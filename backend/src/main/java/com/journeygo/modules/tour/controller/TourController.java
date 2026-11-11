@@ -6,7 +6,9 @@ import com.journeygo.modules.tour.dto.TourRequest;
 import com.journeygo.modules.tour.dto.TourPublicDetailResponse;
 import com.journeygo.modules.tour.dto.TourResponse;
 import com.journeygo.modules.tour.dto.TourSearchFilter;
+import com.journeygo.modules.tour.dto.TourSlotAvailabilityResponse;
 import com.journeygo.modules.tour.entity.TourFormat;
+import com.journeygo.modules.tour.service.TourAvailabilityService;
 import com.journeygo.modules.tour.service.TourService;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.security.UserPrincipal;
@@ -32,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 public class TourController {
 
     private final TourService tourService;
+    private final TourAvailabilityService tourAvailabilityService;
 
     // ── Public endpoints ──────────────────────────────────────────────────────
 
@@ -59,6 +62,17 @@ public class TourController {
     public ResponseEntity<ApiResponse<TourPublicDetailResponse>> getPublicDetail(@PathVariable Long tourId) {
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tour thành công",
                 tourService.getPublicDetail(tourId)));
+    }
+
+    @GetMapping("/{tourId}/availability")
+    @Operation(summary = "Số chỗ còn theo ngày trải nghiệm (công khai)",
+            description = "Trả về danh sách ngày kèm số chỗ còn = capacity - bookedCount. "
+                    + "Màn 'Đặt tour' dùng endpoint này để hiển thị 'Số chỗ còn — Còn N chỗ' "
+                    + "và chặn khách chọn vượt sức chứa thực tế. "
+                    + "Chỉ tính ngày từ hôm nay trở đi.")
+    public ResponseEntity<ApiResponse<TourSlotAvailabilityResponse>> getAvailability(@PathVariable Long tourId) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy số chỗ còn thành công",
+                tourAvailabilityService.getAvailability(tourId)));
     }
 
     @GetMapping("/{tourId}")

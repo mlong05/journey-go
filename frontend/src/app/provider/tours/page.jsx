@@ -9,7 +9,7 @@ import { ProviderToursList } from "@/features/tourwizard";
  *  - GET    /provider/tours                : danh sách tour của tôi
  *  - POST   /provider/tours                : tạo bản nháp → mở wizard /provider/tours/{id}/edit
  *  - POST   /provider/tours/{id}/duplicate : nhân bản
- *  - PATCH  /provider/tours/{id}/pause|resume, DELETE /provider/tours/{id}
+ *  - DELETE /provider/tours/{id}
  */
 export default function ProviderToursPage() {
   return <ProviderToursList />;

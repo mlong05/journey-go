@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 
 /**
  * Đồng bộ {@link TourSlot} với lịch khởi hành của tour.
- * Chỉ tour đã duyệt (PUBLISHED / PAUSED) mới có slot.
+ * Chỉ tour đã duyệt (PUBLISHED) mới có slot.
  */
 @Slf4j
 @Service

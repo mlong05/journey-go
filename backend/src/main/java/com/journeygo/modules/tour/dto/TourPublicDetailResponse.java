@@ -33,6 +33,7 @@ public record TourPublicDetailResponse(
         TourDetailResponse.Ref region,
         TourDetailResponse.Ref theme,
         String providerName,
+        @Schema(description = "ID nhà tour — dùng để mở chat hỗ trợ trước khi mua tour") Long providerId,
         String description,
         List<String> highlights,
         @Schema(description = "Ảnh bìa đứng đầu, sau đó là album ảnh của tour") List<String> images,
@@ -52,7 +53,8 @@ public record TourPublicDetailResponse(
         @Schema(description = "Tổng số nhiệm vụ (câu quiz + hoạt động thực địa)") int taskCount,
         @Schema(description = "Tổng điểm thưởng tối đa") int totalPoints
 ) {
-    public record Price(GuestType guestType, String label, String ageRange, BigDecimal price, boolean alwaysFree) {}
+    public record Price(GuestType guestType, String label, String ageRange, BigDecimal price,
+                        boolean alwaysFree, boolean countsTowardSlot) {}
 
     /** Hoạt động thực địa: tên, thời lượng và điểm. Không có mã QR hay câu hỏi kèm đáp án. */
     public record Activity(String activityName, Integer durationSeconds, Integer points) {}
@@ -86,6 +88,7 @@ public record TourPublicDetailResponse(
                 .region(d.region())
                 .theme(d.theme())
                 .providerName(d.createdByName())
+                .providerId(d.createdById())
                 .description(d.description())
                 .highlights(d.highlights())
                 .images(images)
@@ -105,7 +108,9 @@ public record TourPublicDetailResponse(
                 .prices(d.prices().stream()
                         .filter(p -> p.price() != null || p.alwaysFree())
                         .map(p -> new Price(p.guestType(), p.label(), p.ageRange(),
-                                p.alwaysFree() ? BigDecimal.ZERO : p.price(), p.alwaysFree()))
+                                p.alwaysFree() ? BigDecimal.ZERO : p.price(), p.alwaysFree(),
+                                // Em bé luôn không chiếm chỗ; các loại khác theo cấu hình đối tác.
+                                p.alwaysFree() ? false : p.countsTowardSlot()))
                         .toList())
                 .maxGuestsPerSlot(d.maxGuestsPerSlot())
                 .upcomingDepartureDates(d.departureDates().stream().filter(day -> !day.isBefore(today)).toList())
@@ -141,6 +146,7 @@ public record TourPublicDetailResponse(
                 .wizardTour(false)
                 .durationDays(t.durationDays())
                 .providerName(t.createdBy())
+                .providerId(t.providerId())
                 .highlights(List.of())
                 .images(t.coverImageUrl() == null ? List.of() : List.of(t.coverImageUrl()))
                 .coverImageUrl(t.coverImageUrl())

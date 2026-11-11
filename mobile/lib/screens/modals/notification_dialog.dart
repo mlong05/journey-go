@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/notification_model.dart';
 import '../../core/services/notification_service.dart';
-import '../booking/bookings_screen.dart';
+import '../bookings/my_bookings_screen.dart';
+import '../chat/provider_chat_list_screen.dart';
+import '../booking/invitation_confirm_screen.dart';
 import '../common/heritage_motion.dart';
 import '../common/live_time.dart';
 import '../../core/services/api_client.dart';
@@ -31,6 +33,7 @@ const _styles = {
   'COMMUNITY': _CategoryStyle(Icons.forum_rounded, AppCultureColors.oceanBlue, AppCultureColors.oceanLight, 'Cộng đồng'),
   'FINANCE': _CategoryStyle(Icons.account_balance_wallet_rounded, AppCultureColors.jadeDark, AppCultureColors.jadeLight, 'Tài chính'),
   'REVIEW': _CategoryStyle(Icons.fact_check_rounded, AppCultureColors.oceanBlue, AppCultureColors.oceanLight, 'Thẩm định'),
+  'CHAT': _CategoryStyle(Icons.chat_bubble_rounded, Color(0xFF7C3AED), Color(0xFFEDE9FE), 'Tin nhắn'),
 };
 
 const _fallbackStyle =
@@ -50,7 +53,21 @@ String _timeAgo(DateTime? t) {
 }
 
 /// Thông báo có màn đích để mở hay không (thông báo về báo cáo vi phạm thì chỉ đánh dấu đã đọc).
-bool _hasTarget(AppNotification n) => const {'BOOKING', 'REFUND', 'BADGE', 'POST'}.contains(n.refType);
+bool _hasTarget(AppNotification n) =>
+    const {'BOOKING', 'REFUND', 'BADGE', 'POST', 'PROVIDER_CHAT', 'TOUR_INVITATION'}.contains(n.refType);
+
+/// Thông báo chat (tin nhắn từ đối tác / khách).
+///
+/// ⚠️ Loại này KHÔNG hiện banner hình chữ nhật giữa màn hình — chỉ nằm trong
+/// trung tâm "Thông báo" và tăng số chưa đọc trên chuông, để không làm gián đoạn
+/// trải nghiệm người dùng.
+bool isChatNotification(AppNotification n) {
+  if (n.category == 'CHAT') return true;
+  return const {
+    'PROVIDER_MESSAGE_RECEIVED',
+    'BOOKING_MESSAGE_RECEIVED',
+  }.contains(n.type);
+}
 
 /// Bài viết đang công khai: mở thẳng chi tiết bài. Còn lại (bị ẩn / từ chối / cần sửa) mở "Bài viết của tôi".
 const _openPostDetailTypes = {'POST_COMMENTED', 'POST_APPROVED', 'POST_RESTORED'};
@@ -60,10 +77,12 @@ const _openPostDetailTypes = {'POST_COMMENTED', 'POST_APPROVED', 'POST_RESTORED'
 Future<void> openNotificationTarget(NavigatorState navigator, AppNotification n) async {
   NotificationCenter.instance.markRead(n);
   Widget? screen = switch (n.refType) {
-    'BOOKING' => const BookingsScreen(),
+    'BOOKING' => const MyBookingsScreen(),
     'REFUND' => const RefundsScreen(),
     'BADGE' => const BadgesScreen(),
     'POST' => const MyPostsScreen(),
+    'PROVIDER_CHAT' => ProviderChatListScreen(openConversationId: n.refId),
+    'TOUR_INVITATION' => InvitationConfirmScreen(invitationId: n.refId),
     _ => null,
   };
   if (n.refType == 'POST' && n.refId != null && _openPostDetailTypes.contains(n.type)) {

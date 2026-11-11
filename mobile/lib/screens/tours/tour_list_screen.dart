@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/models/booking_model.dart' show BookingStatus;
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
+import '../../core/services/booking_service.dart';
 import '../../core/services/catalog_service.dart';
-import '../../core/services/progress_service.dart';
 import '../../core/services/tour_service.dart';
 import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeletonList;
 import 'tour_cards.dart';
@@ -69,8 +68,11 @@ class _TourListScreenState extends State<TourListScreen> {
     super.initState();
     _scroll.addListener(_onScroll);
     _loadCatalog();
-    _loadOwned();
-    _reload();
+    // ⚠️ Chờ nạp danh sách tour ĐÃ MUA xong rồi mới tải danh sách tour — nếu
+    // không, lọc có thể bỏ sót tour đã mua ở lần render đầu tiên.
+    _loadOwned().then((_) {
+      if (mounted) _reload();
+    });
   }
 
   @override
@@ -95,11 +97,14 @@ class _TourListScreenState extends State<TourListScreen> {
     }
   }
 
-  /// Tour du khách đang có vé chưa dùng; lỗi thì coi như chưa có vé.
+  /// Tour du khách ĐÃ MUA (đã thanh toán) ⇒ không hiển thị lại trong danh sách.
+  ///
+  /// ⚠️ Lấy từ `getMine()` + `isPaid` (không dùng `getTickets()` vì hàm đó chỉ
+  /// trả về vé đang dùng) — tour đã mua rồi thì KHÔNG được đặt tiếp.
   Future<void> _loadOwned() async {
     try {
-      final tickets = await ProgressService().getTickets();
-      final ids = {for (final b in tickets) if (b.status != BookingStatus.completed) b.tourId};
+      final bookings = await BookingService().getMine();
+      final ids = {for (final b in bookings) if (b.isPaid) b.tourId};
       if (mounted) setState(() => _owned = ids);
     } catch (_) {}
   }
@@ -121,12 +126,26 @@ class _TourListScreenState extends State<TourListScreen> {
         _last = page.last;
         _loading = false;
       });
+      _ensureVisible();
     } on ApiException catch (e) {
       if (!mounted || gen != _generation) return;
       setState(() {
         _error = e.message;
         _loading = false;
       });
+    }
+  }
+
+  /// Nếu trang vừa tải toàn là tour đã mua ⇒ tự tải thêm trang kế tiếp cho tới
+  /// khi có tour hiển thị được (hoặc hết dữ liệu).
+  Future<void> _ensureVisible() async {
+    var guard = 0;
+    while (mounted &&
+        !_last &&
+        _tours.every((t) => _owned.contains(t.id)) &&
+        guard < 10) {
+      guard++;
+      await _loadMore();
     }
   }
 
@@ -337,12 +356,19 @@ class _TourListScreenState extends State<TourListScreen> {
         onRetry: _reload,
       );
     }
-    if (_tours.isEmpty) {
+
+    // ⚠️ Tour đã mua (đã thanh toán) ⇒ KHÔNG hiển thị lại, không cho đặt tiếp.
+    final visible = _tours.where((t) => !_owned.contains(t.id)).toList();
+
+    if (visible.isEmpty) {
+      final filtered = _filter.activeCount > 0 || (_filter.query?.isNotEmpty ?? false);
       return RewardsMessageView(
         icon: Icons.travel_explore_rounded,
         title: 'Không tìm thấy tour phù hợp',
-        message: 'Thử bỏ bớt bộ lọc hoặc tìm bằng từ khóa khác.',
-        onRetry: _filter.activeCount > 0 || (_filter.query?.isNotEmpty ?? false)
+        message: _owned.isNotEmpty && !filtered
+            ? 'Bạn đã mua tất cả các tour đang hiển thị. Hãy xem mục "Chuyến đi" để trải nghiệm.'
+            : 'Thử bỏ bớt bộ lọc hoặc tìm bằng từ khóa khác.',
+        onRetry: filtered
             ? () {
                 _search.clear();
                 _apply(const TourFilter());
@@ -357,10 +383,10 @@ class _TourListScreenState extends State<TourListScreen> {
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        itemCount: _tours.length + 1,
+        itemCount: visible.length + 1,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (_, i) {
-          if (i == _tours.length) {
+          if (i == visible.length) {
             return _loadingMore
                 ? const Padding(
                     padding: EdgeInsets.all(12),
@@ -368,8 +394,8 @@ class _TourListScreenState extends State<TourListScreen> {
                   )
                 : const SizedBox(height: 4);
           }
-          final tour = _tours[i];
-          return TourListTile(tour: tour, owned: _owned.contains(tour.id), onTap: () => _open(tour));
+          final tour = visible[i];
+          return TourListTile(tour: tour, owned: false, onTap: () => _open(tour));
         },
       ),
     );

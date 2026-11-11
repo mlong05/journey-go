@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import PaginationBar from "@/components/ui/PaginationBar";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Tooltip } from "@/components/ui";
 import {
   approveApplication,
   getById,
@@ -408,9 +409,11 @@ export default function AdminPartnersPage() {
                 {rows.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900">
-                        {a.businessName || "—"}
-                      </div>
+                      <Tooltip content={a.businessName || "—"}>
+                        <span className="block max-w-[220px] truncate font-semibold text-slate-900">
+                          {a.businessName || "—"}
+                        </span>
+                      </Tooltip>
                       <div className="text-xs text-slate-500 flex items-center gap-1">
                         <Mail size={12} /> {a.email}
                       </div>
@@ -431,7 +434,11 @@ export default function AdminPartnersPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-700">
                       <div className="text-xs">
-                        {a.bankName || "—"}
+                        <Tooltip content={a.bankName || "—"}>
+                          <span className="block max-w-[180px] truncate">
+                            {a.bankName || "—"}
+                          </span>
+                        </Tooltip>
                       </div>
                       <div className="text-xs text-slate-500 font-mono">
                         {a.bankAccountNumber || ""}
@@ -596,9 +603,11 @@ function PartnerApplicationDetailModal({
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-bold text-slate-900">
-              {a?.businessName || a?.email || "Chi tiết đơn đăng ký"}
-            </h3>
+            <Tooltip content={a?.businessName || a?.email || "Chi tiết đơn đăng ký"}>
+              <h3 className="truncate text-lg font-bold text-slate-900">
+                {a?.businessName || a?.email || "Chi tiết đơn đăng ký"}
+              </h3>
+            </Tooltip>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span>#{a?.id}</span>
               {a?.status && (
@@ -677,7 +686,7 @@ function PartnerApplicationDetailModal({
                   <Field label="Phạm vi hoạt động" value={a.businessScope} />
                   <Field
                     label="Địa chỉ trụ sở"
-                    value={[a.addressDetail, a.ward, a.district, a.province]
+                    value={[a.addressDetail, a.ward, a.province]
                       .filter(Boolean)
                       .join(", ")}
                     icon={MapPin}
