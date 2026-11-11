@@ -4,20 +4,31 @@ import com.journeygo.common.dto.PageResponse;
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.modules.booking.dto.request.CreateBookingRequest;
+import com.journeygo.modules.booking.dto.response.BookingPassengerResponse;
 import com.journeygo.modules.booking.dto.response.BookingResponse;
 import com.journeygo.modules.booking.entity.Booking;
+import com.journeygo.modules.booking.entity.BookingPassenger;
+import com.journeygo.modules.booking.entity.BookingPassengerInvitation;
 import com.journeygo.modules.booking.entity.BookingSlotHold;
+import com.journeygo.modules.booking.entity.enums.BookingPassengerStatus;
+import com.journeygo.modules.booking.entity.enums.BookingSlotType;
 import com.journeygo.modules.booking.entity.enums.BookingStatus;
+import com.journeygo.modules.booking.entity.enums.InvitationStatus;
 import com.journeygo.modules.booking.event.BookingCompletedEvent;
+import com.journeygo.modules.booking.repository.BookingPassengerRepository;
 import com.journeygo.modules.booking.repository.BookingRepository;
 import com.journeygo.modules.booking.repository.BookingSlotHoldRepository;
+import com.journeygo.modules.booking.support.GuestAgeResolver;
 import com.journeygo.modules.experience.entity.ExperienceSlot;
 import com.journeygo.modules.experience.repository.ExperienceRepository;
 import com.journeygo.modules.experience.repository.ExperienceSlotRepository;
 import com.journeygo.modules.finance.config.FinanceProperties;
+import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.Tour;
+import com.journeygo.modules.tour.entity.TourSlot;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
 import com.journeygo.modules.tour.repository.TourRepository;
+import com.journeygo.modules.tour.repository.TourSlotRepository;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +46,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -47,7 +62,17 @@ import java.util.UUID;
  *       EXPIRED và giải phóng slot. Không cho tạo Payment attempt mới cho Booking đã hết hạn.</li>
  *   <li><b>UC-02 Giữ chỗ</b> — giữ chỗ ngay khi tạo Booking, tối đa 10 phút; giải phóng đúng
  *       một lần; không để xảy ra overselling (dùng cập nhật nguyên tử có điều kiện).</li>
- *   <li>Slot chỉ được giải phóng khi Booking chuyển sang EXPIRED hoặc bị hủy hợp lệ.</li>
+ *   <li><b>Slot chỉ được giải phóng</b> khi Booking chuyển sang EXPIRED hoặc bị hủy hợp lệ.</li>
+ * </ul>
+ *
+ * <p><b>Đặt tour nhóm</b> (theo tài liệu "Đặt - Thanh toán tour"):
+ * <ul>
+ *   <li>Mỗi hành khách chiếm 1 slot trải nghiệm; số slot giữ = số hành khách có
+ *       {@code countsTowardSlot = TRUE} (em bé theo cấu hình đối tác thường không chiếm slot).</li>
+ *   <li>Loại khách được xác định theo TUỔI TẠI NGÀY TRẢI NGHIỆM (không theo ngày đặt) —
+ *       xem {@link GuestAgeResolver}.</li>
+ *   <li>Giá = tổng giá vé của từng hành khách theo bảng giá {@code tour_prices} của tour.</li>
+ *   <li>Người đặt (Booking Customer) là một trong các hành khách và giữ quyền quản lý Booking.</li>
  * </ul>
  */
 @Slf4j
@@ -62,22 +87,25 @@ public class BookingService {
 
     private final BookingRepository bookingRepository;
     private final BookingSlotHoldRepository slotHoldRepository;
+    private final BookingPassengerRepository passengerRepository;
     private final ExperienceSlotRepository experienceSlotRepository;
     private final ExperienceRepository experienceRepository;
     private final FinanceProperties financeProperties;
     private final TourRepository tourRepository;
+    private final TourSlotRepository tourSlotRepository;
     private final UserRepository userRepository;
     private final TourBookingCatalogService catalogService;
     private final ApplicationEventPublisher eventPublisher;
+    private final BookingInvitationService invitationService;
 
     // ── Create ────────────────────────────────────────────────────────────────
 
     /**
-     * Tạo Booking mới cho một Tourist.
+     * Tạo Booking mới cho một Tourist (có thể đặt cho bản thân hoặc cho cả nhóm).
      *
-     * <p>Toàn bộ thao tác (kiểm tra điều kiện đặt + giữ slot + lưu Booking) nằm trong một
-     * transaction — nếu một slot không còn chỗ thì rollback toàn bộ, không để sót slot đã giữ
-     * một phần (UC-02).
+     * <p>Toàn bộ thao tác (kiểm tra điều kiện đặt + giữ slot + lưu Booking + lưu hành khách)
+     * nằm trong một transaction — nếu một slot không còn chỗ thì rollback toàn bộ, không để
+     * sót slot đã giữ một phần (UC-02).
      */
     @Transactional
     public BookingResponse createBooking(CreateBookingRequest request, Long touristId) {
@@ -90,79 +118,147 @@ public class BookingService {
         validateTourBookable(tour);
         validateExperienceDate(tour, request.experienceDate());
 
-        List<TourBookingCatalogService.ExperienceQuote> quotes =
-                catalogService.quoteExperiences(tour, request.experienceDate());
-
-        if (quotes.isEmpty()) {
-            throw new AppException(ErrorCode.BOOKING_NO_AVAILABLE_EXPERIENCE,
-                    "Tour không có trải nghiệm nào khả dụch để đặt trong ngày này");
-        }
+        // ── Chuẩn bị danh sách hành khách + chốt giá ─────────────────────────
+        PriceSnapshot price = buildPriceSnapshot(tour, request);
 
         // ── Kiểm tra + giữ chỗ NGUYÊN TỬ ────────────────────────────────────
-        // Duyệt trước để biết slot nào thiếu chỗ, rồi mới reserve. Mọi reserve thất bại
-        // sẽ ném exception → rollback toàn bộ transaction (bao gồm các slot đã reserve).
-        List<ExperienceSlot> slotsToReserve = new java.util.ArrayList<>();
-        for (TourBookingCatalogService.ExperienceQuote quote : quotes) {
-            if (quote.slot() == null) {
-                // Provider chưa mở bán ngày này: tự mở slot nếu được cấu hình, không thì báo như cũ.
+        TourSlot tourSlot = null;
+        ExperienceSlot legacySlot = null;
+
+        if (tour.isWizardTour()) {
+            // Tour luồng 5 bước: giữ chỗ trên TourSlot (sức chứa theo ngày khởi hành).
+            tourSlot = tourSlotRepository
+                    .findByTourAndDateForUpdate(tour.getTourId(), request.experienceDate())
+                    .orElseThrow(() -> new AppException(ErrorCode.BOOKING_SLOT_NOT_FOUND,
+                            "Tour chưa mở bán ngày " + request.experienceDate()));
+            if (tourSlot.getCapacity() == null || tourSlot.getCapacity() <= 0) {
+                throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
+                        "Tour đã hết chỗ ngày " + request.experienceDate());
+            }
+            if (price.slotCount() <= 0) {
+                throw new AppException(ErrorCode.BOOKING_NO_AVAILABLE_EXPERIENCE,
+                        "Tour này không có hành khách nào chiếm chỗ — không thể đặt");
+            }
+            int updated = tourSlotRepository.atomicReserveSlots(tourSlot.getId(), price.slotCount());
+            if (updated == 0) {
+                throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
+                        "Tour đã hết chỗ ngày " + request.experienceDate());
+            }
+        } else {
+            // Tour luồng cũ: giữ chỗ trên ExperienceSlot (mỗi booking 1 slot).
+            ExperienceSlot slot = findLegacyExperienceSlot(tour, request.experienceDate());
+            if (slot == null) {
                 if (!financeProperties.isAutoOpenSlots()) {
                     throw new AppException(ErrorCode.BOOKING_SLOT_NOT_FOUND,
-                            "Trải nghiệm '" + quote.title() + "' chưa mở bán ngày " + request.experienceDate());
+                            "Trải nghiệm chưa mở bán ngày " + request.experienceDate());
                 }
-                slotsToReserve.add(openSlot(quote.experienceId(), request.experienceDate()));
-                continue;
+                slot = openSlot(findFirstExperienceId(tour), request.experienceDate());
             }
-            if (!quote.hasCapacity()) {
-                throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
-                        "Trải nghiệm '" + quote.title() + "' đã hết chỗ ngày " + request.experienceDate());
-            }
-            slotsToReserve.add(quote.slot());
-        }
-
-        for (ExperienceSlot slot : slotsToReserve) {
             int updated = experienceSlotRepository.atomicReserveSlot(slot.getId());
             if (updated == 0) {
-                // Có request khác vừa chiếm slot cuối cùng → thất bại nguyên tử.
                 throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
                         "Trải nghiệm vừa hết chỗ, vui lòng thử lại");
             }
+            legacySlot = slot;
         }
 
-        BigDecimal totalAmount = quotes.stream()
-                .map(TourBookingCatalogService.ExperienceQuote::price)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
+        // ── Lưu Booking ──────────────────────────────────────────────────────
         Instant now = Instant.now();
         Booking booking = Booking.builder()
                 .bookingCode(generateBookingCode())
                 .tourist(tourist)
                 .tour(tour)
                 .experienceDate(request.experienceDate())
-                .totalAmount(totalAmount)
+                .totalAmount(price.totalAmount())
                 .currency("VND")
                 .status(BookingStatus.PENDING_PAYMENT)
                 .paymentDeadline(now.plus(PAYMENT_DEADLINE))
+                .slotCount(price.slotCount())
                 .build();
 
         Booking saved = bookingRepository.save(booking);
 
-        for (ExperienceSlot slot : slotsToReserve) {
-            slotHoldRepository.save(BookingSlotHold.builder()
+        // ── Lưu danh sách hành khách ─────────────────────────────────────────
+        for (PassengerDraft draft : price.passengers()) {
+            BookingPassenger passenger = BookingPassenger.builder()
                     .booking(saved)
-                    .experienceSlot(slot)
-                    .experienceId(slot.getExperience() != null ? slot.getExperience().getId() : null)
-                    .slotDate(slot.getSlotDate())
-                    .build());
+                    .fullName(draft.fullName())
+                    .birthDate(draft.birthDate())
+                    .gender(draft.gender())
+                    .email(draft.email())
+                    .guestType(draft.guestType())
+                    .price(draft.price())
+                    .countsTowardSlot(draft.countsTowardSlot())
+                    // Người đặt tour được liên kết với tài khoản ngay.
+                    .bookingCustomer(draft.bookingCustomer())
+                    .linkedUserId(draft.bookingCustomer() ? touristId : null)
+                    .status(BookingPassengerStatus.ACTIVE)
+                    .build();
+            passengerRepository.save(passenger);
         }
 
-        log.info("Đã tạo booking id={} code={} tourist={} tour={} amount={} giữ {} slot",
-                saved.getId(), saved.getBookingCode(), touristId, tour.getTourId(), totalAmount, slotsToReserve.size());
+        // ── Ghi nhận slot đã giữ ─────────────────────────────────────────────
+        BookingSlotHold hold = BookingSlotHold.builder()
+                .booking(saved)
+                .slotType(tour.isWizardTour() ? BookingSlotType.TOUR : BookingSlotType.EXPERIENCE)
+                .tourSlot(tourSlot)
+                .experienceSlot(legacySlot)
+                .experienceId(legacySlot != null && legacySlot.getExperience() != null
+                        ? legacySlot.getExperience().getId() : null)
+                .slotDate(request.experienceDate())
+                .slotCount(price.slotCount())
+                .build();
+        slotHoldRepository.save(hold);
+
+        log.info("Đã tạo booking id={} code={} tourist={} tour={} amount={} slotCount={} passengers={}",
+                saved.getId(), saved.getBookingCode(), touristId, tour.getTourId(),
+                price.totalAmount(), price.slotCount(), price.passengers().size());
         return BookingResponse.fromEntity(saved);
     }
 
     /**
-     * Tự mở slot cho ngày Provider chưa cấu hình (app.finance.auto-open-slots). Slot mở theo sức chứa
-     * mặc định và vẫn đi qua atomicReserveSlot như slot thường, nên không vượt quá sức chứa đó.
+     * Tìm ExperienceSlot của tour luồng cũ tại một ngày.
+     *
+     * <p>Tour luồng cũ gồm nhiều điểm đến, mỗi điểm đến có Experience; chỉ cần một slot
+     * đại diện để giữ chỗ (giữ trên mọi Experience để không vỡ đối xứng).
+     */
+    private ExperienceSlot findLegacyExperienceSlot(Tour tour, LocalDate date) {
+        List<Long> destinationIds = tour.getTourDestinations() == null
+                ? List.of()
+                : tour.getTourDestinations().stream()
+                .map(td -> td.getDestination())
+                .filter(d -> d != null)
+                .map(d -> d.getId())
+                .toList();
+        if (destinationIds.isEmpty()) {
+            return null;
+        }
+        List<ExperienceSlot> slots = experienceSlotRepository.findByExperienceIdsAndDate(
+                experienceRepository.findByDestination_IdInOrderById(destinationIds).stream()
+                        .map(e -> e.getId())
+                        .toList(),
+                date);
+        return slots.stream().findFirst().orElse(null);
+    }
+
+    /** ID Experience đầu tiên của tour luồng cũ (dùng khi tự mở slot). */
+    private Long findFirstExperienceId(Tour tour) {
+        if (tour.getTourDestinations() == null) {
+            throw new AppException(ErrorCode.BOOKING_NO_AVAILABLE_EXPERIENCE,
+                    "Tour không có trải nghiệm nào khả dụng để đặt");
+        }
+        return tour.getTourDestinations().stream()
+                .map(td -> td.getDestination())
+                .filter(d -> d != null)
+                .flatMap(d -> experienceRepository.findByDestination_Id(d.getId()).stream())
+                .map(e -> e.getId())
+                .findFirst()
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NO_AVAILABLE_EXPERIENCE,
+                        "Tour không có trải nghiệm nào khả dụng để đặt"));
+    }
+
+    /**
+     * Tự mở slot cho ngày Provider chưa cấu hình (app.finance.auto-open-slots).
      */
     private ExperienceSlot openSlot(Long experienceId, LocalDate date) {
         ExperienceSlot slot = experienceSlotRepository.saveAndFlush(ExperienceSlot.builder()
@@ -176,19 +272,197 @@ public class BookingService {
         return slot;
     }
 
+    // ── Chuẩn bị hành khách & chốt giá ───────────────────────────────────────
+
+    /** Một hành khách đã được xác định loại + giá, sẵn sàng lưu. */
+    private record PassengerDraft(String fullName, LocalDate birthDate, String gender, String email,
+                                  GuestType guestType, BigDecimal price, boolean countsTowardSlot,
+                                  boolean bookingCustomer) {
+    }
+
+    /** Kết quả chốt giá cho một Booking nhóm. */
+    private record PriceSnapshot(List<PassengerDraft> passengers, BigDecimal totalAmount, int slotCount) {
+    }
+
+    /**
+     * Xác định loại khách, giá và số slot từ danh sách hành khách khách gửi lên.
+     *
+     * <p>Quy tắc:
+     * <ul>
+     *   <li>Loại khách: nếu khách chỉ định → dùng; ngược lại tự tính từ ngày sinh tại ngày
+     *       trải nghiệm.</li>
+     *   <li>Tour không bán loại khách đó ⇒ lỗi nghiệp vụ (đối tác chưa mở bán loại khách).</li>
+     *   <li>Giá: lấy từ bảng giá của tour theo loại khách. Em bé luôn miễn phí.</li>
+     *   <li>Slot: mỗi hành khách có {@code countsTowardSlot} chiếm 1 slot.</li>
+     * </ul>
+     */
+    private PriceSnapshot buildPriceSnapshot(Tour tour, CreateBookingRequest request) {
+        TourBookingCatalogService.PriceTable table = resolvePriceTable(tour);
+        LocalDate experienceDate = request.experienceDate();
+
+        List<PassengerDraft> drafts = new ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+        int slotCount = 0;
+        boolean customerAssigned = false;
+        java.util.Set<String> seenEmails = new java.util.LinkedHashSet<>();
+
+        for (CreateBookingRequest.PassengerRequest p : request.passengers()) {
+            // Loại khách: ưu tiên giá trị khách gửi, nếu không thì tính từ tuổi tại ngày trải nghiệm.
+            GuestType guestType = p.guestType() != null
+                    ? p.guestType()
+                    : GuestAgeResolver.resolveGuestTypeOrAdult(p.birthDate(), experienceDate);
+
+            if (!table.sells(guestType)) {
+                throw new AppException(ErrorCode.BOOKING_GUEST_TYPE_NOT_AVAILABLE,
+                        "Tour hiện không bán vé cho loại khách \""
+                                + guestType.getLabel() + "\" — vui lòng kiểm tra lại thông tin hành khách");
+            }
+
+            // Người lớn bắt buộc có email (để nhận vé và quyền truy cập tour).
+            String email = p.email() == null || p.email().isBlank()
+                    ? null
+                    : p.email().trim().toLowerCase();
+            if (guestType == GuestType.ADULT && email == null) {
+                throw new AppException(ErrorCode.BOOKING_PASSENGER_EMAIL_REQUIRED,
+                        "Hành khách người lớn bắt buộc phải có email");
+            }
+            // Không được trùng email trong cùng nhóm (mỗi email = một tài khoản).
+            if (email != null && !seenEmails.add(email)) {
+                throw new AppException(ErrorCode.BOOKING_PASSENGER_DUPLICATE_EMAIL,
+                        "Email \"" + email + "\" bị trùng trong nhóm hành khách");
+            }
+
+            BigDecimal price = table.priceOf(guestType);
+            if (guestType.isAlwaysFree()) {
+                price = BigDecimal.ZERO;
+            }
+
+            boolean countsSlot = table.countsTowardSlot(guestType);
+
+            // Người đặt là hành khách có email trùng email tài khoản, hoặc hành khách đầu tiên.
+            boolean isCustomer = !customerAssigned && matchesCustomer(p, drafts.size());
+            if (isCustomer) {
+                customerAssigned = true;
+            }
+
+            drafts.add(new PassengerDraft(
+                    p.fullName().trim(), p.birthDate(), p.gender(),
+                    email,
+                    guestType, price, countsSlot, isCustomer));
+
+            total = total.add(price);
+            if (countsSlot) {
+                slotCount++;
+            }
+        }
+
+        if (!customerAssigned) {
+            // Không hành khách nào khớp người đặt ⇒ hành khách đầu tiên đóng vai người đặt.
+            PassengerDraft first = drafts.get(0);
+            drafts.set(0, new PassengerDraft(first.fullName(), first.birthDate(), first.gender(),
+                    first.email(), first.guestType(), first.price(), first.countsTowardSlot(), true));
+        }
+
+        return new PriceSnapshot(drafts, total, slotCount);
+    }
+
+    /**
+     * Bảng giá của tour.
+     *
+     * <p>Tour luồng 5 bước dùng {@code tour_prices}. Tour luồng cũ không có bảng giá theo loại
+     * khách ⇒ dùng giá trước đây (tổng giá Experience) cho mọi loại khách.
+     */
+    private TourBookingCatalogService.PriceTable resolvePriceTable(Tour tour) {
+        TourBookingCatalogService.PriceTable table = catalogService.priceTable(tour);
+        if (!table.prices().isEmpty()) {
+            return table;
+        }
+        BigDecimal flat = catalogService.flatPriceOf(tour);
+        return catalogService.legacyFlatPriceTable(flat);
+    }
+
+    /** Hành khách đầu tiên được coi là người đặt (người đặt luôn là hành khách đầu tiên trong nhóm). */
+    private boolean matchesCustomer(CreateBookingRequest.PassengerRequest p, int index) {
+        return index == 0;
+    }
+
     // ── Read ──────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public BookingResponse getById(Long bookingId, Long callerId, boolean isAdmin) {
         Booking booking = findOrThrow(bookingId);
-        checkOwnership(booking, callerId, isAdmin);
-        return BookingResponse.fromEntity(booking);
+        checkViewAccess(booking, callerId, isAdmin);
+        return buildResponse(booking, callerId, isAdmin);
+    }
+
+    /**
+     * Dựng response chi tiết Booking theo QUYỀN của người đang xem.
+     *
+     * <p>Ma trận quyền (theo tài liệu "Mời tham gia Tour"):
+     * <ul>
+     *   <li><b>Booking Customer</b> — xem tất cả thông tin cá nhân của mọi hành khách.</li>
+     *   <li><b>Hành khách được mời</b> — xem chi tiết Booking, xem thông tin của chính mình,
+     *       nhưng KHÔNG xem thông tin cá nhân của hành khách khác (che email / ngày sinh / giới tính).</li>
+     *   <li><b>Admin</b> — xem tất cả.</li>
+     * </ul>
+     */
+    @Transactional(readOnly = true)
+    public BookingResponse buildResponse(Booking booking, Long callerId, boolean isAdmin) {
+        List<BookingPassenger> passengers = passengerRepository
+                .findByBooking_IdOrderByCreatedAtAsc(booking.getId());
+
+        boolean isOwner = booking.getTourist() != null && callerId != null
+                && booking.getTourist().getId().equals(callerId);
+        // Hành khách được mời: xem được Booking nhưng không xem PII của người khác.
+        boolean isGuestPassenger = !isOwner && !isAdmin && callerId != null
+                && passengers.stream().anyMatch(p -> callerId.equals(p.getLinkedUserId()));
+
+        // Lời mời gần nhất của từng hành khách (để UI hiển thị trạng thái "đã gửi mời"...).
+        Map<Long, BookingPassengerInvitation> latestInvitations = new HashMap<>();
+        for (BookingPassengerInvitation inv : invitationService
+                .listInvitationsOfBooking(booking.getId())) {
+            latestInvitations.putIfAbsent(inv.getPassenger().getId(), inv);
+        }
+
+        Instant now = Instant.now();
+        List<BookingPassengerResponse> passengerResponses = passengers.stream()
+                .map(p -> {
+                    boolean self = callerId != null && callerId.equals(p.getLinkedUserId());
+                    boolean visible = isAdmin || isOwner || self;
+                    BookingPassengerInvitation inv = latestInvitations.get(p.getId());
+                    InvitationStatus invStatus = inv != null ? inv.getStatus() : null;
+                    Instant invExpires = inv != null ? inv.getExpiresAt() : null;
+                    return BookingPassengerResponse.fromEntity(
+                            p, booking.getExperienceDate(), visible, invStatus, invExpires);
+                })
+                .toList();
+
+        return BookingResponse.fromEntity(booking, passengerResponses, null, now);
     }
 
     @Transactional(readOnly = true)
     public PageResponse<BookingResponse> getMyBookings(Long touristId, Pageable pageable) {
         Page<Booking> page = bookingRepository.findByTourist_Id(touristId, pageable);
-        return PageResponse.from(page, BookingResponse::fromEntity);
+        return PageResponse.from(page, b -> buildResponse(b, touristId, false));
+    }
+
+    /**
+     * Danh sách booking mà user có quyền xem: vừa là người đặt, vừa là hành khách được mời.
+     *
+     * <p>⚠️ Hành khách được mời KHÔNG được xem thông tin cá nhân của hành khách khác
+     * ⇒ {@link #buildResponse} tự ẩn PII tương ứng.
+     */
+    @Transactional(readOnly = true)
+    public List<BookingResponse> getAccessibleBookings(Long userId) {
+        List<Booking> owned = bookingRepository.findByTourist_IdOrderByCreatedAtDesc(userId);
+        List<Booking> joined = bookingRepository
+                .findByPassengerLinkedUserId(userId, Pageable.unpaged()).getContent();
+        Map<Long, Booking> merged = new LinkedHashMap<>();
+        for (Booking b : owned) merged.put(b.getId(), b);
+        for (Booking b : joined) merged.putIfAbsent(b.getId(), b);
+        return merged.values().stream()
+                .map(b -> buildResponse(b, userId, false))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -231,6 +505,9 @@ public class BookingService {
         booking.cancel(reason);
         bookingRepository.save(booking);
         releaseSlots(booking);
+
+        // Lời mời chưa sử dụng bị vô hiệu hóa khi booking bị hủy.
+        invitationService.revokeAllForBooking(bookingId);
 
         log.info("Đã hủy booking id={} bởi user={}", bookingId, callerId);
         return BookingResponse.fromEntity(booking);
@@ -275,7 +552,7 @@ public class BookingService {
         // Slot giữ cho Booking đã thanh toán — KHÔNG giải phóng (tour đã diễn ra).
         eventPublisher.publishEvent(new BookingCompletedEvent(booking.getId(), at));
 
-        log.info("Đã đánh dấu hoàn thành booking id={} tại {}", bookingId, at);
+        log.info("Đã đánh dấu hoàn thành booking id={} tại {}", booking.getId(), at);
         return BookingResponse.fromEntity(booking);
     }
 
@@ -333,6 +610,8 @@ public class BookingService {
         booking.expire();
         bookingRepository.save(booking);
         releaseSlots(booking);
+        // Lời mời chưa sử dụng cũng bị vô hiệu hóa khi booking hết hạn thanh toán.
+        invitationService.revokeAllForBooking(booking.getId());
     }
 
     /**
@@ -340,9 +619,8 @@ public class BookingService {
      *
      * <p>⚠️ Vì sao phải gom ID slot TRƯỚC rồi mới gọi bulk UPDATE?
      * <ul>
-     *   <li>{@code atomicReleaseSlot} là câu UPDATE hàng loạt — nếu để Hibernate tự
-     *       {@code clear} PersistenceContext thì entity {@code Booking} đang quản lý sẽ bị
-     *       detach ⇒ {@code BookingResponse.fromEntity(booking)} ném
+     *   <li>Bulk UPDATE có thể {@code clear} PersistenceContext ⇒ entity {@code Booking} đang
+     *       quản lý sẽ bị detach ⇒ {@code BookingResponse.fromEntity(booking)} ném
      *       {@code LazyInitializationException} khi truy cập {@code booking.getSlotHolds()}.</li>
      *   <li>Gom ID trước còn giúp tránh truy cập lazy {@code hold.getExperienceSlot()}
      *       sau khi bulk update đã làm thay đổi trạng thái của các entity liên quan.</li>
@@ -356,13 +634,17 @@ public class BookingService {
 
         // Gom ID slot cần giải phóng + đánh dấu hold TRƯỚC khi chạy bulk UPDATE.
         List<Long> slotIds = new java.util.ArrayList<>();
+        List<Long> tourSlotIds = new java.util.ArrayList<>();
         for (BookingSlotHold hold : holds) {
             if (!hold.markReleased()) {
                 // Đã giải phóng trước đó — bỏ qua để không cộng/trừ sai số chỗ.
                 continue;
             }
             slotHoldRepository.save(hold);
-            if (hold.getExperienceSlot() != null) {
+            int count = Math.max(1, hold.getSlotCount());
+            if (hold.getTourSlot() != null) {
+                tourSlotIds.add(hold.getTourSlot().getId());
+            } else if (hold.getExperienceSlot() != null) {
                 slotIds.add(hold.getExperienceSlot().getId());
             }
         }
@@ -371,6 +653,9 @@ public class BookingService {
         // giữa chừng ⇒ lazy collection của Booking vẫn khởi tạo được trong transaction.
         for (Long slotId : slotIds) {
             experienceSlotRepository.atomicReleaseSlot(slotId);
+        }
+        for (Long tourSlotId : tourSlotIds) {
+            tourSlotRepository.atomicReleaseSlots(tourSlotId, booking.getSlotCount());
         }
     }
 
@@ -397,6 +682,58 @@ public class BookingService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
+     * Kiểm tra du khách có được phép bắt đầu hành trình của một Booking hay chưa.
+     *
+     * <p>Quy tắc "Tour bị khoá cho tới ngày trải nghiệm":
+     * <ul>
+     *   <li>Chỉ người đặt tour hoặc hành khách đã liên kết tài khoản mới được bắt đầu.</li>
+     *   <li>Chưa tới ngày trải nghiệm thì bị chặn (tour bị khoá).</li>
+     *   <li>Booking chưa thanh toán / bị hủy / quá hạn thì không được bắt đầu.</li>
+     * </ul>
+     *
+     * @throws AppException nếu không được phép
+     */
+    @Transactional(readOnly = true)
+    public Booking assertJourneyAllowed(Long bookingId, Long userId) {
+        Booking booking = findOrThrow(bookingId);
+
+        boolean isOwner = booking.getTourist() != null && userId.equals(booking.getTourist().getId());
+        boolean isPassenger = passengerRepository
+                .findByBooking_IdOrderByCreatedAtAsc(booking.getId()).stream()
+                .anyMatch(p -> userId.equals(p.getLinkedUserId()));
+        if (!isOwner && !isPassenger) {
+            throw new AppException(ErrorCode.UNAUTHORIZED,
+                    "Bạn không có quyền bắt đầu hành trình của booking này");
+        }
+
+        if (!booking.getStatus().isPaid()) {
+            throw new AppException(ErrorCode.BOOKING_INVALID_STATUS_FOR_CANCEL,
+                    "Booking chưa thanh toán thành công — chưa thể bắt đầu hành trình");
+        }
+        if (booking.getStatus() == BookingStatus.CANCELLED || booking.getStatus() == BookingStatus.EXPIRED) {
+            throw new AppException(ErrorCode.BOOKING_INVALID_STATUS_FOR_CANCEL,
+                    "Booking đã bị hủy hoặc hết hạn — không thể bắt đầu hành trình");
+        }
+
+        LocalDate today = LocalDate.now(VIETNAM_ZONE);
+        if (booking.getExperienceDate() != null && booking.getExperienceDate().isAfter(today)) {
+            throw new AppException(ErrorCode.BOOKING_TOUR_LOCKED,
+                    "Tour chỉ mở từ ngày trải nghiệm ("
+                            + booking.getExperienceDate() + ") — còn "
+                            + java.time.temporal.ChronoUnit.DAYS.between(today, booking.getExperienceDate())
+                            + " ngày nữa");
+        }
+
+        return booking;
+    }
+
+    /** Ngày trải nghiệm của một booking (dùng để tính đồng hồ đếm ngược). */
+    @Transactional(readOnly = true)
+    public LocalDate experienceDateOf(Long bookingId) {
+        return findOrThrow(bookingId).getExperienceDate();
+    }
+
+    /**
      * Tìm Booking kèm khóa write — dùng khi xử lý callback thanh toán để tránh race condition
      * với tác vụ hết hạn (UC-01: "Backend phải đảm bảo không vừa giải phóng chỗ vừa xác nhận Booking").
      */
@@ -405,11 +742,54 @@ public class BookingService {
         return bookingRepository.findByIdForUpdate(bookingId).orElse(null);
     }
 
+    /**
+     * Nạp Booking theo id, kèm sẵn {@code tourist}, {@code tour}, {@code tour.createdBy}.
+     *
+     * <p>⚠️ Vì sao KHÔNG dùng {@code findById}?
+     * Hàm này được gọi từ controller — NGOÀI giao dịch — nên entity trả về sẽ bị DETACH
+     * khỏi PersistenceContext. Mọi truy cập vào proxy lười ({@code getTour()},
+     * {@code getTourist()}, {@code getTour().getCreatedBy()}) sau đó sẽ ném
+     * {@code LazyInitializationException: could not initialize proxy - no Session}.
+     * Đó chính là lý do email lời mời không được gửi (lỗi bị nuốt trong log) và
+     * API danh sách hành khách trả về 500.
+     *
+     * <p>⇒ Dùng EntityGraph để nạp sẵn các liên kết này ⇒ không còn phụ thuộc session.
+     */
     public Booking findOrThrow(Long bookingId) {
-        return bookingRepository.findById(bookingId)
+        return bookingRepository.findByIdWithRelations(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
     }
 
+    /**
+     * Kiểm tra quyền XEM chi tiết Booking.
+     *
+     * <p>⚠️ Ngoài người đặt (Booking Customer) và Admin, HÀNH KHÁCH ĐƯỢC MỜI
+     * (đã liên kết tài khoản) cũng được xem chi tiết Booking — theo ma trận quyền.
+     * Họ KHÔNG được quyền sửa/hủy/thanh toán ⇒ các luồng đó dùng {@link #checkOwnership}
+     * (chỉ người đặt).
+     */
+    private void checkViewAccess(Booking booking, Long callerId, boolean isAdmin) {
+        if (isAdmin) {
+            return;
+        }
+        Long ownerId = booking.getTourist() != null ? booking.getTourist().getId() : null;
+        if (ownerId != null && ownerId.equals(callerId)) {
+            return;
+        }
+        if (callerId != null && passengerRepository
+                .findByBooking_IdOrderByCreatedAtAsc(booking.getId()).stream()
+                .anyMatch(p -> callerId.equals(p.getLinkedUserId()))) {
+            return;
+        }
+        throw new AppException(ErrorCode.UNAUTHORIZED,
+                "Bạn không có quyền truy cập Booking này");
+    }
+
+    /**
+     * Kiểm tra quyền QUẢN LÝ Booking — CHỈ người đặt (Booking Customer) và Admin.
+     *
+     * <p>⚠️ Hành khách được mời KHÔNG được quyền sửa / hủy / thanh toán (quy tắc 9).
+     */
     private void checkOwnership(Booking booking, Long callerId, boolean isAdmin) {
         if (isAdmin) {
             return;
@@ -433,6 +813,11 @@ public class BookingService {
         if (experienceDate == null || experienceDate.isBefore(today)) {
             throw new AppException(ErrorCode.BOOKING_INVALID_DATE,
                     "Ngày trải nghiệm không được nằm trong quá khứ");
+        }
+        // Tour luồng 5 bước: ngày trải nghiệm phải nằm trong lịch khởi hành đã công bố.
+        if (tour.isWizardTour() && catalogService.findDepartureDate(tour, experienceDate).isEmpty()) {
+            throw new AppException(ErrorCode.BOOKING_INVALID_DATE,
+                    "Ngày " + experienceDate + " không có trong lịch khởi hành của tour");
         }
     }
 
