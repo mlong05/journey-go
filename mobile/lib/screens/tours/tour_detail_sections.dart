@@ -666,6 +666,50 @@ Future<void> showStopPreview(BuildContext context, TourStopModel stop) {
               ),
             ],
           ],
+          // API công khai không trả nội dung văn hoá: chỉ giới thiệu những gì sẽ mở khi check-in
+          if (stop.culturalContent == null &&
+              stop.culturalImages.isEmpty &&
+              stop.artifacts.isEmpty &&
+              (stop.hasCulturalStory || stop.culturalImageTotal > 0 || stop.artifactTotal > 0)) ...[
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppCultureColors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppCultureColors.border),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.lock_outline_rounded, color: AppCultureColors.lacquer),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Nội dung văn hóa', style: AppType.display(size: 15)),
+                        const SizedBox(height: 3),
+                        Text(
+                          [
+                            if (stop.hasCulturalStory) 'Câu chuyện',
+                            if (stop.culturalImageTotal > 0) '${stop.culturalImageTotal} ảnh tư liệu',
+                            if (stop.artifactTotal > 0) '${stop.artifactTotal} hiện vật',
+                          ].join(' · '),
+                          style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Mở khóa khi bạn check-in tại điểm dừng trong hành trình.',
+                          style: TextStyle(fontSize: 12.5, height: 1.4, color: AppCultureColors.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (stop.artifacts.isNotEmpty) ...[
             const SizedBox(height: 20),
             const Text('Hiện vật', style: _bodyStrong),
