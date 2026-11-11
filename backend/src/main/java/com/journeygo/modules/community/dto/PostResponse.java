@@ -22,6 +22,9 @@ public record PostResponse(
         Long journeyId,
         String destinationName,
         String tourTitle,
+        @io.swagger.v3.oas.annotations.media.Schema(description =
+                "Người viết đã đặt vé hoặc đi tour được gắn (chỉ có ở API kiểm duyệt; null khi không gắn tour)")
+        Boolean authorJoinedTour,
         PostStatus status,
         String moderationNote,
         Integer likesCount,

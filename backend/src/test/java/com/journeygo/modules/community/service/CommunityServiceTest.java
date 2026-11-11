@@ -5,6 +5,10 @@ import com.journeygo.modules.community.entity.*;
 import com.journeygo.modules.community.entity.enums.*;
 import com.journeygo.modules.community.repository.*;
 import com.journeygo.modules.destination.repository.DestinationRepository;
+import com.journeygo.modules.booking.repository.BookingRepository;
+import com.journeygo.modules.journey.entity.Journey;
+import com.journeygo.modules.journey.repository.JourneyRepository;
+import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
@@ -56,6 +60,12 @@ class CommunityServiceTest {
 
     @Mock
     private TourRepository tourRepository;
+    @Mock
+    private JourneyRepository journeyRepository;
+    @Mock
+    private BookingRepository bookingRepository;
+    @Mock
+    private CommentReportRepository commentReportRepository;
 
     /** Publisher thật với ApplicationEventPublisher giả: thông báo được tạo nhưng không gửi đi đâu. */
     private final ApplicationEventPublisher eventPublisher = org.mockito.Mockito.mock(ApplicationEventPublisher.class);
@@ -97,6 +107,7 @@ class CommunityServiceTest {
     @DisplayName("Tạo bài viết mới ở chế độ Nháp (DRAFT)")
     void testCreatePost_Draft() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(sampleUser));
+        when(tourRepository.findById(10L)).thenReturn(Optional.of(Tour.builder().tourId(10L).approved(true).build()));
         when(postRepository.save(any(CommunityPost.class))).thenAnswer(invocation -> {
             CommunityPost p = invocation.getArgument(0);
             p.setId(201L);
@@ -118,7 +129,43 @@ class CommunityServiceTest {
         assertNotNull(res);
         assertEquals(201L, res.id());
         assertEquals(PostStatus.DRAFT, res.status());
-        verify(postRepository).save(argThat(p -> p.getStatus() == PostStatus.DRAFT && p.getMediaList().size() == 1));
+        // Bài mới chỉ gắn tour: destinationId trong request bị bỏ qua
+        verify(postRepository).save(argThat(p -> p.getStatus() == PostStatus.DRAFT && p.getMediaList().size() == 1
+                && Long.valueOf(10L).equals(p.getTourId()) && p.getDestinationId() == null));
+    }
+
+    @Test
+    @DisplayName("Không cho gắn tour không tồn tại hoặc chưa mở bán")
+    void testCreatePost_RejectsInvalidTour() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(sampleUser));
+        when(tourRepository.findById(10L)).thenReturn(Optional.empty());
+        when(tourRepository.findById(11L)).thenReturn(Optional.of(Tour.builder().tourId(11L).approved(false).build()));
+
+        var missing = new CreatePostRequest("T", "N", 10L, null, null, List.of(), false);
+        var unpublished = new CreatePostRequest("T", "N", 11L, null, null, List.of(), false);
+
+        assertEquals("POST-TOUR-NOT-FOUND",
+                assertThrows(BusinessException.class, () -> communityService.createPost(1L, missing)).getCode());
+        assertEquals("POST-TOUR-NOT-PUBLISHED",
+                assertThrows(BusinessException.class, () -> communityService.createPost(1L, unpublished)).getCode());
+        verify(postRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Chỉ cho gắn hành trình của chính mình và đúng tour đã chọn")
+    void testCreatePost_RejectsForeignJourney() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(sampleUser));
+        when(tourRepository.findById(10L)).thenReturn(Optional.of(Tour.builder().tourId(10L).approved(true).build()));
+        when(journeyRepository.findById(5L)).thenReturn(Optional.of(Journey.builder().id(5L).userId(2L).tourId(10L).build()));
+        when(journeyRepository.findById(6L)).thenReturn(Optional.of(Journey.builder().id(6L).userId(1L).tourId(99L).build()));
+
+        var foreign = new CreatePostRequest("T", "N", 10L, null, 5L, List.of(), false);
+        var otherTour = new CreatePostRequest("T", "N", 10L, null, 6L, List.of(), false);
+
+        assertEquals("POST-JOURNEY-FORBIDDEN",
+                assertThrows(BusinessException.class, () -> communityService.createPost(1L, foreign)).getCode());
+        assertEquals("POST-JOURNEY-MISMATCH",
+                assertThrows(BusinessException.class, () -> communityService.createPost(1L, otherTour)).getCode());
     }
 
     @Test
