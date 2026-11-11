@@ -31,7 +31,6 @@ public final class PartnerProfileFields {
     public static final String TAX_CODE = "taxCode";
     public static final String BUSINESS_REGISTRATION_INFO = "businessRegistrationInfo";
     public static final String PROVINCE = "province";
-    public static final String DISTRICT = "district";
     public static final String WARD = "ward";
     public static final String ADDRESS_DETAIL = "addressDetail";
     public static final String BUSINESS_SCOPE = "businessScope";
@@ -49,8 +48,7 @@ public final class PartnerProfileFields {
         LABELS.put(BUSINESS_NAME, "Tên doanh nghiệp / Cơ sở");
         LABELS.put(TAX_CODE, "Mã số thuế");
         LABELS.put(BUSINESS_REGISTRATION_INFO, "Thông tin đăng ký kinh doanh");
-        LABELS.put(PROVINCE, "Tỉnh / Thành");
-        LABELS.put(DISTRICT, "Quận / Huyện");
+        LABELS.put(PROVINCE, "Tỉnh / Thành phố");
         LABELS.put(WARD, "Phường / Xã");
         LABELS.put(ADDRESS_DETAIL, "Địa chỉ trụ sở");
         LABELS.put(BUSINESS_SCOPE, "Phạm vi hoạt động");
@@ -85,7 +83,6 @@ public final class PartnerProfileFields {
         map.put(TAX_CODE, app.getTaxCode());
         map.put(BUSINESS_REGISTRATION_INFO, app.getBusinessRegistrationInfo());
         map.put(PROVINCE, app.getProvince());
-        map.put(DISTRICT, app.getDistrict());
         map.put(WARD, app.getWard());
         map.put(ADDRESS_DETAIL, app.getAddressDetail());
         map.put(BUSINESS_SCOPE, app.getBusinessScope());
@@ -112,7 +109,6 @@ public final class PartnerProfileFields {
         putIfPresent(map, TAX_CODE, req.taxCode());
         putIfPresent(map, BUSINESS_REGISTRATION_INFO, req.businessRegistrationInfo());
         putIfPresent(map, PROVINCE, req.province());
-        putIfPresent(map, DISTRICT, req.district());
         putIfPresent(map, WARD, req.ward());
         putIfPresent(map, ADDRESS_DETAIL, req.addressDetail());
         putIfPresent(map, BUSINESS_SCOPE, req.businessScope());
