@@ -1,5 +1,6 @@
 package com.journeygo.modules.journey.service;
 
+import com.journeygo.modules.booking.service.BookingService;
 import com.journeygo.modules.experience.entity.enums.CheckInVerificationMethod;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.gamification.entity.Badge;
@@ -52,6 +53,9 @@ class JourneyServiceTest {
 
     @Mock
     private GamificationService gamificationService;
+
+    @Mock
+    private BookingService bookingService;
 
     @InjectMocks
     private JourneyService journeyService;

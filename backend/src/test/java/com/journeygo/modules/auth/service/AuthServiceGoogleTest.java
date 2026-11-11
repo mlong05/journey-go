@@ -56,6 +56,10 @@ class AuthServiceGoogleTest {
     @Mock
     private LoginRateLimiterService loginRateLimiterService;
 
+    /** Phát sự kiện "vừa đăng nhập/đăng ký" (VD: đưa lời mời tour vào thông báo). */
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private AuthService authService;
 
