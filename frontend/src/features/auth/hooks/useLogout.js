@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { authService } from "@/features/auth/services/authService";
 import { ROUTES } from "@/constants/routes";
 import { STORAGE_KEYS } from "@/constants";
+import { disconnectRealtime } from "@/services/realtimeService";
 
 export function useLogout() {
   const router = useRouter();
@@ -54,7 +55,10 @@ export function useLogout() {
           "Dữ liệu phiên làm việc của bạn đã được bảo vệ an toàn. Hẹn gặp lại bạn trên các hành trình di sản tiếp theo!",
       });
     } finally {
-      // 4. Xóa sạch mọi session và token trong localStorage
+      // 4. Ngắt kết nối chat tức thời (WebSocket) của tài khoản cũ
+      disconnectRealtime();
+
+      // 5. Xóa sạch mọi session và token trong localStorage
       if (typeof window !== "undefined") {
         localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN || "jg_access_token");
         localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN || "jg_refresh_token");
@@ -69,7 +73,7 @@ export function useLogout() {
         window.dispatchEvent(new Event("storage"));
       }
 
-      // 5. Tự động điều hướng về trang đăng nhập sau 1s (reload sạch để không vướng state cũ)
+      // 6. Tự động điều hướng về trang đăng nhập sau 1s (reload sạch để không vướng state cũ)
       setTimeout(() => {
         if (typeof window !== "undefined") {
           window.location.href = ROUTES.LOGIN || "/auth";
