@@ -43,6 +43,12 @@ class JourneyMap extends StatefulWidget {
   /// Đường đi theo mặt đường khi đang chỉ đường (phần còn phải đi); null khi không chỉ đường.
   final List<LatLng>? navRoute;
 
+  /// Đoạn đường đã đi qua khi dẫn đường (vẽ mờ); null khi không chỉ đường.
+  final List<LatLng>? navTraveled;
+
+  /// Đi bộ: vẽ tuyến bằng nét chấm như dấu chân.
+  final bool navWalk;
+
   /// Du khách tự kéo / phóng bản đồ (để ngừng bám theo vị trí khi dẫn đường).
   final VoidCallback? onUserGesture;
 
@@ -58,6 +64,8 @@ class JourneyMap extends StatefulWidget {
     required this.fitPadding,
     this.onStopTap,
     this.navRoute,
+    this.navTraveled,
+    this.navWalk = false,
     this.onUserGesture,
     this.checkInRadiusMeters = 100,
   });
@@ -218,8 +226,21 @@ class JourneyMapState extends State<JourneyMap> {
           ]),
         if (navRoute != null && navRoute.length >= 2)
           PolylineLayer(polylines: [
-            Polyline(points: navRoute, strokeWidth: 10, color: Colors.white),
-            Polyline(points: navRoute, strokeWidth: 6.5, color: AppCultureColors.oceanBlue),
+            if ((widget.navTraveled?.length ?? 0) >= 2)
+              Polyline(
+                points: widget.navTraveled!,
+                strokeWidth: 5,
+                color: AppCultureColors.textLight.withValues(alpha: 0.7),
+              ),
+            Polyline(points: navRoute, strokeWidth: widget.navWalk ? 9 : 11, color: Colors.white),
+            widget.navWalk
+                ? Polyline(
+                    points: navRoute,
+                    strokeWidth: 6,
+                    color: AppCultureColors.heritageJade,
+                    pattern: const StrokePattern.dotted(spacingFactor: 1.6),
+                  )
+                : Polyline(points: navRoute, strokeWidth: 7, color: AppCultureColors.heritageJade),
           ])
         else if (user != null && current.isNotEmpty)
           PolylineLayer(polylines: [

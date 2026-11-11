@@ -104,6 +104,45 @@ class TourArtifact {
       );
 }
 
+/// Nội dung văn hoá của điểm dừng, chỉ có sau khi check-in: `GET /journeys/{id}/destinations/{stopId}/culture`.
+class StopCulture {
+  final int stopId;
+  final int sequenceOrder;
+  final String name;
+  final String? shortDescription;
+  final String? imageUrl;
+  final String? videoUrl;
+  final String? culturalContent;
+  final List<String> culturalImages;
+  final List<TourArtifact> artifacts;
+
+  const StopCulture({
+    required this.stopId,
+    required this.sequenceOrder,
+    required this.name,
+    this.shortDescription,
+    this.imageUrl,
+    this.videoUrl,
+    this.culturalContent,
+    this.culturalImages = const [],
+    this.artifacts = const [],
+  });
+
+  factory StopCulture.fromJson(Map<String, dynamic> json) => StopCulture(
+        stopId: _asInt(json['stopId']),
+        sequenceOrder: _asInt(json['sequenceOrder']),
+        name: json['name']?.toString() ?? '',
+        shortDescription: _text(json['shortDescription']),
+        imageUrl: _url(json['imageUrl']),
+        videoUrl: _url(json['videoUrl']),
+        culturalContent: _text(json['culturalContent']),
+        culturalImages: _urls(json['culturalImages']),
+        artifacts: _maps(json['artifacts']).map(TourArtifact.fromJson).toList(),
+      );
+
+  bool get isEmpty => culturalContent == null && culturalImages.isEmpty && artifacts.isEmpty && videoUrl == null;
+}
+
 /// Hoạt động thực địa tại điểm dừng (tên, thời lượng, điểm).
 class TourActivity {
   final String name;
@@ -147,6 +186,11 @@ class TourStopModel {
   final double? longitude;
   final int maxPoints;
 
+  /// API công khai không trả nội dung văn hoá (chỉ mở sau check-in), chỉ báo trước số lượng.
+  final bool hasCulturalStory;
+  final int culturalImageCount;
+  final int artifactCount;
+
   const TourStopModel({
     required this.id,
     required this.sequenceOrder,
@@ -163,6 +207,9 @@ class TourStopModel {
     this.latitude,
     this.longitude,
     this.maxPoints = 0,
+    this.hasCulturalStory = false,
+    this.culturalImageCount = 0,
+    this.artifactCount = 0,
   });
 
   factory TourStopModel.fromJson(Map<String, dynamic> json) => TourStopModel(
@@ -181,12 +228,28 @@ class TourStopModel {
         latitude: _asDoubleOrNull(json['latitude']),
         longitude: _asDoubleOrNull(json['longitude']),
         maxPoints: _asInt(json['maxPoints']),
+        hasCulturalStory: json['hasCulturalStory'] == true || _text(json['culturalContent']) != null,
+        culturalImageCount: _asInt(json['culturalImageCount']),
+        artifactCount: _asInt(json['artifactCount']),
       );
 
   bool get hasLocation => latitude != null && longitude != null;
 
   bool get hasCulture =>
-      culturalContent != null || culturalImages.isNotEmpty || artifacts.isNotEmpty || videoUrl != null;
+      hasCulturalStory ||
+      culturalImageCount > 0 ||
+      artifactCount > 0 ||
+      culturalContent != null ||
+      culturalImages.isNotEmpty ||
+      artifacts.isNotEmpty ||
+      videoUrl != null;
+
+  /// Số hiện vật / ảnh tư liệu (ưu tiên số đếm từ API công khai).
+  int get artifactTotal => artifactCount > 0 ? artifactCount : artifacts.length;
+  int get culturalImageTotal => culturalImageCount > 0 ? culturalImageCount : culturalImages.length;
+
+  /// Số thử thách tại điểm: một câu đố (nếu có câu hỏi) + các hoạt động thực địa.
+  int get challengeCount => (quizCount > 0 ? 1 : 0) + activities.length;
 
   /// Dùng lại bản đồ lộ trình sẵn có (vốn nhận danh sách điểm đến).
   TourDestinationModel toMapPoint() => TourDestinationModel(
