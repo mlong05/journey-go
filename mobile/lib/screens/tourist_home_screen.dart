@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/constants/app_colors.dart';
 import '../core/models/auth_models.dart';
 import '../core/models/notification_model.dart';
+import '../core/services/notification_alerts.dart';
 import '../core/services/notification_service.dart';
 import 'journey/journey_launcher.dart';
 import 'modals/notification_dialog.dart';
@@ -53,8 +54,15 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
     // Thông báo thời gian thực: chạy khi app đang mở, hiện banner khi có tin mới
     WidgetsBinding.instance.addObserver(this);
     NotificationCenter.instance.start();
-    _incomingSub = NotificationCenter.instance.incoming.listen((n) {
-      if (mounted) showIncomingNotification(context, n);
+    // Mỗi thông báo mới: âm thanh + rung qua thông báo hệ thống; không có quyền thì rung và hiện banner trong app
+    final alerts = NotificationAlerts.instance;
+    alerts.onOpen = (n) {
+      if (mounted) openNotificationTarget(Navigator.of(context), n);
+    };
+    alerts.init();
+    _incomingSub = NotificationCenter.instance.incoming.listen((n) async {
+      final shownBySystem = await alerts.alert(n);
+      if (!shownBySystem && mounted) showIncomingNotification(context, n);
     });
   }
 
