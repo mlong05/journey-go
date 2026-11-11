@@ -273,7 +273,6 @@ public class PartnerApplicationService {
         application.setSignatureDocumentUrl(trimToNull(request.signatureDocumentUrl()));
         application.setBusinessRegistrationUrl(trimToNull(request.businessRegistrationUrl()));
         application.setProvince(trimToNull(request.province()));
-        application.setDistrict(trimToNull(request.district()));
         application.setWard(trimToNull(request.ward()));
         application.setAddressDetail(trimToNull(request.addressDetail()));
         application.setBusinessScope(trimToNull(request.businessScope()));
@@ -323,7 +322,6 @@ public class PartnerApplicationService {
         application.setSignatureDocumentUrl(trimToNull(request.signatureDocumentUrl()));
         application.setBusinessRegistrationUrl(trimToNull(request.businessRegistrationUrl()));
         application.setProvince(trimToNull(request.province()));
-        application.setDistrict(trimToNull(request.district()));
         application.setWard(trimToNull(request.ward()));
         application.setAddressDetail(trimToNull(request.addressDetail()));
         application.setBusinessScope(trimToNull(request.businessScope()));
@@ -439,12 +437,9 @@ public class PartnerApplicationService {
             }
         }
 
-        // Địa chỉ trụ sở
+        // Địa chỉ trụ sở — mô hình hành chính 2 cấp mới: Tỉnh/Thành phố → Phường/Xã
         if (a.getProvince() == null || a.getProvince().isBlank()) {
-            errors.put("province", "Tỉnh/Thành không được để trống");
-        }
-        if (a.getDistrict() == null || a.getDistrict().isBlank()) {
-            errors.put("district", "Quận/Huyện không được để trống");
+            errors.put("province", "Tỉnh/Thành phố không được để trống");
         }
         if (a.getWard() == null || a.getWard().isBlank()) {
             errors.put("ward", "Phường/Xã không được để trống");
