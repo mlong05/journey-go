@@ -7,6 +7,7 @@ import '../../core/services/notification_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/forum_service.dart';
+import '../common/live_time.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
 import 'compose_post_screen.dart';
 import 'forum_widgets.dart';
@@ -180,6 +181,46 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  /// Nhấn giữ bình luận của người khác: báo cáo vi phạm.
+  Future<void> _reportComment(ForumComment comment) async {
+    final result = await askReportReason(context);
+    if (result == null || !mounted) return;
+    try {
+      await _service.reportComment(comment.id, result.reason, description: result.description);
+      if (mounted) showForumSnack(context, 'Đã báo cáo bình luận. Cảm ơn bạn đã giúp cộng đồng.');
+    } on ApiException catch (e) {
+      if (mounted) showForumSnack(context, e.message);
+    }
+  }
+
+  Future<void> _commentMenu(ForumComment comment) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.flag_outlined, color: AppCultureColors.error),
+              title: const Text('Báo cáo bình luận'),
+              subtitle: const Text('Spam, ngôn từ xúc phạm, thông tin sai lệch…'),
+              onTap: () => Navigator.of(ctx).pop('report'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.close_rounded),
+              title: const Text('Đóng'),
+              onTap: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == 'report' && mounted) await _reportComment(comment);
+  }
+
   Future<void> _report() async {
     final result = await askReportReason(context);
     if (result == null || !mounted) return;
@@ -311,11 +352,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       _post.authorName,
                       style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
                     ),
-                    Text(
-                      [timeAgo(_post.createdAt), if (_post.placeLine != null) _post.placeLine!]
-                          .where((e) => e.isNotEmpty)
-                          .join(' • '),
-                      style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                    LiveTime(
+                      builder: (_) => Text(
+                        [timeAgo(_post.createdAt), if (_post.placeLine != null) _post.placeLine!]
+                            .where((e) => e.isNotEmpty)
+                            .join(' • '),
+                        style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                      ),
                     ),
                   ],
                 ),
@@ -508,7 +551,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ForumAvatar(name: c.authorName, url: c.authorAvatarUrl, size: 34),
           const SizedBox(width: 10),
           Expanded(
-            child: Container(
+            child: GestureDetector(
+              // Bình luận của người khác: nhấn giữ để báo cáo
+              onLongPress: mine || _myUserId == null ? null : () => _commentMenu(c),
+              child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -526,9 +572,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                         ),
                       ),
-                      Text(
-                        timeAgo(c.createdAt),
-                        style: const TextStyle(fontSize: 11, color: AppCultureColors.textLight),
+                      LiveTime(
+                        builder: (_) => Text(
+                          timeAgo(c.createdAt),
+                          style: const TextStyle(fontSize: 11, color: AppCultureColors.textLight),
+                        ),
                       ),
                       if (mine)
                         InkWell(
@@ -545,6 +593,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   const SizedBox(height: 4),
                   Text(c.content, style: const TextStyle(fontSize: 13.5, height: 1.45)),
                 ],
+              ),
               ),
             ),
           ),
