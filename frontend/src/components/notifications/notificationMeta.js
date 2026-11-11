@@ -4,6 +4,7 @@ import {
   Bell,
   CircleAlert,
   ClipboardCheck,
+  MessageCircle,
   MessagesSquare,
   Ticket,
   Undo2,
@@ -23,6 +24,7 @@ export const CATEGORY_META = {
   REJECTED: { icon: CircleAlert, tone: "bg-rose-50 text-rose-600 ring-rose-100", label: "Cần xử lý" },
   BOOKING: { icon: Ticket, tone: "bg-teal-50 text-teal-600 ring-teal-100", label: "Đặt chỗ" },
   REWARD: { icon: Award, tone: "bg-amber-50 text-amber-600 ring-amber-100", label: "Phần thưởng" },
+  CHAT: { icon: MessageCircle, tone: "bg-violet-50 text-violet-600 ring-violet-100", label: "Tin nhắn" },
 };
 
 const FALLBACK = { icon: Bell, tone: "bg-slate-100 text-slate-600 ring-slate-200", label: "Thông báo" };
