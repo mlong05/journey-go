@@ -34,7 +34,7 @@ export default function PartnerRegisterSuccessPage() {
           </div>
 
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-            <Mail size={18} className="mt-0.5 shrink-0 text-teal-600" />
+            <Mail size={18} className="mt-0.5 shrink-0 text-emerald-600" />
             <div>
               <p className="text-xs font-bold text-slate-800">Email thông báo</p>
               <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
@@ -53,7 +53,7 @@ export default function PartnerRegisterSuccessPage() {
           </Link>
           <Link
             href={ROUTES.LOGIN}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-3 text-xs font-bold text-white transition hover:bg-teal-700"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-xs font-bold text-white transition hover:bg-emerald-800"
           >
             Đăng nhập
           </Link>
