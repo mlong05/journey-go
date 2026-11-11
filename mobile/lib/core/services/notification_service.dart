@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../models/notification_model.dart';
 import 'api_client.dart';
 import 'auth_service.dart';
+import 'realtime_service.dart';
 import 'token_storage.dart';
 
 /// Thông báo của du khách: danh sách, số chưa đọc và luồng thời gian thực (SSE).
@@ -39,6 +40,7 @@ class NotificationCenter extends ChangeNotifier {
 
   bool _running = false;
   http.Client? _client;
+  StreamSubscription<RealtimeEvent>? _realtimeSub;
 
   // ── Luồng thời gian thực ───────────────────────────────────────────────────
 
@@ -47,6 +49,7 @@ class NotificationCenter extends ChangeNotifier {
     _running = true;
     refresh();
     _loop();
+    _listenRealtime();
   }
 
   void stop() {
@@ -54,6 +57,28 @@ class NotificationCenter extends ChangeNotifier {
     _client?.close();
     _client = null;
     _setConnected(false);
+  }
+
+  /// Thông báo tới qua WebSocket/STOMP ⇒ hiện ngay trong app (bổ sung cho luồng SSE).
+  ///
+  /// Thông báo có thể tới qua CẢ hai kênh (SSE và WebSocket) ⇒ chống trùng theo `id`.
+  void _listenRealtime() {
+    _realtimeSub?.cancel();
+    _realtimeSub = RealtimeService.instance.events.listen((event) {
+      if (event.type != kRealtimeTypeNotification) return;
+      final raw = event.data['notification'];
+      if (raw is! Map<String, dynamic>) return;
+      final n = AppNotification.fromJson(raw);
+      _addIncoming(n);
+    });
+  }
+
+  void _addIncoming(AppNotification n) {
+    if (_items.any((e) => e.id == n.id)) return;
+    _items = [n, ..._items];
+    _unread += 1;
+    notifyListeners();
+    _incoming.add(n);
   }
 
   Future<void> _loop() async {
@@ -135,10 +160,7 @@ class NotificationCenter extends ChangeNotifier {
     }
     if (event == 'notification' && json is Map<String, dynamic>) {
       final n = AppNotification.fromJson(json);
-      if (_items.any((e) => e.id == n.id)) return;
-      _items = [n, ..._items];
-      notifyListeners();
-      _incoming.add(n);
+      _addIncoming(n);
     } else if (event == 'unread-count' && json is Map && json['count'] is num) {
       _unread = (json['count'] as num).toInt();
       notifyListeners();
@@ -157,6 +179,11 @@ class NotificationCenter extends ChangeNotifier {
     _loading = _items.isEmpty;
     notifyListeners();
     try {
+      // Đồng bộ lời mời tour: nếu email đăng nhập từng được gửi lời mời thì backend
+      // tạo thông báo "Bạn được mời tham gia tour". Gọi này KHÔNG chặn việc tải
+      // danh sách thông báo ⇒ không làm chậm mở trung tâm thông báo.
+      _syncPendingInvitations();
+
       final results = await Future.wait([
         ApiClient.request('GET', '/notifications?page=0&size=$_pageSize'),
         ApiClient.request('GET', '/notifications/unread-count'),
@@ -171,6 +198,45 @@ class NotificationCenter extends ChangeNotifier {
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  bool _syncingInvitations = false;
+
+  /// Đồng bộ lời mời tour đang chờ (backend tạo thông báo tương ứng nếu chưa có).
+  ///
+  /// Chạy nền: nếu backend vừa tạo thông báo lời mời mới ⇒ nạp lại danh sách.
+  Future<void> _syncPendingInvitations() async {
+    if (_syncingInvitations) return;
+    _syncingInvitations = true;
+    try {
+      final data = await ApiClient.request('GET', '/bookings/my-invitations');
+      final list = ApiClient.asList(data);
+      if (list.isEmpty) return;
+      // Có lời mời đang chờ ⇒ backend đã bảo đảm có thông báo tương ứng ⇒ nạp lại.
+      await _reloadNotifications();
+    } on ApiException catch (_) {
+      // Không có lời mời hoặc lỗi mạng ⇒ bỏ qua.
+    } finally {
+      _syncingInvitations = false;
+    }
+  }
+
+  /// Nạp lại danh sách thông báo (không đụng tới trạng thái loading).
+  Future<void> _reloadNotifications() async {
+    try {
+      final results = await Future.wait([
+        ApiClient.request('GET', '/notifications?page=0&size=$_pageSize'),
+        ApiClient.request('GET', '/notifications/unread-count'),
+      ]);
+      _items = ApiClient.asList(results[0]).map(AppNotification.fromJson).toList();
+      _hasMore = results[0] is Map && results[0]['last'] == false;
+      _page = 0;
+      final count = results[1];
+      if (count is Map && count['count'] is num) _unread = (count['count'] as num).toInt();
+      notifyListeners();
+    } on ApiException catch (_) {
+      // giữ dữ liệu cũ
     }
   }
 
@@ -217,6 +283,8 @@ class NotificationCenter extends ChangeNotifier {
   /// Đăng xuất: xoá dữ liệu của tài khoản cũ.
   void clear() {
     stop();
+    _realtimeSub?.cancel();
+    _realtimeSub = null;
     _items = const [];
     _unread = 0;
     _hasMore = false;
