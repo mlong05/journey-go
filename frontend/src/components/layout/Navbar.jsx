@@ -4,11 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ROUTES } from "@/constants/routes";
 
+/**
+ * Navbar cho các trang PUBLIC của web.
+ *
+ * ── Vì sao không có link "Chuyến đi" / "Đơn đặt của tôi" / "Hành trình"? ──
+ * Web chỉ phục vụ ADMIN / ĐỐI TÁC / MODERATOR. Toàn bộ luồng du khách
+ * (xem tour → đặt tour → thanh toán → hành trình) nằm trên ứng dụng MOBILE.
+ * ⇒ Không dẫn tới các route `/tours`, `/bookings`, `/trips`, `/journeys`
+ * vì chúng không tồn tại trên web.
+ */
 const NAV_LINKS = [
   { href: ROUTES.HOME, label: "Trang chủ" },
-  { href: ROUTES.TRIPS, label: "Chuyến đi" },
-  { href: ROUTES.BOOKINGS, label: "Đơn đặt của tôi" },
-  { href: ROUTES.JOURNEYS, label: "Hành trình" },
+  { href: ROUTES.PARTNER_PROGRAM, label: "Hợp tác đối tác" },
 ];
 
 export default function Navbar() {
