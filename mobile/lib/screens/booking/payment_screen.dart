@@ -712,9 +712,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
         //
         // ⇒ `pushReplacement` thay thế màn PaymentScreen bằng BookingDetailScreen
         // ⇒ stack sạch: không còn quay lại được màn thanh toán đã hoàn tất.
+        //
+        // ⚠️ `popToHomeOnBack: true` ⇒ bấm nút quay lại ở chi tiết đơn sẽ quay
+        // thẳng về Trang chủ.
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => BookingDetailScreen(bookingId: widget.bookingId),
+            builder: (_) => BookingDetailScreen(
+              bookingId: widget.bookingId,
+              popToHomeOnBack: true,
+            ),
           ),
         );
       },
