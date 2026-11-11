@@ -55,6 +55,9 @@ public class SecurityConfig {
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/actuator/**",
+            // WebSocket/STOMP — bắt tay (CONNECT) được xác thực riêng trong
+            // WebSocketConfig (đọc header Authorization của frame CONNECT).
+            "/ws",
             "/error"
     };
 
@@ -64,6 +67,8 @@ public class SecurityConfig {
             // Danh mục tour cho du khách: danh sách tour đã xuất bản và trang chi tiết công khai
             "/api/v1/tours/published",
             "/api/v1/tours/*/public-detail",
+            // Số chỗ còn theo ngày — du khách cần xem trước khi đặt (không cần đăng nhập).
+            "/api/v1/tours/*/availability",
             // Master data: public read, admin write
             "/api/v1/task-types",
             "/api/v1/task-types/*",
@@ -75,7 +80,11 @@ public class SecurityConfig {
             "/api/v1/gamification/badges",
             "/api/v1/gamification/vouchers",
             // Community feed & posts public read
-            "/api/v1/community/posts/**"
+            "/api/v1/community/posts/**",
+            // Xem lời mời tham gia tour (deep link trong email): token là "capability
+            // token" ngẫu nhiên 72 ký tự, chỉ người được mời mới có ⇒ cho phép
+            // xem trước khi đăng nhập. Việc XÁC NHẬN (POST) vẫn bắt buộc đăng nhập.
+            "/api/v1/bookings/invitations/*"
     };
 
 
