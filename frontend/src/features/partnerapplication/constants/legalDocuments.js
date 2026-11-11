@@ -85,7 +85,7 @@ export const PRIVACY_POLICY_SECTIONS = [
     heading: "1. Phạm vi và thông tin chúng tôi thu thập",
     paragraphs: [
       "Chính sách này áp dụng cho mọi cá nhân và tổ chức đăng ký hợp tác, ứng dụng dịch vụ hoặc liên hệ với JourneyGo thông qua website, ứng dụng di động, hotline hoặc đầu mối hỗ trợ.",
-      "Dữ liệu chúng tôi thu thập gồm: họ tên, chức vụ, số điện thoại, địa chỉ email, ảnh và tài liệu giấy tờ (giấy phép hoạt động, GPKD/hộ kinh doanh), địa chỉ trụ sở theo cấp Tỉnh/Thành – Quận/Huyện – Phường/Xã, mã số thuế, thông tin ngân hàng và phạm vi hoạt động.",
+      "Dữ liệu chúng tôi thu thập gồm: họ tên, chức vụ, số điện thoại, địa chỉ email, ảnh và tài liệu giấy tờ (giấy phép hoạt động, GPKD/hộ kinh doanh), địa chỉ trụ sở theo cấp Tỉnh/Thành phố – Phường/Xã, mã số thuế, thông tin ngân hàng và phạm vi hoạt động.",
       "Chúng tôi cũng thu thập dữ liệu kỹ thuật ở mức tối thiểu cần thiết như địa chỉ IP, loại thiết bị, trình duyệt và nhật ký tương tác để bảo đảm an toàn hệ thống.",
     ],
   },

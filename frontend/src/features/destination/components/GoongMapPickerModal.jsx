@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { X, Search, MapPin, Navigation, Check, Loader2, Layers } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { X, Search, MapPin, Navigation, Check, Loader2, Layers, Keyboard } from "lucide-react";
 import { getDevicePosition, describeGeoError } from "@/lib/geolocation";
 import { geoService } from "../services/geoService";
 
@@ -112,6 +112,10 @@ export default function GoongMapPickerModal({
   const [pickedAddress, setPickedAddress] = useState(null);
   const [addressLoading, setAddressLoading] = useState(false);
   const [addressError, setAddressError] = useState("");
+  // Tọa độ gõ tay: null = đang dùng vị trí của bản đồ. Có giá trị = người dùng đang sửa tay
+  // (dùng để vẫn chọn được checkpoint khi bản đồ Goong không tải được).
+  const [coordDraft, setCoordDraft] = useState(null);
+  const [coordError, setCoordError] = useState("");
   // Bỏ qua kết quả của lần tra cũ khi người dùng đã ghim chỗ khác
   const lookupSeqRef = useRef(0);
 
@@ -145,6 +149,9 @@ export default function GoongMapPickerModal({
 
   const placeMarker = useCallback((lat, lng) => {
     setCurrentPos({ lat, lng });
+    // Chạm bản đồ = bỏ tọa độ gõ tay (nguồn sự thật lại là bản đồ)
+    setCoordDraft(null);
+    setCoordError("");
     markerRef.current?.setLngLat([lng, lat]);
   }, []);
 
@@ -184,6 +191,8 @@ export default function GoongMapPickerModal({
       marker.on("drag", () => {
         const p = marker.getLngLat();
         setCurrentPos({ lat: p.lat, lng: p.lng });
+        setCoordDraft(null);
+        setCoordError("");
       });
       // Thả ghim xong mới tra địa chỉ (tránh gọi API liên tục khi đang kéo)
       marker.on("dragend", () => {
@@ -194,6 +203,8 @@ export default function GoongMapPickerModal({
         const { lat: cLat, lng: cLng } = e.lngLat;
         marker.setLngLat([cLng, cLat]);
         setCurrentPos({ lat: cLat, lng: cLng });
+        setCoordDraft(null);
+        setCoordError("");
         lookupAddressRef.current(cLat, cLng);
       });
       map.on("load", () => {
@@ -231,6 +242,8 @@ export default function GoongMapPickerModal({
       setPickedAddress(null);
       setAddressLoading(false);
       setAddressError("");
+      setCoordDraft(null);
+      setCoordError("");
     });
     const timer = setTimeout(initMap, 50);
     return () => {
@@ -260,6 +273,29 @@ export default function GoongMapPickerModal({
     placeMarker(lat, lng);
     mapRef.current?.flyTo({ center: [lng, lat], zoom: 17, speed: 1.4 });
   };
+
+  /**
+   * Nhập tọa độ bằng tay (dùng khi bản đồ không tải được — thiếu/sai Maptiles key).
+   * Giữ nguyên ở dạng chuỗi để người dùng gõ dấu phẩy thập phân thoải mái.
+   */
+  const handleCoordChange = (field, value) => {
+    setCoordDraft((prev) => ({ lat: prev?.lat ?? currentPos.lat, lng: prev?.lng ?? currentPos.lng, [field]: value }));
+    setCoordError("");
+  };
+
+  /** Chuẩn hoá tọa độ gõ tay → số, hoặc null nếu không hợp lệ. */
+  const parsedCoordDraft = useMemo(() => {
+    if (!coordDraft) return null;
+    const lat = Number(String(coordDraft.lat).trim().replace(",", "."));
+    const lng = Number(String(coordDraft.lng).trim().replace(",", "."));
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return { lat, lng };
+  }, [coordDraft]);
+
+  // Tọa độ dùng để xác nhận: ưu tiên giá trị gõ tay, không thì vị trí trên bản đồ.
+  const effectivePos = parsedCoordDraft ?? currentPos;
+  const canConfirm = Boolean(parsedCoordDraft) || (!loadError && !addressLoading);
 
   const handleSearch = async () => {
     const q = searchQuery.trim();
@@ -316,9 +352,10 @@ export default function GoongMapPickerModal({
   };
 
   const handleConfirm = () => {
+    const pos = parsedCoordDraft ?? currentPos;
     onSelect?.({
-      latitude: currentPos.lat.toFixed(7),
-      longitude: currentPos.lng.toFixed(7),
+      latitude: pos.lat.toFixed(7),
+      longitude: pos.lng.toFixed(7),
       address: pickedAddress,
     });
     onClose();
@@ -439,6 +476,9 @@ export default function GoongMapPickerModal({
                   Thử lại
                 </button>
               )}
+              <p className="text-[11px] font-medium text-slate-500 max-w-md mt-1">
+                Bạn vẫn có thể chọn checkpoint bằng cách nhập tọa độ thủ công ở ô bên dưới.
+              </p>
             </div>
           )}
 
@@ -491,16 +531,63 @@ export default function GoongMapPickerModal({
           </div>
         </div>
 
+        {/* Nhập tọa độ thủ công — đường dự phòng khi bản đồ Goong không tải được (thiếu/sai Maptiles key). */}
+        <div className="shrink-0 px-6 py-2.5 bg-slate-50 border-t border-slate-200">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="text-[11px] font-bold text-slate-700 inline-flex items-center gap-1.5">
+              <Keyboard size={12} className="text-slate-400" /> Nhập tọa độ thủ công
+            </span>
+            {coordDraft && (
+              <button
+                type="button"
+                onClick={() => { setCoordDraft(null); setCoordError(""); }}
+                className="text-[11px] font-bold text-slate-500 hover:text-rose-600 cursor-pointer"
+              >
+                Xoá tọa độ gõ tay
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <label className="flex-1 flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 focus-within:border-emerald-400">
+              <span className="text-[11px] font-bold text-slate-400 shrink-0">Lat</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={coordDraft ? coordDraft.lat : effectivePos.lat.toFixed(7)}
+                onChange={(e) => handleCoordChange("lat", e.target.value)}
+                placeholder="21.0285110"
+                className="w-full bg-transparent text-xs font-mono text-slate-800 outline-none min-w-0"
+              />
+            </label>
+            <label className="flex-1 flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 focus-within:border-emerald-400">
+              <span className="text-[11px] font-bold text-slate-400 shrink-0">Lng</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={coordDraft ? coordDraft.lng : effectivePos.lng.toFixed(7)}
+                onChange={(e) => handleCoordChange("lng", e.target.value)}
+                placeholder="105.8541670"
+                className="w-full bg-transparent text-xs font-mono text-slate-800 outline-none min-w-0"
+              />
+            </label>
+            {coordDraft && !parsedCoordDraft && (
+              <p className="text-[11px] font-bold text-rose-600 sm:self-center">
+                Tọa độ không hợp lệ (Lat: -90…90, Lng: -180…180)
+              </p>
+            )}
+          </div>
+        </div>
+
         {/* Tọa độ & xác nhận */}
         <div className="shrink-0 px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
             <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl font-mono shadow-2xs">
               <span className="text-slate-400 font-bold">Vĩ độ (Lat):</span>
-              <span className="font-bold text-slate-900">{currentPos.lat.toFixed(7)}</span>
+              <span className="font-bold text-slate-900">{effectivePos.lat.toFixed(7)}</span>
             </div>
             <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl font-mono shadow-2xs">
               <span className="text-slate-400 font-bold">Kinh độ (Lng):</span>
-              <span className="font-bold text-slate-900">{currentPos.lng.toFixed(7)}</span>
+              <span className="font-bold text-slate-900">{effectivePos.lng.toFixed(7)}</span>
             </div>
           </div>
           <div className="flex items-center justify-end gap-2 shrink-0">
@@ -514,7 +601,7 @@ export default function GoongMapPickerModal({
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={addressLoading || Boolean(loadError)}
+              disabled={!canConfirm}
               className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold shadow-sm inline-flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Check size={14} />

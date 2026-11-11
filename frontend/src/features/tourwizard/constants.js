@@ -19,22 +19,14 @@ export const TOUR_STATUS = {
   CHANGES_REQUESTED: { label: "Cần chỉnh sửa", cls: "bg-orange-50 text-orange-700 border-orange-200" },
   REJECTED: { label: "Bị từ chối", cls: "bg-rose-50 text-rose-700 border-rose-200" },
   PUBLISHED: { label: "Đang bán", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  PAUSED: { label: "Tạm ngừng bán", cls: "bg-slate-100 text-slate-500 border-slate-300" },
 };
 
-/** Hỏi lại trước khi tạm ngừng / mở bán lại — nút nhỏ nằm sát nút Xem nên rất dễ bấm nhầm. */
-export const saleToggleConfirm = (paused, title) => (paused
-  ? { tone: "success", icon: "check", title: "Mở bán lại tour?", subject: title || "Tour chưa đặt tên", confirmLabel: "Mở bán lại",
-      description: "Tour hiện lại cho khách đặt vé ngay và trạng thái chuyển về Đang bán." }
-  : { tone: "warning", icon: "warning", title: "Tạm ngừng bán tour?", subject: title || "Tour chưa đặt tên", confirmLabel: "Tạm ngừng bán",
-      description: "Khách không đặt được tour này nữa cho đến khi bạn mở bán lại. Vé đã bán vẫn giữ nguyên." });
-
-export const TOUR_STATUS_ORDER = ["DRAFT", "PENDING_REVIEW", "CHANGES_REQUESTED", "PUBLISHED", "PAUSED", "REJECTED"];
+export const TOUR_STATUS_ORDER = ["DRAFT", "PENDING_REVIEW", "CHANGES_REQUESTED", "PUBLISHED", "REJECTED"];
 
 /** Đối tác được sửa nội dung (bước 1, 3) ở các trạng thái này. */
 export const CONTENT_EDITABLE = ["DRAFT", "CHANGES_REQUESTED"];
 /** Đối tác được sửa giá / lịch (bước 2, 4) ở các trạng thái này (BR-05). */
-export const PRICING_EDITABLE = ["DRAFT", "CHANGES_REQUESTED", "PUBLISHED", "PAUSED"];
+export const PRICING_EDITABLE = ["DRAFT", "CHANGES_REQUESTED", "PUBLISHED"];
 
 export const GUEST_TYPES = [
   { key: "ADULT", label: "Người lớn", age: "12 tuổi trở lên" },

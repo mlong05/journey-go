@@ -8,6 +8,7 @@ import '../../core/models/tour_journey_model.dart';
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/area_service.dart';
+import '../../core/services/booking_service.dart';
 import '../../core/services/catalog_service.dart';
 import '../../core/services/destination_service.dart';
 import '../../core/services/location_service.dart';
@@ -52,8 +53,12 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
   final CatalogService _catalog = CatalogService();
   final DestinationService _destinationService = DestinationService();
   final ProgressService _progress = ProgressService();
+  final BookingService _bookingService = BookingService();
 
   List<TourModel> _tours = [];
+
+  /// Id các tour du khách ĐÃ MUA (đã thanh toán) ⇒ không hiển thị lại trên trang chủ.
+  Set<int> _ownedTourIds = const {};
 
   /// true khi đã tải hết tour (số tour theo vùng miền là chính xác).
   bool _allLoaded = false;
@@ -107,6 +112,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
       safe<List<CatalogItem>>(_catalog.getRegions, const []),
       safe<int>(_progress.getPoints, 0),
       safe<TourJourney?>(_progress.getActiveJourney, null),
+      safe<Set<int>>(_loadOwnedTourIds, const <int>{}),
     ]);
 
     if (!mounted) return;
@@ -123,11 +129,18 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
       _userPoints = results[3] as int;
       _journey = journey;
       _missions = journey == null ? const [] : ProgressService.missionsOf(journey);
+      _ownedTourIds = results[5] as Set<int>;
       _firstLoad = false;
     });
     _updateNextDistance();
     _loadJourneyImage();
     _loadArea();
+  }
+
+  /// Id các tour du khách đã mua (đã thanh toán) ⇒ loại khỏi danh sách hiển thị.
+  Future<Set<int>> _loadOwnedTourIds() async {
+    final bookings = await _bookingService.getMine();
+    return {for (final b in bookings) if (b.isPaid) b.tourId};
   }
 
   /// Ảnh cho thẻ hành trình: ảnh điểm dừng đang mở (tour 5 bước) → ảnh bìa tour.
@@ -164,11 +177,19 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
 
   // ── Các dải tour, chia từ danh sách đã tải (mới nhất trước) ────────────────
 
-  List<TourModel> _byFormat(String format) => _tours.where((t) => t.tourFormat == format).take(10).toList();
+  /// Tour ĐÃ MUA (đã thanh toán) ⇒ không hiển thị lại, không cho đặt tiếp.
+  ///
+  /// ⚠️ Vẫn giữ `_tours` gốc để dùng cho ảnh đại diện chủ đề / vùng miền.
+  List<TourModel> get _availableTours =>
+      _tours.where((t) => !_ownedTourIds.contains(t.id)).toList();
+
+  List<TourModel> _byFormat(String format) =>
+      _availableTours.where((t) => t.tourFormat == format).take(10).toList();
 
   List<TourModel> get _upcoming {
-    final list = _tours.where((t) => t.nextDepartureDate != null).toList()
-      ..sort((a, b) => a.nextDepartureDate!.compareTo(b.nextDepartureDate!));
+    final list =
+        _availableTours.where((t) => t.nextDepartureDate != null).toList()
+          ..sort((a, b) => a.nextDepartureDate!.compareTo(b.nextDepartureDate!));
     return list.take(10).toList();
   }
 
@@ -176,7 +197,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
   Map<int, int> get _regionCounts {
     if (!_allLoaded) return const {};
     final counts = <int, int>{};
-    for (final t in _tours) {
+    for (final t in _availableTours) {
       final id = t.regionId;
       if (id != null) counts[id] = (counts[id] ?? 0) + 1;
     }
@@ -324,6 +345,8 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
         block(_buildToursError())
       else if (_tours.isEmpty)
         block(_buildNoTours())
+      else if (_availableTours.isEmpty)
+        block(_buildAllOwned())
       else ...[
         if (upcoming.isNotEmpty)
           block(
@@ -411,7 +434,9 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
                 shape: const StadiumBorder(),
               ),
               child: Text(
-                _allLoaded ? 'Xem tất cả ${_tours.length} tour' : 'Xem tất cả tour',
+                _allLoaded
+                    ? 'Xem tất cả ${_availableTours.length} tour'
+                    : 'Xem tất cả tour',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
@@ -439,6 +464,19 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
       icon: Icons.luggage_rounded,
       title: 'Chưa có tour nào được mở bán',
       message: 'Các tour mới sẽ xuất hiện ở đây ngay khi được duyệt.',
+    );
+  }
+
+  /// Du khách đã mua hết các tour đang hiển thị ⇒ không còn tour nào để đặt.
+  Widget _buildAllOwned() {
+    return _messageCard(
+      icon: Icons.confirmation_number_rounded,
+      title: 'Bạn đã mua tất cả tour hiện có',
+      message: 'Xem mục "Chuyến đi" để trải nghiệm các tour đã đặt.',
+      action: TextButton(
+        onPressed: () => widget.onNavigateToTab(1),
+        child: const Text('Xem chuyến đi của tôi'),
+      ),
     );
   }
 

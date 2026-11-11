@@ -12,7 +12,14 @@ import 'tour_style.dart';
 class TourWizardDetailBody extends StatefulWidget {
   final TourDetailModel detail;
 
-  const TourWizardDetailBody({super.key, required this.detail});
+  /// Bấm nút "Chat với bên `Tên đối tác`" — mở màn chat hỗ trợ TRƯỚC khi mua tour.
+  final VoidCallback? onChatProvider;
+
+  const TourWizardDetailBody({
+    super.key,
+    required this.detail,
+    this.onChatProvider,
+  });
 
   @override
   State<TourWizardDetailBody> createState() => _TourWizardDetailBodyState();
@@ -39,7 +46,7 @@ class _TourWizardDetailBodyState extends State<TourWizardDetailBody> {
         _Gallery(images: d.images),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-          child: _Overview(detail: d),
+          child: _Overview(detail: d, onChatProvider: widget.onChatProvider),
         ),
         if (d.highlights.isNotEmpty) ...[
           const _SectionTitle('Điểm nổi bật'),
@@ -335,7 +342,8 @@ class _PhotoStrip extends StatelessWidget {
 /// Tên tour, nhãn (vùng miền, chủ đề, thời lượng, số điểm dừng), đơn vị cung cấp và phần thưởng.
 class _Overview extends StatelessWidget {
   final TourDetailModel detail;
-  const _Overview({required this.detail});
+  final VoidCallback? onChatProvider;
+  const _Overview({required this.detail, this.onChatProvider});
 
   @override
   Widget build(BuildContext context) {
@@ -372,12 +380,68 @@ class _Overview extends StatelessWidget {
               ),
             ],
           ),
+          // Chat với nhà tour — TRƯỚC khi mua tour (du khách chưa đặt vé vẫn hỏi được).
+          const SizedBox(height: 10),
+          _ProviderChatButton(
+            providerName: d.providerName!,
+            onTap: onChatProvider,
+          ),
         ],
         if (d.taskCount > 0 || d.totalPoints > 0) ...[
           const SizedBox(height: 12),
           TourRewardStrip(taskCount: d.taskCount, points: d.totalPoints, badgeCount: 0),
         ],
       ],
+    );
+  }
+}
+
+/// Nút "Chat với bên `Tên đối tác`" — mở màn chat hỗ trợ với nhà tour TRƯỚC khi mua tour.
+class _ProviderChatButton extends StatelessWidget {
+  final String providerName;
+  final VoidCallback? onTap;
+
+  const _ProviderChatButton({required this.providerName, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppCultureColors.oceanLight,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.chat_rounded,
+                size: 18,
+                color: AppCultureColors.oceanDark,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Chat với bên $providerName',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppCultureColors.oceanDark,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppCultureColors.oceanBlue,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

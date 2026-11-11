@@ -71,6 +71,15 @@ public interface ExperienceSlotRepository extends JpaRepository<ExperienceSlot, 
     int atomicReleaseSlot(@Param("slotId") Long slotId);
 
     /**
+     * Lấy các slot của nhiều Experience theo danh sách ID — tránh load toàn bảng.
+     */
+    @Query("""
+            SELECT s FROM ExperienceSlot s
+            WHERE s.experience.id IN :experienceIds
+            """)
+    List<ExperienceSlot> findByExperienceIds(@Param("experienceIds") List<Long> experienceIds);
+
+    /**
      * Lấy các slot của một Experience theo ngày — dùng khi tổng hợp slot cần giữ cho Booking.
      */
     @Query("""

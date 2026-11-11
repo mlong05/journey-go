@@ -68,12 +68,16 @@ class TourGuestPrice {
   final double price;
   final bool alwaysFree;
 
+  /// Loại khách này có chiếm 1 chỗ trong slot hay không (em bé luôn false).
+  final bool countsTowardSlot;
+
   const TourGuestPrice({
     required this.guestType,
     required this.label,
     required this.ageRange,
     required this.price,
     required this.alwaysFree,
+    this.countsTowardSlot = true,
   });
 
   factory TourGuestPrice.fromJson(Map<String, dynamic> json) => TourGuestPrice(
@@ -82,6 +86,10 @@ class TourGuestPrice {
         ageRange: json['ageRange']?.toString() ?? '',
         price: _asDoubleOrNull(json['price']) ?? 0,
         alwaysFree: json['alwaysFree'] == true,
+        // Em bé luôn miễn phí và không chiếm chỗ.
+        countsTowardSlot: json['guestType']?.toString() == 'INFANT'
+            ? false
+            : json['countsTowardSlot'] != false,
       );
 
   String get formattedPrice => alwaysFree || price <= 0 ? 'Miễn phí' : '${formatThousands(price)} đ';
@@ -277,6 +285,8 @@ class TourDetailModel {
   final int? themeId;
   final String? themeName;
   final String? providerName;
+  /// ID nhà tour — dùng để mở chat hỗ trợ trước khi mua tour.
+  final int? providerId;
   final String? description;
   final List<String> highlights;
   final List<String> images;
@@ -309,6 +319,7 @@ class TourDetailModel {
     this.themeId,
     this.themeName,
     this.providerName,
+    this.providerId,
     this.description,
     this.highlights = const [],
     this.images = const [],
@@ -345,6 +356,7 @@ class TourDetailModel {
       themeId: _refId(json['theme']),
       themeName: _refName(json['theme']),
       providerName: _text(json['providerName']),
+      providerId: json['providerId'] == null ? null : _asInt(json['providerId']),
       description: _text(json['description']),
       highlights: _texts(json['highlights']),
       images: _urls(json['images']),

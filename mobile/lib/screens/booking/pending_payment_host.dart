@@ -131,7 +131,11 @@ class _PendingPaymentHostState extends State<PendingPaymentHost> {
         if (!mounted) return;
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => BookingDetailScreen(bookingId: bookingId),
+            builder: (_) => BookingDetailScreen(
+              bookingId: bookingId,
+              // Quay lại sau khi thanh toán ⇒ về thẳng Trang chủ.
+              popToHomeOnBack: true,
+            ),
           ),
         );
       },

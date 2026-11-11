@@ -97,10 +97,44 @@ public class Booking {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /**
+     * Số slot đã giữ cho Booking này — bằng số hành khách có {@code countsTowardSlot = TRUE}.
+     *
+     * <p>Khác với bản cũ (mỗi booking giữ 1 slot), Booking nhóm giữ N slot: mỗi người
+     * đặt tour chiếm 1 slot trải nghiệm của tour (theo cấu hình "Số chỗ tối đa mỗi slot"
+     * mà đối tác thiết lập).
+     */
+    @Column(name = "slot_count", nullable = false)
+    @Builder.Default
+    private int slotCount = 1;
+
+    /**
+     * Thời điểm đã gửi nhắc nhở "sắp đến ngày trải nghiệm" — dùng để không gửi trùng.
+     */
+    @Column(name = "reminder_sent_at")
+    private Instant reminderSentAt;
+
     /** Các slot đã giữ cho Booking này — dùng để giải phóng chính xác, đúng một lần. */
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<BookingSlotHold> slotHolds = new ArrayList<>();
+
+    /**
+     * Danh sách hành khách trong Booking (đặt cho bản thân hoặc cho cả nhóm).
+     *
+     * <p>Người đặt ({@link #tourist}) cũng nằm trong danh sách này với
+     * {@code isBookingCustomer = TRUE}.
+     */
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("createdAt ASC")
+    @Builder.Default
+    private List<BookingPassenger> passengers = new ArrayList<>();
+
+    /** Khung chat hỗ trợ giữa khách đặt và đối tác sở hữu tour. */
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("createdAt ASC")
+    @Builder.Default
+    private List<BookingMessage> messages = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
@@ -154,5 +188,15 @@ public class Booking {
     /** Booking đã quá hạn thanh toán chưa. */
     public boolean isDeadlinePassed(Instant now) {
         return now != null && paymentDeadline != null && now.isAfter(paymentDeadline);
+    }
+
+    /** Booking đã trải nghiệm xong — không được thay đổi hành khách. */
+    public boolean isCompleted() {
+        return status == BookingStatus.COMPLETED;
+    }
+
+    /** Booking đã trải nghiệm xong hoặc bị hủy — không thay đổi hành khách được. */
+    public boolean isLockedForPassengerChange() {
+        return status == BookingStatus.COMPLETED || status == BookingStatus.CANCELLED;
     }
 }

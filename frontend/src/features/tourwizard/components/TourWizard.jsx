@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Check, AlertCircle, Loader2, CloudOff, CheckCirc
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useTourDraft, issuesForStep } from "../hooks/useTourDraft";
 import { providerTourService, catalogService, extractIssues } from "../services/providerTourService";
-import { WIZARD_STEPS, TOUR_STATUS, CONTENT_EDITABLE, PRICING_EDITABLE, saleToggleConfirm } from "../constants";
+import { WIZARD_STEPS, TOUR_STATUS, CONTENT_EDITABLE, PRICING_EDITABLE } from "../constants";
 import TourStatusBanner from "./TourStatusBanner";
 import BasicInfoStep from "./steps/BasicInfoStep";
 import PricingStep from "./steps/PricingStep";
@@ -105,7 +105,7 @@ export default function TourWizard({ tourId, initialStep }) {
   const status = tour?.status;
   const contentReadOnly = !CONTENT_EDITABLE.includes(status);
   const pricingReadOnly = !PRICING_EDITABLE.includes(status);
-  const isLive = status === "PUBLISHED" || status === "PAUSED";
+  const isLive = status === "PUBLISHED";
   const stepIndex = WIZARD_STEPS.findIndex((s) => s.key === step);
 
   const stepState = useMemo(() => {
@@ -297,9 +297,7 @@ export default function TourWizard({ tourId, initialStep }) {
       <div className="shrink-0 empty:hidden">
         <TourStatusBanner tour={tour} busy={busy}
           onJumpNote={(n) => goTo(n.step, n.stopIndex)}
-          onDuplicate={() => runAction(() => providerTourService.duplicate(tourId), "Đã tạo bản nháp mới")}
-          onPause={async () => { if (await confirm(saleToggleConfirm(false, tour.title))) runAction(() => providerTourService.pause(tourId), "Đã tạm ngừng bán tour"); }}
-          onResume={async () => { if (await confirm(saleToggleConfirm(true, tour.title))) runAction(() => providerTourService.resume(tourId), "Đã mở bán lại tour"); }} />
+          onDuplicate={() => runAction(() => providerTourService.duplicate(tourId), "Đã tạo bản nháp mới")} />
       </div>
       {notice && <p className="shrink-0 text-xs font-bold text-slate-700 bg-slate-100 rounded-xl px-3 py-2">{notice}</p>}
 

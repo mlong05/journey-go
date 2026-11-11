@@ -358,9 +358,6 @@ public class PartnerProfileUpdateService {
         if (newData.containsKey(PartnerProfileFields.PROVINCE)) {
             app.setProvince(newData.get(PartnerProfileFields.PROVINCE));
         }
-        if (newData.containsKey(PartnerProfileFields.DISTRICT)) {
-            app.setDistrict(newData.get(PartnerProfileFields.DISTRICT));
-        }
         if (newData.containsKey(PartnerProfileFields.WARD)) {
             app.setWard(newData.get(PartnerProfileFields.WARD));
         }

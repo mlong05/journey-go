@@ -5,6 +5,8 @@ import '../core/models/auth_models.dart';
 import '../core/models/notification_model.dart';
 import '../core/services/notification_alerts.dart';
 import '../core/services/notification_service.dart';
+import '../core/services/realtime_service.dart';
+import 'booking/invitation_deep_link_host.dart';
 import 'journey/journey_launcher.dart';
 import 'modals/notification_dialog.dart';
 import 'tabs/community_tab.dart';
@@ -20,8 +22,36 @@ class TouristHomeScreen extends StatefulWidget {
     required this.initialUser,
   });
 
+  /// Kênh yêu cầu chuyển tab từ MÀN KHÁC (VD: sau khi thanh toán xong, bấm nút
+  /// "quay lại" ở chi tiết đơn ⇒ quay về [TouristHomeScreen] và chọn tab Trang chủ).
+  ///
+  /// ⚠️ Vì `TouristHomeScreen` nằm ở gốc Navigator nên không thể `push` được;
+  /// dùng notifier để màn khác ra hiệu lệnh chuyển tab.
+  static final HomeTabRequest tabRequest = HomeTabRequest();
+
   @override
   State<TouristHomeScreen> createState() => _TouristHomeScreenState();
+}
+
+/// Yêu cầu chuyển sang một tab cụ thể của màn gốc [TouristHomeScreen].
+class HomeTabRequest extends ChangeNotifier {
+  /// Tab được yêu cầu; -1 nghĩa là chưa có yêu cầu nào đang chờ.
+  int _target = -1;
+
+  int get target => _target;
+
+  /// Màn khác yêu cầu chuyển tới [index] (0 = Trang chủ).
+  void request(int index) {
+    _target = index;
+    notifyListeners();
+  }
+
+  /// Đọc rồi xoá yêu cầu (tránh xử lý lặp lại khi rebuild).
+  int take() {
+    final value = _target;
+    _target = -1;
+    return value;
+  }
 }
 
 class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindingObserver {
@@ -37,12 +67,21 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
     _selectedTab.value = index;
   }
 
+  /// Nghe yêu cầu chuyển tab từ màn khác (VD: quay lại sau khi thanh toán).
+  void _onTabRequested() {
+    if (!mounted) return;
+    final target = TouristHomeScreen.tabRequest.take();
+    if (target < 0) return;
+    _selectTab(target);
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _incomingSub?.cancel();
     NotificationCenter.instance.stop();
     _selectedTab.dispose();
+    TouristHomeScreen.tabRequest.removeListener(_onTabRequested);
     super.dispose();
   }
 
@@ -51,9 +90,15 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
   void initState() {
     super.initState();
     _currentUser = widget.initialUser;
+    // Nghe yêu cầu chuyển tab từ màn khác (VD: nút "quay lại" sau khi thanh toán
+    // ⇒ quay về Trang chủ).
+    TouristHomeScreen.tabRequest.addListener(_onTabRequested);
     // Thông báo thời gian thực: chạy khi app đang mở, hiện banner khi có tin mới
     WidgetsBinding.instance.addObserver(this);
     NotificationCenter.instance.start();
+    // Chat tức thời (WebSocket): nhận tin nhắn mới từ nhà tour ngay khi đang mở app.
+    RealtimeService.instance.connect();
+
     // Mỗi thông báo mới: âm thanh + rung qua thông báo hệ thống; không có quyền thì rung và hiện banner trong app
     final alerts = NotificationAlerts.instance;
     alerts.onOpen = (n) {
@@ -61,8 +106,23 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
     };
     alerts.init();
     _incomingSub = NotificationCenter.instance.incoming.listen((n) async {
+      if (!mounted) return;
+      // ⚠️ Thông báo CHAT (tin nhắn từ đối tác / khách) chỉ nằm trong trung tâm
+      // "Thông báo" + tăng số chưa đọc trên chuông — KHÔNG hiện banner, không phát âm thanh
+      // (gây gián đoạn trải nghiệm). Chỉ rung nhẹ để du khách biết có tin nhắn.
+      if (isChatNotification(n)) {
+        alerts.vibrateOnly();
+        return;
+      }
       final shownBySystem = await alerts.alert(n);
       if (!shownBySystem && mounted) showIncomingNotification(context, n);
+    });
+
+    // Lời mời tham gia tour đang chờ (mở app từ deep link khi CHƯA đăng nhập)
+    // → sau khi đăng nhập xong thì mở màn xác nhận lời mời.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      openPendingInvitationIfAny(context);
     });
   }
 
@@ -71,8 +131,10 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       NotificationCenter.instance.start();
+      RealtimeService.instance.connect();
     } else if (state == AppLifecycleState.paused) {
       NotificationCenter.instance.stop();
+      RealtimeService.instance.disconnect();
     }
   }
 
