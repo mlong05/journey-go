@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../constants/api_constants.dart';
 import '../models/auth_models.dart';
 import 'api_client.dart';
+import 'server_finder.dart';
 import 'token_storage.dart';
 
 class AuthService {
@@ -22,6 +23,8 @@ class AuthService {
     Duration timeout = const Duration(seconds: 15),
   }) async {
     final baseUrl = await TokenStorage.getBaseUrl();
+    // Dò máy chủ thất bại ⇒ báo lỗi ngay, không chờ request hết hạn 15 giây.
+    if (ServerFinder.lastProbeFailed) throw Exception(ServerFinder.unreachableHint);
     final uri = Uri.parse('$baseUrl$path');
 
     final headers = <String, String>{
@@ -63,6 +66,8 @@ class AuthService {
     Duration timeout = const Duration(seconds: 15),
   }) async {
     final baseUrl = await TokenStorage.getBaseUrl();
+    // Dò máy chủ thất bại ⇒ báo lỗi ngay, không chờ request hết hạn 15 giây.
+    if (ServerFinder.lastProbeFailed) throw Exception(ServerFinder.unreachableHint);
     final uri = Uri.parse('$baseUrl$path');
 
     final headers = <String, String>{
@@ -99,6 +104,8 @@ class AuthService {
     Duration timeout = const Duration(seconds: 15),
   }) async {
     final baseUrl = await TokenStorage.getBaseUrl();
+    // Dò máy chủ thất bại ⇒ báo lỗi ngay, không chờ request hết hạn 15 giây.
+    if (ServerFinder.lastProbeFailed) throw Exception(ServerFinder.unreachableHint);
     final uri = Uri.parse('$baseUrl$path');
 
     final headers = <String, String>{

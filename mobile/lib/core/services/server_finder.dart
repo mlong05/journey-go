@@ -13,6 +13,17 @@ class ServerFinder {
 
   static Future<String>? _found;
 
+  /// `true` khi lần dò gần nhất KHÔNG địa chỉ nào trả lời.
+  /// Dùng để báo lỗi ngay (thay vì chờ request hết hạn 15 giây).
+  static bool lastProbeFailed = false;
+
+  /// Hướng dẫn hiển thị khi không tìm thấy máy chủ.
+  static const String unreachableHint =
+      'Không tìm thấy máy chủ JourneyGo.\n'
+      '• Cắm USB: chạy "adb reverse tcp:${ApiConstants.defaultPort} tcp:${ApiConstants.defaultPort}" '
+      '(hoặc mobile/run-usb.sh) rồi thử lại.\n'
+      '• Dùng Wi-Fi: điện thoại và máy tính phải cùng mạng, API_BASE_URL trong .env là IP máy tính.';
+
   /// Địa chỉ khai báo trong .env (API_BASE_URL), nếu có.
   static String? get envBaseUrl {
     final value = dotenv.maybeGet('API_BASE_URL')?.trim();
@@ -52,9 +63,11 @@ class ServerFinder {
         pending--;
         if (done.isCompleted) return;
         if (ok) {
+          lastProbeFailed = false;
           done.complete(url);
         } else if (pending == 0) {
           _found = null; // không thấy máy chủ: lần gọi sau thử lại
+          lastProbeFailed = true;
           done.complete(list.first);
         }
       });
