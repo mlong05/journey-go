@@ -99,6 +99,10 @@ class _TaskScreenState extends State<TaskScreen> {
   /// Đã đếm ngược xong (hoặc hoạt động không đếm giờ): được quét QR. Giữ nguyên khi làm lại câu hỏi.
   bool _activityDone = false;
 
+  /// Hoạt động thực địa: đã check-in tại trạm (máy chủ xác nhận đang trong bán kính).
+  /// Chỉ sau khi check-in mới được bắt đầu nhiệm vụ đếm ngược. Đổi sang trạm kế tiếp thì phải check-in lại.
+  bool _checkedIn = false;
+
   @override
   void initState() {
     super.initState();
@@ -351,7 +355,54 @@ class _TaskScreenState extends State<TaskScreen> {
 
   // ── Hoạt động thực địa (tour 5 bước) ───────────────────────────────────────
 
+  /// Check-in tại trạm: lấy GPS hiện tại, gửi lên máy chủ và dùng khoảng cách MÁY CHỦ tính để xác nhận
+  /// du khách đang trong bán kính trạm. Check-in xong mới mở khóa nút bắt đầu nhiệm vụ đếm ngược.
+  Future<void> _checkIn() async {
+    setState(() {
+      _busy = true;
+      _locationMessage = null;
+    });
+    try {
+      final position = await LocationService.currentPosition();
+      _lat = position.latitude;
+      _lng = position.longitude;
+      final content = await _service.getTask(
+        journeyId: widget.journeyId,
+        taskId: widget.taskId,
+        latitude: _lat,
+        longitude: _lng,
+      );
+      if (!mounted) return;
+      final radius = content.station?.radiusMeters ?? _task.station?.radiusMeters ?? 50;
+      final distance = content.distanceMeters ?? _liveDistance;
+      final inside = distance != null && distance <= radius;
+      setState(() {
+        _content = content;
+        _checkedIn = inside;
+      });
+      if (inside) {
+        HapticFeedback.mediumImpact();
+        showPointsBurst(context, text: 'Đã check-in!', icon: Icons.where_to_vote_rounded);
+      } else {
+        _snack(distance == null
+            ? 'Chưa xác định được vị trí của bạn. Hãy bật GPS rồi thử lại.'
+            : 'Bạn còn cách trạm ${formatDistance(distance)}. Hãy vào trong bán kính $radius m để check-in.');
+      }
+    } on LocationException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _locationMessage = e.message;
+        _locationNeedsSettings = e.needsSettings;
+      });
+    } on ApiException catch (e) {
+      if (mounted) _snack(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   /// Bắt đầu hoạt động tại checkpoint: đếm ngược theo thời gian quy định, hết giờ mới được quét QR.
+  /// Chỉ gọi được sau khi đã [_checkIn] (trạm có tọa độ).
   void _startActivity() {
     final seconds = _task.durationSeconds ?? 0;
     _activityTimer?.cancel();
@@ -482,6 +533,7 @@ class _TaskScreenState extends State<TaskScreen> {
     }
     _result = null;
     _qr = null;
+    _checkedIn = false; // trạm mới: phải tới nơi và check-in lại
     await _locateAndOpen();
   }
 
@@ -1459,7 +1511,9 @@ class _TaskScreenState extends State<TaskScreen> {
                         Text(
                           arrived
                               ? (task.qrRequired
-                                    ? 'Bấm "Bắt đầu hoạt động"'
+                                    ? (_checkedIn
+                                          ? 'Đã check-in · bấm "Bắt đầu nhiệm vụ"'
+                                          : 'Bấm "Check-in" để xác nhận đã tới nơi')
                                     : _busy
                                         ? 'Đang mở câu hỏi...'
                                         : 'Câu hỏi sẽ tự mở')
@@ -1537,12 +1591,26 @@ class _TaskScreenState extends State<TaskScreen> {
                 children: [
                   Expanded(
                     child: task.qrRequired
-                        // Hoạt động thực địa: tới checkpoint rồi bấm bắt đầu (bản debug cho bấm từ xa để thử).
-                        ? PrimaryButton(
-                            label: arrived || !kDebugMode ? 'Bắt đầu hoạt động' : 'Bắt đầu (dev, chưa tới nơi)',
-                            icon: Icons.play_arrow_rounded,
-                            onPressed: arrived || kDebugMode ? _startActivity : null,
-                          )
+                        // Hoạt động thực địa: chỉ đường tới nơi → Check-in (máy chủ xác nhận trong bán kính)
+                        // → mở khóa "Bắt đầu nhiệm vụ" (đếm ngược) → hết giờ quét QR để trả lời.
+                        ? (_checkedIn
+                            ? PrimaryButton(
+                                label: _task.durationSeconds != null && _task.durationSeconds! > 0
+                                    ? 'Bắt đầu nhiệm vụ · ${formatDuration(_task.durationSeconds!)}'
+                                    : 'Bắt đầu nhiệm vụ',
+                                icon: Icons.timer_outlined,
+                                onPressed: _startActivity,
+                              )
+                            : PrimaryButton(
+                                label: arrived
+                                    ? 'Check-in tại trạm'
+                                    : distance == null
+                                        ? 'Chưa tới trạm'
+                                        : 'Chưa tới trạm · còn ${formatDistance(distance)}',
+                                icon: arrived ? Icons.where_to_vote_rounded : Icons.lock_outline_rounded,
+                                loading: _busy,
+                                onPressed: arrived ? _checkIn : null,
+                              ))
                         : arrived
                         ? PrimaryButton(
                             label: 'Mở câu hỏi',
