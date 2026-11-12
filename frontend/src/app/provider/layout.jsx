@@ -45,10 +45,13 @@ export default function ProviderLayout({ children }) {
   // Trang Quản lý Tour & Thông tin đối tác: khóa khung 100vh, cố định header & filter,
   // chỉ phần nội dung tự cuộn (trang Thông tin đối tác còn cuộn riêng cho khối lịch sử).
   const isScrollLockedPage =
+    pathname === "/provider" ||
+    pathname === "/provider/" ||
     pathname?.startsWith("/provider/tours") ||
     pathname?.startsWith("/provider/bookings") ||
     pathname?.startsWith("/provider/support") ||
-    pathname?.startsWith("/provider/partner-info");
+    pathname?.startsWith("/provider/partner-info") ||
+    pathname?.startsWith("/provider/finance");
 
   // Danh mục điều hướng Sidebar của Đối tác
   const navMenuItems = [
