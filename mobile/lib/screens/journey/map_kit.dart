@@ -9,61 +9,47 @@ import '../../core/services/goong_map_style.dart';
 
 // Bộ phận dùng chung cho các bản đồ trải nghiệm (hành trình, dẫn đường tới trạm).
 
-// ── Nguồn ảnh bản đồ ──────────────────────────────────────────────────────────
-// Đường phố: Goong (bản đồ vector Việt Nam) khi có GOONG_MAPTILES_KEY, xem GoongMapStyle.
-// Dự phòng và ảnh vệ tinh — đã kiểm tra tại Việt Nam, không cần khóa API:
-//  - tile.openstreetmap.org bị chặn trên một số mạng (Connection refused).
-//  - CARTO trả ảnh "API KEY REQUIRED" cho yêu cầu từ ứng dụng không có khóa.
-//  - Esri World Street Map: đường phố có tên tiếng Việt; World Imagery: ảnh vệ tinh.
-const _streetUrl =
-    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
-const _satelliteUrl =
-    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-const _satelliteLabelsUrl =
-    'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
+// ── Nguồn bản đồ: chỉ dùng Goong ─────────────────────────────────────────────
+// Cần GOONG_MAPTILES_KEY trong .env (xem GoongMapStyle):
+//  - Đường phố: bản đồ vector Goong.
+//  - Vệ tinh: ảnh vệ tinh Goong (satellite.goong.io) + lớp tên địa danh của style goong_satellite.
+// Đã bỏ hẳn ảnh nền Esri (nặng, tải chậm). Trong lúc style Goong đang tải, bản đồ chỉ hiện màu nền.
 
 const mapBackground = Color(0xFFEFF3F1);
 
-/// Lớp nền: đường phố (Goong nếu đã cấu hình khóa, không thì Esri) hoặc ảnh vệ tinh Esri (kèm tên địa danh).
-List<Widget> baseTileLayers({required bool satellite}) =>
-    !satellite && GoongMapStyle.configured
-        ? const [_StreetLayer(key: ValueKey('street-goong'))]
-        : _esriLayers(satellite: satellite);
-
-List<Widget> _esriLayers({required bool satellite}) => satellite
-    ? [
-        TileLayer(
-          key: const ValueKey('satellite'),
-          urlTemplate: _satelliteUrl,
-          userAgentPackageName: 'com.journeygo.mobile',
-          maxNativeZoom: 18,
-        ),
-        TileLayer(
-          key: const ValueKey('satellite-labels'),
-          urlTemplate: _satelliteLabelsUrl,
-          userAgentPackageName: 'com.journeygo.mobile',
-          maxNativeZoom: 18,
-        ),
-      ]
-    : [
-        TileLayer(
-          key: const ValueKey('street'),
-          urlTemplate: _streetUrl,
-          userAgentPackageName: 'com.journeygo.mobile',
-          maxNativeZoom: 19,
-        ),
-      ];
-
-/// Đường phố của Goong; trong lúc tải style (hoặc khi lỗi) thì hiện ảnh nền Esri để bản đồ không trống.
-class _StreetLayer extends StatefulWidget {
-  const _StreetLayer({super.key});
-
-  @override
-  State<_StreetLayer> createState() => _StreetLayerState();
+/// Lớp nền bản đồ (Goong). Chưa có khóa Goong thì không có lớp nền — chỉ hiện màu [mapBackground].
+List<Widget> baseTileLayers({required bool satellite}) {
+  final satelliteUrl = GoongMapStyle.satelliteTileUrl;
+  if (satelliteUrl == null) {
+    debugPrint('Chưa cấu hình GOONG_MAPTILES_KEY — bản đồ không có lớp nền.');
+    return const [];
+  }
+  if (!satellite) return const [_GoongVectorLayer(key: ValueKey('street-goong'), satellite: false)];
+  return [
+    TileLayer(
+      key: const ValueKey('satellite-goong'),
+      urlTemplate: satelliteUrl,
+      userAgentPackageName: 'com.journeygo.mobile',
+      maxNativeZoom: 20,
+    ),
+    const _GoongVectorLayer(key: ValueKey('satellite-goong-labels'), satellite: true),
+  ];
 }
 
-class _StreetLayerState extends State<_StreetLayer> {
-  late final Future<Style?> _style = GoongMapStyle.street();
+/// Lớp vector Goong: bản đồ đường phố, hoặc tên địa danh + đường phủ lên ảnh vệ tinh.
+/// Style được tải một lần mỗi phiên (đã tải sẵn từ lúc mở app); trong lúc tải thì không vẽ gì.
+class _GoongVectorLayer extends StatefulWidget {
+  final bool satellite;
+
+  const _GoongVectorLayer({super.key, required this.satellite});
+
+  @override
+  State<_GoongVectorLayer> createState() => _GoongVectorLayerState();
+}
+
+class _GoongVectorLayerState extends State<_GoongVectorLayer> {
+  late final Future<Style?> _style =
+      widget.satellite ? GoongMapStyle.satelliteLabels() : GoongMapStyle.street();
 
   @override
   Widget build(BuildContext context) {
@@ -71,9 +57,9 @@ class _StreetLayerState extends State<_StreetLayer> {
       future: _style,
       builder: (context, snap) {
         final style = snap.data;
-        if (style == null) return _esriLayers(satellite: false).first;
+        if (style == null) return const SizedBox.shrink();
         return VectorTileLayer(
-          key: const ValueKey('goong-vector'),
+          key: ValueKey(widget.satellite ? 'goong-satellite-labels' : 'goong-vector'),
           theme: style.theme,
           sprites: style.sprites,
           tileProviders: style.providers,
@@ -86,30 +72,23 @@ class _StreetLayerState extends State<_StreetLayer> {
   }
 }
 
-/// Ghi nguồn bản đồ (bắt buộc theo điều khoản Goong / Esri). Đặt trong bảng trượt vì bảng che góc dưới bản đồ.
+/// Ghi nguồn bản đồ (bắt buộc theo điều khoản Goong). Đặt trong bảng trượt vì bảng che góc dưới bản đồ.
 class MapAttributionText extends StatelessWidget {
+  /// Giữ tham số để các màn hình gọi không phải đổi; nguồn bản đồ luôn là Goong.
   final bool satellite;
 
   const MapAttributionText({super.key, required this.satellite});
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: GoongMapStyle.active,
-      builder: (context, goong, _) {
-        final useGoong = goong && !satellite;
-        return GestureDetector(
-          onTap: () => launchUrl(
-            Uri.parse(useGoong ? 'https://goong.io' : 'https://www.esri.com/en-us/legal/terms/data-attributions'),
-            mode: LaunchMode.externalApplication,
-          ),
-          child: Text(
-            'Bản đồ: ${useGoong ? '© Goong' : satellite ? 'Esri, Maxar, Earthstar Geographics' : 'Esri, HERE, Garmin, OpenStreetMap'}',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 10.5, color: AppCultureColors.textLight),
-          ),
-        );
-      },
+    if (!GoongMapStyle.configured) return const SizedBox.shrink();
+    return GestureDetector(
+      onTap: () => launchUrl(Uri.parse('https://goong.io'), mode: LaunchMode.externalApplication),
+      child: const Text(
+        'Bản đồ: © Goong',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 10.5, color: AppCultureColors.textLight),
+      ),
     );
   }
 }

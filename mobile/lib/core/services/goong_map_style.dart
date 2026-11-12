@@ -9,7 +9,8 @@ import 'package:vector_tile_renderer/vector_tile_renderer.dart' as vtr;
 ///
 /// Cần khóa **Maptiles** của Goong (`GOONG_MAPTILES_KEY` trong `.env`). Khóa này khác khóa REST đang để ở
 /// backend cho chỉ đường, và phải nằm trong app nên cần giới hạn theo tên gói ứng dụng ở account.goong.io.
-/// Không có khóa hoặc tải lỗi thì [street] trả null và bản đồ dùng lại ảnh nền Esri.
+/// Không có khóa hoặc tải lỗi thì [street] trả null (bản đồ chỉ hiện màu nền; lần mở sau tải lại).
+/// [preload] tải sẵn cả 2 style ngay khi mở app để lúc mở bản đồ không phải chờ.
 class GoongMapStyle {
   GoongMapStyle._();
 
@@ -19,6 +20,7 @@ class GoongMapStyle {
   static final ValueNotifier<bool> active = ValueNotifier(false);
 
   static Future<Style?>? _street;
+  static Future<Style?>? _satelliteLabels;
 
   static String? get _key {
     try {
@@ -31,28 +33,74 @@ class GoongMapStyle {
 
   static bool get configured => _key != null;
 
-  /// Style đường phố của Goong; dùng chung cho mọi bản đồ trong app (chỉ tải một lần).
-  static Future<Style?> street() => _street ??= _load('goong_map_web');
+  /// Tải sẵn style đường phố + lớp chữ vệ tinh (chạy nền lúc mở app).
+  static void preload() {
+    if (!configured) return;
+    street();
+    satelliteLabels();
+  }
 
-  static Future<Style?> _load(String styleName) async {
+  /// Style đường phố của Goong; dùng chung cho mọi bản đồ trong app (chỉ tải một lần).
+  static Future<Style?> street() => _street ??= _load('goong_map_web', onError: () => _street = null);
+
+  /// Mẫu URL ảnh vệ tinh của Goong (lấy từ TileJSON `sources/satellite.json`), null khi chưa có khóa.
+  static String? get satelliteTileUrl {
+    final key = _key;
+    return key == null ? null : 'https://satellite.goong.io/{z}/{x}/{y}.png?api_key=$key';
+  }
+
+  /// Lớp chữ + đường của style vệ tinh Goong (`goong_satellite`), BỎ lớp ảnh raster —
+  /// ảnh vệ tinh được vẽ riêng bằng TileLayer bên dưới, lớp này phủ tên địa danh lên trên.
+  static Future<Style?> satelliteLabels() => _satelliteLabels ??= _load(
+        'goong_satellite',
+        dropRaster: true,
+        markActive: false,
+        onError: () => _satelliteLabels = null,
+      );
+
+  static Future<Style?> _load(
+    String styleName, {
+    required VoidCallback onError,
+    bool dropRaster = false,
+    bool markActive = true,
+  }) async {
     final key = _key;
     if (key == null) return null;
     try {
-      final style = await _read('$_styleBase/$styleName.json', key);
-      active.value = true;
+      final style = await _read('$_styleBase/$styleName.json', key, dropRaster: dropRaster);
+      if (markActive) active.value = true;
       return style;
     } catch (e) {
       debugPrint('Không tải được bản đồ Goong ($styleName): $e');
-      _street = null; // lần mở bản đồ sau thử lại
+      onError(); // lần mở bản đồ sau thử lại
       return null;
     }
   }
 
   /// Đọc style Mapbox GL của Goong. Không dùng StyleReader của thư viện vì nó chỉ gắn khóa vào URL có
   /// `{key}`; ở đây mọi URL của Goong (nguồn, ô bản đồ, sprite) đều được gắn `api_key` nếu còn thiếu.
-  static Future<Style> _read(String styleUrl, String key) async {
+  static Future<Style> _read(String styleUrl, String key, {bool dropRaster = false}) async {
     final json = await _getJson(_withKey(styleUrl, key));
     if (json is! Map<String, dynamic>) throw const FormatException('Style không hợp lệ');
+
+    if (dropRaster) {
+      // Bỏ nguồn + lớp raster (ảnh vệ tinh) và lớp nền: chỉ giữ chữ/đường để phủ lên ảnh.
+      final sources = json['sources'];
+      final rasterIds = <String>{};
+      if (sources is Map) {
+        sources.removeWhere((id, v) {
+          final isRaster = v is Map && (v['type'] == 'raster' || v['type'] == 'raster-dem');
+          if (isRaster) rasterIds.add(id.toString());
+          return isRaster;
+        });
+      }
+      final layers = json['layers'];
+      if (layers is List) {
+        layers.removeWhere((l) =>
+            l is Map &&
+            (l['type'] == 'raster' || l['type'] == 'background' || rasterIds.contains(l['source'])));
+      }
+    }
 
     final providers = <String, VectorTileProvider>{};
     final sources = json['sources'];
