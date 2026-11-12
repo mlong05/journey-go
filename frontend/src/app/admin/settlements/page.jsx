@@ -79,30 +79,30 @@ export default function AdminSettlementsPage() {
   return (
     // Chiếm đúng chiều cao khung chứa — trang KHÔNG cuộn theo window.
     // Chỉ vùng nội dung bên trong mới cuộn.
-    <div className="flex h-full min-h-0 flex-col gap-4">
-      {/* Header — chỉ giữ tiêu đề, bỏ mô tả thừa để tận dụng chiều cao màn hình */}
-      <div className="shrink-0 bg-white rounded-2xl px-5 py-4 border border-slate-200/90 shadow-2xs">
-        <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      {/* Header — tiêu đề và tab chung một hàng (giống trang Tài chính)
+          để nhường chiều cao cho nội dung, trang không phải cuộn. */}
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <h1 className="min-w-0 text-lg sm:text-xl font-bold text-slate-900 truncate">
           Quản lý tất toán &amp; đối soát chu kỳ
         </h1>
-      </div>
 
-      {/* Tabs */}
-      <div className="shrink-0 flex gap-1 rounded-xl border border-slate-200 bg-white p-1 w-fit">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
-              tab === t.id
-                ? "bg-slate-900 text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+        <div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 w-fit shrink-0">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                tab === t.id
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Nội dung tab — chiếm phần chiều cao còn lại, tự cuộn bên trong */}
@@ -121,6 +121,7 @@ export default function AdminSettlementsPage() {
 function SettlementOverviewTab() {
   const [settlements, setSettlements] = useState([]);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -132,6 +133,8 @@ function SettlementOverviewTab() {
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectError, setRejectError] = useState("");
+  // Tổng hợp doanh thu nền tảng — dùng cho dải số liệu và bảng theo kỳ.
+  const revenue = usePlatformRevenue();
 
   const loadSettlements = useCallback(async () => {
     setLoading(true);
@@ -140,9 +143,9 @@ function SettlementOverviewTab() {
       const data = await getAllSettlements({
         status: statusFilter || undefined,
         page,
-        size: PAGE_SIZE,
+        size: pageSize,
       });
-      const normalized = normalizePage(data, PAGE_SIZE);
+      const normalized = normalizePage(data, pageSize);
       setSettlements(normalized.content);
       setTotalPages(normalized.totalPages);
       setTotalElements(normalized.totalElements);
@@ -151,7 +154,7 @@ function SettlementOverviewTab() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, pageSize, statusFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,7 +185,8 @@ function SettlementOverviewTab() {
     setError("");
     try {
       await approveSettlement(settlement.id);
-      await loadSettlements();
+      // Duyệt xong ⇒ doanh thu nền tảng thay đổi, tải lại cả hai khối.
+      await Promise.all([loadSettlements(), revenue.load()]);
     } catch (err) {
       setError(err?.message || "Không thể duyệt đợt tất toán.");
     } finally {
@@ -236,35 +240,62 @@ function SettlementOverviewTab() {
   }, [settlements]);
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-4">
+    // Màn lớn (lg+): vừa khít khung, KHÔNG cuộn trang — chỉ 2 bảng tự cuộn bên trong.
+    // Màn nhỏ: các khối xếp dọc, cho phép cuộn cả tab.
+    <div className="h-full min-h-0 flex flex-col gap-3 overflow-y-auto lg:overflow-hidden [scrollbar-width:thin]">
       {error && <ErrorBox text={error} />}
 
-      {/* ── Doanh thu nền tảng ──────────────────────────────────────────────
-          Phần tiền nền tảng thu được sau khi tất toán cho đối tác
-          (= tổng thanh toán − tổng hoàn tiền − tổng chi trả đối tác).
-          Chỉ tính các đợt đã DUYỆT — đó là lúc tiền thực sự về ví đối tác. */}
-      <PlatformRevenuePanel />
-
-      <div className="shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Metric
-          label="Đợt đang chờ duyệt"
+      {/* ── Dải số liệu ──────────────────────────────────────────────────────
+          4 ô đầu: doanh thu nền tảng (chỉ tính các đợt đã DUYỆT — lúc tiền thực sự
+          về ví đối tác; = tổng thanh toán − hoàn tiền − chi trả đối tác).
+          3 ô sau: tình trạng các đợt trên trang danh sách đang xem. */}
+      <div className="shrink-0 grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2.5">
+        <MiniStat
+          label="Doanh thu nền tảng"
+          value={revenue.loading && !revenue.summary ? "…" : formatVND(revenue.summary?.totalPlatformRevenue)}
+          tone="emerald"
+          hint="Hoa hồng giữ lại sau khi tất toán (các đợt đã duyệt)"
+        />
+        <MiniStat
+          label="Khách đã thanh toán"
+          value={revenue.loading && !revenue.summary ? "…" : formatVND(revenue.summary?.totalGrossAmount)}
+          hint="Sau khi trừ hoàn tiền"
+        />
+        <MiniStat
+          label="Chi trả đối tác"
+          value={revenue.loading && !revenue.summary ? "…" : formatVND(revenue.summary?.totalProviderNetAmount)}
+          hint="Tổng tiền đã ghi vào ví đối tác"
+        />
+        <MiniStat
+          label="Số đợt đã duyệt"
+          value={String(revenue.summary?.approvedSettlementCount ?? 0)}
+          hint={`${revenue.periods.length} kỳ có doanh thu`}
+        />
+        <MiniStat
+          label="Đợt chờ duyệt"
           value={String(stats.pendingCount)}
           tone={stats.pendingCount > 0 ? "amber" : "slate"}
           hint="Trên trang danh sách đang xem"
         />
-        <Metric
+        <MiniStat
           label="Tiền chờ chi trả"
           value={formatVND(stats.pendingAmount)}
           tone="amber"
+          hint="Tổng tiền các đợt chờ duyệt trên trang đang xem"
         />
-        <Metric
+        <MiniStat
           label="Đã chi trả (trang này)"
           value={formatVND(stats.approvedAmount)}
           tone="emerald"
+          hint="Tổng tiền các đợt đã duyệt trên trang đang xem"
         />
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      {/* ── Hai cột: doanh thu theo kỳ (4/12) | danh sách đợt (8/12) ───────── */}
+      <div className="lg:flex-1 lg:min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3">
+      <PeriodRevenuePanel revenue={revenue} className="lg:col-span-4 h-[360px] lg:h-auto lg:min-h-0" />
+
+      <div className="lg:col-span-8 h-[560px] lg:h-auto lg:min-h-0 flex flex-col bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="shrink-0 px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <FileCheck size={16} className="text-slate-500" />
@@ -304,7 +335,7 @@ function SettlementOverviewTab() {
             <Empty icon={FileCheck} text="Chưa có đợt tất toán nào" />
           ) : (
             <div className="overflow-auto">
-              <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
+              <table className="w-full text-left text-xs border-collapse min-w-[760px]">
                 {/* Sticky header — tiêu đề cột luôn nhìn thấy khi cuộn danh sách */}
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-50 text-[11px] font-semibold text-slate-500 border-b border-slate-200">
@@ -315,12 +346,13 @@ function SettlementOverviewTab() {
                     <th className="py-2.5 px-3 text-right">Hoa hồng</th>
                     <th className="py-2.5 px-3 text-right">Đối tác nhận</th>
                     <th className="py-2.5 px-3">Trạng thái</th>
-                    <th className="py-2.5 px-4 text-right">Thao tác</th>
+                    {/* Cột thao tác ghim mép phải — nút luôn nhìn thấy khi bảng cuộn ngang */}
+                    <th className="sticky right-0 z-10 bg-slate-50 py-2.5 px-4 text-right shadow-[-1px_0_0_0_#e2e8f0]">Thao tác</th>
                   </tr>
                 </thead>
               <tbody className="divide-y divide-slate-100">
                 {settlements.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/70 align-top">
+                  <tr key={s.id} className="group hover:bg-slate-50 align-top">
                     <td className="py-2.5 px-4 font-mono font-semibold text-slate-900">
                       {s?.settlementCode ?? `#${s?.id}`}
                     </td>
@@ -347,7 +379,7 @@ function SettlementOverviewTab() {
                         </p>
                       )}
                     </td>
-                    <td className="py-2.5 px-4 text-right">
+                    <td className="sticky right-0 bg-white group-hover:bg-slate-50 py-2.5 px-4 text-right shadow-[-1px_0_0_0_#f1f5f9]">
                       <div className="flex justify-end gap-1.5">
                         <button
                           type="button"
@@ -399,8 +431,14 @@ function SettlementOverviewTab() {
             totalElements={totalElements}
             unit="đợt tất toán"
             onChange={setPage}
+            pageSize={pageSize}
+            onSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
           />
         </div>
+      </div>
       </div>
 
       {detailId && (
@@ -809,7 +847,7 @@ function SettlementCandidatesTab() {
    ══════════════════════════════════════════════════════════════════════════ */
 
 /**
- * Bảng điều khiển doanh thu nền tảng.
+ * Tổng hợp doanh thu nền tảng (hook) — dùng chung cho dải số liệu và bảng theo kỳ.
  *
  * ── Công thức ──
  *   Doanh thu nền tảng = Tổng thanh toán − Tổng hoàn tiền − Tổng chi trả đối tác
@@ -820,10 +858,10 @@ function SettlementCandidatesTab() {
  * ghi vào ví đối tác. Kỳ đang chờ duyệt (DRAFT) chưa phải doanh thu đã thu được
  * ⇒ không tính vào, tránh báo cáo số liệu không thực.
  *
- * Số liệu là TOÀN HỆ THỐNG (không phụ thuộc phân trang) — nên hiển thị ở đây thay
- * vì cộng từ `settlements` (chỉ là trang hiện tại).
+ * Số liệu là TOÀN HỆ THỐNG (không phụ thuộc phân trang) — nên lấy từ endpoint
+ * riêng thay vì cộng từ `settlements` (chỉ là trang hiện tại).
  */
-function PlatformRevenuePanel() {
+function usePlatformRevenue() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -842,134 +880,120 @@ function PlatformRevenuePanel() {
   }, []);
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) load();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   const periods = Array.isArray(summary?.periods) ? summary.periods : [];
+  return { summary, periods, loading, error, load };
+}
+
+/**
+ * Bảng doanh thu nền tảng theo kỳ — bản gọn cho cột trái (~1/3 chiều rộng).
+ *
+ * Mỗi dòng: Kỳ (kèm dòng phụ Hoàn tiền / Chi trả đối tác) | Khách thanh toán |
+ * Hoa hồng | Doanh thu nền tảng (kèm thanh quy mô so với kỳ cao nhất).
+ * Vùng bảng tự cuộn bên trong — khung ngoài không cuộn.
+ */
+function PeriodRevenuePanel({ revenue, className = "" }) {
+  const { summary, periods, loading, error, load } = revenue;
   const maxPlatform = periods.reduce(
     (max, p) => Math.max(max, Number(p?.platformRevenue ?? 0)),
     0,
   );
 
   return (
-    <div className="shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <TrendingUp size={16} className="text-sky-600" />
-          <h2 className="text-sm font-bold text-slate-900">Doanh thu nền tảng</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-slate-500">
+    <div
+      className={`flex flex-col bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden ${className}`}
+    >
+      <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <TrendingUp size={16} className="shrink-0 text-sky-600" />
+            <h2 className="text-sm font-bold text-slate-900 truncate">Doanh thu theo kỳ</h2>
+          </div>
+          <p className="mt-0.5 text-[11px] text-slate-500 truncate">
             Tính trên các đợt tất toán đã duyệt
-          </span>
-          <button
-            type="button"
-            onClick={load}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-            Làm mới
-          </button>
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={load}
+          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+          Làm mới
+        </button>
       </div>
 
-      {error ? (
-        <div className="px-5 py-4">
-          <ErrorBox text={error} />
-        </div>
-      ) : loading && !summary ? (
-        <div className="px-5 py-6 text-center text-xs text-slate-400">
-          <Loader2 size={16} className="mx-auto mb-2 animate-spin" />
-          Đang tải tổng hợp doanh thu...
-        </div>
-      ) : (
-        <div className="p-5 space-y-5">
-          {/* Ô chỉ số tổng quan */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <Metric
-              label="Doanh thu nền tảng"
-              value={formatVND(summary?.totalPlatformRevenue)}
-              tone="emerald"
-              hint="Hoa hồng giữ lại sau khi tất toán"
-            />
-            <Metric
-              label="Tổng khách đã thanh toán"
-              value={formatVND(summary?.totalGrossAmount)}
-              hint="Sau khi trừ hoàn tiền"
-            />
-            <Metric
-              label="Tổng chi trả đối tác"
-              value={formatVND(summary?.totalProviderNetAmount)}
-            />
-            <Metric
-              label="Số đợt đã duyệt"
-              value={String(summary?.approvedSettlementCount ?? 0)}
-              hint={`${periods.length} kỳ có doanh thu`}
-            />
+      <div className="flex-1 min-h-0 overflow-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+        {error ? (
+          <div className="p-4">
+            <ErrorBox text={error} />
           </div>
-
-          {/* Bảng theo kỳ — thanh ngang thể hiện quy mô doanh thu từng tháng */}
-          {periods.length === 0 ? (
-            <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
-              Chưa có đợt tất toán nào được duyệt — doanh thu nền tảng sẽ hiển thị sau khi
-              duyệt đợt tất toán đầu tiên.
-            </p>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-slate-100">
-              <table className="w-full text-left text-[11px] border-collapse">
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-slate-50 text-[10.5px] font-semibold text-slate-500 border-b border-slate-200">
-                    <th className="py-2 px-3">Kỳ doanh thu</th>
-                    <th className="py-2 px-3 text-right">Khách thanh toán</th>
-                    <th className="py-2 px-3 text-right">Hoàn tiền</th>
-                    <th className="py-2 px-3 text-right">Hoa hồng</th>
-                    <th className="py-2 px-3 text-right">Chi trả đối tác</th>
-                    <th className="py-2 px-3 text-right">Doanh thu nền tảng</th>
-                    <th className="w-40 py-2 px-3">Quy mô</th>
+        ) : loading && !summary ? (
+          <Loading />
+        ) : periods.length === 0 ? (
+          <p className="m-4 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
+            Chưa có đợt tất toán nào được duyệt — doanh thu nền tảng sẽ hiển thị sau khi
+            duyệt đợt tất toán đầu tiên.
+          </p>
+        ) : (
+          <table className="w-full text-left text-[11px] border-collapse">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-slate-50 text-[10.5px] font-semibold text-slate-500 border-b border-slate-200">
+                <th className="py-2 px-3">Kỳ</th>
+                <th className="py-2 px-3 text-right">Khách TT</th>
+                <th className="py-2 px-3 text-right">Hoa hồng</th>
+                <th className="py-2 px-3 text-right">DT nền tảng</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {periods.map((p) => {
+                const platform = Number(p?.platformRevenue ?? 0);
+                const ratio =
+                  maxPlatform > 0 ? Math.max(4, (platform / maxPlatform) * 100) : 0;
+                return (
+                  <tr key={p?.revenuePeriod} className="hover:bg-slate-50/70 align-top">
+                    <td className="py-2 px-3">
+                      <p className="font-semibold text-slate-700 whitespace-nowrap">
+                        {formatPeriod(p?.revenuePeriod)}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-400 leading-snug">
+                        Hoàn {formatVND(p?.refundAmount)} · Chi trả{" "}
+                        {formatVND(p?.providerNetAmount)}
+                      </p>
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                      {formatVND(p?.grossAmount)}
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                      {formatVND(p?.commissionAmount)}
+                    </td>
+                    <td className="py-2 px-3 text-right">
+                      <p className="font-mono font-bold text-emerald-700 whitespace-nowrap">
+                        {formatVND(platform)}
+                      </p>
+                      {/* Thanh ngang thể hiện tỷ lệ so với kỳ cao nhất */}
+                      <div className="mt-1.5 ml-auto h-1 w-full max-w-[96px] overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-emerald-400"
+                          style={{ width: `${ratio}%` }}
+                        />
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {periods.map((p) => {
-                    const platform = Number(p?.platformRevenue ?? 0);
-                    const ratio = maxPlatform > 0 ? Math.max(4, (platform / maxPlatform) * 100) : 0;
-                    return (
-                      <tr key={p?.revenuePeriod} className="hover:bg-slate-50/70">
-                        <td className="py-2 px-3 font-semibold text-slate-700">
-                          {formatPeriod(p?.revenuePeriod)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-mono text-slate-600">
-                          {formatVND(p?.grossAmount)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-mono text-slate-600">
-                          {formatVND(p?.refundAmount)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-mono text-slate-600">
-                          {formatVND(p?.commissionAmount)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-mono text-slate-600">
-                          {formatVND(p?.providerNetAmount)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">
-                          {formatVND(platform)}
-                        </td>
-                        <td className="py-2 px-3">
-                          {/* Thanh ngang thể hiện tỷ lệ so với kỳ cao nhất */}
-                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className="h-full rounded-full bg-emerald-400"
-                              style={{ width: `${ratio}%` }}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
@@ -1544,7 +1568,8 @@ function SettlementDetailModal({ settlementId, onClose }) {
    THÀNH PHẦN DÙNG CHUNG
    ══════════════════════════════════════════════════════════════════════════ */
 
-function Metric({ label, value, tone = "slate", hint }) {
+/** Ô số liệu gọn — dùng cho dải số liệu trên cùng (gợi ý hiện khi rê chuột). */
+function MiniStat({ label, value, tone = "slate", hint }) {
   const tones = {
     slate: "text-slate-900",
     emerald: "text-emerald-600",
@@ -1552,10 +1577,14 @@ function Metric({ label, value, tone = "slate", hint }) {
     rose: "text-rose-600",
   };
   return (
-    <div className="bg-white rounded-2xl px-5 py-4 border border-slate-200/85 shadow-2xs">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <div className={`text-2xl font-semibold mt-1.5 font-mono ${tones[tone]}`}>{value}</div>
-      {hint && <p className="mt-1 text-[11px] text-slate-400 leading-snug">{hint}</p>}
+    <div
+      title={hint}
+      className="min-w-0 bg-white rounded-xl px-3.5 py-2.5 border border-slate-200/85 shadow-2xs"
+    >
+      <p className="text-[11px] font-medium text-slate-500 truncate">{label}</p>
+      <div className={`mt-0.5 text-base sm:text-lg font-semibold font-mono truncate ${tones[tone]}`}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -1622,14 +1651,10 @@ function StatusPill({ status, label }) {
   );
 }
 
-function Pagination({ page, totalPages, totalElements, unit, onChange }) {
-  if (!totalPages || totalPages <= 1) {
-    return totalElements > 0 ? (
-      <div className="border-t border-slate-100 px-5 py-3 text-[11px] text-slate-500">
-        Tổng {totalElements} {unit}
-      </div>
-    ) : null;
-  }
+function Pagination({ page, totalPages, totalElements, unit, onChange, pageSize, onSizeChange }) {
+  // Luôn hiện thanh phân trang (kể cả khi chỉ có 1 trang) để thấy
+  // "Đang xem trang X / Y" và ô "Số dòng/trang" — giống trang Quản lý người dùng.
+  if (!totalElements) return null;
   return (
     <PaginationBar
       page={page}
@@ -1637,6 +1662,8 @@ function Pagination({ page, totalPages, totalElements, unit, onChange }) {
       totalElements={totalElements}
       unit={unit}
       onChange={onChange}
+      pageSize={pageSize}
+      onSizeChange={onSizeChange}
     />
   );
 }
