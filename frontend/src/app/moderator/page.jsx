@@ -1,416 +1,588 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  ShieldAlert,
-  Search,
   ArrowUpRight,
-  Compass,
-  Building2,
+  CheckCircle2,
   ChevronRight,
+  Clock,
+  Flag,
+  Gauge,
   Inbox,
   MessageSquare,
-  History,
+  PieChart,
+  RefreshCw,
 } from "lucide-react";
-import { SURFACE, TABLE, BADGE, BUTTON, INPUT } from "../admin/dashboard.tokens";
-import {
-  PageHeader,
-  StatCard,
-  Panel,
-  StackedBar,
-} from "@/components/dashboard/DashboardUI";
+import { SURFACE } from "../admin/dashboard.tokens";
+import { PageHeader, Panel } from "@/components/dashboard/DashboardUI";
 import { moderationService } from "@/features/destination";
 import { dashboardService } from "@/features/dashboard";
+import { communityModerationService } from "@/features/community/services/communityModerationService";
 import { useQueueRefresh } from "@/context/NotificationContext";
 
 /**
- * Trang Bảng Điều Khiển Ban Kiểm Định & Chuẩn Hóa Di Sản - JourneyGo
- * Đường dẫn: /moderator
- * - Redesign theo phong cách Metis: sạch, phẳng, trang nhã cho website du lịch & di sản
- * - Tích hợp trực tiếp dữ liệu hàng chờ từ moderationService
+ * Bàn làm việc tổng quan của Kiểm duyệt viên — /moderator
+ *
+ * Nguồn dữ liệu (đều là API sẵn có):
+ *  • `GET /dashboard/moderator`               → số đếm toàn hệ thống + hiệu suất 30 ngày
+ *  • `GET /moderation/tours/queue`            → hàng chờ tour (tourTitle, tourVersion, submittedAt)
+ *  • `GET /community/moderation/pending`      → bài cộng đồng chờ duyệt
+ *  • `GET /community/moderation/reports`      → báo cáo bài viết chờ xử lý
+ *  • `GET /community/moderation/comment-reports` → báo cáo bình luận chờ xử lý
+ *
+ * Bố cục khóa khung (không cuộn trang): dải 4 ô số liệu → [Hàng chờ cần xử lý | Hiệu suất + Cơ cấu].
+ * Chỉ danh sách trong "Hàng chờ cần xử lý" có thanh cuộn.
+ * Mọi chữ dài đều `truncate` + `title` để không tràn khung.
  */
-const QUICK_LINKS = [
-  { href: "/moderator/tours", label: "Thẩm định tour", icon: Compass },
-  { href: "/moderator/community", label: "Duyệt bài cộng đồng", icon: MessageSquare },
-  { href: "/moderator/history", label: "Nhật ký & lịch sử duyệt", icon: History },
-];
+
+/** Số bài / báo cáo tải về cho mỗi tab (danh sách tự cuộn bên trong). */
+const ROWS_PER_TAB = 30;
+
+/** Ngưỡng hạn xử lý (giờ) tính từ lúc gửi duyệt. */
+const SLA_WARN_HOURS = 24;
+const SLA_OVERDUE_HOURS = 48;
+
+const REPORT_REASONS = {
+  SPAM: "Spam hoặc quảng cáo",
+  INAPPROPRIATE_CONTENT: "Nội dung không phù hợp",
+  HATE_SPEECH: "Ngôn từ thù ghét",
+  FALSE_INFORMATION: "Thông tin sai sự thật",
+  COPYRIGHT_VIOLATION: "Vi phạm bản quyền",
+  OTHER: "Lý do khác",
+};
+
+const TONE_TEXT = {
+  amber: "text-amber-600",
+  rose: "text-rose-600",
+  emerald: "text-emerald-600",
+  sky: "text-sky-600",
+};
+const TONE_CHIP = {
+  amber: "bg-amber-50 text-amber-600",
+  rose: "bg-rose-50 text-rose-600",
+  emerald: "bg-emerald-50 text-emerald-600",
+  sky: "bg-sky-50 text-sky-600",
+};
+
+/* ───────────────────────────── Helpers ───────────────────────────── */
+
+function extractArray(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.content)) return payload.content;
+  return [];
+}
+
+function hoursSince(iso) {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.max(0, (Date.now() - t) / 3_600_000);
+}
+
+/** "vừa xong" · "15 phút trước" · "3 giờ trước" · "2 ngày trước" */
+function timeAgo(iso) {
+  const h = hoursSince(iso);
+  if (h == null) return "—";
+  const minutes = Math.floor(h * 60);
+  if (minutes < 1) return "vừa xong";
+  if (minutes < 60) return `${minutes} phút trước`;
+  if (h < 24) return `${Math.floor(h)} giờ trước`;
+  return `${Math.floor(h / 24)} ngày trước`;
+}
+
+function formatDateTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("vi-VN");
+}
+
+/** Hạn xử lý theo tuổi hồ sơ. */
+function slaOf(iso) {
+  const h = hoursSince(iso);
+  if (h == null) return { label: "—", cls: "bg-slate-100 text-slate-500" };
+  if (h >= SLA_OVERDUE_HOURS) return { label: "Quá hạn", cls: "bg-rose-50 text-rose-700" };
+  if (h >= SLA_WARN_HOURS) return { label: "Cần ưu tiên", cls: "bg-amber-50 text-amber-700" };
+  return { label: "Mới", cls: "bg-emerald-50 text-emerald-700" };
+}
+
+function byOldest(field) {
+  return (a, b) => new Date(a?.[field] ?? 0).getTime() - new Date(b?.[field] ?? 0).getTime();
+}
+
+function formatAvgReview(hours) {
+  if (hours == null) return "—";
+  const h = Number(hours);
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))} phút`;
+  return `${h.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ`;
+}
+
+/* ───────────────────────────── Trang ───────────────────────────── */
 
 export default function ModeratorDashboardPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [statsError, setStatsError] = useState(false);
+  const [tours, setTours] = useState([]);
+  const [posts, setPosts] = useState({ items: [], total: 0 });
+  const [postReports, setPostReports] = useState({ items: [], total: 0 });
+  const [commentReports, setCommentReports] = useState({ items: [], total: 0 });
+  const [updatedAt, setUpdatedAt] = useState(null);
+  const [tab, setTab] = useState("tours");
 
-  // Dynamic KPI Stats
-  const [kpiMetrics, setKpiMetrics] = useState({
-    pendingCount: 0,
-    pendingTrend: "Đang tải dữ liệu hàng chờ...",
-    publishedCount: 0,
-    publishedTrend: "Đang kiểm tra...",
-    revisionCount: 0,
-    revisionTrend: "Đang kiểm tra...",
-    alertsCount: 0,
-    alertsTrend: "Đang kiểm tra...",
-  });
-
-  // Dynamic Priority Queue Data
-  const [queueData, setQueueData] = useState([]);
-
-  // Thời gian thực: hồ sơ mới gửi duyệt hoặc moderator khác vừa xử lý → tải ngầm lại hàng chờ
+  // Thời gian thực: hồ sơ mới gửi duyệt hoặc moderator khác vừa xử lý → tải ngầm lại
   const [reloadKey, setReloadKey] = useState(0);
-  useQueueRefresh(
-    ["tour-review", "post-review", "post-report"],
-    () => setReloadKey((k) => k + 1),
+  useQueueRefresh(["tour-review", "post-review", "post-report"], () =>
+    setReloadKey((k) => k + 1),
   );
 
   useEffect(() => {
-    let isMounted = true;
-    async function fetchDashboardData() {
-      if (reloadKey === 0) setIsLoading(true);
-      try {
-        const [tourQueueRes, statsRes] =
-          await Promise.allSettled([
-            moderationService.getTourQueue({ size: 500 }),
-            dashboardService.getModerator(),
-          ]);
+    let alive = true;
+    async function load() {
+      if (reloadKey > 0) setRefreshing(true);
+      const empty = { items: [], total: 0 };
+      const [tourRes, statsRes, postRes, reportRes, commentRes] = await Promise.allSettled([
+        moderationService.getTourQueue({ size: 100 }),
+        dashboardService.getModerator(),
+        communityModerationService.getPendingPosts({ size: ROWS_PER_TAB }),
+        communityModerationService.getReports({ status: "PENDING", size: ROWS_PER_TAB }),
+        communityModerationService.getCommentReports({ status: "PENDING", size: ROWS_PER_TAB }),
+      ]);
+      if (!alive) return;
 
-        if (!isMounted) return;
-
-        const extractQueueArray = (res) => {
-          if (res.status !== "fulfilled") return [];
-          const val = res.value;
-          if (Array.isArray(val)) return val;
-          if (Array.isArray(val?.content)) return val.content;
-          return [];
-        };
-
-        const tourQueue = extractQueueArray(tourQueueRes);
-        const stats = statsRes.status === "fulfilled" ? statsRes.value : null;
-        if (!stats) console.error("[Moderator Dashboard] Stats error:", statsRes.reason);
-
-        // Số đếm lấy từ API thống kê (không bị giới hạn kích thước trang); hàng chờ chỉ dùng làm dự phòng
-        const totalPending = stats?.pending?.tours ?? tourQueue.length;
-
-        setKpiMetrics({
-          pendingCount: totalPending,
-          pendingTrend:
-            totalPending > 0
-              ? `${totalPending} tour chờ thẩm định`
-              : "Hàng chờ hiện đang trống",
-          publishedCount: stats?.approvedToday ?? 0,
-          publishedTrend: stats
-            ? `Đã ra ${stats.decidedToday} quyết định trong hôm nay`
-            : "Không tải được số liệu",
-          revisionCount: stats?.rejectedTotal ?? 0,
-          revisionTrend: "Hồ sơ đang chờ đối tác hiệu đính",
-          alertsCount: stats?.pendingReports ?? 0,
-          alertsTrend: stats
-            ? `Báo cáo vi phạm chờ xử lý • ${stats.pendingPosts} bài cộng đồng chờ duyệt`
-            : "Không tải được số liệu",
-        });
-
-        // Xây dựng danh sách hàng chờ ưu tiên từ API thực tế
-        const mappedTourItems = tourQueue.map((t) => {
-          const tId = t.tourId || t.id;
-          return {
-            id: tId,
-            code: `TOUR-${tId}`,
-            title: t.title || `Hành trình #${tId}`,
-            type: "tour",
-            typeLabel: "Tuyến hành trình",
-            sender: t.createdBy || "Đối tác lữ hành",
-            submittedTime: t.updatedAt
-              ? new Date(t.updatedAt).toLocaleDateString("vi-VN")
-              : "Mới cập nhật",
-            urgency: "urgent",
-            urgencyLabel: "Cần thẩm định",
-            actionHref: `/moderator/tours/${tId}`,
-            actionText: "Thẩm định tour",
-          };
-        });
-
-        setQueueData(mappedTourItems);
-
-      } catch (err) {
-        console.error("[Moderator Dashboard] Fetch error:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
+      setTours(tourRes.status === "fulfilled" ? extractArray(tourRes.value) : []);
+      if (statsRes.status === "fulfilled") {
+        setStats(statsRes.value);
+        setStatsError(false);
+      } else {
+        console.error("[Moderator Dashboard] Stats error:", statsRes.reason);
+        setStatsError(true);
       }
+      setPosts(postRes.status === "fulfilled" ? postRes.value : empty);
+      setPostReports(reportRes.status === "fulfilled" ? reportRes.value : empty);
+      setCommentReports(commentRes.status === "fulfilled" ? commentRes.value : empty);
+      setUpdatedAt(new Date());
+      setLoading(false);
+      setRefreshing(false);
     }
-    fetchDashboardData();
+    load();
     return () => {
-      isMounted = false;
+      alive = false;
     };
   }, [reloadKey]);
 
-  const kpiStats = [
+  /* ── Số liệu tổng hợp ─────────────────────────────────────────────── */
+  const sortedTours = useMemo(() => [...tours].sort(byOldest("submittedAt")), [tours]);
+  const overdueTours = useMemo(
+    () => tours.filter((t) => (hoursSince(t?.submittedAt) ?? 0) >= SLA_OVERDUE_HOURS).length,
+    [tours],
+  );
+
+  const tourCount = stats?.pending?.tours ?? tours.length;
+  const postCount = stats?.pendingPosts ?? posts.total;
+  const postReportCount = stats?.pendingReports ?? postReports.total;
+  const commentReportCount = commentReports.total;
+  const reportCount = postReportCount + commentReportCount;
+  const decidedToday = stats?.decidedToday ?? 0;
+  const approvedToday = stats?.approvedToday ?? 0;
+  const rejectedToday = Math.max(0, decidedToday - approvedToday);
+
+  const reportRows = useMemo(
+    () =>
+      [
+        ...postReports.items.map((r) => ({ ...r, kind: "post" })),
+        ...commentReports.items.map((r) => ({ ...r, kind: "comment" })),
+      ]
+        .sort(byOldest("createdAt"))
+        .slice(0, ROWS_PER_TAB),
+    [postReports.items, commentReports.items],
+  );
+
+  const kpis = [
     {
-      id: "pending",
-      title: "Hồ sơ chờ phê duyệt",
-      count: kpiMetrics.pendingCount,
-      unit: "mục",
-      trend: kpiMetrics.pendingTrend,
+      id: "tours",
+      label: "Tour chờ duyệt",
+      value: tourCount,
       icon: Clock,
       tone: "amber",
-      linkText: "Chi tiết →",
-      linkHref: "/moderator#queue",
+      href: "/moderator/tours",
+      hint: overdueTours > 0 ? `${overdueTours} quá ${SLA_OVERDUE_HOURS}h` : null,
+      hintCls: "text-rose-600 font-semibold",
     },
     {
-      id: "published",
-      title: "Đã xuất bản hôm nay",
-      count: kpiMetrics.publishedCount,
-      unit: "mục",
-      trend: kpiMetrics.publishedTrend,
+      id: "posts",
+      label: "Bài chờ duyệt",
+      value: postCount,
+      icon: MessageSquare,
+      tone: "sky",
+      href: "/moderator/community",
+      hint: null,
+    },
+    {
+      id: "reports",
+      label: "Báo cáo chờ xử lý",
+      value: reportCount,
+      icon: Flag,
+      tone: "rose",
+      href: "/moderator/community",
+      hint: reportCount > 0 ? `${postReportCount} bài · ${commentReportCount} b.luận` : null,
+      hintCls: "text-slate-500",
+    },
+    {
+      id: "today",
+      label: "Đã xử lý hôm nay",
+      value: decidedToday,
       icon: CheckCircle2,
       tone: "emerald",
-      linkText: "Chi tiết →",
-      linkHref: "/moderator/history",
-    },
-    {
-      id: "revision",
-      title: "Yêu cầu hiệu đính / Từ chối",
-      count: kpiMetrics.revisionCount,
-      unit: "mục",
-      trend: kpiMetrics.revisionTrend,
-      icon: AlertTriangle,
-      tone: "indigo",
-      linkText: "Chi tiết →",
-      linkHref: "/moderator#queue",
-    },
-    {
-      id: "alerts",
-      title: "Cảnh báo phản cảm / Sai sự thật",
-      count: kpiMetrics.alertsCount,
-      unit: "cảnh báo",
-      trend: kpiMetrics.alertsTrend,
-      icon: ShieldAlert,
-      tone: "rose",
-      linkText: "Chi tiết →",
-      linkHref: "/moderator/community",
+      href: "/moderator/history",
+      hint: decidedToday > 0 ? `${approvedToday} duyệt · ${rejectedToday} từ chối` : null,
+      hintCls: "text-slate-500",
     },
   ];
 
-  // Cơ cấu hàng chờ theo loại (tính từ dữ liệu API thật)
-  const queueSegments = [
-    { label: "Tuyến hành trình", value: queueData.length, tone: "amber" },
+  const segments = [
+    { label: "Tour", value: tourCount, bar: "bg-amber-500" },
+    { label: "Bài viết", value: postCount, bar: "bg-sky-500" },
+    { label: "Báo cáo bài viết", value: postReportCount, bar: "bg-rose-500" },
+    { label: "Báo cáo bình luận", value: commentReportCount, bar: "bg-violet-500" },
+  ];
+  const segmentTotal = segments.reduce((s, x) => s + x.value, 0);
+
+  const tabs = [
+    { id: "tours", label: "Tour", count: tourCount },
+    { id: "posts", label: "Bài viết", count: postCount },
+    { id: "reports", label: "Báo cáo", count: reportCount },
   ];
 
-  // Lọc dữ liệu theo từ khóa tìm kiếm
-  const keyword = searchQuery.toLowerCase();
-  const filteredQueue = queueData.filter((item) =>
-    (item.title || "").toLowerCase().includes(keyword) ||
-    (item.sender || "").toLowerCase().includes(keyword) ||
-    (item.code || "").toLowerCase().includes(keyword));
+  const tabMeta = {
+    tours: { shown: sortedTours.length, total: tourCount, href: "/moderator/tours", link: "Đến trang thẩm định tour" },
+    posts: { shown: posts.items.length, total: postCount, href: "/moderator/community", link: "Đến trang duyệt bài" },
+    reports: { shown: reportRows.length, total: reportCount, href: "/moderator/community", link: "Đến trang xử lý báo cáo" },
+  }[tab];
 
   return (
-    <div className={SURFACE.page}>
+    // Màn xl+: vừa khít khung, chỉ danh sách hàng chờ cuộn. Màn nhỏ: các khối xếp dọc, cho cuộn.
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto xl:overflow-hidden">
+      <div className="shrink-0">
       <PageHeader
-        eyebrow="Thẩm định"
         title="Bàn làm việc tổng quan"
-        description="Đảm bảo dữ liệu lịch sử, tọa độ thực địa và bài thuyết minh đạt chuẩn di sản Việt Nam trước khi tiếp cận du khách."
-      />
-
-      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {kpiStats.map((stat) => (
-          <StatCard
-            key={stat.id}
-            title={stat.title}
-            value={stat.count}
-            unit={stat.unit}
-            icon={stat.icon}
-            tone={stat.tone}
-            href={stat.linkHref}
-          />
-        ))}
-      </section>
-
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <Panel
-          className="lg:col-span-8"
-          title="Cơ cấu hàng chờ"
-          description="Phân bổ hồ sơ đang chờ theo loại nội dung"
-          icon={Inbox}
-          tone="indigo"
-          bodyClassName="p-5"
+        description="Theo dõi hàng chờ thẩm định tour, bài cộng đồng và báo cáo vi phạm."
+      >
+        {updatedAt && (
+          <span className="text-xs text-slate-500 whitespace-nowrap">
+            Cập nhật lúc{" "}
+            {updatedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setReloadKey((k) => k + 1)}
+          disabled={refreshing}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
         >
-          <StackedBar
-            segments={queueSegments}
-            emptyText="Hàng chờ đang trống — chưa có hồ sơ cần thẩm định."
-          />
-        </Panel>
+          <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
+          Làm mới
+        </button>
+      </PageHeader>
+      </div>
 
-        <Panel
-          className="lg:col-span-4"
-          title="Lối tắt nghiệp vụ"
-          description="Đi nhanh tới các khu vực duyệt"
-          icon={Compass}
-          tone="amber"
-          bodyClassName="p-2"
-        >
-          <ul>
-            {QUICK_LINKS.map(({ href, label, icon: LinkIcon }) => (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  <LinkIcon size={16} className="text-slate-400" />
-                  <span className="flex-1">{label}</span>
-                  <ChevronRight size={14} className="text-slate-300" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-      </section>
+      {statsError && (
+        <p className="shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Không tải được số liệu thống kê — các con số đang lấy tạm từ hàng chờ.
+        </p>
+      )}
 
-      {/* ────────────────────────────────────────────────────────
-          3. KHỐI DANH SÁCH HÀNG CHỜ ƯU TIÊN
-      ──────────────────────────────────────────────────────── */}
-      <section id="queue" className={`${SURFACE.card} overflow-hidden`}>
-        {/* Header khối */}
-        <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-900">
-                Danh sách hàng chờ ưu tiên
-              </h2>
-              <span className={`${BADGE.base} ${BADGE.warning}`}>
-                {filteredQueue.length} hồ sơ cần duyệt
+      {/* ── 1. Dải số liệu gọn: 1 thẻ chia 4 ô (2×2 trên màn nhỏ) ──────────── */}
+      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 shadow-xs">
+        {kpis.map((k) => {
+          const Icon = k.icon;
+          return (
+            <Link
+              key={k.id}
+              href={k.href}
+              className="group flex min-w-0 items-center gap-3 bg-white px-4 py-3 transition-colors hover:bg-slate-50"
+            >
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${TONE_CHIP[k.tone]}`}
+              >
+                <Icon size={16} />
               </span>
-            </div>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Các hồ sơ quan trọng cần thẩm định gấp để đồng bộ lên ứng dụng di tích
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Search size={14} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-slate-500" title={k.label}>
+                  {k.label}
+                </p>
+                <div className="flex min-w-0 items-baseline gap-2">
+                  <span
+                    className={`shrink-0 text-xl font-bold tabular-nums ${
+                      loading ? "text-slate-300" : k.value > 0 ? TONE_TEXT[k.tone] : "text-slate-900"
+                    }`}
+                  >
+                    {loading ? "…" : k.value}
+                  </span>
+                  {!loading && k.hint && (
+                    <span className={`min-w-0 truncate text-[11px] ${k.hintCls}`} title={k.hint}>
+                      {k.hint}
+                    </span>
+                  )}
+                </div>
               </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm tên nội dung, đơn vị gửi..."
-                className={INPUT.search}
-              />
+            </Link>
+          );
+        })}
+      </section>
+
+      {/* ── 2. Hàng chờ | Cột phụ ─────────────────────────────────────────── */}
+      <section className="grid grid-cols-1 gap-4 xl:flex-1 xl:min-h-0 xl:grid-cols-12 xl:grid-rows-[minmax(0,1fr)]">
+        {/* Hàng chờ cần xử lý */}
+        <div className={`${SURFACE.card} flex h-[560px] min-w-0 flex-col overflow-hidden xl:col-span-8 xl:h-auto xl:min-h-0`}>
+          <div className="flex shrink-0 flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                <Inbox size={16} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-bold text-slate-900">Hàng chờ cần xử lý</h2>
+                <p className="truncate text-xs text-slate-600">
+                  Hồ sơ cũ nhất lên đầu — ưu tiên mục quá hạn
+                </p>
+              </div>
             </div>
+            <div className="flex w-fit shrink-0 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+              {tabs.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTab(t.id)}
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                    tab === t.id
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {t.label}
+                  <span
+                    className={`rounded-full px-1.5 text-[10px] tabular-nums ${
+                      t.count > 0 ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-500"
+                    }`}
+                  >
+                    {loading ? "…" : t.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Vùng DUY NHẤT có thanh cuộn của trang */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+            {loading ? (
+              <div className="flex h-60 items-center justify-center text-xs text-slate-400">
+                <RefreshCw size={14} className="mr-2 animate-spin" />
+                Đang tải hàng chờ...
+              </div>
+            ) : tab === "tours" ? (
+              <QueueList
+                rows={sortedTours}
+                empty="Không có tour nào chờ thẩm định."
+                render={(t) => {
+                  const id = t?.tourId ?? t?.id;
+                  const version = Number(t?.tourVersion ?? 1);
+                  return (
+                    <QueueRow
+                      key={t?.reviewId ?? id}
+                      title={t?.tourTitle || t?.tour?.title || `Tour #${id}`}
+                      meta={[
+                        `TOUR-${id}`,
+                        version > 1 ? `Gửi lại · v${version}` : "Lần gửi đầu",
+                      ]}
+                      time={t?.submittedAt}
+                      href={`/moderator/tours/${id}`}
+                      action="Thẩm định"
+                    />
+                  );
+                }}
+              />
+            ) : tab === "posts" ? (
+              <QueueList
+                rows={posts.items}
+                empty="Không có bài cộng đồng nào chờ duyệt."
+                render={(p) => (
+                  <QueueRow
+                    key={p?.id}
+                    title={p?.title || p?.content || `Bài viết #${p?.id}`}
+                    meta={[
+                      p?.authorName || "Ẩn danh",
+                      p?.tourTitle ? `Tour: ${p.tourTitle}` : null,
+                    ]}
+                    time={p?.createdAt}
+                    href="/moderator/community"
+                    action="Duyệt bài"
+                  />
+                )}
+              />
+            ) : (
+              <QueueList
+                rows={reportRows}
+                empty="Không có báo cáo vi phạm nào chờ xử lý."
+                render={(r) => (
+                  <QueueRow
+                    key={`${r.kind}-${r?.id}`}
+                    badge={r.kind === "post" ? "Bài viết" : "Bình luận"}
+                    title={
+                      r.kind === "post"
+                        ? r?.postTitle || `Bài viết #${r?.postId}`
+                        : r?.commentContent || `Bình luận #${r?.commentId}`
+                    }
+                    meta={[
+                      REPORT_REASONS[r?.reason] || r?.reason || "Không rõ lý do",
+                      r.kind === "comment" && r?.postTitle ? `Trong bài: ${r.postTitle}` : null,
+                    ]}
+                    time={r?.createdAt}
+                    href="/moderator/community"
+                    action="Xử lý"
+                  />
+                )}
+              />
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-3 text-xs text-slate-600">
+            <span className="min-w-0 truncate">
+              Hiển thị {tabMeta.shown} / {tabMeta.total} mục
+            </span>
+            <Link
+              href={tabMeta.href}
+              className="inline-flex shrink-0 items-center gap-1 font-bold text-slate-600 transition-colors hover:text-slate-900"
+            >
+              {tabMeta.link}
+              <ChevronRight size={14} />
+            </Link>
           </div>
         </div>
 
-        {/* Bảng dữ liệu */}
-        <div className={SURFACE.cardTable}>
-          <table className={TABLE.base}>
-            <thead>
-              <tr className={TABLE.theadRow}>
-                <th className={TABLE.th}>Mã hồ sơ</th>
-                <th className={TABLE.th}>Tên nội dung</th>
-                <th className={TABLE.th}>Loại nội dung</th>
-                <th className={TABLE.th}>Người gửi / Đơn vị</th>
-                <th className={TABLE.th}>Thời gian gửi</th>
-                <th className={TABLE.th}>Mức độ</th>
-                <th className={`${TABLE.th} text-right`}>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className={TABLE.tbody}>
-              {filteredQueue.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className={TABLE.emptyCell}>
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
-                        <Inbox size={24} />
-                      </div>
-                      <p className="text-sm font-bold text-slate-600">
-                        {searchQuery
-                          ? "Không tìm thấy hồ sơ phù hợp với từ khóa."
-                          : "Hàng chờ ưu tiên hiện đang trống."}
-                      </p>
-                      <p className="text-xs text-slate-400 max-w-sm">
-                        {searchQuery
-                          ? "Vui lòng thử xóa từ khóa tìm kiếm hoặc chọn lại bộ lọc loại hình."
-                          : "Hiện chưa có hồ sơ nào cần phê duyệt gấp. Dữ liệu sẽ hiển thị khi kết nối máy chủ."}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredQueue.map((item) => (
-                  <tr key={item.id} className={TABLE.tr}>
-                    <td className={TABLE.td}>
-                      <span className="px-2 py-1 bg-slate-100 rounded-md border border-slate-200 font-mono text-xs">
-                        {item.code || item.id}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 max-w-xs sm:max-w-sm">
-                      <p className="font-bold text-slate-900">
-                        {item.title}
-                      </p>
-                    </td>
-                    <td className={TABLE.td}>
-                      <span className={`${BADGE.base} ${BADGE.warning}`}>
-                        <Compass size={11} />
-                        <span>{item.typeLabel || item.type}</span>
-                      </span>
-                    </td>
-                    <td className={TABLE.td}>
-                      <div className="flex items-center gap-1.5 font-semibold text-slate-700">
-                        <Building2 size={13} className="text-slate-400 flex-shrink-0" />
-                        <span>{item.sender}</span>
-                      </div>
-                    </td>
-                    <td className={TABLE.tdMuted}>
-                      <div className="flex items-center gap-1">
-                        <Clock size={12} className="text-slate-400 flex-shrink-0" />
-                        <span>{item.submittedTime}</span>
-                      </div>
-                    </td>
-                    <td className={TABLE.td}>
-                      {item.urgency === "urgent" ? (
-                        <span className={`${BADGE.base} ${BADGE.danger}`}>
-                          <span>{item.urgencyLabel || "Khẩn cấp"}</span>
-                        </span>
-                      ) : item.urgency === "warning" ? (
-                        <span className={`${BADGE.base} ${BADGE.purple}`}>
-                          <span>{item.urgencyLabel || "Cảnh báo sai lệch"}</span>
-                        </span>
-                      ) : (
-                        <span className={`${BADGE.base} ${BADGE.neutral}`}>
-                          <span>{item.urgencyLabel || "Tiêu chuẩn"}</span>
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <Link
-                        href={item.actionHref}
-                        className={BUTTON.primary}
-                      >
-                        <span>{item.actionText || "Thẩm định ngay"}</span>
-                        <ArrowUpRight size={13} />
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        {/* Cột phụ */}
+        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4 xl:min-h-0">
+          <Panel title="Hiệu suất 30 ngày" icon={Gauge} tone="emerald" bodyClassName="px-5 py-2">
+            <dl className="divide-y divide-slate-100">
+              <StatRow label="Thời gian duyệt trung bình" value={formatAvgReview(stats?.avgReviewHours)} />
+              <StatRow label="Hồ sơ đã xử lý" value={`${stats?.reviewedLast30Days ?? 0} hồ sơ`} />
+              <StatRow label="Tổng hồ sơ bị từ chối" value={`${stats?.rejectedTotal ?? 0} hồ sơ`} />
+            </dl>
+          </Panel>
 
-        {/* Chân bảng */}
-        <div className={`${SURFACE.cardFooter} flex items-center justify-between`}>
-          <span>Đang hiển thị {filteredQueue.length} hồ sơ trong hàng chờ</span>
-          <Link
-            href="/moderator/tours"
-            className="font-bold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 transition-colors"
-          >
-            <span>Đến trang thẩm định tour</span>
-            <ChevronRight size={14} />
-          </Link>
+          <Panel title="Cơ cấu hàng chờ" icon={PieChart} tone="indigo" bodyClassName="p-5">
+            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+              {segmentTotal > 0 &&
+                segments
+                  .filter((s) => s.value > 0)
+                  .map((s) => (
+                    <div
+                      key={s.label}
+                      className={`${s.bar} h-full`}
+                      style={{ width: `${(s.value / segmentTotal) * 100}%` }}
+                      title={`${s.label}: ${s.value}`}
+                    />
+                  ))}
+            </div>
+            {segmentTotal === 0 && (
+              <p className="mt-3 text-xs text-slate-400">Hàng chờ đang trống.</p>
+            )}
+            <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+              {segments.map((s) => (
+                <li key={s.label} className="flex min-w-0 items-center gap-2">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${s.bar}`} />
+                  <span className="min-w-0 flex-1 truncate text-xs text-slate-600" title={s.label}>
+                    {s.label}
+                  </span>
+                  <span className="shrink-0 text-xs font-bold tabular-nums text-slate-900">
+                    {s.value}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+
         </div>
       </section>
+    </div>
+  );
+}
+
+/* ───────────────────────────── Thành phần con ───────────────────────────── */
+
+function QueueList({ rows, empty, render }) {
+  if (!rows.length) {
+    return (
+      <div className="flex h-60 flex-col items-center justify-center gap-2 px-6 text-center">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+          <Inbox size={20} />
+        </span>
+        <p className="text-sm font-semibold text-slate-600">{empty}</p>
+      </div>
+    );
+  }
+  return <ul className="divide-y divide-slate-100">{rows.map(render)}</ul>;
+}
+
+/**
+ * Một dòng hàng chờ: [nhãn loại] Tiêu đề / dòng phụ | thời gian · hạn | nút.
+ * Tiêu đề và dòng phụ luôn `truncate` (rê chuột để xem đầy đủ); trên màn hẹp
+ * cụm thời gian + nút tự xuống hàng thay vì đè lên chữ.
+ */
+function QueueRow({ badge, title, meta = [], time, href, action }) {
+  const sla = slaOf(time);
+  const metaText = meta.filter(Boolean).join(" · ");
+  return (
+    <li className="flex flex-col gap-2 px-5 py-3 transition-colors hover:bg-slate-50/70 sm:flex-row sm:items-center sm:gap-4">
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          {badge && (
+            <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+              {badge}
+            </span>
+          )}
+          <p className="min-w-0 truncate text-sm font-semibold text-slate-900" title={title}>
+            {title}
+          </p>
+        </div>
+        {metaText && (
+          <p className="mt-0.5 truncate text-[11px] text-slate-500" title={metaText}>
+            {metaText}
+          </p>
+        )}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2.5">
+        <span
+          className="whitespace-nowrap text-[11px] text-slate-500"
+          title={formatDateTime(time)}
+        >
+          {timeAgo(time)}
+        </span>
+        <span
+          className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${sla.cls}`}
+        >
+          {sla.label}
+        </span>
+        <Link
+          href={href}
+          className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-rose-700"
+        >
+          {action}
+          <ArrowUpRight size={12} />
+        </Link>
+      </div>
+    </li>
+  );
+}
+
+function StatRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2.5">
+      <dt className="min-w-0 truncate text-xs text-slate-600" title={label}>
+        {label}
+      </dt>
+      <dd className="shrink-0 text-sm font-bold tabular-nums text-slate-900">{value}</dd>
     </div>
   );
 }

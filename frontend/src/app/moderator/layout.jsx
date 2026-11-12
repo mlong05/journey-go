@@ -32,7 +32,8 @@ export default function ModeratorLayout({ children }) {
 
   // Trang khung cố định: tiêu đề, thẻ số liệu, bộ lọc đứng yên, chỉ vùng danh sách tự cuộn
   // (gồm cả trang thẩm định một tour: chỉ cột nội dung tự cuộn)
-  const isScrollLockedPage = /^\/moderator\/(tours|community|tours\/[^/]+)\/?$/.test(pathname || "");
+  // Trang tổng quan (/moderator) cũng khóa khung: chỉ "Hàng chờ cần xử lý" tự cuộn.
+  const isScrollLockedPage = /^\/moderator(\/(tours|community|tours\/[^/]+))?\/?$/.test(pathname || "");
 
   // Menu điều hướng của kiểm duyệt viên
   const moderatorNavItems = [
