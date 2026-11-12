@@ -146,7 +146,8 @@ export default function AdminLayout({ children }) {
     pathname?.startsWith("/admin/users") ||
     pathname?.startsWith("/admin/regions") ||
     pathname?.startsWith("/admin/themes") ||
-    pathname?.startsWith("/admin/finance");
+    pathname?.startsWith("/admin/finance") ||
+    pathname?.startsWith("/admin/settlements");
 
   // Xử lý tìm kiếm nhanh từ Topbar
   const handleTopSearchSubmit = (e) => {
