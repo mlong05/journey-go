@@ -1,11 +1,15 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/constants/app_colors.dart';
 import 'core/models/auth_models.dart';
+import 'core/services/goong_map_style.dart';
 import 'core/services/google_auth_service.dart';
 import 'core/services/invitation_deep_link_service.dart';
 import 'core/services/payment_result_service.dart';
+import 'core/services/server_finder.dart';
 import 'core/services/token_storage.dart';
 import 'screens/booking/invitation_deep_link_host.dart';
 import 'screens/booking/pending_payment_host.dart';
@@ -22,6 +26,12 @@ void main() async {
   } catch (e) {
     debugPrint('Không tìm thấy file .env, sẽ dùng --dart-define làm fallback. Lỗi: $e');
   }
+
+  // Dò địa chỉ backend NGAY khi mở app (chạy nền, không chặn giao diện) để lúc bấm
+  // "Đăng nhập" không phải chờ thêm bước dò máy chủ.
+  unawaited(ServerFinder.find());
+  // Tải sẵn style bản đồ Goong (đường phố + chữ vệ tinh) để mở bản đồ không phải chờ.
+  GoongMapStyle.preload();
 
   // Đặt thanh trạng thái trong suốt cho Hero Banner tràn viền
   SystemChrome.setSystemUIOverlayStyle(
