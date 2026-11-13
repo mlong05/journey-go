@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Mobile (USB)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "mobile",
+      "program": "lib/main.dart",
+      "preLaunchTask": "adb reverse 8088"
+    },
+    {
+      "name": "Mobile",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "mobile",
+      "program": "lib/main.dart"
+    }
+  ]
+}
