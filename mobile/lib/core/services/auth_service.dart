@@ -45,13 +45,17 @@ class AuthService {
           .timeout(timeout);
       return response;
     } on SocketException catch (e) {
-      throw Exception(
-        'Không thể kết nối đến máy chủ ($baseUrl).\nChi tiết: ${e.message}\nVui lòng kiểm tra địa chỉ API Backend (cổng 8088).',
-      );
-    } on TimeoutException {
+      ServerFinder.markUnreachable();
       throw Exception(
         kDebugMode
-            ? 'Không kết nối được máy chủ. Kiểm tra địa chỉ ở nút "API" góc trên (điện thoại thật cần IP Wi-Fi của máy tính).'
+            ? 'Không thể kết nối đến máy chủ ($baseUrl).\nChi tiết: ${e.message}\n\n${ServerFinder.unreachableHint}'
+            : 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.',
+      );
+    } on TimeoutException {
+      ServerFinder.markUnreachable();
+      throw Exception(
+        kDebugMode
+            ? 'Kết nối đến máy chủ ($baseUrl) quá hạn.\n\n${ServerFinder.unreachableHint}'
             : 'Kết nối đến máy chủ quá hạn (timeout). Vui lòng thử lại sau.',
       );
     } catch (e) {
@@ -86,10 +90,12 @@ class AuthService {
           .timeout(timeout);
       return response;
     } on SocketException catch (e) {
+      ServerFinder.markUnreachable();
       throw Exception(
         'Không thể kết nối đến máy chủ ($baseUrl).\nChi tiết: ${e.message}',
       );
     } on TimeoutException {
+      ServerFinder.markUnreachable();
       throw Exception('Kết nối quá hạn. Vui lòng thử lại.');
     } catch (e) {
       throw Exception('Lỗi mạng: $e');
@@ -126,8 +132,10 @@ class AuthService {
           .timeout(timeout);
       return response;
     } on SocketException catch (e) {
+      ServerFinder.markUnreachable();
       throw Exception('Không thể kết nối máy chủ: ${e.message}');
     } on TimeoutException {
+      ServerFinder.markUnreachable();
       throw Exception('Kết nối quá hạn. Vui lòng thử lại.');
     } catch (e) {
       throw Exception('Lỗi mạng: $e');
@@ -168,6 +176,10 @@ class AuthService {
     required String password,
   }) async {
     final normalizedEmail = email.trim();
+
+    // Dò lại máy chủ mỗi lần đăng nhập (vài chục ms khi máy chủ trả lời): địa chỉ nhớ từ trước
+    // có thể đã chết vì rút cáp USB / mất adb reverse / đổi Wi-Fi.
+    ServerFinder.reset();
 
     final response = await _post(
       path: ApiConstants.loginEndpoint,

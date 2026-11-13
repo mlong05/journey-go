@@ -42,6 +42,13 @@ class ServerFinder {
 
   static void reset() => _found = null;
 
+  /// Gọi khi request tới địa chỉ đang nhớ bị lỗi kết nối / quá hạn.
+  ///
+  /// Rút cáp USB hoặc khởi động lại adb làm mất `adb reverse`, đổi Wi-Fi làm đổi IP:
+  /// địa chỉ đã dò được không còn dùng được. Quên nó để request sau dò lại từ đầu
+  /// (báo lỗi ngay nếu vẫn không thấy máy chủ) thay vì lần nào cũng chờ hết hạn.
+  static void markUnreachable() => _found = null;
+
   /// Máy chủ có trả lời tại [baseUrl] không (mọi mã HTTP đều tính là có).
   static Future<bool> isReachable(String baseUrl, {Duration timeout = const Duration(seconds: 3)}) async {
     try {
