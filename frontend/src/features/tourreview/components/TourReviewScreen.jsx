@@ -21,6 +21,19 @@ const readableNote = (text) =>
   String(text).replace(/\b(BASIC_INFO|PRICING|STOPS|ITINERARY|SCHEDULE)(?: [\w.[\]]+)?:/g, (_, step) => `${STEP_SHORT[step]}:`);
 let noteSeq = 0;
 
+/** Ghi chú đã lưu ở backend → dạng ghi chú hiển thị (FlaggableBlock khớp theo step/stopId/field). */
+const savedNote = (n) => ({
+  step: n.step, stopId: n.stopId ?? null, field: n.field || "", note: n.note,
+  label: STEP_SHORT[n.step] || n.step, localId: `saved-${n.id}`,
+});
+const DECISION_RESULT = {
+  APPROVED: { label: "Đồng ý duyệt", cls: "bg-emerald-50 text-emerald-700 border-emerald-200", Icon: BadgeCheck },
+  CHANGES_REQUESTED: { label: "Yêu cầu chỉnh sửa", cls: "bg-orange-50 text-orange-700 border-orange-200", Icon: MessageSquareWarning },
+  REJECTED: { label: "Từ chối", cls: "bg-rose-50 text-rose-700 border-rose-200", Icon: Ban },
+};
+const reasonText = (codes) =>
+  String(codes).split(",").map((c) => REJECTION_REASONS.find((r) => r.code === c.trim())?.label || c.trim()).join("; ");
+
 function RejectReasons({ value, onChange, other, onOther }) {
   const toggle = (code) => onChange(value.includes(code) ? value.filter((c) => c !== code) : [...value, code]);
   return (
@@ -131,7 +144,17 @@ export default function TourReviewScreen({ tourId }) {
   useEffect(() => {
     let alive = true;
     Promise.all([tourReviewService.detail(tourId), tourReviewService.history(tourId).catch(() => null)])
-      .then(([detail, hist]) => { if (alive) { setTour(detail); setReview(hist); } })
+      .then(([detail, hist]) => {
+        if (!alive) return;
+        setTour(detail);
+        setReview(hist);
+        // Tour đã qua kiểm duyệt: điền lại tiêu chí + ghi chú của lần duyệt gần nhất để xem lại (chỉ đọc).
+        // Tour đang chờ duyệt thì bắt đầu trống, tránh lẫn kết quả của lần gửi trước.
+        if (detail?.status !== "PENDING_REVIEW" && hist) {
+          setCriteria(hist.criteria ? Object.fromEntries(REVIEW_CRITERIA.map((c) => [c.key, hist.criteria[c.key]])) : {});
+          setNotes((hist.notes || []).map(savedNote));
+        }
+      })
       .catch((err) => alive && setError(err?.message || "Không tải được tour."))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
@@ -200,6 +223,11 @@ export default function TourReviewScreen({ tourId }) {
   if (error || !tour) return <div className="py-24 text-center text-sm font-bold text-rose-600">{error || "Không tìm thấy tour."}</div>;
 
   const meta = TOUR_STATUS[tour.status] || TOUR_STATUS.DRAFT;
+  const history = review?.history || [];
+  const lastSubmit = history.slice().reverse().find((h) => h.action === "SUBMITTED");
+  const submitterName = tour.createdByName || lastSubmit?.actorName;
+  const submittedAt = tour.submittedAt || review?.submittedAt || lastSubmit?.createdAt;
+  const decision = !pending ? DECISION_RESULT[review?.status] : null;
 
   return (
     <ReviewNotesContext.Provider value={notesCtx}>
@@ -213,13 +241,22 @@ export default function TourReviewScreen({ tourId }) {
           <div className="min-w-0">
             <p className="text-[11px] font-bold text-teal-700 uppercase tracking-wide">Thẩm định tour</p>
             <h1 className="text-lg font-bold text-slate-900 truncate">{tour.title}</h1>
+            {(submitterName || submittedAt) && (
+              <p className="text-xs text-slate-500 truncate">
+                {submitterName && <>Người gửi: <b className="text-slate-700">{submitterName}</b></>}
+                {submitterName && submittedAt && " · "}
+                {submittedAt && <>Gửi lúc {fmt(submittedAt)}</>}
+              </p>
+            )}
           </div>
           <span className={`px-2 py-0.5 rounded-md border text-[11px] font-bold shrink-0 ${meta.cls}`}>{meta.label}</span>
         </div>
 
         {!pending && (
           <div className="shrink-0 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-600">
-            Tour không ở trạng thái Chờ duyệt — chỉ xem nội dung và lịch sử kiểm duyệt.
+            {decision
+              ? "Tour đã được kiểm duyệt — đang hiển thị kết quả lần duyệt gần nhất (chỉ xem)."
+              : "Tour không ở trạng thái Chờ duyệt — chỉ xem nội dung và lịch sử kiểm duyệt."}
           </div>
         )}
 
@@ -243,7 +280,7 @@ export default function TourReviewScreen({ tourId }) {
                 <section className="mt-5 rounded-2xl border border-slate-200 bg-white px-4 py-3 space-y-2">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><Flag size={14} className="text-orange-500" />Ghi chú ({notes.length})</h3>
                   {notes.length === 0 ? (
-                    <p className="text-[11px] text-slate-400">Chưa có ghi chú. Gắn cờ trên khối nội dung để thêm.</p>
+                    <p className="text-[11px] text-slate-400">{pending ? "Chưa có ghi chú. Gắn cờ trên khối nội dung để thêm." : "Lần duyệt này không có ghi chú gắn cờ."}</p>
                   ) : (
                     <ul className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                       {notes.map((n) => (
@@ -286,10 +323,14 @@ export default function TourReviewScreen({ tourId }) {
             <>
             <div className="shrink-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 space-y-1.5">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-900">Tiêu chí kiểm duyệt</h3>
+                <h3 className="text-sm font-bold text-slate-900">{pending ? "Tiêu chí kiểm duyệt" : "Kết quả tiêu chí"}</h3>
                 <span className={`text-xs font-bold ${passed >= CRITERIA_MIN_TO_APPROVE ? "text-emerald-700" : "text-slate-500"}`}>Đạt {passed}/5</span>
               </div>
-              <p className="text-[11px] text-slate-500">Đánh giá đủ 5 tiêu chí. Cần tối thiểu {CRITERIA_MIN_TO_APPROVE}/5 để duyệt. Bấm <Info size={10} className="inline -mt-0.5" /> để xem mô tả.</p>
+              <p className="text-[11px] text-slate-500">
+                {pending
+                  ? <>Đánh giá đủ 5 tiêu chí. Cần tối thiểu {CRITERIA_MIN_TO_APPROVE}/5 để duyệt. Bấm <Info size={10} className="inline -mt-0.5" /> để xem mô tả.</>
+                  : answered ? "Các tiêu chí đã đánh giá ở lần duyệt gần nhất." : "Lần duyệt gần nhất chưa có đánh giá tiêu chí."}
+              </p>
               {REVIEW_CRITERIA.map((c) => (
                 <div key={c.key} className="px-2 py-1.5 rounded-lg border border-slate-100">
                   <div className="flex items-center justify-between gap-2">
@@ -302,11 +343,11 @@ export default function TourReviewScreen({ tourId }) {
                     </button>
                     <div className="flex gap-1 shrink-0">
                       <button type="button" disabled={!pending} onClick={() => setCriteria((p) => ({ ...p, [c.key]: true }))}
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold inline-flex items-center gap-0.5 cursor-pointer ${criteria[c.key] === true ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold inline-flex items-center gap-0.5 ${pending ? "cursor-pointer" : "cursor-default"} ${criteria[c.key] === true ? "bg-emerald-600 text-white" : `bg-slate-100 text-slate-500 ${pending ? "" : "opacity-40"}`}`}>
                         <CheckCircle2 size={11} />Đạt
                       </button>
                       <button type="button" disabled={!pending} onClick={() => setCriteria((p) => ({ ...p, [c.key]: false }))}
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold inline-flex items-center gap-0.5 cursor-pointer ${criteria[c.key] === false ? "bg-rose-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold inline-flex items-center gap-0.5 ${pending ? "cursor-pointer" : "cursor-default"} ${criteria[c.key] === false ? "bg-rose-600 text-white" : `bg-slate-100 text-slate-500 ${pending ? "" : "opacity-40"}`}`}>
                         <XCircle size={11} />Không
                       </button>
                     </div>
@@ -319,6 +360,33 @@ export default function TourReviewScreen({ tourId }) {
                 </div>
               ))}
             </div>
+
+            {decision && (
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 space-y-2 min-h-0 overflow-y-auto">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold text-slate-900">Quyết định kiểm duyệt</h3>
+                  <span className={`px-2 py-0.5 rounded-md border text-[11px] font-bold inline-flex items-center gap-1 ${decision.cls}`}>
+                    <decision.Icon size={12} />{decision.label}
+                  </span>
+                </div>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                  <dt className="text-slate-500">Người duyệt</dt>
+                  <dd className="font-bold text-slate-800 truncate">{review.reviewerName || "—"}</dd>
+                  <dt className="text-slate-500">Thời gian</dt>
+                  <dd className="text-slate-800">{fmt(review.reviewedAt) || "—"}</dd>
+                  {review.reason && (<>
+                    <dt className="text-slate-500">Lý do</dt>
+                    <dd className="text-rose-700">{reasonText(review.reason)}{review.otherReason ? ` (${review.otherReason})` : ""}</dd>
+                  </>)}
+                </dl>
+                {review.decisionNote && (
+                  <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                    <p className="text-[11px] font-bold text-slate-500 mb-0.5">Ghi chú chung</p>
+                    <p className="text-xs text-slate-700 whitespace-pre-line break-words">{review.decisionNote}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {pending && (
               <div className="shrink-0 rounded-2xl border border-slate-200 bg-white p-3.5 space-y-2">
