@@ -2,6 +2,7 @@ package com.journeygo.modules.gamification.controller;
 
 import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.gamification.dto.*;
+import com.journeygo.modules.voucher.dto.response.VoucherResponse;
 import com.journeygo.modules.gamification.entity.enums.UserVoucherStatus;
 import com.journeygo.modules.gamification.service.GamificationService;
 import com.journeygo.security.UserPrincipal;
