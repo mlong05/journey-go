@@ -68,8 +68,8 @@ public class AiKnowledgeChunk {
      * Vector nhúng 768 chiều (tạo bởi Gemini text-embedding-004).
      */
     @Convert(converter = PGvectorConverter.class)
-    @JdbcTypeCode(SqlTypes.OTHER)
-    @Column(name = "embedding", nullable = false)
+    //@JdbcTypeCode(SqlTypes.OTHER)
+    @Column(name = "embedding", nullable = false, columnDefinition = "vector")
     private float[] embedding;
 
     @Column(name = "created_at", nullable = false, updatable = false)
