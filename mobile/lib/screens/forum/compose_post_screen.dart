@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/forum_model.dart';
+import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
-import '../../core/services/destination_service.dart';
+import '../../core/services/booking_service.dart';
 import '../../core/services/forum_service.dart';
+import '../../core/services/journey_service.dart';
 import '../../core/services/tour_service.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
 import 'forum_widgets.dart';
@@ -86,25 +88,42 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
     }
   }
 
-  Future<void> _chooseDestination() async {
-    final picked = await showForumOptionPicker(
-      context,
-      title: 'Chọn điểm đến',
-      loader: () async => (await DestinationService().getApprovedDestinations())
-          .map((d) => ForumOption(d.id, d.name))
-          .toList(),
-    );
-    if (picked != null && mounted) setState(() => _destination = picked.id < 0 ? null : picked);
-  }
-
+  /// Bài viết chỉ gắn tour. Danh sách: tour bạn đã tham gia (đã đặt vé hoặc đã đi) lên đầu,
+  /// sau đó là các tour đang mở bán, để vẫn hỏi được về một tour trước khi đi.
   Future<void> _chooseTour() async {
     final picked = await showForumOptionPicker(
       context,
       title: 'Chọn tour',
-      loader: () async =>
-          (await TourService().getPublishedTours()).map((t) => ForumOption(t.id, t.title)).toList(),
+      loader: () async {
+        final results = await Future.wait([
+          TourService().getPublishedTours(),
+          _joinedTourIds(),
+        ]);
+        final tours = results[0] as List<TourModel>;
+        final joined = results[1] as Set<int>;
+        final mine = tours.where((t) => joined.contains(t.id));
+        final others = tours.where((t) => !joined.contains(t.id));
+        return [
+          for (final t in mine) ForumOption(t.id, t.title, note: 'Bạn đã tham gia'),
+          for (final t in others) ForumOption(t.id, t.title),
+        ];
+      },
     );
     if (picked != null && mounted) setState(() => _tour = picked.id < 0 ? null : picked);
+  }
+
+  /// Tour du khách đã tham gia: có hành trình, hoặc vé đã thanh toán / đã hoàn thành. Lỗi thì coi như chưa có.
+  Future<Set<int>> _joinedTourIds() async {
+    final ids = <int>{};
+    try {
+      ids.addAll((await JourneyService().getMine()).map((j) => j.tourId));
+    } catch (_) {}
+    try {
+      ids.addAll((await BookingService().getMine())
+          .where((b) => b.status == 'CONFIRMED' || b.status == 'COMPLETED')
+          .map((b) => b.tourId));
+    } catch (_) {}
+    return ids;
   }
 
   String? _validate() {
@@ -150,7 +169,6 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
         saved = await _service.createPost(
           title: _title.text.trim(),
           content: _content.text.trim(),
-          destinationId: _destination?.id,
           tourId: _tour?.id,
           mediaUrls: urls,
           saveAsDraft: !submit,
@@ -213,36 +231,27 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                 onChanged: () => setState(() {}),
               ),
               const SizedBox(height: 16),
-              _label('Liên quan đến'),
-              Row(
-                children: [
-                  Expanded(
-                    child: _PickerTile(
-                      icon: Icons.place_rounded,
-                      hint: 'Điểm đến',
-                      value: _destination?.label,
-                      onTap: _isEditing ? null : _chooseDestination,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _PickerTile(
-                      icon: Icons.route_rounded,
-                      hint: 'Tour',
-                      value: _tour?.label,
-                      onTap: _isEditing ? null : _chooseTour,
-                    ),
-                  ),
-                ],
+              _label('Tour liên quan'),
+              _PickerTile(
+                icon: Icons.route_rounded,
+                hint: 'Chọn tour (không bắt buộc)',
+                value: _tour?.label,
+                onTap: _isEditing ? null : _chooseTour,
               ),
-              if (_isEditing)
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Không thể đổi điểm đến và tour sau khi đã đăng.',
-                    style: TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
-                  ),
+              // Bài cũ từng gắn điểm đến: vẫn hiện để biết, không chọn mới được nữa
+              if (_destination != null) ...[
+                const SizedBox(height: 8),
+                _PickerTile(icon: Icons.place_rounded, hint: 'Điểm đến', value: _destination!.label, onTap: null),
+              ],
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  _isEditing
+                      ? 'Không thể đổi tour sau khi đã đăng.'
+                      : 'Tour bạn đã tham gia được đưa lên đầu danh sách.',
+                  style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
                 ),
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [

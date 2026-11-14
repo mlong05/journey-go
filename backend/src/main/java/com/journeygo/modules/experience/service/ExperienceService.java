@@ -289,7 +289,8 @@ public class ExperienceService {
         }
         if (e.getStatus() == ExperienceStatus.DRAFT) {
             try {
-                if (AuthorizationGuard.isAdmin() || AuthorizationGuard.hasRole("CONTENT_MODERATOR")) {
+                // Bản nháp chỉ chủ sở hữu và Kiểm duyệt viên được xem (ADMIN không quản lý nội dung).
+                if (AuthorizationGuard.hasRole("CONTENT_MODERATOR")) {
                     return true;
                 }
                 Long ownerId = e.getCreatedBy() != null ? e.getCreatedBy().getId() : null;

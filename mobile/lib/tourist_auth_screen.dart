@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'core/models/auth_models.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/google_auth_service.dart';
-import 'core/services/server_finder.dart';
 import 'screens/account/password_screens.dart';
 import 'core/services/token_storage.dart';
 import 'screens/tourist_home_screen.dart';
@@ -399,186 +397,6 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
     }
   }
 
-  // Hộp thoại tùy chỉnh cấu hình máy chủ Backend API
-  /// Cấu hình địa chỉ backend (chỉ có ở bản chạy thử). Điện thoại thật không dùng được 10.0.2.2:
-  /// cần IP Wi-Fi của máy tính, hoặc cắm USB + `adb reverse tcp:8088 tcp:8088` rồi dùng 127.0.0.1.
-  void _showServerConfigDialog() async {
-    final custom = await TokenStorage.hasCustomBaseUrl();
-    final currentUrl = await TokenStorage.getBaseUrl();
-    final urlController = TextEditingController(text: currentUrl);
-    final envUrl = ServerFinder.envBaseUrl;
-
-    if (!mounted) return;
-
-    // null: chưa kiểm tra · true/false: kết quả kiểm tra địa chỉ đang nhập
-    bool? reachable;
-    bool checking = false;
-    String note = custom ? 'Đang dùng địa chỉ bạn đã lưu.' : 'Đang tự dò máy chủ (chưa lưu địa chỉ).';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          Future<void> check() async {
-            setDialogState(() {
-              checking = true;
-              reachable = null;
-            });
-            final ok = await ServerFinder.isReachable(urlController.text);
-            if (ctx.mounted) {
-              setDialogState(() {
-                checking = false;
-                reachable = ok;
-              });
-            }
-          }
-
-          Widget chip(String label, String url) => ActionChip(
-                label: Text(label),
-                labelStyle: const TextStyle(fontSize: 12),
-                onPressed: () {
-                  urlController.text = url;
-                  check();
-                },
-              );
-
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            backgroundColor: Colors.white,
-            title: const Row(
-              children: [
-                Icon(Icons.dns_rounded, color: AppCultureColors.oceanBlue, size: 22),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Máy chủ API',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(note, style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted)),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: urlController,
-                    keyboardType: TextInputType.url,
-                    onChanged: (_) => setDialogState(() => reachable = null),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: AppCultureColors.surface,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: AppCultureColors.border),
-                      ),
-                      suffixIcon: checking
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                            )
-                          : reachable == null
-                              ? null
-                              : Icon(
-                                  reachable! ? Icons.check_circle_rounded : Icons.error_rounded,
-                                  color: reachable! ? AppCultureColors.heritageJade : AppCultureColors.error,
-                                ),
-                    ),
-                    style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
-                  ),
-                  if (reachable != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      reachable! ? 'Kết nối được máy chủ.' : 'Không kết nối được địa chỉ này.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: reachable! ? AppCultureColors.jadeDark : AppCultureColors.error,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Chọn nhanh:',
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      if (envUrl != null) chip('Từ .env', envUrl),
-                      chip('USB (127.0.0.1)', 'http://127.0.0.1:8088/api/v1'),
-                      chip('Máy ảo (10.0.2.2)', 'http://10.0.2.2:8088/api/v1'),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppCultureColors.oceanLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Điện thoại thật: nhập IP Wi-Fi của máy tính, ví dụ http://192.168.1.5:8088/api/v1 '
-                      '(cùng mạng Wi-Fi), hoặc cắm cáp USB, chạy "adb reverse tcp:8088 tcp:8088" rồi chọn USB. '
-                      'Địa chỉ 10.0.2.2 chỉ dùng cho máy ảo.',
-                      style: TextStyle(fontSize: 12, height: 1.4, color: AppCultureColors.oceanDark),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: checking
-                    ? null
-                    : () async {
-                        await TokenStorage.resetBaseUrl();
-                        final found = await ServerFinder.find();
-                        final ok = await ServerFinder.isReachable(found);
-                        if (ctx.mounted) {
-                          setDialogState(() {
-                            urlController.text = found;
-                            reachable = ok;
-                            note = ok
-                                ? 'Đã tự dò thấy máy chủ. App sẽ tự dò mỗi lần mở.'
-                                : 'Không dò thấy máy chủ. Hãy nhập IP Wi-Fi của máy tính.';
-                          });
-                        }
-                      },
-                child: const Text('Tự dò'),
-              ),
-              TextButton(
-                onPressed: checking ? null : check,
-                child: const Text('Kiểm tra'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final newUrl = urlController.text.trim();
-                  if (newUrl.isNotEmpty) {
-                    await TokenStorage.setBaseUrl(newUrl);
-                  }
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppCultureColors.oceanBlue,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
-                ),
-                child: const Text('Lưu'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
   // Hiển thị SnackBar chúc mừng đạt chuẩn thông báo thương mại
   void _showSuccessFeedback({
     required String title,
@@ -757,10 +575,6 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
 
   @override
   Widget build(BuildContext context) {
-    final double screenHeight = MediaQuery.of(context).size.height;
-    // Hero banner chiếm ~30% chiều cao màn hình (tối thiểu 230px, tối đa 270px)
-    final double bannerHeight = (screenHeight * 0.30).clamp(230.0, 270.0);
-
     return Scaffold(
       backgroundColor: AppCultureColors.background,
       body: GestureDetector(
@@ -772,9 +586,9 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // ========================================================
-              // 1. HERO BANNER TRÀN VIỀN PHÍA TRÊN (~30% CHIỀU CAO)
+              // 1. ĐẦU TRANG: LOGO JOURNEYGO + LỜI CHÀO
               // ========================================================
-              _buildHeroBanner(bannerHeight),
+              _buildBrandHeader(),
 
               // ========================================================
               // NỘI DUNG THÂN GIAO DIỆN CHÍNH
@@ -818,7 +632,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                           // Các trường chỉ hiển thị khi ĐĂNG KÝ
                           if (!_isLogin) ...[
                             _buildInputField(
-                              label: 'Họ và tên du khách',
+                              label: 'Họ và tên',
                               hintText: 'Nguyễn Văn An',
                               controller: _fullNameController,
                               focusNode: _fullNameFocus,
@@ -839,10 +653,8 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
 
                           // Trường Email / Tài khoản (Dùng cho cả Đăng nhập & Đăng ký)
                           _buildInputField(
-                            label: _isLogin
-                                ? 'Tài khoản hoặc Địa chỉ Email'
-                                : 'Địa chỉ Email ',
-                            hintText: 'dulich@journeygo.vn',
+                            label: 'Email',
+                            hintText: 'ten@email.com',
                             controller: _emailController,
                             focusNode: _emailFocus,
                             prefixIcon: Icons.alternate_email_rounded,
@@ -865,7 +677,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                           // Trường Số điện thoại (Chỉ hiển thị khi ĐĂNG KÝ)
                           if (!_isLogin) ...[
                             _buildInputField(
-                              label: 'Số điện thoại liên hệ',
+                              label: 'Số điện thoại',
                               hintText: '0987 654 321',
                               controller: _phoneController,
                               focusNode: _phoneFocus,
@@ -889,8 +701,8 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
 
                           // Trường Mật khẩu (Dùng cho cả 2 tab)
                           _buildInputField(
-                            label: 'Mật khẩu bảo mật',
-                            hintText: 'Tối thiểu 6 ký tự',
+                            label: 'Mật khẩu',
+                            hintText: _isLogin ? 'Nhập mật khẩu' : 'Tối thiểu 6 ký tự',
                             controller: _passwordController,
                             focusNode: _passwordFocus,
                             prefixIcon: Icons.lock_outline_rounded,
@@ -925,7 +737,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                           if (!_isLogin) ...[
                             const SizedBox(height: 14),
                             _buildInputField(
-                              label: 'Xác nhận lại mật khẩu',
+                              label: 'Nhập lại mật khẩu',
                               hintText: 'Nhập lại mật khẩu vừa tạo',
                               controller: _confirmPasswordController,
                               focusNode: _confirmPasswordFocus,
@@ -1000,229 +812,56 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
   }
 
   // --------------------------------------------------------------------------
-  // WIDGET: HERO BANNER TRÀN VIỀN
+  // WIDGET: ĐẦU TRANG THƯƠNG HIỆU (LOGO GIỐNG TRANG WEB)
   // --------------------------------------------------------------------------
-  Widget _buildHeroBanner(double height) {
-    return SizedBox(
-      height: height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 1. Ảnh phong cảnh thực tế (Tam Cốc - Tràng An / Ninh Bình)
-          Image.network(
-            'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1200&q=80',
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              // Dự phòng khi thiết bị offline
-              return Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF0F3E32),
-                      Color(0xFF00A86B),
-                      Color(0xFF0288D1),
-                    ],
+  /// Logo JourneyGo (biểu tượng + chữ, cùng bộ ảnh với frontend) và khẩu hiệu,
+  /// trên nền chuyển màu nhẹ, không phụ thuộc mạng.
+  Widget _buildBrandHeader() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppCultureColors.jadeLight, AppCultureColors.background],
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 8),
+          child: Column(
+            children: [
+              Image.asset(
+                'assets/images/journeygo_emblem.png',
+                height: 96,
+                filterQuality: FilterQuality.medium,
+              ),
+              const SizedBox(height: 10),
+              Image.asset(
+                'assets/images/journeygo_wordmark.png',
+                height: 46,
+                filterQuality: FilterQuality.medium,
+              ),
+              const SizedBox(height: 12),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Text(
+                  _isLogin
+                      ? 'Chào mừng trở lại! Đăng nhập để tiếp tục hành trình.'
+                      : 'Tạo tài khoản để khám phá di sản và nhận điểm thưởng.',
+                  key: ValueKey(_isLogin),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    height: 1.4,
+                    color: AppCultureColors.textMuted,
+                    fontWeight: FontWeight.w500,
                   ),
-                ),
-              );
-            },
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Container(
-                color: const Color(0xFF1E293B),
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppCultureColors.heritageJade,
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // 2. Lớp phủ Gradient mờ dần từ đen nhẹ ở trên xuống trắng tinh khôi ở đáy
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: [0.0, 0.35, 0.72, 1.0],
-                  colors: [
-                    Color(0x73000000), // Đen nhẹ 45% ở trên cùng
-                    Color(0x22000000),
-                    Color(0xB3FFFFFF), // Chuyển tiếp trắng 70%
-                    Color(0xFFFFFFFF), // Trắng tinh khôi #FFFFFF ở chân ảnh
-                  ],
                 ),
               ),
-            ),
+            ],
           ),
-
-          // 3. Thanh trạng thái & Khẩu hiệu thương hiệu nổi đè trên ảnh
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 6),
-
-                  // Thanh Top: Logo thương hiệu Hoa Sen Journey Go
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Nút cấu hình máy chủ Backend API: chỉ hiện ở bản chạy thử (debug)
-                      if (kDebugMode)
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _showServerConfigDialog,
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.92),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x1A000000),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.dns_rounded,
-                                  size: 14,
-                                  color: AppCultureColors.oceanBlue,
-                                ),
-                                SizedBox(width: 5),
-                                Text(
-                                  'API :8088',
-                                  style: TextStyle(
-                                    color: AppCultureColors.textDark,
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      )
-                      else
-                        const SizedBox(width: 1),
-
-                      // Logo thương hiệu "journey go" có hoa sen cách điệu
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.92),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x1A000000),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CustomPaint(
-                              size: const Size(16, 16),
-                              painter: VietLotusLogoPainter(
-                                color: AppCultureColors.heritageJade,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'journey go',
-                              style: TextStyle(
-                                color: AppCultureColors.textDark,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const Spacer(),
-
-                  // Tag nhỏ: CỔNG TRẢI NGHIỆM DU KHÁCH
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3.5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppCultureColors.heritageJade.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: AppCultureColors.heritageJade.withValues(alpha: 0.28),
-                        width: 0.8,
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.travel_explore_rounded,
-                          size: 12,
-                          color: AppCultureColors.heritageJade,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Cổng trải nghiệm du khách',
-                          style: TextStyle(
-                            color: AppCultureColors.heritageJade,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  // Khẩu hiệu chính
-                  const Text(
-                    'Chạm vào Lịch sử - Khám phá Di sản',
-                    style: TextStyle(
-                      color: AppCultureColors.textDark,
-                      fontSize: 19.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.4,
-                      height: 1.2,
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1775,68 +1414,6 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
         ),
       ),
     );
-  }
-}
-
-// ============================================================================
-// CUSTOM PAINTER 1: BIỂU TƯỢNG HOA SEN VIỆT NAM (VIETNAM LOTUS LOGO)
-// ============================================================================
-class VietLotusLogoPainter extends CustomPainter {
-  final Color color;
-
-  VietLotusLogoPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
-
-    final double w = size.width;
-    final double h = size.height;
-
-    // 1. Cánh sen chính giữa (Upright center petal)
-    final Path centerPetal = Path();
-    centerPetal.moveTo(w * 0.5, h * 0.05);
-    centerPetal.cubicTo(w * 0.68, h * 0.35, w * 0.62, h * 0.75, w * 0.5, h * 0.90);
-    centerPetal.cubicTo(w * 0.38, h * 0.75, w * 0.32, h * 0.35, w * 0.5, h * 0.05);
-    canvas.drawPath(centerPetal, paint);
-
-    // 2. Cánh sen bên trái (Left petal)
-    final Path leftPetal = Path();
-    leftPetal.moveTo(w * 0.5, h * 0.28);
-    leftPetal.cubicTo(w * 0.22, h * 0.30, w * 0.02, h * 0.58, w * 0.18, h * 0.85);
-    leftPetal.cubicTo(w * 0.32, h * 0.88, w * 0.44, h * 0.82, w * 0.5, h * 0.90);
-    leftPetal.cubicTo(w * 0.40, h * 0.68, w * 0.36, h * 0.46, w * 0.5, h * 0.28);
-    canvas.drawPath(leftPetal, paint);
-
-    // 3. Cánh sen bên phải (Right petal)
-    final Path rightPetal = Path();
-    rightPetal.moveTo(w * 0.5, h * 0.28);
-    rightPetal.cubicTo(w * 0.78, h * 0.30, w * 0.98, h * 0.58, w * 0.82, h * 0.85);
-    rightPetal.cubicTo(w * 0.68, h * 0.88, w * 0.56, h * 0.82, w * 0.5, h * 0.90);
-    rightPetal.cubicTo(w * 0.60, h * 0.68, w * 0.64, h * 0.46, w * 0.5, h * 0.28);
-    canvas.drawPath(rightPetal, paint);
-
-    // 4. Đế sen / Đài gương sen mỏng ở đáy
-    final Paint basePaint = Paint()
-      ..color = color.withValues(alpha: 0.85)
-      ..style = PaintingStyle.fill;
-    final Rect baseRect = Rect.fromCenter(
-      center: Offset(w * 0.5, h * 0.93),
-      width: w * 0.50,
-      height: h * 0.08,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(baseRect, const Radius.circular(3)),
-      basePaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant VietLotusLogoPainter oldDelegate) {
-    return oldDelegate.color != color;
   }
 }
 

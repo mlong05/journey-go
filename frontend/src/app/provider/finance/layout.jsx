@@ -1,126 +1,60 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Wallet,
-  FileCheck,
-  BarChart3,
-  Bell,
-} from "lucide-react";
-import { useAuthSession } from "@/hooks";
-import { useLogout, LogoutModal } from "@/features/auth";
-import { Sidebar, DashboardHeader } from "@/components/layout";
+import { BarChart3, FileCheck, LayoutDashboard, Wallet } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 
-const FINANCE_NAV_ITEMS = [
-  {
-    id: "overview",
-    label: "Tổng quan",
-    href: ROUTES.PROVIDER_FINANCE,
-    icon: LayoutDashboard,
-  },
-  {
-    id: "wallet",
-    label: "Ví & Doanh thu",
-    href: ROUTES.PROVIDER_FINANCE_WALLET,
-    icon: Wallet,
-  },
-  {
-    id: "settlements",
-    label: "Lịch sử tất toán",
-    href: ROUTES.PROVIDER_FINANCE_SETTLEMENTS,
-    icon: FileCheck,
-  },
-  {
-    id: "revenues",
-    label: "Doanh thu theo kỳ",
-    href: ROUTES.PROVIDER_FINANCE_REVENUES,
-    icon: BarChart3,
-  },
+const FINANCE_TABS = [
+  { id: "overview", label: "Tổng quan", href: ROUTES.PROVIDER_FINANCE, icon: LayoutDashboard },
+  { id: "wallet", label: "Ví & Doanh thu", href: ROUTES.PROVIDER_FINANCE_WALLET, icon: Wallet },
+  { id: "settlements", label: "Lịch sử tất toán", href: ROUTES.PROVIDER_FINANCE_SETTLEMENTS, icon: FileCheck },
+  { id: "revenues", label: "Doanh thu theo kỳ", href: ROUTES.PROVIDER_FINANCE_REVENUES, icon: BarChart3 },
 ];
 
 /**
- * Layout khu vực Tài chính của Đối tác cung cấp nội dung (CONTENT_PROVIDER).
+ * Layout khu vực Tài chính của Đối tác (`/provider/finance/*`).
  *
- * ── Vị trí trong hệ thống ──
- *  • `/provider`         — Provider Portal: quản lý di tích, tour, điểm đến, nhiệm vụ.
- *  • `/provider/finance` — Khu vực tài chính CỦA CHÍNH đối tác đó: doanh thu, ví, tất toán.
+ * Khung chung (Sidebar + Header) đã do `app/provider/layout.jsx` dựng — layout này
+ * KHÔNG dựng lại khung thứ hai (trước đây nó tạo thêm một lớp `fixed inset-0` có
+ * sidebar/header riêng, bị khung Provider che mất, làm menu con không nhìn thấy và
+ * trang không khóa khung được).
  *
- * Trước đây khu vực tài chính nằm ở `/partner` (Partner Portal, role PARTNER).
- * Sau khi hợp nhất PARTNER + PROVIDER thành CONTENT_PROVIDER, toàn bộ chức năng tài chính
- * được chuyển vào Provider Portal và dùng chung theme màu của đối tác.
+ * Ở đây chỉ còn:
+ *  • Thanh tab điều hướng giữa 4 trang tài chính (đứng yên).
+ *  • Vùng nội dung chiếm phần chiều cao còn lại và tự cuộn khi cần. Trang Tổng quan
+ *    dùng `h-full` để vừa khít vùng này; các trang danh sách dài thì cuộn bên trong.
  */
 export default function ProviderFinanceLayout({ children }) {
   const pathname = usePathname();
-  const authData = useAuthSession();
-  const { performLogout, logoutModal } = useLogout();
 
-  // Khóa triệt để thanh cuộn của window/body.
-  useEffect(() => {
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    const prevBodyOverflow = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.documentElement.style.overflow = prevHtmlOverflow;
-      document.body.style.overflow = prevBodyOverflow;
-    };
-  }, []);
-
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSidebarWide, setIsSidebarWide] = useState(true);
-
-  const currentTitle =
-    [...FINANCE_NAV_ITEMS]
-      .sort((a, b) => b.href.length - a.href.length)
-      .find((i) => {
-        const p = i.href.split("#")[0];
-        return p === ROUTES.PROVIDER_FINANCE
-          ? pathname === ROUTES.PROVIDER_FINANCE
-          : pathname?.startsWith(p);
-      })?.label || "Tổng quan";
+  const isActive = (href) =>
+    href === ROUTES.PROVIDER_FINANCE
+      ? pathname === ROUTES.PROVIDER_FINANCE || pathname === `${ROUTES.PROVIDER_FINANCE}/`
+      : pathname?.startsWith(href);
 
   return (
-    <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 font-sans antialiased text-slate-800">
-      <Sidebar
-        role="provider"
-        navItems={FINANCE_NAV_ITEMS}
-        onLogout={performLogout}
-        isOpenMobile={isSidebarOpen}
-        onCloseMobile={() => setIsSidebarOpen(false)}
-        isWide={isSidebarWide}
-        onToggleWide={() => setIsSidebarWide((prev) => !prev)}
-      />
-
-      <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
-        <DashboardHeader
-          role="provider"
-          user={authData?.user}
-          section="Tài chính đối tác"
-          title={currentTitle}
-          onOpenMenu={() => setIsSidebarOpen(true)}
-        >
-          <button
-            type="button"
-            className="relative w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-colors"
-            title="Thông báo"
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <nav className="flex w-fit max-w-full shrink-0 gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 [scrollbar-width:none]">
+        {FINANCE_TABS.map(({ id, label, href, icon: Icon }) => (
+          <Link
+            key={id}
+            href={href}
+            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              isActive(href)
+                ? "bg-emerald-600 text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
           >
-            <Bell size={16} />
-          </button>
-        </DashboardHeader>
+            <Icon size={14} />
+            {label}
+          </Link>
+        ))}
+      </nav>
 
-        <main className="flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-          <div className="w-full max-w-[1600px] mx-auto space-y-6 pb-8">{children}</div>
-        </main>
+      <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+        {children}
       </div>
-
-      <LogoutModal
-        isOpen={logoutModal.isOpen}
-        status={logoutModal.status}
-        message={logoutModal.message}
-      />
     </div>
   );
 }

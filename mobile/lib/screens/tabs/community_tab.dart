@@ -4,7 +4,6 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/auth_models.dart';
 import '../../core/models/forum_model.dart';
 import '../../core/services/api_client.dart';
-import '../../core/services/destination_service.dart';
 import '../../core/services/forum_service.dart';
 import '../../core/services/tour_service.dart';
 import '../common/heritage_motion.dart';
@@ -15,7 +14,7 @@ import '../forum/my_posts_screen.dart';
 import '../forum/post_detail_screen.dart';
 import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeletonList;
 
-/// Tab Diễn đàn: bảng tin bài viết đã được kiểm duyệt, lọc theo điểm đến hoặc tour.
+/// Tab Diễn đàn: bảng tin bài viết đã được kiểm duyệt, lọc theo tour (bài viết chỉ gắn tour).
 class CommunityTab extends StatefulWidget {
   final UserModel currentUser;
 
@@ -43,7 +42,6 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
   final ScrollController _scroll = ScrollController();
 
   final List<ForumPost> _posts = [];
-  ForumOption? _destination;
   ForumOption? _tour;
   bool _loading = true;
   bool _loadingMore = false;
@@ -81,7 +79,6 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
       final result = await _service.getFeed(
         page: 0,
         size: _pageSize,
-        destinationId: _destination?.id,
         tourId: _tour?.id,
       );
       if (!mounted) return;
@@ -109,7 +106,6 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
       final result = await _service.getFeed(
         page: _page + 1,
         size: _pageSize,
-        destinationId: _destination?.id,
         tourId: _tour?.id,
       );
       if (!mounted) return;
@@ -173,19 +169,6 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
 
   void _openMyPosts() {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyPostsScreen()));
-  }
-
-  Future<void> _filterDestination() async {
-    final picked = await showForumOptionPicker(
-      context,
-      title: 'Lọc theo điểm đến',
-      loader: () async => (await DestinationService().getApprovedDestinations())
-          .map((d) => ForumOption(d.id, d.name))
-          .toList(),
-    );
-    if (picked == null || !mounted) return;
-    setState(() => _destination = picked.id < 0 ? null : picked);
-    _load();
   }
 
   Future<void> _filterTour() async {
@@ -304,7 +287,7 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
       );
     }
 
-    final filtering = _destination != null || _tour != null;
+    final filtering = _tour != null;
     return RefreshIndicator(
       color: AppCultureColors.heritageJade,
       onRefresh: _load,
@@ -312,7 +295,7 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 110),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 40),
         children: [
           _buildHeader(),
           const SizedBox(height: 14),
@@ -451,22 +434,12 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
       );
     }
 
+    // Bài viết chỉ gắn tour (không gắn điểm đến nữa) nên chỉ lọc theo tour
     return Row(
       children: [
         chip(
-          icon: Icons.place_rounded,
-          hint: 'Điểm đến',
-          value: _destination,
-          onTap: _filterDestination,
-          onClear: () {
-            setState(() => _destination = null);
-            _load();
-          },
-        ),
-        const SizedBox(width: 10),
-        chip(
           icon: Icons.route_rounded,
-          hint: 'Tour',
+          hint: 'Lọc theo tour',
           value: _tour,
           onTap: _filterTour,
           onClear: () {

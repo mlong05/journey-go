@@ -6,6 +6,10 @@ import com.journeygo.modules.community.entity.enums.*;
 import com.journeygo.modules.community.repository.*;
 import com.journeygo.modules.destination.entity.Destination;
 import com.journeygo.modules.destination.repository.DestinationRepository;
+import com.journeygo.modules.booking.entity.enums.BookingStatus;
+import com.journeygo.modules.booking.repository.BookingRepository;
+import com.journeygo.modules.journey.entity.Journey;
+import com.journeygo.modules.journey.repository.JourneyRepository;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.experience.exception.BusinessException;
@@ -44,9 +48,12 @@ public class CommunityService {
     private final PostCommentRepository commentRepository;
     private final PostReactionRepository reactionRepository;
     private final PostReportRepository reportRepository;
+    private final CommentReportRepository commentReportRepository;
     private final UserRepository userRepository;
     private final DestinationRepository destinationRepository;
     private final TourRepository tourRepository;
+    private final JourneyRepository journeyRepository;
+    private final BookingRepository bookingRepository;
     private final NotificationPublisher notifications;
 
     private static final int MAX_MEDIA_PER_POST = 10;
@@ -67,15 +74,18 @@ public class CommunityService {
                 ? PostStatus.DRAFT
                 : PostStatus.PENDING_REVIEW;
 
+        Long tourId = requireAttachableTour(request.tourId());
+        Long journeyId = requireOwnJourney(request.journeyId(), userId, tourId);
+
         CommunityPost post = CommunityPost.builder()
                 .authorId(userId)
                 .authorName(author.getFullName())
                 .authorAvatarUrl(author.getAvatarUrl())
                 .title(request.title().trim())
                 .content(request.content().trim())
-                .tourId(request.tourId())
-                .destinationId(request.destinationId())
-                .journeyId(request.journeyId())
+                // Bài mới chỉ gắn tour; destinationId giữ lại cho bài cũ (không nhận từ request nữa)
+                .tourId(tourId)
+                .journeyId(journeyId)
                 .status(initialStatus)
                 .likesCount(0)
                 .commentsCount(0)
@@ -133,7 +143,46 @@ public class CommunityService {
         }
 
         CommunityPost updated = postRepository.save(post);
-        return PostResponse.fromEntity(updated, null);
+        return withNames(PostResponse.fromEntity(updated, null));
+    }
+
+    /** Tour gắn vào bài phải tồn tại, đã được duyệt và chưa bị xoá (tour xoá mềm bị lọc sẵn ở repository). */
+    private Long requireAttachableTour(Long tourId) {
+        if (tourId == null) return null;
+        Tour tour = tourRepository.findById(tourId)
+                .orElseThrow(() -> new BusinessException("POST-TOUR-NOT-FOUND", "Tour được gắn không tồn tại hoặc đã bị xoá"));
+        if (!tour.isApproved()) {
+            throw new BusinessException("POST-TOUR-NOT-PUBLISHED", "Chỉ có thể gắn tour đang được mở bán");
+        }
+        return tourId;
+    }
+
+    /** Hành trình gắn vào bài phải là của chính người viết và (nếu có gắn tour) thuộc đúng tour đó. */
+    private Long requireOwnJourney(Long journeyId, Long userId, Long tourId) {
+        if (journeyId == null) return null;
+        Journey journey = journeyRepository.findById(journeyId)
+                .orElseThrow(() -> new BusinessException("POST-JOURNEY-NOT-FOUND", "Hành trình được gắn không tồn tại"));
+        if (!journey.getUserId().equals(userId)) {
+            throw new BusinessException("POST-JOURNEY-FORBIDDEN", "Chỉ có thể gắn hành trình của chính bạn");
+        }
+        if (tourId != null && !tourId.equals(journey.getTourId())) {
+            throw new BusinessException("POST-JOURNEY-MISMATCH", "Hành trình được gắn không thuộc tour đã chọn");
+        }
+        return journeyId;
+    }
+
+    private static final List<BookingStatus> JOINED_BOOKING_STATUSES =
+            List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED);
+
+    /** Người viết đã đặt vé (đã thanh toán) hoặc đã bắt đầu hành trình của tour gắn trong bài. */
+    private boolean authorJoined(Long authorId, Long tourId) {
+        return journeyRepository.existsByUserIdAndTourId(authorId, tourId)
+                || bookingRepository.existsByTour_TourIdAndTourist_IdAndStatusIn(tourId, authorId, JOINED_BOOKING_STATUSES);
+    }
+
+    /** Bổ sung "người viết đã tham gia tour" cho API kiểm duyệt (mỗi bài một lần kiểm tra, trang nhỏ). */
+    private PostResponse withJoined(PostResponse p) {
+        return p.tourId() == null ? p : p.toBuilder().authorJoinedTour(authorJoined(p.authorId(), p.tourId())).build();
     }
 
     /** Tác giả gửi duyệt bài nháp, bài bị từ chối hoặc bài được yêu cầu chỉnh sửa. */
@@ -200,6 +249,8 @@ public class CommunityService {
         }
 
         reactionRepository.deleteByPostId(postId);
+        // Báo cáo bình luận phải xoá trước bình luận, nếu không sẽ thành báo cáo "mồ côi" treo mãi ở hàng chờ moderator
+        commentReportRepository.deleteByPostId(postId);
         commentRepository.deleteByPostId(postId);
         reportRepository.deleteByPostId(postId);
         postRepository.delete(post);
@@ -231,9 +282,9 @@ public class CommunityService {
 
         if (canModerate) {
             // Kiểm duyệt viên xem được mọi bài, kể cả bài đã ẩn hoặc chưa duyệt.
-            return withNames(PostResponse.fromEntity(post, findUserReaction(postId, currentUserId)).toBuilder()
+            return withNames(withJoined(PostResponse.fromEntity(post, findUserReaction(postId, currentUserId)).toBuilder()
                     .reportCount((int) reportRepository.countByPostIdAndStatus(postId, ReportStatus.PENDING))
-                    .build());
+                    .build()));
         }
 
         if (post.isHidden()) {
@@ -299,6 +350,7 @@ public class CommunityService {
         if (!comment.isHidden()) {
             adjustCommentsCount(comment.getPostId(), -1);
         }
+        commentReportRepository.deleteByCommentId(commentId);
         commentRepository.delete(comment);
     }
 
@@ -422,9 +474,9 @@ public class CommunityService {
     public Page<PostResponse> getPendingPosts(Pageable pageable) {
         Page<CommunityPost> page = postRepository.findByStatusOrderByCreatedAtAsc(PostStatus.PENDING_REVIEW, pageable);
         Map<Long, Integer> counts = pendingReportCounts(page.getContent().stream().map(CommunityPost::getId).toList());
-        return withNames(page.map(p -> PostResponse.fromEntity(p, null).toBuilder()
+        return withNames(page.map(p -> withJoined(PostResponse.fromEntity(p, null).toBuilder()
                 .reportCount(counts.getOrDefault(p.getId(), 0))
-                .build()));
+                .build())));
     }
 
     @Transactional

@@ -17,6 +17,9 @@ public interface JourneyRepository extends JpaRepository<Journey, Long> {
 
     List<Journey> findByUserIdAndStatus(Long userId, JourneyStatus status);
 
+    /** Du khách đã từng bắt đầu hành trình của tour (dùng để đánh dấu bài viết cộng đồng đáng tin). */
+    boolean existsByUserIdAndTourId(Long userId, Long tourId);
+
     Optional<Journey> findByUserIdAndBookingId(Long userId, Long bookingId);
 
     Optional<Journey> findFirstByUserIdAndBookingIdOrderByCreatedAtDesc(Long userId, Long bookingId);

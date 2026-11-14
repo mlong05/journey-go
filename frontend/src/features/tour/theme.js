@@ -70,7 +70,7 @@ export const TOUR_STATUS_META = {
     cls: "bg-slate-100 text-slate-600 border-slate-200",
     dot: "bg-slate-400",
   },
-  PENDING: {
+  PENDING_REVIEW: {
     label: "Chờ duyệt",
     cls: "bg-amber-50 text-amber-700 border-amber-200",
     dot: "bg-amber-500",
@@ -85,6 +85,11 @@ export const TOUR_STATUS_META = {
     label: "Bị từ chối",
     cls: "bg-rose-50 text-rose-700 border-rose-200",
     dot: "bg-rose-500",
+  },
+  CHANGES_REQUESTED: {
+    label: "Cần chỉnh sửa",
+    cls: "bg-orange-50 text-orange-700 border-orange-200",
+    dot: "bg-orange-500",
   },
   DELETED: {
     label: "Đã xoá",
@@ -113,7 +118,7 @@ export const TOUR_TYPE_OPTIONS = Object.entries(TOUR_TYPE_META).map(
 /**
  * Thứ tự hiển thị của bảng điều khiển lọc, khớp thứ tự khai báo trong enum backend.
  */
-export const TOUR_STATUS_ORDER = ["DRAFT", "PENDING", "PUBLISHED", "REJECTED"];
+export const TOUR_STATUS_ORDER = ["DRAFT", "PENDING_REVIEW", "CHANGES_REQUESTED", "PUBLISHED", "REJECTED"];
 
 /** Trạng thái mà một tour được phép gửi duyệt (submit). */
 export const SUBMITTABLE_STATUSES = ["DRAFT", "REJECTED"];
@@ -168,9 +173,25 @@ export function formatDuration(days) {
 }
 
 /**
+ * Thời gian của một tour theo ngày: tour trong ngày → "1 ngày";
+ * tour nhiều ngày → "3 ngày 2 đêm" (số đêm lấy từ tour, mặc định = số ngày − 1).
+ */
+export function formatTourDuration(tour) {
+  if (tour?.tourFormat === "DAY_TRIP") return "1 ngày";
+  const days = Number(tour?.durationDays);
+  if (!Number.isFinite(days) || days <= 0) return EMPTY_VALUE;
+  if (tour?.tourFormat === "MULTI_DAY") {
+    const n = tour?.durationNights == null ? NaN : Number(tour.durationNights);
+    const nights = Number.isFinite(n) && n >= 0 ? n : Math.max(days - 1, 0);
+    return nights > 0 ? `${days} ngày ${nights} đêm` : `${days} ngày`;
+  }
+  return formatDuration(days);
+}
+
+/**
  * Chuẩn hoá response thô của backend về dạng dùng chung cho UI.
  * Hỗ trợ cả TourResponse trực tiếp và TourReviewResponse từ moderation.
- * Backend trả `status` (DRAFT/PENDING/APPROVED/PUBLISHED/REJECTED) kèm cờ `deleted`.
+ * Backend trả `status` (DRAFT/PENDING_REVIEW/CHANGES_REQUESTED/REJECTED/PUBLISHED) kèm cờ `deleted`.
  */
 export function normalizeTour(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -188,6 +209,10 @@ export function normalizeTour(raw) {
     // Giá do backend tính động (tổng giá Experience của các điểm đến trong hành trình).
     price: inner.price != null ? Number(inner.price) : null,
     durationDays: inner.durationDays != null ? Number(inner.durationDays) : null,
+    // Tour 5 bước: DAY_TRIP tính theo phút, MULTI_DAY theo ngày.
+    tourFormat: inner.tourFormat || null,
+    durationMinutes: inner.durationMinutes != null ? Number(inner.durationMinutes) : null,
+    durationNights: inner.durationNights != null ? Number(inner.durationNights) : null,
     approved: inner.approved === true || status === "PUBLISHED",
     status,
     rejectionReason: raw.reason || inner.rejectionReason || "",
@@ -203,6 +228,8 @@ export function normalizeTour(raw) {
     createdBy: inner.createdBy || raw.reviewerName || "",
     createdAt: inner.createdAt || raw.submittedAt || null,
     updatedAt: inner.updatedAt || raw.reviewedAt || null,
+    // Tour tạo theo luồng 5 bước → dùng màn hình wizard / thẩm định mới thay cho form & nút duyệt cũ.
+    wizardTour: inner.wizardTour === true || raw.wizardTour === true,
   };
 }
 

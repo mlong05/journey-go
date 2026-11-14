@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'server_finder.dart';
 import 'token_storage.dart';
 
 const _imageSubtypesByExtension = {
@@ -210,8 +211,10 @@ class ApiClient {
         statusCode: response.statusCode,
       );
     } on TimeoutException {
+      ServerFinder.markUnreachable();
       throw const ApiException('Kết nối đến máy chủ quá hạn. Vui lòng thử lại.');
     } on SocketException {
+      ServerFinder.markUnreachable();
       throw const ApiException(
         'Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và địa chỉ API.',
       );

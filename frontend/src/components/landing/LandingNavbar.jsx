@@ -47,7 +47,13 @@ export function BrandLogo({ light = false }) {
   );
 }
 
-export default function LandingNavbar() {
+const DEFAULT_CTA = { href: ROUTES.REGISTER, label: "Bắt đầu ngay" };
+
+/**
+ * @param links neo / đường dẫn trên thanh điều hướng (mặc định: các mục của trang chủ)
+ * @param cta   nút chính bên phải (mặc định: tạo tài khoản)
+ */
+export default function LandingNavbar({ links = NAV_LINKS, cta = DEFAULT_CTA }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -73,7 +79,7 @@ export default function LandingNavbar() {
         <BrandLogo light={!solid} />
 
         <nav className="hidden md:flex items-center gap-1">
-          {NAV_LINKS.map((link) => (
+          {links.map((link) => (
             <a
               key={link.href}
               href={link.href}
@@ -101,10 +107,10 @@ export default function LandingNavbar() {
             Đăng nhập
           </Link>
           <Link
-            href={ROUTES.REGISTER}
+            href={cta.href}
             className="h-9 px-4 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-sm font-medium text-white flex items-center gap-1.5 shadow-xs transition-colors"
           >
-            Bắt đầu ngay
+            {cta.label}
             <ArrowRight size={15} />
           </Link>
         </div>
@@ -125,7 +131,7 @@ export default function LandingNavbar() {
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white px-4 pt-2 pb-5">
           <nav className="flex flex-col py-1">
-            {NAV_LINKS.map((link) => (
+            {links.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
@@ -145,10 +151,10 @@ export default function LandingNavbar() {
               Đăng nhập
             </Link>
             <Link
-              href={ROUTES.REGISTER}
+              href={cta.href}
               className="h-10 rounded-lg bg-emerald-700 text-sm font-medium text-white flex items-center justify-center"
             >
-              Bắt đầu ngay
+              {cta.label}
             </Link>
           </div>
         </div>

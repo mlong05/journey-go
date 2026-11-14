@@ -70,4 +70,13 @@ public class ProviderProfile {
     public BigDecimal getEffectiveCommissionRate() {
         return commissionRate != null ? commissionRate : BigDecimal.ZERO;
     }
+
+    /**
+     * Đối tác được tạo / gửi duyệt tour (BR-01).
+     * Hồ sơ chỉ được tạo SAU KHI Admin duyệt đơn đăng ký đối tác (/partner-register → /admin/partners),
+     * nên chỉ cần kiểm tra đối tác còn đang hoạt động.
+     */
+    public boolean canManageTours() {
+        return active;
+    }
 }

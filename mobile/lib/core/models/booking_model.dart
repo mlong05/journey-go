@@ -9,7 +9,6 @@ library;
 
 import '../utils/formatters.dart';
 import 'gamification_model.dart' show formatThousands;
-
 // Các model Payment được định nghĩa trong `payment_model.dart` nhưng vẫn được
 // export lại từ đây để tương thích với code đang import từ `booking_model.dart`.
 export 'payment_model.dart'
@@ -76,7 +75,147 @@ class BookingStatus {
   };
 }
 
-/// Trạng thái một lần thanh toán (PaymentStatus).
+/// Loại khách (GuestType) — nền tảng quy định, đối tác không sửa được.
+class GuestType {
+  static const adult = 'ADULT';
+  static const child = 'CHILD';
+  static const toddler = 'TODDLER';
+  static const infant = 'INFANT';
+
+  static String label(String type) => switch (type) {
+        adult => 'Người lớn',
+        child => 'Trẻ em',
+        toddler => 'Trẻ nhỏ',
+        infant => 'Em bé',
+        _ => type,
+      };
+
+  /// Khoảng tuổi áp dụng.
+  static String ageRange(String type) => switch (type) {
+        adult => 'Từ 12 tuổi',
+        child => '5 – 11 tuổi',
+        toddler => '2 – 4 tuổi',
+        infant => 'Dưới 2 tuổi',
+        _ => '',
+      };
+}
+
+/// Một hành khách trong nhóm đặt tour.
+class BookingPassengerModel {
+  final int id;
+  final String fullName;
+  final DateTime? birthDate;
+  final String? gender;
+  final String? email;
+  final String guestType;
+
+  /// Nhãn loại khách từ backend (VD: "Người lớn", "Trẻ em").
+  final String guestTypeLabel;
+
+  final num price;
+  final bool countsTowardSlot;
+
+  /// true = chính người đặt tour.
+  final bool bookingCustomer;
+
+  /// Đã liên kết với một tài khoản JourneyGo hay chưa.
+  final bool hasAccount;
+  final String status;
+
+  /// Tuổi tại ngày trải nghiệm.
+  final int? ageAtExperience;
+
+  /// Thông tin cá nhân (ngày sinh / giới tính / email) có hiển thị hay không.
+  ///
+  /// `false` khi người đang xem là hành khách được mời — theo ma trận quyền,
+  /// hành khách được mời không được xem PII của hành khách khác.
+  final bool personalInfoVisible;
+
+  /// Trạng thái lời mời gần nhất: PENDING | ACCEPTED | EXPIRED | REVOKED.
+  final String? invitationStatus;
+
+  /// Thời điểm hết hạn của lời mời (24h kể từ lúc gửi).
+  final DateTime? invitationExpiresAt;
+
+  const BookingPassengerModel({
+    required this.id,
+    required this.fullName,
+    this.birthDate,
+    this.gender,
+    this.email,
+    this.guestType = GuestType.adult,
+    this.guestTypeLabel = '',
+    this.price = 0,
+    this.countsTowardSlot = true,
+    this.bookingCustomer = false,
+    this.hasAccount = false,
+    this.status = 'ACTIVE',
+    this.ageAtExperience,
+    this.personalInfoVisible = true,
+    this.invitationStatus,
+    this.invitationExpiresAt,
+  });
+
+  factory BookingPassengerModel.fromJson(Map<String, dynamic> json) =>
+      BookingPassengerModel(
+        id: _asNum(json['id']).toInt(),
+        fullName: json['fullName']?.toString() ?? '',
+        birthDate: _asLocalDate(json['birthDate']),
+        gender: json['gender']?.toString(),
+        email: json['email']?.toString(),
+        guestType: json['guestType']?.toString() ?? GuestType.adult,
+        guestTypeLabel:
+            json['guestTypeLabel']?.toString() ?? GuestType.label(json['guestType']?.toString() ?? GuestType.adult),
+        price: _asNum(json['price']),
+        countsTowardSlot: json['countsTowardSlot'] != false,
+        bookingCustomer: json['bookingCustomer'] == true,
+        hasAccount: json['hasAccount'] == true,
+        status: json['status']?.toString() ?? 'ACTIVE',
+        ageAtExperience:
+            json['ageAtExperience'] == null ? null : _asNum(json['ageAtExperience']).toInt(),
+        personalInfoVisible: json['personalInfoVisible'] != false,
+        invitationStatus: json['invitationStatus']?.toString(),
+        invitationExpiresAt: _asDate(json['invitationExpiresAt']),
+      );
+
+  bool get isActive => status == 'ACTIVE';
+  bool get isReplaced => status == 'REPLACED';
+
+  /// Người lớn bắt buộc có email (để đăng nhập nhận vé).
+  bool get emailRequired => guestType == GuestType.adult;
+
+  /// Có thể gửi lời mời cho hành khách này không.
+  ///
+  /// Điều kiện: là hành khách thường (không phải người đặt), còn hiệu lực,
+  /// chưa có tài khoản, có email và chưa có lời mời đang chờ.
+  bool get canBeInvited =>
+      !bookingCustomer &&
+      isActive &&
+      !hasAccount &&
+      (email?.isNotEmpty ?? false) &&
+      invitationStatus != 'PENDING' &&
+      invitationStatus != 'ACCEPTED';
+
+  /// Lời mời đã hết hạn ⇒ người đặt có thể gửi lại.
+  bool get invitationExpired => invitationStatus == 'EXPIRED';
+
+  /// Lời mời đang chờ xác nhận.
+  bool get invitationPending => invitationStatus == 'PENDING';
+
+  /// Người được mời đã xác nhận tham gia.
+  bool get invitationAccepted => invitationStatus == 'ACCEPTED';
+
+  /// Nhãn trạng thái hiển thị cho UI.
+  String get invitationLabel => switch (invitationStatus) {
+        'PENDING' => 'Đã gửi lời mời',
+        'ACCEPTED' => 'Đã tham gia',
+        'EXPIRED' => 'Lời mời đã hết hạn',
+        'REVOKED' => 'Lời mời đã hủy',
+        _ => '',
+      };
+}
+
+/// Một lần thanh toán (PaymentStatus).
 class PaymentStatus {
   static const pending = 'PENDING';
   static const processing = 'PROCESSING';
@@ -122,6 +261,18 @@ class BookingModel {
   final String? cancellationReason;
   final List<SlotHoldModel> slotHolds;
 
+  /// Danh sách hành khách trong nhóm (người đặt là hành khách đầu tiên).
+  final List<BookingPassengerModel> passengers;
+
+  /// Số chỗ đã giữ (bằng số hành khách có `countsTowardSlot`).
+  final int slotCount;
+
+  /// Ngày trải nghiệm đã tới chưa (tour đã mở).
+  final bool experienceStarted;
+
+  /// Số ngày còn lại tới ngày trải nghiệm (0 nếu đã qua).
+  final int daysUntilExperience;
+
   const BookingModel({
     required this.id,
     required this.bookingCode,
@@ -140,6 +291,10 @@ class BookingModel {
     this.completedAt,
     required this.cancellationReason,
     this.slotHolds = const [],
+    this.passengers = const [],
+    this.slotCount = 0,
+    this.experienceStarted = false,
+    this.daysUntilExperience = 0,
   });
 
   factory BookingModel.fromJson(Map<String, dynamic> json) => BookingModel(
@@ -165,6 +320,15 @@ class BookingModel {
                 .map(SlotHoldModel.fromJson)
                 .toList()
             : const [],
+        passengers: (json['passengers'] is List)
+            ? (json['passengers'] as List)
+                .whereType<Map<String, dynamic>>()
+                .map(BookingPassengerModel.fromJson)
+                .toList()
+            : const [],
+        slotCount: _asNum(json['slotCount']).toInt(),
+        experienceStarted: json['experienceStarted'] == true,
+        daysUntilExperience: _asNum(json['daysUntilExperience']).toInt(),
       );
 
   bool get isPaid => status == BookingStatus.confirmed || status == BookingStatus.completed;
@@ -241,6 +405,45 @@ class BookingModel {
   /// Slot đã được giải phóng (đơn hủy / hết hạn).
   List<SlotHoldModel> get releasedSlotHolds =>
       slotHolds.where((h) => h.released).toList(growable: false);
+
+  // ── Hành khách trong nhóm ────────────────────────────────────────────────
+
+  /// Hành khách còn hiệu lực (chưa bị thay thế / thu hồi).
+  List<BookingPassengerModel> get activePassengers =>
+      passengers.where((p) => p.isActive).toList(growable: false);
+
+  /// Hành khách chưa có tài khoản ⇒ có thể gửi lời mời tham gia tour.
+  List<BookingPassengerModel> get unlinkedPassengers => activePassengers
+      .where((p) => !p.hasAccount && !p.bookingCustomer)
+      .toList(growable: false);
+
+  /// Tour bị khoá cho tới ngày trải nghiệm.
+  ///
+  /// Khớp đúng với quy tắc của backend (`LocalDate.now(Asia/Ho_Chi_Minh)`) để
+  /// app KHÔNG mở màn hành trình khi server đang khoá tour.
+  bool get isTourLocked => daysUntilStart > 0;
+
+  /// Ngày trải nghiệm còn bao nhiêu ngày nữa (0 = hôm nay hoặc đã qua).
+  ///
+  /// Tính theo giờ Việt Nam (UTC+7) — giống hệt cách backend đếm ngày — nên
+  /// nhãn đếm ngược khớp với thông báo "còn N ngày nữa" của server.
+  int get daysUntilStart {
+    final date = experienceDate;
+    if (date != null) {
+      final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+      final today = DateTime(now.year, now.month, now.day);
+      final target = DateTime(date.year, date.month, date.day);
+      final diff = target.difference(today).inDays;
+      return diff < 0 ? 0 : diff;
+    }
+    // Không có ngày trải nghiệm ⇒ fallback về số ngày backend tính sẵn.
+    return daysUntilExperience < 0 ? 0 : daysUntilExperience;
+  }
+
+  /// Nhãn nút hành động khi mở tour đã mua:
+  /// "12 ngày nữa lên đường!" khi còn ngày, "Bắt đầu trải nghiệm" khi đã tới ngày.
+  String get startJourneyLabel =>
+      isTourLocked ? '$daysUntilStart ngày nữa lên đường!' : 'Bắt đầu trải nghiệm';
 
   Map<String, dynamic> toJson() => {
         'id': id,

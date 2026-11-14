@@ -1,3 +1,4 @@
+import '../models/tour_detail_model.dart' show StopCulture;
 import '../models/tour_journey_model.dart';
 import 'api_client.dart';
 
@@ -66,6 +67,15 @@ class JourneyService {
   /// PATCH /journeys/{id}/destinations/{destId}/skip
   Future<void> skipDestination({required int journeyId, required int destinationId}) async {
     await ApiClient.request('PATCH', '/journeys/$journeyId/destinations/$destinationId/skip');
+  }
+
+  /// GET /journeys/{id}/destinations/{stopId}/culture: nội dung văn hoá, backend chỉ trả khi đã check-in.
+  Future<StopCulture> getCulture({required int journeyId, required int destinationId}) async {
+    final data = await ApiClient.request('GET', '/journeys/$journeyId/destinations/$destinationId/culture');
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Máy chủ trả về nội dung văn hóa không hợp lệ.');
+    }
+    return StopCulture.fromJson(data);
   }
 
   /// GET /journeys/{id}/tasks/{taskId}/questions. Gửi tọa độ để mở khóa nhiệm vụ cần vị trí.

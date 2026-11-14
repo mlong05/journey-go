@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import {
+  BadgeCheck,
+  ExternalLink,
+  Film,
+  MessagesSquare,
   MessageSquare,
   Flag,
   CheckCircle2,
@@ -30,7 +35,8 @@ import { useQueueRefresh } from "@/context/NotificationContext";
  * Hai việc chính:
  *  - Bài chờ duyệt: duyệt, yêu cầu chỉnh sửa hoặc từ chối kèm ghi chú gửi tác giả.
  *  - Báo cáo vi phạm: xác nhận (ẩn hoặc giữ bài) hoặc bác bỏ báo cáo, hiện lại bài đã ẩn.
- * Chỉ bài đã được duyệt mới xuất hiện trên bảng tin của du khách.
+ *  - Bình luận bị báo cáo: bình luận hiện ngay khi đăng; cộng đồng báo cáo, kiểm duyệt viên ẩn hoặc bác bỏ.
+ * Chỉ bài đã được duyệt mới xuất hiện trên bảng tin của du khách. Bài mới chỉ gắn tour (không gắn điểm đến).
  */
 
 const NOTE_MAX = 500;
@@ -253,44 +259,97 @@ function ExpandableText({ as: Tag = "p", lines = 4, className = "", children }) 
   );
 }
 
-function PlaceLine({ destinationName, tourTitle }) {
-  if (!destinationName && !tourTitle) return null;
+/**
+ * Tour gắn trong bài: bấm để mở bản xem tour (tab mới) và đối chiếu nội dung bài.
+ * Kèm nhãn người viết đã tham gia tour (đặt vé đã thanh toán hoặc đã đi) hay chưa.
+ * Bài cũ có thể còn gắn điểm đến: vẫn hiển thị dạng chữ.
+ */
+function PlaceLine({ destinationName, tourId, tourTitle, authorJoinedTour }) {
+  if (!destinationName && !tourId) return null;
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
+      {tourId && (
+        <Link
+          href={`/moderator/tours/${tourId}`}
+          target="_blank"
+          className="inline-flex items-center gap-1 max-w-full text-[11px] font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full px-2.5 py-0.5 transition-colors"
+          title="Mở tour trong tab mới"
+        >
+          <Route size={11} />
+          <span className="truncate">{tourTitle || `Tour #${tourId}`}</span>
+          <ExternalLink size={10} className="shrink-0 text-slate-400" />
+        </Link>
+      )}
+      {tourId && authorJoinedTour === true && (
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
+          <BadgeCheck size={11} />
+          Đã tham gia tour
+        </span>
+      )}
+      {tourId && authorJoinedTour === false && (
+        <span
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-white border border-slate-200 rounded-full px-2.5 py-0.5"
+          title="Người viết chưa đặt vé hoặc chưa đi tour này: có thể là câu hỏi trước chuyến đi, hoặc đánh giá chưa xác thực"
+        >
+          Chưa tham gia tour
+        </span>
+      )}
       {destinationName && (
         <span className="inline-flex items-center gap-1 max-w-full text-[11px] font-medium text-slate-600 bg-slate-100 rounded-full px-2.5 py-0.5">
           <MapPin size={11} />
           <span className="truncate" title={destinationName}>{destinationName}</span>
         </span>
       )}
-      {tourTitle && (
-        <span className="inline-flex items-center gap-1 max-w-full text-[11px] font-medium text-slate-600 bg-slate-100 rounded-full px-2.5 py-0.5">
-          <Route size={11} />
-          <span className="truncate" title={tourTitle}>{tourTitle}</span>
-        </span>
-      )}
     </div>
   );
 }
 
-function PostImages({ mediaList }) {
-  const images = (mediaList || []).filter((m) => m?.mediaType !== "VIDEO" && m?.mediaUrl);
-  if (images.length === 0) return null;
+/** Ảnh (lưới, bấm mở ảnh gốc) và video (phát ngay) đính kèm bài: kiểm duyệt viên phải xem hết trước khi duyệt. */
+function PostMedia({ mediaList }) {
+  const media = (mediaList || []).filter((m) => m?.mediaUrl);
+  const images = media.filter((m) => m.mediaType !== "VIDEO");
+  const videos = media.filter((m) => m.mediaType === "VIDEO");
+  if (media.length === 0) return null;
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-      {images.slice(0, 8).map((m) => (
-        <a
-          key={m.id ?? m.mediaUrl}
-          href={m.mediaUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="block aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200"
-          title="Mở ảnh gốc"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={m.mediaUrl} alt="Ảnh đính kèm bài viết" className="w-full h-full object-cover" />
-        </a>
-      ))}
+    <div className="space-y-2">
+      {videos.length > 0 && (
+        <div className="grid sm:grid-cols-2 gap-2">
+          {videos.map((m) => (
+            <video
+              key={m.id ?? m.mediaUrl}
+              src={m.mediaUrl}
+              controls
+              preload="metadata"
+              className="w-full aspect-video rounded-xl bg-slate-900 border border-slate-200"
+            >
+              <a href={m.mediaUrl} target="_blank" rel="noreferrer">Mở video</a>
+            </video>
+          ))}
+        </div>
+      )}
+      {images.length > 0 && (
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          {images.map((m) => (
+            <a
+              key={m.id ?? m.mediaUrl}
+              href={m.mediaUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200"
+              title="Mở ảnh gốc"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={m.mediaUrl} alt="Ảnh đính kèm bài viết" className="w-full h-full object-cover" />
+            </a>
+          ))}
+        </div>
+      )}
+      {videos.length > 0 && (
+        <p className="text-[11px] text-slate-500 inline-flex items-center gap-1">
+          <Film size={11} />
+          {videos.length} video đính kèm, hãy xem hết trước khi duyệt.
+        </p>
+      )}
     </div>
   );
 }
@@ -342,7 +401,7 @@ function ActionButton({ tone, icon: Icon, children, onClick, disabled }) {
 export default function ModeratorCommunityPage() {
   const { confirm, confirmDialog } = useConfirm();
 
-  const [activeTab, setActiveTab] = useState("posts"); // "posts" | "reports"
+  const [activeTab, setActiveTab] = useState("posts"); // "posts" | "reports" | "comments"
   const [toast, setToast] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -354,6 +413,11 @@ export default function ModeratorCommunityPage() {
   const [reports, setReports] = useState({ items: [], total: 0, hasMore: false, page: 0 });
   const [reportsState, setReportsState] = useState({ loading: true, more: false, error: "" });
   const [pendingReportTotal, setPendingReportTotal] = useState(0);
+
+  const [commentStatus, setCommentStatus] = useState("PENDING");
+  const [commentReports, setCommentReports] = useState({ items: [], total: 0, hasMore: false, page: 0 });
+  const [commentState, setCommentState] = useState({ loading: true, more: false, error: "" });
+  const [pendingCommentTotal, setPendingCommentTotal] = useState(0);
 
   const showToast = useCallback((message, type = "success") => {
     setToast({ message, type });
@@ -405,22 +469,48 @@ export default function ModeratorCommunityPage() {
     []
   );
 
+  const loadCommentReports = useCallback(async (status, page = 0) => {
+    setCommentState((s) => ({ ...s, loading: page === 0, more: page > 0, error: "" }));
+    try {
+      const result = await api.getCommentReports({ status, page, size: PAGE_SIZE });
+      setCommentReports((prev) => ({
+        items: page === 0 ? result.items : [...prev.items, ...result.items],
+        total: result.total,
+        hasMore: result.hasMore,
+        page,
+      }));
+      if (status === "PENDING") setPendingCommentTotal(result.total);
+      setCommentState({ loading: false, more: false, error: "" });
+    } catch (err) {
+      setCommentState({
+        loading: false,
+        more: false,
+        error: err?.message || "Không thể tải danh sách báo cáo bình luận.",
+      });
+    }
+  }, []);
+
   /* Số lượng ở tab báo cáo chờ xử lý, luôn lấy riêng để hiện trên nhãn tab */
   const refreshPendingReportTotal = useCallback(async () => {
     try {
-      const result = await api.getReports({ status: "PENDING", page: 0, size: 1 });
-      setPendingReportTotal(result.total);
+      const [posts, comments] = await Promise.all([
+        api.getReports({ status: "PENDING", page: 0, size: 1 }),
+        api.getCommentReports({ status: "PENDING", page: 0, size: 1 }),
+      ]);
+      setPendingReportTotal(posts.total);
+      setPendingCommentTotal(comments.total);
     } catch {
       // giữ số cũ
     }
   }, []);
 
-  // Thời gian thực: bài mới chờ duyệt → tải ngầm danh sách; báo cáo mới → cập nhật số trên tab
-  // (danh sách báo cáo đang xem chỉ tải lại khi đang mở tab báo cáo chờ xử lý)
+  // Thời gian thực: bài mới chờ duyệt → tải ngầm danh sách; báo cáo mới (bài hoặc bình luận) → cập nhật số
+  // trên tab (danh sách đang xem chỉ tải lại khi đang mở đúng tab ở mục chờ xử lý)
   useQueueRefresh(["post-review"], () => loadPosts(0, true));
   useQueueRefresh(["post-report"], () => {
     refreshPendingReportTotal();
     if (activeTab === "reports" && reportStatus === "PENDING") loadReports("PENDING", 0);
+    if (activeTab === "comments" && commentStatus === "PENDING") loadCommentReports("PENDING", 0);
   });
 
   useEffect(() => {
@@ -429,21 +519,74 @@ export default function ModeratorCommunityPage() {
       if (cancelled) return;
       loadPosts(0);
       loadReports("PENDING", 0);
+      loadCommentReports("PENDING", 0);
     });
     return () => {
       cancelled = true;
     };
-  }, [loadPosts, loadReports]);
+  }, [loadPosts, loadReports, loadCommentReports]);
 
   const refreshAll = () => {
     loadPosts(0);
     loadReports(reportStatus, 0);
-    if (reportStatus !== "PENDING") refreshPendingReportTotal();
+    loadCommentReports(commentStatus, 0);
+    if (reportStatus !== "PENDING" || commentStatus !== "PENDING") refreshPendingReportTotal();
   };
 
   const changeReportStatus = (status) => {
+    if (activeTab === "comments") {
+      setCommentStatus(status);
+      loadCommentReports(status, 0);
+      return;
+    }
     setReportStatus(status);
     loadReports(status, 0);
+  };
+
+  /* ── Xử lý báo cáo bình luận ────────────────────────────────────────── */
+  const openCommentDecision = (report, mode) => {
+    const config = {
+      hide: {
+        tone: "danger",
+        title: "Xác nhận vi phạm và ẩn bình luận",
+        description:
+          "Bình luận bị gỡ khỏi bài viết. Các báo cáo chờ xử lý khác của bình luận này cũng được đánh dấu đã xử lý.",
+        confirmLabel: "Ẩn bình luận",
+      },
+      dismiss: {
+        tone: "neutral",
+        title: "Bác bỏ báo cáo",
+        description:
+          "Bình luận không vi phạm và được giữ nguyên. Nếu bình luận đang bị tự ẩn do nhiều báo cáo, nó sẽ hiện lại khi không còn báo cáo chờ.",
+        confirmLabel: "Bác bỏ báo cáo",
+      },
+    }[mode];
+    setDialog({
+      ...config,
+      noteLabel: "Ghi chú xử lý (không bắt buộc)",
+      required: false,
+      subject: report.commentContent ? `“${report.commentContent.slice(0, 80)}”` : `Bình luận #${report.commentId}`,
+      kind: "comment",
+      report,
+      mode,
+    });
+  };
+
+  const submitCommentDecision = async (note) => {
+    const { report, mode } = dialog;
+    setBusy(true);
+    try {
+      if (mode === "dismiss") await api.dismissCommentReport(report.id, note);
+      else await api.resolveCommentReport(report.id, { hideComment: true, note });
+      setDialog(null);
+      showToast(mode === "dismiss" ? "Đã bác bỏ báo cáo bình luận." : "Đã ẩn bình luận vi phạm.");
+      loadCommentReports(commentStatus, 0);
+      if (commentStatus !== "PENDING") refreshPendingReportTotal();
+    } catch (err) {
+      showToast(err?.message || "Không thể xử lý báo cáo bình luận.", "error");
+    } finally {
+      setBusy(false);
+    }
   };
 
   /* ── Duyệt bài ──────────────────────────────────────────────────────── */
@@ -584,6 +727,7 @@ export default function ModeratorCommunityPage() {
   const handleDialogConfirm = (note) => {
     if (!dialog) return;
     if (dialog.kind === "post") submitPostDecision(note);
+    else if (dialog.kind === "comment") submitCommentDecision(note);
     else submitReportDecision(note);
   };
 
@@ -604,7 +748,12 @@ export default function ModeratorCommunityPage() {
         )}
       </div>
 
-      <PlaceLine destinationName={post.destinationName} tourTitle={post.tourTitle} />
+      <PlaceLine
+        destinationName={post.destinationName}
+        tourId={post.tourId}
+        tourTitle={post.tourTitle}
+        authorJoinedTour={post.authorJoinedTour}
+      />
 
       <div className="space-y-1.5">
         <ExpandableText as="h3" lines={2} className="text-base font-semibold text-slate-900 leading-snug">
@@ -615,7 +764,7 @@ export default function ModeratorCommunityPage() {
         </ExpandableText>
       </div>
 
-      <PostImages mediaList={post.mediaList} />
+      <PostMedia mediaList={post.mediaList} />
 
       <div className="pt-3 border-t border-slate-100 flex flex-wrap gap-2">
         <ActionButton tone="success" icon={CheckCircle2} onClick={() => openPostDecision(post, "APPROVE")}>
@@ -715,6 +864,83 @@ export default function ModeratorCommunityPage() {
     );
   };
 
+  const renderCommentReportCard = (report) => {
+    const pending = report.status === "PENDING";
+    return (
+      <article key={report.id} className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4 hover:border-slate-300 transition-colors">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-3 py-1">
+            <Flag size={12} />
+            {REPORT_REASONS[report.reason] || report.reason}
+          </span>
+          <span className="text-[11px] text-slate-500">Báo cáo lúc {formatTime(report.createdAt)}</span>
+          {report.pendingReportCount > 1 && (
+            <span className="ml-auto text-[11px] font-medium text-slate-600">
+              Bình luận này có {report.pendingReportCount} báo cáo chờ xử lý
+            </span>
+          )}
+        </div>
+
+        {report.description && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+            <ExpandableText lines={3} className="text-sm text-slate-700 leading-relaxed">
+              “{report.description}”
+            </ExpandableText>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-slate-200 p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500">Bình luận bị báo cáo</span>
+            {report.commentHidden && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-0.5">
+                <EyeOff size={11} />
+                Đang ẩn
+              </span>
+            )}
+          </div>
+          {/* Báo cáo của bình luận đã bị xoá được backend dọn đi, nên ở đây bình luận luôn còn */}
+          {report.commentContent != null && (
+            <div className="flex items-start gap-3">
+              <Avatar name={report.commentAuthorName} url={report.commentAuthorAvatarUrl} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900">
+                  {report.commentAuthorName || "Du khách"}
+                  <span className="ml-2 text-[11px] font-normal text-slate-500">{formatTime(report.commentCreatedAt)}</span>
+                </p>
+                <ExpandableText lines={4} className="text-sm text-slate-700 leading-relaxed mt-0.5">
+                  {report.commentContent}
+                </ExpandableText>
+              </div>
+            </div>
+          )}
+          {report.postTitle && (
+            <p className="text-[11px] text-slate-500">
+              Trong bài: <span className="font-medium text-slate-700">{report.postTitle}</span>
+            </p>
+          )}
+        </div>
+
+        {pending ? (
+          <div className="pt-3 border-t border-slate-100 flex flex-wrap gap-2">
+            <ActionButton tone="danger" icon={EyeOff} onClick={() => openCommentDecision(report, "hide")}>
+              Ẩn bình luận
+            </ActionButton>
+            <ActionButton tone="neutral" icon={XCircle} onClick={() => openCommentDecision(report, "dismiss")}>
+              Bác bỏ báo cáo
+            </ActionButton>
+          </div>
+        ) : (
+          report.resolutionNote && (
+            <p className="pt-3 border-t border-slate-100 text-xs text-slate-600">
+              Ghi chú xử lý: {report.resolutionNote}
+            </p>
+          )
+        )}
+      </article>
+    );
+  };
+
   const renderList = ({ state, data, render, empty, onRetry, onMore }) => {
     if (state.loading) return <Skeleton />;
     if (state.error && data.items.length === 0) {
@@ -795,6 +1021,13 @@ export default function ModeratorCommunityPage() {
           unit="báo cáo"
           tone="rose"
         />
+        <KpiTile
+          icon={MessagesSquare}
+          label="Bình luận bị báo cáo"
+          value={pendingCommentTotal}
+          unit="báo cáo"
+          tone="rose"
+        />
       </section>
 
       {/* ── THANH LỌC ─────────────────────────────────────────── */}
@@ -803,6 +1036,7 @@ export default function ModeratorCommunityPage() {
           {[
             { id: "posts", icon: MessageSquare, label: `Bài chờ duyệt (${posts.total})` },
             { id: "reports", icon: Flag, label: `Báo cáo vi phạm (${pendingReportTotal})` },
+            { id: "comments", icon: MessagesSquare, label: `Bình luận bị báo cáo (${pendingCommentTotal})` },
           ].map(({ id, icon: Icon, label }) => (
             <button
               key={id}
@@ -821,7 +1055,7 @@ export default function ModeratorCommunityPage() {
         </div>
 
         {/* Trạng thái báo cáo chỉ hiện ở tab báo cáo */}
-        {activeTab === "reports" && (
+        {(activeTab === "reports" || activeTab === "comments") && (
           <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-lg w-fit">
             {REPORT_STATUS_TABS.map((tab) => (
               <button
@@ -829,7 +1063,7 @@ export default function ModeratorCommunityPage() {
                 type="button"
                 onClick={() => changeReportStatus(tab.id)}
                 className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all ${
-                  reportStatus === tab.id
+                  (activeTab === "comments" ? commentStatus : reportStatus) === tab.id
                     ? "bg-white text-slate-900 shadow-xs"
                     : "text-slate-500 hover:text-slate-700"
                 }`}
@@ -878,6 +1112,30 @@ export default function ModeratorCommunityPage() {
                   text={
                     reportStatus === "PENDING"
                       ? "Báo cáo vi phạm từ cộng đồng sẽ xuất hiện tại đây."
+                      : undefined
+                  }
+                />
+              ),
+            })}
+
+          {activeTab === "comments" &&
+            renderList({
+              state: commentState,
+              data: commentReports,
+              render: renderCommentReportCard,
+              onRetry: () => loadCommentReports(commentStatus, 0),
+              onMore: () => loadCommentReports(commentStatus, commentReports.page + 1),
+              empty: (
+                <EmptyState
+                  icon={MessagesSquare}
+                  title={
+                    commentStatus === "PENDING"
+                      ? "Không có bình luận nào bị báo cáo"
+                      : "Chưa có báo cáo ở mục này"
+                  }
+                  text={
+                    commentStatus === "PENDING"
+                      ? "Bình luận hiện ngay khi đăng. Khi cộng đồng báo cáo một bình luận, nó sẽ xuất hiện tại đây."
                       : undefined
                   }
                 />

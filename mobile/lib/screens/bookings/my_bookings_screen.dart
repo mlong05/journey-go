@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../core/constants/api_constants.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
-import '../../core/services/mock_payment_store.dart';
 import '../../core/services/payment_service.dart';
+import '../booking/booking_detail_screen.dart';
 import '../journey/journey_screen.dart';
+import '../chat/provider_chat_list_screen.dart';
+import '../tours/tour_detail_opener.dart';
 import 'booking_checkout_screen.dart';
 
 /// Đơn đặt tour của tôi: vé (đã thanh toán), đơn chờ thanh toán và lịch sử giao dịch.
@@ -23,7 +24,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   List<BookingModel> _bookings = const [];
   List<PaymentModel> _payments = const [];
-  Set<int> _mockPaid = const {};
   bool _loading = true;
   String? _error;
 
@@ -36,13 +36,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   Future<void> _load() async {
     try {
       final results = await Future.wait([
-        _bookingService.getMine(),
+        // Gồm cả booking mình được mời tham gia (hành khách được mời) — không
+        // chỉ booking do chính mình đặt.
+        _bookingService.getAccessibleBookings(),
         _paymentService.getMine(),
       ]);
-      final mockPaid = ApiConstants.mockPayment ? await MockPaymentStore.paidIds() : <int>{};
       if (!mounted) return;
       setState(() {
-        _mockPaid = mockPaid;
         _bookings = results[0] as List<BookingModel>;
         _payments = results[1] as List<PaymentModel>;
         _error = null;
@@ -65,9 +65,23 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     if (mounted) _load(); // trạng thái có thể đã đổi trong lúc thanh toán
   }
 
-  bool _isTicket(BookingModel b) => b.isPaid || _mockPaid.contains(b.id);
+  /// Chi tiết đơn: mã QR trải nghiệm, thông tin thanh toán, yêu cầu hoàn tiền.
+  Future<void> _openDetail(BookingModel booking) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => BookingDetailScreen(bookingId: booking.id, booking: booking)),
+    );
+    if (changed == true && mounted) _load();
+  }
 
+  bool _isTicket(BookingModel b) => b.isPaid;
+
+  /// Mở hành trình — nhưng nếu ngày trải nghiệm còn ở tương lai thì mở màn CHI TIẾT
+  /// TOUR (không vào hành trình vì backend đang khoá tour tới ngày đó).
   void _startExperience(BookingModel b) {
+    if (b.isTourLocked) {
+      openTourDetailScreen(context, tourId: b.tourId, bookedBooking: b);
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => JourneyScreen(tourId: b.tourId, bookingId: b.id)),
     );
@@ -76,10 +90,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   @override
   Widget build(BuildContext context) {
     final tickets = _bookings.where(_isTicket).toList();
-    final pending = _bookings.where((b) => b.canPay && !_mockPaid.contains(b.id)).toList();
+    final pending = _bookings.where((b) => b.canPay).toList();
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: AppCultureColors.background,
         appBar: AppBar(
@@ -93,10 +107,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             labelColor: AppCultureColors.jadeDark,
             indicatorColor: AppCultureColors.heritageJade,
             unselectedLabelColor: AppCultureColors.textMuted,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: [
               Tab(text: 'Vé (${tickets.length})'),
               Tab(text: 'Chờ thanh toán (${pending.length})'),
               const Tab(text: 'Giao dịch'),
+              const Tab(text: 'Hỗ trợ từ nhà tour'),
             ],
           ),
         ),
@@ -117,6 +134,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                         _list(tickets, 'Chưa có vé nào. Vé xuất hiện sau khi bạn thanh toán thành công.', _ticketTile),
                         _list(pending, 'Không có đơn nào đang chờ thanh toán.', _pendingTile),
                         _list(_payments, 'Chưa có giao dịch nào.', _paymentTile),
+                        // Hỗ trợ từ nhà tour: nhúng danh sách hội thoại để khách
+                        // không phải rời màn "Đơn đặt tour".
+                        const ProviderChatListScreen(embedded: true),
                       ],
                     ),
                   ),
@@ -184,14 +204,36 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               Text('Ngày ${formatDay(b.experienceDate)} · ${formatMoney(b.totalAmount)}',
                   style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
               const SizedBox(height: 10),
-              FilledButton.icon(
-                onPressed: () => _startExperience(b),
-                icon: const Icon(Icons.explore_rounded, size: 18),
-                label: const Text('Vào trải nghiệm', style: TextStyle(fontWeight: FontWeight.w700)),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppCultureColors.heritageJade,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _startExperience(b),
+                      icon: Icon(b.isTourLocked ? Icons.schedule_rounded : Icons.explore_rounded, size: 18),
+                      label: Text(
+                        b.isTourLocked ? '${b.daysUntilStart} ngày nữa lên đường!' : 'Vào trải nghiệm',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppCultureColors.heritageJade,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Chi tiết đơn: mã QR trải nghiệm, hành khách, yêu cầu hoàn tiền
+                  OutlinedButton(
+                    onPressed: () => _openDetail(b),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppCultureColors.jadeDark,
+                      side: const BorderSide(color: AppCultureColors.border),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Chi tiết', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ],
               ),
             ],
           ),

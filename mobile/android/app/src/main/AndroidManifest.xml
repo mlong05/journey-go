@@ -7,6 +7,9 @@
     <!-- Quét mã QR check-in tại điểm đến -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <!-- Thông báo mới: hiện thông báo hệ thống có âm thanh (Android 13+ cần xin quyền) và rung -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
 
     <application
         android:label="mobile"
@@ -42,6 +45,18 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="journeygo"/>
+            </intent-filter>
+
+            <!-- Deep link lời mời tham gia tour (gửi qua email).
+                 URL: journeygo://booking/invitations/accept?token=... -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="journeygo"
+                    android:host="booking"
+                    android:pathPrefix="/invitations/accept"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

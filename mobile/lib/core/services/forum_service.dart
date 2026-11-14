@@ -15,17 +15,15 @@ class ForumService {
     return ForumPage(posts, !last);
   }
 
-  /// GET /community/posts: bảng tin (chỉ bài đã duyệt), lọc theo điểm đến hoặc tour.
+  /// GET /community/posts: bảng tin (chỉ bài đã duyệt), lọc theo tour.
   Future<ForumPage<ForumPost>> getFeed({
     int page = 0,
     int size = 10,
-    int? destinationId,
     int? tourId,
   }) async {
     final query = <String>[
       'page=$page',
       'size=$size',
-      if (destinationId != null) 'destinationId=$destinationId',
       if (tourId != null) 'tourId=$tourId',
     ].join('&');
     return _postPage(await ApiClient.request('GET', '$_base/posts?$query'));
@@ -43,10 +41,10 @@ class ForumService {
   }
 
   /// POST /community/posts: `saveAsDraft` true thì lưu nháp, false thì gửi duyệt ngay.
+  /// Bài mới chỉ gắn tour (backend kiểm tra tour đang mở bán).
   Future<ForumPost> createPost({
     required String title,
     required String content,
-    int? destinationId,
     int? tourId,
     List<String> mediaUrls = const [],
     bool saveAsDraft = false,
@@ -54,7 +52,6 @@ class ForumService {
     final data = await ApiClient.request('POST', '$_base/posts', body: {
       'title': title,
       'content': content,
-      'destinationId': destinationId,
       'tourId': tourId,
       'mediaUrls': mediaUrls,
       'saveAsDraft': saveAsDraft,
@@ -124,6 +121,14 @@ class ForumService {
   /// POST /community/posts/{id}/report
   Future<void> reportPost(int postId, String reason, {String? description}) async {
     await ApiClient.request('POST', '$_base/posts/$postId/report', body: {
+      'reason': reason,
+      if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
+    });
+  }
+
+  /// POST /community/comments/{id}/report: bình luận nhiều báo cáo sẽ tự ẩn chờ kiểm duyệt.
+  Future<void> reportComment(int commentId, String reason, {String? description}) async {
+    await ApiClient.request('POST', '$_base/comments/$commentId/report', body: {
       'reason': reason,
       if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
     });

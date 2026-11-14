@@ -24,6 +24,7 @@ export default function ModeratorToursPage() {
       canCreate={false}
       canModerate
       canDelete={false}
+      wizardHref={(tour) => `/moderator/tours/${tour.tourId}`}
     />
   );
 }

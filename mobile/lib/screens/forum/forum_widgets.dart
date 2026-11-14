@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/forum_model.dart';
 import '../common/heritage_motion.dart';
+import '../common/live_time.dart';
 
 /// Màu trái tim khi đã thả tim.
 const Color _heartColor = Color(0xFFE11D48);
@@ -292,11 +293,13 @@ class _ForumPostCardState extends State<ForumPostCard> {
                             const Icon(Icons.schedule_rounded, size: 12, color: AppCultureColors.textLight),
                             const SizedBox(width: 4),
                             Flexible(
-                              child: Text(
-                                timeAgo(post.createdAt),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                              child: LiveTime(
+                                builder: (_) => Text(
+                                  timeAgo(post.createdAt),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                                ),
                               ),
                             ),
                           ],
@@ -677,12 +680,13 @@ class _ForumImages extends StatelessWidget {
   }
 }
 
-/// Một lựa chọn (điểm đến hoặc tour) trong hộp chọn.
+/// Một lựa chọn (điểm đến hoặc tour) trong hộp chọn. [note]: dòng phụ nổi bật, vd "Bạn đã tham gia".
 class ForumOption {
   final int id;
   final String label;
+  final String? note;
 
-  const ForumOption(this.id, this.label);
+  const ForumOption(this.id, this.label, {this.note});
 }
 
 /// Hộp chọn một mục từ danh sách tải từ API.
@@ -749,6 +753,22 @@ Future<ForumOption?> showForumOptionPicker(
                       const Divider(height: 1, color: AppCultureColors.borderLight),
                   itemBuilder: (_, i) => ListTile(
                     title: Text(items[i].label, style: const TextStyle(fontSize: 14)),
+                    subtitle: items[i].note == null
+                        ? null
+                        : Row(
+                            children: [
+                              const Icon(Icons.verified_rounded, size: 14, color: AppCultureColors.heritageJade),
+                              const SizedBox(width: 4),
+                              Text(
+                                items[i].note!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppCultureColors.heritageJade,
+                                ),
+                              ),
+                            ],
+                          ),
                     onTap: () => Navigator.of(ctx).pop(items[i]),
                   ),
                 );

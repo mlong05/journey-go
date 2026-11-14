@@ -78,13 +78,9 @@ public record PartnerApplicationDraftRequest(
         @Schema(description = "URL giấy đăng ký kinh doanh / GPKD / Hộ kinh doanh")
         String businessRegistrationUrl,
 
-        @Schema(description = "Tỉnh / Thành")
-        @Size(max = 100, message = "Tỉnh/Thành không được vượt quá 100 ký tự")
+        @Schema(description = "Tỉnh / Thành phố")
+        @Size(max = 100, message = "Tỉnh/Thành phố không được vượt quá 100 ký tự")
         String province,
-
-        @Schema(description = "Quận / Huyện")
-        @Size(max = 100, message = "Quận/Huyện không được vượt quá 100 ký tự")
-        String district,
 
         @Schema(description = "Phường / Xã")
         @Size(max = 100, message = "Phường/Xã không được vượt quá 100 ký tự")

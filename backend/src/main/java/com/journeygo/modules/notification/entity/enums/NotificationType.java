@@ -18,6 +18,7 @@ public enum NotificationType {
     REFUND_REQUESTED(Category.REFUND),
     ADJUSTMENT_PENDING(Category.FINANCE),
     PARTNER_APPLICATION_PENDING(Category.REVIEW),
+    PARTNER_PROFILE_UPDATE_PENDING(Category.REVIEW),
 
     // ── Provider ─────────────────────────────────────────────────────────────
     DESTINATION_APPROVED(Category.APPROVED),
@@ -33,9 +34,16 @@ public enum NotificationType {
     SETTLEMENT_REJECTED(Category.REJECTED),
     PARTNER_APPLICATION_APPROVED(Category.APPROVED),
     PARTNER_APPLICATION_REJECTED(Category.REJECTED),
+    PARTNER_PROFILE_UPDATE_APPROVED(Category.APPROVED),
+    PARTNER_PROFILE_UPDATE_REJECTED(Category.REJECTED),
 
     // ── Du khách ─────────────────────────────────────────────────────────────
     PAYMENT_SUCCESS(Category.BOOKING),
+    TOUR_REMINDER(Category.BOOKING),
+    PASSENGER_CHANGE_REQUESTED(Category.BOOKING),
+    PASSENGER_CHANGE_APPROVED(Category.BOOKING),
+    PASSENGER_CHANGE_REJECTED(Category.BOOKING),
+    TOUR_INVITATION_SENT(Category.BOOKING),
     REFUND_APPROVED(Category.REFUND),
     REFUND_REJECTED(Category.REJECTED),
     REFUND_COMPLETED(Category.REFUND),
@@ -47,10 +55,16 @@ public enum NotificationType {
     POST_HIDDEN(Category.REJECTED),
     POST_RESTORED(Category.APPROVED),
     REPORT_RESOLVED(Category.COMMUNITY),
-    REPORT_DISMISSED(Category.COMMUNITY);
+    REPORT_DISMISSED(Category.COMMUNITY),
+
+    // ── Chat (du khách ↔ đối tác) ───────────────────────────────────────────
+    /** Tin nhắn mới trong khung chat hỗ trợ của Booking. */
+    BOOKING_MESSAGE_RECEIVED(Category.CHAT),
+    /** Tin nhắn mới trong khung chat với nhà tour (trước khi đặt tour). */
+    PROVIDER_MESSAGE_RECEIVED(Category.CHAT);
 
     /** Nhóm hiển thị: web/app dùng để chọn biểu tượng và màu nhấn. */
-    public enum Category { REVIEW, COMMUNITY, REFUND, FINANCE, APPROVED, REJECTED, BOOKING, REWARD }
+    public enum Category { REVIEW, COMMUNITY, REFUND, FINANCE, APPROVED, REJECTED, BOOKING, REWARD, CHAT }
 
     private final Category category;
 

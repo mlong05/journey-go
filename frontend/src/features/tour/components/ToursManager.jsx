@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Search,
@@ -23,6 +24,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Layers,
+  ShieldCheck,
 } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { tourService } from "../services/tourService";
@@ -33,9 +35,8 @@ import {
   TOUR_STATUS_ORDER,
   SUBMITTABLE_STATUSES,
   EDITABLE_STATUSES,
-  formatVND,
   getRejectionLabels,
-  formatDuration,
+  formatTourDuration,
   normalizeTour,
 } from "../theme";
 import TourFormModal from "./TourFormModal";
@@ -44,25 +45,25 @@ import RejectTourDialog from "./RejectTourDialog";
 import { useQueueRefresh } from "@/context/NotificationContext";
 
 /* =========================================================================
- *  KHU VỰC QUẢN LÝ Tour, dùng chung cho Provider, Moderator & Admin.
+ *  KHU VỰC QUẢN LÝ Tour, dùng chung cho Provider & Moderator.
  *
  *  Props:
- *   - theme: "emerald" | "teal" | "slate"   (accent theo vai trò)
+ *   - theme: "emerald" | "teal"   (accent theo vai trò)
  *   - source: "mine" | "all"                (Provider: tour của chính mình; còn lại: toàn sàn)
  *   - heading / description: nhãn hiển thị
  *   - canCreate: quyền tạo tour. Backend chốt POST /tours cho
- *     ADMIN + PROVIDER, nên Moderator để false.
+ *     CONTENT_PROVIDER, nên Moderator để false.
  *   - canModerate: quyền duyệt / từ chối (PATCH publish, PATCH reject).
  *   - canDelete: quyền xoá mềm / khôi phục.
  *
  *  Nguồn dữ liệu:
  *   - Provider: GET /tours/my        (chỉ tour của chính mình)
- *   - Admin / Moderator: GET /tours  (+ GET /tours/deleted cho Admin)
+ *   - Moderator: GET /tours          (+ GET /tours/deleted cho bộ lọc thùng rác)
  *
  *  Quy trình duyệt (TourStatus):
- *   DRAFT ──submit──> PENDING ──publish──> PUBLISHED
+ *   DRAFT ──submit──> PENDING_REVIEW ──publish──> PUBLISHED
  *     ^                 │
- *     └───update────────┴──reject──> REJECTED ──submit──> PENDING
+ *     └───update────────┴──reject──> REJECTED ──submit──> PENDING_REVIEW
  * ========================================================================= */
 
 /* Số dòng mỗi trang */
@@ -270,8 +271,11 @@ export default function ToursManager({
   canModerate = false,
   canDelete = false,
   showDeletedFilter = false,
+  /** Tour tạo theo luồng 5 bước: trả URL màn hình mới (thẩm định / wizard). null = không có màn hình mới. */
+  wizardHref = null,
 }) {
   const palette = getTourTheme(theme);
+  const router = useRouter();
 
   /* ── State ──────────────────────────────────────────────────── */
   const [tours, setTours] = useState([]);
@@ -329,7 +333,7 @@ export default function ToursManager({
    * Tách riêng để effect và nút "Làm mới" dùng chung một nguồn dữ liệu.
    */
   const fetchTours = useCallback(async () => {
-    // Provider dùng endpoint "của tôi", còn Admin / Moderator dùng "toàn sàn".
+    // Provider dùng endpoint "của tôi", còn Moderator dùng "toàn sàn".
     const isProvider = source === "mine";
     const [mainRes, deletedRes] = await Promise.allSettled([
       isProvider ? tourService.getMy() : tourService.getAll(),
@@ -349,7 +353,10 @@ export default function ToursManager({
       ...(Array.isArray(deletedRes.value) ? deletedRes.value : []),
     ];
 
-    return merged.map(normalizeTour).filter(Boolean);
+    // Bản nháp chưa gửi duyệt là việc riêng của đối tác: kiểm duyệt viên không thấy.
+    return merged
+      .map(normalizeTour)
+      .filter((t) => t && (isProvider || t.status !== "DRAFT"));
   }, [source, showDeletedFilter]);
 
   /**
@@ -568,22 +575,24 @@ export default function ToursManager({
   }, [restoreTarget, mergeTour, showToast]);
 
   /* ── Counts (luôn tính trên toàn bộ danh sách) ─────────────── */
+  const baseTours = tours;
   const counts = useMemo(
     () => ({
-      all: tours.length,
-      DRAFT: tours.filter((t) => t.status === "DRAFT").length,
-      PENDING: tours.filter((t) => t.status === "PENDING").length,
-      PUBLISHED: tours.filter((t) => t.status === "PUBLISHED").length,
-      REJECTED: tours.filter((t) => t.status === "REJECTED").length,
-      DELETED: tours.filter((t) => t.deleted).length,
+      all: baseTours.length,
+      DRAFT: baseTours.filter((t) => t.status === "DRAFT").length,
+      PENDING_REVIEW: baseTours.filter((t) => t.status === "PENDING_REVIEW").length,
+      CHANGES_REQUESTED: baseTours.filter((t) => t.status === "CHANGES_REQUESTED").length,
+      PUBLISHED: baseTours.filter((t) => t.status === "PUBLISHED").length,
+      REJECTED: baseTours.filter((t) => t.status === "REJECTED").length,
+      DELETED: baseTours.filter((t) => t.deleted).length,
     }),
-    [tours]
+    [baseTours]
   );
 
   /* ── Lọc ───────────────────────────────────────────────────── */
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return tours.filter((tour) => {
+    return baseTours.filter((tour) => {
       const matchSearch =
         !q ||
         tour.title.toLowerCase().includes(q) ||
@@ -606,7 +615,7 @@ export default function ToursManager({
 
       return matchSearch && matchStatus && matchDeletion;
     });
-  }, [tours, searchQuery, statusTab, deletionFilter]);
+  }, [baseTours, searchQuery, statusTab, deletionFilter]);
 
   /* ── Phân trang ────────────────────────────────────────────── */
   const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1);
@@ -649,10 +658,10 @@ export default function ToursManager({
       >
         Tất cả ({counts.all})
       </button>
-      {TOUR_STATUS_ORDER.map((status) => {
+      {TOUR_STATUS_ORDER.filter((s) => source === "mine" || s !== "DRAFT").map((status) => {
         const meta = TOUR_STATUS_META[status];
         const isActive = statusTab === status;
-        const isPending = status === "PENDING";
+        const isPending = status === "PENDING_REVIEW";
         const isRejected = status === "REJECTED";
         const isPublished = status === "PUBLISHED";
         const isDraft = status === "DRAFT";
@@ -710,21 +719,16 @@ export default function ToursManager({
   /* ── Nút hành động trong bảng ──────────────────────────────── */
   const renderRowActions = (tour) => {
     const busy = actionLoadingId === tour.tourId;
-    const canSubmit = SUBMITTABLE_STATUSES.includes(tour.status) && !tour.deleted;
-    const canEdit = EDITABLE_STATUSES.includes(tour.status) && !tour.deleted;
+    const wizard = !!tour.wizardTour;
+    const wizardUrl = wizard && wizardHref ? wizardHref(tour) : null;
+    // Tour 5 bước không dùng form / nút duyệt cũ (cần 5 tiêu chí + ghi chú) — chuyển sang màn hình mới.
+    const canSubmit = !wizard && SUBMITTABLE_STATUSES.includes(tour.status) && !tour.deleted;
+    const canEdit = !wizard && EDITABLE_STATUSES.includes(tour.status) && !tour.deleted;
+    const canLegacyModerate = canModerate && !wizard;
 
     return (
+      /* Nút "Xem" (con mắt) luôn đứng cuối hàng → các con mắt thẳng một cột; nút khác xếp trước nó. */
       <div className="col-span-12 md:col-span-1 flex items-center justify-start md:justify-end gap-1.5 shrink-0">
-        <button
-          type="button"
-          onClick={() => openDetail(tour.tourId)}
-          className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
-          title="Xem chi tiết"
-          aria-label="Xem chi tiết"
-        >
-          <Eye size={14} />
-        </button>
-
         {canEdit && (
           <button
             type="button"
@@ -754,7 +758,19 @@ export default function ToursManager({
           </button>
         )}
 
-        {canModerate && tour.status === "PENDING" && !tour.deleted && (
+        {wizardUrl && canModerate && tour.status === "PENDING_REVIEW" && !tour.deleted && (
+          <button
+            type="button"
+            onClick={() => router.push(wizardUrl)}
+            className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 shadow-sm shadow-emerald-600/20 transition-colors cursor-pointer"
+            title="Thẩm định tour"
+            aria-label="Thẩm định tour"
+          >
+            <ShieldCheck size={14} />
+          </button>
+        )}
+
+        {canLegacyModerate && tour.status === "PENDING_REVIEW" && !tour.deleted && (
           <button
             type="button"
             onClick={() => handlePublish(tour)}
@@ -771,7 +787,7 @@ export default function ToursManager({
           </button>
         )}
 
-        {canModerate && tour.status === "PENDING" && !tour.deleted && (
+        {canLegacyModerate && tour.status === "PENDING_REVIEW" && !tour.deleted && (
           <button
             type="button"
             onClick={() => setRejectTarget(tour)}
@@ -813,6 +829,19 @@ export default function ToursManager({
             )}
           </button>
         )}
+
+        {/* Tour chờ duyệt đã có nút "Thẩm định" (cùng đích) — không hiện thêm nút xem. */}
+        {!(wizardUrl && canModerate && tour.status === "PENDING_REVIEW" && !tour.deleted) && (
+          <button
+            type="button"
+            onClick={() => (wizardUrl ? router.push(wizardUrl) : openDetail(tour.tourId))}
+            className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
+            title="Xem chi tiết"
+            aria-label="Xem chi tiết"
+          >
+            <Eye size={14} />
+          </button>
+        )}
       </div>
     );
   };
@@ -847,7 +876,7 @@ export default function ToursManager({
   );
 
   /* ══════════════════════════════════════════════════════════════
-     DANH SÁCH DẠNG HÀNG (Provider / Moderator / Admin)
+     DANH SÁCH DẠNG HÀNG (Provider / Moderator)
      ══════════════════════════════════════════════════════════════ */
   return (
     <div className="h-full min-h-0 flex flex-col gap-3 overflow-hidden animate-in fade-in-50 duration-200">
@@ -876,7 +905,7 @@ export default function ToursManager({
         <KpiTile
           icon={Clock}
           label="Chờ duyệt"
-          value={counts.PENDING}
+          value={counts.PENDING_REVIEW}
           unit="tour"
           tone="amber"
         />
@@ -969,8 +998,8 @@ export default function ToursManager({
           >
             <div className="hidden md:block md:col-span-1 text-center">STT</div>
             <div className="col-span-12 md:col-span-1">Tour</div>
-            <div className="col-span-6 md:col-span-1">Hành trình</div>
-            <div className="col-span-6 md:col-span-1 truncate" title="Tổng giá &amp; thời lượng">Tổng giá &amp; thời lượng</div>
+            <div className="col-span-6 md:col-span-1">Điểm đến</div>
+            <div className="col-span-6 md:col-span-1 truncate">Thời gian</div>
             <div className="col-span-6 md:col-span-1">Trạng thái</div>
             <div className="col-span-12 md:col-span-1 md:text-right">Thao tác</div>
           </div>
@@ -1033,30 +1062,18 @@ export default function ToursManager({
                       </div>
                     </div>
 
-                    {/* Cột 2: Hành trình */}
+                    {/* Cột 2: Số điểm đến (tour 5 bước: điểm đến ở bước 3) */}
                     <div className="col-span-6 md:col-span-1 flex items-center gap-1.5 min-w-0">
                       <MapPin size={13} className="text-slate-400 shrink-0" />
-                      <span className="text-xs font-bold text-slate-700 tabular-nums">
-                        {tour.destinationCount}
-                      </span>
-                      <span
-                        className="text-[11px] text-slate-600 truncate"
-                        title={tour.destinations.map((d) => d.destinationName).join(" → ") || undefined}
-                      >
-                        {tour.destinations[0]?.destinationName || "chưa có"}
+                      <span className={`text-xs font-bold tabular-nums ${tour.destinationCount > 0 ? "text-slate-700" : "text-slate-400"}`}>
+                        {tour.destinationCount > 0 ? `${tour.destinationCount} điểm đến` : "Chưa có"}
                       </span>
                     </div>
 
-                    {/* Cột 3: Tổng giá & thời lượng */}
-                    <div
-                      className="col-span-6 md:col-span-1 flex flex-col gap-0.5 min-w-0"
-                      title={`${formatVND(tour.price)} · ${formatDuration(tour.durationDays)}`}
-                    >
-                      <span className="text-xs font-bold text-slate-900 tabular-nums leading-none truncate">
-                        {formatVND(tour.price)}
-                      </span>
-                      <span className="text-[11px] font-bold text-slate-600 tabular-nums truncate">
-                        {formatDuration(tour.durationDays)}
+                    {/* Cột 3: Thời gian (theo ngày / đêm) */}
+                    <div className="col-span-6 md:col-span-1 flex items-center min-w-0" title={formatTourDuration(tour)}>
+                      <span className="text-xs font-bold text-slate-700 tabular-nums truncate">
+                        {formatTourDuration(tour)}
                       </span>
                     </div>
 

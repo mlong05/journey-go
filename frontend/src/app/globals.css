@@ -30,6 +30,37 @@
   [role="button"][aria-disabled="true"] {
     cursor: not-allowed;
   }
+
+  /*
+   * Vòng focus hiển thị rõ cho bàn phím. Mặc định trình duyệt dùng outline mặc
+   * định (thường rất mờ trên nền tối), các trang công khai dùng nền sáng/tối
+   * xen kẽ nên cần một vòng focus thống nhất theo màu thương hiệu.
+   */
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--color-emerald-700);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+/*
+ * Cuộn mượt tới các mốc neo (#quyen-loi, #quyen-trinh) và chừa chỗ cho
+ * thanh điều hướng dính đầu trang (h-16) để tiêu đề không bị che.
+ */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 .font-script {
@@ -162,6 +193,28 @@ pre {
 
   .slide-in-from-top-3 {
     --tw-enter-translate-y: -0.75rem;
+  }
+
+  .slide-in-from-bottom-2 {
+    --tw-enter-translate-y: 0.5rem;
+  }
+
+  .slide-in-from-right {
+    --tw-enter-translate-x: 100%;
+  }
+
+  /* Chuyển trang / chuyển bước: hiện dần + trượt nhẹ lên (dùng kèm key thay đổi để chạy lại). */
+  .jg-page-enter {
+    animation: jg-enter 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    --tw-enter-opacity: 0;
+    --tw-enter-translate-y: 0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .jg-page-enter {
+    animation: none !important;
   }
 }
 

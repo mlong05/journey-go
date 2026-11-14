@@ -51,6 +51,32 @@ String? _httpsOrNull(dynamic value) {
   return s.startsWith('http') ? s : null;
 }
 
+int? _asIntOrNull(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString());
+}
+
+String? _textOrNull(dynamic value) {
+  final s = value?.toString().trim() ?? '';
+  return s.isEmpty ? null : s;
+}
+
+/// Thời lượng tour: "4 giờ 30 phút" (trong ngày), "3N2Đ" (nhiều ngày), "2 ngày" (tour luồng cũ).
+String formatTourDuration({String? format, int? minutes, int days = 0, int? nights}) {
+  if (format == 'DAY_TRIP' && minutes != null && minutes > 0) {
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h == 0) return '$m phút';
+    return m == 0 ? '$h giờ' : '$h giờ $m phút';
+  }
+  if (format == 'MULTI_DAY' && days > 0) {
+    return nights != null && nights > 0 ? '${days}N$nightsĐ' : '$days ngày';
+  }
+  if (format == 'DAY_TRIP') return 'Trong ngày';
+  return days <= 1 ? '1 ngày' : '$days ngày';
+}
+
 double? _asDoubleOrNull(dynamic value) {
   if (value == null) return null;
   if (value is num) return value.toDouble();
@@ -75,6 +101,27 @@ class TourModel {
   /// Ảnh bìa tour (backend lấy từ điểm đến đầu tiên có ảnh); null thì dùng nền gradient.
   final String? coverImageUrl;
 
+  // ── Tour tạo theo luồng 5 bước ────────────────────────────────────────────
+  /// true = tour 5 bước (điểm dừng riêng, lịch trình, bảng giá); false = tour luồng cũ.
+  final bool wizardTour;
+
+  /// DAY_TRIP / MULTI_DAY; null với tour luồng cũ.
+  final String? tourFormat;
+  final int? durationMinutes;
+  final int? durationNights;
+  final int? regionId;
+  final String? regionName;
+  final int? themeId;
+  final String? themeName;
+  final int stopCount;
+
+  /// Ngày khởi hành gần nhất từ hôm nay; null nếu không còn ngày nào.
+  final DateTime? nextDepartureDate;
+
+  /// Nhà tour cung cấp tour (tên + id) — dùng cho nút chat hỗ trợ trước khi mua.
+  final String? providerName;
+  final int? providerId;
+
   const TourModel({
     required this.id,
     required this.title,
@@ -86,6 +133,18 @@ class TourModel {
     this.totalTaskPoints = 0,
     this.badgeCount = 0,
     this.coverImageUrl,
+    this.wizardTour = false,
+    this.tourFormat,
+    this.durationMinutes,
+    this.durationNights,
+    this.regionId,
+    this.regionName,
+    this.themeId,
+    this.themeName,
+    this.stopCount = 0,
+    this.nextDepartureDate,
+    this.providerName,
+    this.providerId,
   });
 
   factory TourModel.fromJson(Map<String, dynamic> json) {
@@ -108,20 +167,39 @@ class TourModel {
       totalTaskPoints: _asInt(json['totalTaskPoints']),
       badgeCount: _asInt(json['badgeCount']),
       coverImageUrl: _httpsOrNull(json['coverImageUrl']),
+      wizardTour: json['wizardTour'] == true,
+      tourFormat: json['tourFormat']?.toString(),
+      durationMinutes: _asIntOrNull(json['durationMinutes']),
+      durationNights: _asIntOrNull(json['durationNights']),
+      regionId: _asIntOrNull(json['regionId']),
+      regionName: _textOrNull(json['regionName']),
+      themeId: _asIntOrNull(json['themeId']),
+      themeName: _textOrNull(json['themeName']),
+      stopCount: _asInt(json['stopCount']),
+      nextDepartureDate: DateTime.tryParse(json['nextDepartureDate']?.toString() ?? ''),
+      providerName: json['providerName']?.toString() ??
+          json['createdBy']?.toString(),
+      providerId: _asIntOrNull(json['providerId']),
     );
   }
 
   bool get hasRewards => taskCount > 0 || totalTaskPoints > 0 || badgeCount > 0;
 
-  int get destinationCount => destinations.length;
+  /// Tour 5 bước đếm điểm dừng, tour luồng cũ đếm điểm đến.
+  int get destinationCount => wizardTour ? stopCount : destinations.length;
 
   String get formattedPrice =>
       price <= 0 ? 'Miễn phí' : '${formatThousands(price)} đ';
 
-  String get formattedDuration =>
-      durationDays <= 1 ? '1 ngày' : '$durationDays ngày';
+  String get formattedDuration => formatTourDuration(
+        format: tourFormat,
+        minutes: durationMinutes,
+        days: durationDays,
+        nights: durationNights,
+      );
 
-  String get typeLabel => tourTypeLabel(tourType);
+  /// Chủ đề của tour 5 bước; tour luồng cũ dùng loại hình.
+  String get typeLabel => themeName ?? tourTypeLabel(tourType);
 
   /// Tóm tắt lộ trình: "Điểm A → Điểm B → Điểm C".
   String get routePreview => destinations.map((d) => d.name).join(' → ');

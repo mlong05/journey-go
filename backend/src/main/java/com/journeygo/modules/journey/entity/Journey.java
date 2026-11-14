@@ -1,6 +1,8 @@
 package com.journeygo.modules.journey.entity;
 
+import com.journeygo.modules.journey.entity.enums.DestinationProgressStatus;
 import com.journeygo.modules.journey.entity.enums.JourneyStatus;
+import com.journeygo.modules.journey.entity.enums.TaskProgressStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -67,6 +69,35 @@ public class Journey {
     @OrderBy("orderIndex ASC")
     @Builder.Default
     private List<JourneyDestinationProgress> destinations = new ArrayList<>();
+
+    /** Điểm thưởng khi đi trọn hành trình (không bỏ qua điểm đến nào). */
+    public static final int COMPLETION_BONUS_POINTS = 50;
+
+    /** Có điểm đến nào bị du khách bỏ qua không. */
+    public boolean hasSkippedDestination() {
+        return destinations.stream()
+                .anyMatch(d -> d.getStatus() == DestinationProgressStatus.SKIPPED);
+    }
+
+    /** Điểm thưởng hoàn thành của hành trình này: chỉ có khi đã xong và không bỏ qua điểm đến nào. */
+    public int completionBonusPoints() {
+        return status == JourneyStatus.COMPLETED && !hasSkippedDestination() ? COMPLETION_BONUS_POINTS : 0;
+    }
+
+    /**
+     * Mức hoàn thành khi hành trình đã xong (null nếu chưa xong):
+     * PERFECT — mọi nhiệm vụ đều đúng hết; COMPLETED — đi đủ điểm đến nhưng có nhiệm vụ hết lượt
+     * hoặc câu đố trả lời sai; PARTIAL — có điểm đến bị bỏ qua.
+     */
+    public String completionRank() {
+        if (status != JourneyStatus.COMPLETED) return null;
+        if (hasSkippedDestination()) return "PARTIAL";
+        // Câu đố chấm theo câu vẫn COMPLETED khi sai, nên xét thêm isCorrect (null = nhiệm vụ không chấm đúng/sai).
+        boolean allPassed = destinations.stream()
+                .flatMap(d -> d.getTasks().stream())
+                .allMatch(t -> t.getStatus() == TaskProgressStatus.COMPLETED && !Boolean.FALSE.equals(t.getIsCorrect()));
+        return allPassed ? "PERFECT" : "COMPLETED";
+    }
 
     @PrePersist
     protected void onCreate() {

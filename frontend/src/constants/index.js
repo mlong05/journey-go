@@ -1,4 +1,5 @@
 export * from "./routes";
+export * from "./banks";
 
 export const APP_CONFIG = {
   APP_NAME: "JourneyGo",

@@ -8,8 +8,9 @@ spring:
     name: journey-go-backend
   servlet:
     multipart:
-      max-file-size: 8MB
-      max-request-size: 10MB
+      # Ảnh tối đa 10MB, video cổ vật tối đa 100MB (kiểm tra chi tiết trong CloudinaryService)
+      max-file-size: 100MB
+      max-request-size: 105MB
   threads:
     virtual:
       enabled: true
@@ -97,6 +98,10 @@ springdoc:
 
 # CORS, OAuth2 & Mail Configuration
 app:
+  # Hành trình du khách. skip-location-check CHỈ bật khi dev (thử ở nhà): bỏ kiểm tra khoảng cách GPS,
+  # mã QR vẫn bắt buộc. Bật bằng JOURNEY_SKIP_LOCATION_CHECK=true trong backend/.env.
+  journey:
+    skip-location-check: ${JOURNEY_SKIP_LOCATION_CHECK:false}
   cloudinary:
     cloud-name: ${CLOUDINARY_CLOUD_NAME:}
     api-key: ${CLOUDINARY_API_KEY:}
@@ -106,6 +111,13 @@ app:
     api-key: ${GOONG_API_KEY:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+  websocket:
+    # Origin được phép kết nối WebSocket/STOMP (danh sách, phân tách bởi dấu phẩy).
+    allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:*}
+  booking:
+    # Deep link mở app để hành khách xác nhận lời mời tham gia tour.
+    # (Web KHÔNG có trang xác nhận lời mời — luồng du khách nằm trên mobile.)
+    invitation-app-url: ${BOOKING_INVITATION_APP_URL:journeygo://booking/invitations/accept}
   oauth2:
     default-redirect-uri: ${OAUTH2_DEFAULT_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
     authorized-redirect-uris: ${OAUTH2_AUTHORIZED_REDIRECT_URIS:http://localhost:3000/oauth2/redirect,http://127.0.0.1:3000/oauth2/redirect,journeygo://oauth2/redirect,journeygo://auth/callback}
@@ -167,11 +179,9 @@ app:
     # URL nhận kết quả trả về (Return URL) sau khi khách thanh toán.
     return-url: ${VNPAY_RETURN_URL:}
 
-    # Return URL riêng cho WEB (frontend Next.js). Để trống ⇒ dùng `return-url`.
-    #   => VNPAY_WEB_RETURN_URL=http://localhost:3000/payment/return
-    # ⚠️ URL này phải truy cập được từ trình duyệt của khách (không dùng localhost
-    #    khi test trên điện thoại).
-    web-return-url: ${VNPAY_WEB_RETURN_URL:}
+    # ⚠️ KHÔNG còn Return URL cho WEB: thanh toán CHỈ diễn ra trên ứng dụng
+    # MOBILE (du khách đặt tour và thanh toán trong app). Web chỉ phục vụ
+    # admin / đối tác / moderator ở góc nhìn quản trị (không có màn checkout).
 
     # ── Return URL riêng cho APP MOBILE (deep link, custom scheme) ─────────────
     # ĐÃ KIỂM CHỨNG TRÊN SANDBOX: khi vnp_ReturnUrl là CUSTOM SCHEME, VNPay

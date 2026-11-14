@@ -85,7 +85,7 @@ export default function LegalDocumentModal({ open, title, sections, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center justify-center rounded-xl bg-teal-600 px-5 py-2 text-xs font-bold text-white transition hover:bg-teal-700"
+            className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-5 py-2 text-xs font-bold text-white transition hover:bg-emerald-800"
           >
             Đóng
           </button>

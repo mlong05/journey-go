@@ -29,6 +29,14 @@ public class Region {
     @Column(nullable = false, unique = true, length = 150)
     private String slug;
 
+    /** Ảnh đại diện khu vực (ảnh chụp thật), hiện ở trang chủ app du khách. */
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
+    /** Ghi nguồn ảnh (tác giả · giấy phép) khi ảnh không phải của JourneyGo; trống nếu là ảnh tự chụp. */
+    @Column(name = "image_credit", length = 300)
+    private String imageCredit;
+
     @JsonIgnore
     @OneToMany(mappedBy = "region", fetch = FetchType.LAZY)
     @Builder.Default

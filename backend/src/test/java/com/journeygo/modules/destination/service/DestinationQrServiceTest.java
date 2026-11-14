@@ -21,7 +21,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-/** Mã QR check-in của điểm đến: chỉ chủ điểm đến / ADMIN / MODERATOR xem và tạo lại được. */
+/** Mã QR check-in của điểm đến: chỉ chủ điểm đến / MODERATOR xem và tạo lại được. */
 @ExtendWith(MockitoExtension.class)
 class DestinationQrServiceTest {
 
@@ -35,7 +35,7 @@ class DestinationQrServiceTest {
     private DestinationService destinationService;
 
     private static final Role PROVIDER = Role.of("CONTENT_PROVIDER");
-    private static final Role ADMIN = Role.of("ADMIN");
+    private static final Role MODERATOR = Role.of("CONTENT_MODERATOR");
 
     private Destination destination(Long ownerId, String qrToken) {
         Destination d = Destination.builder()
@@ -87,10 +87,10 @@ class DestinationQrServiceTest {
     }
 
     @Test
-    void admin_canRegenerate_andOldTokenIsReplaced() {
+    void moderator_canRegenerate_andOldTokenIsReplaced() {
         Destination d = destination(10L, "JGD-AAAABBBBCCCCDDDD");
 
-        DestinationQrResponse res = destinationService.regenerateQr(5L, 1L, ADMIN);
+        DestinationQrResponse res = destinationService.regenerateQr(5L, 1L, MODERATOR);
 
         assertNotEquals("JGD-AAAABBBBCCCCDDDD", res.qrToken());
         assertEquals(res.qrToken(), d.getQrToken());
