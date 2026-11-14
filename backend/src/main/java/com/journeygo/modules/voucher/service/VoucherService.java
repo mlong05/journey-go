@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 @Slf4j
@@ -149,7 +149,7 @@ public class VoucherService {
 
     @Transactional(readOnly = true)
     public List<VoucherResponse> getApplicableVouchers(Long partnerId) {
-        return voucherRepository.findApplicableVouchersForTour(partnerId, Instant.now())
+        return voucherRepository.findApplicableVouchersForTour(partnerId, LocalDate.now())
                 .stream()
                 .map(VoucherResponse::fromEntity)
                 .toList();
@@ -165,7 +165,7 @@ public class VoucherService {
         Voucher voucher = voucherRepository.findByCode(request.voucherCode().trim().toUpperCase())
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY, "Mã voucher không tồn tại"));
 
-        Instant now = Instant.now();
+        LocalDate now = LocalDate.now();
         if (!voucher.isActive()) {
             return buildInvalidResult(voucher, request.tourPrice(), "Voucher hiện đang bị khóa");
         }

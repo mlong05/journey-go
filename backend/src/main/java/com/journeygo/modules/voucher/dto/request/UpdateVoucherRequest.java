@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Builder;
 
 import java.math.BigDecimal;
-import java.time.Instant;
+import java.time.LocalDate;
 
 @Builder
 public record UpdateVoucherRequest(
@@ -36,9 +36,9 @@ public record UpdateVoucherRequest(
 
         Integer validDays,
 
-        Instant startDate,
+        LocalDate startDate,
 
-        Instant endDate,
+        LocalDate endDate,
 
         Boolean active
 ) {}

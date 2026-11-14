@@ -5,6 +5,7 @@ import com.journeygo.modules.gamification.entity.enums.UserVoucherStatus;
 import lombok.Builder;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Builder
 public record UserVoucherResponse(
@@ -17,7 +18,7 @@ public record UserVoucherResponse(
         Integer pointsSpent,
         UserVoucherStatus status,
         Instant redeemedAt,
-        Instant expiryDate,
+        LocalDate expiryDate,
         Instant usedAt
 ) {
     public static UserVoucherResponse fromEntity(UserVoucher entity) {
