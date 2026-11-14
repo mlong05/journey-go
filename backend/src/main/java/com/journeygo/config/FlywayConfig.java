@@ -48,8 +48,6 @@ public class FlywayConfig {
      * V3, V4 đã bị gỡ khỏi code.
      */
     static final String PRE_HIBERNATE_TARGET = "5";
-    /** Phiên bản migration cuối cùng KHÔNG phụ thuộc bảng do Hibernate tạo. */
-    static final String PRE_HIBERNATE_TARGET = "7";
 
     @Bean
     public FlywayMigrationStrategy twoPhaseFlywayMigrationStrategy() {
