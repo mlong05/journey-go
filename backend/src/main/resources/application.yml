@@ -179,9 +179,13 @@ app:
     # URL nhận kết quả trả về (Return URL) sau khi khách thanh toán.
     return-url: ${VNPAY_RETURN_URL:}
 
-    # ⚠️ KHÔNG còn Return URL cho WEB: thanh toán CHỈ diễn ra trên ứng dụng
-    # MOBILE (du khách đặt tour và thanh toán trong app). Web chỉ phục vụ
-    # admin / đối tác / moderator ở góc nhìn quản trị (không có màn checkout).
+    # ── Return URL cho WEB du khách ───────────────────────────────────────────
+    # Web khởi tạo thanh toán với appRedirect=false ⇒ VNPay đưa trình duyệt về
+    # trang kết quả của frontend; trang này gửi tham số vnp_* đã ký về
+    # POST /payments/return-result để backend kiểm tra chữ ký rồi áp dụng.
+    #   => VNPAY_WEB_RETURN_URL=http://localhost:3000/payment/result
+    # Để trống ⇒ web dùng chung Return URL với app (hành vi cũ).
+    web-return-url: ${VNPAY_WEB_RETURN_URL:}
 
     # ── Return URL riêng cho APP MOBILE (deep link, custom scheme) ─────────────
     # ĐÃ KIỂM CHỨNG TRÊN SANDBOX: khi vnp_ReturnUrl là CUSTOM SCHEME, VNPay

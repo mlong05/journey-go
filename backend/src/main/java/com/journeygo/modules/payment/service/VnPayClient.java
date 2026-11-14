@@ -135,8 +135,8 @@ public class VnPayClient {
      * {@code vnp_*} mới được hash) ⇒ thêm sau khi ký vẫn an toàn. Backend cũng phải
      * bỏ qua mọi tham số không phải {@code vnp_*} khi xác minh chữ ký.
      *
-     * @param appRedirect giữ lại để tương thích với client cũ — KHÔNG còn ảnh hưởng
-     *                   tới Return URL (luôn dùng deep link của app).
+     * @param appRedirect true khi client là APP MOBILE (dùng deep link của app);
+     *                   false khi client là WEB ⇒ dùng {@code web-return-url} nếu đã cấu hình.
      */
     public String buildPaymentUrl(String txnRef, BigDecimal amount, String orderInfo,
                                   LocalDateTime createDate, LocalDateTime expireDate, String clientIp,
@@ -153,7 +153,7 @@ public class VnPayClient {
         params.put("vnp_OrderInfo", orderInfo);
         params.put("vnp_OrderType", properties.getOrderType());
         params.put("vnp_Locale", properties.getLocale());
-        params.put("vnp_ReturnUrl", buildReturnUrl());
+        params.put("vnp_ReturnUrl", buildReturnUrl(appRedirect));
         params.put("vnp_IpAddr", clientIp != null && !clientIp.isBlank() ? clientIp : properties.getIpAddr());
         params.put("vnp_CreateDate", formatDate(createDate));
         params.put("vnp_ExpireDate", formatDate(expireDate));
@@ -202,7 +202,13 @@ public class VnPayClient {
      * {@code vnp_*} mới được hash) ⇒ thêm/sửa sau khi ký vẫn an toàn. Xem
      * {@link #isValidSignature(Map)}.
      */
-    private String buildReturnUrl() {
+    private String buildReturnUrl(boolean appRedirect) {
+        // WEB du khách: quay về trang kết quả của frontend (không đi qua app / tunnel).
+        String webUrl = properties.getWebReturnUrl();
+        if (!appRedirect && webUrl != null && !webUrl.isBlank()) {
+            return webUrl;
+        }
+
         // ƯU TIÊN: CUSTOM SCHEME (`journeygo://payment/return`) nếu được cấu hình.
         //
         // ⚠️ VÌ SAO ưu tiên custom scheme thay vì Return URL HTTPS của backend?
@@ -228,7 +234,7 @@ public class VnPayClient {
         boolean hasHttpsBase = base != null && !base.isBlank()
                 && (base.startsWith("http://") || base.startsWith("https://"));
 
-        // CUSTOM SCHEME — luôn ưu tiên (thanh toán chỉ có trên mobile).
+        // APP MOBILE: CUSTOM SCHEME — luôn ưu tiên.
         String appSchemeUrl = properties.getAppReturnUrl();
         if (appSchemeUrl != null && !appSchemeUrl.isBlank()) {
             return appSchemeUrl;
