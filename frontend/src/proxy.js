@@ -4,13 +4,11 @@ import { NextResponse } from "next/server";
  * Proxy (middleware) của web.
  *
  * ── Phạm vi ──
- * Web chỉ phục vụ ADMIN / ĐỐI TÁC (provider) / MODERATOR.
- * Các khu vực này tự bảo vệ bằng `useAuthSession` + điều hướng về `/login`
- * trong từng layout, nên proxy chỉ giữ lại chặn cơ bản cho các đường dẫn
- * cũ còn nằm trong `protectedPaths`.
- *
- * ⚠️ Không có route du khách (`/tours`, `/bookings`, `/checkout`, `/payments`,
- * `/trips`, `/journeys`) trên web ⇒ không cần bảo vệ chúng ở đây.
+ * Phiên đăng nhập lưu trong localStorage (không có cookie) nên proxy không đọc được.
+ * Các khu vực cần đăng nhập tự bảo vệ ở client:
+ *  • ADMIN / ĐỐI TÁC / MODERATOR: `useAuthSession` + điều hướng về `/login` trong từng layout.
+ *  • Du khách (`/checkout`, `/trips`): `RequireTourist` ⇒ `/login?callbackUrl=...`.
+ * Proxy chỉ giữ lại chặn cơ bản cho các đường dẫn cũ còn nằm trong `protectedPaths`.
  */
 export function proxy(request) {
   const { pathname } = request.nextUrl;

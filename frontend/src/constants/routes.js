@@ -2,24 +2,33 @@
  * Định nghĩa tập trung các đường dẫn (routes) trong ứng dụng.
  *
  * ── Lưu ý về vai trò ──
- * WEB chỉ phục vụ ADMIN / ĐỐI TÁC (provider) / MODERATOR.
- * Toàn bộ luồng DU KHÁCH (xem tour → đặt tour → thanh toán → hành trình)
- * nằm trên MOBILE. Vì vậy các route `/tours`, `/bookings`, `/checkout`,
- * `/payments`, `/payment/*`, `/trips`, `/journeys` KHÔNG tồn tại trên web.
+ * WEB phục vụ DU KHÁCH (xem tour → đặt tour → thanh toán → chuyến đi của tôi)
+ * và ADMIN / ĐỐI TÁC (provider) / MODERATOR. Phần đi tour tại chỗ (check-in GPS,
+ * quét QR, quiz tại điểm dừng) vẫn nằm trên ứng dụng MOBILE.
  */
 export const ROUTES = {
   HOME: "/",
   LOGIN: "/login",
   REGISTER: "/register",
 
-  // ── Chuyến đi / Tour (chỉ có trên MOBILE) ────────────────────────────────
-  // Web không phục vụ du khách ⇒ các route dưới đây đã bị gỡ.
-  // Xem `mobile/lib/screens/tours/` cho phần tương ứng của app.
-
-  // ── Thanh toán (chỉ có trên MOBILE) ───────────────────────────────────────
-  // Web không có checkout/payment ⇒ xem `mobile/lib/screens/bookings/`.
-
-  // ── Hành trình (chỉ có trên MOBILE) ──────────────────────────────────────
+  // ── Du khách ──────────────────────────────────────────────────────────────
+  /** Danh sách tour đang bán (lọc vùng / chủ đề / tìm kiếm). */
+  TOURS: "/tours",
+  /** Chi tiết tour + chọn ngày, số khách. */
+  TOUR_DETAIL: (id) => `/tours/${id}`,
+  /** Nhập hành khách + thanh toán: /checkout/{tourId}?date=yyyy-MM-dd&adult=2&child=1 */
+  CHECKOUT: (tourId) => `/checkout/${tourId}`,
+  /** VNPay chuyển trình duyệt về đây (VNPAY_WEB_RETURN_URL). */
+  PAYMENT_RESULT: "/payment/result",
+  /** Chuyến đi (đơn đặt tour) của tôi. */
+  TRIPS: "/trips",
+  TRIP_DETAIL: (id) => `/trips/${id}`,
+  /** Tài khoản du khách: hồ sơ + đổi mật khẩu. */
+  ACCOUNT: "/account",
+  ACCOUNT_REFUNDS: "/account/refunds",
+  /** Nhắn tin với nhà tour: /account/messages?c={conversationId} */
+  ACCOUNT_MESSAGES: "/account/messages",
+  ACCOUNT_REWARDS: "/account/rewards",
 
   // ── Đăng ký thành đối tác ─────────────────────────────────────────────────
   /** Luồng đăng ký đối tác (4 giai đoạn) — link đặt ở footer trang chủ. */
