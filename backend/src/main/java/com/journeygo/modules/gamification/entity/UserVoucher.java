@@ -1,6 +1,7 @@
 package com.journeygo.modules.gamification.entity;
 
 import com.journeygo.modules.gamification.entity.enums.UserVoucherStatus;
+import com.journeygo.modules.voucher.entity.Voucher;
 import jakarta.persistence.*;
 import lombok.*;
 
