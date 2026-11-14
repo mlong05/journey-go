@@ -8,6 +8,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
 /**
  * Voucher Entity: Định nghĩa chương trình khuyến mãi/giảm giá của Nền tảng hoặc Đối tác.
@@ -83,10 +84,10 @@ public class Voucher {
     private Integer validDays = 30;
 
     @Column(name = "start_date")
-    private Instant startDate;
+    private LocalDate startDate;
 
     @Column(name = "end_date")
-    private Instant endDate;
+    private LocalDate endDate;
 
     @Column(name = "is_active", nullable = false)
     @Builder.Default

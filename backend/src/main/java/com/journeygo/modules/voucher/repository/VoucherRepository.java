@@ -11,7 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,7 +37,7 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
            "(v.startDate IS NULL OR v.startDate <= :now) AND " +
            "(v.endDate IS NULL OR v.endDate >= :now) AND " +
            "(v.voucherScope = 'PLATFORM' OR (v.voucherScope = 'PARTNER' AND v.partner.id = :partnerId))")
-    List<Voucher> findApplicableVouchersForTour(@Param("partnerId") Long partnerId, @Param("now") Instant now);
+    List<Voucher> findApplicableVouchersForTour(@Param("partnerId") Long partnerId, @Param("now") LocalDate now);
 
     @Query("SELECT v FROM Voucher v WHERE " +
            "(:scope IS NULL OR v.voucherScope = :scope) AND " +

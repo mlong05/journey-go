@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS vouchers (
     total_quantity INT NOT NULL DEFAULT 0,
     remaining_quantity INT NOT NULL DEFAULT 0,
     valid_days INT NOT NULL DEFAULT 30,
-    start_date TIMESTAMPTZ,
-    end_date TIMESTAMPTZ,
+    start_date DATE,
+    end_date DATE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -7,6 +7,7 @@ import lombok.Builder;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Builder
 public record VoucherResponse(
@@ -25,8 +26,8 @@ public record VoucherResponse(
         Integer totalQuantity,
         Integer remainingQuantity,
         Integer validDays,
-        Instant startDate,
-        Instant endDate,
+        LocalDate startDate,
+        LocalDate endDate,
         boolean active,
         Instant createdAt
 ) {
