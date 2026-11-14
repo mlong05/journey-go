@@ -1,11 +1,11 @@
-import LandingPage from "@/components/landing/LandingPage";
+import { HomePage } from "@/features/tourist";
 
 export const metadata = {
-  title: "Journey Go - Nền tảng Du lịch Trải nghiệm & Di sản Việt Nam",
+  title: "Journey Go - Tour trải nghiệm văn hoá & di sản Việt Nam",
   description:
-    "Khám phá các hoạt động trải nghiệm độc bản tại Hà Giang, Hội An, Ninh Bình, Đà Lạt cùng người bản địa và tự thiết kế lịch trình chuyến đi của bạn.",
+    "Đặt tour trong ngày ở làng nghề, phố cổ và di tích cùng người địa phương: Bát Tràng, Hội An, Cố đô Huế, Văn Miếu, chợ nổi Cái Răng. Đặt trên web, đi tour bằng app JourneyGo.",
 };
 
 export default function RootPage() {
-  return <LandingPage />;
+  return <HomePage />;
 }
