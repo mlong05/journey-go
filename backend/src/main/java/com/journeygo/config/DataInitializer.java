@@ -30,12 +30,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.journeygo.modules.finance.entity.CommissionPolicy;
 import com.journeygo.modules.gamification.entity.Badge;
 import com.journeygo.modules.gamification.entity.UserPoint;
-import com.journeygo.modules.gamification.entity.Voucher;
+import com.journeygo.modules.voucher.entity.Voucher;
 import com.journeygo.modules.gamification.entity.enums.BadgeType;
-import com.journeygo.modules.gamification.entity.enums.DiscountType;
+import com.journeygo.modules.voucher.entity.enums.DiscountType;
 import com.journeygo.modules.gamification.repository.BadgeRepository;
 import com.journeygo.modules.gamification.repository.UserPointRepository;
-import com.journeygo.modules.gamification.repository.VoucherRepository;
+import com.journeygo.modules.voucher.repository.VoucherRepository;
 
 import com.journeygo.modules.booking.entity.Booking;
 import com.journeygo.modules.booking.entity.BookingSlotHold;
