@@ -19,6 +19,9 @@ public interface PartnerApplicationRepository extends JpaRepository<PartnerAppli
     /** Đơn của một ứng viên đối tác cụ thể (mới nhất trước). */
     Optional<PartnerApplication> findFirstByApplicant_IdOrderByCreatedAtDesc(Long applicantUserId);
 
+    /** Toàn bộ đơn của một ứng viên đối tác (mới nhất trước). */
+    List<PartnerApplication> findByApplicant_IdOrderByCreatedAtDesc(Long applicantUserId);
+
     /** Tồn tại đơn đang chờ duyệt của email này hay không (chống trùng đơn). */
     boolean existsByEmailIgnoreCaseAndStatusIn(String email, List<PartnerApplicationStatus> statuses);
 
@@ -26,6 +29,9 @@ public interface PartnerApplicationRepository extends JpaRepository<PartnerAppli
     boolean existsByBusinessNameIgnoreCaseAndStatusIn(String businessName, List<PartnerApplicationStatus> statuses);
 
     Page<PartnerApplication> findByStatus(PartnerApplicationStatus status, Pageable pageable);
+
+    /** Toàn bộ đơn trừ trạng thái {@code DRAFT} — dùng cho tab "Tất cả" của Admin. */
+    Page<PartnerApplication> findByStatusNot(PartnerApplicationStatus status, Pageable pageable);
 
     /**
      * Tìm đơn đang chờ duyệt của một email — dùng để chống trùng khi gửi đơn.

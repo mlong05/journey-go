@@ -20,6 +20,9 @@ import com.journeygo.modules.journey.provider.TourInfoProvider;
 import com.journeygo.modules.journey.repository.JourneyDestinationProgressRepository;
 import com.journeygo.modules.journey.repository.JourneyRepository;
 import com.journeygo.modules.journey.repository.JourneyTaskProgressRepository;
+import com.journeygo.modules.tour.dto.StopCultureResponse;
+import com.journeygo.modules.tour.service.TextAnswerMatcher;
+import com.journeygo.modules.tour.service.TourService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,11 +45,25 @@ public class JourneyService {
     private final TourInfoProvider tourInfoProvider;
     private final GamificationService gamificationService;
     private final BookingService bookingService;
+    private final TourService tourService;
+
+    /**
+     * CHỈ DÙNG KHI DEV: bỏ kiểm tra khoảng cách GPS (check-in trạm, mở câu hỏi theo vị trí) để thử hành trình
+     * ở nhà. Mã QR vẫn bắt buộc ở nơi cần QR. Bật bằng JOURNEY_SKIP_LOCATION_CHECK=true.
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.journey.skip-location-check:false}")
+    private boolean skipLocationCheck;
 
     // ── JOURNEY LIFECYCLE ────────────────────────────────────────────────────────
 
     @Transactional
     public JourneyResponse startJourney(Long userId, StartJourneyRequest request) {
+        // Tour bị khoá cho tới ngày trải nghiệm: chỉ người đặt / hành khách đã liên kết
+        // mới được bắt đầu, và chỉ từ ngày trải nghiệm trở đi.
+        if (request.bookingId() != null) {
+            bookingService.assertJourneyAllowed(request.bookingId(), userId);
+        }
+
         // Mỗi đơn đặt tour chỉ có một hành trình: đã đi xong thì mở lại hành trình cũ, không tạo mới để check-in lại.
         if (request.bookingId() != null) {
             var byBooking = journeyRepository.findFirstByUserIdAndBookingIdOrderByCreatedAtDesc(userId, request.bookingId());
@@ -131,6 +148,22 @@ public class JourneyService {
         return JourneyResponse.fromEntity(journey);
     }
 
+    /**
+     * Nội dung văn hoá của điểm dừng: chỉ mở khi du khách đã check-in tại điểm đó trong hành trình của mình.
+     */
+    @Transactional(readOnly = true)
+    public StopCultureResponse getDestinationCulture(Long journeyId, Long destinationId, Long userId) {
+        Journey journey = findJourneyAndVerifyOwner(journeyId, userId);
+        JourneyDestinationProgress destProgress = destinationProgressRepository
+                .findByJourneyIdAndDestinationId(journeyId, destinationId)
+                .orElseThrow(() -> new ResourceNotFoundException("JourneyDestinationProgress", destinationId));
+        if (!destProgress.isCheckedIn()) {
+            throw new BusinessException("CULTURE-LOCKED",
+                    "Hãy check-in tại " + destProgress.getDestinationName() + " để mở khóa nội dung văn hóa");
+        }
+        return tourService.getStopCulture(journey.getTourId(), destinationId);
+    }
+
     // ── CHECK-IN LOGIC ──────────────────────────────────────────────────────────
 
     @Transactional
@@ -172,8 +205,15 @@ public class JourneyService {
                 .orElseThrow(() -> new BusinessException("DEST-NOT-IN-TOUR", "Điểm đến không nằm trong hành trình Tour này"));
 
         Integer distanceMeters = null;
+        // Điểm dừng của tour 5 bước chưa có checkpoint nào có toạ độ: không có gì để đối chiếu, check-in thẳng.
+        boolean nothingToVerify = tourInfo.wizard()
+                && (currentDestInfo.latitude() == null || currentDestInfo.longitude() == null);
 
-        if (request.verificationMethod() == CheckInVerificationMethod.GPS) {
+        if (nothingToVerify) {
+            log.info("Điểm dừng {} chưa có toạ độ: check-in không cần xác minh vị trí", destinationId);
+        } else if (request.verificationMethod() == CheckInVerificationMethod.GPS && skipLocationCheck) {
+            log.warn("[DEV] Bỏ kiểm tra GPS khi check-in: journey={}, dest={}", journeyId, destinationId);
+        } else if (request.verificationMethod() == CheckInVerificationMethod.GPS) {
             if (request.latitude() == null || request.longitude() == null) {
                 throw new BusinessException("GPS-MISSING", "Vui lòng bật định vị GPS để xác thực vị trí");
             }
@@ -210,7 +250,8 @@ public class JourneyService {
         destProgress.setStatus(DestinationProgressStatus.IN_PROGRESS);
         syncMissingTasks(destProgress, currentDestInfo);
 
-        UserBadge awardedBadge = gamificationService.awardCheckInBadge(
+        // Huy hiệu check-in gắn với điểm đến chung; điểm dừng riêng của tour 5 bước chưa có huy hiệu.
+        UserBadge awardedBadge = tourInfo.wizard() ? null : gamificationService.awardCheckInBadge(
                 userId, destinationId, destProgress.getDestinationName(), journeyId
         );
 
@@ -313,6 +354,9 @@ public class JourneyService {
                 .status(taskProgress.getStatus())
                 .requiresLocation(task.requiresLocation())
                 .sequential(task.requiresLocation())
+                .durationSeconds(task.durationSeconds())
+                .qrRequired(task.qrRequired())
+                .perQuestionPoints(task.perQuestionPoints())
                 .totalQuestions(total);
 
         if (!task.requiresLocation()) {
@@ -330,7 +374,7 @@ public class JourneyService {
         }
 
         TourInfo.QuestionInfo current = task.questions().get(index);
-        LocationCheck location = checkLocation(current, latitude, longitude, qrValue);
+        LocationCheck location = checkLocation(task, current, latitude, longitude, qrValue);
         return base
                 .unlocked(location.unlocked())
                 .distanceMeters(location.distanceMeters())
@@ -383,7 +427,7 @@ public class JourneyService {
             if (given == null) {
                 throw new BusinessException("ANSWER-MISSING", "Vui lòng trả lời câu hỏi hiện tại của nhiệm vụ");
             }
-            LocationCheck location = checkLocation(current, request.latitude(), request.longitude(), request.qrValue());
+            LocationCheck location = checkLocation(task, current, request.latitude(), request.longitude(), request.qrValue());
             if (!location.unlocked()) {
                 throw new BusinessException(location.failureCode(), location.failureMessage());
             }
@@ -407,6 +451,15 @@ public class JourneyService {
                 taskProgress.setIsCorrect(false);
                 registerFailedAttempt(taskProgress, max, userId, taskId, journeyId);
             }
+        } else if (task.perQuestionPoints()) {
+            // ── Câu đố tour 5 bước: nộp một lần, đúng câu nào cộng điểm câu đó ──
+            GradeResult grade = gradeTask(task, request.answers());
+            correctCount = grade.correct();
+            questionIndex = 0;
+            lastAnswerCorrect = grade.passed();
+            taskProgress.setIsCorrect(grade.passed());
+            taskProgress.setAttempts(taskProgress.getAttempts() + 1);
+            completeTask(task, taskProgress, destProgress, userId, journeyId, grade.points());
         } else {
             // ── Nộp bài cả nhiệm vụ một lần ──
             GradeResult grade = gradeTask(task, request.answers());
@@ -439,7 +492,12 @@ public class JourneyService {
     /** Đúng hết: nhận trọn điểm nhiệm vụ, cộng một lần. */
     private void completeTask(TourInfo.TourTaskInfo task, JourneyTaskProgress taskProgress,
                               JourneyDestinationProgress destProgress, Long userId, Long journeyId) {
-        int points = task.points() != null ? task.points() : 0;
+        completeTask(task, taskProgress, destProgress, userId, journeyId, task.points() != null ? task.points() : 0);
+    }
+
+    /** Hoàn thành nhiệm vụ với số điểm cho trước (câu đố chấm theo từng câu có thể nhận một phần điểm). */
+    private void completeTask(TourInfo.TourTaskInfo task, JourneyTaskProgress taskProgress,
+                              JourneyDestinationProgress destProgress, Long userId, Long journeyId, int points) {
         taskProgress.setStatus(TaskProgressStatus.COMPLETED);
         taskProgress.setPointsEarned(points);
         taskProgress.setCompletedAt(Instant.now());
@@ -523,15 +581,26 @@ public class JourneyService {
                 .count();
 
         if (completedDests >= journey.getTotalDestinations()) {
-            journey.setStatus(JourneyStatus.COMPLETED);
-            journey.setCompletedAt(Instant.now());
-            log.info("Chúc mừng! Du khách {} đã hoàn thành toàn bộ hành trình Tour {}", userId, journey.getTourName());
+            completeJourney(journey, userId);
+        }
+    }
 
-            markBookingCompleted(journey, journey.getCompletedAt());
+    /**
+     * Kết thúc hành trình (dù điểm cuối xong bằng nhiệm vụ hay bị bỏ qua): đánh dấu booking hoàn thành
+     * và cộng thưởng hoàn thành — chỉ khi du khách không bỏ qua điểm đến nào.
+     */
+    private void completeJourney(Journey journey, Long userId) {
+        journey.setStatus(JourneyStatus.COMPLETED);
+        journey.setCompletedAt(Instant.now());
+        log.info("Du khách {} đã đi hết hành trình Tour {} (mức {})", userId, journey.getTourName(), journey.completionRank());
 
+        markBookingCompleted(journey, journey.getCompletedAt());
+
+        int bonus = journey.completionBonusPoints();
+        if (bonus > 0) {
             gamificationService.awardPoints(
                     userId,
-                    50,
+                    bonus,
                     PointTransactionType.EARNED_TOUR,
                     "TOUR_COMPLETION_" + journey.getId(),
                     "Thưởng hoàn thành trọn vẹn hành trình " + journey.getTourName()
@@ -541,7 +610,8 @@ public class JourneyService {
 
     // ── Chấm bài ───────────────────────────────────────────────────────────────
 
-    private record GradeResult(int total, int correct) {
+    /** @param points tổng điểm của các câu trả lời đúng (chỉ có ý nghĩa với câu hỏi mang điểm riêng) */
+    private record GradeResult(int total, int correct, int points) {
         boolean passed() {
             return correct == total;
         }
@@ -557,14 +627,23 @@ public class JourneyService {
             }
         }
         int correct = 0;
+        int points = 0;
         for (TourInfo.QuestionInfo q : questions) {
-            if (isAnswerCorrect(q, byQuestion.get(q.questionId()))) correct++;
+            if (isAnswerCorrect(q, byQuestion.get(q.questionId()))) {
+                correct++;
+                points += q.points() != null ? q.points() : 0;
+            }
         }
-        return new GradeResult(questions.size(), correct);
+        return new GradeResult(questions.size(), correct, points);
     }
 
     private boolean isAnswerCorrect(TourInfo.QuestionInfo q, SubmitTaskRequest.QuestionAnswer given) {
         if (given == null) return false;
+        if ("TEXT".equals(q.questionType()) && q.lenientText()) {
+            // Tour 5 bước: không phân biệt dấu / hoa thường / khoảng trắng; nhiều đáp án ngăn bởi ';'
+            if (normalizeText(given.text()).isEmpty()) return false;
+            return normalizeText(q.expectedText()).isEmpty() || TextAnswerMatcher.matches(given.text(), q.expectedText());
+        }
         if ("TEXT".equals(q.questionType())) {
             String actual = normalizeText(given.text());
             if (actual.isEmpty()) return false;
@@ -611,11 +690,28 @@ public class JourneyService {
         }
     }
 
-    /** Mở khóa bằng một trong hai cách: quét đúng mã QR của địa điểm, hoặc đứng trong bán kính của địa điểm. */
-    private LocationCheck checkLocation(TourInfo.QuestionInfo q, BigDecimal latitude, BigDecimal longitude, String qrValue) {
+    /**
+     * Mở khóa bằng một trong hai cách: quét đúng mã QR của địa điểm, hoặc đứng trong bán kính của địa điểm.
+     * Nhiệm vụ {@code qrRequired} (hoạt động thực địa của tour 5 bước) chỉ mở bằng QR; GPS chỉ để báo khoảng cách.
+     */
+    private LocationCheck checkLocation(TourInfo.TourTaskInfo task, TourInfo.QuestionInfo q,
+                                        BigDecimal latitude, BigDecimal longitude, String qrValue) {
         boolean hasCoords = q.stationLatitude() != null && q.stationLongitude() != null;
         boolean hasQr = q.stationQrToken() != null && !q.stationQrToken().isBlank();
         if (!hasCoords && !hasQr) return LocationCheck.ok(null); // câu hỏi chưa gắn địa điểm: không có gì để kiểm tra
+
+        if (task.qrRequired() && hasQr) {
+            Integer distance = hasCoords && latitude != null && longitude != null
+                    ? GeoUtils.haversineMeters(latitude, longitude, q.stationLatitude(), q.stationLongitude()).intValue()
+                    : null;
+            if (qrValue == null || qrValue.isBlank()) {
+                return LocationCheck.fail(distance, "QR-REQUIRED",
+                        "Hoàn thành hoạt động rồi quét mã QR tại điểm để mở câu hỏi");
+            }
+            return qrValue.trim().equalsIgnoreCase(q.stationQrToken().trim())
+                    ? LocationCheck.ok(distance)
+                    : LocationCheck.fail(distance, "QR-INVALID", "Mã QR không khớp với điểm hoạt động này");
+        }
 
         if (qrValue != null && !qrValue.isBlank()) {
             if (hasQr && qrValue.trim().equalsIgnoreCase(q.stationQrToken().trim())) {
@@ -624,6 +720,10 @@ public class JourneyService {
             return LocationCheck.fail(null, "QR-INVALID", "Mã QR không khớp với địa điểm của câu hỏi này");
         }
 
+        if (skipLocationCheck) {
+            log.warn("[DEV] Bỏ kiểm tra GPS khi mở câu hỏi {}", q.questionId());
+            return LocationCheck.ok(null);
+        }
         if (latitude == null || longitude == null || !hasCoords) {
             return LocationCheck.fail(null, "GPS-REQUIRED",
                     "Hãy đến đúng địa điểm của câu hỏi (bật định vị GPS) hoặc quét mã QR tại đó để mở câu hỏi");
@@ -728,9 +828,7 @@ public class JourneyService {
                 .count();
 
         if (completedDests >= journey.getTotalDestinations()) {
-            journey.setStatus(JourneyStatus.COMPLETED);
-            journey.setCompletedAt(Instant.now());
-            markBookingCompleted(journey, journey.getCompletedAt());
+            completeJourney(journey, userId);
         }
 
         destinationProgressRepository.save(destProgress);

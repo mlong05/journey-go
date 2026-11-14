@@ -226,4 +226,16 @@ public class ProviderProfileService {
     public ProviderProfile findByUserIdOrNull(Long userId) {
         return providerProfileRepository.findByUser_Id(userId).orElse(null);
     }
+
+    /**
+     * BR-01: chỉ đối tác đã được Admin duyệt (có hồ sơ — tạo khi duyệt đơn đăng ký đối tác)
+     * và đang hoạt động mới được tạo / gửi duyệt tour.
+     */
+    @Transactional(readOnly = true)
+    public void requireCanManageTours(Long userId) {
+        ProviderProfile profile = providerProfileRepository.findByUser_Id(userId).orElse(null);
+        if (profile == null || !profile.canManageTours()) {
+            throw new AppException(ErrorCode.PROVIDER_NOT_APPROVED);
+        }
+    }
 }

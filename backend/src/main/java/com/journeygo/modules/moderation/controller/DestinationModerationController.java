@@ -39,7 +39,7 @@ public class DestinationModerationController {
     }
 
     @PostMapping("/{destinationId}/submit")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'CONTENT_MODERATOR')")
     @Operation(summary = "Gửi điểm đến để kiểm duyệt")
     public ResponseEntity<ApiResponse<DestinationReviewResponse>> submit(
             @PathVariable Long destinationId,
@@ -49,7 +49,7 @@ public class DestinationModerationController {
     }
 
     @GetMapping("/queue")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Lấy hàng chờ kiểm duyệt điểm đến")
     public ResponseEntity<ApiResponse<PageResponse<DestinationReviewResponse>>> queue(
             @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
@@ -58,7 +58,7 @@ public class DestinationModerationController {
     }
 
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Lấy điểm đến theo trạng thái kiểm duyệt")
     public ResponseEntity<ApiResponse<PageResponse<DestinationReviewResponse>>> byStatus(
             @PathVariable DestinationReviewStatus status,
@@ -68,7 +68,7 @@ public class DestinationModerationController {
     }
 
     @GetMapping("/rejection-reasons")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     public ResponseEntity<ApiResponse<java.util.List<RejectionReasonOption>>> rejectionReasons() {
         var reasons = java.util.Arrays.stream(DestinationRejectionReason.values())
                 .map(reason -> new RejectionReasonOption(reason.getCode(), reason.getLabel())).toList();
@@ -78,7 +78,7 @@ public class DestinationModerationController {
     public record RejectionReasonOption(String code, String label) {}
 
     @GetMapping("/{destinationId}/history")
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'CONTENT_MODERATOR')")
     @Operation(summary = "Xem trạng thái và lịch sử kiểm duyệt điểm đến")
     public ResponseEntity<ApiResponse<DestinationReviewResponse>> history(@PathVariable Long destinationId,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -87,7 +87,7 @@ public class DestinationModerationController {
     }
 
     @PatchMapping("/{destinationId}/approve")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Duyệt và xuất bản điểm đến")
     public ResponseEntity<ApiResponse<DestinationReviewResponse>> approve(@PathVariable Long destinationId,
             @AuthenticationPrincipal UserPrincipal principal,
@@ -97,7 +97,7 @@ public class DestinationModerationController {
     }
 
     @PatchMapping("/{destinationId}/reject")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
+    @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Từ chối điểm đến")
     public ResponseEntity<ApiResponse<DestinationReviewResponse>> reject(@PathVariable Long destinationId,
             @AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody DestinationReviewDecisionRequest request) {

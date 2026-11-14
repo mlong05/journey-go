@@ -1,27 +1,16 @@
 ﻿"use client";
 
-import { ToursManager } from "@/features/tour";
+import { ProviderToursList } from "@/features/tourwizard";
 
 /**
- * Trang quản lý Tour của Đối tác Điểm đến (PROVIDER).
+ * Trang Quản lý Tour của Đối tác (CONTENT_PROVIDER).
  *
- * Phạm vi quyền theo backend:
- *  - GET    /api/v1/tours/my        : danh sách tour của chính mình
- *  - POST   /api/v1/tours           : tạo tour mới (DRAFT)
- *  - PUT    /api/v1/tours/{tourId}  : sửa tour của mình (reset về DRAFT)
- *  - PATCH  /api/v1/tours/{tourId}/submit : gửi duyệt
- *
- * PROVIDER không có quyền duyệt / từ chối / xoá (dành cho MODERATOR, ADMIN).
+ * Luồng 5 bước — backend /api/v1/provider/tours:
+ *  - GET    /provider/tours                : danh sách tour của tôi
+ *  - POST   /provider/tours                : tạo bản nháp → mở wizard /provider/tours/{id}/edit
+ *  - POST   /provider/tours/{id}/duplicate : nhân bản
+ *  - DELETE /provider/tours/{id}
  */
 export default function ProviderToursPage() {
-  return (
-    <ToursManager
-      theme="emerald"
-      source="mine"
-      heading="Tour Du Lịch Của Tôi"
-      canCreate
-      canModerate={false}
-      canDelete={false}
-    />
-  );
+  return <ProviderToursList />;
 }

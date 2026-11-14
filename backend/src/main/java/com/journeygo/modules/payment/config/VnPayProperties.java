@@ -56,17 +56,6 @@ public class VnPayProperties {
     private String returnUrl = "";
 
     /**
-     * Return URL riêng cho WEB (trang kết quả của frontend Next.js).
-     *
-     * <p>Nếu để trống ⇒ dùng {@link #returnUrl} cho mọi giao dịch.
-     * Nếu có ⇒ giao dịch KHÔNG phải từ app mobile sẽ redirect về trang này
-     * (frontend tự poll {@code GET /payments/{id}} để hiện kết quả).
-     *
-     * <p>VD: {@code http://localhost:3000/payment/return}
-     */
-    private String webReturnUrl = "";
-
-    /**
      * Return URL riêng cho APP MOBILE — dạng CUSTOM SCHEME (deep link).
      *
      * <p>VD: {@code journeygo://payment/return}
@@ -85,6 +74,9 @@ public class VnPayProperties {
      *
      * <p>App gửi kèm các tham số này lên backend để backend kiểm tra chữ ký
      * rồi áp dụng — xem {@code POST /payments/return-result}.
+     *
+     * <p>⚠️ Thanh toán CHỈ diễn ra trên ứng dụng MOBILE. Web không có màn checkout
+     * nên KHÔNG cần Return URL riêng cho web.
      *
      * <p>Nếu để trống ⇒ dùng {@link #returnUrl} (https) + gắn {@code app_redirect=1}
      * ⇒ trang kết quả của backend tự chuyển hướng trình duyệt về app (cần tunnel).

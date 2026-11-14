@@ -35,6 +35,17 @@ public class TourReviewHistory {
     @Column(name = "other_reason", length = 500)
     private String otherReason;
 
+    /** Trạng thái tour trước / sau thao tác (mục 9.5). */
+    @Column(name = "from_status", length = 30)
+    private String fromStatus;
+
+    @Column(name = "to_status", length = 30)
+    private String toStatus;
+
+    /** Phiên bản tour tại thời điểm thao tác. */
+    @Column(name = "tour_version")
+    private Integer tourVersion;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

@@ -4,11 +4,11 @@ import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  MapPin,
-  Trophy,
-  FileCheck,
   Route,
+  Users,
+  Headphones,
   Wallet,
+  UserCog,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -42,10 +42,16 @@ export default function ProviderLayout({ children }) {
 
   // Dynamic danh sách thông báo duyệt bài (sẵn sàng gắn API)
 
-  // Trang Quản lý Điểm đến: khóa khung 100vh, cố định header & filter, chỉ danh sách thẻ tự cuộn
+  // Trang Quản lý Tour & Thông tin đối tác: khóa khung 100vh, cố định header & filter,
+  // chỉ phần nội dung tự cuộn (trang Thông tin đối tác còn cuộn riêng cho khối lịch sử).
   const isScrollLockedPage =
-    pathname?.startsWith("/provider/destinations") ||
-    pathname?.startsWith("/provider/tours");
+    pathname === "/provider" ||
+    pathname === "/provider/" ||
+    pathname?.startsWith("/provider/tours") ||
+    pathname?.startsWith("/provider/bookings") ||
+    pathname?.startsWith("/provider/support") ||
+    pathname?.startsWith("/provider/partner-info") ||
+    pathname?.startsWith("/provider/finance");
 
   // Danh mục điều hướng Sidebar của Đối tác
   const navMenuItems = [
@@ -62,28 +68,28 @@ export default function ProviderLayout({ children }) {
       icon: Route,
     },
     {
-      id: "destinations",
-      label: "Quản lý Điểm đến",
-      href: "/provider/destinations",
-      icon: MapPin,
+      id: "bookings",
+      label: "Khách hàng đã đặt tour",
+      href: "/provider/bookings",
+      icon: Users,
     },
     {
-      id: "missions",
-      label: "Nhiệm vụ & Đố vui",
-      href: "/provider/tasks/create",
-      icon: Trophy,
-    },
-    {
-      id: "reviews",
-      label: "Tiến độ Thẩm định",
-      href: "/provider#reviews",
-      icon: FileCheck,
+      id: "support",
+      label: "Hỗ trợ khách hàng",
+      href: "/provider/support",
+      icon: Headphones,
     },
     {
       id: "finance",
       label: "Tài chính & Doanh thu",
       href: "/provider/finance",
       icon: Wallet,
+    },
+    {
+      id: "partner-info",
+      label: "Thông tin đối tác",
+      href: "/provider/partner-info",
+      icon: UserCog,
     },
   ];
 
@@ -124,16 +130,18 @@ export default function ProviderLayout({ children }) {
           <main
             className={
               isScrollLockedPage
-                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8"
+                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col px-4 sm:px-6 lg:px-8 pt-4 lg:pt-5 pb-4 sm:pb-6"
                 : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
             }
           >
+            {/* key theo đường dẫn: mỗi lần chuyển trang chạy lại hiệu ứng hiện dần */}
             <div
-              className={
+              key={pathname}
+              className={`jg-page-enter ${
                 isScrollLockedPage
                   ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
                   : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
-              }
+              }`}
             >
               {children}
             </div>

@@ -36,6 +36,9 @@ class JourneyTask {
   final int pointsEarned;
   final int attempts;
 
+  /// Đúng hết hay chưa (null: nhiệm vụ không chấm đúng/sai hoặc chưa làm).
+  final bool? isCorrect;
+
   const JourneyTask({
     required this.taskId,
     required this.name,
@@ -44,6 +47,7 @@ class JourneyTask {
     required this.status,
     required this.pointsEarned,
     required this.attempts,
+    this.isCorrect,
   });
 
   factory JourneyTask.fromJson(Map<String, dynamic> j) => JourneyTask(
@@ -54,11 +58,15 @@ class JourneyTask {
         status: _str(j['status'], ProgressStatus.notStarted),
         pointsEarned: _int(j['pointsEarned']),
         attempts: _int(j['attempts']),
+        isCorrect: j['isCorrect'] is bool ? j['isCorrect'] as bool : null,
       );
 
   bool get isCompleted => status == ProgressStatus.completed;
   bool get isFailed => status == ProgressStatus.failed;
   bool get isOpen => !isCompleted && !isFailed && status != ProgressStatus.skipped;
+
+  /// Hoàn thành và trả lời đúng hết (câu đố chấm theo câu vẫn "hoàn thành" khi sai).
+  bool get isPassed => isCompleted && isCorrect != false;
 }
 
 class JourneyDestination {
@@ -123,6 +131,13 @@ class TourJourney {
 
   /// Thời điểm đi xong toàn bộ hành trình; null khi chưa xong.
   final DateTime? completedAt;
+  final DateTime? startedAt;
+
+  /// Điểm thưởng hoàn thành backend đã cộng (0 khi chưa xong hoặc có điểm đến bị bỏ qua).
+  final int completionBonusPoints;
+
+  /// Mức hoàn thành khi đã xong (null khi chưa xong).
+  final CompletionRank? completionRank;
 
   const TourJourney({
     required this.id,
@@ -134,6 +149,9 @@ class TourJourney {
     required this.totalDestinations,
     required this.destinations,
     this.completedAt,
+    this.startedAt,
+    this.completionBonusPoints = 0,
+    this.completionRank,
   });
 
   factory TourJourney.fromJson(Map<String, dynamic> j) {
@@ -149,14 +167,52 @@ class TourJourney {
       totalDestinations: _int(j['totalDestinations'], dests.length),
       destinations: dests,
       completedAt: DateTime.tryParse(_str(j['completedAt']))?.toLocal(),
+      startedAt: DateTime.tryParse(_str(j['startedAt']))?.toLocal(),
+      completionBonusPoints: _int(j['completionBonusPoints']),
+      completionRank: CompletionRank.parse(j['completionRank']),
     );
   }
 
   bool get isCompleted => status == ProgressStatus.completed;
   int get doneCount => destinations.where((d) => d.isDone).length;
+  int get skippedCount => destinations.where((d) => d.status == ProgressStatus.skipped).length;
   double get progress => totalDestinations == 0 ? 0 : doneCount / totalDestinations;
+
+  /// Điểm từ nhiệm vụ (chưa gồm thưởng hoàn thành).
   int get pointsEarned =>
       destinations.fold(0, (s, d) => s + d.tasks.fold(0, (t, task) => t + task.pointsEarned));
+
+  /// Tổng điểm của cả chuyến: điểm nhiệm vụ + thưởng hoàn thành.
+  int get totalPoints => pointsEarned + completionBonusPoints;
+
+  List<JourneyTask> get allTasks => [for (final d in destinations) ...d.tasks];
+  int get passedTaskCount => allTasks.where((t) => t.isPassed).length;
+
+  /// Thời gian từ lúc bắt đầu tới lúc đi xong (null khi thiếu mốc thời gian).
+  Duration? get duration {
+    final start = startedAt, end = completedAt;
+    if (start == null || end == null || end.isBefore(start)) return null;
+    return end.difference(start);
+  }
+}
+
+/// Mức hoàn thành hành trình (backend: Journey.completionRank()).
+enum CompletionRank {
+  /// Đủ mọi điểm đến, mọi nhiệm vụ đều đúng hết.
+  perfect,
+
+  /// Đủ mọi điểm đến nhưng có nhiệm vụ trả lời sai hoặc hết lượt.
+  completed,
+
+  /// Có điểm đến bị bỏ qua.
+  partial;
+
+  static CompletionRank? parse(dynamic v) => switch (v?.toString().toUpperCase()) {
+        'PERFECT' => CompletionRank.perfect,
+        'COMPLETED' => CompletionRank.completed,
+        'PARTIAL' => CompletionRank.partial,
+        _ => null,
+      };
 }
 
 /// Kết quả check-in điểm đến, kèm huy hiệu di sản nếu được cấp.
@@ -273,6 +329,15 @@ class TaskContent {
   final int? distanceMeters;
   final List<TaskQuestion> questions;
 
+  /// Hoạt động thực địa (tour 5 bước): đếm ngược bao lâu (giây) trước khi được quét QR; null = không đếm.
+  final int? durationSeconds;
+
+  /// Câu hỏi chỉ mở khi quét đúng mã QR tại điểm (tới nơi bằng GPS thôi chưa đủ).
+  final bool qrRequired;
+
+  /// Nộp một lần, đúng câu nào cộng điểm câu đó (câu đố tour 5 bước).
+  final bool perQuestionPoints;
+
   const TaskContent({
     required this.taskId,
     required this.name,
@@ -292,6 +357,9 @@ class TaskContent {
     this.stations = const [],
     required this.distanceMeters,
     required this.questions,
+    this.durationSeconds,
+    this.qrRequired = false,
+    this.perQuestionPoints = false,
   });
 
   factory TaskContent.fromJson(Map<String, dynamic> j) {
@@ -315,6 +383,9 @@ class TaskContent {
       stations: _maps(j['stations']).map(TaskStation.fromJson).toList(),
       distanceMeters: _intOrNull(j['distanceMeters']),
       questions: _maps(j['questions']).map(TaskQuestion.fromJson).toList(),
+      durationSeconds: _intOrNull(j['durationSeconds']),
+      qrRequired: j['qrRequired'] == true,
+      perQuestionPoints: j['perQuestionPoints'] == true,
     );
   }
 

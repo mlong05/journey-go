@@ -132,6 +132,7 @@ export default function AdminFinancePage() {
 
 function PaymentsTab() {
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [pageData, setPageData] = useState({ content: [], totalElements: 0, totalPages: 0 });
   const [summary, setSummary] = useState(null);
   const [platformRevenue, setPlatformRevenue] = useState(null);
@@ -168,14 +169,14 @@ function PaymentsTab() {
           status: statusFilter || undefined,
           search: search || undefined,
           page,
-          size: PAGE_SIZE,
+          size: pageSize,
         }),
         getPaymentSummary().catch(() => null),
         // Doanh thu nền tảng (phần thu được sau khi tất toán cho đối tác).
         // Lỗi ở endpoint này KHÔNG được làm hỏng tab giao dịch.
         getPlatformRevenueSummary(12).catch(() => null),
       ]);
-      setPageData(normalizePage(data, PAGE_SIZE));
+      setPageData(normalizePage(data, pageSize));
       if (sum) setSummary(sum);
       if (platform) setPlatformRevenue(platform);
     } catch (err) {
@@ -183,7 +184,7 @@ function PaymentsTab() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, search, page]);
+  }, [statusFilter, search, page, pageSize]);
 
   useEffect(() => {
     // `queueMicrotask` để không gọi setState đồng bộ trong thân effect
@@ -267,6 +268,11 @@ function PaymentsTab() {
             totalElements={pageData.totalElements}
             unit="giao dịch"
             onChange={setPage}
+            pageSize={pageSize}
+            onSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
           />
         }
         right={
@@ -425,6 +431,7 @@ function PaymentsTab() {
 
 function RefundsTab() {
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [pageData, setPageData] = useState({ content: [], totalElements: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -440,15 +447,15 @@ function RefundsTab() {
       const data = await getAllRefunds({
         status: statusFilter || undefined,
         page,
-        size: PAGE_SIZE,
+        size: pageSize,
       });
-      setPageData(normalizePage(data, PAGE_SIZE));
+      setPageData(normalizePage(data, pageSize));
     } catch (err) {
       setError(err?.message || "Không thể tải danh sách yêu cầu hoàn tiền.");
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, page]);
+  }, [statusFilter, page, pageSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -520,6 +527,11 @@ function RefundsTab() {
             totalElements={pageData.totalElements}
             unit="yêu cầu hoàn tiền"
             onChange={setPage}
+            pageSize={pageSize}
+            onSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
           />
         }
         right={
@@ -1173,6 +1185,7 @@ function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
 
 function BookingsTab() {
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [pageData, setPageData] = useState({ content: [], totalElements: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1185,15 +1198,15 @@ function BookingsTab() {
       const data = await getAllBookings({
         status: statusFilter || undefined,
         page,
-        size: PAGE_SIZE,
+        size: pageSize,
       });
-      setPageData(normalizePage(data, PAGE_SIZE));
+      setPageData(normalizePage(data, pageSize));
     } catch (err) {
       setError(err?.message || "Không thể tải danh sách đơn.");
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, page]);
+  }, [statusFilter, page, pageSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1223,6 +1236,11 @@ function BookingsTab() {
             totalElements={pageData.totalElements}
             unit="đơn đặt tour"
             onChange={setPage}
+            pageSize={pageSize}
+            onSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
           />
         }
         right={
@@ -1364,18 +1382,11 @@ function Panel({ icon: Icon, title, right, children, fill = false, footer = null
 
 /**
  * Thanh phân trang — bọc component dùng chung `PaginationBar`
- * (có số trang + nút nhảy trang đầu/cuối, giống trang Quản lý người dùng).
+ * (số trang, nút nhảy đầu/cuối, "Đang xem trang X / Y" và ô "Số dòng/trang",
+ * giống trang Quản lý người dùng). Luôn hiện kể cả khi chỉ có 1 trang.
  */
-function Pagination({ page, totalPages, totalElements, unit = "bản ghi", onChange }) {
-  if (!totalPages || totalPages <= 1) {
-    return (
-      totalElements > 0 ? (
-        <div className="border-t border-slate-100 px-5 py-3 text-[11px] text-slate-500">
-          Tổng {totalElements} {unit}
-        </div>
-      ) : null
-    );
-  }
+function Pagination({ page, totalPages, totalElements, unit = "bản ghi", onChange, pageSize, onSizeChange }) {
+  if (!totalElements) return null;
   return (
     <PaginationBar
       page={page}
@@ -1383,6 +1394,8 @@ function Pagination({ page, totalPages, totalElements, unit = "bản ghi", onCha
       totalElements={totalElements}
       unit={unit}
       onChange={onChange}
+      pageSize={pageSize}
+      onSizeChange={onSizeChange}
     />
   );
 }

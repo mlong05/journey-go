@@ -5,16 +5,16 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
-  MapPin,
   CreditCard,
-  Settings,
-  Route,
-  Receipt,
-  Award,
   HandCoins,
   ShieldAlert,
   Handshake,
   BadgePercent,
+  Globe2,
+  Tags,
+  UserCog,
+  Sparkles,
+  Medal,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -46,6 +46,13 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
+    id: "partner-profile-updates",
+    label: "Yêu cầu đổi thông tin",
+    href: "/admin/partner-profile-updates",
+    icon: UserCog,
+    badge: null,
+  },
+  {
     id: "commission-policies",
     label: "Chính sách hoa hồng",
     href: "/admin/commission-policies",
@@ -53,27 +60,33 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
-    id: "tours",
-    label: "Quản lý tour du lịch",
-    href: "/admin/tours",
-    icon: Route,
+    id: "regions",
+    label: "Cấu hình khu vực",
+    href: "/admin/regions",
+    icon: Globe2,
     badge: null,
   },
   {
-    id: "destinations",
-    label: "Quản lý điểm đến",
-    href: "/admin/destinations",
-    icon: MapPin,
+    id: "themes",
+    label: "Cấu hình chủ đề",
+    href: "/admin/themes",
+    icon: Tags,
     badge: null,
   },
   {
-    id: "badges",
-    label: "Huy hiệu di sản",
-    href: "/admin/badges",
-    icon: Award,
+    id: "experience-rewards",
+    label: "Cấu hình trải nghiệm và điểm thưởng",
+    href: "/admin/experience-rewards",
+    icon: Sparkles,
     badge: null,
   },
-
+  {
+    id: "badge-config",
+    label: "Cấu hình huy hiệu",
+    href: "/admin/badge-config",
+    icon: Medal,
+    badge: null,
+  },
   {
     id: "finance",
     label: "Tài chính & Thanh toán",
@@ -89,24 +102,10 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
-    id: "bookings",
-    label: "Đơn đặt tour",
-    href: "/admin/bookings",
-    icon: Receipt,
-    badge: null,
-  },
-  {
     id: "audit-logs",
     label: "Nhật ký kiểm toán",
     href: "/admin/audit-logs",
     icon: ShieldAlert,
-    badge: null,
-  },
-  {
-    id: "system-config",
-    label: "Cấu hình hệ thống",
-    href: "/admin/system-config",
-    icon: Settings,
     badge: null,
   },
 ];
@@ -145,11 +144,10 @@ export default function AdminLayout({ children }) {
   const isScrollLockedPage =
     pathname === "/admin" ||
     pathname?.startsWith("/admin/users") ||
-    pathname?.startsWith("/admin/badges") ||
+    pathname?.startsWith("/admin/regions") ||
+    pathname?.startsWith("/admin/themes") ||
     pathname?.startsWith("/admin/finance") ||
-    pathname?.startsWith("/admin/destinations") ||
-    pathname?.startsWith("/admin/experiences") ||
-    pathname?.startsWith("/admin/tours");
+    pathname?.startsWith("/admin/settlements");
 
   // Xử lý tìm kiếm nhanh từ Topbar
   const handleTopSearchSubmit = (e) => {

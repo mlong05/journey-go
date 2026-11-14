@@ -30,10 +30,8 @@ import {
   MapPin,
   Phone,
   ShieldCheck,
-  Upload,
   UserRound,
   Wallet,
-  X,
 } from "lucide-react";
 import {
   saveDraft,
@@ -44,12 +42,24 @@ import {
 } from "@/features/partnerapplication/services/partnerApplicationService";
 import PartnerAddressFields from "@/features/partnerapplication/components/PartnerAddressFields";
 import LegalDocumentModal from "@/features/partnerapplication/components/LegalDocumentModal";
+import { Tooltip } from "@/components/ui";
+import {
+  CheckRow,
+  Field,
+  FileField,
+  OptionCard,
+  Select,
+  TextArea,
+  TextInput,
+  buttonCls,
+} from "@/features/partnerapplication/components/PartnerFormKit";
 import {
   PARTNER_TERMS_SECTIONS,
   PARTNER_TERMS_TITLE,
   PRIVACY_POLICY_SECTIONS,
   PRIVACY_POLICY_TITLE,
 } from "@/features/partnerapplication/constants/legalDocuments";
+import { BANKS } from "@/constants/banks";
 
 const STEPS = [
   { id: 1, label: "Thông tin người đại diện", icon: UserRound },
@@ -80,19 +90,6 @@ const POSITIONS = [
   { value: "OTHER", label: "Khác" },
 ];
 
-const BANKS = [
-  "Ngân hàng TMCP Ngoại thương Việt Nam (Vietcombank)",
-  "Ngân hàng TMCP Kỹ thương Việt Nam (Techcombank)",
-  "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV)",
-  "Ngân hàng TMCP Quân đội (MB)",
-  "Ngân hàng TMCP Á Châu (ACB)",
-  "Ngân hàng TMCP Sài Gòn – Hà Nội (SHB)",
-  "Ngân hàng TMCP Đông Á (DongA Bank)",
-  "Ngân hàng TMCP Bưu điện Liên Việt (LienVietPostBank)",
-  "Ngân hàng TMCP Nam Á (Nam A Bank)",
-  "Ngân hàng TMCP Đại Đồng Tiến (BIDV) / VietinBank",
-];
-
 const EMPTY_FORM = {
   email: "",
   phone: "",
@@ -108,7 +105,6 @@ const EMPTY_FORM = {
   signatureDocumentUrl: "",
   businessRegistrationUrl: "",
   province: "",
-  district: "",
   ward: "",
   addressDetail: "",
   businessScope: "",
@@ -158,8 +154,7 @@ function validateStep(step, form) {
       if (!form.signatureDocumentUrl)
         errors.signatureDocumentUrl = "Giấy ký quỹ là bắt buộc với Công ty Lữ hành";
     }
-    if (!form.province.trim()) errors.province = "Vui lòng chọn Tỉnh/Thành";
-    if (!form.district.trim()) errors.district = "Vui lòng chọn Quận/Huyện";
+    if (!form.province.trim()) errors.province = "Vui lòng chọn Tỉnh/Thành phố";
     if (!form.ward.trim()) errors.ward = "Vui lòng chọn Phường/Xã";
     if (!form.addressDetail.trim())
       errors.addressDetail = "Địa chỉ trụ sở không được để trống";
@@ -259,7 +254,6 @@ export default function PartnerRegisterPage() {
       signatureDocumentUrl: form.signatureDocumentUrl || null,
       businessRegistrationUrl: form.businessRegistrationUrl || null,
       province: form.province.trim(),
-      district: form.district.trim(),
       ward: form.ward.trim(),
       addressDetail: form.addressDetail.trim(),
       businessScope: form.businessScope.trim(),
@@ -448,112 +442,44 @@ export default function PartnerRegisterPage() {
   };
 
   // ── Render helpers ────────────────────────────────────────────────────────
-  const fieldClass = (field) =>
-    `w-full px-3.5 py-2.5 rounded-xl border bg-white text-sm text-slate-800 outline-none transition focus:ring-4 ${
-      errors[field]
-        ? "border-rose-300 focus:border-rose-400 focus:ring-rose-100"
-        : "border-slate-200 focus:border-teal-400 focus:ring-teal-100"
-    }`;
-
-  const Label = ({ children, required, htmlFor }) => (
-    <label
-      htmlFor={htmlFor}
-      className="mb-1.5 block text-xs font-bold text-slate-700"
-    >
-      {children}
-      {required && <span className="text-rose-500"> *</span>}
-    </label>
-  );
-
-  const FieldError = ({ field }) =>
-    errors[field] ? (
-      <p className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-rose-600">
-        <CircleAlert size={12} /> {errors[field]}
-      </p>
-    ) : null;
-
-  const DocumentField = ({ field, label, required }) => (
-    <div>
-      <Label required={required}>{label}</Label>
-      {form[field] ? (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
-          <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
-          <a
-            href={form[field]}
-            target="_blank"
-            rel="noreferrer"
-            className="min-w-0 flex-1 truncate text-xs font-semibold text-emerald-800 underline"
-          >
-            {form[field].split("/").pop()}
-          </a>
-          <button
-            type="button"
-            onClick={() => setField(field, "")}
-            className="shrink-0 rounded-lg p-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-            aria-label="Xoá tệp"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      ) : (
-        <label
-          className={`flex cursor-pointer items-center gap-2 rounded-xl border border-dashed px-3 py-2.5 transition ${
-            uploadingField === field
-              ? "border-teal-400 bg-teal-50/60"
-              : "border-slate-300 bg-slate-50/60 hover:border-teal-400 hover:bg-teal-50/40"
-          }`}
-        >
-          {uploadingField === field ? (
-            <Loader2 size={16} className="shrink-0 animate-spin text-teal-600" />
-          ) : (
-            <Upload size={16} className="shrink-0 text-teal-600" />
-          )}
-          <span className="text-xs font-semibold text-slate-600">
-            {uploadingField === field
-              ? "Đang tải lên…"
-              : "Tải lên tệp (PNG, JPG, PDF)"}
-          </span>
-          <input
-            type="file"
-            accept="image/*,.pdf"
-            className="hidden"
-            disabled={uploadingField === field}
-            onChange={(e) => handleUpload(field, e.target.files?.[0])}
-          />
-        </label>
-      )}
-      <FieldError field={field} />
-    </div>
-  );
+  /*
+   * Mọi kiểu dùng của form đều lấy từ PartnerFormKit để 4 giai đoạn có cùng
+   * chiều cao ô nhập, cùng kiểu nhãn và cùng kiểu lỗi.
+   */
 
   const stepProgress = useMemo(() => ((step - 1) / 3) * 100, [step]);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-50 text-slate-800">
+    <div className="flex h-dvh flex-col overflow-hidden bg-slate-50 text-slate-800">
       {/* Header */}
-      <header className="shrink-0 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+      <header className="shrink-0 border-b border-slate-200 bg-white/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-2.5 sm:px-6">
           <Link href="/" className="flex items-center gap-2 text-sm font-bold text-slate-800">
             <ArrowLeft size={16} className="text-slate-400" />
             Về trang chủ
           </Link>
-          <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
+          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
             Đăng ký đối tác
           </span>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl min-h-0 flex-1 flex-col justify-center gap-4 px-4 py-4 sm:px-6">
+      {/*
+        main — chiếm đúng phần chiều cao còn lại của màn hình.
+        `min-h-0` là mấu chốt: nó cho phép vùng cuộn bên trong co lại đúng bằng
+        chiều cao khung thay vì đẩy trang dài ra ngoài viewport.
+      */}
+      <main className="mx-auto flex w-full max-w-4xl min-h-0 flex-1 flex-col px-4 py-3 sm:px-6 sm:py-4">
         {/* Hero — thu gọn để mọi thứ vừa một màn hình */}
         <div className="flex shrink-0 items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-700 text-white shadow-lg shadow-teal-600/20">
-            <Landmark size={22} />
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg shadow-emerald-600/20">
+            <Landmark size={20} />
           </div>
           <div className="min-w-0">
             <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
               Trở thành đối tác của JourneyGo
             </h1>
-            <p className="mt-0.5 truncate text-xs leading-relaxed text-slate-500">
+            <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
               Đồng hành cùng chúng tôi — đưa những giá trị lịch sử, văn hóa truyền thống đến gần
               hơn với du khách thông qua các trải nghiệm thực tế.
             </p>
@@ -561,10 +487,10 @@ export default function PartnerRegisterPage() {
         </div>
 
         {/* Thanh tiến trình */}
-        <div className="shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white px-5 py-3.5 shadow-sm">
-          <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="mt-3 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+          <div className="mb-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-600 transition-all duration-500"
+              className="h-full rounded-full bg-emerald-600 transition-all duration-500"
               style={{ width: `${stepProgress}%` }}
             />
           </div>
@@ -580,15 +506,19 @@ export default function PartnerRegisterPage() {
                       isDone
                         ? "bg-emerald-600 text-white"
                         : isActive
-                        ? "bg-teal-600 text-white ring-4 ring-teal-100"
+                        ? "bg-emerald-700 text-white ring-4 ring-emerald-100"
                         : "bg-slate-100 text-slate-400"
                     }`}
                   >
                     {isDone ? <Check size={15} /> : <Icon size={15} />}
                   </span>
                   <span
-                    className={`hidden text-[11px] font-bold leading-tight sm:block ${
-                      isActive ? "text-teal-700" : isDone ? "text-slate-700" : "text-slate-400"
+                    className={`hidden text-[11px] font-semibold leading-tight sm:block ${
+                      isActive
+                        ? "text-emerald-700"
+                        : isDone
+                        ? "text-slate-700"
+                        : "text-slate-400"
                     }`}
                   >
                     {s.label}
@@ -599,10 +529,17 @@ export default function PartnerRegisterPage() {
           </ol>
         </div>
 
-        {/* Thẻ form — chiều cao bám theo nội dung, tự co lại + cuộn nội bộ khi nội dung dài,
-            trang ngoài không bao giờ bị scroll */}
-        <div className="flex min-h-0 max-h-full shrink flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {/* Vùng nội dung: cuộn nội bộ khi dài, co gọn khi ngắn */}
+        {/*
+          Thẻ form — luôn cùng một bề rộng và cùng một cấu trúc ở cả 4 giai đoạn.
+
+          `min-h-0 flex-1` cho phép khung co giãn theo phần chiều cao còn lại của
+          màn hình, còn `overflow-hidden` trên khung + `overflow-y-auto` trên vùng
+          nội dung ⇒ nội dung dài cuộn BÊN TRONG khung, trang ngoài không bao giờ
+          phải cuộn. Nhờ vậy cả 4 giai đoạn có cùng chiều cao và bề rộng, không
+          còn tình trạng giai đoạn 1 co lại còn giai đoạn 2 tràn rộng.
+        */}
+        <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {/* Vùng nội dung: cuộn nội bộ khi nội dung dài hơn khung */}
           <div
             className={`min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 ${
               submitted ? "hidden" : ""
@@ -621,28 +558,24 @@ export default function PartnerRegisterPage() {
               </div>
 
               {/* Email + OTP */}
-              <div>
-                <Label required htmlFor="email">
-                  Email
-                </Label>
+              <Field label="Email" required htmlFor="email" error={errors.email}>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="flex-1">
-                    <input
+                    <TextInput
                       id="email"
                       type="email"
                       value={form.email}
                       onChange={(e) => setField("email", e.target.value)}
                       disabled={otpSent}
                       placeholder="doanhnghiep@example.com"
-                      className={fieldClass("email")}
+                      error={errors.email}
                     />
-                    <FieldError field="email" />
                   </div>
                   <button
                     type="button"
                     onClick={handleSendOtp}
                     disabled={otpLoading || otpSent}
-                    className="inline-flex h-[42px] items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 text-xs font-bold text-white transition hover:bg-teal-700 disabled:opacity-50"
+                    className={buttonCls("primary")}
                   >
                     {otpLoading ? (
                       <Loader2 size={15} className="animate-spin" />
@@ -652,38 +585,37 @@ export default function PartnerRegisterPage() {
                     {otpSent ? "Đã gửi mã" : "Gửi mã OTP"}
                   </button>
                 </div>
-              </div>
+              </Field>
 
               {otpSent && (
-                <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4">
-                  <Label required htmlFor="otp">
-                    Mã xác thực 6 chữ số
-                  </Label>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      id="otp"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                      placeholder="123456"
-                      className={`${fieldClass("otp")} flex-1 tracking-[0.5em] text-center font-mono text-lg`}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleVerifyOtp}
-                      disabled={otpLoading}
-                      className="inline-flex h-[42px] items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                      {otpLoading ? (
-                        <Loader2 size={15} className="animate-spin" />
-                      ) : (
-                        <ShieldCheck size={15} />
-                      )}
-                      Xác minh
-                    </button>
-                  </div>
-                  <p className="mt-2 text-[11px] text-slate-500">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                  <Field label="Mã xác thực 6 chữ số" required htmlFor="otp">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <TextInput
+                        id="otp"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                        placeholder="123456"
+                        className="flex-1 text-center font-mono text-lg tracking-[0.5em]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        disabled={otpLoading}
+                        className={buttonCls("success")}
+                      >
+                        {otpLoading ? (
+                          <Loader2 size={15} className="animate-spin" />
+                        ) : (
+                          <ShieldCheck size={15} />
+                        )}
+                        Xác minh
+                      </button>
+                    </div>
+                  </Field>
+                  <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
                     Mã có hiệu lực 5 phút. Tối đa 3 lần gửi / ngày · 5 lần nhập sai. Mã mới sẽ
                     làm mã cũ mất hiệu lực.
                   </p>
@@ -707,50 +639,50 @@ export default function PartnerRegisterPage() {
               )}
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label required htmlFor="phone">
-                    Số điện thoại
-                  </Label>
+                <Field label="Số điện thoại" required htmlFor="phone" error={errors.phone}>
                   <div className="relative">
                     <Phone
                       size={15}
                       className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                     />
-                    <input
+                    <TextInput
                       id="phone"
                       value={form.phone}
                       onChange={(e) => setField("phone", e.target.value)}
                       placeholder="0901234567"
-                      className={`${fieldClass("phone")} pl-10`}
+                      error={errors.phone}
+                      className="pl-10"
                     />
                   </div>
-                  <FieldError field="phone" />
-                </div>
+                </Field>
 
-                <div>
-                  <Label required htmlFor="representativeName">
-                    Họ tên người đại diện
-                  </Label>
-                  <input
+                <Field
+                  label="Họ tên người đại diện"
+                  required
+                  htmlFor="representativeName"
+                  error={errors.representativeName}
+                >
+                  <TextInput
                     id="representativeName"
                     value={form.representativeName}
                     onChange={(e) => setField("representativeName", e.target.value)}
                     placeholder="Nguyễn Văn A"
-                    className={fieldClass("representativeName")}
+                    error={errors.representativeName}
                   />
-                  <FieldError field="representativeName" />
-                </div>
+                </Field>
               </div>
 
-              <div>
-                <Label required htmlFor="representativePosition">
-                  Chức vụ
-                </Label>
-                <select
+              <Field
+                label="Chức vụ"
+                required
+                htmlFor="representativePosition"
+                error={errors.representativePosition}
+              >
+                <Select
                   id="representativePosition"
                   value={form.representativePosition}
                   onChange={(e) => setField("representativePosition", e.target.value)}
-                  className={fieldClass("representativePosition")}
+                  error={errors.representativePosition}
                 >
                   <option value="">-- Chọn chức vụ --</option>
                   {POSITIONS.map((p) => (
@@ -758,9 +690,8 @@ export default function PartnerRegisterPage() {
                       {p.label}
                     </option>
                   ))}
-                </select>
-                <FieldError field="representativePosition" />
-              </div>
+                </Select>
+              </Field>
             </section>
           )}
 
@@ -776,172 +707,213 @@ export default function PartnerRegisterPage() {
                 </p>
               </div>
 
-              <div>
-                <Label required htmlFor="businessName">
-                  Tên doanh nghiệp / cơ sở
-                </Label>
-                <input
+              <Field
+                label="Tên doanh nghiệp / cơ sở"
+                required
+                htmlFor="businessName"
+                error={errors.businessName}
+              >
+                <TextInput
                   id="businessName"
                   value={form.businessName}
                   onChange={(e) => setField("businessName", e.target.value)}
                   placeholder="Công ty TNHH Du lịch & Nghỉ dưỡng ABC"
-                  className={fieldClass("businessName")}
+                  error={errors.businessName}
                 />
-                <FieldError field="businessName" />
-              </div>
+              </Field>
 
-              <div>
-                <Label required htmlFor="partnerType">
-                  Loại hình đối tác
-                </Label>
+              <Field label="Loại hình đối tác" required error={errors.partnerType}>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {PARTNER_TYPES.map((t) => (
-                    <button
+                    <OptionCard
                       key={t.value}
-                      type="button"
+                      selected={form.partnerType === t.value}
                       onClick={() => setField("partnerType", t.value)}
-                      className={`rounded-xl border p-4 text-left transition ${
-                        form.partnerType === t.value
-                          ? "border-teal-500 bg-teal-50/60 ring-2 ring-teal-200"
-                          : "border-slate-200 bg-white hover:border-teal-300"
-                      }`}
-                    >
-                      <p className="text-sm font-bold text-slate-900">{t.label}</p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{t.hint}</p>
-                    </button>
+                      title={t.label}
+                      hint={t.hint}
+                    />
                   ))}
                 </div>
-                <FieldError field="partnerType" />
-              </div>
+              </Field>
 
               {form.partnerType === "TRAVEL_AGENCY" && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-                  <Label required htmlFor="travelScope">
-                    Loại giấy phép lữ hành
-                  </Label>
-                  <div className="flex flex-wrap gap-4">
-                    {[
-                      { value: "INTERNATIONAL", label: "Quốc tế" },
-                      { value: "DOMESTIC", label: "Nội địa" },
-                    ].map((s) => (
-                      <label
-                        key={s.value}
-                        className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={form.travelScope === s.value}
-                          onChange={() =>
-                            setField(
-                              "travelScope",
-                              form.travelScope === s.value ? "" : s.value
-                            )
-                          }
-                          className="h-4 w-4 accent-teal-600"
-                        />
-                        Giấy phép lữ hành {s.label}
-                      </label>
-                    ))}
-                  </div>
-                  <FieldError field="travelScope" />
+                  <Field
+                    label="Loại giấy phép lữ hành"
+                    required
+                    error={errors.travelScope}
+                  >
+                    <div className="flex flex-wrap gap-4">
+                      {[
+                        { value: "INTERNATIONAL", label: "Quốc tế" },
+                        { value: "DOMESTIC", label: "Nội địa" },
+                      ].map((s) => (
+                        <label
+                          key={s.value}
+                          className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={form.travelScope === s.value}
+                            onChange={() =>
+                              setField(
+                                "travelScope",
+                                form.travelScope === s.value ? "" : s.value
+                              )
+                            }
+                            className="h-4 w-4 accent-emerald-600"
+                          />
+                          Giấy phép lữ hành {s.label}
+                        </label>
+                      ))}
+                    </div>
+                  </Field>
                 </div>
               )}
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label required htmlFor="taxCode">
-                    Mã số thuế
-                  </Label>
-                  <input
+                <Field label="Mã số thuế" required htmlFor="taxCode" error={errors.taxCode}>
+                  <TextInput
                     id="taxCode"
                     value={form.taxCode}
                     onChange={(e) => setField("taxCode", e.target.value)}
                     placeholder="0101234567"
-                    className={fieldClass("taxCode")}
+                    error={errors.taxCode}
+                    className="tabular-nums"
                   />
-                  <FieldError field="taxCode" />
-                </div>
-                <div>
-                  <Label required htmlFor="businessRegistrationInfo">
-                    Thông tin đăng ký kinh doanh
-                  </Label>
-                  <input
+                </Field>
+                <Field
+                  label="Thông tin đăng ký kinh doanh"
+                  required
+                  htmlFor="businessRegistrationInfo"
+                  error={errors.businessRegistrationInfo}
+                >
+                  <TextInput
                     id="businessRegistrationInfo"
                     value={form.businessRegistrationInfo}
                     onChange={(e) => setField("businessRegistrationInfo", e.target.value)}
                     placeholder="Số GPKD / hộ kinh doanh, ngày cấp..."
-                    className={fieldClass("businessRegistrationInfo")}
+                    error={errors.businessRegistrationInfo}
                   />
-                  <FieldError field="businessRegistrationInfo" />
-                </div>
+                </Field>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <DocumentField
-                  field="operationLicenseUrl"
+                <FileField
                   label="Giấy phép hoạt động"
                   required
+                  field="operationLicenseUrl"
+                  value={form.operationLicenseUrl}
+                  fileName={
+                    form.operationLicenseUrl
+                      ? form.operationLicenseUrl.split("/").pop()
+                      : ""
+                  }
+                  uploading={uploadingField === "operationLicenseUrl"}
+                  onSelect={(file) => handleUpload("operationLicenseUrl", file)}
+                  onClear={() => setField("operationLicenseUrl", "")}
+                  error={errors.operationLicenseUrl}
                 />
-                <DocumentField
-                  field="businessRegistrationUrl"
+                <FileField
                   label="Giấy đăng ký kinh doanh / GPKD / Hộ kinh doanh"
                   required
+                  field="businessRegistrationUrl"
+                  value={form.businessRegistrationUrl}
+                  fileName={
+                    form.businessRegistrationUrl
+                      ? form.businessRegistrationUrl.split("/").pop()
+                      : ""
+                  }
+                  uploading={uploadingField === "businessRegistrationUrl"}
+                  onSelect={(file) => handleUpload("businessRegistrationUrl", file)}
+                  onClear={() => setField("businessRegistrationUrl", "")}
+                  error={errors.businessRegistrationUrl}
                 />
               </div>
 
               {form.partnerType === "TRAVEL_AGENCY" && (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <DocumentField field="travelLicenseUrl" label="Giấy phép lữ hành" required />
-                  <DocumentField field="signatureDocumentUrl" label="Giấy ký quỹ" required />
+                  <FileField
+                    label="Giấy phép lữ hành"
+                    required
+                    field="travelLicenseUrl"
+                    value={form.travelLicenseUrl}
+                    fileName={
+                      form.travelLicenseUrl ? form.travelLicenseUrl.split("/").pop() : ""
+                    }
+                    uploading={uploadingField === "travelLicenseUrl"}
+                    onSelect={(file) => handleUpload("travelLicenseUrl", file)}
+                    onClear={() => setField("travelLicenseUrl", "")}
+                    error={errors.travelLicenseUrl}
+                  />
+                  <FileField
+                    label="Giấy ký quỹ"
+                    required
+                    field="signatureDocumentUrl"
+                    value={form.signatureDocumentUrl}
+                    fileName={
+                      form.signatureDocumentUrl
+                        ? form.signatureDocumentUrl.split("/").pop()
+                        : ""
+                    }
+                    uploading={uploadingField === "signatureDocumentUrl"}
+                    onSelect={(file) => handleUpload("signatureDocumentUrl", file)}
+                    onClear={() => setField("signatureDocumentUrl", "")}
+                    error={errors.signatureDocumentUrl}
+                  />
                 </div>
               )}
 
               {/* Địa chỉ */}
               <PartnerAddressFields
+                accent="emerald"
                 value={{
                   province: form.province,
-                  district: form.district,
                   ward: form.ward,
                 }}
-                onChange={({ province, district, ward }) => {
+                onChange={({ province, ward }) => {
                   setField("province", province ?? "");
-                  setField("district", district ?? "");
                   setField("ward", ward ?? "");
                 }}
                 errors={errors}
               />
 
-              <div>
-                <Label required htmlFor="addressDetail">
-                  Chi tiết địa chỉ trụ sở
-                </Label>
-                <input
+              <Field
+                label="Chi tiết địa chỉ trụ sở"
+                required
+                htmlFor="addressDetail"
+                error={errors.addressDetail}
+                hint={
+                  <span className="flex items-center gap-1">
+                    <MapPin size={11} /> Địa chỉ gồm 3 cấp hành chính và chi tiết trụ sở.
+                  </span>
+                }
+              >
+                <TextInput
                   id="addressDetail"
                   value={form.addressDetail}
                   onChange={(e) => setField("addressDetail", e.target.value)}
                   placeholder="Số nhà, tên đường, tòa nhà..."
-                  className={fieldClass("addressDetail")}
+                  error={errors.addressDetail}
                 />
-                <FieldError field="addressDetail" />
-                <p className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-400">
-                  <MapPin size={11} /> Địa chỉ gồm 3 cấp hành chính và chi tiết trụ sở.
-                </p>
-              </div>
+              </Field>
 
-              <div>
-                <Label required htmlFor="businessScope">
-                  Phạm vi hoạt động
-                </Label>
-                <textarea
+              <Field
+                label="Phạm vi hoạt động"
+                required
+                htmlFor="businessScope"
+                error={errors.businessScope}
+              >
+                <TextArea
                   id="businessScope"
                   rows={3}
                   value={form.businessScope}
                   onChange={(e) => setField("businessScope", e.target.value)}
                   placeholder="Mô tả phạm vi hoạt động, loại hình trải nghiệm / tuyến tour cung cấp..."
-                  className={`${fieldClass("businessScope")} resize-none`}
+                  error={errors.businessScope}
+                  className="resize-none"
                 />
-                <FieldError field="businessScope" />
-              </div>
+              </Field>
             </section>
           )}
 
@@ -957,15 +929,17 @@ export default function PartnerRegisterPage() {
                 </p>
               </div>
 
-              <div>
-                <Label required htmlFor="bankName">
-                  Ngân hàng thụ hưởng
-                </Label>
-                <select
+              <Field
+                label="Ngân hàng thụ hưởng"
+                required
+                htmlFor="bankName"
+                error={errors.bankName}
+              >
+                <Select
                   id="bankName"
                   value={form.bankName}
                   onChange={(e) => setField("bankName", e.target.value)}
-                  className={fieldClass("bankName")}
+                  error={errors.bankName}
                 >
                   <option value="">-- Chọn ngân hàng --</option>
                   {BANKS.map((b) => (
@@ -973,41 +947,43 @@ export default function PartnerRegisterPage() {
                       {b}
                     </option>
                   ))}
-                </select>
-                <FieldError field="bankName" />
-              </div>
+                </Select>
+              </Field>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label required htmlFor="bankAccountNumber">
-                    Số tài khoản
-                  </Label>
-                  <input
+                <Field
+                  label="Số tài khoản"
+                  required
+                  htmlFor="bankAccountNumber"
+                  error={errors.bankAccountNumber}
+                >
+                  <TextInput
                     id="bankAccountNumber"
                     value={form.bankAccountNumber}
                     onChange={(e) => setField("bankAccountNumber", e.target.value)}
                     placeholder="0123456789"
-                    className={fieldClass("bankAccountNumber")}
+                    error={errors.bankAccountNumber}
+                    className="tabular-nums"
                   />
-                  <FieldError field="bankAccountNumber" />
-                </div>
-                <div>
-                  <Label required htmlFor="bankAccountHolder">
-                    Tên chủ tài khoản
-                  </Label>
-                  <input
+                </Field>
+                <Field
+                  label="Tên chủ tài khoản"
+                  required
+                  htmlFor="bankAccountHolder"
+                  error={errors.bankAccountHolder}
+                >
+                  <TextInput
                     id="bankAccountHolder"
                     value={form.bankAccountHolder}
                     onChange={(e) => setField("bankAccountHolder", e.target.value)}
                     placeholder="NGUYEN VAN A"
-                    className={fieldClass("bankAccountHolder")}
+                    error={errors.bankAccountHolder}
                   />
-                  <FieldError field="bankAccountHolder" />
-                </div>
+                </Field>
               </div>
 
               <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                <Landmark size={18} className="mt-0.5 shrink-0 text-teal-600" />
+                <Landmark size={18} className="mt-0.5 shrink-0 text-emerald-600" />
                 <p className="text-xs leading-relaxed text-slate-600">
                   Thông tin tài khoản ngân hàng sẽ được dùng để chuyển khoản doanh thu khi
                   nền tảng tất toán. Bạn có thể cập nhật lại trong Dashboard Đối tác sau khi
@@ -1049,7 +1025,10 @@ export default function PartnerRegisterPage() {
                     <div key={k} className="flex items-baseline justify-between gap-3 border-b border-slate-200/70 py-1.5">
                       <dt className="shrink-0 text-[11px] font-semibold text-slate-500">{k}</dt>
                       <dd className="min-w-0 truncate text-xs font-bold text-slate-800">
-                        {v || "—"}
+                        {/* Rê chuột lên giá trị bị cắt để xem toàn bộ nội dung. */}
+                        <Tooltip content={v || "—"} className="block">
+                          <span className="block truncate">{v || "—"}</span>
+                        </Tooltip>
                       </dd>
                     </div>
                   ))}
@@ -1075,7 +1054,7 @@ export default function PartnerRegisterPage() {
                           e.stopPropagation();
                           setLegalDoc("terms");
                         }}
-                        className="font-bold text-teal-700 underline decoration-2 underline-offset-2 transition hover:text-teal-900"
+                        className="font-bold text-emerald-700 underline decoration-2 underline-offset-2 transition hover:text-emerald-900"
                       >
                         Điều khoản hợp tác Đối tác của JourneyGo
                       </button>
@@ -1095,7 +1074,7 @@ export default function PartnerRegisterPage() {
                           e.stopPropagation();
                           setLegalDoc("privacy");
                         }}
-                        className="font-bold text-teal-700 underline decoration-2 underline-offset-2 transition hover:text-teal-900"
+                        className="font-bold text-emerald-700 underline decoration-2 underline-offset-2 transition hover:text-emerald-900"
                       >
                         Chính sách bảo vệ dữ liệu cá nhân
                       </button>
@@ -1105,16 +1084,18 @@ export default function PartnerRegisterPage() {
                 },
               ].map((c) => (
                 <div key={c.field}>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-teal-300">
-                    <input
-                      type="checkbox"
-                      checked={form[c.field]}
-                      onChange={(e) => setField(c.field, e.target.checked)}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-teal-600"
-                    />
-                    <span className="text-xs leading-relaxed text-slate-700">{c.label}</span>
-                  </label>
-                  <FieldError field={c.field} />
+                  <CheckRow
+                    checked={form[c.field]}
+                    onChange={(e) => setField(c.field, e.target.checked)}
+                  >
+                    {c.label}
+                  </CheckRow>
+                  {errors[c.field] && (
+                    <p className="mt-1.5 flex items-start gap-1 text-[11px] font-semibold leading-relaxed text-rose-600">
+                      <CircleAlert size={12} className="mt-px shrink-0" />
+                      <span>{errors[c.field]}</span>
+                    </p>
+                  )}
                 </div>
               ))}
             </section>
@@ -1124,7 +1105,7 @@ export default function PartnerRegisterPage() {
 
           {/* ── Màn hình "đã gửi đơn" hiển thị tại chỗ (trước khi chuyển trang) ── */}
           {submitted && (
-            <div className="flex flex-col items-center px-4 py-10 text-center">
+            <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 text-center">
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-8 ring-emerald-100">
                 <CheckCircle2 size={26} />
               </div>
@@ -1138,13 +1119,13 @@ export default function PartnerRegisterPage() {
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
                 >
                   <ArrowLeft size={15} /> Về trang chủ
                 </Link>
                 <Link
                   href="/login"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-teal-700"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 text-xs font-bold text-white transition hover:bg-emerald-800"
                 >
                   Đăng nhập
                 </Link>
@@ -1152,16 +1133,12 @@ export default function PartnerRegisterPage() {
             </div>
           )}
 
-          {/* ── Thanh điều hướng — ghim đáy, luôn nhìn thấy ── */}
+          {/* ── Thanh điều hướng — ghim đáy khung form, luôn nhìn thấy ── */}
           {!submitted && (
-          <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-slate-100 bg-white px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+          <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-7">
             <div className="flex items-center gap-3">
               {step > 1 && (
-                <button
-                  type="button"
-                  onClick={goBack}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                >
+                <button type="button" onClick={goBack} className={buttonCls("outline")}>
                   <ArrowLeft size={15} /> Quay lại
                 </button>
               )}
@@ -1173,11 +1150,7 @@ export default function PartnerRegisterPage() {
             </div>
 
             {step < 4 ? (
-              <button
-                type="button"
-                onClick={goNext}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-teal-700"
-              >
+              <button type="button" onClick={goNext} className={buttonCls("primary")}>
                 Tiếp tục <ArrowRight size={15} />
               </button>
             ) : (
@@ -1185,7 +1158,7 @@ export default function PartnerRegisterPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                className={buttonCls("success")}
               >
                 {submitting ? (
                   <Loader2 size={15} className="animate-spin" />
@@ -1200,13 +1173,13 @@ export default function PartnerRegisterPage() {
         </div>
 
         {/* Link hỗ trợ */}
-        <p className="shrink-0 text-center text-[11px] text-slate-400">
+        <p className="mt-2.5 shrink-0 text-center text-[11px] text-slate-400">
           Đã có tài khoản?{" "}
-          <Link href="/login" className="font-bold text-teal-700 underline">
+          <Link href="/login" className="font-bold text-emerald-700 underline">
             Đăng nhập
           </Link>{" "}
           · Khôi phục mật khẩu?{" "}
-          <Link href="/login" className="font-bold text-teal-700 underline">
+          <Link href="/login" className="font-bold text-emerald-700 underline">
             Quên mật khẩu
           </Link>
         </p>

@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import '../core/constants/app_colors.dart';
 import '../core/models/auth_models.dart';
 import '../core/models/notification_model.dart';
+import '../core/services/notification_alerts.dart';
 import '../core/services/notification_service.dart';
+import '../core/services/realtime_service.dart';
+import 'booking/invitation_deep_link_host.dart';
 import 'journey/journey_launcher.dart';
 import 'modals/notification_dialog.dart';
 import 'tabs/community_tab.dart';
-import 'tabs/explore_tab.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/profile_tab.dart';
+import 'tabs/trips_tab.dart';
 
 class TouristHomeScreen extends StatefulWidget {
   final UserModel initialUser;
@@ -19,14 +22,42 @@ class TouristHomeScreen extends StatefulWidget {
     required this.initialUser,
   });
 
+  /// Kênh yêu cầu chuyển tab từ MÀN KHÁC (VD: sau khi thanh toán xong, bấm nút
+  /// "quay lại" ở chi tiết đơn ⇒ quay về [TouristHomeScreen] và chọn tab Trang chủ).
+  ///
+  /// ⚠️ Vì `TouristHomeScreen` nằm ở gốc Navigator nên không thể `push` được;
+  /// dùng notifier để màn khác ra hiệu lệnh chuyển tab.
+  static final HomeTabRequest tabRequest = HomeTabRequest();
+
   @override
   State<TouristHomeScreen> createState() => _TouristHomeScreenState();
+}
+
+/// Yêu cầu chuyển sang một tab cụ thể của màn gốc [TouristHomeScreen].
+class HomeTabRequest extends ChangeNotifier {
+  /// Tab được yêu cầu; -1 nghĩa là chưa có yêu cầu nào đang chờ.
+  int _target = -1;
+
+  int get target => _target;
+
+  /// Màn khác yêu cầu chuyển tới [index] (0 = Trang chủ).
+  void request(int index) {
+    _target = index;
+    notifyListeners();
+  }
+
+  /// Đọc rồi xoá yêu cầu (tránh xử lý lặp lại khi rebuild).
+  int take() {
+    final value = _target;
+    _target = -1;
+    return value;
+  }
 }
 
 class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindingObserver {
   late UserModel _currentUser;
   StreamSubscription<AppNotification>? _incomingSub;
-  int _currentIndex = 0; // 0: Home, 1: Explore, 2: Community, 3: Profile
+  int _currentIndex = 0; // 0: Trang chủ, 1: Chuyến đi, 2: Diễn đàn, 3: Tài khoản
 
   /// Báo cho các tab biết tab nào đang mở để tự làm mới khi du khách quay lại.
   final ValueNotifier<int> _selectedTab = ValueNotifier(0);
@@ -36,12 +67,21 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
     _selectedTab.value = index;
   }
 
+  /// Nghe yêu cầu chuyển tab từ màn khác (VD: quay lại sau khi thanh toán).
+  void _onTabRequested() {
+    if (!mounted) return;
+    final target = TouristHomeScreen.tabRequest.take();
+    if (target < 0) return;
+    _selectTab(target);
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _incomingSub?.cancel();
     NotificationCenter.instance.stop();
     _selectedTab.dispose();
+    TouristHomeScreen.tabRequest.removeListener(_onTabRequested);
     super.dispose();
   }
 
@@ -50,11 +90,39 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
   void initState() {
     super.initState();
     _currentUser = widget.initialUser;
+    // Nghe yêu cầu chuyển tab từ màn khác (VD: nút "quay lại" sau khi thanh toán
+    // ⇒ quay về Trang chủ).
+    TouristHomeScreen.tabRequest.addListener(_onTabRequested);
     // Thông báo thời gian thực: chạy khi app đang mở, hiện banner khi có tin mới
     WidgetsBinding.instance.addObserver(this);
     NotificationCenter.instance.start();
-    _incomingSub = NotificationCenter.instance.incoming.listen((n) {
-      if (mounted) showIncomingNotification(context, n);
+    // Chat tức thời (WebSocket): nhận tin nhắn mới từ nhà tour ngay khi đang mở app.
+    RealtimeService.instance.connect();
+
+    // Mỗi thông báo mới: âm thanh + rung qua thông báo hệ thống; không có quyền thì rung và hiện banner trong app
+    final alerts = NotificationAlerts.instance;
+    alerts.onOpen = (n) {
+      if (mounted) openNotificationTarget(Navigator.of(context), n);
+    };
+    alerts.init();
+    _incomingSub = NotificationCenter.instance.incoming.listen((n) async {
+      if (!mounted) return;
+      // ⚠️ Thông báo CHAT (tin nhắn từ đối tác / khách) chỉ nằm trong trung tâm
+      // "Thông báo" + tăng số chưa đọc trên chuông — KHÔNG hiện banner, không phát âm thanh
+      // (gây gián đoạn trải nghiệm). Chỉ rung nhẹ để du khách biết có tin nhắn.
+      if (isChatNotification(n)) {
+        alerts.vibrateOnly();
+        return;
+      }
+      final shownBySystem = await alerts.alert(n);
+      if (!shownBySystem && mounted) showIncomingNotification(context, n);
+    });
+
+    // Lời mời tham gia tour đang chờ (mở app từ deep link khi CHƯA đăng nhập)
+    // → sau khi đăng nhập xong thì mở màn xác nhận lời mời.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      openPendingInvitationIfAny(context);
     });
   }
 
@@ -63,8 +131,10 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       NotificationCenter.instance.start();
+      RealtimeService.instance.connect();
     } else if (state == AppLifecycleState.paused) {
       NotificationCenter.instance.stop();
+      RealtimeService.instance.disconnect();
     }
   }
 
@@ -83,7 +153,7 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
             onNavigateToTab: _selectTab,
             selectedTab: _selectedTab,
           ),
-          ExploreTab(selectedTab: _selectedTab),
+          TripsTab(selectedTab: _selectedTab),
           CommunityTab(currentUser: _currentUser, selectedTab: _selectedTab),
           ProfileTab(
             currentUser: _currentUser,
@@ -170,9 +240,9 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
               ),
               _buildNavItem(
                 index: 1,
-                icon: Icons.explore_rounded,
-                unselectedIcon: Icons.explore_outlined,
-                label: 'Lộ trình',
+                icon: Icons.confirmation_number_rounded,
+                unselectedIcon: Icons.confirmation_number_outlined,
+                label: 'Chuyến đi',
               ),
               // Empty space for the center floating Check-In button
               const SizedBox(width: 56),

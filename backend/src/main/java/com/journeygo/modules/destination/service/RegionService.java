@@ -61,6 +61,8 @@ public class RegionService {
         Region region = Region.builder()
                 .name(request.name().trim())
                 .slug(slug)
+                .imageUrl(blankToNull(request.imageUrl()))
+                .imageCredit(blankToNull(request.imageCredit()))
                 .deleted(false)
                 .build();
 
@@ -84,6 +86,9 @@ public class RegionService {
 
         region.setName(request.name().trim());
         region.setSlug(slug);
+        // null = giữ ảnh cũ (form đổi tên không gửi ảnh); chuỗi rỗng = bỏ ảnh
+        if (request.imageUrl() != null) region.setImageUrl(blankToNull(request.imageUrl()));
+        if (request.imageCredit() != null) region.setImageCredit(blankToNull(request.imageCredit()));
 
         Region saved = regionRepository.save(region);
         log.info("Updated region id={}", saved.getId());
@@ -108,6 +113,10 @@ public class RegionService {
         Region saved = regionRepository.save(region);
         log.info("Restored region id={}", saved.getId());
         return RegionResponse.fromEntity(saved);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private Region findOrThrow(Long id) {

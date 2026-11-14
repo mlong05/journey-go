@@ -37,6 +37,7 @@ public class NotificationPublisher {
         public static final String POST_REVIEW = "post-review";
         public static final String POST_REPORT = "post-report";
         public static final String REFUND_REVIEW = "refund-review";
+        public static final String PARTNER_PROFILE_UPDATE = "partner-profile-update";
         public static final String ADJUSTMENT_REVIEW = "adjustment-review";
         public static final String BOOKINGS = "bookings";
         public static final String SETTLEMENTS = "settlements";

@@ -41,6 +41,8 @@ public class AuthService {
     private final com.journeygo.modules.auth.repository.PasswordResetOtpRepository passwordResetOtpRepository;
     private final EmailService emailService;
     private final LoginRateLimiterService loginRateLimiterService;
+    /** Phát sự kiện "vừa đăng nhập/đăng ký" để các module khác phản ứng (VD: lời mời tour). */
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @org.springframework.beans.factory.annotation.Value("${app.mail.otp-expiration-minutes:10}")
     private int otpExpirationMinutes;
@@ -72,6 +74,11 @@ public class AuthService {
 
         String accessToken = tokenProvider.generateAccessToken(user.getEmail(), user.getId());
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+
+        // Báo cho các module khác biết user này vừa đăng nhập (VD: đưa lời mời tour
+        // đã gửi tới email này vào trung tâm thông báo của app).
+        eventPublisher.publishEvent(new com.journeygo.modules.auth.event.UserAuthenticatedEvent(
+                user.getId(), user.getEmail()));
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -108,6 +115,11 @@ public class AuthService {
 
         String accessToken = tokenProvider.generateAccessToken(user.getEmail(), user.getId());
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+
+        // Báo cho các module khác biết user này vừa đăng ký (VD: lời mời tour gửi
+        // tới chính email này sẽ hiện trong trung tâm thông báo của app).
+        eventPublisher.publishEvent(new com.journeygo.modules.auth.event.UserAuthenticatedEvent(
+                user.getId(), user.getEmail()));
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -170,6 +182,11 @@ public class AuthService {
 
         String accessToken = tokenProvider.generateAccessToken(user.getEmail(), user.getId());
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+
+        // Báo cho các module khác biết user này vừa đăng nhập bằng Google
+        // (VD: lời mời tour gửi tới chính email này).
+        eventPublisher.publishEvent(new com.journeygo.modules.auth.event.UserAuthenticatedEvent(
+                user.getId(), user.getEmail()));
 
         return AuthResponse.builder()
                 .accessToken(accessToken)

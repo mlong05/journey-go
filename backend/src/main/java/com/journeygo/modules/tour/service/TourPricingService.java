@@ -1,8 +1,10 @@
 package com.journeygo.modules.tour.service;
 
 import com.journeygo.modules.tour.dto.TourResponse;
+import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.repository.TourPriceProjection;
+import com.journeygo.modules.tour.repository.TourPriceRepository;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.tour.repository.TourRewardProjection;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +28,7 @@ import java.util.stream.Collectors;
 public class TourPricingService {
 
     private final TourRepository tourRepository;
+    private final TourPriceRepository tourPriceRepository;
 
     @Transactional(readOnly = true)
     public TourResponse toResponse(Tour tour) {
@@ -36,23 +40,58 @@ public class TourPricingService {
     public Function<Tour, TourResponse> mapperFor(Collection<Tour> tours) {
         List<Long> ids = tours.stream().map(Tour::getTourId).toList();
         if (ids.isEmpty()) return TourResponse::fromEntity;
-        Map<Long, BigDecimal> totals = tourRepository.sumExperiencePricesByTourIds(ids).stream()
-                .collect(Collectors.toMap(TourPriceProjection::tourId, TourPriceProjection::totalPrice));
+        Map<Long, BigDecimal> totals = new java.util.HashMap<>(tourRepository.sumExperiencePricesByTourIds(ids).stream()
+                .collect(Collectors.toMap(TourPriceProjection::tourId, TourPriceProjection::totalPrice)));
+        // Tour tạo theo luồng 5 bước: giá hiển thị = giá vé người lớn.
+        List<Long> wizardIds = tours.stream().filter(Tour::isWizardTour).map(Tour::getTourId).toList();
+        if (!wizardIds.isEmpty()) {
+            tourPriceRepository.findByTourIdsAndGuestType(wizardIds, GuestType.ADULT)
+                    .forEach(p -> totals.put(p.getTour().getTourId(), p.getPrice()));
+        }
         // Phần thưởng hiển thị trên thẻ tour: nhiệm vụ, điểm tối đa, huy hiệu (mỗi điểm đến một huy hiệu check-in)
         Map<Long, TourRewardProjection> rewards = tourRepository.sumTaskRewardsByTourIds(ids).stream()
                 .collect(Collectors.toMap(TourRewardProjection::tourId, Function.identity()));
         Map<Long, Long> disabledBadges = tourRepository.countDisabledBadgesByTourIds(ids).stream()
                 .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+        // Tour 5 bước: nhiệm vụ = câu quiz + hoạt động thực địa của các điểm dừng (điểm đã chốt lúc duyệt).
+        Map<Long, long[]> stopRewards = new java.util.HashMap<>();
+        if (!wizardIds.isEmpty()) {
+            for (Object[] row : tourRepository.sumStopQuizByTourIds(wizardIds)) addReward(stopRewards, row);
+            for (Object[] row : tourRepository.sumStopExperiencesByTourIds(wizardIds)) addReward(stopRewards, row);
+        }
+        Map<Long, LocalDate> nextDepartures = new java.util.HashMap<>();
+        if (!wizardIds.isEmpty()) {
+            for (Object[] row : tourRepository.findNextDepartureByTourIds(wizardIds, LocalDate.now())) {
+                nextDepartures.put((Long) row[0], (LocalDate) row[1]);
+            }
+        }
         return tour -> {
+            TourResponse.TourResponseBuilder builder = TourResponse.fromEntity(tour)
+                    .toBuilder()
+                    .price(totals.getOrDefault(tour.getTourId(), BigDecimal.ZERO));
+            if (tour.isWizardTour()) {
+                long[] reward = stopRewards.getOrDefault(tour.getTourId(), new long[2]);
+                return builder
+                        .taskCount((int) reward[0])
+                        .totalTaskPoints((int) reward[1])
+                        .badgeCount(0)
+                        .nextDepartureDate(nextDepartures.get(tour.getTourId()))
+                        .build();
+            }
             TourRewardProjection reward = rewards.get(tour.getTourId());
             long badges = tour.getDestinationCount() - disabledBadges.getOrDefault(tour.getTourId(), 0L);
-            return TourResponse.fromEntity(tour)
-                    .toBuilder()
-                    .price(totals.getOrDefault(tour.getTourId(), BigDecimal.ZERO))
+            return builder
                     .taskCount(reward == null ? 0 : reward.taskCount().intValue())
                     .totalTaskPoints(reward == null ? 0 : reward.totalPoints().intValue())
                     .badgeCount((int) Math.max(0, badges))
                     .build();
         };
+    }
+
+    /** Cộng dồn [số nhiệm vụ, tổng điểm] từ một dòng [tourId, count, sum]. */
+    private static void addReward(Map<Long, long[]> acc, Object[] row) {
+        long[] total = acc.computeIfAbsent((Long) row[0], id -> new long[2]);
+        total[0] += ((Number) row[1]).longValue();
+        total[1] += ((Number) row[2]).longValue();
     }
 }

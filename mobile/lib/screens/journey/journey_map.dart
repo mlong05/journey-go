@@ -16,6 +16,9 @@ class JourneyStop {
   final StopState state;
   final bool skipped;
 
+  /// Ảnh của điểm đến (tour 5 bước), hiện trong ghim của điểm đang mở / đã xong.
+  final String? imageUrl;
+
   const JourneyStop({
     required this.destinationId,
     required this.order,
@@ -23,6 +26,7 @@ class JourneyStop {
     required this.point,
     required this.state,
     this.skipped = false,
+    this.imageUrl,
   });
 }
 
@@ -39,6 +43,12 @@ class JourneyMap extends StatefulWidget {
   /// Đường đi theo mặt đường khi đang chỉ đường (phần còn phải đi); null khi không chỉ đường.
   final List<LatLng>? navRoute;
 
+  /// Đoạn đường đã đi qua khi dẫn đường (vẽ mờ); null khi không chỉ đường.
+  final List<LatLng>? navTraveled;
+
+  /// Đi bộ: vẽ tuyến bằng nét chấm như dấu chân.
+  final bool navWalk;
+
   /// Du khách tự kéo / phóng bản đồ (để ngừng bám theo vị trí khi dẫn đường).
   final VoidCallback? onUserGesture;
 
@@ -54,6 +64,8 @@ class JourneyMap extends StatefulWidget {
     required this.fitPadding,
     this.onStopTap,
     this.navRoute,
+    this.navTraveled,
+    this.navWalk = false,
     this.onUserGesture,
     this.checkInRadiusMeters = 100,
   });
@@ -113,6 +125,58 @@ class JourneyMapState extends State<JourneyMap> {
     if (user != null) _controller.move(user, 17.5);
   }
 
+  /// Ruột ghim: ảnh địa điểm (điểm đang mở / đã ghé) kèm dấu nhỏ, hoặc số thứ tự / dấu tích như cũ.
+  Widget _pinContent(JourneyStop s) {
+    final symbol = s.state == StopState.done
+        ? Icon(s.skipped ? Icons.skip_next_rounded : Icons.check_rounded, color: Colors.white, size: 20)
+        : Text(
+            '${s.order}',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: s.state == StopState.current ? 18 : 14,
+            ),
+          );
+    final image = s.imageUrl;
+    if (image == null || s.state == StopState.locked || s.skipped) return symbol;
+    return Stack(
+      fit: StackFit.expand,
+      clipBehavior: Clip.none,
+      children: [
+        ClipOval(
+          child: Image.network(
+            image,
+            fit: BoxFit.cover,
+            // Ảnh lỗi / đang tải: vẫn thấy số thứ tự
+            errorBuilder: (_, _, _) => Center(child: symbol),
+            loadingBuilder: (_, child, progress) => progress == null ? child : Center(child: symbol),
+          ),
+        ),
+        Positioned(
+          right: -6,
+          bottom: -6,
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: s.state == StopState.done ? AppCultureColors.heritageJade : AppCultureColors.oceanBlue,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: Center(
+              child: s.state == StopState.done
+                  ? const Icon(Icons.check_rounded, color: Colors.white, size: 12)
+                  : Text(
+                      '${s.order}',
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                    ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final stops = widget.stops;
@@ -162,8 +226,21 @@ class JourneyMapState extends State<JourneyMap> {
           ]),
         if (navRoute != null && navRoute.length >= 2)
           PolylineLayer(polylines: [
-            Polyline(points: navRoute, strokeWidth: 10, color: Colors.white),
-            Polyline(points: navRoute, strokeWidth: 6.5, color: AppCultureColors.oceanBlue),
+            if ((widget.navTraveled?.length ?? 0) >= 2)
+              Polyline(
+                points: widget.navTraveled!,
+                strokeWidth: 5,
+                color: AppCultureColors.textLight.withValues(alpha: 0.7),
+              ),
+            Polyline(points: navRoute, strokeWidth: widget.navWalk ? 9 : 11, color: Colors.white),
+            widget.navWalk
+                ? Polyline(
+                    points: navRoute,
+                    strokeWidth: 6,
+                    color: AppCultureColors.heritageJade,
+                    pattern: const StrokePattern.dotted(spacingFactor: 1.6),
+                  )
+                : Polyline(points: navRoute, strokeWidth: 7, color: AppCultureColors.heritageJade),
           ])
         else if (user != null && current.isNotEmpty)
           PolylineLayer(polylines: [
@@ -201,15 +278,7 @@ class JourneyMapState extends State<JourneyMap> {
                   },
                   emphasized: s.state == StopState.current,
                   label: s.name,
-                  child: s.state == StopState.done
-                      ? Icon(s.skipped ? Icons.skip_next_rounded : Icons.check_rounded,
-                          color: Colors.white, size: 20)
-                      : Text('${s.order}',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: s.state == StopState.current ? 18 : 14,
-                          )),
+                  child: _pinContent(s),
                 ),
               ),
             ),

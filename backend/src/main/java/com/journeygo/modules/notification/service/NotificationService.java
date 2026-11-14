@@ -33,6 +33,7 @@ public class NotificationService {
 
     private final NotificationRepository repository;
     private final SseHub hub;
+    private final com.journeygo.modules.realtime.service.RealtimeHub realtimeHub;
 
     // ── Gửi ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,10 @@ public class NotificationService {
 
         for (Notification n : saved) {
             Long userId = n.getRecipientId();
+            // WebSocket: thông báo tới thiết bị đang mở app (mobile/web) ngay lập tức.
+            realtimeHub.sendNotification(userId, Map.of(
+                    "type", com.journeygo.modules.realtime.service.RealtimeHub.TYPE_NOTIFICATION,
+                    "notification", NotificationResponse.fromEntity(n)));
             if (!hub.isOnline(userId)) continue;
             hub.send(userId, EVENT_NOTIFICATION, NotificationResponse.fromEntity(n));
             hub.send(userId, EVENT_UNREAD, Map.of("count", repository.countByRecipientIdAndReadAtIsNull(userId)));

@@ -25,6 +25,37 @@ public class EmailService {
     @Value("${app.mail.from-name:JourneyGo Platform}")
     private String fromName;
 
+    /**
+     * Gửi email HTML. Không ném lỗi — lỗi gửi mail chỉ được ghi log để không làm hỏng nghiệp vụ gọi nó.
+     *
+     * @return true nếu gửi thành công
+     */
+    public boolean sendHtml(String toEmail, String subject, String htmlContent) {
+        if (toEmail == null || toEmail.isBlank()) {
+            log.warn("Bỏ qua email '{}' vì không có địa chỉ người nhận", subject);
+            return false;
+        }
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
+                    StandardCharsets.UTF_8.name());
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Đã gửi email '{}' đến {}", subject, toEmail);
+            return true;
+        } catch (Exception ex) {
+            log.error("Không thể gửi email '{}' đến {}: {}", subject, toEmail, ex.getMessage());
+            return false;
+        }
+    }
+
+    public String getFromEmail() {
+        return fromEmail;
+    }
+
     public void sendPasswordResetOtp(String toEmail, String fullName, String otp, int expiryMinutes) {
         log.info("===> [OTP RESET PASSWORD] Đang gửi mã OTP đến email: {} | OTP: {} (Thời hạn: {} phút)",
                 toEmail, otp, expiryMinutes);

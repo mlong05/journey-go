@@ -1,41 +1,63 @@
 import 'package:flutter/material.dart';
 
-/// Bảng màu chuẩn Cổng Du Lịch Văn Hóa Việt Nam (VietCulture)
+/// Bảng màu "di sản" dùng cho toàn app: nền giấy dó ấm, chữ màu mực, xanh ngọc sơn mài làm màu chính,
+/// chàm làm màu phụ, đồng thau cho phần thưởng và đỏ son làm điểm nhấn.
 class AppCultureColors {
-  // Nền sáng và trung tính cao cấp
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceSubtle = Color(0xFFF1F5F9);
-  static const Color border = Color(0xFFE2E8F0);
-  static const Color borderLight = Color(0xFFF1F5F9);
+  // Nền giấy & bề mặt
+  static const Color background = Color(0xFFF7F3EA); // giấy dó
+  static const Color surface = Color(0xFFFFFDF8); // ngà
+  static const Color surfaceSubtle = Color(0xFFF0EADD);
+  static const Color border = Color(0xFFE3DACA);
+  static const Color borderLight = Color(0xFFEEE7DA);
 
-  // Gam màu di sản chủ đạo (Heritage Jade)
-  static const Color heritageJade = Color(0xFF00A86B); // Xanh ngọc di sản
-  static const Color jadeLight = Color(0xFFE6F7F0);
-  static const Color jadeDark = Color(0xFF008F5A);
-  static const Color jadeGradientStart = Color(0xFF00A86B);
-  static const Color jadeGradientEnd = Color(0xFF0288D1);
+  // Màu chính: xanh ngọc sơn mài
+  static const Color heritageJade = Color(0xFF1F6F54);
+  static const Color jadeLight = Color(0xFFE3EEE7);
+  static const Color jadeDark = Color(0xFF17573F);
+  static const Color jadeGradientStart = Color(0xFF1F6F54);
+  static const Color jadeGradientEnd = Color(0xFF123F31);
 
-  // Gam màu biển trời thứ cấp (Ocean Blue)
-  static const Color oceanBlue = Color(0xFF0288D1);
-  static const Color oceanLight = Color(0xFFE1F5FE);
-  static const Color oceanDark = Color(0xFF01579B);
+  // Màu phụ: chàm (tên cũ "ocean" giữ lại để không phải sửa các màn khác)
+  static const Color oceanBlue = Color(0xFF2F4B7C);
+  static const Color oceanLight = Color(0xFFE6EAF2);
+  static const Color oceanDark = Color(0xFF22375C);
 
-  // Màu chữ & tương phản
-  static const Color textDark = Color(0xFF0F172A); // Slate 900
-  static const Color textMuted = Color(0xFF64748B); // Slate 500
-  static const Color textLight = Color(0xFF94A3B8); // Slate 400
+  // Điểm nhấn: đỏ son
+  static const Color lacquer = Color(0xFF9E2B25);
+  static const Color lacquerLight = Color(0xFFF5E3DF);
 
-  // Thưởng & Huy hiệu
-  static const Color rewardBg = Color(0xFFFEF3C7);
-  static const Color rewardBorder = Color(0xFFFDE68A);
-  static const Color rewardText = Color(0xFF92400E);
-  static const Color gold = Color(0xFFF59E0B);
-  static const Color amberDark = Color(0xFFB45309);
+  // Chữ màu mực
+  static const Color textDark = Color(0xFF1E1A14);
+  static const Color textMuted = Color(0xFF6B6357);
+  static const Color textLight = Color(0xFFA39A8C);
+
+  // Thưởng & huy hiệu: đồng thau
+  static const Color rewardBg = Color(0xFFF6ECD4);
+  static const Color rewardBorder = Color(0xFFE7D3A3);
+  static const Color rewardText = Color(0xFF6E4A12);
+  static const Color gold = Color(0xFFB8862B);
+  static const Color amberDark = Color(0xFF8C5A14);
 
   // Trạng thái
-  static const Color success = Color(0xFF10B981);
-  static const Color error = Color(0xFFEF4444);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color info = Color(0xFF3B82F6);
+  static const Color success = Color(0xFF2E7D4F);
+  static const Color error = Color(0xFFB3261E);
+  static const Color warning = Color(0xFFC98A1B);
+  static const Color info = Color(0xFF2F4B7C);
+}
+
+/// Kiểu chữ: tiêu đề dùng font có chân Noto Serif (đủ dấu tiếng Việt), thân bài dùng font hệ thống.
+class AppType {
+  static const String serif = 'NotoSerif';
+
+  /// Tiêu đề kiểu tạp chí di sản.
+  static TextStyle display({double size = 24, Color color = AppCultureColors.textDark, FontWeight weight = FontWeight.w700, double height = 1.25}) =>
+      TextStyle(fontFamily: serif, fontSize: size, fontWeight: weight, color: color, height: height);
+
+  /// Đoạn văn đọc dài (câu chuyện văn hoá).
+  static TextStyle reading({double size = 16, Color color = AppCultureColors.textDark}) =>
+      TextStyle(fontFamily: serif, fontSize: size, height: 1.75, color: color);
+
+  /// Nhãn nhỏ viết hoa, giãn chữ (VD "CHƯƠNG 1").
+  static TextStyle eyebrow({Color color = AppCultureColors.lacquer}) =>
+      TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.4, color: color);
 }

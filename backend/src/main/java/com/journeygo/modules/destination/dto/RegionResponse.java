@@ -13,6 +13,8 @@ public record RegionResponse(
         @Schema(description = "ID khu vực") Long id,
         @Schema(description = "Tên khu vực") String name,
         @Schema(description = "Slug") String slug,
+        @Schema(description = "URL ảnh đại diện") String imageUrl,
+        @Schema(description = "Ghi nguồn ảnh") String imageCredit,
         @Schema(description = "Đã xóa") boolean deleted,
         @Schema(description = "Thời gian tạo") Instant createdAt,
         @Schema(description = "Thời gian cập nhật") Instant updatedAt
@@ -23,6 +25,8 @@ public record RegionResponse(
                 .id(region.getId())
                 .name(region.getName())
                 .slug(region.getSlug())
+                .imageUrl(region.getImageUrl())
+                .imageCredit(region.getImageCredit())
                 .deleted(region.isDeleted())
                 .createdAt(region.getCreatedAt())
                 .updatedAt(region.getUpdatedAt())

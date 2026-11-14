@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "adb reverse 8088",
+      "detail": "Chuyển cổng 8088 trên điện thoại cắm USB về backend trên máy tính (mất khi rút cáp / khởi động lại adb)",
+      "type": "process",
+      "command": "adb",
+      "args": ["reverse", "tcp:8088", "tcp:8088"],
+      "presentation": { "reveal": "silent", "panel": "shared" },
+      "problemMatcher": []
+    }
+  ]
+}
