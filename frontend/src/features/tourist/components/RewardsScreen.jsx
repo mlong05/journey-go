@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Sparkles, Ticket, Smartphone, TrendingUp, TrendingDown } from "lucide-react";
+import { Sparkles, Ticket, Smartphone, TrendingUp, TrendingDown } from "lucide-react";
 import AccountLayout from "./AccountLayout";
 import { touristService } from "../services/touristService";
 import { dateTime, longDate, vnd } from "../utils";
@@ -27,9 +27,9 @@ export default function RewardsScreen() {
   const { loading, points, history, mine, shop } = data;
 
   return (
-    <AccountLayout title="Điểm thưởng & voucher" description="Điểm được cộng khi bạn trả lời đúng quiz và hoàn thành hoạt động tại điểm dừng trong app JourneyGo.">
+    <AccountLayout title="Điểm thưởng & voucher">
       {loading ? (
-        <p className="flex gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />Đang tải…</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-busy="true"><div className="jg-shimmer h-28 rounded-3xl" /><div className="jg-shimmer h-28 rounded-3xl" /><div className="jg-shimmer h-28 rounded-3xl" /></div>
       ) : (
         <div className="space-y-5">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

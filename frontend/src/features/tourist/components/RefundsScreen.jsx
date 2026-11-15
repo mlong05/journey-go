@@ -148,7 +148,7 @@ export default function RefundsScreen() {
   }, []);
 
   return (
-    <AccountLayout title="Hoàn tiền & hỗ trợ" description="Theo dõi các yêu cầu hoàn tiền bạn đã gửi.">
+    <AccountLayout title="Hoàn tiền & hỗ trợ">
       <div className="mb-5 grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
           <p className="font-bold text-slate-900">Cách gửi yêu cầu hoàn tiền</p>
@@ -160,7 +160,7 @@ export default function RefundsScreen() {
         </div>
       </div>
       {state.loading ? (
-        <p className="flex gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />Đang tải…</p>
+        <div className="space-y-3" aria-busy="true"><div className="jg-shimmer h-20 rounded-2xl" /><div className="jg-shimmer h-20 rounded-2xl" /></div>
       ) : state.error ? (
         <p role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"><AlertTriangle size={16} />{state.error}</p>
       ) : state.items.length ? (
