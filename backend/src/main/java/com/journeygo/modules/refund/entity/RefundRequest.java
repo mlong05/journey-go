@@ -60,7 +60,7 @@ public class RefundRequest {
     @Builder.Default
     private RefundStatus status = RefundStatus.PENDING_REVIEW;
 
-    /** Nguyên nhân do Tourist khai báo (lý do cá nhân / lỗi nền tảng). */
+    /** Nguyên nhân do Tourist khai báo (nhóm lý do: PERSONAL / PLATFORM_FAULT / PROVIDER_FAULT / FORCE_MAJEURE). */
     @Enumerated(EnumType.STRING)
     @Column(name = "declared_reason", length = 30)
     private RefundReason declaredReason;
@@ -70,6 +70,23 @@ public class RefundRequest {
     @Column(name = "approved_reason", length = 30)
     private RefundReason approvedReason;
 
+    /** Mã lý do chi tiết do Tourist chọn (VD: HEALTH_ISSUE). */
+    @Column(name = "declared_reason_code", length = 60)
+    private String declaredReasonCode;
+
+    /**
+     * Lý do NGẮN GỌN do Tourist nhập (VD: "Bị ốm đột xuất").
+     *
+     * <p>Khách KHÔNG chọn nhóm / mã lý do cụ thể nữa — chỉ mô tả bằng văn bản.
+     * Việc phân loại vào nhóm lý do và mã lý do là quyết định của Admin khi duyệt.
+     */
+    @Column(name = "reason_summary", length = 200)
+    private String reasonSummary;
+
+    /** Mã lý do chi tiết do Admin xác định khi phê duyệt. */
+    @Column(name = "approved_reason_code", length = 60)
+    private String approvedReasonCode;
+
     /** Lý do chi tiết từ Tourist. */
     @Column(name = "reason_detail", columnDefinition = "TEXT")
     private String reasonDetail;
@@ -77,6 +94,13 @@ public class RefundRequest {
     /** Bằng chứng / thông tin bổ sung do Tourist cung cấp (JSONB). */
     @Column(name = "evidence", columnDefinition = "TEXT")
     private String evidence;
+
+    /**
+     * Danh sách file bằng chứng đính kèm (ảnh / video) — JSON array các URL
+     * đã tải lên Cloudinary.
+     */
+    @Column(name = "evidence_attachments", columnDefinition = "TEXT")
+    private String evidenceAttachments;
 
     /** Số tiền đề xuất — hệ thống tính tự động theo nguyên nhân. */
     @Column(name = "proposed_amount", nullable = false, precision = 14, scale = 2)
@@ -162,6 +186,14 @@ public class RefundRequest {
     @Column(name = "bank_name", length = 150)
     private String bankName;
 
+    /** Số điện thoại liên hệ do Tourist cung cấp — Admin dùng để hỗ trợ. */
+    @Column(name = "contact_phone", length = 20)
+    private String contactPhone;
+
+    /** Email dự phòng do Tourist cung cấp — Admin dùng để hỗ trợ. */
+    @Column(name = "contact_email", length = 150)
+    private String contactEmail;
+
     /** Mã tham chiếu giao dịch chuyển khoản thủ công. */
     @Column(name = "transfer_reference", length = 100)
     private String transferReference;
@@ -214,11 +246,42 @@ public class RefundRequest {
         this.rejectionReason = reason;
     }
 
-    /** Đã gửi yêu cầu tới VNPay nhưng chưa có kết quả cuối cùng. */
-    public void markProcessing() {
+    /**
+     * Đã gửi yêu cầu tới VNPay nhưng chưa có kết quả cuối cùng.
+     *
+     * <p>Trạng thái riêng cho phương thức VNPay — tách khỏi
+     * {@link #markManualTransferPending()} để mỗi yêu cầu có đúng MỘT trạng thái.
+     */
+    public void markVnPayProcessing() {
         if (this.status != RefundStatus.REFUNDED) {
-            this.status = RefundStatus.REFUND_PROCESSING;
+            this.status = RefundStatus.VNPAY_PROCESSING;
         }
+    }
+
+    /**
+     * Đã chốt phương thức chuyển khoản ngân hàng thủ công — đang chờ quản trị viên
+     * thực hiện chuyển khoản rồi ghi nhận bằng chứng.
+     */
+    public void markManualTransferPending() {
+        if (this.status != RefundStatus.REFUNDED) {
+            this.status = RefundStatus.MANUAL_TRANSFER_PENDING;
+        }
+    }
+
+    /**
+     * Chuyển sang trạng thái "đang xử lý" theo phương thức hiện tại của yêu cầu.
+     *
+     * <p>Trạng thái "đang xử lý" phải BÁM THEO phương thức hoàn — nếu không, giao diện
+     * sẽ hiển thị "Đang xử lý hoàn tiền" cho cả yêu cầu chờ VNPay lẫn yêu cầu chờ
+     * chuyển khoản thủ công ⇒ người dùng không xác định được yêu cầu đang chờ gì.
+     */
+    public void markProcessing() {
+        if (this.status == RefundStatus.REFUNDED) {
+            return;
+        }
+        this.status = (this.method == RefundMethod.MANUAL_BANK_TRANSFER)
+                ? RefundStatus.MANUAL_TRANSFER_PENDING
+                : RefundStatus.VNPAY_PROCESSING;
     }
 
     /**
