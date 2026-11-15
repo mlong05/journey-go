@@ -25,6 +25,7 @@ import {
 import { useAuthSession } from "@/hooks";
 import { authService } from "@/features/auth";
 import { apiClient } from "@/services/apiClient";
+import { formatDateTimeVN } from "@/lib/money";
 
 /**
  * CẤU HÌNH GIAO DIỆN & VAI TRÒ THEO 3 ROLE:
@@ -111,22 +112,12 @@ function getRoleLabel(role, fallbackRole = "admin") {
 }
 
 /**
- * Format ngày tháng chuẩn tiếng Việt (dd/MM/yyyy)
+ * Format ngày tháng chuẩn CHUNG của hệ thống: "14:19 15/11/2026" (giờ Việt Nam).
  */
 function formatDateVN(dateString) {
   if (!dateString) return "Chưa cập nhật";
-  try {
-    const d = new Date(dateString);
-    if (isNaN(d.getTime())) return dateString;
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    const hours = String(d.getHours()).padStart(2, "0");
-    const minutes = String(d.getMinutes()).padStart(2, "0");
-    return `${day}/${month}/${year} (${hours}:${minutes})`;
-  } catch {
-    return dateString;
-  }
+  const formatted = formatDateTimeVN(dateString);
+  return formatted || dateString;
 }
 
 /**

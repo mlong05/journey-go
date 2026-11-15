@@ -21,6 +21,7 @@ import { useAuthSession } from "@/hooks";
 import { tourService, TOUR_STATUS_META } from "@/features/tour";
 import { dashboardService, percentChange } from "@/features/dashboard";
 import { useQueueRefresh } from "@/context/NotificationContext";
+import { formatDateVN } from "@/lib/money";
 
 /**
  * Trang Tổng quan Đối tác — /provider
@@ -98,7 +99,7 @@ function timeAgo(iso) {
   if (hours < 24) return `${hours} giờ trước`;
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days} ngày trước`;
-  return new Date(iso).toLocaleDateString("vi-VN");
+  return formatDateVN(iso);
 }
 
 export default function ProviderOverviewPage() {
