@@ -137,8 +137,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   bool _isRefunded(BookingModel b) =>
       _refundIndex.stateFor(b.id) == RefundSummaryState.resolved;
 
-  /// Đơn đã thanh toán và KHÔNG dính hoàn tiền.
-  bool _isPurchased(BookingModel b) => b.isPaid && !_refundIndex.hasRefund(b.id);
+  /// Đơn đã thanh toán và KHÔNG dính hoàn tiền, CHƯA đi xong.
+  bool _isPurchased(BookingModel b) =>
+      b.isPaid && !b.isCompleted && !_refundIndex.hasRefund(b.id);
+
+  /// Đơn đã đi xong (trải nghiệm đã hoàn thành).
+  bool _isCompleted(BookingModel b) => b.isCompleted;
 
   /// Đơn còn trong hạn thanh toán (10 phút) — khách có thể thanh toán tiếp.
   ///
@@ -193,12 +197,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     // ⚠️ Mỗi đơn thuộc ĐÚNG MỘT nhóm để không hiện trùng ở nhiều tab:
     //   • Đang hoàn tiền  — ưu tiên cao nhất (đơn đang bay tiền).
     //   • Đã hoàn tiền    — đã có kết quả hoàn tiền (đã hoàn / bị từ chối / lỗi).
-    //   • Đã mua          — đã thanh toán và KHÔNG dính hoàn tiền.
+    //   • Đã hoàn thành   — tour đã đi xong.
+    //   • Đã mua          — đã thanh toán và KHÔNG dính hoàn tiền, còn hiệu lực đi.
     //   • Chờ thanh toán  — còn trong hạn 10 phút.
     //   • Đã hủy/Hết hạn — phần còn lại.
     final all = _bookings;
     final refunding = all.where((b) => _isRefunding(b)).toList();
     final refunded = all.where((b) => _isRefunded(b)).toList();
+    final completed = all.where((b) => _isCompleted(b)).toList();
     final purchased = all.where((b) => _isPurchased(b)).toList();
     final pending = all.where((b) => _isPendingPayment(b)).toList();
     // ⚠️ "Đã hủy/Hết hạn" = đơn ở trạng thái TERMINAL (CANCELLED / EXPIRED).
@@ -207,7 +213,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     final closed = all.where((b) => _isClosed(b)).toList();
 
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: Scaffold(
         backgroundColor: AppCultureColors.background,
         appBar: AppBar(
@@ -227,6 +233,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               Tab(text: 'Tất cả (${all.length})'),
               Tab(text: 'Đã mua (${purchased.length})'),
               Tab(text: 'Chờ thanh toán (${pending.length})'),
+              Tab(text: 'Đã hoàn thành (${completed.length})'),
               Tab(text: 'Đang hoàn tiền (${refunding.length})'),
               Tab(text: 'Đã hoàn tiền (${refunded.length})'),
               Tab(text: 'Đã hủy/Hết hạn (${closed.length})'),
@@ -250,6 +257,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                         _list(all, 'Chưa có đơn nào.', _ticketTile),
                         _list(purchased, 'Chưa có đơn nào đã thanh toán.', _ticketTile),
                         _list(pending, 'Không có đơn nào đang chờ thanh toán.', _pendingTile),
+                        _list(completed, 'Chưa có đơn nào đã hoàn thành.', _ticketTile),
                         _list(refunding, 'Không có đơn nào đang hoàn tiền.', _ticketTile),
                         _list(refunded, 'Chưa có đơn nào đã hoàn tiền xong.', _ticketTile),
                         _list(closed, 'Không có đơn nào đã hủy hoặc hết hạn.', _closedTile),

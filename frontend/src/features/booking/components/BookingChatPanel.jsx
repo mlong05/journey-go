@@ -27,14 +27,20 @@ export default function BookingChatPanel({ bookingId, currentUserId, className =
   const loading = Boolean(bookingId) && !loaded;
 
   // Tin nhắn mới trong booking này ⇒ thêm vào danh sách ngay.
+  //
+  // ⚠️ Kênh đã gộp: "Hỗ trợ trong đơn này" ≡ "Tin nhắn với nhà tour" ⇒ nhận cả
+  // scope `BOOKING_CHAT` (cũ) và `PROVIDER_CHAT` (mới).
   useRealtimeMessages(
     useCallback(
       (payload) => {
-        if (payload?.scope !== "BOOKING_CHAT") return;
-        if (Number(payload.bookingId) !== Number(bookingId)) return;
+        const scope = payload?.scope;
+        if (scope !== "BOOKING_CHAT" && scope !== "PROVIDER_CHAT") return;
+        if (scope === "BOOKING_CHAT" && Number(payload.bookingId) !== Number(bookingId)) return;
+        if (scope === "PROVIDER_CHAT" && payload.bookingId != null
+          && Number(payload.bookingId) !== Number(bookingId)) return;
         setMessages((prev) => {
           if (prev.some((m) => Number(m.id) === Number(payload.message?.id))) return prev;
-          return payload.message ? [payload.message, ...prev] : prev;
+          return payload.message ? [...prev, payload.message] : prev;
         });
       },
       [bookingId],
@@ -75,7 +81,10 @@ export default function BookingChatPanel({ bookingId, currentUserId, className =
     setError("");
     try {
       const created = await sendBookingMessage(bookingId, body);
-      setMessages((prev) => [created, ...prev]);
+      setMessages((prev) => {
+        if (prev.some((m) => Number(m.id) === Number(created.id))) return prev;
+        return [...prev, created];
+      });
       setText("");
     } catch (err) {
       setError(err?.message || "Không gửi được tin nhắn.");

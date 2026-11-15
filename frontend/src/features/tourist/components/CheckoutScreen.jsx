@@ -4,13 +4,16 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CalendarDays, Loader2, AlertTriangle, Lock, UserRound, Timer, CreditCard } from "lucide-react";
+import {
+  ArrowLeft, CalendarDays, Loader2, AlertTriangle, Lock, UserRound, Timer, CreditCard, CheckCircle2,
+} from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
 import Breadcrumbs from "./Breadcrumbs";
 import RequireTourist from "./RequireTourist";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
+import { usePurchasedBooking } from "../hooks/usePurchasedBooking";
 import { GUEST_TYPES, ageAt, durationLabel, longDate, vnd } from "../utils";
 import { LimitedField } from "@/components/ui/LimitedField";
 import { useGuestTypes } from "@/lib/guestTypes";
@@ -57,6 +60,8 @@ function CheckoutForm({ tourId }) {
   const params = useSearchParams();
   const guestTypes = useGuestTypes();
   const { user } = useTouristSession();
+  // Tour đã mua ⇒ không thể đặt lại (chặn ngay ở bước nhập hành khách).
+  const { booking: purchased, loading: purchasedLoading } = usePurchasedBooking(tourId);
   const date = params.get("date") || "";
   const [tour, setTour] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -87,6 +92,10 @@ function CheckoutForm({ tourId }) {
     e.preventDefault();
     setTouched(true);
     setError("");
+    if (purchased) {
+      setError("Bạn đã mua tour này rồi — không thể đặt lại.");
+      return;
+    }
     if (hasErrors) {
       document.querySelector("[aria-invalid=true]")?.focus();
       return;
@@ -123,6 +132,35 @@ function CheckoutForm({ tourId }) {
   }
   if (loadError) return <p role="alert" className="mx-auto max-w-md px-4 py-20 text-center font-bold text-rose-600">{loadError}</p>;
   if (!tour) return <div className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />Đang tải…</div>;
+
+  /*
+    ⚠️ TOUR ĐÃ MUA ⇒ KHÔNG THỂ ĐẶT LẠI.
+    Chặn ngay ở bước thanh toán (backend cũng chặn với lỗi 409
+    `BOOKING_TOUR_ALREADY_PURCHASED` — frontend chỉ để trải nghiệm tốt hơn).
+  */
+  if (purchased) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-20 text-center">
+        <CheckCircle2 size={36} className="mx-auto text-emerald-600" />
+        <p className="mt-3 text-lg font-extrabold text-slate-900">Bạn đã mua tour này rồi</p>
+        <p className="mt-2 text-sm text-slate-600">
+          Đơn <b className="font-mono">{purchased.bookingCode}</b> · ngày khởi hành{" "}
+          <b>{longDate(purchased.experienceDate)}</b>. Mỗi tour chỉ được đặt một lần.
+        </p>
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
+          <Link href={ROUTES.TRIP_DETAIL(purchased.id)} className="inline-flex items-center justify-center rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white">
+            Xem chuyến đi của tôi
+          </Link>
+          <Link href={`${ROUTES.TOUR_DETAIL(tourId)}?bookingId=${purchased.id}`} className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700">
+            Xem chi tiết tour
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  if (purchasedLoading) {
+    return <div className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />Đang kiểm tra…</div>;
+  }
 
   const typeIndex = {};
   return (

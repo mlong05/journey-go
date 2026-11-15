@@ -47,6 +47,15 @@ public class ProviderConversation {
     @Column(name = "tour_id")
     private Long tourId;
 
+    /**
+     * Đơn đặt tour liên quan (nếu có).
+     *
+     * <p>NULL = du khách chỉ hỏi trước khi đặt tour.
+     * Có giá trị = cuộc trò chuyện gắn với đơn (khung "Hỗ trợ trong đơn này").
+     */
+    @Column(name = "booking_id")
+    private Long bookingId;
+
     /** Tiêu đề rút gọn (VD: tên tour). */
     @Column(name = "subject", length = 255)
     private String subject;

@@ -11,3 +11,9 @@ export { default as AccountProfileScreen } from "./components/AccountProfileScre
 export { default as RefundsScreen } from "./components/RefundsScreen";
 export { default as MessagesScreen } from "./components/MessagesScreen";
 export { default as RewardsScreen } from "./components/RewardsScreen";
+export { default as NotificationsScreen } from "./components/NotificationsScreen";
+export { default as CommunityScreen } from "./components/CommunityScreen";
+export { default as CommunityPostScreen } from "./components/CommunityPostScreen";
+export { default as MyPostsScreen } from "./components/MyPostsScreen";
+export { default as InvitationsScreen } from "./components/InvitationsScreen";
+export { default as InvitationAcceptScreen } from "./components/InvitationAcceptScreen";

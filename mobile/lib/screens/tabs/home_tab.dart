@@ -138,8 +138,10 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
   }
 
   /// Id các tour du khách đã mua (đã thanh toán) ⇒ loại khỏi danh sách hiển thị.
+  ///
+  /// ⚠️ `size: 200` để không bỏ sót tour đã mua khi du khách có nhiều đơn.
   Future<Set<int>> _loadOwnedTourIds() async {
-    final bookings = await _bookingService.getMine();
+    final bookings = await _bookingService.getMine(size: 200);
     return {for (final b in bookings) if (b.isPaid) b.tourId};
   }
 

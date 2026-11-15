@@ -510,6 +510,8 @@ public class RefundService {
                         "Vui lòng nhập lý do từ chối yêu cầu hoàn tiền");
             }
             refund.reject(admin, reason);
+            refund.setAdminNote(request.note() != null && !request.note().isBlank()
+                    ? request.note().trim() : null);
             refundRepository.save(refund);
             audit(refund, RefundAuditLog.Action.REJECTED, fromStatus, RefundStatus.REJECTED, admin,
                     null, null, "Quản trị viên từ chối yêu cầu hoàn tiền. Lý do: " + reason);
@@ -580,6 +582,9 @@ public class RefundService {
 
         refund.approve(admin, approvedReason, policyAmount);
         refund.setApprovedReasonCode(approvedReasonCode);
+        // Ghi chú của nền tảng — hiển thị cho người dùng ở lịch sử hoàn tiền.
+        refund.setAdminNote(request.note() != null && !request.note().isBlank()
+                ? request.note().trim() : null);
         // ⚠️ BẮT BUỘC lưu phương thức hoàn — nếu không, cột `method` NULL ⇒
         // tác vụ nền `findByStatusAndMethod(VNPAY_PROCESSING, VNPAY_API)` KHÔNG
         // quét được yêu cầu này ⇒ yêu cầu kẹt vĩnh viễn ở "Chờ VNPay xác nhận hoàn tiền".
@@ -953,6 +958,8 @@ public class RefundService {
         Instant transferredAt = request.transferredAt() != null ? request.transferredAt() : Instant.now();
         refund.setTransferReference(request.transferReference());
         refund.setTransferEvidence(request.transferEvidence());
+        refund.setTransferNote(request.transferNote() != null && !request.transferNote().isBlank()
+                ? request.transferNote().trim() : null);
         refund.setTransferredAt(transferredAt);
         refundRepository.save(refund);
 
