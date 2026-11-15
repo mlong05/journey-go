@@ -156,7 +156,39 @@ public class ProviderChatService {
             messageRepository.saveAll(unread);
         }
 
-        return messages.stream().map(ProviderMessageResponse::fromEntity).toList();
+        return toResponses(messages);
+    }
+
+    /** Ghép tên + ảnh bìa tour cho từng tin nhắn (lấy tour theo lô, không truy vấn lặp). */
+    private List<ProviderMessageResponse> toResponses(List<ProviderMessage> messages) {
+        java.util.Set<Long> tourIds = messages.stream().map(ProviderMessage::getTourId)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        java.util.Map<Long, Tour> tours = tourIds.isEmpty() ? java.util.Map.of()
+                : tourRepository.findAllById(tourIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(Tour::getTourId, t -> t));
+        return messages.stream().map(m -> {
+            Tour t = m.getTourId() == null ? null : tours.get(m.getTourId());
+            return ProviderMessageResponse.fromEntity(m, t == null ? null : t.getTitle(), t == null ? null : t.getCoverImageUrl());
+        }).toList();
+    }
+
+    /**
+     * Tour gắn với tin nhắn mới: tour client gửi lên (phải thuộc nhà tour của cuộc trò chuyện),
+     * nếu không có thì dùng tour hiện tại của cuộc trò chuyện. Tour hợp lệ được ghi làm tour hiện tại.
+     */
+    private Tour resolveMessageTour(ProviderConversation conversation, Long requestedTourId) {
+        Long tourId = requestedTourId != null ? requestedTourId : conversation.getTourId();
+        if (tourId == null) return null;
+        Tour tour = tourRepository.findByTourId(tourId).orElse(null);
+        if (tour == null || tour.getCreatedBy() == null || !conversation.getProviderId().equals(tour.getCreatedBy().getId())) {
+            // Tour không thuộc nhà tour này (hoặc đã bị xoá) ⇒ bỏ qua, không gắn tour sai.
+            return null;
+        }
+        if (!tourId.equals(conversation.getTourId())) {
+            conversation.setTourId(tourId);
+            conversation.setSubject(tour.getTitle());
+        }
+        return tour;
     }
 
     /** Gửi tin nhắn mới trong cuộc trò chuyện. */
@@ -170,17 +202,20 @@ public class ProviderChatService {
             throw new AppException(ErrorCode.BOOKING_MESSAGE_EMPTY);
         }
 
+        Tour tour = resolveMessageTour(conversation, request.tourId());
         ProviderMessage message = ProviderMessage.builder()
                 .conversation(conversation)
                 .senderId(senderId)
                 .body(body)
+                .tourId(tour == null ? null : tour.getTourId())
                 .build();
         messageRepository.save(message);
 
         conversation.setLastMessageAt(message.getCreatedAt());
         conversationRepository.save(conversation);
 
-        ProviderMessageResponse response = ProviderMessageResponse.fromEntity(message);
+        ProviderMessageResponse response = ProviderMessageResponse.fromEntity(message,
+                tour == null ? null : tour.getTitle(), tour == null ? null : tour.getCoverImageUrl());
         pushRealtime(conversation, response, senderId);
         return response;
     }

@@ -35,6 +35,10 @@ public class ProviderMessage {
     @Column(name = "body", nullable = false, columnDefinition = "TEXT")
     private String body;
 
+    /** Tour mà tin nhắn này hỏi về (NULL với tin nhắn cũ trước V26). */
+    @Column(name = "tour_id")
+    private Long tourId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
