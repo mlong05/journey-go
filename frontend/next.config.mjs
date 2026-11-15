@@ -24,6 +24,11 @@ const nextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
+      {
+        // Ảnh / video bằng chứng hoàn tiền & ảnh upload từ Cloudinary.
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+      },
     ],
   },
 };
