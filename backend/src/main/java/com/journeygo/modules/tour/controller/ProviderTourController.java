@@ -128,7 +128,7 @@ public class ProviderTourController {
     public ResponseEntity<ApiResponse<TourDetailResponse>> submit(@PathVariable Long tourId,
             @Valid @RequestBody TourWizardRequests.Submit request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.success("Đã gửi tour để Moderator duyệt",
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi tour cho kiểm duyệt viên",
                 service.submit(tourId, request, principal.getId())));
     }
 
