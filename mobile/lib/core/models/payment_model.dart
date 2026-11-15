@@ -95,11 +95,17 @@ class PaymentModel {
   bool get isCancelled => status == 'CANCELLED';
   bool get isExpired => status == 'EXPIRED';
 
+  /// Giao dịch bị THAY THẾ — khách đã tạo giao dịch mới và đơn đã được thanh toán.
+  ///
+  /// ⚠️ KHÔNG phải lỗi — đây là kết quả ĐÃ RÕ, không còn "đang chờ".
+  bool get isSuperseded => status == 'SUPERSEDED';
+
   /// Đang xử lý (chưa có kết quả cuối) — cần poll tiếp, KHÔNG coi là lỗi.
   bool get isProcessing => status == 'PENDING' || status == 'PROCESSING';
 
-  /// Giao dịch đã có kết quả cuối (thành công / thất bại / đã hủy).
-  bool get isFinal => isSuccess || isFailed || isCancelled;
+  /// Giao dịch đã có kết quả cuối (thành công / thất bại / đã hủy / bị thay thế).
+  bool get isFinal =>
+      isSuccess || isFailed || isCancelled || isExpired || isSuperseded;
 
   /// Được phép thử lại thanh toán (booking còn trong hạn 10 phút).
   bool get isRetryable => isFailed || isCancelled || isExpired;
@@ -284,7 +290,7 @@ class PaymentBank {
 }
 
 /// Kết quả QueryDR: `POST /payments/{id}/query` → { outcome, message }.
-/// outcome ∈ SUCCESS | FAILED | CANCELLED | DUPLICATE | UNKNOWN
+/// outcome ∈ SUCCESS | FAILED | CANCELLED | DUPLICATE | SUPERSEDED | UNKNOWN
 class PaymentQueryResult {
   final String outcome;
   final String message;
@@ -294,6 +300,10 @@ class PaymentQueryResult {
   bool get isSuccess => outcome == 'SUCCESS';
   bool get isFailed => outcome == 'FAILED';
   bool get isCancelled => outcome == 'CANCELLED';
+
+  /// Giao dịch bị thay thế — đơn đã được thanh toán bởi giao dịch khác.
+  bool get isSuperseded => outcome == 'SUPERSEDED';
+
   bool get isUnknown => outcome == 'UNKNOWN';
 
   /// Đã rõ kết quả (không còn "chờ").
@@ -342,8 +352,11 @@ class PaymentReturnResult {
   bool get isFailed => status == 'FAILED';
   bool get isCancelled => status == 'CANCELLED';
 
+  /// Giao dịch bị thay thế — đơn đã được thanh toán bởi giao dịch khác.
+  bool get isSuperseded => status == 'SUPERSEDED';
+
   /// Đã có kết quả cuối (không còn "chờ").
-  bool get isFinal => isSuccess || isFailed || isCancelled;
+  bool get isFinal => isSuccess || isFailed || isCancelled || isSuperseded;
 
   factory PaymentReturnResult.fromJson(Map<String, dynamic> json) {
     return PaymentReturnResult(

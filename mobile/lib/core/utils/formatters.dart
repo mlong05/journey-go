@@ -121,6 +121,9 @@ String paymentStatusLabel(String? status) {
       return 'Đã hủy';
     case 'EXPIRED':
       return 'Đã hết hạn';
+    // Giao dịch bị thay thế — khách đã tạo giao dịch mới và đơn đã được thanh toán.
+    case 'SUPERSEDED':
+      return 'Đã bị thay thế';
     default:
       return status ?? 'Không rõ';
   }
@@ -151,15 +154,32 @@ String refundStatusLabel(String? status) {
   }
 }
 
-/// Nhãn tiếng Việt cho nguyên nhân hoàn tiền.
+/// Nhãn tiếng Việt cho nhóm lý do hoàn tiền.
+///
+/// Nhãn chuẩn đến từ cấu hình của Admin (bảng `refund_reason_groups`) — hàm này
+/// chỉ là FALLBACK khi backend chưa có cấu hình.
+///
+/// ⚠️ KHÔNG BAO GIỜ trả về mã kỹ thuật thô (VD: `PERSONAL_7`) cho người dùng.
+/// Mã nhóm là chi tiết nội bộ của DB; người dùng chỉ thấy tên tiếng Việt.
 String refundReasonLabel(String? reason) {
   switch (reason) {
-    case 'TOURIST_FAULT':
-      return 'Lỗi khách du lịch (hoàn 50%)';
+    case 'PERSONAL':
+      return 'Lỗi khách hàng';
     case 'PLATFORM_FAULT':
-      return 'Lỗi nền tảng (hoàn 100%)';
+      return 'Lỗi nền tảng';
+    case 'PROVIDER_FAULT':
+      return 'Lỗi đối tác';
+    case 'FORCE_MAJEURE':
+      return 'Lỗi bất khả kháng';
+    case 'TOURIST_FAULT':
+      return 'Lỗi khách hàng';
+    case null:
+    case '':
+      return 'Không rõ';
     default:
-      return reason ?? 'Không rõ';
+      // Mã lạ (VD: `PERSONAL_7` do Admin tự sinh, hoặc enum đã đổi) ⇒ KHÔNG lộ
+      // mã kỹ thuật ra UI, chỉ hiển thị nhãn chung.
+      return 'Lý do khác';
   }
 }
 
