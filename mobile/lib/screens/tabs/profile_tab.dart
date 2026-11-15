@@ -6,7 +6,7 @@ import '../../core/models/auth_models.dart';
 import '../../core/models/gamification_model.dart'
     show PointTransactionModel, UserPointModel, formatDate, formatThousands;
 import '../../core/models/journey_model.dart';
-import '../../core/models/booking_model.dart' show BookingModel, BookingStatus;
+import '../../core/models/booking_model.dart' show BookingModel;
 import '../../core/services/auth_service.dart';
 import '../../core/models/refund_model.dart';
 import '../../core/services/progress_service.dart';
@@ -133,10 +133,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
     );
   }
 
-  /// Ví vé và Đơn đặt tour dùng CHUNG một màn ([MyBookingsScreen]): vé, chờ thanh toán,
-  /// giao dịch và chat với nhà tour.
-  void _openTickets() => _openBookings();
-
+  /// Mở "Đơn đặt tour của tôi" — gồm vé, đơn chờ thanh toán, giao dịch và chat
+  /// với nhà tour.
   void _openBookings() {
     Navigator.of(
       context,
@@ -260,10 +258,6 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
 
   @override
   Widget build(BuildContext context) {
-    final activeTicketsCount = _tickets
-        .where((t) => t.status != BookingStatus.completed)
-        .length;
-
     return Scaffold(
       backgroundColor: AppCultureColors.background,
       body: SafeArea(
@@ -288,7 +282,7 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                     const SizedBox(height: 26),
                     Reveal(
                       order: 2,
-                      child: _buildServicesSection(activeTicketsCount),
+                      child: _buildServicesSection(),
                     ),
                     const SizedBox(height: 26),
                     Reveal(order: 3, child: _buildGeneralSettingsSection()),
@@ -1003,7 +997,7 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
 
   // ─────────────────────── Vé & hỗ trợ ───────────────────────
 
-  Widget _buildServicesSection(int activeCount) {
+  Widget _buildServicesSection() {
     final refundsInProgress = _refunds.where((r) => r.isInProgress).length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1019,21 +1013,6 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             subtitle: 'Theo dõi đơn, thanh toán & mã QR trải nghiệm',
             onTap: _openBookings,
           ),
-          _tileDivider(),
-          _buildSettingTile(
-            icon: Icons.confirmation_number_outlined,
-            iconColor: AppCultureColors.heritageJade,
-            iconBg: AppCultureColors.jadeLight,
-            title: 'Ví vé & chi phí du lịch',
-            subtitle: '${_tickets.length} vé · hoá đơn, mã QR',
-            trailing: _badgeTrailing(
-              '$activeCount khả dụng',
-              AppCultureColors.jadeLight,
-              AppCultureColors.jadeDark,
-            ),
-            onTap: _openTickets,
-          ),
-          _tileDivider(),
           _tileDivider(),
           _buildSettingTile(
             icon: Icons.forum_rounded,
