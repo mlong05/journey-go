@@ -198,9 +198,28 @@ public class RefundRequest {
     @Column(name = "transfer_reference", length = 100)
     private String transferReference;
 
-    /** Bằng chứng chuyển khoản (URL hoặc mô tả). */
+    /** Bằng chứng chuyển khoản (URL ảnh). */
     @Column(name = "transfer_evidence", columnDefinition = "TEXT")
     private String transferEvidence;
+
+    /**
+     * Ghi chú của nền tảng khi Admin ghi nhận chuyển khoản thủ công.
+     *
+     * <p>Tách khỏi {@link #transferEvidence} (ảnh bằng chứng) vì người dùng cần
+     * thấy CẢ hai: ảnh (bằng chứng) và ghi chú giải thích (VD: "Đã chuyển kèm phí
+     * 11.000đ").
+     */
+    @Column(name = "transfer_note", columnDefinition = "TEXT")
+    private String transferNote;
+
+    /**
+     * Ghi chú của nền tảng khi Admin xử lý yêu cầu (duyệt / từ chối).
+     *
+     * <p>Hiển thị cho người dùng ở mục "Ghi chú của nền tảng" trong lịch sử hoàn
+     * tiền — tách khỏi {@link #rejectionReason} (chỉ dùng khi bị từ chối).
+     */
+    @Column(name = "admin_note", columnDefinition = "TEXT")
+    private String adminNote;
 
     /** Thời điểm Admin xác nhận đã chuyển khoản. */
     @Column(name = "transferred_at")

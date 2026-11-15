@@ -72,6 +72,10 @@ public record RefundResponse(
         String contactEmail,
         @Schema(description = "Mã tham chiếu chuyển khoản thủ công") String transferReference,
         @Schema(description = "Bằng chứng chuyển khoản") String transferEvidence,
+        @Schema(description = "Ghi chú của nền tảng khi ghi nhận chuyển khoản thủ công")
+        String transferNote,
+        @Schema(description = "Ghi chú của nền tảng khi Admin xử lý yêu cầu (duyệt / từ chối)")
+        String adminNote,
         @Schema(description = "Thời điểm chuyển khoản") Instant transferredAt,
         @Schema(description = "Thời điểm tạo yêu cầu") Instant createdAt,
         @Schema(description = "Nhật ký kiểm toán") List<RefundAuditLogResponse> auditLogs
@@ -122,6 +126,8 @@ public record RefundResponse(
                 .contactEmail(r.getContactEmail())
                 .transferReference(r.getTransferReference())
                 .transferEvidence(r.getTransferEvidence())
+                .transferNote(r.getTransferNote())
+                .adminNote(r.getAdminNote())
                 .transferredAt(r.getTransferredAt())
                 .createdAt(r.getCreatedAt())
                 .auditLogs(List.of())
