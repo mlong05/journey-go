@@ -13,10 +13,15 @@ public record SendProviderMessageRequest(
         String body,
 
         @Schema(description = "Tour mà tin nhắn hỏi về (bỏ trống ⇒ dùng tour hiện tại của cuộc trò chuyện)", example = "39")
-        Long tourId
+        Long tourId,
+
+        @Schema(description = "ID đơn đặt tour liên quan (bỏ trống = hỏi trước khi đặt). "
+                + "Khi gửi từ khung 'Hỗ trợ trong đơn này' thì truyền bookingId "
+                + "⇒ tin nhắn gắn với đơn và hiện trong tab 'Tin nhắn với nhà tour'.")
+        Long bookingId
 ) {
     /** Giữ tương thích nơi gọi cũ chỉ gửi nội dung. */
     public SendProviderMessageRequest(String body) {
-        this(body, null);
+        this(body, null, null);
     }
 }

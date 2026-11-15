@@ -220,7 +220,7 @@ public class BookingPassengerController {
         Booking booking = bookingService.findOrThrow(bookingId);
         requireAccess(booking, userPrincipal.getId());
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tin nhắn thành công",
-                chatService.list(booking)));
+                chatService.list(booking, userPrincipal.getId())));
     }
 
     @PostMapping("/{bookingId}/messages")

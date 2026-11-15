@@ -2,6 +2,10 @@ package com.journeygo.modules.providerchat.service;
 
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
+import com.journeygo.modules.booking.entity.Booking;
+import com.journeygo.modules.booking.entity.BookingPassenger;
+import com.journeygo.modules.booking.repository.BookingPassengerRepository;
+import com.journeygo.modules.booking.repository.BookingRepository;
 import com.journeygo.modules.providerchat.dto.request.SendProviderMessageRequest;
 import com.journeygo.modules.providerchat.dto.request.StartProviderConversationRequest;
 import com.journeygo.modules.providerchat.dto.response.ProviderConversationResponse;
@@ -26,13 +30,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Chat trực tiếp giữa du khách và NHÀ TOUR — KHÔNG cần đã mua tour.
+ * Chat giữa du khách và NHÀ TOUR — MỘT KÊNH LIÊN LẠC DUY NHẤT.
  *
- * <p>─── Vì sao cần module riêng? ───
- *  Chat hỗ trợ hiện có ({@code BookingMessage}) gắn với một Booking ⇒ chỉ dùng được
- *  SAU khi đặt tour. Yêu cầu mới: du khách xem chi tiết tour (chưa mua) vẫn nhắn
- *  được cho nhà tour ⇒ cần mô hình hội thoại độc lập Booking, khóa theo cặp
- *  (du khách, nhà tour) để gom lịch sử theo từng nhà tour.
+ * <p>─── Vì sao gộp? ───
+ *  Trước đây có hai hệ thống song song:
+ * <ul>
+ *   <li>{@code booking_messages} — khung "Hỗ trợ trong đơn này" (chỉ dùng được SAU khi đặt).</li>
+ *   <li>{@code provider_messages} — mục "Tin nhắn với nhà tour" (dùng được cả TRƯỚC khi đặt).</li>
+ * </ul>
+ *  Về bản chất đây là CÙNG MỘT kênh liên lạc giữa du khách và nhà tour của một tour ⇒
+ *  hội thoại được khóa theo cặp (du khách, nhà tour) và tin nhắn ghi thêm {@code booking_id}
+ *  khi được gửi trong khung hỗ trợ của một đơn cụ thể.
  *
  * <p>─── Quyền ───
  *  • Du khách: mở / xem / gửi tin trong cuộc trò chuyện của mình.
@@ -47,6 +55,8 @@ public class ProviderChatService {
     private final ProviderMessageRepository messageRepository;
     private final TourRepository tourRepository;
     private final UserRepository userRepository;
+    private final BookingRepository bookingRepository;
+    private final BookingPassengerRepository passengerRepository;
     private final com.journeygo.modules.realtime.service.RealtimeHub realtimeHub;
     private final com.journeygo.modules.notification.service.NotificationPublisher notifications;
 
@@ -56,7 +66,8 @@ public class ProviderChatService {
      * Lấy (hoặc tạo) cuộc trò chuyện giữa du khách và nhà tour.
      *
      * @param touristId du khách đang đăng nhập
-     * @param request   tourId (hoặc providerId) — xác định nhà tour cần liên hệ
+     * @param request   tourId (hoặc providerId) — xác định nhà tour cần liên hệ;
+     *                 bookingId (tùy chọn) — gắn hội thoại với đơn đặt tour
      */
     @Transactional
     public ProviderConversationResponse start(Long touristId, StartProviderConversationRequest request) {
@@ -91,6 +102,9 @@ public class ProviderChatService {
                     "Bạn không thể tự nhắn cho chính mình");
         }
 
+        // Đơn đặt tour (nếu có) — phải thuộc về du khách và có nhà tour tương ứng.
+        Booking booking = resolveBooking(request.bookingId(), touristId, providerId);
+
         ProviderConversation conversation = conversationRepository
                 .findByTouristIdAndProviderId(touristId, providerId)
                 .orElseGet(() -> {
@@ -98,6 +112,7 @@ public class ProviderChatService {
                             .touristId(touristId)
                             .providerId(providerId)
                             .tourId(tourId)
+                            .bookingId(booking != null ? booking.getId() : null)
                             .subject(tourTitle != null ? tourTitle : "Hỗ trợ từ nhà tour")
                             .build();
                     return conversationRepository.save(created);
@@ -109,13 +124,122 @@ public class ProviderChatService {
             if (tourTitle != null) {
                 conversation.setSubject(tourTitle);
             }
-            conversationRepository.save(conversation);
         }
+        // Gắn đơn đặt tour nếu có (khung "Hỗ trợ trong đơn này").
+        if (booking != null && !booking.getId().equals(conversation.getBookingId())) {
+            conversation.setBookingId(booking.getId());
+        }
+        conversationRepository.save(conversation);
 
         return toResponse(conversation, touristId);
     }
 
+    /**
+     * Tra cứu đơn đặt tour theo id và kiểm tra tính hợp lệ:
+     * đơn phải thuộc về du khách (người đặt hoặc hành khách được mời)
+     * và tour của đơn phải do {@code providerId} làm nhà tour.
+     */
+    private Booking resolveBooking(Long bookingId, Long touristId, Long providerId) {
+        if (bookingId == null) {
+            return null;
+        }
+        Booking booking = bookingRepository.findByIdWithRelations(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        Tour tour = booking.getTour();
+        Long ownerId = tour != null && tour.getCreatedBy() != null ? tour.getCreatedBy().getId() : null;
+        if (!providerId.equals(ownerId)) {
+            throw new AppException(ErrorCode.PROVIDER_CHAT_TARGET_REQUIRED,
+                    "Đơn này không thuộc nhà tour đang liên hệ");
+        }
+        // Người đặt / hành khách được mời, hoặc chính nhà tour của tour.
+        if (!canAccessBooking(booking, touristId) && !providerId.equals(touristId)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED,
+                    "Bạn không có quyền truy cập cuộc trò chuyện của đơn này");
+        }
+        return booking;
+    }
+
+    /** Người dùng có thuộc đơn (người đặt / hành khách được mời) không. */
+    private boolean canAccessBooking(Booking booking, Long userId) {
+        if (userId == null) return false;
+        if (booking.getTourist() != null && userId.equals(booking.getTourist().getId())) {
+            return true;
+        }
+        for (BookingPassenger p : passengerRepository
+                .findByBooking_IdOrderByCreatedAtAsc(booking.getId())) {
+            if (userId.equals(p.getLinkedUserId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ── Danh sách hội thoại ────────────────────────────────────────────────────
+
+    /**
+     * Lấy (hoặc tạo) hội thoại gắn với MỘT đơn đặt tour.
+     *
+     * <p>Dùng cho khung "Hỗ trợ trong đơn này" — trả về đúng hội thoại mà tab
+     * "Tin nhắn với nhà tour" đang hiển thị ⇒ hai nơi là MỘT kênh liên lạc.
+     *
+     * @param bookingId đơn đặt tour
+     * @param userId   người đang đăng nhập (người đặt / hành khách được mời / nhà tour)
+     */
+    @Transactional
+    public ProviderConversationResponse startForBooking(Long bookingId, Long userId) {
+        Booking booking = bookingRepository.findByIdWithRelations(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        Tour tour = booking.getTour();
+        if (tour == null || tour.getCreatedBy() == null) {
+            throw new AppException(ErrorCode.PROVIDER_CHAT_NO_PROVIDER,
+                    "Tour này chưa có nhà tour liên hệ");
+        }
+        Long providerId = tour.getCreatedBy().getId();
+
+        // Người gọi phải là du khách (người đặt / hành khách được mời) hoặc chính nhà tour.
+        boolean isTouristSide = canAccessBooking(booking, userId);
+        boolean isProviderSide = userId != null && userId.equals(providerId);
+        if (!isTouristSide && !isProviderSide) {
+            throw new AppException(ErrorCode.UNAUTHORIZED,
+                    "Bạn không có quyền truy cập cuộc trò chuyện của đơn này");
+        }
+
+        // Nhà tour mở khung chat từ phía đối tác ⇒ hội thoại vẫn do DU KHÁCH là chủ.
+        Long touristId = isProviderSide
+                ? (booking.getTourist() != null ? booking.getTourist().getId() : null)
+                : userId;
+        if (touristId == null) {
+            throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
+        }
+
+        ProviderConversation conversation = conversationRepository
+                .findByTouristIdAndProviderId(touristId, providerId)
+                .orElseGet(() -> {
+                    ProviderConversation created = ProviderConversation.builder()
+                            .touristId(touristId)
+                            .providerId(providerId)
+                            .tourId(tour.getTourId())
+                            .bookingId(booking.getId())
+                            .subject(tour.getTitle())
+                            .build();
+                    return conversationRepository.save(created);
+                });
+
+        if (!booking.getId().equals(conversation.getBookingId())) {
+            conversation.setBookingId(booking.getId());
+        }
+        if (conversation.getTourId() == null) {
+            conversation.setTourId(tour.getTourId());
+        }
+        if (conversation.getSubject() == null) {
+            conversation.setSubject(tour.getTitle());
+        }
+        conversationRepository.save(conversation);
+
+        return toResponse(conversation, userId);
+    }
 
     /** Danh sách cuộc trò chuyện của du khách ("Hỗ trợ từ nhà tour"). */
     @Transactional(readOnly = true)
@@ -159,16 +283,27 @@ public class ProviderChatService {
         return toResponses(messages);
     }
 
-    /** Ghép tên + ảnh bìa tour cho từng tin nhắn (lấy tour theo lô, không truy vấn lặp). */
+    /**
+     * Ghép họ tên người gửi + tên/ảnh bìa tour cho từng tin nhắn
+     * (lấy tour và user theo lô, không truy vấn lặp từng tin).
+     */
     private List<ProviderMessageResponse> toResponses(List<ProviderMessage> messages) {
         java.util.Set<Long> tourIds = messages.stream().map(ProviderMessage::getTourId)
                 .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
         java.util.Map<Long, Tour> tours = tourIds.isEmpty() ? java.util.Map.of()
                 : tourRepository.findAllById(tourIds).stream()
                         .collect(java.util.stream.Collectors.toMap(Tour::getTourId, t -> t));
+        java.util.Set<Long> senderIds = messages.stream().map(ProviderMessage::getSenderId)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        java.util.Map<Long, String> senderNames = senderIds.isEmpty() ? java.util.Map.of()
+                : userRepository.findAllById(senderIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(User::getId, User::getFullName));
         return messages.stream().map(m -> {
             Tour t = m.getTourId() == null ? null : tours.get(m.getTourId());
-            return ProviderMessageResponse.fromEntity(m, t == null ? null : t.getTitle(), t == null ? null : t.getCoverImageUrl());
+            return ProviderMessageResponse.fromEntity(m,
+                    senderNames.get(m.getSenderId()),
+                    t == null ? null : t.getTitle(),
+                    t == null ? null : t.getCoverImageUrl());
         }).toList();
     }
 
@@ -191,6 +326,12 @@ public class ProviderChatService {
         return tour;
     }
 
+    /** Tra cứu họ tên người gửi (null nếu không còn tài khoản). */
+    private String senderNameOf(Long userId) {
+        if (userId == null) return null;
+        return userRepository.findById(userId).map(User::getFullName).orElse(null);
+    }
+
     /** Gửi tin nhắn mới trong cuộc trò chuyện. */
     @Transactional
     public ProviderMessageResponse send(Long conversationId, Long senderId, SendProviderMessageRequest request) {
@@ -202,12 +343,38 @@ public class ProviderChatService {
             throw new AppException(ErrorCode.BOOKING_MESSAGE_EMPTY);
         }
 
+        // ── Gắn tin nhắn vào tour và (nếu có) vào đơn đặt tour ──
+        // Tin nhắn gửi trong khung "Hỗ trợ trong đơn này" ⇒ gắn bookingId.
+        // Tin nhắn gửi từ tab "Tin nhắn với nhà tour" ⇒ giữ bookingId của hội thoại (nếu có).
+        Long bookingId = request.bookingId() != null ? request.bookingId() : conversation.getBookingId();
+        if (bookingId != null) {
+            Booking booking = bookingRepository.findByIdWithRelations(bookingId)
+                    .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+            Tour tour = booking.getTour();
+            Long ownerId = tour != null && tour.getCreatedBy() != null ? tour.getCreatedBy().getId() : null;
+            if (!conversation.getProviderId().equals(ownerId)) {
+                throw new AppException(ErrorCode.PROVIDER_CHAT_TARGET_REQUIRED,
+                        "Đơn này không thuộc nhà tour của cuộc trò chuyện");
+            }
+            if (!canAccessBooking(booking, senderId)
+                    && !conversation.getProviderId().equals(senderId)) {
+                throw new AppException(ErrorCode.UNAUTHORIZED,
+                        "Bạn không có quyền nhắn tin trong đơn này");
+            }
+            // Ghi nhớ đơn trên hội thoại để hiển thị "Đơn #MÃ" ở danh sách tin nhắn.
+            if (!bookingId.equals(conversation.getBookingId())) {
+                conversation.setBookingId(bookingId);
+                conversationRepository.save(conversation);
+            }
+        }
+
         Tour tour = resolveMessageTour(conversation, request.tourId());
         ProviderMessage message = ProviderMessage.builder()
                 .conversation(conversation)
                 .senderId(senderId)
                 .body(body)
                 .tourId(tour == null ? null : tour.getTourId())
+                .bookingId(bookingId)
                 .build();
         messageRepository.save(message);
 
@@ -215,7 +382,9 @@ public class ProviderChatService {
         conversationRepository.save(conversation);
 
         ProviderMessageResponse response = ProviderMessageResponse.fromEntity(message,
-                tour == null ? null : tour.getTitle(), tour == null ? null : tour.getCoverImageUrl());
+                senderNameOf(senderId),
+                tour == null ? null : tour.getTitle(),
+                tour == null ? null : tour.getCoverImageUrl());
         pushRealtime(conversation, response, senderId);
         return response;
     }
@@ -238,6 +407,7 @@ public class ProviderChatService {
                 "type", com.journeygo.modules.realtime.service.RealtimeHub.TYPE_CHAT_MESSAGE,
                 "scope", "PROVIDER_CHAT",
                 "conversationId", conversation.getId(),
+                "bookingId", conversation.getBookingId() == null ? 0L : conversation.getBookingId(),
                 "senderId", senderId,
                 "senderName", senderName,
                 "body", response.body(),
@@ -292,6 +462,12 @@ public class ProviderChatService {
             tourTitle = tourRepository.findByTourId(c.getTourId()).map(Tour::getTitle).orElse(null);
         }
 
+        String bookingCode = null;
+        if (c.getBookingId() != null) {
+            bookingCode = bookingRepository.findById(c.getBookingId())
+                    .map(Booking::getBookingCode).orElse(null);
+        }
+
         List<ProviderMessage> messages = messageRepository
                 .findByConversation_IdOrderByCreatedAtAsc(c.getId());
         String lastMessage = messages.isEmpty()
@@ -303,7 +479,7 @@ public class ProviderChatService {
                 .count();
 
         return ProviderConversationResponse.fromEntity(
-                c, touristName, providerName, tourTitle, lastMessage, unread);
+                c, touristName, providerName, tourTitle, bookingCode, lastMessage, unread);
     }
 
     /** Danh sách cuộc trò chuyện của du khách, sắp xếp theo tin nhắn mới nhất. */
