@@ -17,6 +17,13 @@
 import { apiClient } from "@/services/apiClient";
 
 const data = (res) => (res && Object.prototype.hasOwnProperty.call(res, "data") ? res.data : res);
+
+/**
+ * Tóm tắt tour đã thấy trong danh sách (ảnh bìa, tên…). Trang chi tiết dùng để hiện ngay ảnh lớn
+ * khi chuyển trang ⇒ hiệu ứng ảnh thẻ phóng thành ảnh lớn chạy được trước khi dữ liệu đầy đủ về.
+ */
+const previewCache = new Map();
+export const getTourPreview = (tourId) => previewCache.get(String(tourId)) || null;
 const list = (payload) => (Array.isArray(payload) ? payload : Array.isArray(payload?.content) ? payload.content : []);
 
 export const touristService = {
@@ -31,6 +38,7 @@ export const touristService = {
     // Chỉ hiện tour còn ngày khởi hành sắp tới (đặt được). Tour luồng cũ / hết lịch không có
     // nextDepartureDate ⇒ ẩn khỏi trang du khách.
     const items = list(payload).filter((t) => t.nextDepartureDate);
+    items.forEach((t) => previewCache.set(String(t.tourId), t));
     return { items, total: items.length };
   },
   async tourDetail(tourId) {
@@ -116,8 +124,9 @@ export const touristService = {
   async messages(conversationId) {
     return list(data(await apiClient.get(`/provider-chat/conversations/${conversationId}/messages`)));
   },
-  async sendMessage(conversationId, body) {
-    return data(await apiClient.post(`/provider-chat/conversations/${conversationId}/messages`, { body }));
+  /** tourId: tour mà tin nhắn hỏi về (backend ghi lên tin nhắn để hiện thẻ tour trong khung chat). */
+  async sendMessage(conversationId, body, tourId) {
+    return data(await apiClient.post(`/provider-chat/conversations/${conversationId}/messages`, { body, tourId: tourId ? Number(tourId) : null }));
   },
 
   // ── Điểm thưởng & voucher (chỉ xem) ─────────────────────────────────────────
