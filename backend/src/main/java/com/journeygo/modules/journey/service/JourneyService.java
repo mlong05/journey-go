@@ -1,6 +1,10 @@
 package com.journeygo.modules.journey.service;
 
+import com.journeygo.modules.achievement.event.DestinationCheckedInEvent;
+import com.journeygo.modules.achievement.event.TaskCompletedEvent;
+import com.journeygo.modules.achievement.event.TourCompletedEvent;
 import com.journeygo.modules.booking.service.BookingService;
+import org.springframework.context.ApplicationEventPublisher;
 import com.journeygo.modules.experience.entity.enums.CheckInVerificationMethod;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
@@ -46,6 +50,7 @@ public class JourneyService {
     private final GamificationService gamificationService;
     private final BookingService bookingService;
     private final TourService tourService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * CHỈ DÙNG KHI DEV: bỏ kiểm tra khoảng cách GPS (check-in trạm, mở câu hỏi theo vị trí) để thử hành trình
@@ -261,6 +266,19 @@ public class JourneyService {
         }
 
         destinationProgressRepository.save(destProgress);
+        if (eventPublisher != null) {
+            boolean isEarlyBird = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+                    .getHour() < 6;
+            boolean hasSpecialExp = currentDestInfo.tasks() != null && !currentDestInfo.tasks().isEmpty();
+            eventPublisher.publishEvent(new DestinationCheckedInEvent(
+                    userId,
+                    destinationId,
+                    journeyId,
+                    destProgress.getCheckedInAt(),
+                    isEarlyBird,
+                    hasSpecialExp
+            ));
+        }
         finishDestinationIfDone(journey, destProgress, userId);
         journeyRepository.save(journey);
         log.info("Check-in thành công: user={}, journey={}, dest={}", userId, journeyId, destinationId);
@@ -512,6 +530,19 @@ public class JourneyService {
             );
         }
         destProgress.setTasksCompleted(destProgress.getTasksCompleted() + 1);
+        if (eventPublisher != null) {
+            boolean isPerfect = Boolean.TRUE.equals(taskProgress.getIsCorrect());
+            boolean hasSpecialReward = points >= 50;
+            eventPublisher.publishEvent(new TaskCompletedEvent(
+                    userId,
+                    journeyId,
+                    task.taskType(),
+                    true,
+                    isPerfect,
+                    100.0,
+                    hasSpecialReward
+            ));
+        }
     }
 
     /** Một lần làm không đạt: không có điểm; hết lượt thì nhiệm vụ thất bại. */
@@ -521,6 +552,17 @@ public class JourneyService {
         if (taskProgress.getAttempts() >= max) {
             taskProgress.setStatus(TaskProgressStatus.FAILED);
             log.info("Du khách {} hết lượt làm nhiệm vụ {} (journey {})", userId, taskId, journeyId);
+        }
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new TaskCompletedEvent(
+                    userId,
+                    journeyId,
+                    null,
+                    false,
+                    false,
+                    0.0,
+                    false
+            ));
         }
     }
 
@@ -605,6 +647,17 @@ public class JourneyService {
                     "TOUR_COMPLETION_" + journey.getId(),
                     "Thưởng hoàn thành trọn vẹn hành trình " + journey.getTourName()
             );
+        }
+
+        if (eventPublisher != null) {
+            List<Long> destinationIds = journey.getDestinations() != null
+                    ? journey.getDestinations().stream()
+                        .map(JourneyDestinationProgress::getDestinationId)
+                        .filter(java.util.Objects::nonNull)
+                        .distinct()
+                        .toList()
+                    : List.of();
+            eventPublisher.publishEvent(new TourCompletedEvent(userId, journey.getId(), journey.getTourId(), destinationIds));
         }
     }
 

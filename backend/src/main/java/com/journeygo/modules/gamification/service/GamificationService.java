@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import com.journeygo.modules.achievement.event.PointsEarnedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -43,6 +45,7 @@ public class GamificationService {
     private final PointTransactionRepository pointTransactionRepository;
     private final VoucherRepository voucherRepository;
     private final UserVoucherRepository userVoucherRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ── BADGE OPERATIONS ────────────────────────────────────────────────────────
 
@@ -185,6 +188,9 @@ public class GamificationService {
 
         pointTransactionRepository.save(tx);
         log.info("Cộng {} điểm cho user {}, số dư mới: {}", amount, userId, point.getCurrentBalance());
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new PointsEarnedEvent(userId, point.getLifetimeEarned()));
+        }
         return point;
     }
 
