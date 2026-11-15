@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  * <p>UC-04 — "Backend kiểm tra kết quả tiếp theo qua cơ chế truy vấn hoặc thông báo mà VNPay hỗ trợ."
  *
  * <p>Nguyên tắc: KHÔNG tự động gửi lại yêu cầu hoàn tiền và KHÔNG tự động chuyển sang phương
- * thức thủ công. Nếu chưa xác minh được kết quả → giữ {@code REFUND_PROCESSING}.
+ * thức thủ công. Nếu chưa xác minh được kết quả → giữ {@code VNPAY_PROCESSING}.
  */
 @Slf4j
 @Component
@@ -59,7 +59,13 @@ public class RefundStatusScheduler {
     public void refreshPendingRefunds() {
         try {
             List<RefundRequest> pending = refundRepository.findByStatusAndMethod(
-                    RefundStatus.REFUND_PROCESSING, RefundMethod.VNPAY_API);
+                    RefundStatus.VNPAY_PROCESSING, RefundMethod.VNPAY_API);
+            if (pending.isEmpty()) {
+                // Yêu cầu cũ đang ở trạng thái REFUND_PROCESSING (trước khi tách trạng thái)
+                // vẫn được quét để không bỏ sót ⇒ tránh kẹt vĩnh viễn.
+                pending = refundRepository.findByStatusAndMethod(
+                        RefundStatus.REFUND_PROCESSING, RefundMethod.VNPAY_API);
+            }
             if (pending.isEmpty()) {
                 return;
             }
