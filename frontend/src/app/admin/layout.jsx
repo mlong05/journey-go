@@ -15,6 +15,8 @@ import {
   UserCog,
   Sparkles,
   Medal,
+  RotateCcw,
+  FileText,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -95,6 +97,20 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
+    id: "refunds",
+    label: "Yêu cầu hoàn tiền",
+    href: "/admin/refunds",
+    icon: FileText,
+    badge: null,
+  },
+  {
+    id: "refund-reasons",
+    label: "Cấu hình lý do hoàn tiền",
+    href: "/admin/refund-reasons",
+    icon: RotateCcw,
+    badge: null,
+  },
+  {
     id: "settlements",
     label: "Tất toán doanh thu",
     href: "/admin/settlements",
@@ -147,6 +163,8 @@ export default function AdminLayout({ children }) {
     pathname?.startsWith("/admin/regions") ||
     pathname?.startsWith("/admin/themes") ||
     pathname?.startsWith("/admin/finance") ||
+    pathname?.startsWith("/admin/refunds") ||
+    pathname?.startsWith("/admin/refund-reasons") ||
     pathname?.startsWith("/admin/settlements");
 
   // Xử lý tìm kiếm nhanh từ Topbar
