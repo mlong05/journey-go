@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import { Users } from "lucide-react";
 import { Field, TextArea, NumberInput, MoneyInput } from "../FormKit";
 import { issueFor } from "../../hooks/useTourDraft";
-import { GUEST_TYPES } from "../../constants";
+import { GUEST_TYPES, LIMITS } from "../../constants";
+import { useGuestTypes } from "@/lib/guestTypes";
 
 /** Tour chưa cấu hình giá: API vẫn trả đủ 4 loại khách với price = null. */
 const DEFAULT_COUNTS_SLOT = { ADULT: true, CHILD: true, TODDLER: false, INFANT: false };
@@ -16,7 +17,7 @@ const fromTour = (tour) => {
       const p = (tour.prices || []).find((x) => x.guestType === g.key);
       return {
         guestType: g.key,
-        price: g.alwaysFree ? 0 : p?.price ?? null,
+        price: p?.price ?? (g.alwaysFree ? 0 : null),
         // Lần đầu (chưa nhập giá nào): Người lớn + Trẻ em mặc định tính slot.
         countsTowardSlot: configured ? !!p?.countsTowardSlot : DEFAULT_COUNTS_SLOT[g.key],
       };
@@ -31,6 +32,7 @@ const POLICY_SAMPLE =
   "Tour bị hủy do thời tiết hoặc di tích đóng cửa hoàn 100%.";
 
 export default function PricingStep({ tour, issues, readOnly, isLive, onSave }) {
+  const guestTypes = useGuestTypes();
   const [form, setForm] = useState(() => fromTour(tour));
 
   const update = (patch) => {
@@ -63,7 +65,7 @@ export default function PricingStep({ tour, issues, readOnly, isLive, onSave }) 
             <span className="col-span-4">Giá tiền</span>
             <span className="col-span-2 text-center">Tính slot</span>
           </div>
-          {GUEST_TYPES.map((g) => {
+          {guestTypes.map((g) => {
             const p = form.prices.find((x) => x.guestType === g.key);
             const e = err(`prices.${g.key}`);
             return (
@@ -101,7 +103,7 @@ export default function PricingStep({ tour, issues, readOnly, isLive, onSave }) 
       </Field>
 
       <Field label="Chính sách hủy" required error={err("cancellationPolicy")}>
-        <TextArea rows={4} value={form.cancellationPolicy} disabled={readOnly} placeholder={POLICY_SAMPLE}
+        <TextArea rows={4} value={form.cancellationPolicy} limit={LIMITS.TEXT.CANCELLATION} disabled={readOnly} placeholder={POLICY_SAMPLE}
           error={err("cancellationPolicy")} onChange={(e) => update({ cancellationPolicy: e.target.value })} />
         {!readOnly && !form.cancellationPolicy && (
           <button type="button" onClick={() => update({ cancellationPolicy: POLICY_SAMPLE })}

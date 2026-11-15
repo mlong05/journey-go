@@ -17,6 +17,7 @@ import {
   Medal,
   RotateCcw,
   FileText,
+  UsersRound,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -73,6 +74,13 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình chủ đề",
     href: "/admin/themes",
     icon: Tags,
+    badge: null,
+  },
+  {
+    id: "guest-types",
+    label: "Cấu hình loại khách & độ tuổi",
+    href: "/admin/guest-types",
+    icon: UsersRound,
     badge: null,
   },
   {

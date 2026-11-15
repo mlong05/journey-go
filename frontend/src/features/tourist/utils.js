@@ -50,13 +50,11 @@ export const todayIso = () => {
 export const normalize = (s) =>
   String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d").toLowerCase();
 
-/** Loại khách theo backend (GuestType). */
-export const GUEST_TYPES = [
-  { type: "ADULT", label: "Người lớn", age: "12 tuổi trở lên", min: 12, max: 200 },
-  { type: "CHILD", label: "Trẻ em", age: "5 – 11 tuổi", min: 5, max: 11 },
-  { type: "TODDLER", label: "Trẻ nhỏ", age: "2 – 4 tuổi", min: 2, max: 4 },
-  { type: "INFANT", label: "Em bé", age: "Dưới 2 tuổi", min: 0, max: 1 },
-];
+/**
+ * Mã loại khách (thứ tự Người lớn → Em bé). Tên và độ tuổi do Admin cấu hình — dùng useGuestTypes()
+ * (@/lib/guestTypes) khi cần hiển thị hoặc kiểm tra tuổi; mảng này chỉ là giá trị mặc định.
+ */
+export { DEFAULT_GUEST_TYPES as GUEST_TYPES } from "@/lib/guestTypes";
 
 /** Tuổi tròn tại một ngày (cả hai dạng yyyy-MM-dd). */
 export function ageAt(birthIso, onIso) {

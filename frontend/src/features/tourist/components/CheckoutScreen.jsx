@@ -12,6 +12,8 @@ import RequireTourist from "./RequireTourist";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { GUEST_TYPES, ageAt, durationLabel, longDate, vnd } from "../utils";
+import { LimitedField } from "@/components/ui/LimitedField";
+import { useGuestTypes } from "@/lib/guestTypes";
 
 const GENDERS = [["MALE", "Nam"], ["FEMALE", "Nữ"], ["OTHER", "Khác"]];
 const input = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 aria-[invalid=true]:border-rose-400";
@@ -28,12 +30,12 @@ function buildPassengers(params, user) {
   return list;
 }
 
-function validate(passengers, date) {
+function validate(passengers, date, guestTypes) {
   const errors = passengers.map(() => ({}));
   const seen = new Map();
   passengers.forEach((p, i) => {
     const e = errors[i];
-    const meta = GUEST_TYPES.find((g) => g.type === p.guestType);
+    const meta = guestTypes.find((g) => g.type === p.guestType);
     if (!p.fullName.trim()) e.fullName = "Nhập họ và tên";
     if (!p.gender) e.gender = "Chọn giới tính";
     if (!p.birthDate) e.birthDate = "Nhập ngày sinh";
@@ -53,6 +55,7 @@ function validate(passengers, date) {
 
 function CheckoutForm({ tourId }) {
   const params = useSearchParams();
+  const guestTypes = useGuestTypes();
   const { user } = useTouristSession();
   const date = params.get("date") || "";
   const [tour, setTour] = useState(null);
@@ -76,7 +79,7 @@ function CheckoutForm({ tourId }) {
     return p?.alwaysFree ? 0 : Number(p?.price || 0);
   };
   const total = passengers.reduce((s, p) => s + priceOf(p.guestType), 0);
-  const errors = useMemo(() => validate(passengers, date), [passengers, date]);
+  const errors = useMemo(() => validate(passengers, date, guestTypes), [passengers, date, guestTypes]);
   const hasErrors = errors.some((e) => Object.keys(e).length);
   const set = (i, patch) => setPassengers((list) => list.map((p, j) => (j === i ? { ...p, ...patch } : p)));
 
@@ -131,7 +134,7 @@ function CheckoutForm({ tourId }) {
       <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-4">
           {passengers.map((p, i) => {
-            const meta = GUEST_TYPES.find((g) => g.type === p.guestType);
+            const meta = guestTypes.find((g) => g.type === p.guestType);
             typeIndex[p.guestType] = (typeIndex[p.guestType] || 0) + 1;
             const err = touched ? errors[i] : {};
             const id = (f) => `p${i}-${f}`;
@@ -147,7 +150,7 @@ function CheckoutForm({ tourId }) {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <label htmlFor={id("name")} className="mb-1 block text-xs font-bold text-slate-600">Họ và tên</label>
-                    <input id={id("name")} className={input} value={p.fullName} onChange={(e) => set(i, { fullName: e.target.value })} aria-invalid={Boolean(err.fullName)} autoComplete={p.isBooker ? "name" : "off"} maxLength={200} />
+                    <LimitedField as="input" limit={200} id={id("name")} className={input} value={p.fullName} onChange={(e) => set(i, { fullName: e.target.value })} aria-invalid={Boolean(err.fullName)} autoComplete={p.isBooker ? "name" : "off"} />
                     {err.fullName && <p className="mt-1 text-xs font-semibold text-rose-600">{err.fullName}</p>}
                   </div>
                   <div>
@@ -177,7 +180,7 @@ function CheckoutForm({ tourId }) {
           })}
           <div className="rounded-3xl border border-slate-200 bg-white p-5">
             <label htmlFor="booking-note" className="mb-1 block text-sm font-bold text-slate-800">Ghi chú cho đối tác <span className="font-normal text-slate-400">(không bắt buộc)</span></label>
-            <textarea id="booking-note" rows={3} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ví dụ: nhóm có người lớn tuổi, cần đi chậm"
+            <LimitedField as="textarea" limit={1000} id="booking-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ví dụ: nhóm có người lớn tuổi, cần đi chậm"
               className={`${input} resize-none`} />
           </div>
         </div>
@@ -189,7 +192,7 @@ function CheckoutForm({ tourId }) {
               <h2 className="font-bold leading-snug text-slate-900">{tour.title}</h2>
               <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-600"><CalendarDays size={14} />{longDate(date)} · {durationLabel(tour)}</p>
               <ul className="mt-4 space-y-1.5 border-t border-dashed border-slate-200 pt-4 text-sm">
-                {GUEST_TYPES.map(({ type, label }) => {
+                {guestTypes.map(({ type, label }) => {
                   const n = passengers.filter((p) => p.guestType === type).length;
                   return n ? (
                     <li key={type} className="flex justify-between text-slate-700"><span>{label} × {n}</span><span className="tabular-nums">{vnd(priceOf(type) * n)}</span></li>
