@@ -162,7 +162,10 @@ public enum ErrorCode {
     BOOKING_TOUR_LOCKED("Tour chỉ mở từ ngày trải nghiệm — chưa thể bắt đầu hành trình", HttpStatus.CONFLICT),
     PROVIDER_CHAT_CONVERSATION_NOT_FOUND("Cuộc trò chuyện không tồn tại", HttpStatus.NOT_FOUND),
     PROVIDER_CHAT_TARGET_REQUIRED("Cần chọn tour hoặc nhà tour để bắt đầu trò chuyện", HttpStatus.BAD_REQUEST),
-    PROVIDER_CHAT_NO_PROVIDER("Tour này chưa có nhà tour liên hệ", HttpStatus.BAD_REQUEST);
+    PROVIDER_CHAT_NO_PROVIDER("Tour này chưa có nhà tour liên hệ", HttpStatus.BAD_REQUEST),
+    ACHIEVEMENT_NOT_FOUND("Thành tựu không tồn tại", HttpStatus.NOT_FOUND),
+    ACHIEVEMENT_NOT_CLAIMABLE("Thành tựu chưa đủ điều kiện hoặc đã được nhận thưởng", HttpStatus.BAD_REQUEST),
+    ACHIEVEMENT_CODE_EXISTED("Mã thành tựu này đã tồn tại trong hệ thống", HttpStatus.CONFLICT);
 
     private final String message;
     private final HttpStatus httpStatus;
