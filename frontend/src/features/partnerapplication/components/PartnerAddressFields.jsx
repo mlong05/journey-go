@@ -19,11 +19,25 @@
  *
  * ── Cấp phường/xã chỉ bật khi tỉnh đã chọn ──
  *  Tránh gửi tỉnh và phường lạc nhau.
+ *
+ * ── Ô gõ + gợi ý (HTML5 datalist) ──
+ *  Vừa gõ vừa lọc thay cho dropdown dài. Mỗi gợi ý có nhãn không dấu nên gõ "phu my" vẫn ra
+ *  "Phường Phú Mỹ". Chỉ nhận tên có trong danh sách (so khớp không phân biệt hoa thường / dấu);
+ *  gõ tên lạ thì báo lỗi khi rời ô và không gửi tên đó ra ngoài.
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import { Loader2, MapPin, TriangleAlert } from "lucide-react";
 import partnerAddressService from "../services/partnerAddressService";
-import { ACCENTS, Select, labelCls } from "./PartnerFormKit";
+import { ACCENTS, TextInput, labelCls } from "./PartnerFormKit";
+
+const norm = (s) => partnerAddressService.normalizeForSearch(s).replace(/\s+/g, " ");
+
+/** Tìm đơn vị khớp chính xác với chữ đã gõ — theo nhãn đầy đủ ("Phường Ba Đình") hoặc tên ("Ba Đình"). */
+function findUnit(list, text) {
+  const k = norm(text);
+  if (!k) return null;
+  return list.find((u) => norm(buildLabel(u)) === k) || list.find((u) => norm(u.name) === k) || null;
+}
 
 /**
  * Ghép loại + tên thành nhãn hiển thị, tránh lặp khi tên đã chứa sẵn loại.
@@ -87,6 +101,14 @@ export default function PartnerAddressFields({
   // Mã đang chọn (mã, không phải tên)
   const [provinceCode, setProvinceCode] = useState("");
   const [wardCode, setWardCode] = useState("");
+  // Chữ đang gõ (null = hiện tên của mục đã chọn) + lỗi "không có trong danh sách"
+  const [provText, setProvText] = useState(null);
+  const [wardText, setWardText] = useState(null);
+  const [provPickErr, setProvPickErr] = useState("");
+  const [wardPickErr, setWardPickErr] = useState("");
+  const uid = useId();
+  const provListId = `${uid}-provinces`;
+  const wardListId = `${uid}-wards`;
 
   // ── 1. Tỉnh / Thành phố ───────────────────────────────────────────────────
   useEffect(() => {
@@ -158,8 +180,44 @@ export default function PartnerAddressFields({
   const handleProvince = (code) => {
     setProvinceCode(code);
     setWardCode("");
+    setWardText(null);
+    setWardPickErr("");
     emit({ province: labelOf(provinces, code), ward: "" });
   };
+
+  // Gõ vào ô Tỉnh: khớp đúng một tỉnh thì chọn luôn; chưa khớp thì bỏ lựa chọn cũ.
+  const typeProvince = (text) => {
+    setProvText(text);
+    setProvPickErr("");
+    const m = findUnit(provinces, text);
+    if (m) {
+      setProvText(null);
+      if (m.code !== provinceCode) handleProvince(m.code);
+    } else if (provinceCode || value.province) {
+      setProvinceCode("");
+      setWardCode("");
+      setWardText(null);
+      emit({ province: "", ward: "" });
+    }
+  };
+
+  const typeWard = (text) => {
+    setWardText(text);
+    setWardPickErr("");
+    const m = findUnit(wards, text);
+    if (m) {
+      setWardText(null);
+      if (m.code !== wardCode) handleWard(m.code);
+    } else if (wardCode || value.ward) {
+      setWardCode("");
+      emit({ province: labelOf(provinces, provinceCode), ward: "" });
+    }
+  };
+
+  const provDisplay = provText ?? (labelOf(provinces, provinceCode) || value.province || "");
+  const wardDisplay = wardText ?? (labelOf(wards, wardCode) || value.ward || "");
+  const provError = provPickErr || errors.province;
+  const wardError = wardPickErr || errors.ward;
 
   const handleWard = (code) => {
     setWardCode(code);
@@ -189,23 +247,24 @@ export default function PartnerAddressFields({
           <SubLabel loading={provLoading} accent={accent}>
             Tỉnh / Thành phố
           </SubLabel>
-          <Select
-            value={provinceCode}
+          <TextInput
+            list={provListId}
+            value={provDisplay}
             accent={accent}
             disabled={disabled || provLoading}
-            onChange={(e) => handleProvince(e.target.value)}
-            error={errors.province}
-          >
-            <option value="">
-              {provLoading ? "Đang tải..." : "-- Chọn Tỉnh/Thành phố --"}
-            </option>
+            autoComplete="off"
+            aria-invalid={Boolean(provError)}
+            placeholder={provLoading ? "Đang tải..." : "Gõ để tìm Tỉnh/Thành phố"}
+            onChange={(e) => typeProvince(e.target.value)}
+            onBlur={() => { if (provText && !findUnit(provinces, provText)) setProvPickErr("Chọn Tỉnh/Thành phố trong danh sách gợi ý"); }}
+            error={provError}
+          />
+          <datalist id={provListId}>
             {provinces.map((p) => (
-              <option key={p.code} value={p.code}>
-                {buildLabel(p)}
-              </option>
+              <option key={p.code} value={buildLabel(p)} label={norm(buildLabel(p))} />
             ))}
-          </Select>
-          <AddressFieldError>{errors.province}</AddressFieldError>
+          </datalist>
+          <AddressFieldError>{provError}</AddressFieldError>
         </div>
 
         {/* Phường / Xã */}
@@ -213,27 +272,24 @@ export default function PartnerAddressFields({
           <SubLabel loading={wardLoading} accent={accent}>
             Phường / Xã
           </SubLabel>
-          <Select
-            value={wardCode}
+          <TextInput
+            list={wardListId}
+            value={wardDisplay}
             accent={accent}
             disabled={disabled || !provinceCode || wardLoading}
-            onChange={(e) => handleWard(e.target.value)}
-            error={errors.ward}
-          >
-            <option value="">
-              {!provinceCode
-                ? "Chọn Tỉnh/Thành phố trước"
-                : wardLoading
-                ? "Đang tải..."
-                : "-- Chọn Phường/Xã --"}
-            </option>
+            autoComplete="off"
+            aria-invalid={Boolean(wardError)}
+            placeholder={!provinceCode ? "Chọn Tỉnh/Thành phố trước" : wardLoading ? "Đang tải..." : "Gõ để tìm Phường/Xã"}
+            onChange={(e) => typeWard(e.target.value)}
+            onBlur={() => { if (wardText && !findUnit(wards, wardText)) setWardPickErr("Chọn Phường/Xã trong danh sách gợi ý"); }}
+            error={wardError}
+          />
+          <datalist id={wardListId}>
             {wards.map((w) => (
-              <option key={w.code} value={w.code}>
-                {buildLabel(w)}
-              </option>
+              <option key={w.code} value={buildLabel(w)} label={norm(buildLabel(w))} />
             ))}
-          </Select>
-          <AddressFieldError>{errors.ward}</AddressFieldError>
+          </datalist>
+          <AddressFieldError>{wardError}</AddressFieldError>
         </div>
       </div>
     </div>
