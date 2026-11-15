@@ -28,6 +28,7 @@ export const CONTENT_EDITABLE = ["DRAFT", "CHANGES_REQUESTED"];
 /** Đối tác được sửa giá / lịch (bước 2, 4) ở các trạng thái này (BR-05). */
 export const PRICING_EDITABLE = ["DRAFT", "CHANGES_REQUESTED", "PUBLISHED"];
 
+/** Mã loại khách + giá trị mặc định. Tên / độ tuổi / miễn phí do Admin cấu hình — hiển thị dùng useGuestTypes(). */
 export const GUEST_TYPES = [
   { key: "ADULT", label: "Người lớn", age: "12 tuổi trở lên" },
   { key: "CHILD", label: "Trẻ em", age: "5 – 11 tuổi" },
@@ -57,6 +58,28 @@ export const LIMITS = {
   RADIUS_DEFAULT: 50,
   IMAGE_MAX_BYTES: 10 * 1024 * 1024,
   VIDEO_MAX_BYTES: 100 * 1024 * 1024,
+  /** Số ký tự tối đa của từng ô chữ (giao diện). Backend cho phép dài hơn để tour cũ vẫn lưu được. */
+  TEXT: {
+    TITLE: 80,
+    DESCRIPTION: 1000,
+    HIGHLIGHT: 150,
+    NOTICE: 1000,          // Giá bao gồm / không bao gồm / bất khả kháng / hoàn tiền
+    CONTACT: 300,
+    CANCELLATION: 1000,
+    DAY_TITLE: 100,
+    DAY_ACTIVITY: 200,
+    DAY_CONTENT: 1500,
+    STOP_NAME: 100,
+    STOP_SHORT: 500,
+    STOP_NOTE: 500,
+    CULTURE: 5000,
+    ARTIFACT_NAME: 100,
+    ARTIFACT_DESC: 500,
+    QUESTION: 300,
+    ANSWER: 200,
+    REFERENCE_ANSWER: 500,
+    ACTIVITY_NAME: 150,
+  },
 };
 
 export const BANNED_TITLE_WORDS = ["rẻ nhất", "độc quyền", "tốt nhất", "số 1", "số một"];
@@ -94,9 +117,9 @@ export const STEP_LABEL = {
 
 /** Bước 1 — "Những thông tin cần lưu ý" (không bắt buộc), hiển thị dạng mục xổ xuống cho khách. */
 export const NOTICE_SECTIONS = [
-  { key: "priceIncludes", label: "Giá tour bao gồm", max: 5000 },
-  { key: "priceExcludes", label: "Giá tour không bao gồm", max: 5000 },
-  { key: "forceMajeure", label: "Trường hợp bất khả kháng", max: 5000 },
-  { key: "refundPolicy", label: "Chính sách hỗ trợ hoàn tiền", max: 5000 },
-  { key: "contactInfo", label: "Liên hệ", max: 2000 },
+  { key: "priceIncludes", label: "Giá tour bao gồm", max: 1000 },
+  { key: "priceExcludes", label: "Giá tour không bao gồm", max: 1000 },
+  { key: "forceMajeure", label: "Trường hợp bất khả kháng", max: 1000 },
+  { key: "refundPolicy", label: "Chính sách hỗ trợ hoàn tiền", max: 1000 },
+  { key: "contactInfo", label: "Liên hệ", max: 300 },
 ];

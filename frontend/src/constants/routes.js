@@ -25,7 +25,7 @@ export const ROUTES = {
   TRIP_DETAIL: (id) => `/trips/${id}`,
   /** Tài khoản du khách: hồ sơ + đổi mật khẩu. */
   ACCOUNT: "/account",
-  ACCOUNT_REFUNDS: "/account/refunds",
+  ACCOUNT_REFUNDS: "/trips?tab=refunds",
   /** Nhắn tin với nhà tour: /account/messages?c={conversationId} */
   ACCOUNT_MESSAGES: "/account/messages",
   ACCOUNT_REWARDS: "/account/rewards",
@@ -42,6 +42,7 @@ export const ROUTES = {
   ADMIN_PARTNER_PROFILE_UPDATES: "/admin/partner-profile-updates",
   /** Admin — quản lý chính sách hoa hồng. */
   ADMIN_COMMISSION_POLICIES: "/admin/commission-policies",
+  ADMIN_GUEST_TYPES: "/admin/guest-types",
   /** Thiết lập mật khẩu lần đầu cho đối tác (link trong email duyệt). */
   ACTIVATE: "/activate",
 
