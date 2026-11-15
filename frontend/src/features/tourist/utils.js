@@ -74,19 +74,66 @@ export const BOOKING_STATUS = {
   EXPIRED: { label: "Hết hạn thanh toán", cls: "bg-rose-50 text-rose-700 border-rose-200" },
 };
 
+/**
+ * Trạng thái yêu cầu hoàn tiền — KHỚP enum `RefundStatus` ở backend.
+ *
+ * ⚠️ Backend đã TÁCH trạng thái "đang xử lý" theo phương thức hoàn:
+ *   • VNPAY_PROCESSING        — đã gửi yêu cầu tới VNPay, đang chờ VNPay xác nhận
+ *   • MANUAL_TRANSFER_PENDING — đã chốt chuyển khoản thủ công, chờ admin chuyển tiền
+ * Một yêu cầu chỉ có MỘT phương thức tại một thời điểm.
+ *
+ * ⚠️ `REFUND_PROCESSING` là trạng thái LỊCH SỬ (đã migrate hết) — chỉ còn trong
+ * dòng nhật ký kiểm toán cũ (append-only) ⇒ giữ nhãn riêng để đọc được,
+ * KHÔNG đưa vào bộ lọc trạng thái.
+ */
 export const REFUND_STATUS = {
   PENDING_REVIEW: { label: "Chờ xét duyệt", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  APPROVED: { label: "Đã duyệt, chờ hoàn", cls: "bg-sky-50 text-sky-700 border-sky-200" },
-  REFUND_PROCESSING: { label: "Đang hoàn tiền", cls: "bg-sky-50 text-sky-700 border-sky-200" },
+  APPROVED: { label: "Đã duyệt — đang hoàn tiền", cls: "bg-sky-50 text-sky-700 border-sky-200" },
+  VNPAY_PROCESSING: { label: "Chờ VNPay xác nhận hoàn tiền", cls: "bg-sky-50 text-sky-700 border-sky-200" },
+  MANUAL_TRANSFER_PENDING: { label: "Chờ chuyển khoản thủ công", cls: "bg-violet-50 text-violet-700 border-violet-200" },
   REFUNDED: { label: "Đã hoàn tiền", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   REJECTED: { label: "Bị từ chối", cls: "bg-rose-50 text-rose-700 border-rose-200" },
   FAILED: { label: "Hoàn tiền lỗi", cls: "bg-rose-50 text-rose-700 border-rose-200" },
   CANCELLED: { label: "Đã huỷ", cls: "bg-slate-100 text-slate-600 border-slate-200" },
+  // Trạng thái lịch sử — chỉ hiển thị, không lọc.
+  REFUND_PROCESSING: { label: "Đang xử lý hoàn tiền", cls: "bg-sky-50 text-sky-700 border-sky-200" },
 };
+
+/**
+ * Nhóm lý do hoàn tiền — KHỚP enum `RefundReason` ở backend.
+ *
+ * ⚠️ Khách KHÔNG chọn nhóm lý do (form chỉ mô tả bằng văn bản — admin phân loại
+ * khi duyệt). Bảng này chỉ dùng để HIỂN THỊ khi admin đã xác định nhóm lý do
+ * (`approvedReason` / `declaredReason`).
+ */
 export const REFUND_REASON = {
-  TOURIST_FAULT: { label: "Lý do cá nhân", note: "Hoàn 50% số tiền đã thanh toán" },
-  PLATFORM_FAULT: { label: "Lỗi từ tour / nền tảng", note: "Hoàn 100% sau khi quản trị viên xác minh" },
+  PERSONAL: { label: "Lý do cá nhân", note: "Hoàn 50% số tiền đã thanh toán" },
+  PLATFORM_FAULT: { label: "Lỗi từ nền tảng", note: "Hoàn 100% sau khi quản trị viên xác minh" },
+  PROVIDER_FAULT: { label: "Lỗi từ nhà tour", note: "Hoàn 100% sau khi quản trị viên xác minh" },
+  FORCE_MAJEURE: { label: "Bất khả kháng", note: "Theo chính sách không hoàn tiền" },
 };
+
+/**
+ * Trạng thái yêu cầu hoàn tiền đang MỞ (chặn tạo yêu cầu mới cho cùng payment).
+ * ⚠️ `REFUNDED` cũng tính — không cho gửi lại lần hai.
+ */
+export const REFUND_OPEN_STATUSES = [
+  "PENDING_REVIEW",
+  "APPROVED",
+  "VNPAY_PROCESSING",
+  "MANUAL_TRANSFER_PENDING",
+  "REFUND_PROCESSING",
+  "REFUNDED",
+];
+
+/** Yêu cầu đang chờ quản trị viên / đang xử lý (chưa có kết quả cuối). */
+export const REFUND_PENDING_STATUSES = [
+  "PENDING_REVIEW",
+  "APPROVED",
+  "VNPAY_PROCESSING",
+  "MANUAL_TRANSFER_PENDING",
+  "REFUND_PROCESSING",
+];
 
 /** Cập nhật thông tin người dùng trong phiên đăng nhập (localStorage) để header đổi theo ngay. */
 export function patchSessionUser(patch) {
