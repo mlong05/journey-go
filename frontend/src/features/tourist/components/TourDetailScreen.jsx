@@ -5,14 +5,17 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Clock, MapPin, Tag, Store, Check, X, Minus, Plus, CalendarDays, Loader2, AlertTriangle, ListChecks,
+  Clock, MapPin, Tag, Store, Check, X, Minus, Plus, CalendarDays, Loader2, AlertTriangle, ListChecks,
   Footprints, Info, ShieldCheck, Sparkles, MessageCircle, Heart, MessagesSquare,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
-import { touristService } from "../services/touristService";
+import { touristService, getTourPreview } from "../services/touristService";
+import { tourCoverTransition } from "./TourCard";
+import Breadcrumbs from "./Breadcrumbs";
+import LoginRequiredModal from "./LoginRequiredModal";
 import { useTouristSession } from "../hooks/useTouristSession";
-import { dateTime, durationLabel, loginHref, shortDate, longDate, vnd } from "../utils";
+import { dateTime, durationLabel, shortDate, vnd } from "../utils";
 
 /** "**08:00** Đón khách" → giờ in đậm + nội dung. */
 function ItineraryContent({ text }) {
@@ -43,19 +46,21 @@ function Section({ title, icon: Icon, children }) {
   );
 }
 
-function Gallery({ images, title }) {
+function Gallery({ images, title, tourId }) {
   const [active, setActive] = useState(0);
-  if (!images.length) return <div className="aspect-[16/9] rounded-3xl bg-slate-100" />;
+  if (!images.length) return <div className="jg-shimmer aspect-[16/9] rounded-3xl lg:aspect-auto lg:h-[clamp(260px,calc(100dvh-23rem),560px)]" />;
   return (
     <div className="space-y-2">
-      <div className="aspect-[16/9] overflow-hidden rounded-3xl bg-slate-100">
-        <img src={images[active]} alt={title} className="h-full w-full object-cover" />
+      {/* Cùng tên chuyển trang với ảnh bìa trên thẻ ⇒ ảnh thẻ "phóng" thành ảnh này */}
+      {/* Máy tính: cao tối đa (màn hình − header − tên tour) để ảnh nằm trọn khi vừa mở trang */}
+      <div className="aspect-[16/9] overflow-hidden rounded-3xl bg-slate-100 lg:aspect-auto lg:h-[clamp(260px,calc(100dvh-23rem),560px)]" style={{ viewTransitionName: tourCoverTransition(tourId), viewTransitionClass: "morph" }}>
+        <img key={images[active]} src={images[active]} alt={title} className={`h-full w-full object-cover ${active ? "jg-fade-in" : ""}`} />
       </div>
       {images.length > 1 && (
         <div className="grid grid-cols-5 gap-2" role="group" aria-label="Chọn ảnh">
           {images.slice(0, 5).map((src, i) => (
             <button key={src} type="button" onClick={() => setActive(i)} aria-label={`Ảnh ${i + 1}`} aria-pressed={i === active}
-              className={`aspect-[4/3] overflow-hidden rounded-xl border-2 cursor-pointer ${i === active ? "border-teal-600" : "border-transparent opacity-80 hover:opacity-100"}`}>
+              className={`aspect-[4/3] overflow-hidden rounded-xl border-2 transition duration-200 active:scale-95 cursor-pointer ${i === active ? "border-teal-600" : "border-transparent opacity-75 hover:-translate-y-0.5 hover:opacity-100"}`}>
               <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
             </button>
           ))}
@@ -70,9 +75,20 @@ function BookingPanel({ tour, dates }) {
   const { ready, isLoggedIn, isTourist } = useTouristSession();
   const open = dates.filter((d) => d.available && (d.remaining ?? 0) > 0);
   const [date, setDate] = useState("");
+  const [allDates, setAllDates] = useState(false);
   const prices = (tour.prices || []).filter((p) => p.alwaysFree || Number(p.price) > 0 || p.guestType === "ADULT");
   const [counts, setCounts] = useState({ ADULT: 1 });
+  const [needLogin, setNeedLogin] = useState(false);
   const chosen = date || open[0]?.date || "";
+  const DATES_COLLAPSED = 6;
+  const visibleDates = useMemo(() => {
+    const list = dates.slice(0, 30);
+    if (allDates || list.length <= DATES_COLLAPSED) return list;
+    const head = list.slice(0, DATES_COLLAPSED);
+    const picked = list.find((d) => d.date === chosen);
+    return picked && !head.includes(picked) ? [...head.slice(0, DATES_COLLAPSED - 1), picked] : head;
+  }, [dates, allDates, chosen]);
+  const hiddenDates = Math.max(0, Math.min(dates.length, 30) - visibleDates.length);
   const remaining = dates.find((d) => d.date === chosen)?.remaining ?? 0;
 
   const seats = prices.reduce((s, p) => s + (p.countsTowardSlot ? counts[p.guestType] || 0 : 0), 0);
@@ -83,23 +99,19 @@ function BookingPanel({ tour, dates }) {
     : seats > remaining ? `Ngày ${shortDate(chosen)} chỉ còn ${remaining} chỗ.` : "";
 
   const change = (type, delta) => setCounts((c) => ({ ...c, [type]: Math.max(0, Math.min(20, (c[type] || 0) + delta)) }));
-  const book = () => {
-    const p = new URLSearchParams({ date: chosen });
-    Object.entries(counts).forEach(([k, v]) => v > 0 && p.set(k.toLowerCase(), String(v)));
-    const target = `${ROUTES.CHECKOUT(tour.tourId)}?${p}`;
-    router.push(isLoggedIn ? target : loginHref(target));
-  };
+  const p = new URLSearchParams({ date: chosen });
+  Object.entries(counts).forEach(([k, v]) => v > 0 && p.set(k.toLowerCase(), String(v)));
+  const target = `${ROUTES.CHECKOUT(tour.tourId)}?${p}`;
+  // Chưa đăng nhập: hỏi xác nhận trước, khách đồng ý mới sang trang đăng nhập (quay lại thẳng trang thanh toán).
+  const book = () => (isLoggedIn ? router.push(target) : setNeedLogin(true));
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(16,32,29,0.08)]">
-      <p className="text-xs font-semibold text-slate-500">Người lớn từ</p>
-      <p className="text-2xl font-extrabold tabular-nums text-slate-900">{vnd(tour.price)} <span className="text-sm font-semibold text-slate-500">/ khách</span></p>
-
-      <fieldset className="mt-5">
+      <fieldset>
         <legend className="mb-2 flex items-center gap-1.5 text-sm font-bold text-slate-800"><CalendarDays size={15} />Chọn ngày khởi hành</legend>
         {open.length ? (
-          <div className="grid max-h-48 grid-cols-3 gap-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
-            {dates.slice(0, 30).map((d) => {
+          <div className={`grid grid-cols-3 gap-2 ${allDates ? "max-h-[11.5rem] overflow-y-auto pr-1 [scrollbar-width:thin]" : ""}`}>
+            {visibleDates.map((d) => {
               const full = !d.available || (d.remaining ?? 0) <= 0;
               const on = d.date === chosen;
               return (
@@ -112,9 +124,15 @@ function BookingPanel({ tour, dates }) {
             })}
           </div>
         ) : <p className="text-sm text-slate-500">Chưa có ngày mở bán.</p>}
+        {open.length > 0 && (hiddenDates > 0 || allDates) && (
+          <button type="button" onClick={() => setAllDates((v) => !v)} aria-expanded={allDates}
+            className="mt-2 text-xs font-bold text-teal-700 hover:text-teal-900 cursor-pointer">
+            {allDates ? "Thu gọn" : `Xem thêm ${hiddenDates} ngày`}
+          </button>
+        )}
       </fieldset>
 
-      <fieldset className="mt-5 space-y-2.5">
+      <fieldset className="mt-4 space-y-2">
         <legend className="mb-2 text-sm font-bold text-slate-800">Số khách</legend>
         {prices.map((p) => (
           <div key={p.guestType} className="flex items-center justify-between gap-3">
@@ -133,7 +151,7 @@ function BookingPanel({ tour, dates }) {
         ))}
       </fieldset>
 
-      <div className="mt-5 flex items-end justify-between border-t border-dashed border-slate-200 pt-4">
+      <div className="mt-4 flex items-end justify-between border-t border-dashed border-slate-200 pt-3">
         <span className="text-sm text-slate-600">Tạm tính · {guests} khách</span>
         <span className="text-xl font-extrabold tabular-nums text-slate-900">{vnd(total)}</span>
       </div>
@@ -142,11 +160,14 @@ function BookingPanel({ tour, dates }) {
         <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">Bạn đang đăng nhập bằng tài khoản quản trị hoặc đối tác. Dùng tài khoản du khách để đặt tour.</p>
       ) : (
         <button type="button" onClick={book} disabled={Boolean(problem)}
-          className="mt-4 w-full rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white hover:bg-orange-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed">
-          {ready && !isLoggedIn ? "Đăng nhập để đặt tour" : "Đặt tour"}
+          className="mt-4 w-full rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] transition duration-200 hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-[0_10px_22px_rgba(234,88,12,0.38)] active:translate-y-0 active:scale-[0.98] disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none motion-reduce:transition-none cursor-pointer disabled:cursor-not-allowed">
+          Đặt tour
         </button>
       )}
-      <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-500"><ShieldCheck size={13} className="mt-px shrink-0 text-teal-700" />Chỗ được giữ 10 phút khi bạn xác nhận đơn. Thanh toán qua VNPay.</p>
+      <LoginRequiredModal open={needLogin} onClose={() => setNeedLogin(false)} callbackUrl={target}
+        title="Đăng nhập để đặt tour"
+        message="Bạn cần đăng nhập tài khoản du khách để đặt tour. Ngày và số khách đã chọn sẽ được giữ nguyên."
+        summary={`${shortDate(chosen)} · ${guests} khách · ${vnd(total)}`} />
     </div>
   );
 }
@@ -157,24 +178,26 @@ function AskProvider({ tour }) {
   const { ready, isLoggedIn, isTourist } = useTouristSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [needLogin, setNeedLogin] = useState(false);
   if (ready && isLoggedIn && !isTourist) return null;
   const ask = async () => {
-    if (!isLoggedIn) { router.push(loginHref(ROUTES.TOUR_DETAIL(tour.tourId))); return; }
+    if (!isLoggedIn) { setNeedLogin(true); return; }
     setBusy(true); setError("");
     try {
       const c = await touristService.startConversation(tour.tourId);
-      router.push(`${ROUTES.ACCOUNT_MESSAGES}?c=${c.id}`);
+      router.push(`${ROUTES.ACCOUNT_MESSAGES}?c=${c.id}&tour=${tour.tourId}`);
     } catch (err) { setError(err?.message || "Không mở được cuộc trò chuyện."); setBusy(false); }
   };
   return (
-    <div className="mt-3 rounded-3xl border border-slate-200 bg-white p-4">
-      <p className="text-sm font-bold text-slate-900">Còn thắc mắc về tour?</p>
-      <p className="mt-0.5 text-xs text-slate-500">Hỏi trực tiếp {tour.providerName || "nhà tour"} về giờ đón, trang phục, chỗ gửi xe…</p>
-      <button type="button" onClick={ask} disabled={busy}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 py-2.5 text-sm font-bold text-teal-800 hover:bg-teal-100 disabled:opacity-60 cursor-pointer">
-        {busy ? <Loader2 size={15} className="animate-spin" /> : <MessageCircle size={15} />}Nhắn tin với nhà tour
+    <div className="mt-3">
+      <button type="button" onClick={ask} disabled={busy} title={`Hỏi ${tour.providerName || "nhà tour"} về giờ đón, trang phục, chỗ gửi xe…`}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-teal-200 bg-white py-2.5 text-sm font-bold text-teal-800 transition hover:bg-teal-50 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none cursor-pointer">
+        {busy ? <Loader2 size={15} className="animate-spin" /> : <MessageCircle size={15} />}Còn thắc mắc? Nhắn tin với nhà tour
       </button>
       {error && <p role="alert" className="mt-2 text-xs font-semibold text-rose-600">{error}</p>}
+      <LoginRequiredModal open={needLogin} onClose={() => setNeedLogin(false)} callbackUrl={ROUTES.TOUR_DETAIL(tour.tourId)}
+        title="Đăng nhập để nhắn tin"
+        message={`Đăng nhập để hỏi ${tour.providerName || "nhà tour"} về giờ đón, trang phục, chỗ gửi xe… trước khi đặt.`} />
     </div>
   );
 }
@@ -227,6 +250,8 @@ export default function TourDetailScreen({ tourId }) {
   const [tour, setTour] = useState(null);
   const [dates, setDates] = useState([]);
   const [error, setError] = useState("");
+  // Tóm tắt tour đã thấy ở danh sách (ảnh bìa, tên) ⇒ hiện ngay khi chuyển trang.
+  const [preview] = useState(() => getTourPreview(tourId));
 
   useEffect(() => {
     let alive = true;
@@ -250,14 +275,36 @@ export default function TourDetailScreen({ tourId }) {
     );
   }
   if (!tour) {
-    return <TouristShell><div className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />Đang tải tour…</div></TouristShell>;
+    return (
+      <TouristShell>
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6" aria-busy="true">
+          <Breadcrumbs fallback={ROUTES.TOURS} items={[{ label: "Khám phá", href: ROUTES.HOME }, { label: "Tất cả tour", href: ROUTES.TOURS }, { label: preview?.title || "Chi tiết tour" }]} />
+          <div className="mt-3 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="min-w-0 space-y-5">
+          <header>
+            {preview?.title
+              ? <h1 className="text-[clamp(24px,3vw,34px)] font-extrabold leading-tight tracking-tight text-slate-900 text-balance">{preview.title}</h1>
+              : <div className="jg-shimmer h-9 w-2/3 rounded-lg" />}
+            <div className="jg-shimmer mt-3 h-4 w-80 max-w-full rounded" />
+          </header>
+              <Gallery images={preview?.coverImageUrl ? [preview.coverImageUrl] : []} title={preview?.title || ""} tourId={tourId} />
+              <div className="jg-shimmer h-40 rounded-3xl" />
+            </div>
+            <div className="jg-shimmer h-96 rounded-3xl" />
+          </div>
+          <p className="sr-only" role="status"><Loader2 size={18} className="animate-spin" />Đang tải tour…</p>
+        </div>
+      </TouristShell>
+    );
   }
 
   return (
     <TouristShell>
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <Link href={ROUTES.TOURS} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-teal-800"><ArrowLeft size={15} />Tất cả tour</Link>
-        <header className="mt-3">
+        <Breadcrumbs fallback={ROUTES.TOURS} items={[{ label: "Khám phá", href: ROUTES.HOME }, { label: "Tất cả tour", href: ROUTES.TOURS }, { label: tour.title }]} />
+        <div className="mt-3 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="min-w-0 space-y-5">
+        <header>
           <h1 className="text-[clamp(24px,3vw,34px)] font-extrabold leading-tight tracking-tight text-slate-900 text-balance">{tour.title}</h1>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-slate-600">
             <span className="inline-flex items-center gap-1"><Clock size={15} />{durationLabel(tour)}</span>
@@ -267,10 +314,7 @@ export default function TourDetailScreen({ tourId }) {
             {tour.totalPoints > 0 && <span className="inline-flex items-center gap-1 font-semibold text-orange-700"><Sparkles size={15} />Tối đa {tour.totalPoints} điểm thưởng</span>}
           </div>
         </header>
-
-        <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="min-w-0 space-y-5">
-            <Gallery images={images} title={tour.title} />
+            <Gallery images={images} title={tour.title} tourId={tour.tourId} />
 
             <Section title="Giới thiệu">
               <p className="whitespace-pre-line text-[15px] leading-relaxed text-slate-700">{tour.description}</p>
@@ -355,12 +399,9 @@ export default function TourDetailScreen({ tourId }) {
             </Section>
           </div>
 
-          <aside className="lg:sticky lg:top-20">
+          <aside className="lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pb-1 [scrollbar-width:thin]">
             <BookingPanel tour={tour} dates={dates} />
             <AskProvider tour={tour} />
-            {tour.upcomingDepartureDates?.[0] && (
-              <p className="mt-3 text-center text-xs text-slate-500">Khởi hành gần nhất: {longDate(tour.upcomingDepartureDates[0])}</p>
-            )}
           </aside>
         </div>
       </div>
