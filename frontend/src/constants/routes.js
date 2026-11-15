@@ -25,10 +25,23 @@ export const ROUTES = {
   TRIP_DETAIL: (id) => `/trips/${id}`,
   /** Tài khoản du khách: hồ sơ + đổi mật khẩu. */
   ACCOUNT: "/account",
-  ACCOUNT_REFUNDS: "/trips?tab=refunds",
   /** Nhắn tin với nhà tour: /account/messages?c={conversationId} */
   ACCOUNT_MESSAGES: "/account/messages",
   ACCOUNT_REWARDS: "/account/rewards",
+  /** Trung tâm thông báo (đầy đủ): /account/notifications */
+  ACCOUNT_NOTIFICATIONS: "/account/notifications",
+  /** Bài viết cộng đồng của tôi: /account/posts */
+  ACCOUNT_POSTS: "/account/posts",
+  /** Lời mời tham gia tour đang chờ tôi xác nhận: /account/invitations */
+  ACCOUNT_INVITATIONS: "/account/invitations",
+
+  // ── Cộng đồng ─────────────────────────────────────────────────────────────
+  /** Bảng tin cộng đồng: /community */
+  COMMUNITY: "/community",
+  /** Chi tiết bài viết: /community/{id} */
+  COMMUNITY_POST: (id) => `/community/${id}`,
+  /** Trang nhận lời mời tham gia tour (deep link trong email): /invitations/{token} */
+  INVITATION: (token) => `/invitations/${token}`,
 
   // ── Đăng ký thành đối tác ─────────────────────────────────────────────────
   /** Luồng đăng ký đối tác (4 giai đoạn) — link đặt ở footer trang chủ. */
