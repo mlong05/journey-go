@@ -99,7 +99,8 @@ final class TourImportLayout {
         if (value == null) return null;
         String key = normalize(value);
         for (GuestType t : GuestType.values()) {
-            if (normalize(t.getLabel()).equals(key) || t.name().equalsIgnoreCase(value.trim())) return t;
+            if (normalize(t.getLabel()).equals(key) || normalize(t.getDefaultLabel()).equals(key)
+                    || t.name().equalsIgnoreCase(value.trim())) return t;
         }
         return null;
     }
