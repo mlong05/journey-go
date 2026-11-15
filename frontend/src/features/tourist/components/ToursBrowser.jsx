@@ -53,7 +53,7 @@ function MorePicker({ label, options, selected, onSelect }) {
         + Thêm ({options.length})<ChevronDown size={13} />
       </button>
       {open && (
-        <div className="absolute left-0 top-11 z-40 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+        <div className="jg-pop absolute left-0 top-11 z-40 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
           <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-2.5 focus-within:border-teal-500">
             <Search size={14} className="text-slate-400" />
             <span className="sr-only">Tìm {label}</span>
@@ -130,7 +130,7 @@ function FilterSheet({ open, onClose, regions, themes, filters, update, onReset,
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-slate-900/40" role="dialog" aria-modal="true" aria-labelledby="filter-sheet-title" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="flex max-h-[85dvh] w-full flex-col rounded-t-3xl bg-white pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="jg-sheet flex max-h-[85dvh] w-full flex-col rounded-t-3xl bg-white pb-[env(safe-area-inset-bottom,0px)]">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <h2 id="filter-sheet-title" className="text-lg font-extrabold text-slate-900">Bộ lọc</h2>
           <button type="button" onClick={onClose} aria-label="Đóng bộ lọc" className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 cursor-pointer"><X size={17} /></button>
@@ -272,7 +272,7 @@ export default function ToursBrowser() {
           ) : state.loading ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">{[0, 1, 2, 3, 4, 5].map((i) => <TourCardSkeleton key={i} />)}</div>
           ) : state.items.length ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">{state.items.map((t) => <TourCard key={t.tourId} tour={t} />)}</div>
+            <div key={key} className="jg-fade-in grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">{state.items.map((t) => <TourCard key={t.tourId} tour={t} />)}</div>
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
               <p className="font-bold text-slate-800">Chưa có tour phù hợp</p>

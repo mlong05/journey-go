@@ -1,0 +1,167 @@
+/* =========================================================================
+   HIỆU ỨNG TRANG DU KHÁCH (mức nhẹ nhàng: 200–450ms)
+   Nguyên tắc:
+   • Nội dung luôn hiện sẵn khi chưa có JS: chỉ phần tử nằm dưới màn hình lúc tải mới bị
+     ẩn tạm (data-reveal="hidden" do JS gắn) rồi hiện khi cuộn tới.
+   • prefers-reduced-motion: tắt mọi chuyển động, nội dung đổi ngay.
+   ========================================================================= */
+
+:root {
+  --jg-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --jg-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ── Xuất hiện khi tải (phần đầu trang): chạy bằng CSS, không cần JS ───────── */
+@keyframes jg-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.jg-rise {
+  animation: jg-rise 560ms var(--jg-ease-out) both;
+  animation-delay: calc(var(--d, 0) * 80ms);
+}
+
+/* Ảnh xếp chồng "đặt xuống" về đúng góc nghiêng (--rot do từng ảnh đặt) */
+@keyframes jg-drop {
+  from { opacity: 0; transform: translateY(-18px) rotate(calc(var(--rot, 0deg) + 6deg)) scale(0.96); }
+  to { opacity: 1; transform: rotate(var(--rot, 0deg)); }
+}
+.jg-drop {
+  transform: rotate(var(--rot, 0deg));
+  animation: jg-drop 700ms var(--jg-ease-out) both;
+  animation-delay: calc(240ms + var(--d, 0) * 110ms);
+}
+
+/* Chồng ảnh nghiêng nhẹ theo con trỏ (biến --tx/--ty do JS đặt, chỉ máy có chuột) */
+.jg-tilt {
+  transform: perspective(900px) rotateX(calc(var(--ty, 0) * -4deg)) rotateY(calc(var(--tx, 0) * 4deg));
+  transition: transform 500ms var(--jg-ease-out);
+}
+
+/* ── Hiện khi cuộn tới ─────────────────────────────────────────────────── */
+[data-reveal] {
+  transition: opacity 520ms var(--jg-ease-out), transform 520ms var(--jg-ease-out);
+}
+[data-reveal="hidden"] {
+  opacity: 0;
+  transform: translateY(18px);
+}
+/* Các thẻ trong cùng phần hiện lần lượt (style="--i: n") */
+[data-reveal] .jg-item {
+  transition: opacity 480ms var(--jg-ease-out), transform 480ms var(--jg-ease-out);
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+[data-reveal="hidden"] .jg-item {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+/* ── Khung chờ có vệt sáng chạy qua ─────────────────────────────────────── */
+@keyframes jg-shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+.jg-shimmer {
+  background: linear-gradient(90deg, #f1f5f9 0%, #f8fafc 45%, #f1f5f9 90%);
+  background-size: 200% 100%;
+  animation: jg-shimmer 1.4s linear infinite;
+}
+
+/* Danh sách vừa tải xong: mờ dần vào */
+@keyframes jg-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.jg-fade-in {
+  animation: jg-fade-in 360ms var(--jg-ease-out) both;
+}
+
+/* Menu xổ xuống */
+@keyframes jg-pop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.jg-pop {
+  transform-origin: top right;
+  animation: jg-pop 180ms var(--jg-ease-out) both;
+}
+
+/* Bảng lọc trượt từ dưới lên (điện thoại) */
+@keyframes jg-sheet {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+.jg-sheet {
+  animation: jg-sheet 300ms var(--jg-ease-out) both;
+}
+
+/* ── Chuyển trang (View Transitions API, gọi từ navigation.js) ─────────────
+   • Vùng nội dung <main> tên "jg-page" trượt theo hướng html[data-nav="forward|back"].
+   • Header ("site-header") đứng yên; footer nằm trong root ⇒ chỉ mờ chéo.
+   • Ảnh bìa thẻ tour ↔ ảnh lớn trang chi tiết cùng lớp "morph" ⇒ phóng to / thu về. */
+
+::view-transition-group(.morph) {
+  animation-duration: 420ms;
+  animation-timing-function: var(--jg-ease-in-out);
+}
+::view-transition-image-pair(.morph) {
+  animation-name: jg-via-blur;
+}
+@keyframes jg-via-blur {
+  30% { filter: blur(3px); }
+}
+
+/* Không có hướng (vd. bấm menu): nội dung mờ chéo nhanh */
+::view-transition-old(jg-page) { animation: 160ms ease-in both jg-vt-fade reverse; }
+::view-transition-new(jg-page) { animation: 240ms ease-out 80ms both jg-vt-fade; }
+
+/* Đi tới: trang cũ trượt sang trái, trang mới vào từ phải; quay lại thì ngược lại */
+html[data-nav="forward"]::view-transition-old(jg-page) {
+  --jg-slide: -48px;
+  animation: 150ms ease-in both jg-vt-fade reverse, 380ms var(--jg-ease-in-out) both jg-vt-slide reverse;
+}
+html[data-nav="forward"]::view-transition-new(jg-page) {
+  --jg-slide: 48px;
+  animation: 220ms ease-out 140ms both jg-vt-fade, 380ms var(--jg-ease-in-out) both jg-vt-slide;
+}
+html[data-nav="back"]::view-transition-old(jg-page) {
+  --jg-slide: 48px;
+  animation: 150ms ease-in both jg-vt-fade reverse, 380ms var(--jg-ease-in-out) both jg-vt-slide reverse;
+}
+html[data-nav="back"]::view-transition-new(jg-page) {
+  --jg-slide: -48px;
+  animation: 220ms ease-out 140ms both jg-vt-fade, 380ms var(--jg-ease-in-out) both jg-vt-slide;
+}
+@keyframes jg-vt-fade {
+  from { opacity: 0; filter: blur(2px); }
+  to { opacity: 1; filter: blur(0); }
+}
+@keyframes jg-vt-slide {
+  from { translate: var(--jg-slide); }
+  to { translate: 0; }
+}
+
+/* Header đứng yên khi nội dung trượt */
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header) { display: none; }
+::view-transition-new(site-header) { animation: none; }
+/* Ảnh đang phóng nằm trên nội dung trượt */
+::view-transition-group(.morph) { z-index: 50; }
+
+/* Vẫn bấm được trang trong lúc hiệu ứng chạy */
+::view-transition { pointer-events: none; }
+
+/* ── Giảm chuyển động ───────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .jg-rise, .jg-drop, .jg-fade-in, .jg-pop, .jg-sheet, .jg-shimmer { animation: none !important; }
+  .jg-drop { transform: rotate(var(--rot, 0deg)) !important; }
+  .jg-tilt { transform: none !important; transition: none !important; }
+  [data-reveal], [data-reveal] .jg-item { transition: none !important; opacity: 1 !important; transform: none !important; }
+  ::view-transition-old(*), ::view-transition-new(*), ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
