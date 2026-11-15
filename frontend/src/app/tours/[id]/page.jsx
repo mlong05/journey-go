@@ -1,10 +1,15 @@
 "use client";
 
-import { use } from "react";
+import { Suspense, use } from "react";
 import { TourDetailScreen } from "@/features/tourist";
 
 /** Chi tiết tour công khai + chọn ngày, số khách. */
 export default function TourDetailPage({ params }) {
   const { id } = use(params);
-  return <TourDetailScreen tourId={id} />;
+  // ⚠️ useSearchParams (đọc ?bookingId=) cần nằm trong Suspense để build Next.js không lỗi.
+  return (
+    <Suspense fallback={null}>
+      <TourDetailScreen tourId={id} />
+    </Suspense>
+  );
 }

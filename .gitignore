@@ -37,3 +37,8 @@ mobile/android/build/
 # Database backups
 *.dump
 .worktrees/
+
+# Next.js build output (frontend/.next) — không commit
+frontend/.next/
+.next/
+node_modules/

@@ -184,7 +184,13 @@ public class VnPayClient {
      *
      * <p>2 chế độ (theo thứ tự ưu tiên):
      * <ul>
-     *   <li><b>CUSTOM SCHEME</b> ({@code appReturnUrl} được cấu hình)
+     *   <li><b>WEB</b> ({@code appRedirect=false}) → {@code webReturnUrl} nếu được cấu
+     *       hình ({@code http://localhost:3000/payment/result}); nếu không có thì
+     *       {@code returnUrl} của backend ({@code /payments/return-page}).
+     *       <br>⚠️ TUYỆT ĐỐI KHÔNG rơi xuống custom scheme của app ở nhánh này —
+     *       xem giải thích trong thân hàm.</li>
+     *   <li><b>MOBILE</b> ({@code appRedirect=true}) → <b>CUSTOM SCHEME</b> ({@code appReturnUrl}
+     *       được cấu hình)
      *       → {@code journeygo://payment/return} ⇒ VNPay chuyển thẳng
      *       trình duyệt về app kèm TOÀN BỘ tham số kết quả ĐÃ KÝ ⇒ app gửi lại
      *       {@code POST /payments/return-result} ⇒ backend kiểm tra chữ ký rồi áp dụng.
@@ -192,7 +198,7 @@ public class VnPayClient {
      *       trình duyệt thật bằng trang cảnh báo (ERR_NGROK_6024) ⇒ trang
      *       {@code /payments/return-page} không bao giờ tới được khách ⇒ deep link
      *       không bao giờ được mở.</li>
-     *   <li><b>FALLBACK</b> — không có {@code appReturnUrl} mà {@code returnUrl} là HTTPS
+     *   <li><b>FALLBACK (mobile)</b> — không có {@code appReturnUrl} mà {@code returnUrl} là HTTPS
      *       → Return URL của backend ({@code /payments/return-page}) + {@code app_redirect=1}
      *       → trang kết quả chuyển hướng trình duyệt về app (deep link
      *       {@code journeygo://payment/return?...}).</li>
@@ -203,10 +209,33 @@ public class VnPayClient {
      * {@link #isValidSignature(Map)}.
      */
     private String buildReturnUrl(boolean appRedirect) {
-        // WEB du khách: quay về trang kết quả của frontend (không đi qua app / tunnel).
-        String webUrl = properties.getWebReturnUrl();
-        if (!appRedirect && webUrl != null && !webUrl.isBlank()) {
-            return webUrl;
+        // ── WEB du khách ──────────────────────────────────────────────────────
+        // Quay về trang kết quả của frontend (không đi qua app / tunnel).
+        //
+        // ⚠️ VÌ SAO KHÔNG ĐƯỢC "rơi" xuống nhánh APP khi `webReturnUrl` trống?
+        // Nếu web rơi xuống nhánh APP, Return URL sẽ là CUSTOM SCHEME
+        // (`journeygo://payment/return`) ⇒ VNPay chuyển TRÌNH DUYỆT về scheme đó
+        // ⇒ web portal KHÔNG BAO GIỜ nhận được callback ⇒ trình duyệt báo
+        // "không tìm thấy trang" và khách không thấy "thanh toán thành công".
+        // ⇒ Với web, LUÔN phải trả về một URL HTTP(S) của trang kết quả.
+        //
+        // Nếu `webReturnUrl` chưa cấu hình ⇒ dùng Return URL HTTPS của backend
+        // (`/payments/return-page`) ⇒ trang kết quả của backend hiển thị thành công
+        // và có nút "Về trang thanh toán" của web.
+        if (!appRedirect) {
+            String webUrl = properties.getWebReturnUrl();
+            if (webUrl != null && !webUrl.isBlank()) {
+                return webUrl;
+            }
+            String backendBase = properties.getReturnUrl();
+            if (backendBase != null && !backendBase.isBlank()) {
+                log.warn("[VNPay] Chưa cấu hình VNPAY_WEB_RETURN_URL ⇒ web sẽ quay về trang "
+                        + "kết quả của backend: {}", backendBase);
+                return backendBase;
+            }
+            log.error("[VNPay] Thiếu cả VNPAY_WEB_RETURN_URL lẫn VNPAY_RETURN_URL — "
+                    + "web sẽ KHÔNG quay lại được sau khi thanh toán.");
+            return properties.getWebReturnUrl();
         }
 
         // ƯU TIÊN: CUSTOM SCHEME (`journeygo://payment/return`) nếu được cấu hình.

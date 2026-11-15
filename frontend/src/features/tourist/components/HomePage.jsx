@@ -11,6 +11,7 @@ import TourCard, { TourCardSkeleton } from "./TourCard";
 import Reveal from "./Reveal";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
+import { usePurchasedTourIds } from "../hooks/usePurchasedTourIds";
 import { longDate, todayIso } from "../utils";
 
 /**
@@ -41,6 +42,12 @@ const APP_STEPS = [
 const LIMIT = { soonest: 4, moreTours: 8, regions: 6, themes: 8 };
 /** Lưới thẻ tour cố định số cột theo màn hình (1 / 2 / 4) để tính được "đủ hàng". */
 const CARD_GRID = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4";
+
+/**
+ * Trạng thái đơn ⇒ tour đã "mua" (đã thanh toán) ⇒ không hiển thị lại trên trang chủ.
+ *
+ * `PENDING_PAYMENT` chưa hoàn tất thanh toán nên tour vẫn còn mở bán cho người khác.
+ */
 
 /**
  * Lấy tối đa `limit` ô cho vùng / chủ đề có tour, nhiều tour nhất trước.
@@ -229,6 +236,11 @@ export default function HomePage() {
   const [themes, setThemes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  /**
+   * Tour du khách đã mua ⇒ không hiển thị lại trên trang chủ.
+   * ⚠️ Hook dùng chung với trang "Tất cả tour" để hai nơi luôn ẩn giống nhau.
+   */
+  const { ids: purchasedTourIds, loading: purchasedLoading } = usePurchasedTourIds();
 
   useEffect(() => {
     let alive = true;
@@ -246,33 +258,41 @@ export default function HomePage() {
     return () => { alive = false; };
   }, []);
 
+  /** Chưa xác định được tour đã mua ⇒ chưa hiện tour (để không nháy tour đã mua). */
+  const bookingsLoading = purchasedLoading;
+
+  const visibleTours = useMemo(
+    () => (purchasedTourIds.size ? tours.filter((t) => !purchasedTourIds.has(Number(t.tourId))) : tours),
+    [tours, purchasedTourIds],
+  );
+
   // ── Mỗi phần có giới hạn cố định: trang chủ không dài ra theo lượng dữ liệu; danh sách đầy đủ ở /tours ──
-  const soonest = useMemo(() => [...tours].filter((t) => t.nextDepartureDate)
+  const soonest = useMemo(() => [...visibleTours].filter((t) => t.nextDepartureDate)
     .sort((a, b) => a.nextDepartureDate.localeCompare(b.nextDepartureDate) || (b.stopCount || 0) - (a.stopCount || 0))
-    .slice(0, LIMIT.soonest), [tours]);
+    .slice(0, LIMIT.soonest), [visibleTours]);
   // Tour chưa xuất hiện ở "Khởi hành sớm nhất"; lấy đủ hàng (4 cột) để không có thẻ nằm lẻ.
   const moreTours = useMemo(() => {
     const shown = new Set(soonest.map((t) => t.tourId));
-    const rest = tours.filter((t) => !shown.has(t.tourId)).sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+    const rest = visibleTours.filter((t) => !shown.has(t.tourId)).sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
     const n = Math.min(rest.length, LIMIT.moreTours);
     return rest.slice(0, n >= 4 ? n - (n % 4) : n);
-  }, [tours, soonest]);
-  const regionCards = useMemo(() => topByCount(regions, tours, "regionId", LIMIT.regions), [regions, tours]);
-  const themeCards = useMemo(() => topByCount(themes, tours, "themeId", LIMIT.themes), [themes, tours]);
+  }, [visibleTours, soonest]);
+  const regionCards = useMemo(() => topByCount(regions, visibleTours, "regionId", LIMIT.regions), [regions, visibleTours]);
+  const themeCards = useMemo(() => topByCount(themes, visibleTours, "themeId", LIMIT.themes), [themes, visibleTours]);
   // Ảnh nền cho ô chủ đề: ảnh bìa của một tour thuộc chủ đề (khác nhau giữa các ô nếu có thể).
   const themeCover = useMemo(() => {
     const used = new Set(); const map = {};
     themeCards.items.forEach((th) => {
-      const list = tours.filter((t) => t.themeId === th.id && t.coverImageUrl);
+      const list = visibleTours.filter((t) => t.themeId === th.id && t.coverImageUrl);
       const pick = list.find((t) => !used.has(t.coverImageUrl)) || list[0];
       if (pick) { used.add(pick.coverImageUrl); map[th.id] = pick.coverImageUrl; }
     });
     return map;
-  }, [themeCards, tours]);
+  }, [themeCards, visibleTours]);
 
   return (
     <TouristShell>
-      <Hero tours={tours} regions={regions} />
+      <Hero tours={visibleTours} regions={regions} />
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-4 py-10 sm:gap-14 sm:px-6 sm:py-12 [&>*]:min-w-0">
         {error && (
           <p role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
@@ -283,8 +303,8 @@ export default function HomePage() {
         <UpcomingTrip tours={tours} />
 
         <section aria-labelledby="h-soon">
-          <SectionHead id="h-soon" title="Khởi hành sớm nhất" sub="Các tour còn chỗ trong những ngày tới" href={ROUTES.TOURS} linkLabel={tours.length > soonest.length ? `Xem tất cả ${tours.length} tour` : "Xem tất cả"} />
-          {loading ? (
+          <SectionHead id="h-soon" title="Khởi hành sớm nhất" sub="Các tour còn chỗ trong những ngày tới" href={ROUTES.TOURS} linkLabel={visibleTours.length > soonest.length ? `Xem tất cả ${visibleTours.length} tour` : "Xem tất cả"} />
+          {loading || bookingsLoading ? (
             <div className={CARD_GRID}>{[0, 1, 2, 3].map((i) => <TourCardSkeleton key={i} />)}</div>
           ) : soonest.length ? (
             <Reveal className={CARD_GRID}>{soonest.map((t, i) => <div key={t.tourId} className="jg-item min-w-0" style={{ "--i": i }}><TourCard tour={t} /></div>)}</Reveal>
@@ -356,7 +376,7 @@ export default function HomePage() {
 
         {moreTours.length > 0 && (
           <section aria-labelledby="h-all">
-            <SectionHead id="h-all" title="Tour khác đang mở bán" sub="Giá từ thấp đến cao" href={ROUTES.TOURS} linkLabel={`Xem tất cả ${tours.length} tour`} />
+            <SectionHead id="h-all" title="Tour khác đang mở bán" sub="Giá từ thấp đến cao" href={ROUTES.TOURS} linkLabel={`Xem tất cả ${visibleTours.length} tour`} />
             {/* Điện thoại chỉ hiện 4 thẻ đầu; phần còn lại xem ở /tours */}
             <Reveal className={CARD_GRID}>
               {moreTours.map((t, i) => (

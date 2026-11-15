@@ -110,7 +110,7 @@ export async function reviewRefund(refundId, payload) {
  * @param {object} payload
  * @param {string} payload.transferReference mã tham chiếu
  * @param {string} [payload.transferEvidence] bằng chứng (URL hoặc mô tả)
- * @param {string} [payload.note]
+ * @param {string} [payload.transferNote] ghi chú của nền tảng (khách sẽ thấy)
  */
 export async function confirmManualTransfer(refundId, payload) {
   const res = await apiClient.post(`${ENDPOINT}/${refundId}/manual-transfer`, payload);

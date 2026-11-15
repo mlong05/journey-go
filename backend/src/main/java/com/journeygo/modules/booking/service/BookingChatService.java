@@ -5,11 +5,15 @@ import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.modules.booking.dto.request.SendMessageRequest;
 import com.journeygo.modules.booking.dto.response.BookingMessageResponse;
 import com.journeygo.modules.booking.entity.Booking;
-import com.journeygo.modules.booking.entity.BookingMessage;
 import com.journeygo.modules.booking.entity.BookingPassenger;
-import com.journeygo.modules.booking.repository.BookingMessageRepository;
 import com.journeygo.modules.booking.repository.BookingPassengerRepository;
+import com.journeygo.modules.providerchat.dto.request.SendProviderMessageRequest;
+import com.journeygo.modules.providerchat.dto.response.ProviderConversationResponse;
+import com.journeygo.modules.providerchat.dto.response.ProviderMessageResponse;
+import com.journeygo.modules.providerchat.service.ProviderChatService;
 import com.journeygo.modules.tour.entity.Tour;
+import com.journeygo.modules.user.entity.User;
+import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,10 +21,20 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Khung chat hỗ trợ gắn với Booking.
+ *
+ * <p>─── QUY ƯỚC MỚI: "Hỗ trợ trong đơn này" ≡ "Tin nhắn với nhà tour" ───
+ *  Hai khung này về bản chất là CÙNG MỘT kênh liên lạc giữa du khách và nhà tour
+ *  của tour đó. Vì vậy service này KHÔNG tự lưu tin nhắn nữa mà chuyển tiếp
+ *  sang {@link ProviderChatService}:
+ * <ul>
+ *   <li>Gửi tin trong khung "Hỗ trợ trong đơn này" ⇒ tin được ghi vào hội thoại
+ *       (du khách, nhà tour) với {@code bookingId} tương ứng ⇒ tự động xuất hiện
+ *       trong tab "Tin nhắn với nhà tour" và trên dashboard của nhà tour.</li>
+ *   <li>Đọc tin trong khung "Hỗ trợ trong đơn này" ⇒ đọc chính hội thoại đó.</li>
+ * </ul>
  *
  * <p>Các bên tham gia:
  * <ul>
@@ -35,16 +49,18 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class BookingChatService {
 
-    private final BookingMessageRepository messageRepository;
+    /** Không còn ghi bảng `booking_messages` — mọi tin nhắn nằm ở hội thoại thống nhất. */
     private final BookingPassengerRepository passengerRepository;
-    private final com.journeygo.modules.realtime.service.RealtimeHub realtimeHub;
-    private final com.journeygo.modules.notification.service.NotificationPublisher notifications;
-    private final com.journeygo.modules.user.repository.UserRepository userRepository;
+    private final ProviderChatService providerChatService;
+    private final UserRepository userRepository;
 
     // ── Gửi tin ───────────────────────────────────────────────────────────────
 
     /**
      * Gửi một tin nhắn vào khung chat của Booking.
+     *
+     * <p>Tin được ghi vào hội thoại thống nhất (du khách ↔ nhà tour) nên vừa xuất hiện
+     * ở khung "Hỗ trợ trong đơn này", vừa xuất hiện ở tab "Tin nhắn với nhà tour".
      *
      * @param booking   Booking
      * @param senderId  Người gửi
@@ -57,75 +73,35 @@ public class BookingChatService {
             throw new AppException(ErrorCode.BOOKING_MESSAGE_EMPTY);
         }
 
-        BookingMessage message = BookingMessage.builder()
-                .booking(booking)
-                .senderId(senderId)
-                .body(body)
-                .build();
-        messageRepository.save(message);
+        // Lấy (hoặc tạo) hội thoại thống nhất gắn với đơn này.
+        ProviderConversationResponse conversation =
+                providerChatService.startForBooking(booking.getId(), senderId);
 
-        BookingMessageResponse response = BookingMessageResponse.fromEntity(message);
-        pushRealtime(booking, response, senderId);
-        return response;
-    }
+        ProviderMessageResponse sent = providerChatService.send(
+                conversation.id(), senderId, new SendProviderMessageRequest(body, null, booking.getId()));
 
-    /**
-     * Đẩy tin nhắn mới tới các bên còn lại trong khung chat (qua WebSocket) và tạo
-     * thông báo "Đã nhận tin nhắn mới" cho họ.
-     */
-    private void pushRealtime(Booking booking, BookingMessageResponse response, Long senderId) {
-        // Dùng Set để tránh gửi trùng: người đặt cũng có thể nằm trong danh sách hành khách
-        // đã liên kết tài khoản ⇒ cùng một người có thể xuất hiện nhiều lần.
-        java.util.Set<Long> recipients = new java.util.LinkedHashSet<>();
-        if (booking.getTourist() != null) recipients.add(booking.getTourist().getId());
-        Tour tour = booking.getTour();
-        if (tour != null && tour.getCreatedBy() != null) recipients.add(tour.getCreatedBy().getId());
-        for (BookingPassenger p : passengerRepository.findByBooking_IdOrderByCreatedAtAsc(booking.getId())) {
-            if (p.getLinkedUserId() != null) recipients.add(p.getLinkedUserId());
-        }
-        recipients.remove(senderId);
-        recipients.removeIf(java.util.Objects::isNull);
-
-        String senderName = userRepository.findById(senderId)
-                .map(com.journeygo.modules.user.entity.User::getFullName).orElse("Người dùng");
-        String tourTitle = tour != null ? tour.getTitle() : "tour";
-        String preview = truncate(response.body(), 120);
-
-        for (Long recipientId : recipients) {
-            realtimeHub.sendChatMessage(recipientId, Map.of(
-                    "type", com.journeygo.modules.realtime.service.RealtimeHub.TYPE_CHAT_MESSAGE,
-                    "scope", "BOOKING_CHAT",
-                    "bookingId", booking.getId(),
-                    "senderId", senderId,
-                    "senderName", senderName,
-                    "body", response.body(),
-                    "createdAt", response.createdAt().toString(),
-                    "message", response));
-
-            notifications.send(com.journeygo.modules.notification.entity.enums.NotificationType.BOOKING_MESSAGE_RECEIVED)
-                    .to(recipientId)
-                    .title("Đã nhận tin nhắn mới")
-                    .body(senderName + " vừa gửi tin nhắn về tour “" + tourTitle + "”: “" + preview + "”")
-                    .ref("BOOKING", booking.getId())
-                    .publish();
-        }
-    }
-
-    private static String truncate(String text, int max) {
-        if (text == null) return "";
-        String trimmed = text.trim();
-        return trimmed.length() <= max ? trimmed : trimmed.substring(0, max - 1) + "…";
+        return toBookingResponse(sent, sent.senderName() != null ? sent.senderName() : senderNameOf(senderId));
     }
 
     // ── Đọc ───────────────────────────────────────────────────────────────────
 
     /**
-     * Lấy toàn bộ tin nhắn của Booking (mới nhất trước).
+     * Lấy toàn bộ tin nhắn của Booking (cũ nhất trước) — đọc từ hội thoại thống nhất.
+     *
+     * @param booking  Booking
+     * @param readerId người đang đọc (để đánh dấu đã đọc đúng phía)
      */
-    @Transactional(readOnly = true)
-    public List<BookingMessageResponse> list(Booking booking) {
-        return messageRepository.findByBooking_IdOrderByCreatedAtDesc(booking.getId()).stream()
-                .map(BookingMessageResponse::fromEntity)
+    @Transactional
+    public List<BookingMessageResponse> list(Booking booking, Long readerId) {
+        Long viewerId = readerId != null ? readerId : resolveViewerId(booking);
+        ProviderConversationResponse conversation =
+                providerChatService.startForBooking(booking.getId(), viewerId);
+
+        List<ProviderMessageResponse> messages =
+                providerChatService.listMessages(conversation.id(), viewerId);
+
+        return messages.stream()
+                .map(m -> toBookingResponse(m, m.senderName() != null ? m.senderName() : senderNameOf(m.senderId())))
                 .toList();
     }
 
@@ -134,17 +110,15 @@ public class BookingChatService {
      */
     @Transactional
     public int markRead(Booking booking, Long readerId) {
-        List<BookingMessage> unread = messageRepository.findByBooking_IdAndReadAtIsNull(booking.getId());
-        Instant now = Instant.now();
-        int count = 0;
-        for (BookingMessage m : unread) {
-            if (!m.getSenderId().equals(readerId)) {
-                m.setReadAt(now);
-                messageRepository.save(m);
-                count++;
-            }
+        try {
+            ProviderConversationResponse conversation =
+                    providerChatService.startForBooking(booking.getId(), readerId);
+            providerChatService.listMessages(conversation.id(), readerId);
+            return 0;
+        } catch (AppException e) {
+            log.debug("markRead bỏ qua booking={} reader={}: {}", booking.getId(), readerId, e.getMessage());
+            return 0;
         }
-        return count;
     }
 
     // ── Kiểm tra quyền ───────────────────────────────────────────────────────
@@ -180,5 +154,36 @@ public class BookingChatService {
         return isOwner(booking, userId)
                 || isTourProvider(booking, userId)
                 || isLinkedPassenger(booking, userId);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Người đang đọc khung chat của đơn (ưu tiên người đặt, nhà tour, hành khách). */
+    private Long resolveViewerId(Booking booking) {
+        if (booking.getTourist() != null) return booking.getTourist().getId();
+        Tour tour = booking.getTour();
+        if (tour != null && tour.getCreatedBy() != null) return tour.getCreatedBy().getId();
+        return passengerRepository.findByBooking_IdOrderByCreatedAtAsc(booking.getId()).stream()
+                .map(BookingPassenger::getLinkedUserId)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String senderNameOf(Long userId) {
+        if (userId == null) return null;
+        return userRepository.findById(userId).map(User::getFullName).orElse(null);
+    }
+
+    /** Chuyển tin nhắn của hội thoại thống nhất sang định dạng của khung trong đơn. */
+    private BookingMessageResponse toBookingResponse(ProviderMessageResponse m, String senderName) {
+        return BookingMessageResponse.builder()
+                .id(m.id())
+                .senderId(m.senderId())
+                .senderName(senderName)
+                .body(m.body())
+                .createdAt(m.createdAt() != null ? m.createdAt() : Instant.now())
+                .read(m.read())
+                .build();
     }
 }

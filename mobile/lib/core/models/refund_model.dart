@@ -70,6 +70,13 @@ class RefundModel {
   final String? contactEmail;
   final String? transferReference;
   final String? transferEvidence;
+
+  /// Ghi chú của nền tảng khi quản trị viên ghi nhận chuyển khoản thủ công.
+  final String? transferNote;
+
+  /// Ghi chú của nền tảng khi quản trị viên xử lý yêu cầu (duyệt / từ chối).
+  final String? adminNote;
+
   final DateTime? transferredAt;
   final DateTime? createdAt;
   final List<RefundAuditLogModel> auditLogs;
@@ -116,6 +123,8 @@ class RefundModel {
     this.contactEmail,
     this.transferReference,
     this.transferEvidence,
+    this.transferNote,
+    this.adminNote,
     this.transferredAt,
     this.createdAt,
     this.auditLogs = const [],
@@ -169,6 +178,8 @@ class RefundModel {
       contactEmail: json['contactEmail']?.toString(),
       transferReference: json['transferReference']?.toString(),
       transferEvidence: json['transferEvidence']?.toString(),
+      transferNote: json['transferNote']?.toString(),
+      adminNote: json['adminNote']?.toString(),
       transferredAt: _toDate(json['transferredAt']),
       createdAt: _toDate(json['createdAt']),
       auditLogs: (json['auditLogs'] is List)

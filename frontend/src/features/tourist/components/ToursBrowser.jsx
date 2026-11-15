@@ -6,6 +6,7 @@ import { Search, SlidersHorizontal, X, AlertTriangle, ChevronDown, Check } from 
 import TouristShell from "./TouristShell";
 import TourCard, { TourCardSkeleton } from "./TourCard";
 import { touristService } from "../services/touristService";
+import { usePurchasedTourIds } from "../hooks/usePurchasedTourIds";
 import { normalize } from "../utils";
 
 const ORDERS = [
@@ -178,6 +179,8 @@ export default function ToursBrowser() {
   const [catalog, setCatalog] = useState({ regions: [], themes: [], allTours: [] });
   const [state, setState] = useState({ loading: true, items: [], error: "" });
   const [sheetOpen, setSheetOpen] = useState(false);
+  /** Tour du khách đã mua ⇒ không hiện trong danh sách tour có thể đặt. */
+  const { ids: purchasedIds, loading: purchasedLoading } = usePurchasedTourIds();
 
   // Danh mục + toàn bộ tour đang bán (để đếm số tour mỗi vùng / chủ đề, không phụ thuộc bộ lọc hiện tại).
   useEffect(() => {
@@ -198,8 +201,28 @@ export default function ToursBrowser() {
     return () => { alive = false; };
   }, [key]);
 
-  const regionOptions = useMemo(() => withCounts(catalog.regions, catalog.allTours, "regionId", filters.regionId), [catalog, filters.regionId]);
-  const themeOptions = useMemo(() => withCounts(catalog.themes, catalog.allTours, "themeId", filters.themeId), [catalog, filters.themeId]);
+  /**
+   * Tour hiển thị = kết quả lọc của backend MINUS các tour đã mua.
+   * ⚠️ Phải lọc ở TẦNG HIỂN THỊ (không chỉ lúc render) ⇒ số tour trên chip
+   * Vùng/Chủ đề và số "Xem N tour" cũng khớp với danh sách thực sự hiện.
+   */
+  const visibleItems = useMemo(
+    () => (purchasedIds.size
+      ? state.items.filter((t) => !purchasedIds.has(Number(t.tourId)))
+      : state.items),
+    [state.items, purchasedIds],
+  );
+
+  /** Tour đã mua KHÔNG tính vào số tour của từng Vùng / Chủ đề. */
+  const catalogTours = useMemo(
+    () => (purchasedIds.size
+      ? catalog.allTours.filter((t) => !purchasedIds.has(Number(t.tourId)))
+      : catalog.allTours),
+    [catalog.allTours, purchasedIds],
+  );
+
+  const regionOptions = useMemo(() => withCounts(catalog.regions, catalogTours, "regionId", filters.regionId), [catalog.regions, catalogTours, filters.regionId]);
+  const themeOptions = useMemo(() => withCounts(catalog.themes, catalogTours, "themeId", filters.themeId), [catalog.themes, catalogTours, filters.themeId]);
 
   const update = (patch) => {
     const next = new URLSearchParams(params.toString());
@@ -248,7 +271,7 @@ export default function ToursBrowser() {
 
         <div className="mt-0 flex flex-wrap items-center gap-3 md:mt-3 md:border-t md:border-slate-200 md:pt-3">
           <p className="min-w-0 text-sm text-slate-600" aria-live="polite">
-            {state.loading ? "Đang tải…" : <><b className="text-slate-900">{state.items.length}</b> tour</>}
+            {state.loading || purchasedLoading ? "Đang tải…" : <><b className="text-slate-900">{visibleItems.length}</b> tour</>}
             {regionName && ` · ${regionName}`}{themeName && ` · ${themeName}`}{filters.q && ` · "${filters.q}"`}
           </p>
           {(activeCount > 0 || filters.q) && (
@@ -269,10 +292,10 @@ export default function ToursBrowser() {
         <div className="mt-6">
           {state.error ? (
             <p role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"><AlertTriangle size={16} />{state.error}</p>
-          ) : state.loading ? (
+          ) : state.loading || purchasedLoading ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">{[0, 1, 2, 3, 4, 5].map((i) => <TourCardSkeleton key={i} />)}</div>
-          ) : state.items.length ? (
-            <div key={key} className="jg-fade-in grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">{state.items.map((t) => <TourCard key={t.tourId} tour={t} />)}</div>
+          ) : visibleItems.length ? (
+            <div key={key} className="jg-fade-in grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">{visibleItems.map((t) => <TourCard key={t.tourId} tour={t} />)}</div>
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
               <p className="font-bold text-slate-800">Chưa có tour phù hợp</p>
@@ -283,7 +306,7 @@ export default function ToursBrowser() {
       </div>
 
       <FilterSheet open={sheetOpen} onClose={() => setSheetOpen(false)} regions={regionOptions} themes={themeOptions}
-        filters={filters} update={update} onReset={reset} resultCount={state.items.length} />
+        filters={filters} update={update} onReset={reset} resultCount={visibleItems.length} />
     </TouristShell>
   );
 }

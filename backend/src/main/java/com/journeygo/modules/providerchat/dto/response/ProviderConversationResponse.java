@@ -17,6 +17,8 @@ public record ProviderConversationResponse(
         @Schema(description = "Tên nhà tour") String providerName,
         @Schema(description = "ID tour liên quan") Long tourId,
         @Schema(description = "Tên tour liên quan") String tourTitle,
+        @Schema(description = "ID đơn đặt tour liên quan (null = mới hỏi, chưa đặt)") Long bookingId,
+        @Schema(description = "Mã đơn đặt tour liên quan") String bookingCode,
         @Schema(description = "Tiêu đề") String subject,
         @Schema(description = "Tin nhắn cuối cùng") String lastMessage,
         @Schema(description = "Thời điểm tin nhắn cuối") Instant lastMessageAt,
@@ -29,6 +31,7 @@ public record ProviderConversationResponse(
                                                            String touristName,
                                                            String providerName,
                                                            String tourTitle,
+                                                           String bookingCode,
                                                            String lastMessage,
                                                            int unreadCount) {
         if (c == null) return null;
@@ -40,6 +43,8 @@ public record ProviderConversationResponse(
                 .providerName(providerName)
                 .tourId(c.getTourId())
                 .tourTitle(tourTitle)
+                .bookingId(c.getBookingId())
+                .bookingCode(bookingCode)
                 .subject(c.getSubject())
                 .lastMessage(lastMessage)
                 .lastMessageAt(c.getLastMessageAt())

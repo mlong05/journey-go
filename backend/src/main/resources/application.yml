@@ -191,7 +191,9 @@ app:
     # trang kết quả của frontend; trang này gửi tham số vnp_* đã ký về
     # POST /payments/return-result để backend kiểm tra chữ ký rồi áp dụng.
     #   => VNPAY_WEB_RETURN_URL=http://localhost:3000/payment/result
-    # Để trống ⇒ web dùng chung Return URL với app (hành vi cũ).
+    # Để trống ⇒ web dùng Return URL của backend (/payments/return-page).
+    # ⚠️ TUYỆT ĐỐI KHÔNG để web rơi xuống custom scheme của app — xem
+    # VnPayClient#buildReturnUrl.
     web-return-url: ${VNPAY_WEB_RETURN_URL:}
 
     # ── Return URL riêng cho APP MOBILE (deep link, custom scheme) ─────────────
