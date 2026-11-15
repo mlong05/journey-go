@@ -3,10 +3,10 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Clock, MapPin, Tag, Store, Check, X, Minus, Plus, CalendarDays, Loader2, AlertTriangle, ListChecks,
-  Footprints, Info, ShieldCheck, Sparkles, MessageCircle, Heart, MessagesSquare,
+  ArrowLeft, Clock, MapPin, Tag, Store, Check, X, Minus, Plus, CalendarDays, Loader2, AlertTriangle, ListChecks,
+  Footprints, Info, ShieldCheck, Sparkles, MessageCircle, Heart, MessagesSquare, CheckCircle2, Lock,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
@@ -15,7 +15,8 @@ import { tourCoverTransition } from "./TourCard";
 import Breadcrumbs from "./Breadcrumbs";
 import LoginRequiredModal from "./LoginRequiredModal";
 import { useTouristSession } from "../hooks/useTouristSession";
-import { dateTime, durationLabel, shortDate, vnd } from "../utils";
+import { usePurchasedBooking } from "../hooks/usePurchasedBooking";
+import { dateTime, durationLabel, shortDate, longDate, vnd } from "../utils";
 
 /** "**08:00** Đón khách" → giờ in đậm + nội dung. */
 function ItineraryContent({ text }) {
@@ -72,7 +73,11 @@ function Gallery({ images, title, tourId }) {
 
 function BookingPanel({ tour, dates }) {
   const router = useRouter();
+  const params = useSearchParams();
   const { ready, isLoggedIn, isTourist } = useTouristSession();
+  // Đơn đã mua của du khách cho tour này (nếu có) ⇒ khung đặt tour bị khoá.
+  const bookingId = params?.get("bookingId") || "";
+  const { booking: purchased, loading: purchasedLoading } = usePurchasedBooking(tour.tourId, bookingId);
   const open = dates.filter((d) => d.available && (d.remaining ?? 0) > 0);
   const [date, setDate] = useState("");
   const [allDates, setAllDates] = useState(false);
@@ -91,14 +96,39 @@ function BookingPanel({ tour, dates }) {
   const hiddenDates = Math.max(0, Math.min(dates.length, 30) - visibleDates.length);
   const remaining = dates.find((d) => d.date === chosen)?.remaining ?? 0;
 
-  const seats = prices.reduce((s, p) => s + (p.countsTowardSlot ? counts[p.guestType] || 0 : 0), 0);
-  const total = prices.reduce((s, p) => s + (p.alwaysFree ? 0 : Number(p.price) * (counts[p.guestType] || 0)), 0);
-  const guests = Object.values(counts).reduce((a, b) => a + b, 0);
-  const problem = !open.length ? "Tour chưa có ngày khởi hành còn chỗ."
+  // ── ĐÃ MUA TOUR ⇒ khoá ngày + số khách, nút "Đã thanh toán" ──────────────
+  const paid = Boolean(purchased);
+  // Ngày đã chọn khi đặt (giữ đúng như lúc đặt) — nếu ngày đó không còn trong
+  // danh sách lịch (VD đã khép) thì vẫn hiển thị để khách thấy đúng ngày đã đặt.
+  const lockedDate = paid ? String(purchased.experienceDate || "").slice(0, 10) : "";
+  const effectiveDate = paid ? lockedDate : chosen;
+
+  // Số khách đã chọn lúc đặt (đếm theo loại vé trong danh sách hành khách).
+  const bookedCounts = useMemo(() => {
+    const acc = {};
+    (purchased?.passengers || []).forEach((p) => {
+      if (p.status === "REVOKED" || p.status === "REPLACED") return;
+      const t = String(p.guestType || "ADULT").toUpperCase();
+      acc[t] = (acc[t] || 0) + 1;
+    });
+    return acc;
+  }, [purchased]);
+
+  const effectiveCounts = paid
+    ? prices.reduce((acc, p) => ({ ...acc, [p.guestType]: bookedCounts[p.guestType] || 0 }), {})
+    : counts;
+
+  const seats = prices.reduce((s, p) => s + (p.countsTowardSlot ? effectiveCounts[p.guestType] || 0 : 0), 0);
+  const total = prices.reduce((s, p) => s + (p.alwaysFree ? 0 : Number(p.price) * (effectiveCounts[p.guestType] || 0)), 0);
+  const guests = Object.values(effectiveCounts).reduce((a, b) => a + b, 0);
+  const problem = paid ? "" : !open.length ? "Tour chưa có ngày khởi hành còn chỗ."
     : (counts.ADULT || 0) < 1 ? "Cần ít nhất 1 người lớn đi cùng."
     : seats > remaining ? `Ngày ${shortDate(chosen)} chỉ còn ${remaining} chỗ.` : "";
 
-  const change = (type, delta) => setCounts((c) => ({ ...c, [type]: Math.max(0, Math.min(20, (c[type] || 0) + delta)) }));
+  const change = (type, delta) => {
+    if (paid) return;
+    setCounts((c) => ({ ...c, [type]: Math.max(0, Math.min(20, (c[type] || 0) + delta)) }));
+  };
   const p = new URLSearchParams({ date: chosen });
   Object.entries(counts).forEach(([k, v]) => v > 0 && p.set(k.toLowerCase(), String(v)));
   const target = `${ROUTES.CHECKOUT(tour.tourId)}?${p}`;
@@ -107,9 +137,30 @@ function BookingPanel({ tour, dates }) {
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(16,32,29,0.08)]">
+      {/* ── ĐÃ MUA: thông báo + ngày/số khách bị khoá ─────────────────────── */}
+      {paid && (
+        <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="flex items-center gap-2 text-sm font-extrabold text-emerald-800">
+            <CheckCircle2 size={16} />Bạn đã mua tour này
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-emerald-700">
+            Đơn <b className="font-mono">{purchased.bookingCode}</b> · ngày khởi hành và số khách
+            đã chốt không thể thay đổi.
+          </p>
+        </div>
+      )}
+
       <fieldset>
         <legend className="mb-2 flex items-center gap-1.5 text-sm font-bold text-slate-800"><CalendarDays size={15} />Chọn ngày khởi hành</legend>
-        {open.length ? (
+        {paid ? (
+          /* Đã mua: chỉ hiện ngày đã chọn, sáng (không đổi được). */
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-teal-700 bg-teal-700 px-2 py-2 text-center text-xs text-white">
+              <span className="block font-bold">{shortDate(effectiveDate)}</span>
+              <span className="text-teal-50">Ngày đã chọn</span>
+            </div>
+          </div>
+        ) : open.length ? (
           <div className={`grid grid-cols-3 gap-2 ${allDates ? "max-h-[11.5rem] overflow-y-auto pr-1 [scrollbar-width:thin]" : ""}`}>
             {visibleDates.map((d) => {
               const full = !d.available || (d.remaining ?? 0) <= 0;
@@ -141,11 +192,11 @@ function BookingPanel({ tour, dates }) {
               <p className="text-xs text-slate-500">{p.alwaysFree ? "Miễn phí, không tính chỗ" : `${vnd(p.price)}${p.countsTowardSlot ? "" : " · không tính chỗ"}`}</p>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => change(p.guestType, -1)} disabled={!counts[p.guestType]} aria-label={`Bớt ${p.label}`}
+              <button type="button" onClick={() => change(p.guestType, -1)} disabled={paid || !effectiveCounts[p.guestType]} aria-label={`Bớt ${p.label}`}
                 className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 text-slate-600 disabled:opacity-30 cursor-pointer"><Minus size={14} /></button>
-              <span className="w-5 text-center font-bold tabular-nums" aria-live="polite">{counts[p.guestType] || 0}</span>
-              <button type="button" onClick={() => change(p.guestType, 1)} aria-label={`Thêm ${p.label}`}
-                className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 text-slate-600 cursor-pointer"><Plus size={14} /></button>
+              <span className="w-5 text-center font-bold tabular-nums" aria-live="polite">{effectiveCounts[p.guestType] || 0}</span>
+              <button type="button" onClick={() => change(p.guestType, 1)} disabled={paid} aria-label={`Thêm ${p.label}`}
+                className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 text-slate-600 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"><Plus size={14} /></button>
             </div>
           </div>
         ))}
@@ -156,12 +207,26 @@ function BookingPanel({ tour, dates }) {
         <span className="text-xl font-extrabold tabular-nums text-slate-900">{vnd(total)}</span>
       </div>
       {problem && <p className="mt-2 flex items-start gap-1.5 text-xs font-semibold text-amber-700"><AlertTriangle size={13} className="mt-px shrink-0" />{problem}</p>}
-      {ready && isLoggedIn && !isTourist ? (
+      {paid ? (
+        /* ĐÃ THANH TOÁN — không thể đặt lại. */
+        <>
+          <button type="button" disabled
+            className="mt-4 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-[15px] font-bold text-white disabled:opacity-70">
+            <Lock size={16} />Đã thanh toán
+          </button>
+          <p className="mt-2 text-center text-xs font-semibold text-emerald-700">
+            Tour đã mua không thể đặt lại. Bạn có thể xem lại đơn trong mục Chuyến đi của tôi.
+          </p>
+          <Link href={ROUTES.TRIPS} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">
+            Xem chuyến đi của tôi
+          </Link>
+        </>
+      ) : ready && isLoggedIn && !isTourist ? (
         <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">Bạn đang đăng nhập bằng tài khoản quản trị hoặc đối tác. Dùng tài khoản du khách để đặt tour.</p>
       ) : (
-        <button type="button" onClick={book} disabled={Boolean(problem)}
+        <button type="button" onClick={book} disabled={Boolean(problem) || purchasedLoading}
           className="mt-4 w-full rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] transition duration-200 hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-[0_10px_22px_rgba(234,88,12,0.38)] active:translate-y-0 active:scale-[0.98] disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none motion-reduce:transition-none cursor-pointer disabled:cursor-not-allowed">
-          Đặt tour
+          {ready && !isLoggedIn ? "Đăng nhập để đặt tour" : "Đặt tour"}
         </button>
       )}
       <LoginRequiredModal open={needLogin} onClose={() => setNeedLogin(false)} callbackUrl={target}
