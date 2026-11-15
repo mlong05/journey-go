@@ -12,11 +12,14 @@ import { touristService } from "../services/touristService";
 import { loginHref, registerHref } from "../utils";
 import { PAGE_EVENT, rememberPage } from "../navigation";
 import "../tourist-motion.css";
+import TouristNotificationBell from "./TouristNotificationBell";
+import TouristNotificationProvider from "./TouristNotificationProvider";
 
 const NAV = [
   { href: ROUTES.HOME, label: "Khám phá", match: (p) => p === "/" },
   // Chỉ sáng ở trang danh sách; trang chi tiết /tours/{id} không tô mục nào (đã có dòng đường dẫn).
   { href: ROUTES.TOURS, label: "Tất cả tour", match: (p) => p === "/tours" },
+  { href: ROUTES.COMMUNITY, label: "Cộng đồng", match: (p) => p.startsWith("/community") },
   { href: ROUTES.TRIPS, label: "Chuyến đi của tôi", match: (p) => p.startsWith("/trips"), touristOnly: true },
   { href: ROUTES.PARTNER_PROGRAM, label: "Dành cho đối tác", match: (p) => p.startsWith("/partner"), hideForTourist: true },
 ];
@@ -132,7 +135,10 @@ export function TouristHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           {!ready ? null : isTourist ? (
-            <AccountMenu user={user} onLogout={performLogout} />
+            <>
+              <TouristNotificationBell />
+              <AccountMenu user={user} onLogout={performLogout} />
+            </>
           ) : isStaff ? (
             <AccountMenu user={user} role={role} staffHome={staffHome} onLogout={performLogout} />
           ) : (
@@ -207,10 +213,12 @@ export default function TouristShell({ children }) {
   return (
     // overflow-x-clip: chặn mọi phần tử tràn ngang (không dùng overflow-hidden để header `sticky` vẫn hoạt động).
     <div className="font-jakarta flex min-h-screen w-full min-w-0 flex-col overflow-x-clip bg-[#f4f7f6] text-slate-900 antialiased">
-      <TouristHeader />
-      {/* Vùng nội dung có tên riêng ⇒ trượt khi chuyển trang, header & footer đứng yên */}
-      <main className="flex-1" style={{ viewTransitionName: "jg-page" }}>{children}</main>
-      <TouristFooter />
+      <TouristNotificationProvider>
+        <TouristHeader />
+        {/* Vùng nội dung có tên riêng ⇒ trượt khi chuyển trang, header & footer đứng yên */}
+        <main className="flex-1" style={{ viewTransitionName: "jg-page" }}>{children}</main>
+        <TouristFooter />
+      </TouristNotificationProvider>
     </div>
   );
 }
