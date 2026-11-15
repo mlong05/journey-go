@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
+import '../../core/models/refund_model.dart';
 import '../../core/models/tour_journey_model.dart';
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/progress_service.dart';
+import '../../core/services/refund_service.dart';
 import '../../core/services/tour_service.dart';
 import '../common/heritage_motion.dart';
 import '../journey/journey_screen.dart';
@@ -22,7 +24,16 @@ class _MyTour {
   final TourModel? tour;
   final _Stage stage;
 
-  const _MyTour({required this.booking, required this.journey, required this.tour, required this.stage});
+  /// Trạng thái hoàn tiền của đơn (null = không có booking / không có yêu cầu).
+  final RefundSummaryState? refundState;
+
+  const _MyTour({
+    required this.booking,
+    required this.journey,
+    required this.tour,
+    required this.stage,
+    this.refundState,
+  });
 
   int get tourId => booking?.tourId ?? journey!.tourId;
   String get title => tour?.title ?? booking?.tourTitle ?? journey?.tourName ?? 'Tour';
@@ -33,6 +44,15 @@ class _MyTour {
     if (j == null) return 0;
     return j.destinations.isNotEmpty ? j.doneCount : (j.currentOrder - 1).clamp(0, j.totalDestinations);
   }
+
+  /// Đang trong quá trình hoàn tiền.
+  bool get isRefunding => refundState == RefundSummaryState.processing;
+
+  /// Đã xử lý hoàn tiền xong.
+  bool get isRefundResolved => refundState == RefundSummaryState.resolved;
+
+  /// Đơn đã hoàn thành trải nghiệm (không còn hành trình đang chạy).
+  bool get isExperienceDone => stage == _Stage.done;
 }
 
 /// "Tour của tôi": các tour đã mua, chia theo đang trải nghiệm / sẵn sàng khởi hành / đã hoàn thành.
@@ -52,6 +72,7 @@ class MyToursView extends StatefulWidget {
 class _MyToursViewState extends State<MyToursView> {
   final ProgressService _progress = ProgressService();
   final TourService _tourService = TourService();
+  final RefundService _refundService = RefundService();
 
   List<_MyTour> _items = const [];
   bool _loading = true;
@@ -84,13 +105,22 @@ class _MyToursViewState extends State<MyToursView> {
         _progress.getTickets(),
         safe<List<TourJourney>>(_progress.getJourneys, const []),
         safe<List<TourModel>>(_tourService.getPublishedTours, const []),
+        // Yêu cầu hoàn tiền của tôi — dùng để thay nhãn đếm ngược và bật nút
+        // "Đặt lại tour" cho tour đang hoàn tiền / đã hoàn xong.
+        safe<List<RefundModel>>(
+          () => _refundService.getMyRefunds(page: 0, size: 100),
+          const [],
+        ),
       ]);
       if (!mounted) return;
+      final refundIndex =
+          RefundStateIndex.fromRefunds(results[3] as List<RefundModel>);
       setState(() {
         _items = _combine(
           results[0] as List<BookingModel>,
           results[1] as List<TourJourney>,
           results[2] as List<TourModel>,
+          refundIndex,
         );
         _error = null;
         _loading = false;
@@ -105,12 +135,22 @@ class _MyToursViewState extends State<MyToursView> {
   }
 
   /// Ghép vé với hành trình cùng booking; hành trình không gắn vé (tour miễn phí) cũng được liệt kê.
-  static List<_MyTour> _combine(List<BookingModel> tickets, List<TourJourney> journeys, List<TourModel> tours) {
+  static List<_MyTour> _combine(
+    List<BookingModel> tickets,
+    List<TourJourney> journeys,
+    List<TourModel> tours,
+    RefundStateIndex refundIndex,
+  ) {
     final tourById = {for (final t in tours) t.id: t};
     final items = <_MyTour>[];
     final usedJourneys = <int>{};
 
     for (final b in tickets) {
+      // ⚠️ "Chuyến đi" chỉ hiển thị tour ĐÃ THANH TOÁN và CÒN TRẢI NGHIỆM ĐƯỢC.
+      // Đơn đang hoàn tiền hoặc đã hoàn xong ⇒ không còn hiệu lực trải nghiệm
+      // ⇒ loại khỏi danh sách này (khách xem ở màn "Đơn đặt tour của tôi").
+      if (refundIndex.hasRefund(b.id)) continue;
+
       final mine = journeys.where((j) => j.bookingId == b.id).toList()
         ..sort((a, c) => c.id.compareTo(a.id));
       final journey = mine.where((j) => j.status == ProgressStatus.inProgress).firstOrNull ??
@@ -121,7 +161,13 @@ class _MyToursViewState extends State<MyToursView> {
           : (journey?.isCompleted ?? false) || b.status == BookingStatus.completed
               ? _Stage.done
               : _Stage.ready;
-      items.add(_MyTour(booking: b, journey: journey, tour: tourById[b.tourId], stage: stage));
+      items.add(_MyTour(
+        booking: b,
+        journey: journey,
+        tour: tourById[b.tourId],
+        stage: stage,
+        refundState: refundIndex.stateFor(b.id),
+      ));
     }
 
     for (final j in journeys) {
@@ -510,53 +556,111 @@ class _TicketCard extends StatelessWidget {
         );
       case _Stage.ready:
         // Tour chưa tới ngày trải nghiệm ⇒ đếm ngược thay cho "Bắt đầu trải nghiệm".
+        //
+        // ⚠️ Màn "Chuyến đi" CHỈ hiển thị tour đã thanh toán và còn trải nghiệm
+        // được (không dính vào hoàn tiền) ⇒ các nhánh "đang/có hoàn tiền" ở đây
+        // chỉ là lưới an toàn (đơn vừa gửi yêu cầu hoàn tiền nhưng danh sách chưa
+        // kịp tải lại).
         final booking = item.booking;
         final locked = booking?.isTourLocked ?? false;
-        return SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: FilledButton.icon(
-            onPressed: onJourney,
-            icon: Icon(locked ? Icons.schedule_rounded : Icons.explore_rounded, size: 19),
-            label: Text(
-              locked ? '${booking!.daysUntilStart} ngày nữa lên đường!' : 'Bắt đầu trải nghiệm',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            style: FilledButton.styleFrom(backgroundColor: AppCultureColors.heritageJade, shape: shape),
-          ),
-        );
-      case _Stage.done:
-        return Row(
+        final refunding = item.isRefunding;
+        final resolved = item.isRefundResolved;
+        return Column(
           children: [
-            if (onJourney != null)
-            Expanded(
-              child: OutlinedButton.icon(
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton.icon(
                 onPressed: onJourney,
-                icon: const Icon(Icons.auto_stories_rounded, size: 18),
-                label: const Text('Xem lại', style: TextStyle(fontWeight: FontWeight.w600)),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(46),
-                  foregroundColor: AppCultureColors.amberDark,
-                  side: const BorderSide(color: AppCultureColors.rewardBorder),
+                icon: Icon(
+                  refunding
+                      ? Icons.pending_actions_rounded
+                      : resolved
+                          ? Icons.verified_rounded
+                          : locked
+                              ? Icons.schedule_rounded
+                              : Icons.explore_rounded,
+                  size: 19,
+                ),
+                label: Text(
+                  refunding
+                      ? 'Đang trong quá trình hoàn tiền'
+                      : resolved
+                          ? 'Đã xử lý hoàn tiền'
+                          : locked
+                              ? '${booking!.daysUntilStart} ngày nữa lên đường!'
+                              : 'Bắt đầu trải nghiệm',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: refunding
+                      ? AppCultureColors.rewardText
+                      : resolved
+                          ? AppCultureColors.oceanBlue
+                          : AppCultureColors.heritageJade,
                   shape: shape,
                 ),
               ),
             ),
-            if (onRebook != null) ...[
-              if (onJourney != null) const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.icon(
+            // ⚠️ "Đặt lại tour" KHÔNG hiện khi đơn ĐANG trong quá trình hoàn
+            // tiền (chưa chốt được kết quả ⇒ chưa nên đặt lại). Chỉ hiện khi
+            // đã xử lý xong (đã hoàn / bị từ chối / lỗi) hoặc đã trải nghiệm xong.
+            if (onRebook != null && resolved) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: OutlinedButton.icon(
                   onPressed: onRebook,
                   icon: const Icon(Icons.replay_rounded, size: 18),
-                  label: const Text('Đặt lại', style: TextStyle(fontWeight: FontWeight.w600)),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(46),
-                    backgroundColor: AppCultureColors.heritageJade,
+                  label: const Text('Đặt lại tour', style: TextStyle(fontWeight: FontWeight.w600)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppCultureColors.heritageJade,
+                    side: const BorderSide(color: AppCultureColors.heritageJade),
                     shape: shape,
                   ),
                 ),
               ),
             ],
+          ],
+        );
+      case _Stage.done:
+        return Column(
+          children: [
+            Row(
+              children: [
+                if (onJourney != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onJourney,
+                      icon: const Icon(Icons.auto_stories_rounded, size: 18),
+                      label: const Text('Xem lại', style: TextStyle(fontWeight: FontWeight.w600)),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(46),
+                        foregroundColor: AppCultureColors.amberDark,
+                        side: const BorderSide(color: AppCultureColors.rewardBorder),
+                        shape: shape,
+                      ),
+                    ),
+                  ),
+                if (onJourney != null && onRebook != null) const SizedBox(width: 10),
+                if (onRebook != null)
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: onRebook,
+                      icon: const Icon(Icons.replay_rounded, size: 18),
+                      label: const Text('Đặt lại tour', style: TextStyle(fontWeight: FontWeight.w600)),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(46),
+                        backgroundColor: AppCultureColors.heritageJade,
+                        shape: shape,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
         );
     }
@@ -566,8 +670,12 @@ class _TicketCard extends StatelessWidget {
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   /// "05/11/2026 · còn 5 ngày" / "Hôm nay" cho vé chưa đi.
+  ///
+  /// ⚠️ Khi đơn đang/có hoàn tiền ⇒ KHÔNG hiển thị đếm ngược (đã bị thay bằng nhãn
+  /// trạng thái hoàn tiền ở nút hành động).
   String _dateLine(DateTime d) {
     if (item.stage != _Stage.ready) return _date(d);
+    if (item.isRefunding || item.isRefundResolved) return _date(d);
     // Đếm ngày theo giờ Việt Nam — khớp với cách backend tính "còn N ngày".
     final now = DateTime.now().toUtc().add(const Duration(hours: 7));
     final today = DateUtils.dateOnly(now);
