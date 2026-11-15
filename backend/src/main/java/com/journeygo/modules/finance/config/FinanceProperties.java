@@ -32,6 +32,22 @@ public class FinanceProperties {
     private int refundWindowHours = 24;
 
     /**
+     * Số giờ trước ngày trải nghiệm mà yêu cầu hoàn tiền của nhóm cá nhân bị tính
+     * tỷ lệ 0% (khách hủy quá muộn hoặc không xuất hiện — no-show).
+     *
+     * <p>Chính sách: "Hủy trong vòng 48 giờ hoặc không xuất hiện thì hoàn 0%".
+     */
+    private int refundNoShowWindowHours = 48;
+
+    /**
+     * Số giờ trước ngày trải nghiệm mà Tourist được gửi lại yêu cầu hoàn tiền
+     * sau khi yêu cầu trước bị từ chối.
+     *
+     * <p>0 = KHÔNG cho gửi lại (chặt chẽ, an toàn tài chính).
+     */
+    private int refundResubmitHoursBeforeStart = 0;
+
+    /**
      * Tỷ lệ hoa hồng nền tảng mặc định (0.20 = 20%) — dùng khi ProviderProfile chưa có cấu hình riêng.
      */
     private BigDecimal defaultCommissionRate = new BigDecimal("0.2000");
@@ -101,5 +117,15 @@ public class FinanceProperties {
     /** Số giờ tối đa cho phép âm thầm dùng {@link #refundResubmitWindowHours}. */
     public int effectiveRefundResubmitWindowHours() {
         return Math.max(0, refundResubmitWindowHours);
+    }
+
+    /** Số giờ cửa sổ no-show — không bao giờ âm thầm. */
+    public int effectiveRefundNoShowWindowHours() {
+        return Math.max(0, refundNoShowWindowHours);
+    }
+
+    /** Số giờ cho phép gửi lại yêu cầu trước ngày trải nghiệm — không bao giờ âm thầm. */
+    public int effectiveRefundResubmitHoursBeforeStart() {
+        return Math.max(0, refundResubmitHoursBeforeStart);
     }
 }

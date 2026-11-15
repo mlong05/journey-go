@@ -94,14 +94,19 @@ public class DashboardService {
         // Phạm vi Admin chỉ gồm cấu hình hệ thống, đối tác, người dùng và tất toán.
         // Việc thẩm định điểm đến / tour thuộc CONTENT_MODERATOR nên không xuất hiện ở đây.
         List<AdminDashboardResponse.PendingTask> tasks = new ArrayList<>();
-        query("select r.id, r.refundCode, u.fullName, r.proposedAmount, r.declaredReason, r.reasonDetail, r.createdAt "
+        query("select r.id, r.refundCode, u.fullName, r.proposedAmount, r.declaredReason, r.reasonSummary, r.reasonDetail, r.createdAt "
                 + "from RefundRequest r join r.tourist u where r.status = ?1 order by r.createdAt asc", Object[].class,
                 RefundStatus.PENDING_REVIEW).setMaxResults(TASK_LIMIT).getResultList()
                 .forEach(r -> tasks.add(new AdminDashboardResponse.PendingTask("REFUND", (Long) r[0], (String) r[1],
                         "Yêu cầu hoàn tiền " + r[1],
-                        "Du khách: " + r[2] + " · Đề xuất " + formatVnd((BigDecimal) r[3]),
-                        r[5] != null ? (String) r[5] : "Lý do: " + name(r[4]),
-                        (Instant) r[6], "/admin/finance")));
+                        // ⚠️ Khách KHÔNG chọn nhóm lý do ⇒ `declaredReason` có thể
+                        // null và `proposedAmount` = 0 ⇒ hiển thị cho đúng.
+                        (BigDecimal) r[3] != null && ((BigDecimal) r[3]).signum() > 0
+                                ? "Du khách: " + r[2] + " · Đề xuất " + formatVnd((BigDecimal) r[3])
+                                : "Du khách: " + r[2] + " · Chờ phân loại nguyên nhân",
+                        r[5] != null ? (String) r[5]
+                                : (r[6] != null ? (String) r[6] : "Lý do: " + name(r[4])),
+                        (Instant) r[7], "/admin/finance")));
         tasks.sort(Comparator.comparing(AdminDashboardResponse.PendingTask::submittedAt,
                 Comparator.nullsLast(Comparator.naturalOrder())));
 

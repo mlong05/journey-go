@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
+import '../../core/models/refund_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
 import '../../core/services/payment_service.dart';
+import '../../core/services/refund_service.dart';
 import '../booking/booking_detail_screen.dart';
 import '../journey/journey_screen.dart';
-import '../chat/provider_chat_list_screen.dart';
 import '../tours/tour_detail_opener.dart';
 import 'booking_checkout_screen.dart';
 
@@ -21,15 +22,51 @@ class MyBookingsScreen extends StatefulWidget {
 class _MyBookingsScreenState extends State<MyBookingsScreen> {
   final BookingService _bookingService = BookingService();
   final PaymentService _paymentService = PaymentService();
+  final RefundService _refundService = RefundService();
 
   List<BookingModel> _bookings = const [];
-  List<PaymentModel> _payments = const [];
+
+  /// Chỉ mục trạng thái hoàn tiền theo booking — dùng để thay nhãn đếm ngược
+  /// ".. ngày nữa lên đường" và bật nút "Đặt lại tour".
+  RefundStateIndex _refundIndex = const RefundStateIndex({});
+
+  /// Tập booking ĐÃ có giao dịch thanh toán thành công.
+  ///
+  /// ⚠️ Vì sao cần? ── Đơn `EXPIRED` / `CANCELLED` vẫn CÓ thể đã từng thanh toán
+  /// thành công (VD: thanh toán đến muộn ⇒ đơn hết hạn nhưng tiền đã vào, hoặc
+  /// đơn bị hủy sau khi đã trả tiền rồi hoàn tiền). Backend giữ booking ở
+  /// trạng thái terminal ⇒ `isPaid` = false ⇒ nếu chỉ dựa vào `isPaid` thì app
+  /// hiểu nhầm là "chưa thanh toán" ⇒ hiện sai "Thanh toán thành công" hoặc
+  /// cho truy cập trải nghiệm.
+  ///
+  /// ⇒ Chỉ hiện "Thanh toán thành công" khi booking có giao dịch SUCCESS thật.
+  Set<int> _paidBookingIds = const {};
+
   bool _loading = true;
   String? _error;
+
+  /// Theo dõi vòng đời app — tải lại danh sách khi quay lại từ trình duyệt
+  /// VNPay (hoặc từ bất kỳ màn nào khác) để trạng thái đơn luôn mới.
+  late final WidgetsBindingObserver _lifecycleWatcher;
 
   @override
   void initState() {
     super.initState();
+    _lifecycleWatcher = _BookingListWatcher(onResumed: _onResumed);
+    WidgetsBinding.instance.addObserver(_lifecycleWatcher);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(_lifecycleWatcher);
+    super.dispose();
+  }
+
+  /// Khách quay lại app sau khi thanh toán ⇒ tải lại đơn ⇒ trạng thái cập nhật.
+  void _onResumed() {
+    if (!mounted) return;
+    if (_loading) return;
     _load();
   }
 
@@ -40,11 +77,21 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         // chỉ booking do chính mình đặt.
         _bookingService.getAccessibleBookings(),
         _paymentService.getMine(),
+        // Yêu cầu hoàn tiền của tôi — gom theo booking để biết đơn nào đang
+        // hoàn tiền / đã hoàn xong.
+        _refundService.getMyRefunds(page: 0, size: 100),
       ]);
       if (!mounted) return;
+      final payments = results[1] as List<PaymentModel>;
       setState(() {
         _bookings = results[0] as List<BookingModel>;
-        _payments = results[1] as List<PaymentModel>;
+        _refundIndex = RefundStateIndex.fromRefunds(results[2] as List<RefundModel>);
+        // ⚠️ Đơn nào THỰC SỰ đã thanh toán thành công (không phụ thuộc status
+        // của booking — đơn hết hạn/hủy vẫn có thể đã trả tiền).
+        _paidBookingIds = {
+          for (final p in payments)
+            if (p.isSuccess && p.bookingId != null) p.bookingId!,
+        };
         _error = null;
         _loading = false;
       });
@@ -73,7 +120,59 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     if (changed == true && mounted) _load();
   }
 
-  bool _isTicket(BookingModel b) => b.isPaid;
+  // ── Phân loại đơn theo trạng thái ──────────────────────────────────────────
+  //
+  // ⚠️ Thứ tự ưu tiên RẤT quan trọng — mỗi đơn chỉ thuộc MỘT nhóm:
+  //   1. Đang hoàn tiền (tiền đang bay) — ưu tiên cao nhất.
+  //   2. Đã hoàn tiền (đã có kết quả).
+  //   3. Đã mua (đã thanh toán, không dính hoàn tiền).
+  //   4. Chờ thanh toán (còn trong hạn 10 phút).
+  //   5. Còn lại ⇒ đã hủy / hết hạn.
+
+  /// Đơn đang trong quá trình hoàn tiền (chờ duyệt / chờ VNPay / chờ chuyển khoản).
+  bool _isRefunding(BookingModel b) =>
+      _refundIndex.stateFor(b.id) == RefundSummaryState.processing;
+
+  /// Đơn đã xử lý xong hoàn tiền (đã hoàn / bị từ chối / lỗi).
+  bool _isRefunded(BookingModel b) =>
+      _refundIndex.stateFor(b.id) == RefundSummaryState.resolved;
+
+  /// Đơn đã thanh toán và KHÔNG dính hoàn tiền.
+  bool _isPurchased(BookingModel b) => b.isPaid && !_refundIndex.hasRefund(b.id);
+
+  /// Đơn còn trong hạn thanh toán (10 phút) — khách có thể thanh toán tiếp.
+  ///
+  /// ⚠️ Chỉ những đơn CHƯA thanh toán mới vào nhóm này. Đơn đã thanh toán phải
+  /// rơi vào "Đã mua" — nếu không, đơn đã trả tiền vẫn hiện "Chờ thanh toán".
+  bool _isPendingPayment(BookingModel b) =>
+      b.isPendingPayment && b.isPaymentWindowOpen;
+
+  /// Đơn đã hủy hoặc hết hạn thanh toán — KHÔNG còn hiệu lực trải nghiệm.
+  ///
+  /// ⚠️ Gồm 2 trường hợp:
+  ///   • Trạng thái TERMINAL (`CANCELLED` / `EXPIRED`) — chỗ đã được giải phóng.
+  ///   • `PENDING_PAYMENT` đã quá hạn 10 phút — chỗ đã/như sẽ được trả lại.
+  ///
+  /// Cả hai đều KHÔNG được hiển thị như "đã thanh toán thành công" và KHÔNG
+  /// được cho truy cập trải nghiệm.
+  bool _isClosed(BookingModel b) =>
+      b.isCancelled ||
+      b.isExpired ||
+      (b.isPendingPayment && !b.isPaymentWindowOpen);
+
+  /// Đơn này ĐÃ từng thanh toán thành công (có giao dịch `SUCCESS`).
+  ///
+  /// ⚠️ KHÔNG dựa vào `booking.isPaid` — đơn hết hạn/hủy sau khi đã trả tiền
+  /// vẫn `isPaid` = false. Đây là nguồn sự thật về "đã trả tiền hay chưa".
+  bool _hasSuccessfulPayment(BookingModel b) => _paidBookingIds.contains(b.id);
+
+  /// Đơn đã hủy/hết hạn NHƯNG vẫn có giao dịch thành công ⇒ tiền đã thu nhưng
+  /// chỗ đã được trả lại ⇒ cần đưa vào quy trình hoàn tiền.
+  ///
+  /// ⚠️ Đây là trường hợp "đơn chết" mà app phải hiển thị ĐÚNG, không phải
+  /// "Thanh toán thành công" (không có chỗ để trải nghiệm).
+  bool _isClosedButPaid(BookingModel b) =>
+      _isClosed(b) && _hasSuccessfulPayment(b);
 
   /// Mở hành trình — nhưng nếu ngày trải nghiệm còn ở tương lai thì mở màn CHI TIẾT
   /// TOUR (không vào hành trình vì backend đang khoá tour tới ngày đó).
@@ -89,11 +188,26 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tickets = _bookings.where(_isTicket).toList();
-    final pending = _bookings.where((b) => b.canPay).toList();
+    // ── Phân loại đơn theo trạng thái ──────────────────────────────────────
+    //
+    // ⚠️ Mỗi đơn thuộc ĐÚNG MỘT nhóm để không hiện trùng ở nhiều tab:
+    //   • Đang hoàn tiền  — ưu tiên cao nhất (đơn đang bay tiền).
+    //   • Đã hoàn tiền    — đã có kết quả hoàn tiền (đã hoàn / bị từ chối / lỗi).
+    //   • Đã mua          — đã thanh toán và KHÔNG dính hoàn tiền.
+    //   • Chờ thanh toán  — còn trong hạn 10 phút.
+    //   • Đã hủy/Hết hạn — phần còn lại.
+    final all = _bookings;
+    final refunding = all.where((b) => _isRefunding(b)).toList();
+    final refunded = all.where((b) => _isRefunded(b)).toList();
+    final purchased = all.where((b) => _isPurchased(b)).toList();
+    final pending = all.where((b) => _isPendingPayment(b)).toList();
+    // ⚠️ "Đã hủy/Hết hạn" = đơn ở trạng thái TERMINAL (CANCELLED / EXPIRED).
+    // Trước đây nhóm này là "phần còn lại" ⇒ lẫn cả đơn `PENDING_PAYMENT` quá
+    // hạn ⇒ hiển thị sai (như "đã thanh toán" / cho truy cập trải nghiệm).
+    final closed = all.where((b) => _isClosed(b)).toList();
 
     return DefaultTabController(
-      length: 4,
+      length: 6,
       child: Scaffold(
         backgroundColor: AppCultureColors.background,
         appBar: AppBar(
@@ -110,10 +224,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             isScrollable: true,
             tabAlignment: TabAlignment.start,
             tabs: [
-              Tab(text: 'Vé (${tickets.length})'),
+              Tab(text: 'Tất cả (${all.length})'),
+              Tab(text: 'Đã mua (${purchased.length})'),
               Tab(text: 'Chờ thanh toán (${pending.length})'),
-              const Tab(text: 'Giao dịch'),
-              const Tab(text: 'Hỗ trợ từ nhà tour'),
+              Tab(text: 'Đang hoàn tiền (${refunding.length})'),
+              Tab(text: 'Đã hoàn tiền (${refunded.length})'),
+              Tab(text: 'Đã hủy/Hết hạn (${closed.length})'),
             ],
           ),
         ),
@@ -131,12 +247,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   Expanded(
                     child: TabBarView(
                       children: [
-                        _list(tickets, 'Chưa có vé nào. Vé xuất hiện sau khi bạn thanh toán thành công.', _ticketTile),
+                        _list(all, 'Chưa có đơn nào.', _ticketTile),
+                        _list(purchased, 'Chưa có đơn nào đã thanh toán.', _ticketTile),
                         _list(pending, 'Không có đơn nào đang chờ thanh toán.', _pendingTile),
-                        _list(_payments, 'Chưa có giao dịch nào.', _paymentTile),
-                        // Hỗ trợ từ nhà tour: nhúng danh sách hội thoại để khách
-                        // không phải rời màn "Đơn đặt tour".
-                        const ProviderChatListScreen(embedded: true),
+                        _list(refunding, 'Không có đơn nào đang hoàn tiền.', _ticketTile),
+                        _list(refunded, 'Chưa có đơn nào đã hoàn tiền xong.', _ticketTile),
+                        _list(closed, 'Không có đơn nào đã hủy hoặc hết hạn.', _closedTile),
                       ],
                     ),
                   ),
@@ -182,63 +298,255 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         child: child,
       );
 
-  Widget _ticketTile(BookingModel b) => _tile(
-        child: InkWell(
-          onTap: () => _startExperience(b),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(b.bookingCode,
-                      style: const TextStyle(fontSize: 11, color: AppCultureColors.textMuted)),
-                  Text(BookingStatus.label(b.status),
-                      style: const TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.w700, color: AppCultureColors.jadeDark)),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(b.tourTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 4),
-              Text('Ngày ${formatDay(b.experienceDate)} · ${formatMoney(b.totalAmount)}',
-                  style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => _startExperience(b),
-                      icon: Icon(b.isTourLocked ? Icons.schedule_rounded : Icons.explore_rounded, size: 18),
-                      label: Text(
-                        b.isTourLocked ? '${b.daysUntilStart} ngày nữa lên đường!' : 'Vào trải nghiệm',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppCultureColors.heritageJade,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
+  Widget _ticketTile(BookingModel b) {
+    final refundState = _refundIndex.stateFor(b.id);
+    final refunding = refundState == RefundSummaryState.processing;
+    final resolved = refundState == RefundSummaryState.resolved;
+
+    // ⚠️ Đơn đã hủy / hết hạn KHÔNG có chỗ để trải nghiệm ⇒ không mở hành
+    // trình (backend trả lỗi "Booking đã bị hủy hoặc hết hạn"), chỉ xem chi tiết.
+    final closed = _isClosed(b);
+    final canStartExperience = !closed && !refunding && !resolved;
+
+    void openDetail() => _openDetail(b);
+    void startExperience() => _startExperience(b);
+
+    return _tile(
+      child: InkWell(
+        // ⚠️ Đơn đang/có hoàn tiền ⇒ bấm vào mở CHI TIẾT ĐƠN (có lịch sử xử
+        // lý + trạng thái hoàn tiền), KHÔNG mở màn trải nghiệm.
+        onTap: canStartExperience ? startExperience : openDetail,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(b.bookingCode,
+                    style: const TextStyle(fontSize: 11, color: AppCultureColors.textMuted)),
+                Text(BookingStatus.label(b.status),
+                    style: const TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w700, color: AppCultureColors.jadeDark)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(b.tourTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('Ngày ${formatDay(b.experienceDate)} · ${formatMoney(b.totalAmount)}',
+                style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    // ⚠️ Đơn đang/có hoàn tiền ⇒ bấm vào XEM CHI TIẾT ĐƠN (nơi có
+                    // lịch sử + trạng thái hoàn tiền), KHÔNG mở màn trải nghiệm.
+                    // Đơn đã hủy/hết hạn ⇒ cũng chỉ xem chi tiết (không có chỗ).
+                    onPressed: canStartExperience ? startExperience : openDetail,
+                    icon: Icon(
+                      refunding
+                          ? Icons.pending_actions_rounded
+                          : resolved
+                              ? Icons.verified_rounded
+                              : closed
+                                  ? Icons.event_busy_rounded
+                                  : b.isTourLocked
+                                      ? Icons.schedule_rounded
+                                      : Icons.explore_rounded,
+                      size: 18,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Chi tiết đơn: mã QR trải nghiệm, hành khách, yêu cầu hoàn tiền
-                  OutlinedButton(
-                    onPressed: () => _openDetail(b),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppCultureColors.jadeDark,
-                      side: const BorderSide(color: AppCultureColors.border),
+                    label: Text(
+                      _actionLabel(b, refunding, resolved),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: refunding
+                          ? AppCultureColors.rewardText
+                          : resolved
+                              ? AppCultureColors.oceanBlue
+                              : closed
+                                  ? AppCultureColors.textMuted
+                                  : AppCultureColors.heritageJade,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    child: const Text('Chi tiết', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
-                ],
+                ),
+                const SizedBox(width: 8),
+                // Chi tiết đơn: mã QR trải nghiệm, hành khách, yêu cầu hoàn tiền
+                OutlinedButton(
+                  onPressed: () => _openDetail(b),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppCultureColors.jadeDark,
+                    side: const BorderSide(color: AppCultureColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Chi tiết', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+            // ⚠️ KHÔNG hiện badge trạng thái hoàn tiền ở đây — nhãn đã nằm trên
+            // nút hành động ngay phía trên ("Đang trong quá trình hoàn tiền" /
+            // "Đã xử lý hoàn tiền"). Hiện cả hai ⇒ hiển thị TRÙNG LẶP.
+            //
+            // ⚠️ "Đặt lại tour" chỉ hiện khi đơn ĐÃ xử lý xong hoàn tiền.
+            // Đang trong quá trình hoàn tiền thì chưa chốt được kết quả ⇒
+            // chưa nên đặt lại (tránh mua trùng khi hoàn tiền còn bay).
+            if (resolved) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _rebook(b),
+                  icon: const Icon(Icons.replay_rounded, size: 17),
+                  label: const Text(
+                    'Đặt lại tour',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppCultureColors.heritageJade,
+                    side: const BorderSide(color: AppCultureColors.heritageJade),
+                    minimumSize: const Size.fromHeight(44),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Nhãn nút hành động — thay ".. ngày nữa lên đường" khi đơn đang/có hoàn tiền.
+  String _actionLabel(BookingModel b, bool refunding, bool resolved) {
+    if (refunding) return 'Đang trong quá trình hoàn tiền';
+    if (resolved) return 'Đã xử lý hoàn tiền';
+    // ⚠️ Đơn đã hủy/hết hạn ⇒ KHÔNG mở được hành trình ⇒ nhãn phải nói đúng
+    // sự thật, không hiện "Vào trải nghiệm" (gây hiểu nhầm đã mua thành công).
+    if (_isClosed(b)) return b.isCancelled ? 'Đơn đã hủy' : 'Đơn đã hết hạn';
+    return b.isTourLocked ? '${b.daysUntilStart} ngày nữa lên đường!' : 'Vào trải nghiệm';
+  }
+
+  /// Tile cho đơn ĐÃ HỦY / HẾT HẠN.
+  ///
+  /// ⚠️ Vì sao cần tile riêng? ── Trước đây dùng chung `_ticketTile` ⇒ đơn hủy/hết
+  /// hạn hiện nút "Vào trải nghiệm" (mở được hành trình ⇒ backend chặn với lỗi
+  /// khó hiểu) và nhãn trạng thái màu "đã xác nhận" ⇒ gây hiểu nhầm là đã mua
+  /// thành công.
+  ///
+  /// ⇒ Ở đây: KHÔNG có nút trải nghiệm, chỉ có "Chi tiết" để xem thông tin và
+  /// (nếu đã trả tiền) hướng dẫn yêu cầu hoàn tiền.
+  Widget _closedTile(BookingModel b) {
+    final cancelled = b.isCancelled;
+    final paidButClosed = _isClosedButPaid(b);
+    final reason = (b.cancellationReason ?? '').trim();
+
+    return _tile(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(b.bookingCode,
+                  style: const TextStyle(fontSize: 11, color: AppCultureColors.textMuted)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: cancelled ? const Color(0xFFFEE2E2) : AppCultureColors.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  cancelled ? 'Đã hủy' : 'Hết hạn thanh toán',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: cancelled ? AppCultureColors.error : AppCultureColors.textMuted,
+                  ),
+                ),
               ),
             ],
           ),
-        ),
-      );
+          const SizedBox(height: 4),
+          Text(
+            b.tourTitle,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppCultureColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Ngày ${formatDay(b.experienceDate)} · ${formatMoney(b.totalAmount)}',
+            style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+          ),
+          if (reason.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Lý do: $reason',
+              style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
+            ),
+          ],
+          const SizedBox(height: 10),
+          // ⚠️ Đơn đã hủy/hết hạn KHÔNG có chỗ để trải nghiệm ⇒ không hiện nút
+          // mở hành trình (backend sẽ từ chối với lỗi khó hiểu).
+          if (paidButClosed) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppCultureColors.rewardBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline_rounded,
+                      size: 16, color: AppCultureColors.rewardText),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Khoản tiền đã được ghi nhận nhưng chỗ đã được trả lại. '
+                      'Vui lòng liên hệ hỗ trợ để được hoàn tiền.',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        height: 1.35,
+                        color: AppCultureColors.rewardText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _openDetail(b),
+              icon: const Icon(Icons.receipt_long_rounded, size: 17),
+              label: const Text(
+                'Xem chi tiết đơn',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppCultureColors.jadeDark,
+                side: const BorderSide(color: AppCultureColors.border),
+                minimumSize: const Size.fromHeight(44),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Mở màn chi tiết tour để đặt lại (nếu tour còn tồn tại và đặt được).
+  Future<void> _rebook(BookingModel b) async {
+    await openTourDetailScreen(context, tourId: b.tourId);
+  }
 
   Widget _pendingTile(BookingModel b) => _tile(
         child: Column(
@@ -259,33 +567,30 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           ],
         ),
       );
+}
 
-  Widget _paymentTile(PaymentModel p) => _tile(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(formatMoney(p.amount), style: const TextStyle(fontWeight: FontWeight.w700)),
-                  Text('Đơn ${p.bookingCode} · ${formatDateTime(p.createdAt)}',
-                      style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
-                  if (p.duplicatePayment)
-                    const Text('Giao dịch trùng với một giao dịch đã thanh toán',
-                        style: TextStyle(fontSize: 11, color: AppCultureColors.amberDark)),
-                ],
-              ),
-            ),
-            Text(PaymentStatus.label(p.status),
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: p.status == PaymentStatus.success
-                      ? AppCultureColors.jadeDark
-                      : AppCultureColors.textMuted,
-                )),
-          ],
-        ),
-      );
+/// Giám sát vòng đời app cho màn "Đơn đặt tour".
+///
+/// ── Vì sao cần? ──
+/// Khách thanh toán xong ⇒ quay lại app từ trình duyệt VNPay ⇒ trạng thái đơn
+/// trên server đã đổi (`PENDING_PAYMENT` → `CONFIRMED`) nhưng danh sách đang
+/// hiển thị vẫn là bản cũ ⇒ đơn đã trả tiền vẫn nằm ở tab "Chờ thanh toán".
+///
+/// ⇒ Gọi `onResumed` mỗi lần app quay lại foreground để tải lại danh sách.
+///
+/// ⚠️ `WidgetsBindingObserver` là abstract class ⇒ phải subclass, không
+/// instantiate trực tiếp.
+class _BookingListWatcher extends WidgetsBindingObserver {
+  /// Được gọi khi app chuyển sang `AppLifecycleState.resumed`.
+  final void Function() onResumed;
+
+  _BookingListWatcher({required this.onResumed});
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      onResumed();
+    }
+  }
 }

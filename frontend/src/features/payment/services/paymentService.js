@@ -175,8 +175,18 @@ export async function getPaymentSummary() {
   return res?.data ?? res;
 }
 
-/** Trạng thái cuối cùng của một giao dịch — dùng để quyết định dừng poll hay chưy. */
-export const FINAL_PAYMENT_STATUSES = ["SUCCESS", "FAILED", "CANCELLED"];
+/**
+ * Trạng thái cuối cùng của một giao dịch — dùng để quyết định dừng poll hay chưy.
+ *
+ * ⚠️ `SUPERSEDED` (giao dịch bị thay thế — khách đã tạo giao dịch mới và đơn đã
+ * được thanh toán) CŨNG là trạng thái CUỐI ⇒ không poll tiếp.
+ */
+export const FINAL_PAYMENT_STATUSES = [
+  "SUCCESS",
+  "FAILED",
+  "CANCELLED",
+  "SUPERSEDED",
+];
 
 /** `PROCESSING` là trạng thái đang xử lý — KHÔNG phải lỗi, KHÔNG được coi là thất bại. */
 export function isPaymentFinal(status) {

@@ -27,6 +27,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { communityModerationService as api } from "@/features/community/services/communityModerationService";
 import { useQueueRefresh } from "@/context/NotificationContext";
+import { formatDateTimeVN } from "@/lib/money";
 
 /**
  * Trang Duyệt Bài Viết Cộng Đồng của Kiểm duyệt viên.
@@ -90,8 +91,7 @@ const TONES = {
 
 function formatTime(value) {
   if (!value) return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("vi-VN");
+  return formatDateTimeVN(value);
 }
 
 function initialOf(name) {

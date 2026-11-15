@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/services/apiClient";
 import RoleManagerModal from "./RoleManagerModal";
+import { formatDateTimeVN } from "@/lib/money";
 
 // URL chỉ dùng để hiển thị trong banner cảnh báo khi fallback.
 // Việc gọi API thực sự dùng apiClient (đã cấu hình base URL đúng ở services/apiClient.js).
@@ -94,14 +95,7 @@ const SIZE_OPTIONS = [10, 20, 50];
 
 function formatDateTime(value) {
   if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  const dd = String(date.getDate()).padStart(2, "0");
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const yyyy = date.getFullYear();
-  const hh = String(date.getHours()).padStart(2, "0");
-  const mi = String(date.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+  return formatDateTimeVN(value) || "—";
 }
 
 function getInitials(fullName = "") {

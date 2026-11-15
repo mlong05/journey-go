@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { SURFACE, TABLE, BADGE, BUTTON } from "./dashboard.tokens";
 import { PageHeader, StatCard } from "@/components/dashboard/DashboardUI";
+import { formatDateTimeVN } from "@/lib/money";
 import { dashboardService } from "@/features/dashboard";
 import { useQueueRefresh } from "@/context/NotificationContext";
 
@@ -37,6 +38,8 @@ const PAYMENT_STATUS = {
   FAILED: { label: "Thất bại", badge: BADGE.danger, icon: XCircle },
   EXPIRED: { label: "Hết hạn", badge: BADGE.neutral, icon: XCircle },
   CANCELLED: { label: "Đã hủy", badge: BADGE.neutral, icon: XCircle },
+  // Giao dịch bị thay thế — khách đã tạo giao dịch mới và đơn đã được thanh toán.
+  SUPERSEDED: { label: "Đã bị thay thế", badge: BADGE.neutral, icon: XCircle },
 };
 
 const TASK_BADGE = {
@@ -47,16 +50,16 @@ const TASK_BADGE = {
 
 const fmtNumber = (n) => Number(n || 0).toLocaleString("vi-VN");
 
-const fmtDateTime = (iso) =>
-  iso
-    ? new Date(iso).toLocaleString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })
-    : "—";
+/**
+ * Định dạng mốc thời gian theo chuẩn CHUNG của toàn hệ thống:
+ * "14:19 15/11/2026" (giờ Việt Nam, dd/MM/yyyy).
+ *
+ * ⚠️ Dùng helper `formatDateTimeVN` thay vì `toLocaleString` rời rạc:
+ * • cố định múi giờ Asia/Ho_Chi_Minh (server render UTC vs client render local
+ *   ⇒ "Hydration failed" nếu để múi giờ hệ thống),
+ * • định dạng giờ phút giống hệt các trang admin khác.
+ */
+const fmtDateTime = (iso) => formatDateTimeVN(iso) || "—";
 
 /**
  * Trang Tổng Quan Vận Hành & Tăng Trưởng Toàn Sàn - JourneyGo

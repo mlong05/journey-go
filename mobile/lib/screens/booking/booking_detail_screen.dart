@@ -84,20 +84,26 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       if (!mounted) return;
       _myUserId = myUser?.id;
 
-      final booking =
-          widget.booking ?? await _bookingService.getBookingById(widget.bookingId);
+      // ⚠️ LUÔN đọc booking từ server — KHÔNG dùng `widget.booking` (bản cache
+      // truyền vào).
+      //
+      // ── Vì sao? ──
+      // `widget.booking` là ẢNH CHỤP tại thời điểm màn được mở. Sau khi khách
+      // thanh toán (hoặc admin duyệt hoàn tiền), trạng thái đã thay đổi trên
+      // server nhưng bản cache vẫn là `PENDING_PAYMENT` ⇒ màn chi tiết hiện
+      // "Chờ thanh toán" cho một đơn ĐÃ thanh toán thành công.
+      //
+      // ⇒ Luôn gọi API ⇒ trạng thái luôn khớp với server.
+      final booking = await _bookingService.getBookingById(widget.bookingId);
       final payments = await _paymentService.getPaymentsByBooking(widget.bookingId);
 
-      // Chỉ tra yêu cầu hoàn tiền theo các payment thực sự đã thanh toán.
-      final refunds = <RefundModel>[];
-      for (final payment in payments.where((p) => p.isSuccess)) {
-        try {
-          refunds.addAll(
-            await _refundService.getRefundsByPayment(payment.id),
-          );
-        } on ApiException {
-          // Bỏ qua lỗi từng payment — không chặn việc hiển thị đơn.
-        }
+      // Lấy yêu cầu hoàn tiền theo BOOKING (gộp mọi payment) — kèm nhật ký kiểm
+      // toán đầy đủ để hiển thị lịch sử xử lý theo thứ tự thời gian.
+      List<RefundModel> refunds = const [];
+      try {
+        refunds = await _refundService.getRefundsByBooking(widget.bookingId);
+      } on ApiException {
+        // Bỏ qua lỗi — không chặn việc hiển thị đơn.
       }
 
       if (!mounted) return;
@@ -130,24 +136,35 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     return null;
   }
 
-  /// Còn trong 24h kể từ `paidAt` — điều kiện tối thiểu để gửi yêu cầu hoàn tiền.
+  /// Yêu cầu hoàn tiền chỉ được gửi TRƯỚC ngày khởi hành (tour chưa bắt đầu).
+  ///
+  /// ── Vì sao không dùng mốc 24h kể từ `paidAt`? ──
+  /// Chính sách mới bỏ hoàn toàn cửa sổ 24h sau thanh toán. Điều kiện duy nhất là
+  /// booking đã thanh toán thành công và ngày trải nghiệm còn ở tương lai.
   bool get _withinRefundWindow {
-    final payment = _successfulPayment;
-    if (payment?.paidAt == null) return false;
-    return DateTime.now()
-        .difference(payment!.paidAt!)
-        .inHours < 24;
+    final booking = _booking;
+    if (booking?.experienceDate == null) return false;
+    final today = DateTime.now();
+    final start = DateTime(
+      booking!.experienceDate!.year,
+      booking.experienceDate!.month,
+      booking.experienceDate!.day,
+    );
+    return start.isAfter(today);
   }
 
-  bool get _hasOpenRefund {
-    return _refunds.any((r) =>
-        r.isPending || r.isApproved || r.isProcessing || r.isManualTransferPending);
-  }
+  /// Đã có yêu cầu hoàn tiền nào cho đơn này chưa.
+  ///
+  /// ⚠️ Mỗi giao dịch chỉ có tối đa MỘT yêu cầu hoàn tiền đang xử lý hoặc đã hoàn
+  /// tất (backend cũng chặn) ⇒ sau khi gửi, KHÔNG hiển thị lại nút "Yêu cầu hoàn
+  /// tiền" cho đơn đó.
+  bool get _hasOpenRefund => _refunds.isNotEmpty;
 
   bool get _canRequestRefund {
     final booking = _booking;
     if (booking == null) return false;
     if (!booking.isConfirmed && !booking.isCompleted) return false;
+    if (booking.isCompleted) return false;
     if (_successfulPayment == null) return false;
     if (!_withinRefundWindow) return false;
     if (_hasOpenRefund) return false;
@@ -189,12 +206,22 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       if (result.isFinal) {
         await _load();
         if (!mounted) return;
+        // Giao dịch bị THAY THẾ ⇒ không phải lỗi — đơn đã được thanh toán bởi
+        // giao dịch khác ⇒ hiện thông báo trung tính (không đỏ báo lỗi).
+        final superseded = result.payment?.isSuperseded == true;
         _showToast(
           result.message.isNotEmpty
               ? result.message
-              : 'Giao dịch đã được xác nhận không thành công.',
-          icon: Icons.cancel_rounded,
-          color: AppCultureColors.error,
+              : superseded
+                  ? 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
+                      'bởi một giao dịch khác.'
+                  : 'Giao dịch đã được xác nhận không thành công.',
+          icon: superseded
+              ? Icons.swap_horiz_rounded
+              : Icons.cancel_rounded,
+          color: superseded
+              ? AppCultureColors.textMuted
+              : AppCultureColors.error,
         );
         return;
       }
@@ -536,13 +563,16 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         _buildPaymentCard(),
         if (_refunds.isNotEmpty) ...[
           const SizedBox(height: 14),
+          _buildRefundStatusBanner(),
+          const SizedBox(height: 14),
           _buildRefundCard(),
+          const SizedBox(height: 14),
+          _buildAuditHistoryCard(),
         ],
         if (_successfulPayment != null && !_withinRefundWindow) ...[
           const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
+            padding: const EdgeInsets.all(14),            decoration: BoxDecoration(
               color: AppCultureColors.rewardBg,
               borderRadius: BorderRadius.circular(14),
             ),
@@ -553,7 +583,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Đã quá 24 giờ kể từ thời điểm thanh toán nên không thể gửi yêu cầu hoàn tiền.',
+                    'Yêu cầu hoàn tiền chỉ được gửi trước ngày khởi hành của tour. '
+                    'Bạn đã trải nghiệm hoặc tour đã hoàn thành nên không thể gửi yêu cầu.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
@@ -731,6 +762,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
   // ── Timeline trạng thái ──────────────────────────────────────────────────
   Widget _buildStatusTimeline(BookingModel booking) {
+    // ⚠️ Đơn đã hủy / hết hạn ⇒ các bước sau KHÔNG còn là "chờ" nữa mà là
+    // "không thực hiện" (chỗ đã được trả lại) ⇒ hiện đúng sự thật.
+    final closed = booking.isCancelled || booking.isExpired;
+    final cancelled = booking.isCancelled;
+
     final steps = <_StatusStep>[
       _StatusStep(
         'Đặt tour',
@@ -749,15 +785,20 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         'Xác nhận',
         booking.confirmedAt != null
             ? formatDateTimeVn(booking.confirmedAt)
-            : 'Chờ thanh toán',
+            : closed
+                // Đơn chưa từng được xác nhận ⇒ chỗ đã được trả lại.
+                ? (cancelled ? 'Đơn đã hủy' : 'Đơn đã hết hạn')
+                : 'Chờ thanh toán',
         done: booking.confirmedAt != null,
-        active: booking.paidAt != null && booking.confirmedAt == null,
+        active: !closed && booking.paidAt != null && booking.confirmedAt == null,
       ),
       _StatusStep(
         'Hoàn thành',
         booking.completedAt != null
             ? formatDateTimeVn(booking.completedAt)
-            : 'Chưa trải nghiệm',
+            : closed
+                ? 'Không thực hiện'
+                : 'Chưa trải nghiệm',
         done: booking.completedAt != null,
         active: booking.isConfirmed,
       ),
@@ -1417,6 +1458,289 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
+  // ── Lịch sử xử lý hoàn tiền ─────────────────────────────────────────────
+
+  /// Banner trạng thái hoàn tiền của đơn.
+  ///
+  /// Hiển thị ngay dưới tiến trình đơn để khách biết:
+  ///  • đang trong quá trình hoàn tiền (chờ quản trị viên / VNPay / chuyển khoản)
+  ///  • đã xử lý hoàn tiền xong
+  Widget _buildRefundStatusBanner() {
+    final state = summarizeRefundState(_refunds);
+    if (state == RefundSummaryState.none) return const SizedBox.shrink();
+
+    final processing = state == RefundSummaryState.processing;
+    final latest = _refunds.first;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: processing ? AppCultureColors.rewardBg : AppCultureColors.jadeLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: processing
+              ? AppCultureColors.rewardBorder
+              : AppCultureColors.jadeDark.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            processing ? Icons.pending_actions_rounded : Icons.verified_rounded,
+            size: 18,
+            color: processing ? AppCultureColors.rewardText : AppCultureColors.jadeDark,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  processing
+                      ? 'Đang trong quá trình hoàn tiền'
+                      : 'Đã xử lý hoàn tiền',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: processing
+                        ? AppCultureColors.rewardText
+                        : AppCultureColors.jadeDark,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  processing
+                      ? 'Yêu cầu ${latest.refundCode.isEmpty ? '#${latest.id}' : latest.refundCode} đang được xử lý. '
+                          'Bạn có thể theo dõi từng bước trong "Lịch sử xử lý hoàn tiền" bên dưới.'
+                      : 'Yêu cầu ${latest.refundCode.isEmpty ? '#${latest.id}' : latest.refundCode} đã được xử lý: '
+                          '${latest.statusLabel}.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.35,
+                    color: processing
+                        ? AppCultureColors.rewardText
+                        : AppCultureColors.jadeDark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Card "Lịch sử xử lý" — hiển thị ĐẦY ĐỦ mọi bước xử lý của yêu cầu hoàn tiền.
+  ///
+  /// ⚠️ Thứ tự: CŨ NHẤT Ở TRÊN, MỚI NHẤT Ở DƯỚI (sắp xếp tăng dần theo thời
+  /// gian). Mỗi bước admin thực hiện đều được GHI LẠI, không ghi đè bước cũ.
+  Widget _buildAuditHistoryCard() {
+    // Gom tất cả dòng nhật ký của mọi yêu cầu của đơn, sắp xếp tăng dần.
+    final entries = <_AuditEntry>[];
+    for (final refund in _refunds) {
+      for (final log in refund.auditLogs) {
+        entries.add(_AuditEntry(refund: refund, log: log));
+      }
+    }
+    entries.sort((a, b) {
+      final ta = a.log.createdAt;
+      final tb = b.log.createdAt;
+      if (ta == null && tb == null) return a.log.id.compareTo(b.log.id);
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      final byTime = ta.compareTo(tb);
+      return byTime != 0 ? byTime : a.log.id.compareTo(b.log.id);
+    });
+
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardTitle(
+              icon: Icons.history_rounded, text: 'Lịch sử xử lý hoàn tiền'),
+          const SizedBox(height: 4),
+          const Text(
+            'Các bước xử lý được ghi nhận theo thứ tự thời gian — cũ nhất ở trên, mới nhất ở dưới.',
+            style: TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
+          ),
+          const SizedBox(height: 14),
+          ...entries.asMap().entries.map((e) {
+            final isLast = e.key == entries.length - 1;
+            return _buildAuditRow(e.value, isLast);
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAuditRow(_AuditEntry entry, bool isLast) {
+    final log = entry.log;
+    final tone = _auditTone(log.action);
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 26,
+            child: Column(
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: tone.bg,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(tone.icon, size: 11, color: tone.fg),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      margin: const EdgeInsets.symmetric(vertical: 3),
+                      color: AppCultureColors.border,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tone.label,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppCultureColors.textDark,
+                    ),
+                  ),
+                  if (log.detail != null && log.detail!.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      log.detail!,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        height: 1.35,
+                        color: AppCultureColors.textMuted,
+                      ),
+                    ),
+                  ],
+                  if (log.amount > 0) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      formatVndAmount(log.amount),
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppCultureColors.jadeDark,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 3),
+                  Text(
+                    '${entry.refund.refundCode.isEmpty ? 'Yêu cầu #${entry.refund.id}' : entry.refund.refundCode}'
+                    '${log.createdAt != null ? ' • ${formatDateTimeVn(log.createdAt)}' : ''}',
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: AppCultureColors.textLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Nhãn + màu cho một hành động trong nhật ký kiểm toán.
+  _AuditTone _auditTone(String? action) {
+    switch (action) {
+      case 'CREATED':
+        return const _AuditTone(
+          'Đã gửi yêu cầu hoàn tiền',
+          Icons.send_rounded,
+          AppCultureColors.oceanDark,
+          AppCultureColors.oceanLight,
+        );
+      case 'APPROVED':
+        return const _AuditTone(
+          'Quản trị viên đã duyệt yêu cầu',
+          Icons.verified_rounded,
+          AppCultureColors.jadeDark,
+          AppCultureColors.jadeLight,
+        );
+      case 'REJECTED':
+        return const _AuditTone(
+          'Yêu cầu bị từ chối',
+          Icons.do_not_disturb_rounded,
+          AppCultureColors.error,
+          Color(0xFFFEF2F2),
+        );
+      case 'CANCELLED':
+        return const _AuditTone(
+          'Yêu cầu đã được hủy',
+          Icons.cancel_rounded,
+          AppCultureColors.error,
+          Color(0xFFFEF2F2),
+        );
+      case 'VNPAY_REQUEST_SENT':
+        return const _AuditTone(
+          'Đã gửi yêu cầu hoàn tiền tới VNPay',
+          Icons.cloud_upload_rounded,
+          AppCultureColors.rewardText,
+          AppCultureColors.rewardBg,
+        );
+      case 'VNPAY_RESPONSE':
+      case 'VNPAY_STATUS_UPDATED':
+        return const _AuditTone(
+          'VNPay phản hồi kết quả hoàn tiền',
+          Icons.cloud_sync_rounded,
+          AppCultureColors.oceanDark,
+          AppCultureColors.oceanLight,
+        );
+      case 'MANUAL_TRANSFER_RECORDED':
+        return const _AuditTone(
+          'Đã ghi nhận chuyển khoản thủ công',
+          Icons.payments_rounded,
+          AppCultureColors.jadeDark,
+          AppCultureColors.jadeLight,
+        );
+      case 'MANUAL_TRANSFER_CONFIRMED':
+        return const _AuditTone(
+          'Đã xác nhận chuyển khoản — hoàn tiền thành công',
+          Icons.check_circle_rounded,
+          AppCultureColors.jadeDark,
+          AppCultureColors.jadeLight,
+        );
+      case 'STATUS_UPDATED':
+        return const _AuditTone(
+          'Cập nhật trạng thái yêu cầu',
+          Icons.sync_rounded,
+          AppCultureColors.textMuted,
+          AppCultureColors.surfaceSubtle,
+        );
+      default:
+        return const _AuditTone(
+          'Cập nhật yêu cầu hoàn tiền',
+          Icons.info_rounded,
+          AppCultureColors.textMuted,
+          AppCultureColors.surfaceSubtle,
+        );
+    }
+  }
+
   // ── Helpers ─────────────────────────────────────────────────────────────
   Widget _card({required Widget child}) {
     return Container(
@@ -1576,6 +1900,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Widget _buildPaymentRow(PaymentModel payment) {
     final isSuccess = payment.isSuccess;
     final isStuck = payment.isProcessing;
+    final isSuperseded = payment.isSuperseded;
     final isChecking = _checking.contains(payment.id);
 
     return Padding(
@@ -1590,13 +1915,17 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     ? Icons.check_circle_rounded
                     : payment.isFailed || payment.isCancelled
                         ? Icons.cancel_rounded
-                        : Icons.schedule_rounded,
+                        : isSuperseded
+                            ? Icons.swap_horiz_rounded
+                            : Icons.schedule_rounded,
                 size: 17,
                 color: isSuccess
                     ? AppCultureColors.heritageJade
                     : payment.isFailed || payment.isCancelled
                         ? AppCultureColors.error
-                        : AppCultureColors.warning,
+                        : isSuperseded
+                            ? AppCultureColors.textMuted
+                            : AppCultureColors.warning,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1617,6 +1946,17 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       style: const TextStyle(
                           fontSize: 11, color: AppCultureColors.textMuted),
                     ),
+                    if (isSuperseded) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
+                        'bởi một giao dịch khác.',
+                        style: const TextStyle(
+                            fontSize: 10.5,
+                            color: AppCultureColors.textMuted,
+                            height: 1.35),
+                      ),
+                    ],
                     if (isStuck) ...[
                       const SizedBox(height: 2),
                       Text(
@@ -1704,22 +2044,21 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Widget _buildRefundRow(RefundModel refund) {
+    final tone = _refundTone(refund);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          Icon(
-            refund.isRefunded
-                ? Icons.assignment_turned_in_rounded
-                : refund.isRejected
-                    ? Icons.do_not_disturb_rounded
-                    : Icons.pending_actions_rounded,
-            size: 17,
-            color: refund.isRefunded
-                ? AppCultureColors.heritageJade
-                : refund.isRejected
-                    ? AppCultureColors.error
-                    : AppCultureColors.warning,
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: tone.bg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(tone.icon, size: 17, color: tone.fg),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1738,24 +2077,64 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${refund.statusLabel} • ${refund.declaredReasonLabel}',
+                  // ⚠️ Khách KHÔNG chọn nhóm lý do nữa ⇒ `declaredReason` có thể
+                  // null khi Admin chưa duyệt ⇒ fallback sang lý do ngắn gọn.
+                  refund.approvedReasonName != null
+                      ? '${refund.statusLabel} • ${refund.approvedReasonName}'
+                      : refund.reasonSummary.isNotEmpty
+                          ? '${refund.statusLabel} • ${refund.reasonSummary}'
+                          : '${refund.statusLabel} • Chờ quản trị viên phân loại',
                   style: const TextStyle(
                       fontSize: 11, color: AppCultureColors.textMuted),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
           Text(
-            refund.formattedProposedAmount,
-            style: const TextStyle(
+            // ⚠️ Khách KHÔNG chọn nhóm lý do ⇒ chưa có tỷ lệ ⇒ chưa có số tiền
+            // đề xuất ⇒ hiển thị "Chờ phân loại" thay vì "0 đ".
+            refund.displayAmount != null && refund.displayAmount! > 0
+                ? refund.formattedEffectiveAmount
+                : 'Chờ phân loại',
+            style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w800,
-              color: AppCultureColors.textDark,
+              color: refund.displayAmount != null && refund.displayAmount! > 0
+                  ? AppCultureColors.textDark
+                  : AppCultureColors.textMuted,
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// Màu/nhãn/icon của trạng thái một yêu cầu hoàn tiền.
+  _AuditTone _refundTone(RefundModel refund) {
+    if (refund.isRefunded) {
+      return const _AuditTone(
+        'Đã hoàn tiền',
+        Icons.assignment_turned_in_rounded,
+        AppCultureColors.heritageJade,
+        AppCultureColors.jadeLight,
+      );
+    }
+    if (refund.isRejected || refund.isFailed) {
+      return const _AuditTone(
+        'Từ chối',
+        Icons.do_not_disturb_rounded,
+        AppCultureColors.error,
+        Color(0xFFFEF2F2),
+      );
+    }
+    return const _AuditTone(
+        'Đang xử lý',
+        Icons.pending_actions_rounded,
+        AppCultureColors.warning,
+        AppCultureColors.rewardBg,
+      );
   }
 }
 
@@ -1787,6 +2166,24 @@ class _HoldTone {
   final Color bg;
 
   const _HoldTone(this.label, this.icon, this.fg, this.bg);
+}
+
+/// Một dòng nhật ký kiểm toán kèm yêu cầu hoàn tiền tương ứng.
+class _AuditEntry {
+  final RefundModel refund;
+  final RefundAuditLogModel log;
+
+  const _AuditEntry({required this.refund, required this.log});
+}
+
+/// Nhãn + màu của một bước trong lịch sử xử lý.
+class _AuditTone {
+  final String label;
+  final IconData icon;
+  final Color fg;
+  final Color bg;
+
+  const _AuditTone(this.label, this.icon, this.fg, this.bg);
 }
 
 /// Tiêu đề card dùng chung.

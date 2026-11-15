@@ -15,6 +15,14 @@ public interface RefundAuditLogRepository extends JpaRepository<RefundAuditLog, 
     List<RefundAuditLog> findByRefundRequest_IdOrderByCreatedAtAsc(Long refundRequestId);
 
     /**
+     * Lấy nhật ký kiểm toán của NHIỀU yêu cầu cùng lúc, sắp xếp theo thời gian tăng dần.
+     *
+     * <p>Dùng cho các endpoint trả danh sách (danh sách của tôi / theo payment) để
+     * tránh N+1 query: mỗi yêu cầu cần một vòng query riêng.
+     */
+    List<RefundAuditLog> findByRefundRequest_IdInOrderByCreatedAtAsc(List<Long> refundRequestIds);
+
+    /**
      * Lấy các dòng nhật ký gần nhất theo hành động (mới nhất trước).
      *
      * <p>Dùng để phát hiện dòng nhật ký trùng lặp: mỗi lần tác vụ nền quét lại trạng

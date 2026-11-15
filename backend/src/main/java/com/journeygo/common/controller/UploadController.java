@@ -45,8 +45,10 @@ public class UploadController {
     }
 
     @PostMapping(value = "/video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN')")
-    @Operation(summary = "Tải video lên Cloudinary", description = "Video MP4 / WEBM / MOV tối đa 100MB — dùng cho video cổ vật của tour")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN', 'TOURIST')")
+    @Operation(summary = "Tải video lên Cloudinary",
+            description = "Video MP4 / WEBM / MOV tối đa 100MB — dùng cho video cổ vật của tour "
+                    + "và bằng chứng đính kèm của yêu cầu hoàn tiền")
     public ResponseEntity<ApiResponse<Map<String, String>>> uploadVideo(
             @Parameter(description = "Tệp video cần tải lên (MP4, WEBM, MOV)")
             @RequestParam("file") MultipartFile file,

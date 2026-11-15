@@ -275,7 +275,7 @@ public class ProviderRevenueService {
         List<RefundRequest> unresolved = refunds.stream()
                 .filter(r -> r.getStatus() == RefundStatus.PENDING_REVIEW
                         || r.getStatus() == RefundStatus.APPROVED
-                        || r.getStatus() == RefundStatus.REFUND_PROCESSING)
+                        || r.getStatus().isPendingResult())
                 .toList();
         checks.add(check("3_NO_PENDING_REFUND", "Không có Refund chưa có kết quả cuối cùng",
                 unresolved.isEmpty(),
