@@ -16,5 +16,12 @@ public enum PaymentOutcome {
     /** Chưa xác định được kết quả — giữ nguyên trạng thái chờ, KHÔNG tự kết luận. */
     UNKNOWN,
     /** Giao dịch trùng (callback lặp) — đã được xử lý trước đó, không ghi nhận lại. */
-    DUPLICATE
+    DUPLICATE,
+    /**
+     * Giao dịch bị THAY THẾ — Booking đã được giao dịch khác thanh toán thành công.
+     *
+     * <p>Khác với {@link #UNKNOWN}: đây là kết quả ĐÃ RÕ (không còn "chờ") ⇒
+     * giao dịch được đóng lại, UI không hiện "Đang chờ kết quả thanh toán" nữa.
+     */
+    SUPERSEDED
 }
