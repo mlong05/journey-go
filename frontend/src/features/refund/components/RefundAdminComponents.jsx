@@ -323,6 +323,33 @@ export function RefundDetailBody({ refund, compact = false }) {
         </DetailBlock>
       )}
 
+      {/* Ghi chú của nền tảng — Admin nhập khi duyệt / từ chối. Khách cũng thấy. */}
+      {refund?.adminNote && (
+        <DetailBlock title="Ghi chú của nền tảng">
+          <p className="text-xs text-slate-700 leading-relaxed">
+            {refund.adminNote}
+          </p>
+        </DetailBlock>
+      )}
+
+      {/* Ghi chú khi ghi nhận chuyển khoản thủ công + ảnh bằng chứng. */}
+      {(refund?.transferNote || refund?.transferEvidence) && (
+        <DetailBlock title="Ghi nhận chuyển khoản thủ công">
+          <div className="space-y-2">
+            {refund?.transferNote && (
+              <p className="text-xs text-slate-700 leading-relaxed">
+                {refund.transferNote}
+              </p>
+            )}
+            {refund?.transferEvidence && (
+              <p className="text-xs text-slate-600 leading-relaxed break-all">
+                {refund.transferEvidence}
+              </p>
+            )}
+          </div>
+        </DetailBlock>
+      )}
+
       {/* Thông tin ngân hàng nhận tiền */}
       {(refund?.bankAccountNumber || refund?.transferReference) && (
         <DetailBlock title="Thông tin nhận tiền">
@@ -1183,6 +1210,9 @@ const TRANSFER_REFERENCE_MAX = 100;
 /** Bằng chứng — backend `ManualTransferRequest.transferEvidence` cho phép 5000. */
 const TRANSFER_EVIDENCE_MAX = 5000;
 
+/** Ghi chú nền tảng — backend `ManualTransferRequest.transferNote` cho phép 2000. */
+const TRANSFER_NOTE_MAX = 500;
+
 /**
  * Modal ghi nhận đã chuyển khoản ngân hàng thủ công.
  *
@@ -1208,6 +1238,7 @@ export function ManualTransferModal({ refund, busy, onClose, onSubmit }) {
   const [reference, setReference] = useState("");
   const [evidence, setEvidence] = useState("");
   const [evidenceUrl, setEvidenceUrl] = useState("");
+  const [note, setNote] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
@@ -1285,6 +1316,7 @@ export function ManualTransferModal({ refund, busy, onClose, onSubmit }) {
     onSubmit({
       transferReference: reference.trim(),
       transferEvidence: evidence.trim(),
+      transferNote: note.trim() || null,
       transferredAt: new Date().toISOString(),
     });
   };
@@ -1434,6 +1466,23 @@ export function ManualTransferModal({ refund, busy, onClose, onSubmit }) {
                   {evidence.length}/{TRANSFER_EVIDENCE_MAX}
                 </p>
               </div>
+            </Field>
+
+            <Field
+              label="Ghi chú của nền tảng"
+              hint="Không bắt buộc — khách sẽ thấy ghi chú này trong lịch sử hoàn tiền."
+            >
+              <textarea
+                value={note}
+                maxLength={TRANSFER_NOTE_MAX}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                placeholder="VD: Đã chuyển kèm phí 11.000đ, tiền về tối nay."
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:bg-white focus:outline-none"
+              />
+              <p className="mt-1 text-right text-[10px] tabular-nums text-slate-400">
+                {note.length}/{TRANSFER_NOTE_MAX}
+              </p>
             </Field>
 
             <div className="flex justify-end gap-2 pt-1">
