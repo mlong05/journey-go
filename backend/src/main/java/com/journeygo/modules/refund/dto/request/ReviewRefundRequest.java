@@ -15,8 +15,13 @@ public record ReviewRefundRequest(
         @NotNull(message = "Quyết định không được để trống")
         Boolean approve,
 
-        @Schema(description = "Nguyên nhân do Admin xác định — quyết định tỷ lệ hoàn 50%/100%")
+        @Schema(description = "Nhóm lý do do Admin xác định: PERSONAL | PLATFORM_FAULT | "
+                + "PROVIDER_FAULT | FORCE_MAJEURE — quyết định tỷ lệ hoàn")
         RefundReason reason,
+
+        @Schema(description = "Mã lý do cụ thể trong nhóm do Admin xác định (VD: HEALTH_ISSUE)")
+        @Size(max = 60, message = "Mã lý do không được vượt quá 60 ký tự")
+        String reasonCode,
 
         @Schema(description = "Số tiền được duyệt (Admin chỉ có thể điều chỉnh trong phạm vi chính sách)")
         BigDecimal amount,
