@@ -140,8 +140,8 @@ export default function ProviderSupportChat({ currentUserId }) {
         <div>
           <h1 className="text-xl font-bold text-slate-900">Hỗ trợ khách hàng</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Tin nhắn khách hàng gửi tới bạn qua mục &ldquo;Chat với bên đối tác&rdquo; trước khi
-            đặt tour ({conversations.length} hội thoại).
+            Tin nhắn khách hàng gửi tới bạn qua mục &ldquo;Chat với bên đối tác&rdquo; hoặc qua khung
+            &ldquo;Hỗ trợ trong đơn này&rdquo; ({conversations.length} hội thoại).
           </p>
         </div>
         <button
@@ -203,6 +203,12 @@ export default function ProviderSupportChat({ currentUserId }) {
                         {c.tourTitle && (
                           <p className="mt-0.5 truncate text-[11px] font-semibold text-emerald-700">
                             {c.tourTitle}
+                          </p>
+                        )}
+                        {/* Gắn với đơn đặt tour ⇒ hiển thị mã đơn cho dễ tra cứu. */}
+                        {c.bookingCode && (
+                          <p className="truncate text-[11px] font-semibold text-amber-700">
+                            Đơn {c.bookingCode}
                           </p>
                         )}
                         <div className="mt-1 flex items-center gap-2">

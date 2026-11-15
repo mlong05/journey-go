@@ -260,8 +260,12 @@ function Messages() {
                       <span className={`truncate text-sm ${c.unreadCount ? "font-extrabold text-slate-900" : "font-bold text-slate-800"}`}>{c.providerName}</span>
                       <span className="shrink-0 text-[11px] text-slate-400">{shortWhen(c.lastMessageAt || c.updatedAt)}</span>
                     </span>
+                    {c.tourTitle && <span className="block truncate text-xs text-teal-700">{c.tourTitle}</span>}
+                    {/* Gắn với đơn đặt tour ⇒ hiển thị mã đơn cho dễ tra cứu. */}
+                    {c.bookingCode && (
+                      <span className="block truncate text-[11px] font-semibold text-orange-600">Đơn {c.bookingCode}</span>
+                    )}
                     <span className={`block truncate text-xs ${c.unreadCount ? "font-semibold text-slate-700" : "text-slate-500"}`}>{c.lastMessage || "Chưa có tin nhắn"}</span>
-                    {c.tourTitle && <span className="mt-0.5 block truncate text-[11px] text-teal-700">{c.tourTitle}</span>}
                   </span>
                 </button>
               </li>
