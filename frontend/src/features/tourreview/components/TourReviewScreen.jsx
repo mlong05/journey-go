@@ -11,8 +11,10 @@ import { TOUR_STATUS, REVIEW_CRITERIA, CRITERIA_MIN_TO_APPROVE, REJECTION_REASON
 import { tourReviewService } from "../services/tourReviewService";
 import FlaggableBlock, { ReviewNotesContext, anchorId } from "./FlaggableBlock";
 import CustomerPreview from "./CustomerPreview";
+import { formatDateTimeVN } from "@/lib/money";
 
-const fmt = (iso) => (iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : "");
+/** Chuẩn thời gian CHUNG: "14:19 15/11/2026" (giờ Việt Nam). */
+const fmt = (iso) => (iso ? formatDateTimeVN(iso) || "" : "");
 const ACTION_LABEL = { SUBMITTED: "Gửi duyệt", APPROVED: "Đồng ý", CHANGES_REQUESTED: "Yêu cầu chỉnh sửa", REJECTED: "Từ chối" };
 const statusLabel = (s) => (s ? TOUR_STATUS[s]?.label || s : "—");
 const STEP_SHORT = { BASIC_INFO: "Thông tin cơ bản", PRICING: "Giá vé", STOPS: "Điểm đến", ITINERARY: "Lịch trình", SCHEDULE: "Lịch khởi hành" };

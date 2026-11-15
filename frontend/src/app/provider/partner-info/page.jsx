@@ -39,6 +39,7 @@ import {
   PARTNER_PROFILE_FIELD_LABELS,
   PARTNER_PROFILE_GROUPS,
 } from "@/features/partnerprofileupdate/services/partnerProfileUpdateService";
+import { formatDateTimeVN } from "@/lib/money";
 
 /** Nhãn tiếng Việt ↔ mã enum của chức vụ người đại diện. */
 const POSITIONS = [
@@ -77,14 +78,7 @@ const HISTORY_TONE = {
 
 function formatDateTime(value) {
   if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+  return formatDateTimeVN(value) || "—";
 }
 
 function getErrorMessage(err, fallback) {

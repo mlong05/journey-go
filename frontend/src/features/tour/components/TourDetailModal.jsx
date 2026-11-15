@@ -21,6 +21,7 @@ import {
   formatDuration,
 } from "../theme";
 import { tourService } from "../services/tourService";
+import { formatDateTimeVN } from "@/lib/money";
 
 /**
  * Modal xem chi tiết tour du lịch.
@@ -283,7 +284,7 @@ export default function TourDetailModal({
                       <Clock size={11} className="text-slate-400 shrink-0" />
                       Khởi tạo:{" "}
                       <span className="font-bold text-slate-700">
-                        {new Date(tour.createdAt).toLocaleString("vi-VN")}
+                        {formatDateTimeVN(tour.createdAt)}
                       </span>
                     </span>
                   )}
@@ -292,7 +293,7 @@ export default function TourDetailModal({
                       <Clock size={11} className="text-slate-400 shrink-0" />
                       Cập nhật:{" "}
                       <span className="font-bold text-slate-700">
-                        {new Date(tour.updatedAt).toLocaleString("vi-VN")}
+                        {formatDateTimeVN(tour.updatedAt)}
                       </span>
                     </span>
                   )}
@@ -334,7 +335,7 @@ export default function TourDetailModal({
                               </span>
                               <span className="text-[11px] text-slate-400 font-semibold">
                                 {h.timestamp || h.createdAt
-                                  ? new Date(h.timestamp || h.createdAt).toLocaleString("vi-VN")
+                                  ? formatDateTimeVN(h.timestamp || h.createdAt)
                                   : ""}
                               </span>
                             </div>
