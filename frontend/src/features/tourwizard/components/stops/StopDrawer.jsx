@@ -3,11 +3,13 @@
 import React, { useRef, useState } from "react";
 import {
   X, Plus, Trash2, Info, BookOpen, Gamepad2, Save, Loader2, CheckCircle2, AlertCircle,
-  Check, ChevronRight, ArrowLeft, ArrowRight,
+  ChevronRight, ArrowLeft, ArrowRight,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Field, TextInput, TextArea, SingleImage, ImageStrip, VideoField } from "../FormKit";
+import { LIMITS } from "../../constants";
 import StopActivitiesEditor from "./StopActivitiesEditor";
+import StepNumber from "../StepNumber";
 
 let keySeq = 0;
 export const newKey = () => `k${Date.now().toString(36)}${(keySeq++).toString(36)}`;
@@ -147,9 +149,7 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
               {i > 0 && <ChevronRight size={14} className="text-slate-300 shrink-0" />}
               <button type="button" onClick={() => goToTab(i)} disabled={saveStatus === "saving"}
                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shrink-0 cursor-pointer disabled:cursor-wait ${active ? "bg-emerald-50 text-emerald-800" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}>
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${active ? "bg-emerald-600 text-white" : hasError ? "bg-rose-100 text-rose-600" : done ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                  {hasError && !active ? <AlertCircle size={11} /> : done ? <Check size={11} /> : i + 1}
-                </span>
+                <StepNumber n={i + 1} size="sm" status={hasError ? "error" : active ? "active" : done ? "done" : "idle"} />
                 <Icon size={14} className="hidden sm:inline" />
                 {label}
               </button>
@@ -167,15 +167,15 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
         {tab === "info" && (
           <>
             <Field label="Tên điểm đến" required error={stopErr("name")}>
-              <TextInput value={stop.name} disabled={readOnly} maxLength={200}
+              <TextInput value={stop.name} disabled={readOnly} limit={LIMITS.TEXT.STOP_NAME}
                 placeholder="Ví dụ: Xưởng mộc làng Kim Bồng" onChange={(e) => set({ name: e.target.value })} error={stopErr("name")} />
             </Field>
             <Field label="Mô tả ngắn" required error={stopErr("shortDescription")}>
-              <TextArea rows={3} value={stop.shortDescription} disabled={readOnly}
+              <TextArea rows={3} value={stop.shortDescription} limit={LIMITS.TEXT.STOP_SHORT} disabled={readOnly}
                 onChange={(e) => set({ shortDescription: e.target.value })} error={stopErr("shortDescription")} />
             </Field>
             <Field label="Lưu ý cho khách" hint="Không bắt buộc. Ví dụ: mang giày kín mũi, ăn mặc lịch sự.">
-              <TextArea rows={2} value={stop.guestNote} disabled={readOnly} onChange={(e) => set({ guestNote: e.target.value })} />
+              <TextArea rows={2} value={stop.guestNote} limit={LIMITS.TEXT.STOP_NOTE} disabled={readOnly} onChange={(e) => set({ guestNote: e.target.value })} />
             </Field>
             <Field label="Ảnh riêng của điểm đến" hint="Không bắt buộc.">
               <SingleImage value={stop.imageUrl} disabled={readOnly} onChange={(imageUrl) => set({ imageUrl })} />
@@ -194,7 +194,7 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
                 onChange={(videoUrl, videoSource) => set({ videoUrl, videoSource })} />
             </Field>
             <Field label="Nội dung văn hóa (câu chuyện)" required error={stopErr("culturalContent")}>
-              <TextArea rows={7} value={stop.culturalContent} disabled={readOnly}
+              <TextArea rows={7} value={stop.culturalContent} limit={LIMITS.TEXT.CULTURE} disabled={readOnly}
                 placeholder="Câu chuyện lịch sử, văn hóa của điểm đến, viết dựa trên nguồn đáng tin cậy…"
                 onChange={(e) => set({ culturalContent: e.target.value })} error={stopErr("culturalContent")} />
             </Field>
@@ -231,9 +231,9 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
                       {stopErr(`artifacts[${i}].imageUrl`) && <p className="text-[11px] font-bold text-rose-600">{stopErr(`artifacts[${i}].imageUrl`)}</p>}
                     </div>
                     <div className="sm:col-span-3 space-y-2">
-                      <TextInput value={a.name} disabled={readOnly} placeholder="Tên cổ vật" error={stopErr(`artifacts[${i}].name`)}
+                      <TextInput value={a.name} limit={LIMITS.TEXT.ARTIFACT_NAME} disabled={readOnly} placeholder="Tên cổ vật" error={stopErr(`artifacts[${i}].name`)}
                         onChange={(e) => setArtifact(i, { name: e.target.value })} />
-                      <TextArea rows={3} value={a.shortDescription} disabled={readOnly} placeholder="Mô tả ngắn"
+                      <TextArea rows={3} value={a.shortDescription} limit={LIMITS.TEXT.ARTIFACT_DESC} disabled={readOnly} placeholder="Mô tả ngắn"
                         onChange={(e) => setArtifact(i, { shortDescription: e.target.value })} />
                     </div>
                   </div>
