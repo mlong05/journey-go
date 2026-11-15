@@ -81,6 +81,14 @@ public enum ErrorCode {
     REFUND_INVALID_STATUS("Trạng thái yêu cầu hoàn tiền không cho phép thao tác này", HttpStatus.CONFLICT),
     REFUND_METHOD_NOT_ALLOWED("Chưa xác minh được trạng thái VNPay — không thể chuyển sang phương thức thủ công", HttpStatus.CONFLICT),
     REFUND_BANK_INFO_REQUIRED("Thiếu thông tin tài khoản nhận tiền cho chuyển khoản thủ công", HttpStatus.BAD_REQUEST),
+    REFUND_TOUR_ALREADY_STARTED("Tour đã bắt đầu — không thể gửi yêu cầu hoàn tiền", HttpStatus.BAD_REQUEST),
+    REFUND_NO_SHOW_WINDOW("Đã quá thời hạn 48 giờ trước ngày trải nghiệm, yêu cầu hoàn tiền không đủ điều kiện", HttpStatus.BAD_REQUEST),
+    REFUND_REASON_GROUP_NOT_FOUND("Nhóm lý do hoàn tiền không tồn tại", HttpStatus.NOT_FOUND),
+    REFUND_REASON_CODE_NOT_FOUND("Mã lý do hoàn tiền không tồn tại", HttpStatus.NOT_FOUND),
+    REFUND_REASON_CODE_IN_USE("Mã lý do đã được dùng trong yêu cầu hoàn tiền nên không thể xóa", HttpStatus.CONFLICT),
+    REFUND_REASON_CODE_REQUIRED("Vui lòng chọn lý do cụ thể trong nhóm lý do đã chọn", HttpStatus.BAD_REQUEST),
+    REFUND_REASON_CODE_MISMATCH("Mã lý do không thuộc nhóm lý do đã chọn", HttpStatus.BAD_REQUEST),
+    REFUND_EVIDENCE_REQUIRED("Lý do này yêu cầu đính kèm bằng chứng (ảnh hoặc video)", HttpStatus.BAD_REQUEST),
 
     // ── ProviderProfile / Revenue ─────────────────────────────────────────────────────
     PROVIDER_PROFILE_NOT_FOUND("Đối tác không tồn tại", HttpStatus.NOT_FOUND),
