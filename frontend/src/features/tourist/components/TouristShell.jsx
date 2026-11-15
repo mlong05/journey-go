@@ -10,10 +10,13 @@ import { ROUTES } from "@/constants/routes";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { touristService } from "../services/touristService";
 import { loginHref, registerHref } from "../utils";
+import { PAGE_EVENT, rememberPage } from "../navigation";
+import "../tourist-motion.css";
 
 const NAV = [
   { href: ROUTES.HOME, label: "Khám phá", match: (p) => p === "/" },
-  { href: ROUTES.TOURS, label: "Tất cả tour", match: (p) => p.startsWith("/tours") },
+  // Chỉ sáng ở trang danh sách; trang chi tiết /tours/{id} không tô mục nào (đã có dòng đường dẫn).
+  { href: ROUTES.TOURS, label: "Tất cả tour", match: (p) => p === "/tours" },
   { href: ROUTES.TRIPS, label: "Chuyến đi của tôi", match: (p) => p.startsWith("/trips"), touristOnly: true },
   { href: ROUTES.PARTNER_PROGRAM, label: "Dành cho đối tác", match: (p) => p.startsWith("/partner"), hideForTourist: true },
 ];
@@ -70,7 +73,7 @@ function AccountMenu({ user, role, staffHome, onLogout }) {
         <ChevronDown size={14} className="text-slate-400" />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-12 z-50 w-64 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
+        <div role="menu" className="jg-pop absolute right-0 top-12 z-50 w-64 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
           <div className="border-b border-slate-100 px-3 pb-2.5 pt-2">
             <p className="truncate text-sm font-bold text-slate-900">{user?.fullName || user?.email}</p>
             <p className="truncate text-xs text-slate-500">{user?.email}</p>
@@ -115,14 +118,14 @@ export function TouristHeader() {
   const links = NAV.filter((n) => (!n.touristOnly || isTourist) && !(n.hideForTourist && isTourist));
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur" style={{ viewTransitionName: "site-header" }}>
       <LogoutModal {...logoutModal} />
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
         <BrandLogo compact />
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Điều hướng chính">
           {links.map((n) => (
             <Link key={n.href} href={n.href}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${n.match(pathname) ? "bg-teal-50 text-teal-800" : "text-slate-600 hover:bg-slate-50 hover:text-teal-800"}`}>
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition active:scale-[0.97] ${n.match(pathname) ? "bg-teal-50 text-teal-800" : "text-slate-600 hover:bg-slate-50 hover:text-teal-800"}`}>
               {n.label}
             </Link>
           ))}
@@ -145,7 +148,7 @@ export function TouristHeader() {
         </div>
       </div>
       {mobileOpen && (
-        <nav className="border-t border-slate-100 bg-white px-4 py-3 lg:hidden" aria-label="Điều hướng (di động)">
+        <nav className="jg-fade-in border-t border-slate-100 bg-white px-4 py-3 lg:hidden" aria-label="Điều hướng (di động)">
           {links.map((n) => (
             <Link key={n.href} href={n.href} onClick={() => setMobileOpen(false)}
               className={`block rounded-xl px-3 py-2.5 text-sm font-semibold ${n.match(pathname) ? "bg-teal-50 text-teal-800" : "text-slate-700"}`}>
@@ -195,11 +198,18 @@ function FooterCol({ title, links }) {
 
 /** Khung trang du khách: header dính + nội dung + footer. */
 export default function TouristShell({ children }) {
+  const pathname = usePathname();
+  // Báo cho transitionNavigate() biết trang mới đã gắn xong ⇒ chụp trạng thái mới và chạy hiệu ứng.
+  useEffect(() => {
+    rememberPage(window.location.pathname + window.location.search);
+    window.dispatchEvent(new CustomEvent(PAGE_EVENT, { detail: pathname }));
+  }, [pathname]);
   return (
     // overflow-x-clip: chặn mọi phần tử tràn ngang (không dùng overflow-hidden để header `sticky` vẫn hoạt động).
     <div className="font-jakarta flex min-h-screen w-full min-w-0 flex-col overflow-x-clip bg-[#f4f7f6] text-slate-900 antialiased">
       <TouristHeader />
-      <main className="flex-1">{children}</main>
+      {/* Vùng nội dung có tên riêng ⇒ trượt khi chuyển trang, header & footer đứng yên */}
+      <main className="flex-1" style={{ viewTransitionName: "jg-page" }}>{children}</main>
       <TouristFooter />
     </div>
   );

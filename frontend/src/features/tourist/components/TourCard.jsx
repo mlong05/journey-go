@@ -1,21 +1,36 @@
+"use client";
 /* eslint-disable @next/next/no-img-element -- ảnh tour đến từ nhiều nguồn (Cloudinary, Wikimedia) do đối tác nhập */
+import { useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { isPlainClick, transitionNavigate } from "../navigation";
 import { Clock, MapPin, CalendarDays, ImageOff } from "lucide-react";
 import { durationLabel, shortDate, vnd } from "../utils";
 
+/** Tên chuyển trang của ảnh bìa: trùng với ảnh lớn ở trang chi tiết ⇒ ảnh "phóng" sang trang mới. */
+export const tourCoverTransition = (tourId) => `tour-cover-${tourId}`;
+
 /**
  * Thẻ tour dùng ở trang chủ và trang danh sách. `badge` hiện góc phải ảnh (vd. "Đã đặt").
- * Điện thoại (< sm): dạng hàng ngang gọn — ảnh nhỏ bên trái, thông tin bên phải (cao ~130px thay vì ~430px).
+ * Điện thoại (< sm): dạng hàng ngang gọn — ảnh nhỏ bên trái, thông tin bên phải.
  * Từ sm trở lên: dạng thẻ dọc, ảnh 16:10 phía trên.
+ * Hiệu ứng: rê chuột nổi lên + ảnh phóng chậm; bấm lún nhẹ; chuyển trang trượt tới + ảnh phóng thành ảnh lớn.
  */
 export default function TourCard({ tour, badge }) {
   const href = `/tours/${tour.tourId}`;
   const cover = tour.coverImageUrl || tour.tourCoverImageUrl;
+  const router = useRouter();
+  const imgRef = useRef(null);
+  const open = (e) => {
+    if (!isPlainClick(e)) return;
+    e.preventDefault();
+    transitionNavigate(router, href, { type: "forward", morphEl: imgRef.current, morphName: tourCoverTransition(tour.tourId) });
+  };
   return (
-    <article className="group grid min-w-0 grid-cols-[112px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(16,32,29,0.10)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:flex sm:flex-col">
-      <Link href={href} className="relative block h-full min-h-[128px] overflow-hidden bg-slate-100 sm:aspect-[16/10] sm:h-auto sm:min-h-0" tabIndex={-1} aria-hidden="true">
+    <article className="group grid min-w-0 grid-cols-[112px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-300 ease-out hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(16,32,29,0.12)] active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:flex sm:flex-col">
+      <Link href={href} onClick={open} className="relative block h-full min-h-[128px] overflow-hidden bg-slate-100 sm:aspect-[16/10] sm:h-auto sm:min-h-0" tabIndex={-1} aria-hidden="true">
         {cover ? (
-          <img src={cover} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.04] motion-reduce:transition-none" />
+          <img ref={imgRef} src={cover} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.06] motion-reduce:transition-none" />
         ) : (
           <span className="absolute inset-0 grid place-items-center text-slate-300"><ImageOff size={28} /></span>
         )}
@@ -26,7 +41,7 @@ export default function TourCard({ tour, badge }) {
       </Link>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-3 sm:gap-2.5 sm:p-4">
         <h3 className="line-clamp-2 text-[14.5px] font-bold leading-snug text-slate-900 sm:line-clamp-none sm:text-[15.5px]">
-          <Link href={href} className="hover:text-teal-800 focus-visible:outline-none focus-visible:underline">{tour.title}</Link>
+          <Link href={href} onClick={open} className="transition-colors hover:text-teal-800 focus-visible:outline-none focus-visible:underline">{tour.title}</Link>
         </h3>
         {/* Điện thoại: một dòng tóm tắt thay cho các nhãn */}
         <p className="flex min-w-0 items-center gap-1 text-xs text-slate-500 sm:hidden">
@@ -58,11 +73,11 @@ export default function TourCard({ tour, badge }) {
 export function TourCardSkeleton() {
   return (
     <div className="grid grid-cols-[112px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-slate-200 bg-white sm:block" aria-hidden="true">
-      <div className="min-h-[128px] animate-pulse bg-slate-100 sm:aspect-[16/10] sm:min-h-0" />
+      <div className="jg-shimmer min-h-[128px] sm:aspect-[16/10] sm:min-h-0" />
       <div className="space-y-3 p-3 sm:p-4">
-        <div className="h-4 w-4/5 animate-pulse rounded bg-slate-100" />
-        <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100" />
-        <div className="h-8 w-full animate-pulse rounded bg-slate-100" />
+        <div className="jg-shimmer h-4 w-4/5 rounded" />
+        <div className="jg-shimmer h-3 w-1/2 rounded" />
+        <div className="jg-shimmer h-8 w-full rounded" />
       </div>
     </div>
   );

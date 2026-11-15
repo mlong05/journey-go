@@ -4,9 +4,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, CalendarDays, Loader2, AlertTriangle, Lock, UserRound, Timer, CreditCard } from "lucide-react";
+import { CalendarDays, Loader2, AlertTriangle, Lock, UserRound, Timer, CreditCard } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
+import Breadcrumbs from "./Breadcrumbs";
 import RequireTourist from "./RequireTourist";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
@@ -123,7 +124,7 @@ function CheckoutForm({ tourId }) {
   const typeIndex = {};
   return (
     <form onSubmit={submit} noValidate className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-      <Link href={ROUTES.TOUR_DETAIL(tourId)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-teal-800"><ArrowLeft size={15} />Quay lại tour</Link>
+      <Breadcrumbs fallback={ROUTES.TOUR_DETAIL(tourId)} items={[{ label: "Khám phá", href: ROUTES.HOME }, { label: tour.title, href: ROUTES.TOUR_DETAIL(tourId) }, { label: "Thông tin hành khách" }]} />
       <h1 className="mt-3 text-[26px] font-extrabold tracking-tight text-slate-900">Thông tin hành khách</h1>
       <p className="mt-1 text-sm text-slate-500">Ngày sinh dùng để xác định loại vé theo ngày đi tour. Người lớn cần email để nhận vé và mở tour trong app.</p>
 
@@ -208,7 +209,7 @@ function CheckoutForm({ tourId }) {
                 </div>
               )}
               <button type="submit" disabled={busy || (touched && hasErrors)}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white hover:bg-orange-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed">
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] hover:bg-orange-700 disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none transition duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none cursor-pointer disabled:cursor-not-allowed">
                 {busy ? <Loader2 size={17} className="animate-spin" /> : <CreditCard size={17} />}
                 {pendingBooking ? "Thử thanh toán lại" : "Xác nhận và thanh toán"}
               </button>

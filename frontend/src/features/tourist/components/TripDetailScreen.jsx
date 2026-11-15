@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Loader2, AlertTriangle, Timer, CreditCard, Smartphone, Ban } from "lucide-react";
+import { CalendarDays, Loader2, AlertTriangle, Timer, CreditCard, Smartphone, Ban } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import AccountLayout from "./AccountLayout";
+import Breadcrumbs from "./Breadcrumbs";
 import { RefundPanel } from "./RefundsScreen";
 import { touristService } from "../services/touristService";
 import { BOOKING_STATUS, dateTime, longDate, vnd } from "../utils";
@@ -72,7 +73,7 @@ function TripDetail({ bookingId }) {
   return (
     <div className="min-w-0">
       {confirmDialog}
-      <Link href={ROUTES.TRIPS} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-teal-800"><ArrowLeft size={15} />Chuyến đi của tôi</Link>
+      <Breadcrumbs fallback={ROUTES.TRIPS} items={[{ label: "Tài khoản", href: ROUTES.ACCOUNT }, { label: "Chuyến đi của tôi", href: ROUTES.TRIPS }, { label: `Đơn ${booking.bookingCode}` }]} />
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className={`rounded-md border px-2 py-0.5 text-xs font-bold ${st.cls}`}>{st.label}</span>
         <span className="text-sm text-slate-500">Mã đơn <b className="font-mono text-slate-800">{booking.bookingCode}</b></span>
@@ -86,7 +87,7 @@ function TripDetail({ bookingId }) {
         <div className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-5">
           <p className="flex items-center gap-2 text-sm font-bold text-amber-800"><Timer size={16} />Chỗ đang được giữ, còn <Countdown deadline={booking.paymentDeadline} onExpire={onExpire} /> để thanh toán</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={pay} disabled={Boolean(busy)} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-50 cursor-pointer">
+            <button type="button" onClick={pay} disabled={Boolean(busy)} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:translate-y-0 disabled:opacity-50 transition duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none cursor-pointer">
               {busy === "pay" ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}Thanh toán {vnd(booking.totalAmount)}
             </button>
             <button type="button" onClick={cancel} disabled={Boolean(busy)} className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50 cursor-pointer">
