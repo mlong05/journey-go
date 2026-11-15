@@ -22,6 +22,7 @@ import {
 import { getSettlementsByProviderProfile } from "@/features/settlement/services/settlementService";
 import {
   formatDateTimeVN,
+  formatDateVN,
   formatPeriod,
   formatVND,
   SETTLEMENT_STATUS_LABELS,
@@ -69,12 +70,6 @@ function formatRate(rate) {
   if (rate == null) return "—";
   // Làm tròn để tránh lỗi số thực (0.15 * 100 = 15.000000000000002).
   return `${Math.round(Number(rate) * 1000) / 10}%`;
-}
-
-function formatDateVN(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("vi-VN");
 }
 
 export default function ProviderFinanceOverviewPage() {

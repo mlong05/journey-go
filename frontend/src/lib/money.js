@@ -208,26 +208,47 @@ export const PAYMENT_STATUS_LABELS = {
   FAILED: "Thất bại",
   CANCELLED: "Đã hủy",
   EXPIRED: "Đã hết hạn",
+  // Giao dịch bị thay thế — khách đã tạo giao dịch mới và đơn đã được thanh toán.
+  SUPERSEDED: "Đã bị thay thế",
 };
 
 /**
  * Nhãn tiếng Việt cho trạng thái hoàn tiền.
  *
  * Khớp enum `RefundStatus` ở backend:
- *   PENDING_REVIEW → APPROVED → REFUND_PROCESSING → REFUNDED
+ *   PENDING_REVIEW → APPROVED → VNPAY_PROCESSING | MANUAL_TRANSFER_PENDING → REFUNDED
  *   (kèm REJECTED / FAILED / CANCELLED)
  *
- * LƯU Ý: backend KHÔNG có `PENDING` hay `MANUAL_TRANSFER_PENDING`.
+ * ⚠️ "Đang xử lý" được TÁCH theo phương thức hoàn:
+ *   • VNPAY_PROCESSING        — đã gửi yêu cầu tới VNPay, đang chờ VNPay xác nhận
+ *   • MANUAL_TRANSFER_PENDING — đã chốt chuyển khoản thủ công, chờ admin chuyển tiền
+ * Nếu gộp chung, giao diện sẽ hiện "Đang xử lý hoàn tiền" cạnh nút "Chuyển thủ công"
+ * ⇒ người dùng không xác định được yêu cầu đang chờ gì.
+ *
+ * LƯU Ý: backend KHÔNG có `PENDING` hay `MANUAL_TRANSFER_PENDING` cũ.
  * Dùng sai key ⇒ dropdown lọc không trả kết quả nào ⇒ phải bám đúng enum backend.
  */
 export const REFUND_STATUS_LABELS = {
   PENDING_REVIEW: "Chờ xét duyệt",
   APPROVED: "Đã duyệt — đang hoàn tiền",
-  REFUND_PROCESSING: "Đang xử lý hoàn tiền",
+  VNPAY_PROCESSING: "Chờ VNPay xác nhận hoàn tiền",
+  MANUAL_TRANSFER_PENDING: "Chờ chuyển khoản thủ công",
   REFUNDED: "Đã hoàn tiền",
   REJECTED: "Đã từ chối",
   FAILED: "Thất bại",
   CANCELLED: "Đã hủy",
+};
+
+/**
+ * Nhãn cho trạng thái LỊCH SỬ — không dùng để lọc (đã được migrate hết).
+ *
+ * `REFUND_PROCESSING` là trạng thái dùng chung cho cả VNPay lẫn chuyển khoản
+ * thủ công trước khi tách. Nó chỉ còn xuất hiện trong các dòng nhật ký kiểm toán
+ * cũ (bảng append-only) ⇒ giữ nhãn riêng để đọc được, không nhân bản vào
+ * dropdown lọc trạng thái.
+ */
+export const REFUND_STATUS_LEGACY_LABELS = {
+  REFUND_PROCESSING: "Đang xử lý hoàn tiền",
 };
 
 /**
@@ -296,14 +317,6 @@ export const DEFERRED_REASON_LABELS = {
   REFUND_PENDING: "Còn yêu cầu hoàn tiền",
   PERIOD_NOT_CLOSED: "Kỳ doanh thu chưa kết thúc",
   FINANCIAL_REVIEW_REQUIRED: "Cần kiểm tra đối soát tài chính",
-};
-
-/**
- * Nhãn tiếng Việt cho nguyên nhân hoàn tiền.
- */
-export const REFUND_REASON_LABELS = {
-  TOURIST_FAULT: "Lỗi khách du lịch (hoàn 50%)",
-  PLATFORM_FAULT: "Lỗi nền tảng (hoàn 100%)",
 };
 
 /**
@@ -500,7 +513,7 @@ export function sanitizeAuditDetail(detail) {
 
   // 3. Bỏ mệnh đề lý do (mã enum) — lý do đã hiển thị ở cột riêng.
   text = text.replace(
-    /[,.]?\s*[Nn]guyên nhân\s*:\s*(TOURIST_FAULT|PLATFORM_FAULT)\s*[.,]?/g,
+    /[,.]?\s*[Nn]guyên nhân\s*:\s*(TOURIST_FAULT|PLATFORM_FAULT|PROVIDER_FAULT|FORCE_MAJEURE|PERSONAL)\s*[.,]?/g,
     " ",
   );
   // Bỏ "Số tiền đề xuất: 750000.00" — số tiền đã hiển thị ở cột riêng.
@@ -508,9 +521,16 @@ export function sanitizeAuditDetail(detail) {
 
   // 4. Dịch mã enum còn sót lại.
   text = text.replace(/\bTOURIST_FAULT\b/g, "lỗi khách du lịch");
+  text = text.replace(/\bPERSONAL\b/g, "lỗi khách hàng");
   text = text.replace(/\bPLATFORM_FAULT\b/g, "lỗi nền tảng");
+  text = text.replace(/\bPROVIDER_FAULT\b/g, "lỗi đối tác");
+  text = text.replace(/\bFORCE_MAJEURE\b/g, "lỗi bất khả kháng");
   text = text.replace(/\bVNPAY_API\b/g, "VNPay");
   text = text.replace(/\bMANUAL_BANK_TRANSFER\b/g, "chuyển khoản thủ công");
+
+  // 4b. Mã lý do tự sinh của hệ thống (VD: `PERSONAL_7`) — gỡ hẳn.
+  // Đây là mã KỸ THUẬT nội bộ ⇒ tuyệt đối không hiển thị cho người dùng.
+  text = text.replace(/\b[A-Z][A-Z0-9]*_\d+\b/g, "");
 
   // 5. Bỏ số tiền thô đứng sau chữ "hoàn" (ví dụ "phê duyệt hoàn 750000.00 —").
   text = text.replace(/(?<=\shoàn\s)\d+(?:[.,]\d+)?(?=\s*[-–—.,]|$)/g, "");
@@ -558,19 +578,118 @@ export function auditActionLabel(action) {
  * Tỷ lệ hoàn tiền theo nguyên nhân — khớp `FinanceProperties` ở backend
  * (tourist-fault 50%, platform-fault 100%).
  */
-export const REFUND_RATE_BY_REASON = {
-  TOURIST_FAULT: 0.5,
-  PLATFORM_FAULT: 1,
+/**
+ * Nhãn tiếng Việt cho nhóm lý do hoàn tiền.
+ *
+ * Nhãn chuẩn đến từ cấu hình của Admin (bảng `refund_reason_groups`) — bảng này
+ * chỉ là FALLBACK khi backend chưa có cấu hình.
+ */
+export const REFUND_REASON_LABELS = {
+  PERSONAL: "Lỗi khách hàng",
+  PLATFORM_FAULT: "Lỗi nền tảng",
+  PROVIDER_FAULT: "Lỗi đối tác",
+  FORCE_MAJEURE: "Lỗi bất khả kháng",
 };
 
 /**
- * Tính số tiền hoàn theo nguyên nhân từ số tiền gốc của đơn.
- * Ví dụ: 1.500.000 + TOURIST_FAULT → 750.000; + PLATFORM_FAULT → 1.500.000.
+ * Tỷ lệ hoàn mặc định theo nhóm lý do — FALLBACK khi backend chưa có cấu hình.
+ * Nguồn thật là cấu hình của Admin trong tab "Cấu hình lý do hoàn tiền".
  */
-export function refundAmountForReason(paymentAmount, reason) {
+export const REFUND_RATE_BY_REASON = {
+  PERSONAL: 0.5,
+  PLATFORM_FAULT: 1,
+  PROVIDER_FAULT: 1,
+  FORCE_MAJEURE: 0,
+};
+
+/**
+ * Tính số tiền hoàn theo nhóm lý do từ số tiền gốc của đơn.
+ * Ví dụ: 1.500.000 + PERSONAL → 750.000; + PLATFORM_FAULT → 1.500.000.
+ *
+ * @param {number} paymentAmount số tiền gốc
+ * @param {string} reason nhóm lý do
+ * @param {Record<string, number>} [rateOverrides] tỷ lệ thật từ cấu hình Admin
+ */
+export function refundAmountForReason(paymentAmount, reason, rateOverrides) {
+  // ⚠️ Chưa chọn nhóm lý do (Admin chưa phân loại) ⇒ KHÔNG có tỷ lệ ⇒ 0.
+  //    Không dùng fallback 50% vì sẽ hiển thị sai số tiền cho Admin.
+  if (!reason) return 0;
   const base = toAmount(paymentAmount);
-  const rate = REFUND_RATE_BY_REASON[reason] ?? 0.5;
+  const rate =
+    rateOverrides?.[reason] ?? REFUND_RATE_BY_REASON[reason] ?? 0.5;
   return Math.round(base * rate);
+}
+
+/**
+ * Số giờ cửa sổ "no-show" — khách hủy trong vòng này (tính từ đầu ngày trải
+ * nghiệm) thì nhóm PERSONAL hoàn 0%. Khớp với
+ * `finance.refund-no-show-window-hours` của backend.
+ */
+export const REFUND_NO_SHOW_WINDOW_HOURS = 48;
+
+/**
+ * Tính số tiền hoàn theo chính sách đầy đủ (khớp với `RefundService`).
+ *
+ * ── Quy tắc ──
+ *  • Nhóm có mức hoàn 0% riêng (mặc định là PERSONAL): hủy trong vòng N giờ
+ *    trước ngày trải nghiệm (hoặc no-show) → 0%; ngoài cửa sổ → tỷ lệ của nhóm
+ *    (mặc định 50%).
+ *  • PLATFORM_FAULT / PROVIDER_FAULT → 100%.
+ *  • FORCE_MAJEURE → 0%.
+ *
+ * @param {number} paymentAmount số tiền gốc
+ * @param {string} reason nhóm lý do
+ * @param {Record<string, number>} [rateOverrides] tỷ lệ thật từ cấu hình Admin
+ * @param {string} [experienceDate] ngày trải nghiệm (YYYY-MM-DD)
+ * @param {string} [requestedAt] thời điểm khách gửi yêu cầu (ISO) — mốc so sánh
+ *   cửa sổ no-show. Mặc định lấy "bây giờ" (dùng khi xem trước).
+ * @param {number} [noShowWindowHours] số giờ cửa sổ no-show do backend cấu hình
+ *   (mặc định {@link REFUND_NO_SHOW_WINDOW_HOURS}).
+ */
+export function refundAmountForReasonAt(
+  paymentAmount,
+  reason,
+  rateOverrides,
+  experienceDate,
+  requestedAt,
+  noShowWindowHours = REFUND_NO_SHOW_WINDOW_HOURS,
+) {
+  if (
+    reason === "PERSONAL" &&
+    isWithinNoShowWindow(experienceDate, requestedAt, noShowWindowHours)
+  ) {
+    return 0;
+  }
+  return refundAmountForReason(paymentAmount, reason, rateOverrides);
+}
+
+/**
+ * Yêu cầu có nằm trong cửa sổ no-show không (hủy quá muộn / không xuất hiện).
+ *
+ * @param {string} [experienceDate] ngày trải nghiệm (YYYY-MM-DD)
+ * @param {string} [requestedAt] thời điểm gửi yêu cầu (ISO) — mặc định "bây giờ"
+ * @param {number} [noShowWindowHours] số giờ cửa sổ no-show
+ */
+export function isWithinNoShowWindow(
+  experienceDate,
+  requestedAt,
+  noShowWindowHours = REFUND_NO_SHOW_WINDOW_HOURS,
+) {
+  if (!experienceDate) return false;
+  const start = parseLocalDateStart(experienceDate);
+  if (!start) return false;
+  const when = requestedAt ? new Date(requestedAt) : new Date();
+  if (Number.isNaN(when.getTime())) return false;
+  const deadline = start - noShowWindowHours * 3600 * 1000;
+  return when.getTime() > deadline;
+}
+
+/** Parse 'YYYY-MM-DD' thành Date lúc 00:00 theo giờ địa phương — tránh lệch múi giờ. */
+function parseLocalDateStart(value) {
+  const parts = String(value).slice(0, 10).split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
+  const [y, m, d] = parts;
+  return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
 }
 
 /**
@@ -589,7 +708,11 @@ export function refundMethodLabel(method) {
  */
 export function refundStatusLabel(status) {
   if (!status) return "—";
-  return REFUND_STATUS_LABELS[status] ?? status;
+  return (
+    REFUND_STATUS_LABELS[status] ??
+    REFUND_STATUS_LEGACY_LABELS[status] ??
+    status
+  );
 }
 
 /**

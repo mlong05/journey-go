@@ -224,9 +224,18 @@ class PaymentStatus {
   static const expired = 'EXPIRED';
   static const cancelled = 'CANCELLED';
 
+  /// Giao dịch bị THAY THẾ — khách đã tạo giao dịch mới và đơn đã được thanh toán.
+  ///
+  /// ⚠️ KHÔNG phải lỗi của khách và KHÔNG phải "đang chờ" — đây là kết quả ĐÃ RÕ.
+  static const superseded = 'SUPERSEDED';
+
   /// Đã có kết quả cuối. PENDING / PROCESSING nghĩa là CHƯA rõ, KHÔNG được coi là thất bại.
   static bool isFinal(String status) =>
-      status == success || status == failed || status == cancelled || status == expired;
+      status == success ||
+      status == failed ||
+      status == cancelled ||
+      status == expired ||
+      status == superseded;
 
   static String label(String status) => switch (status) {
     pending => 'Chờ thanh toán',
@@ -235,6 +244,7 @@ class PaymentStatus {
     failed => 'Thất bại',
     cancelled => 'Khách đã hủy',
     expired => 'Hết hạn',
+    superseded => 'Đã bị thay thế',
     _ => status,
   };
 }

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Gift, Loader2, Save, CheckCircle2 } from "lucide-react";
 import { rewardSettingService } from "../services/catalogAdminService";
+import { formatDateTimeVN } from "@/lib/money";
 
 const EXAMPLE = {
   QUIZ_QUESTION: (p) => `Đối tác tạo 4 câu quiz ⇒ mỗi câu ${p} điểm, tối đa ${p * 4} điểm. Khách trả lời đúng câu nào nhận điểm câu đó.`,
@@ -89,7 +90,7 @@ export default function RewardSettingsCard() {
                 </div>
                 <p className="text-[11px] text-slate-500">{EXAMPLE[s.code]?.(Number(draft[s.code]) || 0)}</p>
                 {s.updatedAt && (
-                  <p className="text-[10px] text-slate-400">Sửa lần cuối {new Date(s.updatedAt).toLocaleString("vi-VN")}{s.updatedByName ? ` bởi ${s.updatedByName}` : ""}</p>
+                  <p className="text-[10px] text-slate-400">Sửa lần cuối {formatDateTimeVN(s.updatedAt)}{s.updatedByName ? ` bởi ${s.updatedByName}` : ""}</p>
                 )}
               </div>
             );

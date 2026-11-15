@@ -105,6 +105,17 @@ class PaymentSyncService {
       );
     }
 
+    // Giao dịch bị THAY THẾ — đơn hàng đã được thanh toán bởi giao dịch khác.
+    // ⇒ Kết quả ĐÃ RÕ (không phải "đang chờ") ⇒ không gọi QueryDR nữa.
+    if (payment.isSuperseded) {
+      return PaymentSyncResult(
+        payment: payment,
+        isFinal: true,
+        message: 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
+            'bởi một giao dịch khác.',
+      );
+    }
+
     // Vẫn đang xử lý (PENDING / PROCESSING) → hỏi trực tiếp VNPay (QueryDR).
     if (!allowQuery) {
       return PaymentSyncResult(
@@ -185,6 +196,30 @@ class PaymentSyncService {
               ? result.message
               : 'Giao dịch này đã được xử lý trước đó.',
         );
+      case 'SUPERSEDED':
+        // Giao dịch bị thay thế — đơn hàng đã được thanh toán bởi giao dịch KHÁC.
+        // ⇒ Đây là kết quả ĐÃ RÕ (không còn "đang chờ") ⇒ đọc lại giao dịch để
+        // lấy trạng thái mới nhất (SUPERSEDED) cho UI hiển thị.
+        try {
+          final fresh = await _paymentService.getPaymentById(paymentId);
+          return PaymentSyncResult(
+            payment: fresh,
+            isFinal: true,
+            message: result.message.isNotEmpty
+                ? result.message
+                : 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
+                    'bởi một giao dịch khác.',
+          );
+        } catch (_) {
+          return PaymentSyncResult(
+            payment: payment,
+            isFinal: true,
+            message: result.message.isNotEmpty
+                ? result.message
+                : 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
+                    'bởi một giao dịch khác.',
+          );
+        }
       default:
         // UNKNOWN — chưa xác minh được ⇒ KHÔNG kết luận thất bại.
         return PaymentSyncResult(

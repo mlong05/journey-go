@@ -10,6 +10,7 @@ import {
   Undo2,
   Wallet,
 } from "lucide-react";
+import { formatDateVN } from "@/lib/money";
 
 /**
  * Biểu tượng + màu theo nhóm thông báo (backend: NotificationType.Category).
@@ -41,5 +42,5 @@ export function timeAgo(value) {
   if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
   if (diff < 172800) return "Hôm qua";
   if (diff < 604800) return `${Math.floor(diff / 86400)} ngày trước`;
-  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return formatDateVN(value);
 }

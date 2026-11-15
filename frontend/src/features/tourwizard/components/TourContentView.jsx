@@ -9,9 +9,11 @@ import StopsOverviewMap, { stopLocation, googleMapsUrl } from "./stops/StopsOver
 import CheckpointMap from "./stops/CheckpointMap";
 import ExperienceQr from "./stops/ExperienceQr";
 import VideoPreview from "./VideoPreview";
+import { formatLocalDate } from "@/lib/money";
 
 const money = (v) => (v == null ? "—" : `${Number(v).toLocaleString("vi-VN")} đ`);
-const fmtDate = (s) => { const [y, m, d] = (s || "").split("-"); return d ? `${d}/${m}/${y}` : s; };
+/** Ngày `LocalDate` (YYYY-MM-DD) → "dd/MM/yyyy" — không lệch múi giờ. */
+const fmtDate = (s) => formatLocalDate(s) || s;
 
 export function durationText(tour) {
   if (tour.tourFormat === "MULTI_DAY") return `${tour.durationDays || "?"} ngày ${tour.durationNights ?? "?"} đêm`;

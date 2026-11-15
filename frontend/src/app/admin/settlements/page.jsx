@@ -1640,7 +1640,10 @@ function StatusPill({ status, label }) {
           status === "FAILED" ||
           status === "EXPIRED"
         ? "bg-rose-50 text-rose-700"
-        : "bg-amber-50 text-amber-700";
+        : // Giao dịch bị THAY THẾ — KHÔNG phải lỗi ⇒ màu trung tính.
+          status === "SUPERSEDED"
+          ? "bg-slate-100 text-slate-600"
+          : "bg-amber-50 text-amber-700";
 
   return (
     <span

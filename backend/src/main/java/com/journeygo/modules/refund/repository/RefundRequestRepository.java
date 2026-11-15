@@ -26,6 +26,41 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, Lo
 
     Page<RefundRequest> findByStatus(RefundStatus status, Pageable pageable);
 
+    /**
+     * Tìm yêu cầu hoàn tiền theo từ khoá (mã yêu cầu / mã đơn / mã giao dịch /
+     * mã lý do / mô tả lý do) — dùng cho ô tìm kiếm ở trang "Yêu cầu hoàn tiền".
+     */
+    @Query("""
+            SELECT r FROM RefundRequest r
+            WHERE LOWER(r.refundCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(r.payment.txnRef) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(r.payment.booking.bookingCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(COALESCE(r.declaredReasonCode, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(COALESCE(r.approvedReasonCode, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(COALESCE(r.reasonDetail, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            """)
+    Page<RefundRequest> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
+
+    /**
+     * Tìm yêu cầu hoàn tiền theo từ khoá + trạng thái.
+     */
+    @Query("""
+            SELECT r FROM RefundRequest r
+            WHERE r.status = :status
+              AND (
+                    LOWER(r.refundCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(r.payment.txnRef) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(r.payment.booking.bookingCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(COALESCE(r.declaredReasonCode, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(COALESCE(r.approvedReasonCode, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(COALESCE(r.reasonDetail, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              )
+            """)
+    Page<RefundRequest> searchByKeywordAndStatus(
+            @Param("keyword") String keyword,
+            @Param("status") RefundStatus status,
+            Pageable pageable);
+
     List<RefundRequest> findByStatus(RefundStatus status);
 
     /**
@@ -56,6 +91,17 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, Lo
     java.math.BigDecimal sumRefundedAmountByPayment(@Param("paymentId") Long paymentId);
 
     /**
+     * Tìm các Refund thuộc một Booking (qua Payment) — dùng để biết đơn đang/có
+     * yêu cầu hoàn tiền mà không cần gọi từng payment.
+     */
+    @Query("""
+            SELECT r FROM RefundRequest r
+            WHERE r.payment.booking.id = :bookingId
+            ORDER BY r.createdAt DESC
+            """)
+    List<RefundRequest> findByBooking_IdOrderByCreatedAtDesc(@Param("bookingId") Long bookingId);
+
+    /**
      * Lấy Refund kèm khóa pessimistic write — dùng khi duyệt/từ chối/xác minh kết quả
      * để tránh xử lý đồng thời.
      */
@@ -67,4 +113,14 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, Lo
      * Tìm các Refund đang chờ xác minh kết quả cuối cùng từ VNPay.
      */
     List<RefundRequest> findByStatusAndMethod(RefundStatus status, com.journeygo.modules.refund.entity.enums.RefundMethod method);
+
+    /**
+     * Đếm số yêu cầu hoàn tiền đã dùng một mã lý do chi tiết — dùng để chặn
+     * xóa mã lý do đã có lịch sử (giữ dấu vết tài chính).
+     */
+    @Query("""
+            SELECT COUNT(r) FROM RefundRequest r
+            WHERE r.declaredReasonCode = :code OR r.approvedReasonCode = :code
+            """)
+    long countByDeclaredReasonCodeOrApprovedReasonCode(@Param("code") String code);
 }

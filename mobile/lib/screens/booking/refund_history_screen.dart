@@ -11,8 +11,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/refund_model.dart';
+import '../../core/models/refund_reason_model.dart';
 import '../../core/services/api_client.dart';
+import '../../core/services/refund_reason_config_service.dart';
 import '../../core/services/refund_service.dart';
+import '../common/inline_video.dart';
 
 class RefundHistoryScreen extends StatefulWidget {
   const RefundHistoryScreen({super.key});
@@ -23,11 +26,20 @@ class RefundHistoryScreen extends StatefulWidget {
 
 class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
   final RefundService _service = RefundService();
+  final RefundReasonConfigService _configService = RefundReasonConfigService();
 
   List<RefundModel> _refunds = [];
   bool _loading = true;
   String _error = '';
   String _filter = 'ALL';
+
+  /// Nhóm lý do do Admin cấu hình — dùng để tra tên tiếng Việt của mã lý do.
+  ///
+  /// Map `mã lý do` → tên tiếng Việt để hiển thị.
+  Map<String, String> _codeNames = {};
+
+  /// Map `mã nhóm` → nhóm lý do.
+  Map<String, RefundReasonGroupModel> _groupsByCode = {};
 
   static const List<String> _filters = [
     'ALL',
@@ -51,9 +63,15 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
 
     try {
       final list = await _service.getMyRefunds(page: 0, size: 50);
+      final groups = await _configService.getActiveGroups();
       if (!mounted) return;
       setState(() {
         _refunds = list;
+        _groupsByCode = {for (final g in groups) g.code: g};
+        _codeNames = {
+          for (final g in groups)
+            for (final c in g.reasonCodes) c.code: c.name,
+        };
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -69,6 +87,38 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
         _loading = false;
       });
     }
+  }
+
+  /// Tên tiếng Việt của lý do cụ thể (null nếu không tìm thấy).
+  ///
+  /// Ưu tiên tên backend đã trả về (`*ReasonCodeName`) — KHÔNG lộ mã kỹ thuật.
+  String? _reasonCodeName(RefundModel refund) {
+    final backendName =
+        refund.approvedReasonCodeName ?? refund.declaredReasonCodeName;
+    if (backendName != null && backendName.isNotEmpty) return backendName;
+    final code = refund.approvedReasonCode ?? refund.declaredReasonCode;
+    if (code == null || code.isEmpty) return null;
+    return _codeNames[code];
+  }
+
+  /// Nhóm lý do đã được Admin xác nhận (fallback về nhóm khách khai báo).
+  RefundReasonGroupModel? _groupFor(RefundModel refund) {
+    final code = refund.approvedReason ?? refund.declaredReason;
+    if (code == null) return null;
+    return _groupsByCode[code];
+  }
+
+  /// Tên nhóm lý do — ưu tiên tên backend trả về.
+  ///
+  /// ⚠️ Khách KHÔNG chọn nhóm lý do nữa ⇒ `declaredReason` có thể null khi
+  /// Admin chưa duyệt ⇒ fallback sang lý do ngắn gọn khách nhập.
+  String _groupName(RefundModel refund) {
+    final backendName = refund.approvedReasonName ?? refund.declaredReasonName;
+    if (backendName != null && backendName.isNotEmpty) return backendName;
+    final group = _groupFor(refund);
+    if (group != null) return group.name;
+    if (refund.reasonSummary.isNotEmpty) return refund.reasonSummary;
+    return 'Chờ quản trị viên phân loại';
   }
 
   List<RefundModel> get _filtered {
@@ -256,7 +306,9 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                refund.refundCode ?? 'Yêu cầu #${refund.id}',
+                refund.refundCode.isEmpty
+                    ? 'Yêu cầu #${refund.id}'
+                    : refund.refundCode,
                 style: const TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w800,
@@ -291,13 +343,24 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      refund.declaredReasonLabel,
+                      _groupName(refund),
                       style: const TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w800,
                         color: AppCultureColors.textDark,
                       ),
                     ),
+                    if (_reasonCodeName(refund) != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        _reasonCodeName(refund)!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppCultureColors.textMuted,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       '${refund.bookingCode ?? 'Đơn của tôi'} • '
@@ -308,18 +371,59 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                   ],
                 ),
               ),
-              Text(
-                refund.formattedEffectiveAmount,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: AppCultureColors.jadeDark,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    // ⚠️ Khách KHÔNG chọn nhóm lý do ⇒ chưa có tỷ lệ ⇒ chưa có
+                    // số tiền đề xuất ⇒ hiển thị "Chờ phân loại" thay vì "0 đ".
+                    refund.displayAmount != null && refund.displayAmount! > 0
+                        ? refund.formattedEffectiveAmount
+                        : 'Chờ phân loại',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: refund.displayAmount != null &&
+                              refund.displayAmount! > 0
+                          ? AppCultureColors.jadeDark
+                          : AppCultureColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    refund.displayAmount != null && refund.displayAmount! > 0
+                        ? (refund.refundRatePercent > 0
+                            ? 'Hoàn ${refund.refundRatePercent}%'
+                            : 'Không hoàn tiền')
+                        : (refund.isPending
+                            ? 'Chờ quản trị viên xử lý'
+                            : 'Không được hoàn'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: refund.displayAmount != null &&
+                              refund.displayAmount! > 0 &&
+                              refund.refundRatePercent > 0
+                          ? AppCultureColors.textMuted
+                          : const Color(0xFFB91C1C),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          if (refund.reasonDetail != null &&
-              refund.reasonDetail!.isNotEmpty) ...[
+          if (refund.evidenceAttachments.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final url in refund.evidenceAttachments.take(5))
+                  _buildEvidenceThumb(url),
+              ],
+            ),
+          ],
+          if (refund.reasonSummary.isNotEmpty) ...[
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
@@ -329,7 +433,29 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                refund.reasonDetail!,
+                refund.reasonSummary,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.4,
+                  color: AppCultureColors.textDark,
+                ),
+              ),
+            ),
+          ],
+          if (refund.reasonDetail.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppCultureColors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                refund.reasonDetail,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -340,8 +466,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
               ),
             ),
           ],
-          if (refund.rejectionReason != null &&
-              refund.rejectionReason!.isNotEmpty) ...[
+          if (refund.rejectionReason.isNotEmpty) ...[
             const SizedBox(height: 10),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,6 +503,83 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// Thumbnail bằng chứng đính kèm (ảnh hoặc video).
+  Widget _buildEvidenceThumb(String url) {
+    final isVideo = url.contains('.mp4') ||
+        url.contains('.mov') ||
+        url.contains('.webm') ||
+        url.contains('.m3u8');
+    return GestureDetector(
+      onTap: () => _openEvidence(url),
+      child: Container(
+        width: 62,
+        height: 62,
+        decoration: BoxDecoration(
+          color: AppCultureColors.surfaceSubtle,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppCultureColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: isVideo
+            ? const Icon(
+                Icons.play_circle_outline_rounded,
+                size: 24,
+                color: AppCultureColors.textMuted,
+              )
+            : Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const Icon(
+                  Icons.broken_image_outlined,
+                  size: 20,
+                  color: AppCultureColors.textLight,
+                ),
+              ),
+      ),
+    );
+  }
+
+  /// Mở bằng chứng để xem toàn màn hình.
+  void _openEvidence(String url) {
+    final isVideo = url.contains('.mp4') ||
+        url.contains('.mov') ||
+        url.contains('.webm') ||
+        url.contains('.m3u8');
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: isVideo
+                    ? InlineVideo(url: url)
+                    : Image.network(
+                        url,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => const Text(
+                          'Không tải được bằng chứng',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              right: 12,
+              child: IconButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

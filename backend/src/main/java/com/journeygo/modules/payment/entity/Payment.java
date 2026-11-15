@@ -208,9 +208,12 @@ public class Payment {
     /**
      * Chuyển sang trạng thái "đang xử lý" — kết quả chưa rõ, KHÔNG được kết luận thất bại.
      * Dùng khi: đã gửi yêu cầu tới VNPay nhưng chưa có kết quả cuối cùng (UC-03, UC-05).
+     *
+     * <p>⚠️ KHÔNG ghi đè {@code SUPERSEDED} — giao dịch đã bị đóng dứt khoát thì
+     * không được "mở lại" khi có kết quả chưa rõ.
      */
     public void markProcessing() {
-        if (this.status != PaymentStatus.SUCCESS) {
+        if (this.status != PaymentStatus.SUCCESS && this.status != PaymentStatus.SUPERSEDED) {
             this.status = PaymentStatus.PROCESSING;
         }
     }
@@ -220,6 +223,24 @@ public class Payment {
         if (this.status == PaymentStatus.PENDING || this.status == PaymentStatus.PROCESSING) {
             this.status = PaymentStatus.EXPIRED;
             this.resolvedAt = Instant.now();
+        }
+    }
+
+    /**
+     * Đánh dấu giao dịch bị THAY THẾ — Booking đã được giao dịch khác thanh toán.
+     *
+     * <p>Chỉ áp dụng cho giao dịch còn {@code PENDING} / {@code PROCESSING} (chưa có
+     * kết quả) ⇒ không đụng vào giao dịch đã có kết quả cuối.
+     *
+     * <p>⚠️ KHÔNG phải là "thất bại" và KHÔNG phải "thành công": tiền có thể vẫn
+     * đã trôi ở VNPay (nếu khách hoàn tất ở cửa sổ trình duyệt cũ) ⇒ khoản tiền dư
+     * được xử lý qua quy trình hoàn tiền/đối soát.
+     */
+    public void markSuperseded(String note) {
+        if (this.status == PaymentStatus.PENDING || this.status == PaymentStatus.PROCESSING) {
+            this.status = PaymentStatus.SUPERSEDED;
+            this.resolvedAt = Instant.now();
+            this.note = note;
         }
     }
 
