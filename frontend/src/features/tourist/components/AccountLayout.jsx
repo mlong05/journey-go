@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserRound, Ticket, MessageCircle, RotateCcw, Gift, ChevronDown, Check } from "lucide-react";
+import { UserRound, Ticket, MessageCircle, Gift, ChevronDown, Check } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
 import RequireTourist from "./RequireTourist";
@@ -15,7 +15,7 @@ import { useTouristSession } from "../hooks/useTouristSession";
 export const ACCOUNT_GROUPS = [
   { title: "Chuyến đi", items: [
     { href: ROUTES.TRIPS, label: "Chuyến đi của tôi", Icon: Ticket, match: (p) => p.startsWith("/trips") },
-    { href: ROUTES.ACCOUNT_REFUNDS, label: "Hoàn tiền & hỗ trợ", Icon: RotateCcw, match: (p) => p.startsWith("/account/refunds") },
+    { href: ROUTES.ACCOUNT_INVITATIONS, label: "Lời mời tham gia tour", Icon: Ticket, match: (p) => p.startsWith("/account/invitations") },
   ] },
   { title: "Liên hệ", items: [
     { href: ROUTES.ACCOUNT_MESSAGES, label: "Tin nhắn với nhà tour", Icon: MessageCircle, match: (p) => p.startsWith("/account/messages"), badge: "unread" },
@@ -23,6 +23,7 @@ export const ACCOUNT_GROUPS = [
   { title: "Tài khoản", items: [
     { href: ROUTES.ACCOUNT, label: "Thông tin cá nhân", Icon: UserRound, match: (p) => p === "/account" },
     { href: ROUTES.ACCOUNT_REWARDS, label: "Điểm thưởng & voucher", Icon: Gift, match: (p) => p.startsWith("/account/rewards") },
+    { href: ROUTES.ACCOUNT_POSTS, label: "Bài viết của tôi", Icon: MessageCircle, match: (p) => p.startsWith("/account/posts") },
   ] },
 ];
 const ALL_ITEMS = ACCOUNT_GROUPS.flatMap((g) => g.items);
