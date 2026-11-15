@@ -1,21 +1,22 @@
 "use client";
 
 import React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Compass, Loader2, Sparkles, Check } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 
 /**
- * Modal Đăng xuất an toàn mang đậm bản sắc Di sản & Du lịch trải nghiệm JourneyGo
- * Tối giản, thanh lịch, tinh gọn theo yêu cầu:
- * - Giữ lại logo JourneyGo, huy hiệu con dấu, tiêu đề và badge trạng thái
- * - Bỏ dòng lời cảm ơn dài và ô trạng thái bảo mật
+ * Hộp thông báo đăng xuất: chỉ dấu tích + một dòng "Đăng xuất thành công"
+ * ("Đang đăng xuất…" khi đang gọi API) + thanh tiến trình trong lúc chuyển trang.
+ * Dùng chung cho trang du khách và khu quản trị / kiểm duyệt / đối tác.
  */
-export function LogoutModal({ isOpen, status = "success", message }) {
-  if (!isOpen) return null;
+export function LogoutModal({ isOpen, status = "success" }) {
+  if (!isOpen || typeof document === "undefined") return null;
 
   const isLoading = status === "loading";
 
-  return (
+  // Gắn thẳng vào <body>: header có backdrop-blur khiến position:fixed bên trong bị định vị theo header.
+  return createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -34,12 +35,6 @@ export function LogoutModal({ isOpen, status = "success", message }) {
           {/* Vầng sáng ambient nhẹ nhàng */}
           <div className="absolute -top-16 -right-16 w-36 h-36 bg-sky-200/40 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-blue-100/40 rounded-full blur-3xl pointer-events-none" />
-
-          {/* Logo Thương hiệu JourneyGo nhỏ gọn tinh tế */}
-          <div className="flex items-center justify-center gap-1.5 pb-4 text-xs font-bold text-slate-400">
-            <Compass className="w-3.5 h-3.5 text-[#009fe3]" />
-            <span>JourneyGo • Hành Trình Di Sản</span>
-          </div>
 
           {/* Huy hiệu trung tâm */}
           <div className="relative mx-auto mb-4 w-20 h-20 flex items-center justify-center">
@@ -83,40 +78,24 @@ export function LogoutModal({ isOpen, status = "success", message }) {
             </motion.div>
           </div>
 
-          {/* Nội dung thông báo tinh gọn */}
-          <div className="space-y-1.5 relative z-10">
-            <h3 className="text-xl font-semibold text-slate-900 tracking-tight leading-tight">
-              {isLoading ? "Đang Kết Thúc Phiên..." : "Tạm Biệt & Hẹn Gặp Lại!"}
-            </h3>
+          {/* Chỉ một dòng thông báo */}
+          <h3 role="status" className="relative z-10 text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
+            {isLoading ? "Đang đăng xuất…" : "Đăng xuất thành công"}
+          </h3>
 
-            {!isLoading && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200/70 shadow-2xs my-1">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Phiên làm việc đã kết thúc an toàn</span>
-              </div>
-            )}
-          </div>
-
-          {/* Thanh dẫn tiến trình chuyển tiếp tinh tế */}
-          <div className="mt-5 pt-1 relative z-10">
-            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: "0%" }}
-                animate={{ width: "100%" }}
-                transition={{ duration: 1.0, ease: "easeInOut" }}
-                className="h-full bg-gradient-to-r from-[#009fe3] to-teal-400 rounded-full"
-              />
-            </div>
-
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 mt-2.5 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#009fe3] animate-ping" />
-              <span>Đang chuyển về trang đăng nhập...</span>
-            </div>
+          {/* Thanh tiến trình trong lúc chuyển trang */}
+          <div className="mt-5 relative z-10 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+            <motion.div
+              initial={{ width: "0%" }}
+              animate={{ width: "100%" }}
+              transition={{ duration: 1.0, ease: "easeInOut" }}
+              className="h-full bg-gradient-to-r from-[#009fe3] to-teal-400 rounded-full"
+            />
           </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
-  );
+  , document.body);
 }
 
 export default LogoutModal;
