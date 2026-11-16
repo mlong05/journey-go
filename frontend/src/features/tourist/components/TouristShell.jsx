@@ -215,7 +215,11 @@ function FooterCol({ title, links }) {
 }
 
 /** Khung trang du khách: header dính + nội dung + footer. */
-export default function TouristShell({ children }) {
+/**
+ * desktopFixed: trang kiểu bảng tin (Cộng đồng, chi tiết bài viết) — trên máy tính cuộn xuống chỉ thấy nội dung,
+ * cột phải dính ⇒ ẩn footer từ màn hình lg trở lên; điện thoại vẫn hiện footer bình thường.
+ */
+export default function TouristShell({ children, desktopFixed = false }) {
   const pathname = usePathname();
   // Báo cho transitionNavigate() biết trang mới đã gắn xong ⇒ chụp trạng thái mới và chạy hiệu ứng.
   useEffect(() => {
@@ -229,7 +233,7 @@ export default function TouristShell({ children }) {
         <TouristHeader />
         {/* Vùng nội dung có tên riêng ⇒ trượt khi chuyển trang, header & footer đứng yên */}
         <main className="flex-1" style={{ viewTransitionName: "jg-page" }}>{children}</main>
-        <TouristFooter />
+        {desktopFixed ? <div className="lg:hidden"><TouristFooter /></div> : <TouristFooter />}
       </TouristNotificationProvider>
     </div>
   );

@@ -1,22 +1,33 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- ảnh bài viết / tour đến từ nhiều nguồn (Cloudinary, Wikimedia) */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  Loader2, AlertTriangle, Heart, MessageCircle, Plus, X, ImagePlus, Send, Compass, Flag,
+  Loader2, AlertTriangle, Heart, MessageCircle, Plus, X, ImagePlus, Send, Compass, Flag, MoreHorizontal,
+  Clock, Flame,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import { LimitedField } from "@/components/ui/LimitedField";
 import TouristShell from "./TouristShell";
 import CommunityReportDialog from "./CommunityReportDialog";
+import { Avatar, JoinedBadge, ExpandableText, MediaGrid, Lightbox, TourChip, timeAgo, fullDateTime } from "./CommunityUI";
+import { ShareCard, TopToursCard, GuidelinesCard } from "./CommunitySidebar";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { touristService } from "../services/touristService";
-import { dateTime } from "../utils";
 
 const input = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20";
 const MAX_MEDIA = 10;
 /** Số ký tự tối đa — khớp `@Size` ở `CreatePostRequest`. */
 const TITLE_MAX = 200;
 const CONTENT_MAX = 5000;
+const PAGE_SIZE = 10;
+const SORTS = [
+  ["createdAt,desc", "Mới nhất", Clock],
+  ["likesCount,desc", "Nổi bật", Flame],
+];
 
 /** Bảng chuyển trạng thái bài viết (enum `PostStatus` ở backend). */
 export const POST_STATUS = {
@@ -32,7 +43,18 @@ export function postThumbnail(post) {
   return post?.mediaList?.find((m) => m.mediaType !== "VIDEO")?.mediaUrl || null;
 }
 
-/** Ô nhập nội dung bài viết — dùng chung cho trang cộng đồng và trang "bài của tôi". */
+/** Danh sách tour công khai cho ô "Gắn với tour" (tải 1 lần). */
+function usePublishedTours() {
+  const [tours, setTours] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    touristService.publishedTours().then((r) => { if (alive) setTours(r.items || []); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  return tours;
+}
+
+/** Ô nhập nội dung bài viết — dùng chung cho trang cộng đồng (trong hộp nổi) và trang "bài của tôi". */
 export function PostComposer({ onCreated, onCancel, defaultTourId }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -41,6 +63,7 @@ export function PostComposer({ onCreated, onCancel, defaultTourId }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef(null);
+  const tours = usePublishedTours();
 
   const pickFiles = async (e) => {
     const picked = Array.from(e.target.files || []);
@@ -48,7 +71,7 @@ export function PostComposer({ onCreated, onCancel, defaultTourId }) {
     const room = MAX_MEDIA - media.length;
     if (room <= 0) return;
     const accepted = picked.slice(0, room);
-    const slots = accepted.map((file) => ({ file, url: null, uploading: true, failed: false }));
+    const slots = accepted.map((file) => ({ file, url: null, preview: URL.createObjectURL(file), uploading: true, failed: false }));
     setMedia((prev) => [...prev, ...slots]);
     await Promise.all(slots.map(async (slot) => {
       try {
@@ -86,82 +109,54 @@ export function PostComposer({ onCreated, onCancel, defaultTourId }) {
     }
   };
 
+  const picked = tours.find((t) => String(t.tourId) === String(tourId));
+
   return (
     <form onSubmit={submit} className="rounded-3xl border border-slate-200 bg-white p-5">
       <h2 className="font-extrabold text-slate-900">Chia sẻ trải nghiệm của bạn</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        Bài viết sẽ được kiểm duyệt trước khi hiện trong bảng tin cộng đồng.
-      </p>
+      <p className="mt-1 text-sm text-slate-500">Bài viết sẽ được kiểm duyệt trước khi hiện trong bảng tin cộng đồng.</p>
 
       <div className="mt-4 space-y-3">
         <div>
           <label htmlFor="post-title" className="mb-1 block text-sm font-bold text-slate-800">Tiêu đề</label>
-          <input
-            id="post-title"
-            maxLength={TITLE_MAX}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="VD: Trải nghiệm đêm Cù Lao Phố ở Hội An"
-            className={input}
-          />
+          <LimitedField as="input" limit={TITLE_MAX} id="post-title" value={title} onChange={(e) => setTitle(e.target.value)}
+            placeholder="VD: Trải nghiệm đêm Cù Lao Phố ở Hội An" className={input} />
         </div>
         <div>
           <label htmlFor="post-content" className="mb-1 block text-sm font-bold text-slate-800">Nội dung</label>
-          <textarea
-            id="post-content"
-            rows={5}
-            maxLength={CONTENT_MAX}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Chia sẻ cảm nhận, gợi ý cho người sắp đi tour…"
-            className={`${input} resize-none`}
-          />
-          <p className="mt-1 text-right text-[11px] text-slate-400">{content.length}/{CONTENT_MAX}</p>
+          <LimitedField as="textarea" limit={CONTENT_MAX} id="post-content" rows={6} value={content} onChange={(e) => setContent(e.target.value)}
+            placeholder="Chia sẻ cảm nhận, gợi ý cho người sắp đi tour…" className={`${input} resize-y`} />
         </div>
         <div>
           <label htmlFor="post-tour" className="mb-1 block text-sm font-bold text-slate-800">
             Gắn với tour <span className="font-normal text-slate-400">(không bắt buộc)</span>
           </label>
-          <input
-            id="post-tour"
-            inputMode="numeric"
-            value={tourId}
-            onChange={(e) => setTourId(e.target.value.replace(/\D/g, ""))}
-            placeholder="Nhập mã tour (ID)"
-            className={input}
-          />
+          <div className="flex items-center gap-2">
+            {picked?.coverImageUrl && <img src={picked.coverImageUrl} alt="" className="h-11 w-14 shrink-0 rounded-lg object-cover" />}
+            <select id="post-tour" value={tourId} onChange={(e) => setTourId(e.target.value)} className={`${input} cursor-pointer`}>
+              <option value="">— Không gắn tour —</option>
+              {tours.map((t) => <option key={t.tourId} value={t.tourId}>{t.title}</option>)}
+              {tourId && !picked && <option value={tourId}>Tour #{tourId}</option>}
+            </select>
+          </div>
         </div>
         <div>
           <p className="mb-1 text-sm font-bold text-slate-800">
-            Ảnh đính kèm <span className="font-normal text-slate-400">(tối đa {MAX_MEDIA})</span>
+            Ảnh đính kèm <span className="font-normal text-slate-400">({media.length}/{MAX_MEDIA})</span>
           </p>
           <div className="flex flex-wrap gap-2">
             {media.map((m) => (
-              <div key={m.file.name} className="relative h-20 w-20 overflow-hidden rounded-xl border border-slate-200">
-                {m.url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.url} alt="Đính kèm" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-slate-50 text-slate-400">
-                    {m.uploading ? <Loader2 size={18} className="animate-spin" /> : <X size={18} />}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => removeMedia(m.file)}
-                  aria-label="Xoá ảnh"
-                  className="absolute right-1 top-1 cursor-pointer rounded-full bg-slate-900/70 p-0.5 text-white"
-                >
-                  <X size={12} />
-                </button>
+              <div key={m.preview || m.file.name} className="relative h-20 w-20 overflow-hidden rounded-xl border border-slate-200">
+                <img src={m.url || m.preview} alt="Đính kèm" className={`h-full w-full object-cover ${m.uploading ? "opacity-50" : ""}`} />
+                {m.uploading && <span className="absolute inset-0 grid place-items-center"><Loader2 size={18} className="animate-spin text-white drop-shadow" /></span>}
+                {m.failed && <span className="absolute inset-x-0 bottom-0 bg-rose-600/90 py-0.5 text-center text-[10px] font-bold text-white">Lỗi tải</span>}
+                <button type="button" onClick={() => removeMedia(m.file)} aria-label="Xoá ảnh"
+                  className="absolute right-1 top-1 cursor-pointer rounded-full bg-slate-900/70 p-0.5 text-white"><X size={12} /></button>
               </div>
             ))}
             {media.length < MAX_MEDIA && (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-700"
-              >
+              <button type="button" onClick={() => fileRef.current?.click()}
+                className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-700">
                 <ImagePlus size={18} />
                 <span className="text-[10px] font-semibold">Thêm ảnh</span>
               </button>
@@ -177,223 +172,339 @@ export function PostComposer({ onCreated, onCancel, defaultTourId }) {
         </p>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-60"
-        >
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="cursor-pointer rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Huỷ</button>
+        )}
+        <button type="submit" disabled={busy}
+          className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700 active:scale-[0.98] disabled:opacity-60">
           {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}Đăng bài
         </button>
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="cursor-pointer rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600"
-          >
-            Huỷ
-          </button>
-        )}
       </div>
     </form>
   );
 }
 
-/** Thẻ bài viết dùng chung (bảng tin + trang chi tiết + bài của tôi). */
-export function PostCard({ post, onReact, onComment, onReport }) {
-  const liked = post?.myReaction === "LOVE";
-  const thumb = postThumbnail(post);
+/** Menu "⋯" của thẻ bài (hiện có: Báo cáo). */
+function PostMenu({ onReport }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", esc); };
+  }, [open]);
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-4">
+    <div className="relative shrink-0" ref={ref}>
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-label="Tuỳ chọn bài viết" aria-haspopup="menu" aria-expanded={open}
+        className="grid h-8 w-8 cursor-pointer place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+        <MoreHorizontal size={18} />
+      </button>
+      {open && (
+        <div role="menu" className="jg-pop absolute right-0 top-9 z-20 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); onReport(); }}
+            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
+            <Flag size={14} />Báo cáo bài viết
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Thẻ bài viết dùng chung (bảng tin + trang chi tiết + bài của tôi).
+ * full: trang chi tiết — hiện toàn bộ nội dung, không cắt và không dẫn link sang chính nó.
+ */
+export function PostCard({ post, onReact, onComment, onReport, full = false }) {
+  const liked = post?.myReaction === "LOVE";
+  const [viewer, setViewer] = useState(null);
+  const [pop, setPop] = useState(false);
+  const react = () => { setPop(true); window.setTimeout(() => setPop(false), 320); onReact?.(post); };
+  const title = <h3 className={`font-extrabold leading-snug text-slate-900 ${full ? "text-xl sm:text-2xl" : "text-lg hover:text-teal-800"}`}>{post?.title}</h3>;
+
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-teal-50 text-sm font-bold text-teal-700">
-          {(post?.authorName || "?").trim().slice(0, 1).toUpperCase()}
-        </span>
+        <Avatar name={post?.authorName || "Du khách"} url={post?.authorAvatarUrl} size={44} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-slate-900">{post?.authorName || "Du khách"}</p>
-          <p className="text-xs text-slate-400">{dateTime(post?.createdAt)}</p>
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="truncate text-sm font-bold text-slate-900">{post?.authorName || "Du khách"}</span>
+            {post?.authorJoinedTour && <JoinedBadge />}
+          </p>
+          <p className="mt-0.5 text-xs text-slate-400" title={fullDateTime(post?.createdAt)}>{timeAgo(post?.createdAt)}</p>
         </div>
         {post?.status && post.status !== "PUBLISHED" && (
           <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-bold ${POST_STATUS[post.status]?.cls || POST_STATUS.DRAFT.cls}`}>
             {POST_STATUS[post.status]?.label || post.status}
           </span>
         )}
+        {onReport && <PostMenu onReport={() => onReport(post)} />}
       </div>
 
-      <Link href={ROUTES.COMMUNITY_POST(post.id)} className="mt-3 block">
-        <h3 className="font-extrabold text-slate-900 hover:text-teal-800">{post?.title}</h3>
-        <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{post?.content}</p>
-      </Link>
+      <div className="mt-3">
+        {full || !post?.id ? title : <Link href={ROUTES.COMMUNITY_POST(post.id)} className="block">{title}</Link>}
+        <div className="mt-1.5">
+          {full
+            ? <p className="whitespace-pre-line break-words text-[15px] leading-relaxed text-slate-700">{post?.content}</p>
+            : <ExpandableText text={post?.content} lines={4} className="text-[15px] leading-relaxed text-slate-700" />}
+        </div>
+      </div>
 
       {post?.mediaList?.length > 0 && (
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {post.mediaList.slice(0, 6).map((m) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={m.id ?? m.mediaUrl} src={m.mediaUrl} alt="" className="aspect-square w-full rounded-xl object-cover" />
-          ))}
+        <div className="mt-3">
+          <MediaGrid media={post.mediaList} onOpen={setViewer} />
+          <Lightbox media={post.mediaList} index={viewer} onIndex={setViewer} onClose={() => setViewer(null)} />
         </div>
       )}
 
-      {/* ⚠️ Ghi chú kiểm duyệt chỉ có ý nghĩa khi bài BỊ TỪ CHỐI / CẦN CHỈNH SỬA
-          (khớp mobile: `forum_widgets.dart` chỉ hiện khi status = REJECTED | NEEDS_REVISION).
-          Bài đã PUBLISHED mà còn ghi chú cũ ⇒ không hiện để khỏi gây nhầm lẫn. */}
-      {(post?.status === "REJECTED" || post?.status === "NEEDS_REVISION") && post?.moderationNote && (
-        <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">
-          Phản hồi từ kiểm duyệt viên: {post.moderationNote}
-        </p>
+      {(post?.tourId || post?.tourTitle) && (
+        <div className="mt-3"><TourChip tourId={post.tourId} title={post.tourTitle} destinationName={post.destinationName} /></div>
       )}
 
-      <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3 text-sm">
-        <button
-          type="button"
-          onClick={() => onReact?.(post)}
-          disabled={!onReact}
-          className={`inline-flex cursor-pointer items-center gap-1.5 font-bold disabled:cursor-default ${liked ? "text-rose-600" : "text-slate-500 hover:text-rose-600"}`}
-        >
-          <Heart size={16} fill={liked ? "currentColor" : "none"} />
-          {post?.likesCount || 0}
+      {/* ⚠️ Ghi chú kiểm duyệt chỉ có ý nghĩa khi bài BỊ TỪ CHỐI / CẦN CHỈNH SỬA (khớp mobile). */}
+      {(post?.status === "REJECTED" || post?.status === "NEEDS_REVISION") && post?.moderationNote && (
+        <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">Phản hồi từ kiểm duyệt viên: {post.moderationNote}</p>
+      )}
+
+      <div className="mt-3 flex items-center gap-1 border-t border-slate-100 pt-2 text-sm">
+        <button type="button" onClick={react} disabled={!onReact} aria-pressed={liked} aria-label={liked ? "Bỏ thả tim" : "Thả tim"}
+          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 font-bold transition disabled:cursor-default ${liked ? "text-rose-600 hover:bg-rose-50" : "text-slate-500 hover:bg-slate-50 hover:text-rose-600"}`}>
+          <Heart size={17} fill={liked ? "currentColor" : "none"} className={`transition-transform duration-300 ${pop ? "scale-125" : ""}`} />
+          <span className="tabular-nums">{post?.likesCount || 0}</span>
         </button>
-        <button
-          type="button"
-          onClick={() => onComment?.(post)}
-          disabled={!onComment}
-          className="inline-flex cursor-pointer items-center gap-1.5 font-bold text-slate-500 hover:text-teal-700 disabled:cursor-default"
-        >
-          <MessageCircle size={16} />
-          {post?.commentsCount || 0}
-        </button>
-        {post?.tourTitle && (
-          <span className="ml-auto truncate text-xs text-slate-400">Gắn với: {post.tourTitle}</span>
-        )}
-        {onReport && (
-          <button
-            type="button"
-            onClick={() => onReport(post)}
-            aria-label="Báo cáo bài viết"
-            title="Báo cáo bài viết"
-            className="shrink-0 cursor-pointer rounded-lg p-1 text-slate-300 transition-colors hover:bg-rose-50 hover:text-rose-600"
-          >
-            <Flag size={14} />
+        {onComment ? (
+          <button type="button" onClick={() => onComment(post)}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 font-bold text-slate-500 transition hover:bg-slate-50 hover:text-teal-700">
+            <MessageCircle size={17} /><span className="tabular-nums">{post?.commentsCount || 0}</span>
           </button>
+        ) : post?.id && !full ? (
+          <Link href={ROUTES.COMMUNITY_POST(post.id)}
+            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 font-bold text-slate-500 transition hover:bg-slate-50 hover:text-teal-700">
+            <MessageCircle size={17} /><span className="tabular-nums">{post?.commentsCount || 0}</span><span className="hidden sm:inline font-semibold">Bình luận</span>
+          </Link>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-3 py-2 font-bold text-slate-500"><MessageCircle size={17} /><span className="tabular-nums">{post?.commentsCount || 0}</span></span>
         )}
       </div>
     </article>
   );
 }
 
-/** Trang /community — bảng tin cộng đồng + đăng bài mới. */
+function FeedSkeleton() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-label="Đang tải bài viết">
+      {[0, 1].map((i) => (
+        <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5">
+          <div className="flex items-center gap-3"><div className="jg-shimmer h-11 w-11 rounded-full" /><div className="flex-1 space-y-2"><div className="jg-shimmer h-3 w-40 rounded" /><div className="jg-shimmer h-3 w-24 rounded" /></div></div>
+          <div className="jg-shimmer mt-4 h-5 w-2/3 rounded" />
+          <div className="jg-shimmer mt-2 h-3 w-full rounded" /><div className="jg-shimmer mt-2 h-3 w-5/6 rounded" />
+          <div className="jg-shimmer mt-4 aspect-[16/9] w-full rounded-2xl" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Hộp nổi chứa form viết bài. */
+function ComposerModal({ open, onClose, onCreated }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const esc = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", esc);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", esc); document.body.style.overflow = prev; };
+  }, [open, onClose]);
+  if (!open || typeof document === "undefined") return null;
+  return createPortal(
+    <div className="jg-fade-in fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-label="Viết bài" className="jg-pop relative mx-auto my-6 w-full max-w-xl">
+        <button type="button" onClick={onClose} aria-label="Đóng" className="absolute right-3 top-3 z-10 grid h-8 w-8 cursor-pointer place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X size={18} /></button>
+        <PostComposer onCancel={onClose} onCreated={onCreated} />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Trang /community — bảng tin 2 cột: bài viết + cột phải (chia sẻ, tour được nhắc nhiều, quy tắc). */
 export default function CommunityScreen() {
-  const { user } = useTouristSession();
-  const [state, setState] = useState({ loading: true, items: [], error: "" });
+  const router = useRouter();
+  const { user, isTourist } = useTouristSession();
+  const toLogin = () => router.push(`${ROUTES.LOGIN}?callbackUrl=${encodeURIComponent(ROUTES.COMMUNITY)}`);
+  const [feed, setFeed] = useState({ loading: true, items: [], last: true, total: 0, error: "", page: 0, more: false });
+  const [sort, setSort] = useState(SORTS[0][0]);
+  const [tourFilter, setTourFilter] = useState("");
   const [composing, setComposing] = useState(false);
   const [notice, setNotice] = useState("");
   const [reportTarget, setReportTarget] = useState(null);
+  const [stats, setStats] = useState({ posts: 0, tours: [], cover: null });
+  const tours = usePublishedTours();
 
-  const load = useCallback(() => touristService.communityPosts({ size: 20 })
-    .then((items) => setState({ loading: false, items, error: "" }))
-    .catch((err) => setState({ loading: false, items: [], error: err?.message || "Không tải được bài viết." })), []);
-  useEffect(() => { load(); }, [load]);
+  // Số liệu cho banner + "Tour được nhắc nhiều": lấy một lượt bài mới nhất (không lọc).
+  useEffect(() => {
+    let alive = true;
+    touristService.communityFeed({ page: 0, size: 50 }).then(({ items, total }) => {
+      if (!alive) return;
+      const byTour = new Map();
+      items.forEach((p) => { if (p.tourId) byTour.set(p.tourId, { tourId: p.tourId, title: p.tourTitle || `Tour #${p.tourId}`, count: (byTour.get(p.tourId)?.count || 0) + 1 }); });
+      const cover = items.map((p) => p.mediaList?.find((m) => m.mediaType !== "VIDEO")?.mediaUrl).find(Boolean) || null;
+      setStats({ posts: total, tours: [...byTour.values()].sort((a, b) => b.count - a.count).slice(0, 5), cover });
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
-  /** Thả tim / bỏ thả tim — cập nhật số lượng ngay (optimistic). */
+  // Chỉ gọi API rồi ghi kết quả; trạng thái "đang tải" bật ở chỗ người dùng thao tác (đổi sắp xếp / lọc / xem thêm).
+  const fetchPage = useCallback((page) => touristService.communityFeed({ page, size: PAGE_SIZE, sort, tourId: tourFilter || undefined })
+    .then(({ items, last, total }) => setFeed((f) => ({ loading: false, more: false, error: "", page, last, total, items: page === 0 ? items : [...f.items, ...items.filter((p) => !f.items.some((x) => x.id === p.id))] })))
+    .catch((err) => setFeed((f) => ({ ...f, loading: false, more: false, error: err?.message || "Không tải được bài viết." }))), [sort, tourFilter]);
+  useEffect(() => { fetchPage(0); }, [fetchPage]);
+
+  const changeSort = (k) => { if (k === sort) return; setFeed((f) => ({ ...f, loading: true })); setSort(k); };
+  const changeFilter = (id) => { if (id === tourFilter) return; setFeed((f) => ({ ...f, loading: true })); setTourFilter(id); };
+  const loadMore = () => { setFeed((f) => ({ ...f, more: true })); fetchPage(feed.page + 1); };
+
+  /** Thả tim / bỏ thả tim — cập nhật ngay. */
   const react = async (post) => {
+    if (!isTourist) { toLogin(); return; }
     try {
       const likes = await touristService.reactCommunityPost(post.id);
-      setState((s) => ({
-        ...s,
-        items: s.items.map((p) => (p.id === post.id
+      setFeed((f) => ({
+        ...f,
+        items: f.items.map((p) => (p.id === post.id
           ? { ...p, likesCount: typeof likes === "number" ? likes : p.likesCount, myReaction: p.myReaction === "LOVE" ? null : "LOVE" }
           : p)),
       }));
-    } catch {
-      /* bỏ qua — số lượng sẽ đồng bộ lại khi tải */
-    }
+    } catch { /* bỏ qua — số lượng sẽ đồng bộ lại khi tải */ }
   };
 
-  const items = state.items;
-  const myId = user?.id ? String(user.id) : null;
+  const openComposer = () => {
+    if (!isTourist) { toLogin(); return; }
+    setComposing(true);
+  };
 
-  /** Gửi báo cáo vi phạm cho một bài trong bảng tin. */
+  const myId = user?.id ? String(user.id) : null;
+  const filterTitle = useMemo(() => {
+    if (!tourFilter) return "";
+    return tours.find((t) => String(t.tourId) === tourFilter)?.title || stats.tours.find((t) => String(t.tourId) === tourFilter)?.title || `Tour #${tourFilter}`;
+  }, [tourFilter, tours, stats.tours]);
+
   const submitReport = async ({ reason, description }) => {
     if (!reportTarget) return;
     await touristService.reportCommunityPost(reportTarget.id, { reason, description });
     setNotice("Đã gửi báo cáo. Cảm ơn bạn đã đóng góp xây dựng cộng đồng.");
   };
 
+  // Ảnh minh hoạ cho ô trống (không dùng làm nền tiêu đề — tiêu đề không có ảnh).
+  const bannerImg = stats.cover || tours.find((t) => t.coverImageUrl)?.coverImageUrl;
+
   return (
-    <TouristShell>
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[26px] font-extrabold tracking-tight text-slate-900">Cộng đồng JourneyGo</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Trải nghiệm thật từ các du khách đã đi cùng bạn.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setComposing((v) => !v)}
-          className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-700"
-        >
-          <Plus size={16} />Viết bài
-        </button>
-      </div>
+    <TouristShell desktopFixed>
+      {/* Kiểu Facebook: cả trang cuộn bằng thanh cuộn của trình duyệt (mép phải màn hình), cột phải dính đứng yên,
+          máy tính không có footer ⇒ cuộn xuống chỉ thấy bài viết. */}
+      <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          {/* Bảng tin */}
+          <div className="min-w-0 lg:pb-8">
+            {/* Thanh sắp xếp / lọc dính dưới menu khi cuộn */}
+            <div className="sticky top-16 z-20 -mx-1 mb-3 flex flex-wrap items-center gap-2 bg-[#f4f7f6]/95 px-1 py-2 backdrop-blur-sm">
+              <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1" role="tablist" aria-label="Sắp xếp bài viết">
+                {SORTS.map(([k, label, Icon]) => (
+                  <button key={k} type="button" role="tab" aria-selected={sort === k} onClick={() => changeSort(k)}
+                    className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-bold transition ${sort === k ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
+                    <Icon size={14} />{label}
+                  </button>
+                ))}
+              </div>
+              <label className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1 sm:max-w-xs">
+                <span className="sr-only">Lọc theo tour</span>
+                <select value={tourFilter} onChange={(e) => changeFilter(e.target.value)}
+                  className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-teal-500">
+                  <option value="">Tất cả tour</option>
+                  {tours.map((t) => <option key={t.tourId} value={t.tourId}>{t.title}</option>)}
+                  {tourFilter && !tours.some((t) => String(t.tourId) === tourFilter) && <option value={tourFilter}>{filterTitle}</option>}
+                </select>
+              </label>
+              {tourFilter && (
+                <button type="button" onClick={() => changeFilter("")}
+                  className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800 ring-1 ring-teal-200 hover:bg-teal-100">
+                  <span className="truncate">Đang xem: {filterTitle}</span><X size={13} className="shrink-0" />
+                </button>
+              )}
+              {/* Điện thoại: nút viết bài (máy tính đã có ô "Bạn vừa đi đâu?" ở cột phải) */}
+              <button type="button" onClick={openComposer}
+                className="ml-auto inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl bg-orange-600 px-3.5 py-2 text-sm font-bold text-white transition hover:bg-orange-700 active:scale-[0.98] lg:hidden">
+                <Plus size={15} />Viết bài
+              </button>
+            </div>
 
-      {notice && (
-        <p role="status" className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-          {notice}
-        </p>
-      )}
+            {notice && (
+              <p role="status" className="mb-3 flex items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                {notice}<button type="button" onClick={() => setNotice("")} aria-label="Đóng thông báo" className="shrink-0 cursor-pointer text-emerald-600 hover:text-emerald-800"><X size={16} /></button>
+              </p>
+            )}
 
-      {composing && (
-        <div className="mt-5">
-          <PostComposer
-            onCancel={() => setComposing(false)}
-            onCreated={(created) => {
-              setComposing(false);
-              setNotice("Bài viết đã được gửi kiểm duyệt. Bạn sẽ thấy nó trong mục \"Bài viết của tôi\".");
-              load();
-              if (created?.id) window.setTimeout(() => { window.location.href = ROUTES.ACCOUNT_POSTS; }, 900);
-            }}
-          />
-        </div>
-      )}
-
-      <div className="mt-6 space-y-3">
-        {state.loading ? (
-          <p className="flex justify-center gap-2 py-16 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />Đang tải…</p>
-        ) : state.error ? (
-          <p role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
-            <AlertTriangle size={16} />{state.error}
-          </p>
-        ) : items.length ? (
-          items.map((p) => (
-            <PostCard
-              key={p.id}
-              post={p}
-              onReact={react}
-              // ⚠️ Backend không cho báo cáo bài của chính mình ⇒ ẩn nút cho bài đó.
-              onReport={myId && String(p.authorId) === myId
-                ? undefined
-                : (post) => setReportTarget({ id: post.id, subject: post.title })}
-            />
-          ))
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-            <Compass size={30} className="mx-auto text-teal-600" />
-            <p className="mt-2 font-bold text-slate-800">Chưa có bài viết nào</p>
-            <p className="mt-1 text-sm text-slate-500">Hãy là người đầu tiên chia sẻ trải nghiệm của bạn.</p>
+            {feed.loading ? <FeedSkeleton /> : feed.error ? (
+              <p role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"><AlertTriangle size={16} />{feed.error}</p>
+            ) : feed.items.length ? (
+              <div className="space-y-4">
+                {feed.items.map((p) => (
+                  <PostCard key={p.id} post={p} onReact={react}
+                    // ⚠️ Backend không cho báo cáo bài của chính mình ⇒ ẩn nút cho bài đó.
+                    onReport={!isTourist || (myId && String(p.authorId) === myId) ? undefined : (post) => setReportTarget({ id: post.id, subject: post.title })} />
+                ))}
+                {!feed.last && (
+                  <button type="button" onClick={loadMore} disabled={feed.more}
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition hover:border-teal-300 hover:text-teal-800 disabled:opacity-60">
+                    {feed.more && <Loader2 size={15} className="animate-spin" />}Xem thêm bài viết
+                  </button>
+                )}
+                {feed.last && feed.items.length > PAGE_SIZE && <p className="py-2 text-center text-xs text-slate-400">Bạn đã xem hết bài viết.</p>}
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-3xl border border-dashed border-slate-300 bg-white">
+                {bannerImg && <img src={bannerImg} alt="" className="h-36 w-full object-cover opacity-80" />}
+                <div className="p-8 text-center">
+                  <Compass size={28} className="mx-auto text-teal-600" />
+                  <p className="mt-2 font-bold text-slate-800">{tourFilter ? "Chưa có bài viết nào về tour này" : "Chưa có bài viết nào"}</p>
+                  <p className="mt-1 text-sm text-slate-500">Hãy là người đầu tiên chia sẻ trải nghiệm của bạn.</p>
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    <button type="button" onClick={openComposer} className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-700"><Plus size={15} />Viết bài đầu tiên</button>
+                    <Link href={ROUTES.TOURS} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Khám phá tour</Link>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Cột phải */}
+          {/* Cột phải dính dưới menu; nếu cao hơn màn hình thì tự cuộn riêng (ẩn thanh cuộn) */}
+          <aside className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pt-2 [scrollbar-width:none]">
+            <div className="hidden lg:block"><ShareCard user={user} onCompose={openComposer} /></div>
+            <TopToursCard tours={stats.tours} activeTourId={tourFilter} onPick={(id) => { changeFilter(id); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+            <GuidelinesCard />
+          </aside>
+        </div>
       </div>
+
+      <ComposerModal open={composing} onClose={() => setComposing(false)}
+        onCreated={(created) => {
+          setComposing(false);
+          setNotice("Bài viết đã được gửi kiểm duyệt. Bạn sẽ thấy nó trong mục \"Bài viết của tôi\".");
+          if (created?.id) window.setTimeout(() => router.push(ROUTES.ACCOUNT_POSTS), 900);
+        }} />
 
       <CommunityReportDialog
-        key={reportTarget ? `report-${reportTarget.kind}-${reportTarget.id}` : "report-none"}
+        key={reportTarget ? `report-post-${reportTarget.id}` : "report-none"}
         open={Boolean(reportTarget)}
         subject={reportTarget?.subject}
         onClose={() => setReportTarget(null)}
         onSubmit={submitReport}
       />
-    </div>
     </TouristShell>
   );
 }
