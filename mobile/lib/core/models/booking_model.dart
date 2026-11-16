@@ -253,6 +253,15 @@ class BookingModel {
   final num totalAmount;
   final String currency;
   final String status;
+
+  /// Mã voucher đã áp dụng (nếu có).
+  final String? appliedVoucherCode;
+
+  /// Số tiền được giảm bởi voucher.
+  final num discountAmount;
+
+  /// Loại voucher: PLATFORM hoặc PARTNER.
+  final String? voucherScope;
   final DateTime? createdAt;
   final DateTime? paymentDeadline;
   final DateTime? paidAt;
@@ -284,6 +293,9 @@ class BookingModel {
     required this.totalAmount,
     this.currency = 'VND',
     required this.status,
+    this.appliedVoucherCode,
+    this.discountAmount = 0,
+    this.voucherScope,
     required this.createdAt,
     required this.paymentDeadline,
     required this.paidAt,
@@ -308,6 +320,9 @@ class BookingModel {
         totalAmount: _asNum(json['totalAmount']),
         currency: json['currency']?.toString() ?? 'VND',
         status: json['status']?.toString() ?? '',
+        appliedVoucherCode: json['appliedVoucherCode']?.toString(),
+        discountAmount: _asNum(json['discountAmount']),
+        voucherScope: json['voucherScope']?.toString(),
         createdAt: _asDate(json['createdAt']),
         paymentDeadline: _asDate(json['paymentDeadline']),
         paidAt: _asDate(json['paidAt']),
@@ -332,6 +347,12 @@ class BookingModel {
       );
 
   bool get isPaid => status == BookingStatus.confirmed || status == BookingStatus.completed;
+
+  /// Đơn có áp voucher giảm giá không.
+  bool get hasVoucher => appliedVoucherCode != null && discountAmount > 0;
+
+  /// Tổng tiền gốc (trước giảm giá) = totalAmount + discountAmount.
+  num get originalAmount => totalAmount + discountAmount;
 
   /// Còn có thể thanh toán: đang chờ và chưa quá hạn.
   bool get canPay {
