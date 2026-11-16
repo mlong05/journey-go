@@ -8,6 +8,7 @@ import { ROUTES } from "@/constants/routes";
 import AccountLayout, { refreshAccountSummary } from "./AccountLayout";
 import { touristService } from "../services/touristService";
 import { patchSessionUser } from "../utils";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 const input = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 aria-[invalid=true]:border-rose-400";
 const initials = (name) => String(name || "?").trim().split(/\s+/).slice(-2).map((w) => w[0]).join("").toUpperCase();
@@ -123,7 +124,7 @@ function ContactCard({ user, onSaved }) {
         <form onSubmit={save} noValidate className="jg-fade-in mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="acc-name" className="mb-1 block text-xs font-bold text-slate-600">Họ và tên</label>
-            <input id="acc-name" autoFocus className={input} value={form.fullName} maxLength={150} autoComplete="name" aria-invalid={Boolean(errors.fullName)}
+            <LimitedField as="input" limit={150} id="acc-name" autoFocus className={input} value={form.fullName} autoComplete="name" aria-invalid={Boolean(errors.fullName)}
               onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} />
             {errors.fullName && <p className="mt-1 text-xs font-semibold text-rose-600">{errors.fullName}</p>}
           </div>

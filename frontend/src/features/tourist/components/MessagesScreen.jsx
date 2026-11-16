@@ -9,6 +9,7 @@ import { ROUTES } from "@/constants/routes";
 import AccountLayout, { refreshAccountSummary } from "./AccountLayout";
 import { touristService, getTourPreview } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 const POLL_MS = 6000;
 const SUGGESTIONS = ["Điểm đón ở đâu ạ?", "Có chỗ gửi xe máy gần điểm hẹn không?", "Trẻ em cần chuẩn bị gì?", "Tour có phù hợp với người lớn tuổi không?"];
@@ -179,10 +180,10 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
         )}
         <div className="flex items-end gap-2">
           <label htmlFor="msg-input" className="sr-only">Tin nhắn</label>
-          <textarea id="msg-input" ref={inputRef} rows={1} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)}
+          <LimitedField as="textarea" counter="near" limit={1000} wrapperClassName="flex-1" id="msg-input" ref={inputRef} rows={1} value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
             placeholder="Nhập tin nhắn…"
-            className="min-h-[44px] flex-1 resize-none rounded-2xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20" />
+            className="min-h-[44px] w-full resize-none rounded-2xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20" />
           <button type="submit" disabled={busy || !text.trim()} aria-label="Gửi"
             className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white transition active:scale-95 cursor-pointer disabled:cursor-not-allowed ${text.trim() ? "bg-orange-600 hover:bg-orange-700" : "bg-slate-300"}`}>
             {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

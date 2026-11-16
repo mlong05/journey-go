@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import AccountLayout from "./AccountLayout";
+import TripsLayout from "./TripsLayout";
 import Breadcrumbs from "./Breadcrumbs";
 import { RefundPanel } from "./RefundsScreen";
 import PassengerGroupPanel from "./PassengerGroupPanel";
@@ -104,7 +104,7 @@ function TripDetail({ bookingId }) {
   return (
     <div className="min-w-0">
       {confirmDialog}
-      <Breadcrumbs fallback={ROUTES.TRIPS} items={[{ label: "Tài khoản", href: ROUTES.ACCOUNT }, { label: "Chuyến đi của tôi", href: ROUTES.TRIPS }, { label: `Đơn ${booking.bookingCode}` }]} />
+      <Breadcrumbs fallback={ROUTES.TRIPS} items={[{ label: "Trang chủ", href: ROUTES.HOME }, { label: "Chuyến đi của tôi", href: ROUTES.TRIPS }, { label: `Đơn ${booking.bookingCode}` }]} />
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className={`rounded-md border px-2 py-0.5 text-xs font-bold ${st.cls}`}>{st.label}</span>
         <span className="text-sm text-slate-500">Mã đơn <b className="font-mono text-slate-800">{booking.bookingCode}</b></span>
@@ -239,8 +239,8 @@ function TripDetail({ bookingId }) {
 /** Trang /trips/[id] — chi tiết đơn, thanh toán lại hoặc hủy khi còn giữ chỗ. */
 export default function TripDetailScreen({ bookingId }) {
   return (
-    <AccountLayout wide>
+    <TripsLayout>
       <TripDetail bookingId={bookingId} />
-    </AccountLayout>
+    </TripsLayout>
   );
 }

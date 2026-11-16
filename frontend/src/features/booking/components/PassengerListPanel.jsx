@@ -30,6 +30,7 @@ import {
   requestPassengerChange,
   sendPassengerInvitation,
 } from "@/features/booking/services/passengerService";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /** Nhãn loại khách tiếng Việt. */
 const GUEST_LABELS = {
@@ -420,11 +421,12 @@ function ChangePassengerModal({ passenger, onClose, onSubmit, loading }) {
       </div>
       <div className="mt-3">
         <Field label="Lý do thay đổi">
-          <textarea
+          <LimitedField
+            as="textarea"
+            limit={1000}
             value={form.reason}
             onChange={set("reason")}
             rows={2}
-            maxLength={1000}
             placeholder="Nêu rõ lý do thay hành khách..."
             className={inputCls}
           />

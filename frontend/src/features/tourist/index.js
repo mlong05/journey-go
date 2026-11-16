@@ -8,7 +8,6 @@ export { default as TripDetailScreen } from "./components/TripDetailScreen";
 export { default as TouristShell } from "./components/TouristShell";
 export { touristService } from "./services/touristService";
 export { default as AccountProfileScreen } from "./components/AccountProfileScreen";
-export { default as RefundsScreen } from "./components/RefundsScreen";
 export { default as MessagesScreen } from "./components/MessagesScreen";
 export { default as RewardsScreen } from "./components/RewardsScreen";
 export { default as NotificationsScreen } from "./components/NotificationsScreen";

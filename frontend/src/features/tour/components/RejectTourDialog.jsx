@@ -3,23 +3,12 @@
 import React, { useState, useEffect } from "react";
 import { Ban, Loader2, AlertCircle, Check, X } from "lucide-react";
 import { tourService } from "../services/tourService";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /** Giới hạn khớp TourReviewDecisionRequest ở backend. */
 const OTHER_REASON_MAX = 500;
 const NOTE_MAX = 1000;
 
-function CharCounter({ value, max, className = "" }) {
-  const length = value.length;
-  return (
-    <span
-      className={`pointer-events-none absolute right-3 text-[11px] tabular-nums font-bold ${
-        length >= max * 0.9 ? "text-rose-500" : "text-slate-400"
-      } ${className}`}
-    >
-      {length}/{max}
-    </span>
-  );
-}
 
 const FALLBACK_REASONS = [
   { code: "INACCURATE_INFORMATION", label: "Thông tin tour chưa chính xác" },
@@ -225,9 +214,11 @@ export default function RejectTourDialog({
                 </span>
               </label>
               <div className="relative">
-              <input
+              <LimitedField
+                as="input"
+                counter="always"
                 type="text"
-                maxLength={OTHER_REASON_MAX}
+                limit={OTHER_REASON_MAX}
                 value={otherReason}
                 onChange={(e) => {
                   setOtherReason(e.target.value);
@@ -235,9 +226,8 @@ export default function RejectTourDialog({
                 }}
                 disabled={isSubmitting}
                 placeholder="Ví dụ: Thiếu văn bản xác nhận của hướng dẫn viên địa phương..."
-                className="w-full pl-3.5 pr-16 py-2.5 bg-rose-50/40 border border-rose-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-semibold transition-colors"
+                className="w-full px-3.5 py-2.5 bg-rose-50/40 border border-rose-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-semibold transition-colors"
               />
-              <CharCounter value={otherReason} max={OTHER_REASON_MAX} className="top-1/2 -translate-y-1/2" />
               </div>
             </div>
           )}
@@ -248,16 +238,17 @@ export default function RejectTourDialog({
               Ghi chú &amp; Hướng dẫn chỉnh sửa gửi đối tác:
             </label>
             <div className="relative">
-            <textarea
-              maxLength={NOTE_MAX}
+            <LimitedField
+              as="textarea"
+              counter="always"
+              limit={NOTE_MAX}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
               placeholder="Ghi rõ chi tiết các nội dung cần bổ sung để đối tác cập nhật chính xác và nhanh chóng..."
               disabled={isSubmitting}
-              className="w-full px-3.5 pt-2.5 pb-6 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 resize-none leading-relaxed transition-colors"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 resize-none leading-relaxed transition-colors"
             />
-            <CharCounter value={note} max={NOTE_MAX} className="bottom-2" />
             </div>
           </div>
 

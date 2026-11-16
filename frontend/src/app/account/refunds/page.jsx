@@ -1,8 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { RefundsScreen } from "@/features/tourist";
-
-/** Các yêu cầu hoàn tiền của du khách. */
+/** Hoàn tiền đã chuyển thành tab trong "Chuyến đi của tôi" — giữ link cũ hoạt động. */
 export default function AccountRefundsPage() {
-  return <RefundsScreen />;
+  redirect("/trips?tab=refunds");
 }

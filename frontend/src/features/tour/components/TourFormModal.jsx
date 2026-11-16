@@ -27,6 +27,7 @@ import {
   formatVND,
   normalizeTour,
 } from "../theme";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /**
  * Modal tạo / sửa tour du lịch, dùng chung cho Provider và Admin.
@@ -438,7 +439,9 @@ export default function TourFormModal({
                     <span>Tên tour</span>
                     <span className="text-rose-500">*</span>
                   </label>
-                  <input
+                  <LimitedField
+                    as="input"
+                    limit={80}
                     type="text"
                     value={form.title}
                     onChange={(e) => handleChange("title", e.target.value)}

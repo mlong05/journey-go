@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/models/refund_model.dart';
+import '../../core/models/tour_journey_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
+import '../../core/services/journey_service.dart';
 import '../../core/services/payment_service.dart';
 import '../../core/services/refund_service.dart';
 import '../booking/booking_detail_screen.dart';
@@ -41,6 +43,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   ///
   /// ⇒ Chỉ hiện "Thanh toán thành công" khi booking có giao dịch SUCCESS thật.
   Set<int> _paidBookingIds = const {};
+
+  /// Booking có hành trình đang đi (`IN_PROGRESS`) ⇒ thuộc tab "Đang trải nghiệm".
+  Set<int> _activeJourneyBookingIds = const {};
 
   bool _loading = true;
   String? _error;
@@ -80,10 +85,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         // Yêu cầu hoàn tiền của tôi — gom theo booking để biết đơn nào đang
         // hoàn tiền / đã hoàn xong.
         _refundService.getMyRefunds(page: 0, size: 100),
+        // Hành trình của tôi — đơn nào đang đi tour (IN_PROGRESS). Lỗi thì bỏ qua,
+        // vẫn xếp theo ngày đi tour.
+        JourneyService().getMine().catchError((_) => <TourJourney>[]),
       ]);
       if (!mounted) return;
       final payments = results[1] as List<PaymentModel>;
+      final journeys = results[3] as List<TourJourney>;
       setState(() {
+        _activeJourneyBookingIds = {
+          for (final j in journeys)
+            if (j.status == ProgressStatus.inProgress && j.bookingId != null) j.bookingId!,
+        };
         _bookings = results[0] as List<BookingModel>;
         _refundIndex = RefundStateIndex.fromRefunds(results[2] as List<RefundModel>);
         // ⚠️ Đơn nào THỰC SỰ đã thanh toán thành công (không phụ thuộc status
@@ -137,9 +150,24 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   bool _isRefunded(BookingModel b) =>
       _refundIndex.stateFor(b.id) == RefundSummaryState.resolved;
 
-  /// Đơn đã thanh toán và KHÔNG dính hoàn tiền, CHƯA đi xong.
+  /// Hôm nay (giờ Việt Nam, giống backend) có phải đúng ngày đi tour không.
+  bool _isExperienceDay(BookingModel b) {
+    final date = b.experienceDate;
+    if (date == null) return false;
+    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+    return date.year == now.year && date.month == now.month && date.day == now.day;
+  }
+
+  /// Đơn đang trải nghiệm: đã thanh toán, không dính hoàn tiền, chưa xong, và
+  /// đã bắt đầu hành trình (IN_PROGRESS) hoặc hôm nay là ngày đi tour.
+  bool _isExperiencing(BookingModel b) =>
+      b.isConfirmed &&
+      !_refundIndex.hasRefund(b.id) &&
+      (_activeJourneyBookingIds.contains(b.id) || _isExperienceDay(b));
+
+  /// Đơn đã thanh toán và KHÔNG dính hoàn tiền, CHƯA đi, chưa đang trải nghiệm.
   bool _isPurchased(BookingModel b) =>
-      b.isPaid && !b.isCompleted && !_refundIndex.hasRefund(b.id);
+      b.isPaid && !b.isCompleted && !_refundIndex.hasRefund(b.id) && !_isExperiencing(b);
 
   /// Đơn đã đi xong (trải nghiệm đã hoàn thành).
   bool _isCompleted(BookingModel b) => b.isCompleted;
@@ -205,6 +233,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     final refunding = all.where((b) => _isRefunding(b)).toList();
     final refunded = all.where((b) => _isRefunded(b)).toList();
     final completed = all.where((b) => _isCompleted(b)).toList();
+    final experiencing = all.where((b) => _isExperiencing(b)).toList();
     final purchased = all.where((b) => _isPurchased(b)).toList();
     final pending = all.where((b) => _isPendingPayment(b)).toList();
     // ⚠️ "Đã hủy/Hết hạn" = đơn ở trạng thái TERMINAL (CANCELLED / EXPIRED).
@@ -213,7 +242,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     final closed = all.where((b) => _isClosed(b)).toList();
 
     return DefaultTabController(
-      length: 7,
+      length: 8,
       child: Scaffold(
         backgroundColor: AppCultureColors.background,
         appBar: AppBar(
@@ -233,6 +262,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               Tab(text: 'Tất cả (${all.length})'),
               Tab(text: 'Đã mua (${purchased.length})'),
               Tab(text: 'Chờ thanh toán (${pending.length})'),
+              Tab(text: 'Đang trải nghiệm (${experiencing.length})'),
               Tab(text: 'Đã hoàn thành (${completed.length})'),
               Tab(text: 'Đang hoàn tiền (${refunding.length})'),
               Tab(text: 'Đã hoàn tiền (${refunded.length})'),
@@ -257,6 +287,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                         _list(all, 'Chưa có đơn nào.', _ticketTile),
                         _list(purchased, 'Chưa có đơn nào đã thanh toán.', _ticketTile),
                         _list(pending, 'Không có đơn nào đang chờ thanh toán.', _pendingTile),
+                        _list(experiencing, 'Không có chuyến nào đang diễn ra.', _ticketTile),
                         _list(completed, 'Chưa có đơn nào đã hoàn thành.', _ticketTile),
                         _list(refunding, 'Không có đơn nào đang hoàn tiền.', _ticketTile),
                         _list(refunded, 'Chưa có đơn nào đã hoàn tiền xong.', _ticketTile),

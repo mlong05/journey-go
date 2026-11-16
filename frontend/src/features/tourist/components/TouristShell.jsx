@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogOut, LayoutDashboard, ChevronDown, UserRound, MessageCircle } from "lucide-react";
+import { Menu, X, LogOut, LayoutDashboard, ChevronDown, UserRound, MessageCircle, Gift } from "lucide-react";
 import BrandLogo from "@/components/brand/BrandLogo";
 import { LogoutModal, useLogout } from "@/features/auth";
 import { ROUTES } from "@/constants/routes";
@@ -28,12 +28,13 @@ const initials = (name) =>
   String(name || "?").trim().split(/\s+/).slice(-2).map((w) => w[0]).join("").toUpperCase();
 
 /**
- * Menu avatar của du khách chỉ là lối vào khu tài khoản (danh sách đầy đủ nằm ở cột trái trang tài khoản)
- * + tin nhắn (kèm số chưa đọc) + đăng xuất. "Chuyến đi của tôi" đã có trên menu trên cùng.
+ * Menu avatar của du khách = khu tài khoản (thông tin, tin nhắn kèm số chưa đọc, điểm thưởng) + đăng xuất.
+ * "Chuyến đi của tôi" là khu riêng, nằm trên menu trên cùng.
  */
 const TOURIST_MENU = [
   [ROUTES.ACCOUNT, "Tài khoản của tôi", UserRound],
   [ROUTES.ACCOUNT_MESSAGES, "Tin nhắn", MessageCircle, "unread"],
+  [ROUTES.ACCOUNT_REWARDS, "Điểm thưởng & voucher", Gift],
 ];
 
 const ROLE_LABEL = { admin: "Quản trị viên", content_moderator: "Kiểm duyệt viên", content_provider: "Đối tác" };
@@ -161,6 +162,17 @@ export function TouristHeader() {
               {n.label}
             </Link>
           ))}
+          {isTourist && (
+            <div className="mt-2 border-t border-slate-100 pt-2">
+              <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">Tài khoản</p>
+              {TOURIST_MENU.map(([href, label]) => (
+                <Link key={href} href={href} onClick={() => setMobileOpen(false)}
+                  className={`block rounded-xl px-3 py-2.5 text-sm font-semibold ${pathname === href ? "bg-teal-50 text-teal-800" : "text-slate-700"}`}>
+                  {label}
+                </Link>
+              ))}
+            </div>
+          )}
           {ready && !isTourist && !isStaff && (
             <Link href={loginHref(pathname)} onClick={() => setMobileOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700">Đăng nhập</Link>
           )}
@@ -180,7 +192,7 @@ export function TouristFooter() {
           <p className="max-w-xs text-sm text-slate-500">Đồng hành cùng bạn trong chuyến đi. Tour trải nghiệm văn hoá Việt Nam, đặt trên web và đi tour bằng app.</p>
         </div>
         <FooterCol title="Du khách" links={isTourist
-          ? [[ROUTES.TOURS, "Khám phá tour"], [ROUTES.ACCOUNT, "Tài khoản của tôi"]]
+          ? [[ROUTES.TOURS, "Khám phá tour"], [ROUTES.TRIPS, "Chuyến đi của tôi"], [ROUTES.ACCOUNT, "Tài khoản của tôi"]]
           : [[ROUTES.TOURS, "Khám phá tour"], [ROUTES.TRIPS, "Chuyến đi của tôi"], [ROUTES.REGISTER, "Tạo tài khoản"]]} />
         {!isTourist && <FooterCol title="Đối tác" links={[[ROUTES.PARTNER_REGISTER, "Trở thành đối tác"], [ROUTES.PARTNER_PROGRAM, "Quyền lợi hợp tác"], [ROUTES.LOGIN, "Đăng nhập đối tác"]]} />}
         <FooterCol title="Hỗ trợ" links={[[`${ROUTES.HOME}#vi-sao`, "Vì sao chọn JourneyGo"], [`${ROUTES.HOME}#tai-app`, "Ứng dụng di động"]]} />

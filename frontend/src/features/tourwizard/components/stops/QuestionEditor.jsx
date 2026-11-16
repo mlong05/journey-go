@@ -3,6 +3,8 @@
 import React from "react";
 import { CheckCircle2, Circle, Trash2, ListChecks, PenLine } from "lucide-react";
 import { TextInput, TextArea, PointsBadge } from "../FormKit";
+import { LimitedField } from "@/components/ui/LimitedField";
+import { LIMITS } from "../../constants";
 
 /** Dạng câu hỏi — khớp enum QuestionType ở backend. */
 export const QUESTION_TYPES = [
@@ -86,7 +88,7 @@ export default function QuestionEditor({ index, label, value, onChange, onRemove
         </div>
       )}
 
-      <TextInput value={q.content} disabled={readOnly} placeholder={isText ? "Nội dung câu hỏi tự luận" : "Nội dung câu hỏi"}
+      <TextInput value={q.content} limit={LIMITS.TEXT.QUESTION} disabled={readOnly} placeholder={isText ? "Nội dung câu hỏi tự luận" : "Nội dung câu hỏi"}
         onChange={(e) => onChange({ ...q, content: e.target.value })} />
 
       {isText && fixedType ? (
@@ -94,7 +96,7 @@ export default function QuestionEditor({ index, label, value, onChange, onRemove
           <label className="text-[11px] font-bold text-slate-700">
             Đáp án đúng <span className="text-rose-500">*</span>
           </label>
-          <TextInput value={q.referenceAnswer || ""} disabled={readOnly} maxLength={2000}
+          <TextInput value={q.referenceAnswer || ""} disabled={readOnly} limit={LIMITS.TEXT.REFERENCE_ANSWER}
             placeholder="Vd: Lý Thái Tổ; Lý Công Uẩn" error={!!error}
             onChange={(e) => onChange({ ...q, referenceAnswer: e.target.value })} />
           <p className="text-[11px] text-slate-500">
@@ -106,7 +108,7 @@ export default function QuestionEditor({ index, label, value, onChange, onRemove
           <div className="px-3 py-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-[11px] text-slate-500">
             Khách sẽ nhập câu trả lời bằng chữ trên app.
           </div>
-          <TextArea rows={2} value={q.referenceAnswer || ""} disabled={readOnly}
+          <TextArea rows={2} value={q.referenceAnswer || ""} limit={LIMITS.TEXT.REFERENCE_ANSWER} disabled={readOnly}
             placeholder="Đáp án gợi ý (không bắt buộc)"
             onChange={(e) => onChange({ ...q, referenceAnswer: e.target.value })} />
         </div>
@@ -120,9 +122,9 @@ export default function QuestionEditor({ index, label, value, onChange, onRemove
                   className={`shrink-0 cursor-pointer ${a.correct ? "text-emerald-600" : "text-slate-300 hover:text-slate-500"}`}>
                   {a.correct ? <CheckCircle2 size={17} /> : <Circle size={17} />}
                 </button>
-                <input value={a.content} disabled={readOnly} placeholder={`Đáp án ${String.fromCharCode(65 + i)}`}
+                <LimitedField as="input" limit={LIMITS.TEXT.ANSWER} wrapperClassName="flex-1" value={a.content} disabled={readOnly} placeholder={`Đáp án ${String.fromCharCode(65 + i)}`}
                   onChange={(e) => setAnswer(i, { content: e.target.value })}
-                  className="flex-1 min-w-0 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none" />
+                  className="w-full bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none" />
               </div>
             ))}
           </div>

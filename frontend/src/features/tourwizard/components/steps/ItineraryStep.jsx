@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Field, TextInput, TextArea } from "../FormKit";
+import { LIMITS } from "../../constants";
 
 /* ── Lịch trình (dạng chữ, không gắn điểm đến) ─────────────────────────── */
 const emptyDay = () => ({ title: "", mainActivity: "", content: "" });
@@ -54,15 +55,15 @@ export default function ItineraryStep({ tour, readOnly, onSave }) {
                 </span>
               </div>
               <Field label="Chặng">
-                <TextInput value={d.title} maxLength={200} disabled={readOnly}
+                <TextInput value={d.title} limit={LIMITS.TEXT.DAY_TITLE} disabled={readOnly}
                   onChange={(e) => setDay(i, { title: e.target.value })} />
               </Field>
               <Field label="Hoạt động chính" hint="Hiển thị nổi bật đầu tiên trong ngày.">
-                <TextInput value={d.mainActivity} maxLength={500} disabled={readOnly}
+                <TextInput value={d.mainActivity} limit={LIMITS.TEXT.DAY_ACTIVITY} disabled={readOnly}
                   onChange={(e) => setDay(i, { mainActivity: e.target.value })} />
               </Field>
-              <Field label="Nội dung" counter={`${d.content.length}/5000`}>
-                <TextArea rows={4} maxLength={5000} value={d.content} disabled={readOnly}
+              <Field label="Nội dung">
+                <TextArea rows={4} limit={LIMITS.TEXT.DAY_CONTENT} value={d.content} disabled={readOnly}
                   onChange={(e) => setDay(i, { content: e.target.value })} />
               </Field>
             </li>

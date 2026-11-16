@@ -173,6 +173,10 @@ export const touristService = {
   async messages(conversationId) {
     return list(data(await apiClient.get(`/provider-chat/conversations/${conversationId}/messages`)));
   },
+  /** Hành trình trải nghiệm của tôi (mở trong app) — dùng để biết đơn nào đang trải nghiệm (IN_PROGRESS). */
+  async myJourneys() {
+    return list(data(await apiClient.get("/journeys/my")));
+  },
   /** tourId: tour mà tin nhắn hỏi về (backend ghi lên tin nhắn để hiện thẻ tour trong khung chat). */
   async sendMessage(conversationId, body, tourId) {
     return data(await apiClient.post(`/provider-chat/conversations/${conversationId}/messages`, { body, tourId: tourId ? Number(tourId) : null }));

@@ -21,6 +21,7 @@ import {
   normalizeGroups,
   updateRefundReasonCode,
 } from "@/features/refund/services/refundReasonConfigService";
+import { LimitedField, limitCounterClass } from "@/components/ui/LimitedField";
 
 /* =========================================================================
    HẰNG SỐ
@@ -110,13 +111,8 @@ const CONDITIONS_MAX = 150;
  */
 function CharCount({ max, value }) {
   const len = value?.length ?? 0;
-  const nearLimit = len >= max * 0.9;
   return (
-    <span
-      className={`pointer-events-none text-[11px] tabular-nums ${
-        nearLimit ? "font-semibold text-amber-600" : "text-slate-400"
-      }`}
-    >
+    <span className={`pointer-events-none text-[11px] font-semibold tabular-nums ${limitCounterClass(len, max)}`}>
       {len}/{max}
     </span>
   );
@@ -210,10 +206,12 @@ function ReasonCodeForm({ initial, onSubmit, onCancel, saving }) {
           </label>
           <CharCount max={CONDITIONS_MAX} value={form.conditions} />
         </div>
-        <textarea
+        <LimitedField
+          as="textarea"
+          counter="never"
+          limit={CONDITIONS_MAX}
           id="reason-code-conditions"
           value={form.conditions}
-          maxLength={CONDITIONS_MAX}
           onChange={(e) =>
             setForm((f) => ({
               ...f,

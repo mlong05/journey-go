@@ -201,7 +201,7 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
           {experiencePoints != null && <PointsBadge points={experiencePoints} label="điểm / trải nghiệm" />}
         </div>
         <Field label="Tên hoạt động" required>
-          <TextInput value={d.activityName} maxLength={200} placeholder="Ví dụ: Đục hoa văn sen cùng nghệ nhân"
+          <TextInput value={d.activityName} limit={LIMITS.TEXT.ACTIVITY_NAME} placeholder="Ví dụ: Đục hoa văn sen cùng nghệ nhân"
             onChange={(e) => setDraft({ activityName: e.target.value })} />
         </Field>
         <Field label="Checkpoint" required

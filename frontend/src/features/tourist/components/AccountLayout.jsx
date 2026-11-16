@@ -11,19 +11,19 @@ import RequireTourist from "./RequireTourist";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 
-/** Các mục của khu tài khoản, chia nhóm — chỉ hiện đầy đủ ở đây (menu avatar chỉ dẫn vào /account). */
+/**
+ * Các mục của khu tài khoản, chia nhóm. "Chuyến đi của tôi" (kèm hoàn tiền) là khu riêng ở /trips,
+ * không nằm trong cột trái này.
+ */
 export const ACCOUNT_GROUPS = [
-  { title: "Chuyến đi", items: [
-    { href: ROUTES.TRIPS, label: "Chuyến đi của tôi", Icon: Ticket, match: (p) => p.startsWith("/trips") },
-    { href: ROUTES.ACCOUNT_INVITATIONS, label: "Lời mời tham gia tour", Icon: Ticket, match: (p) => p.startsWith("/account/invitations") },
-  ] },
-  { title: "Liên hệ", items: [
-    { href: ROUTES.ACCOUNT_MESSAGES, label: "Tin nhắn với nhà tour", Icon: MessageCircle, match: (p) => p.startsWith("/account/messages"), badge: "unread" },
-  ] },
   { title: "Tài khoản", items: [
     { href: ROUTES.ACCOUNT, label: "Thông tin cá nhân", Icon: UserRound, match: (p) => p === "/account" },
     { href: ROUTES.ACCOUNT_REWARDS, label: "Điểm thưởng & voucher", Icon: Gift, match: (p) => p.startsWith("/account/rewards") },
     { href: ROUTES.ACCOUNT_POSTS, label: "Bài viết của tôi", Icon: MessageCircle, match: (p) => p.startsWith("/account/posts") },
+  ] },
+  { title: "Liên hệ", items: [
+    { href: ROUTES.ACCOUNT_MESSAGES, label: "Tin nhắn với nhà tour", Icon: MessageCircle, match: (p) => p.startsWith("/account/messages"), badge: "unread" },
+    { href: ROUTES.ACCOUNT_INVITATIONS, label: "Lời mời tham gia tour", Icon: Ticket, match: (p) => p.startsWith("/account/invitations") },
   ] },
 ];
 const ALL_ITEMS = ACCOUNT_GROUPS.flatMap((g) => g.items);
