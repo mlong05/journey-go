@@ -143,6 +143,20 @@ export const touristService = {
     return list(data(await apiClient.get("/gamification/vouchers")));
   },
 
+  // ── Thành tựu & Huy hiệu ────────────────────────────────────────────────────
+  async achievements({ category, status, page = 0, size = 100 } = {}) {
+    const q = new URLSearchParams({ page: String(page), size: String(size) });
+    if (category) q.set("category", category);
+    if (status) q.set("status", status);
+    return list(data(await apiClient.get(`/tourist/achievements?${q}`)));
+  },
+  async achievementSummary() {
+    return data(await apiClient.get("/tourist/achievements/summary"));
+  },
+  async claimAchievement(achievementId) {
+    return data(await apiClient.post(`/tourist/achievements/${achievementId}/claim`, {}));
+  },
+
   // ── Cộng đồng (chỉ đọc bài đã duyệt) ────────────────────────────────────────
   async communityPosts({ tourId, size = 6 } = {}) {
     const q = new URLSearchParams({ page: "0", size: String(size), sort: "createdAt,desc" });

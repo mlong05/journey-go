@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserRound, Ticket, MessageCircle, RotateCcw, Gift, ChevronDown, Check } from "lucide-react";
+import { UserRound, Ticket, MessageCircle, RotateCcw, Gift, Trophy, ChevronDown, Check } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
 import RequireTourist from "./RequireTourist";
@@ -22,6 +22,7 @@ export const ACCOUNT_GROUPS = [
   ] },
   { title: "Tài khoản", items: [
     { href: ROUTES.ACCOUNT, label: "Thông tin cá nhân", Icon: UserRound, match: (p) => p === "/account" },
+    { href: ROUTES.ACCOUNT_ACHIEVEMENTS, label: "Thành tựu & Huy hiệu", Icon: Trophy, match: (p) => p.startsWith("/account/achievements"), badge: "achievements" },
     { href: ROUTES.ACCOUNT_REWARDS, label: "Điểm thưởng & voucher", Icon: Gift, match: (p) => p.startsWith("/account/rewards") },
   ] },
 ];
@@ -38,17 +39,19 @@ let summaryAt = 0;
 const listeners = new Set();
 async function loadSummary(force = false) {
   if (!force && summaryCache && Date.now() - summaryAt < 60_000) return summaryCache;
-  const [me, points, vouchers, conversations] = await Promise.all([
+  const [me, points, vouchers, conversations, achSummary] = await Promise.all([
     touristService.me().catch(() => null),
     touristService.myPoints().catch(() => null),
     touristService.myVouchers().catch(() => []),
     touristService.conversations().catch(() => []),
+    touristService.achievementSummary().catch(() => null),
   ]);
   summaryCache = {
     me,
     points: points?.currentBalance ?? 0,
     vouchers: vouchers.filter((v) => v.status === "AVAILABLE").length,
     unread: conversations.reduce((n, c) => n + (c.unreadCount || 0), 0),
+    unclaimedAchievements: achSummary?.unclaimedCount ?? 0,
   };
   summaryAt = Date.now();
   listeners.forEach((fn) => fn(summaryCache));
@@ -91,7 +94,7 @@ function UserCard({ summary }) {
   );
 }
 
-function NavItem({ item, pathname, unread, onClick }) {
+function NavItem({ item, pathname, unread, unclaimedAchievements, onClick }) {
   const on = item.match(pathname);
   return (
     <Link href={item.href} onClick={onClick} aria-current={on ? "page" : undefined}
@@ -101,12 +104,18 @@ function NavItem({ item, pathname, unread, onClick }) {
       {item.badge === "unread" && unread > 0 && (
         <span className="grid h-5 min-w-5 place-items-center rounded-full bg-orange-600 px-1 text-[11px] font-bold text-white" aria-label={`${unread} tin chưa đọc`}>{unread}</span>
       )}
+      {item.badge === "achievements" && unclaimedAchievements > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white" aria-label={`${unclaimedAchievements} thành tựu chờ nhận thưởng`}>
+          <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+          {unclaimedAchievements}
+        </span>
+      )}
     </Link>
   );
 }
 
 /** Điện thoại / máy tính bảng: một nút chọn mục thay cho cột trái. */
-function MobileSectionPicker({ pathname, unread }) {
+function MobileSectionPicker({ pathname, unread, unclaimedAchievements }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const current = ALL_ITEMS.find((n) => n.match(pathname)) || ALL_ITEMS[0];
@@ -125,6 +134,12 @@ function MobileSectionPicker({ pathname, unread }) {
         <current.Icon size={17} className="shrink-0 text-teal-700" />
         <span className="flex-1">{current.label}</span>
         {unread > 0 && current.badge !== "unread" && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-orange-600 px-1 text-[11px] font-bold text-white">{unread}</span>}
+        {unclaimedAchievements > 0 && current.badge !== "achievements" && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white">
+            <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+            {unclaimedAchievements}
+          </span>
+        )}
         <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -134,7 +149,7 @@ function MobileSectionPicker({ pathname, unread }) {
               <p className="px-3 pb-1 pt-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{g.title}</p>
               {g.items.map((it) => (
                 <div key={it.href} className="relative">
-                  <NavItem item={it} pathname={pathname} unread={unread} onClick={() => setOpen(false)} />
+                  <NavItem item={it} pathname={pathname} unread={unread} unclaimedAchievements={unclaimedAchievements} onClick={() => setOpen(false)} />
                   {it.match(pathname) && <Check size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-teal-700" />}
                 </div>
               ))}
@@ -164,9 +179,10 @@ export default function AccountLayout({ title, actions, children, wide = false }
 function AccountBody({ pathname, title, actions, wide, children }) {
   const summary = useAccountSummary();
   const unread = summary?.unread || 0;
+  const unclaimedAchievements = summary?.unclaimedAchievements || 0;
   return (
     <div className="mx-auto grid max-w-6xl grid-cols-1 gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-7">
-      <MobileSectionPicker pathname={pathname} unread={unread} />
+      <MobileSectionPicker pathname={pathname} unread={unread} unclaimedAchievements={unclaimedAchievements} />
       <aside className="hidden min-w-0 space-y-4 lg:sticky lg:top-24 lg:block lg:self-start">
         <UserCard summary={summary} />
         <nav aria-label="Tài khoản" className="space-y-3">
@@ -174,7 +190,15 @@ function AccountBody({ pathname, title, actions, wide, children }) {
             <div key={g.title}>
               <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{g.title}</p>
               <div className="space-y-0.5">
-                {g.items.map((it) => <NavItem key={it.href} item={it} pathname={pathname} unread={unread} />)}
+                {g.items.map((it) => (
+                  <NavItem
+                    key={it.href}
+                    item={it}
+                    pathname={pathname}
+                    unread={unread}
+                    unclaimedAchievements={unclaimedAchievements}
+                  />
+                ))}
               </div>
             </div>
           ))}
