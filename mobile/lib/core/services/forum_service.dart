@@ -16,14 +16,18 @@ class ForumService {
   }
 
   /// GET /community/posts: bảng tin (chỉ bài đã duyệt), lọc theo tour.
+  /// [popular] = true ⇒ "Nổi bật" (nhiều tim nhất, cùng số tim thì bài mới trước); false ⇒ mới nhất.
   Future<ForumPage<ForumPost>> getFeed({
     int page = 0,
     int size = 10,
     int? tourId,
+    bool popular = false,
   }) async {
     final query = <String>[
       'page=$page',
       'size=$size',
+      if (popular) 'sort=likesCount,desc',
+      'sort=createdAt,desc',
       if (tourId != null) 'tourId=$tourId',
     ].join('&');
     return _postPage(await ApiClient.request('GET', '$_base/posts?$query'));

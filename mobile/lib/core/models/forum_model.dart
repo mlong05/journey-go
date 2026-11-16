@@ -91,6 +91,9 @@ class ForumPost {
   final List<String> imageUrls;
   final DateTime? createdAt;
 
+  /// Người viết đã thực sự tham gia tour được gắn (hiện nhãn "Đã tham gia tour").
+  final bool authorJoinedTour;
+
   const ForumPost({
     required this.id,
     required this.authorId,
@@ -110,6 +113,7 @@ class ForumPost {
     this.myReaction,
     required this.imageUrls,
     this.createdAt,
+    this.authorJoinedTour = false,
   });
 
   factory ForumPost.fromJson(Map<String, dynamic> json) {
@@ -142,6 +146,7 @@ class ForumPost {
       myReaction: json['myReaction']?.toString(),
       imageUrls: images,
       createdAt: _parseDate(json['createdAt']),
+      authorJoinedTour: json['authorJoinedTour'] == true,
     );
   }
 
@@ -171,6 +176,7 @@ class ForumPost {
       myReaction: clearReaction ? null : (myReaction ?? this.myReaction),
       imageUrls: imageUrls,
       createdAt: createdAt,
+      authorJoinedTour: authorJoinedTour,
     );
   }
 
