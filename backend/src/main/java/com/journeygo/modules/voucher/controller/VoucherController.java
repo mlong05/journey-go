@@ -3,11 +3,13 @@ package com.journeygo.modules.voucher.controller;
 import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.voucher.dto.request.CreateVoucherRequest;
 import com.journeygo.modules.voucher.dto.request.UpdateVoucherRequest;
+import com.journeygo.modules.voucher.dto.request.ValidateUserVoucherRequest;
 import com.journeygo.modules.voucher.dto.request.ValidateVoucherRequest;
 import com.journeygo.modules.voucher.dto.response.VoucherCalculationResult;
 import com.journeygo.modules.voucher.dto.response.VoucherResponse;
 import com.journeygo.modules.voucher.entity.enums.VoucherScope;
 import com.journeygo.modules.voucher.service.VoucherService;
+import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -18,6 +20,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -80,5 +83,15 @@ public class VoucherController {
     public ResponseEntity<ApiResponse<VoucherCalculationResult>> calculateVoucher(@Valid @RequestBody ValidateVoucherRequest request) {
         VoucherCalculationResult result = voucherService.calculateAndValidateVoucher(request);
         return ResponseEntity.ok(ApiResponse.success("Tính toán voucher thành công", result));
+    }
+
+    @PostMapping("/validate-user-voucher")
+    @Operation(summary = "Kiểm tra và tính toán giảm giá khi người dùng áp dụng UserVoucher")
+    public ResponseEntity<ApiResponse<VoucherCalculationResult>> validateUserVoucher(
+            @Valid @RequestBody ValidateUserVoucherRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        Long userId = principal != null ? principal.getId() : null;
+        VoucherCalculationResult result = voucherService.validateUserVoucher(request, userId);
+        return ResponseEntity.ok(ApiResponse.success("Xác thực voucher thành công", result));
     }
 }

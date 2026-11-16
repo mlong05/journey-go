@@ -6,8 +6,12 @@ import com.journeygo.modules.finance.config.FinanceProperties;
 import com.journeygo.modules.finance.service.CommissionPolicyService;
 import com.journeygo.modules.providerprofile.entity.ProviderProfile;
 import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
+import com.journeygo.modules.gamification.entity.UserVoucher;
+import com.journeygo.modules.gamification.entity.enums.UserVoucherStatus;
+import com.journeygo.modules.gamification.repository.UserVoucherRepository;
 import com.journeygo.modules.voucher.dto.request.CreateVoucherRequest;
 import com.journeygo.modules.voucher.dto.request.UpdateVoucherRequest;
+import com.journeygo.modules.voucher.dto.request.ValidateUserVoucherRequest;
 import com.journeygo.modules.voucher.dto.request.ValidateVoucherRequest;
 import com.journeygo.modules.voucher.dto.response.VoucherCalculationResult;
 import com.journeygo.modules.voucher.dto.response.VoucherResponse;
@@ -33,6 +37,7 @@ import java.util.List;
 public class VoucherService {
 
     private final VoucherRepository voucherRepository;
+    private final UserVoucherRepository userVoucherRepository;
     private final ProviderProfileRepository providerProfileRepository;
     private final CommissionPolicyService commissionPolicyService;
     private final FinanceProperties financeProperties;
@@ -219,9 +224,13 @@ public class VoucherService {
         //   1. CommissionRate riêng của đối tác (ProviderProfile.commissionRate)
         //   2. Chính sách hoa hồng hiện hành (CommissionPolicyService.getEffectiveRate)
         //   3. Fallback cấu hình mặc định (FinanceProperties.defaultCommissionRate)
-        ProviderProfile partner = providerProfileRepository.findById(request.partnerId())
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY, "Không tìm thấy thông tin đối tác"));
-        BigDecimal commissionRate = partner.getEffectiveCommissionRate();
+        BigDecimal commissionRate = null;
+        if (request.partnerId() != null) {
+            ProviderProfile partner = providerProfileRepository.findById(request.partnerId()).orElse(null);
+            if (partner != null) {
+                commissionRate = partner.getEffectiveCommissionRate();
+            }
+        }
         if (commissionRate == null || commissionRate.compareTo(BigDecimal.ZERO) == 0) {
             BigDecimal policyRate = commissionPolicyService.getEffectiveRate();
             commissionRate = (policyRate != null && policyRate.compareTo(BigDecimal.ZERO) > 0)
@@ -269,6 +278,57 @@ public class VoucherService {
                 .partnerRevenue(finalPartnerRevenue)
                 .valid(true)
                 .errorMessage(null)
+                .build();
+    }
+
+    /**
+     * Thẩm định mã voucher người dùng đã quy đổi (UserVoucher).
+     */
+    @Transactional(readOnly = true)
+    public VoucherCalculationResult validateUserVoucher(ValidateUserVoucherRequest request, Long userId) {
+        if (request.userVoucherCode() == null || request.userVoucherCode().isBlank()) {
+            return buildInvalidResult(null, request.tourPrice(), "Mã voucher không được để trống");
+        }
+
+        String code = request.userVoucherCode().trim();
+        UserVoucher userVoucher = (userId != null)
+                ? userVoucherRepository.findByUserVoucherCodeAndUserId(code, userId)
+                        .orElse(null)
+                : userVoucherRepository.findByUserVoucherCode(code).orElse(null);
+
+        if (userVoucher == null) {
+            return buildInvalidResult(null, request.tourPrice(), "Mã voucher không tồn tại hoặc không thuộc về bạn");
+        }
+
+        if (userVoucher.getStatus() != UserVoucherStatus.AVAILABLE) {
+            return buildInvalidResult(userVoucher.getVoucher(), request.tourPrice(), "Voucher này đã được sử dụng hoặc không còn hiệu lực");
+        }
+
+        LocalDate now = LocalDate.now();
+        if (userVoucher.getExpiryDate() != null && userVoucher.getExpiryDate().isBefore(now)) {
+            return buildInvalidResult(userVoucher.getVoucher(), request.tourPrice(), "Voucher của bạn đã hết hạn sử dụng");
+        }
+
+        Voucher voucher = userVoucher.getVoucher();
+        VoucherCalculationResult result = calculateAndValidateVoucher(ValidateVoucherRequest.builder()
+                .voucherCode(voucher.getCode())
+                .tourPrice(request.tourPrice())
+                .partnerId(request.partnerId())
+                .build());
+
+        // Ghi đè voucherCode trả về là userVoucherCode để UI hiển thị chuẩn mã người dùng đã nhập/chọn
+        return VoucherCalculationResult.builder()
+                .voucherId(result.voucherId())
+                .voucherCode(userVoucher.getUserVoucherCode())
+                .title(result.title())
+                .voucherScope(result.voucherScope())
+                .originalPrice(result.originalPrice())
+                .discountAmount(result.discountAmount())
+                .finalPrice(result.finalPrice())
+                .platformRevenue(result.platformRevenue())
+                .partnerRevenue(result.partnerRevenue())
+                .valid(result.valid())
+                .errorMessage(result.errorMessage())
                 .build();
     }
 
