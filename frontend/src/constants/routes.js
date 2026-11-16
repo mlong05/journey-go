@@ -29,6 +29,7 @@ export const ROUTES = {
   /** Nhắn tin với nhà tour: /account/messages?c={conversationId} */
   ACCOUNT_MESSAGES: "/account/messages",
   ACCOUNT_REWARDS: "/account/rewards",
+  ACCOUNT_ACHIEVEMENTS: "/account/achievements",
 
   // ── Đăng ký thành đối tác ─────────────────────────────────────────────────
   /** Luồng đăng ký đối tác (4 giai đoạn) — link đặt ở footer trang chủ. */

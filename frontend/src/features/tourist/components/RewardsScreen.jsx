@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, Ticket, Smartphone, TrendingUp, TrendingDown } from "lucide-react";
+import Link from "next/link";
+import { Sparkles, Ticket, Smartphone, TrendingUp, TrendingDown, Trophy, ArrowRight } from "lucide-react";
+import { ROUTES } from "@/constants/routes";
 import AccountLayout from "./AccountLayout";
 import { touristService } from "../services/touristService";
 import { dateTime, longDate, vnd } from "../utils";
@@ -46,6 +48,24 @@ export default function RewardsScreen() {
               <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900">{(points?.lifetimeSpent ?? 0).toLocaleString("vi-VN")}</p>
             </div>
           </div>
+          <Link
+            href={ROUTES.ACCOUNT_ACHIEVEMENTS}
+            className="group flex items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-[linear-gradient(135deg,#fffbeb,#fef3c7)] p-4 text-amber-950 transition hover:border-amber-300 hover:shadow-sm"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500 text-white shadow-sm">
+                <Trophy size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-extrabold text-amber-950">Sổ Thành tựu & Huy hiệu</p>
+                <p className="truncate text-xs text-amber-800/85">Khám phá các cột mốc hành trình và nhận thưởng Journey Points</p>
+              </div>
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-white/90 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-xs transition group-hover:bg-white">
+              Mở ngay <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </Link>
+
           <p className="flex items-start gap-2 rounded-2xl border border-teal-200 bg-teal-50 p-3.5 text-sm text-teal-900">
             <Smartphone size={17} className="mt-0.5 shrink-0" />Đổi điểm lấy voucher và xem huy hiệu trong app JourneyGo (mục Cá nhân). Trên web bạn xem được số điểm, lịch sử và voucher đang có.
           </p>
