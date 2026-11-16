@@ -119,9 +119,13 @@ export default function TourWizard({ tourId, initialStep }) {
   const [gateNotice, setGateNotice] = useState("");
   const [checking, setChecking] = useState(false);
 
+  // Bước xa nhất người dùng đã mở trong phiên này — bước chưa mở thì chưa báo lỗi trên thanh bước.
+  const [maxVisited, setMaxVisited] = useState(() => Math.max(0, WIZARD_STEPS.findIndex((s) => s.key === step)));
+
   const goTo = async (key, stopIndex = null) => {
     await flush();
     setStep(key);
+    setMaxVisited((m) => Math.max(m, WIZARD_STEPS.findIndex((s) => s.key === key)));
     setGateNotice("");
     setFocusStop(stopIndex != null ? { index: stopIndex, nonce: (focusSeq.current += 1) } : null);
     contentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -307,7 +311,9 @@ export default function TourWizard({ tourId, initialStep }) {
         <nav className="self-start rounded-2xl border border-slate-200 bg-white p-2 flex lg:flex-col gap-1 overflow-x-auto">
           {WIZARD_STEPS.map((s, i) => {
             const active = s.key === step;
-            const errors = stepState[s.key];
+            // Bản nháp: chỉ báo lỗi ở bước đã mở (chưa tới bước đó thì chưa báo). Tour đã gửi/đang bán: báo hết.
+            const seen = !gated || i <= Math.max(maxVisited, stepIndex);
+            const errors = seen ? stepState[s.key] : 0;
             const done = !errors && i < stepIndex;
             const locked = !active && isLocked(i);
             return (
