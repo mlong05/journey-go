@@ -232,6 +232,22 @@ export const touristService = {
 
   // ── Cộng đồng ───────────────────────────────────────────────────────────────
   /** Bài viết đã được kiểm duyệt + đã công khai. */
+  /**
+   * Bảng tin cộng đồng có phân trang. sort: "createdAt,desc" (mới nhất) | "likesCount,desc" (nổi bật).
+   * Trả { items, last, total } để hiện nút "Xem thêm bài viết".
+   */
+  async communityFeed({ tourId, page = 0, size = 10, sort = "createdAt,desc" } = {}) {
+    const q = new URLSearchParams({ page: String(page), size: String(size), sort });
+    if (sort !== "createdAt,desc") q.append("sort", "createdAt,desc");
+    if (tourId) q.set("tourId", String(tourId));
+    const payload = data(await apiClient.get(`/community/posts?${q}`));
+    const items = list(payload);
+    return {
+      items,
+      last: payload?.last ?? items.length < size,
+      total: payload?.totalElements ?? items.length,
+    };
+  },
   async communityPosts({ tourId, size = 6 } = {}) {
     const q = new URLSearchParams({ page: "0", size: String(size), sort: "createdAt,desc" });
     if (tourId) q.set("tourId", String(tourId));
