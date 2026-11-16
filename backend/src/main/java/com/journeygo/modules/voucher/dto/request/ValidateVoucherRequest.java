@@ -18,9 +18,5 @@ public record ValidateVoucherRequest(
 
         /** ID đối tác tổ chức tour */
         @NotNull(message = "ID đối tác không được để trống")
-        Long partnerId,
-
-        /** Tỷ lệ hoa hồng của nền tảng (ví dụ: 0.20 tương đương 20%) */
-        @NotNull(message = "Tỷ lệ hoa hồng không được để trống")
-        BigDecimal commissionRate
+        Long partnerId
 ) {}

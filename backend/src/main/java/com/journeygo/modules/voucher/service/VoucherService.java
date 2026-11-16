@@ -2,6 +2,8 @@ package com.journeygo.modules.voucher.service;
 
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
+import com.journeygo.modules.finance.config.FinanceProperties;
+import com.journeygo.modules.finance.service.CommissionPolicyService;
 import com.journeygo.modules.providerprofile.entity.ProviderProfile;
 import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
 import com.journeygo.modules.voucher.dto.request.CreateVoucherRequest;
@@ -32,6 +34,8 @@ public class VoucherService {
 
     private final VoucherRepository voucherRepository;
     private final ProviderProfileRepository providerProfileRepository;
+    private final CommissionPolicyService commissionPolicyService;
+    private final FinanceProperties financeProperties;
 
     @Transactional
     public VoucherResponse createVoucher(CreateVoucherRequest request) {
@@ -207,8 +211,22 @@ public class VoucherService {
         }
 
         // Tính doanh thu lý thuyết ban đầu
+        // Resolve commissionRate theo thứ tự ưu tiên:
+        //   1. CommissionRate riêng của đối tác (ProviderProfile.commissionRate)
+        //   2. Chính sách hoa hồng hiện hành (CommissionPolicyService.getEffectiveRate)
+        //   3. Fallback cấu hình mặc định (FinanceProperties.defaultCommissionRate)
+        ProviderProfile partner = providerProfileRepository.findById(request.partnerId())
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY, "Không tìm thấy thông tin đối tác"));
+        BigDecimal commissionRate = partner.getEffectiveCommissionRate();
+        if (commissionRate == null || commissionRate.compareTo(BigDecimal.ZERO) == 0) {
+            BigDecimal policyRate = commissionPolicyService.getEffectiveRate();
+            commissionRate = (policyRate != null && policyRate.compareTo(BigDecimal.ZERO) > 0)
+                    ? policyRate
+                    : financeProperties.getDefaultCommissionRate();
+        }
+
         BigDecimal initialPlatformRevenue = request.tourPrice()
-                .multiply(request.commissionRate())
+                .multiply(commissionRate)
                 .setScale(2, RoundingMode.HALF_UP);
         BigDecimal initialPartnerRevenue = request.tourPrice().subtract(initialPlatformRevenue);
 
