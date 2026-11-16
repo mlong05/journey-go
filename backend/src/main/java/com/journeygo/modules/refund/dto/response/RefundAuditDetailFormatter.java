@@ -1,7 +1,11 @@
 package com.journeygo.modules.refund.dto.response;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * Chuẩn hoá nội dung nhật ký kiểm toán Refund để NGƯỜI DÙNG ĐỌC ĐƯỢC.
@@ -29,66 +33,102 @@ import java.util.regex.Pattern;
  * <p>Việc chuẩn hoá thực hiện LÚC ĐỌC (không sửa dữ liệu gốc) ⇒ nhật ký cũ cũng được
  * hiển thị đúng ngay mà không cần migrate DB. Các dòng mới ghi ra đã sạch sẵn nên
  * hàm này là "no-op" với chúng.
+ *
+ * <p><b>⚠️ Lưu ý quan trọng về an toàn khởi tạo:</b> nếu một {@link Pattern} hỏng
+ * (regex sai) thì {@code <clinit>} ném {@code ExceptionInInitializerError} ⇒ lần gọi
+ * sau sẽ ném {@code NoClassDefFoundError} và MỌI request có đọc nhật ký refund đều
+ * hỏng (500). Vì vậy toàn bộ pattern được biên dịch qua {@link #compile(String, Pattern)}
+ * — luôn trả về pattern dự phòng thay vì ném lỗi.
  */
 public final class RefundAuditDetailFormatter {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RefundAuditDetailFormatter.class);
 
     private RefundAuditDetailFormatter() {
     }
 
+    /**
+     * Biên dịch regex — KHÔNG BAO GIỜ ném lỗi.
+     *
+     * <p>Nếu regex không hợp lệ thì dùng {@code fallback} (một pattern vô hại,
+     * không khớp gì) và ghi log cảnh báo. Nhờ vậy class luôn khởi tạo được ⇒ không
+     * bao giờ có {@code NoClassDefFoundError} khi bấm "Chi tiết yêu cầu hoàn tiền".
+     */
+    private static Pattern compile(String regex, Pattern fallback) {
+        try {
+            return Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
+        } catch (PatternSyntaxException ex) {
+            LOG.error("Regex không hợp lệ trong RefundAuditDetailFormatter: {}", regex, ex);
+            return fallback;
+        }
+    }
+
+    /** Pattern vô hại — không khớp bất cứ chuỗi nào (dùng làm fallback). */
+    private static final Pattern NEVER = Pattern.compile("(?!)");
+
     // ── Quy tắc theo TIỀN TỐ (áp dụng trước, cho kết quả đúng nhất) ──────────
 
-    /** "Tourist gửi yêu cầu hoàn tiền" + phần thừa ⇒ chỉ giữ câu đầu. */
-    private static final Pattern PREFIX_TOURIST_REQUEST = Pattern.compile(
-            "^(?:Tourist|Khách du lịch)\\s+gửi\\s+yêu\\u00cầu\\s+hoàn\\s+tiền[^.]*\\.?",
-            Pattern.CASE_INSENSITIVE);
+    /**
+     * "Tourist gửi yêu cầu hoàn tiền" + phần thừa ⇒ chỉ giữ câu đầu.
+     *
+     * <p>⚠️ Không dùng escape unicode trong regex cho ký tự tiếng Việt: Java xử lý
+     * escape unicode ở tầng lexer và BẮT BUỘC phải có đúng 4 chữ số hex — escape thiếu
+     * số sẽ làm hỏng regex (và kéo theo lỗi 500 toàn hệ thống).
+     */
+    private static final Pattern PREFIX_TOURIST_REQUEST = compile(
+            "^(?:Tourist|Khách du lịch)\\s+gửi\\s+yêu\\s+cầu\\s+hoàn\\s+tiền[^.]*\\.?",
+            NEVER);
 
     /** "Phản hồi VNPay: {vnp_…}" ⇒ câu tự nhiên. */
-    private static final Pattern PREFIX_VNPAY_RESPONSE = Pattern.compile(
+    private static final Pattern PREFIX_VNPAY_RESPONSE = compile(
             "Phản\\s+hồi\\s+VNPay\\s*:\\s*\\{[^{}]*\\}",
-            Pattern.CASE_INSENSITIVE);
+            NEVER);
 
     /** "Kiểm tra trạng thái từ VNPay: {vnp_…}" ⇒ câu tự nhiên. */
-    private static final Pattern PREFIX_VNPAY_QUERY = Pattern.compile(
+    private static final Pattern PREFIX_VNPAY_QUERY = compile(
             "Kiểm\\s+tra\\s+trạng\\s+thái\\s+từ\\s+VNPay\\s*:\\s*\\{[^{}]*\\}",
-            Pattern.CASE_INSENSITIVE);
+            NEVER);
 
     /** "Admin phê duyệt hoàn 750000.00 — …" ⇒ "Quản trị viên phê duyệt hoàn tiền …". */
-    private static final Pattern PREFIX_ADMIN_APPROVED = Pattern.compile(
+    private static final Pattern PREFIX_ADMIN_APPROVED = compile(
             "^(?:Admin|Quản trị viên)\\s+phê\\s+duyệt\\s+hoàn(?:\\s+tiền)?\\s+[\\d.,]+\\s*₫?",
-            Pattern.CASE_INSENSITIVE);
+            NEVER);
 
     /** "phương thức: VNPay" ⇒ "phương thức VNPay" (bỏ dấu hai chấm thô). */
-    private static final Pattern METHOD_COLON = Pattern.compile(
-            "phương\\s+thức\\s*:\\s*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern METHOD_COLON = compile(
+            "phương\\s+thức\\s*:\\s*", NEVER);
 
     // ── Quy tắc chung ────────────────────────────────────────────────────────
 
     /** Map thô kiểu {@code {vnp_ResponseId=…, vnp_SecureHash=…}} (không có tiền tố). */
-    private static final Pattern RAW_MAP = Pattern.compile(
-            "\\{[^{}]*vnp_[^{}]*}", Pattern.CASE_INSENSITIVE);
+    private static final Pattern RAW_MAP = compile(
+            "\\{[^{}]*vnp_[^{}]*}", NEVER);
 
-    /** "Nguyên nhân: TOURIST_FAULT." / "nguyên nhân: PLATFORM_FAULT," */
-    private static final Pattern REASON_CLAUSE = Pattern.compile(
-            "[,.]?\\s*[Nn]guyên\\s+nhân\\s*:\\s*(?:TOURIST_FAULT|PLATFORM_FAULT)\\s*[.,]?",
-            Pattern.CASE_INSENSITIVE);
+    /** "Nguyên nhân: PERSONAL." / "nguyên nhân: PLATFORM_FAULT," */
+    private static final Pattern REASON_CLAUSE = compile(
+            "[,.]?\\s*[Nn]guyên\\s+nhân\\s*:\\s*(?:PERSONAL|PLATFORM_FAULT|PROVIDER_FAULT|FORCE_MAJEURE|TOURIST_FAULT)\\s*[.,]?",
+            NEVER);
 
     /** "Số tiền đề xuất: 750000.00" */
-    private static final Pattern PROPOSED_AMOUNT_CLAUSE = Pattern.compile(
+    private static final Pattern PROPOSED_AMOUNT_CLAUSE = compile(
             "[,.]?\\s*Số\\s+tiền\\s+đề\\s+xuất\\s*:\\s*[\\d.,]+\\s*[.,]?",
-            Pattern.CASE_INSENSITIVE);
+            NEVER);
 
     /** "hoàn 750000.00 —" — số tiền thô sau chữ "hoàn" (đã có ở cột amount). */
-    private static final Pattern RAW_AMOUNT_AFTER_HOAN = Pattern.compile(
+    private static final Pattern RAW_AMOUNT_AFTER_HOAN = compile(
             "(?<=\\shoàn\\s)\\d+(?:[.,]\\d+)?(?=\\s*[-–—.,]|$)",
-            Pattern.CASE_INSENSITIVE);
+            NEVER);
 
     /** Mã enum còn sót lại trong câu mô tả. */
-    private static final Pattern ENUM_TOURIST_FAULT = Pattern.compile("\\bTOURIST_FAULT\\b");
-    private static final Pattern ENUM_PLATFORM_FAULT = Pattern.compile("\\bPLATFORM_FAULT\\b");
-    private static final Pattern ENUM_VNPAY_API = Pattern.compile("\\bVNPAY_API\\b");
-    private static final Pattern ENUM_MANUAL_TRANSFER = Pattern.compile("\\bMANUAL_BANK_TRANSFER\\b");
+    private static final Pattern ENUM_TOURIST_FAULT = compile("\\bTOURIST_FAULT\\b", NEVER);
+    private static final Pattern ENUM_PERSONAL = compile("\\bPERSONAL\\b", NEVER);
+    private static final Pattern ENUM_PLATFORM_FAULT = compile("\\bPLATFORM_FAULT\\b", NEVER);
+    private static final Pattern ENUM_PROVIDER_FAULT = compile("\\bPROVIDER_FAULT\\b", NEVER);
+    private static final Pattern ENUM_FORCE_MAJEURE = compile("\\bFORCE_MAJEURE\\b", NEVER);
+    private static final Pattern ENUM_VNPAY_API = compile("\\bVNPAY_API\\b", NEVER);
+    private static final Pattern ENUM_MANUAL_TRANSFER = compile("\\bMANUAL_BANK_TRANSFER\\b", NEVER);
 
-    private static final Pattern MULTI_SPACE = Pattern.compile("\\s{2,}");
+    private static final Pattern MULTI_SPACE = compile("\\s{2,}", NEVER);
 
     /**
      * Trả về nội dung nhật ký đã chuẩn hoá, an toàn để hiển thị cho người dùng.
@@ -121,7 +161,10 @@ public final class RefundAuditDetailFormatter {
 
         // 5. Dịch mã enum còn sót.
         text = ENUM_TOURIST_FAULT.matcher(text).replaceAll("lỗi khách du lịch");
+        text = ENUM_PERSONAL.matcher(text).replaceAll("lỗi khách hàng");
         text = ENUM_PLATFORM_FAULT.matcher(text).replaceAll("lỗi nền tảng");
+        text = ENUM_PROVIDER_FAULT.matcher(text).replaceAll("lỗi đối tác");
+        text = ENUM_FORCE_MAJEURE.matcher(text).replaceAll("lỗi bất khả kháng");
         text = ENUM_VNPAY_API.matcher(text).replaceAll("VNPay");
         text = ENUM_MANUAL_TRANSFER.matcher(text).replaceAll("chuyển khoản thủ công");
 

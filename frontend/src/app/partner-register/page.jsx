@@ -16,6 +16,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import BrandLogo from "@/components/brand/BrandLogo";
+import { ROUTES } from "@/constants/routes";
 import {
   ArrowLeft,
   ArrowRight,
@@ -453,14 +455,17 @@ export default function PartnerRegisterPage() {
     <div className="flex h-dvh flex-col overflow-hidden bg-slate-50 text-slate-800">
       {/* Header */}
       <header className="shrink-0 border-b border-slate-200 bg-white/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-2.5 sm:px-6">
-          <Link href="/" className="flex items-center gap-2 text-sm font-bold text-slate-800">
-            <ArrowLeft size={16} className="text-slate-400" />
-            Về trang chủ
-          </Link>
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-            Đăng ký đối tác
-          </span>
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-2 sm:px-6">
+          <BrandLogo compact />
+          <div className="flex items-center gap-3">
+            <span className="hidden text-xs font-bold uppercase tracking-wider text-emerald-700 sm:inline">
+              Đăng ký đối tác
+            </span>
+            <Link href={ROUTES.PARTNER_PROGRAM} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-700 hover:border-teal-300">
+              <ArrowLeft size={15} className="text-slate-400" />
+              Trang đối tác
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -563,6 +568,7 @@ export default function PartnerRegisterPage() {
                   <div className="flex-1">
                     <TextInput
                       id="email"
+                  limit={150} counter="never"
                       type="email"
                       value={form.email}
                       onChange={(e) => setField("email", e.target.value)}
@@ -647,6 +653,7 @@ export default function PartnerRegisterPage() {
                     />
                     <TextInput
                       id="phone"
+                  limit={20} counter="never"
                       value={form.phone}
                       onChange={(e) => setField("phone", e.target.value)}
                       placeholder="0901234567"
@@ -664,6 +671,7 @@ export default function PartnerRegisterPage() {
                 >
                   <TextInput
                     id="representativeName"
+                  limit={150}
                     value={form.representativeName}
                     onChange={(e) => setField("representativeName", e.target.value)}
                     placeholder="Nguyễn Văn A"
@@ -715,6 +723,7 @@ export default function PartnerRegisterPage() {
               >
                 <TextInput
                   id="businessName"
+                  limit={200}
                   value={form.businessName}
                   onChange={(e) => setField("businessName", e.target.value)}
                   placeholder="Công ty TNHH Du lịch & Nghỉ dưỡng ABC"
@@ -775,6 +784,7 @@ export default function PartnerRegisterPage() {
                 <Field label="Mã số thuế" required htmlFor="taxCode" error={errors.taxCode}>
                   <TextInput
                     id="taxCode"
+                  limit={10} counter="never"
                     value={form.taxCode}
                     onChange={(e) => setField("taxCode", e.target.value)}
                     placeholder="0101234567"
@@ -790,6 +800,7 @@ export default function PartnerRegisterPage() {
                 >
                   <TextInput
                     id="businessRegistrationInfo"
+                  limit={500}
                     value={form.businessRegistrationInfo}
                     onChange={(e) => setField("businessRegistrationInfo", e.target.value)}
                     placeholder="Số GPKD / hộ kinh doanh, ngày cấp..."
@@ -891,6 +902,7 @@ export default function PartnerRegisterPage() {
               >
                 <TextInput
                   id="addressDetail"
+                  limit={255}
                   value={form.addressDetail}
                   onChange={(e) => setField("addressDetail", e.target.value)}
                   placeholder="Số nhà, tên đường, tòa nhà..."
@@ -906,6 +918,7 @@ export default function PartnerRegisterPage() {
               >
                 <TextArea
                   id="businessScope"
+                  limit={1000}
                   rows={3}
                   value={form.businessScope}
                   onChange={(e) => setField("businessScope", e.target.value)}
@@ -959,6 +972,7 @@ export default function PartnerRegisterPage() {
                 >
                   <TextInput
                     id="bankAccountNumber"
+                  limit={20} counter="never"
                     value={form.bankAccountNumber}
                     onChange={(e) => setField("bankAccountNumber", e.target.value)}
                     placeholder="0123456789"
@@ -974,6 +988,7 @@ export default function PartnerRegisterPage() {
                 >
                   <TextInput
                     id="bankAccountHolder"
+                  limit={150}
                     value={form.bankAccountHolder}
                     onChange={(e) => setField("bankAccountHolder", e.target.value)}
                     placeholder="NGUYEN VAN A"

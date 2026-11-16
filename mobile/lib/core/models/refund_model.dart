@@ -20,6 +20,33 @@ class RefundModel {
   final String status;
   final String? declaredReason;
   final String? approvedReason;
+
+  /// Mã lý do cụ thể do khách chọn (VD: HEALTH_ISSUE).
+  final String? declaredReasonCode;
+
+  /// Mã lý do cụ thể do quản trị viên xác định.
+  final String? approvedReasonCode;
+
+  /// Tên tiếng Việt của nhóm lý do khai báo (VD: "Lỗi khách hàng").
+  ///
+  /// Backend trả sẵn để mobile KHÔNG phải tự map mã kỹ thuật → nhãn.
+  final String? declaredReasonName;
+
+  /// Tên tiếng Việt của nhóm lý do do quản trị viên xác định.
+  final String? approvedReasonName;
+
+  /// Tên tiếng Việt của lý do cụ thể do khách chọn.
+  final String? declaredReasonCodeName;
+
+  /// Tên tiếng Việt của lý do cụ thể do quản trị viên xác định.
+  final String? approvedReasonCodeName;
+
+  /// Danh sách URL bằng chứng đính kèm (ảnh / video).
+  final List<String> evidenceAttachments;
+
+  /// Lý do NGẮN GỌN do khách nhập (VD: "Bị ốm đột xuất").
+  final String reasonSummary;
+
   final String reasonDetail;
   final num proposedAmount;
   final num approvedAmount;
@@ -39,8 +66,17 @@ class RefundModel {
   final String? bankAccountNumber;
   final String? bankAccountName;
   final String? bankName;
+  final String? contactPhone;
+  final String? contactEmail;
   final String? transferReference;
   final String? transferEvidence;
+
+  /// Ghi chú của nền tảng khi quản trị viên ghi nhận chuyển khoản thủ công.
+  final String? transferNote;
+
+  /// Ghi chú của nền tảng khi quản trị viên xử lý yêu cầu (duyệt / từ chối).
+  final String? adminNote;
+
   final DateTime? transferredAt;
   final DateTime? createdAt;
   final List<RefundAuditLogModel> auditLogs;
@@ -56,6 +92,14 @@ class RefundModel {
     required this.status,
     this.declaredReason,
     this.approvedReason,
+    this.declaredReasonCode,
+    this.approvedReasonCode,
+    this.declaredReasonName,
+    this.approvedReasonName,
+    this.declaredReasonCodeName,
+    this.approvedReasonCodeName,
+    this.evidenceAttachments = const [],
+    required this.reasonSummary,
     required this.reasonDetail,
     required this.proposedAmount,
     required this.approvedAmount,
@@ -75,8 +119,12 @@ class RefundModel {
     this.bankAccountNumber,
     this.bankAccountName,
     this.bankName,
+    this.contactPhone,
+    this.contactEmail,
     this.transferReference,
     this.transferEvidence,
+    this.transferNote,
+    this.adminNote,
     this.transferredAt,
     this.createdAt,
     this.auditLogs = const [],
@@ -94,6 +142,19 @@ class RefundModel {
       status: json['status']?.toString() ?? '',
       declaredReason: json['declaredReason']?.toString(),
       approvedReason: json['approvedReason']?.toString(),
+      declaredReasonCode: json['declaredReasonCode']?.toString(),
+      approvedReasonCode: json['approvedReasonCode']?.toString(),
+      declaredReasonName: json['declaredReasonName']?.toString(),
+      approvedReasonName: json['approvedReasonName']?.toString(),
+      declaredReasonCodeName: json['declaredReasonCodeName']?.toString(),
+      approvedReasonCodeName: json['approvedReasonCodeName']?.toString(),
+      evidenceAttachments: (json['evidenceAttachments'] is List)
+          ? (json['evidenceAttachments'] as List)
+              .map((e) => e.toString())
+              .where((e) => e.isNotEmpty)
+              .toList()
+          : const [],
+      reasonSummary: json['reasonSummary']?.toString() ?? '',
       reasonDetail: json['reasonDetail']?.toString() ?? '',
       proposedAmount: _toNum(json['proposedAmount']),
       approvedAmount: _toNum(json['approvedAmount']),
@@ -113,8 +174,12 @@ class RefundModel {
       bankAccountNumber: json['bankAccountNumber']?.toString(),
       bankAccountName: json['bankAccountName']?.toString(),
       bankName: json['bankName']?.toString(),
+      contactPhone: json['contactPhone']?.toString(),
+      contactEmail: json['contactEmail']?.toString(),
       transferReference: json['transferReference']?.toString(),
       transferEvidence: json['transferEvidence']?.toString(),
+      transferNote: json['transferNote']?.toString(),
+      adminNote: json['adminNote']?.toString(),
       transferredAt: _toDate(json['transferredAt']),
       createdAt: _toDate(json['createdAt']),
       auditLogs: (json['auditLogs'] is List)
@@ -132,19 +197,37 @@ class RefundModel {
   bool get isApproved => status == 'APPROVED';
   bool get isRejected => status == 'REJECTED';
   bool get isRefunded => status == 'REFUNDED';
-  bool get isProcessing => status == 'REFUND_PROCESSING';
+  bool get isProcessing =>
+      status == 'REFUND_PROCESSING' || status == 'VNPAY_PROCESSING';
   bool get isManualTransferPending => status == 'MANUAL_TRANSFER_PENDING';
   bool get isFailed => status == 'FAILED';
 
-  /// Đang chờ duyệt, đã duyệt chờ chuyển tiền hoặc đang hoàn qua VNPay.
+  /// Đã gửi yêu cầu tới VNPay — đang chờ VNPay xác nhận kết quả hoàn tiền.
+  bool get isVnPayProcessing => status == 'VNPAY_PROCESSING';
+
+  /// Đang chờ quản trị viên chuyển khoản thủ công.
+  bool get isAwaitingManualTransfer => status == 'MANUAL_TRANSFER_PENDING';
+
+  /// Yêu cầu đang được xử lý (chưa có kết luận cuối cùng).
+  ///
+  /// ⚠️ Mỗi thời điểm chỉ có MỘT phương thức hoàn ⇒ trạng thái "đang xử lý" được
+  /// tách theo phương thức: `VNPAY_PROCESSING` (chờ VNPay) và
+  /// `MANUAL_TRANSFER_PENDING` (chờ quản trị viên chuyển khoản).
   bool get isInProgress =>
       status == 'PENDING_REVIEW' ||
       status == 'APPROVED' ||
+      status == 'VNPAY_PROCESSING' ||
+      status == 'MANUAL_TRANSFER_PENDING' ||
       status == 'REFUND_PROCESSING';
 
   /// Yêu cầu đã có kết quả cuối (không còn chờ xử lý).
   bool get isFinal =>
-      isRefunded || isRejected || isFailed || isManualTransferPending || isApproved;
+      isRefunded || isRejected || isFailed || status == 'CANCELLED';
+
+  /// Yêu cầu đã được xử lý XONG về mặt tiền (đã hoàn hoặc bị từ chối).
+  ///
+  /// ⇒ Dùng để hiển thị nhãn "Đã xử lý hoàn tiền" trên danh sách đơn / chuyến đi.
+  bool get isResolved => isRefunded || isRejected || isFailed || status == 'CANCELLED';
 
   String get statusLabel {
     switch (status) {
@@ -152,8 +235,12 @@ class RefundModel {
         return 'Chờ duyệt';
       case 'APPROVED':
         return 'Đã duyệt';
+      case 'VNPAY_PROCESSING':
+        return 'Chờ VNPay xác nhận hoàn tiền';
       case 'REFUND_PROCESSING':
         return 'Đang hoàn tiền';
+      case 'MANUAL_TRANSFER_PENDING':
+        return 'Chờ chuyển khoản thủ công';
       case 'REFUNDED':
         return 'Đã hoàn tiền';
       case 'REJECTED':
@@ -176,9 +263,19 @@ class RefundModel {
     return proposedAmount;
   }
 
-  String get declaredReasonLabel => refundReasonLabel(declaredReason);
+  /// Nhãn nhóm lý do khai báo — ưu tiên tên từ backend, không lộ mã kỹ thuật.
+  String get declaredReasonLabel =>
+      declaredReasonName ?? refundReasonLabel(declaredReason);
 
-  String get approvedReasonLabel => refundReasonLabel(approvedReason);
+  /// Nhãn nhóm lý do do Admin xác định.
+  String get approvedReasonLabel =>
+      approvedReasonName ?? refundReasonLabel(approvedReason);
+
+  /// Nhãn lý do cụ thể (tên tiếng Việt) do khách chọn.
+  String? get declaredReasonCodeLabel => declaredReasonCodeName;
+
+  /// Nhãn lý do cụ thể (tên tiếng Việt) do Admin xác định.
+  String? get approvedReasonCodeLabel => approvedReasonCodeName;
 
   String get methodLabel => refundMethodLabel(method);
 
@@ -199,16 +296,93 @@ class RefundModel {
 
   String get formattedCreatedAt => formatDateTimeVn(createdAt);
 
-  /// Tỷ lệ hoàn theo nguyên nhân đã được Admin xác định (0.5 / 1.0).
+  /// Tỷ lệ hoàn theo nhóm lý do đã được Admin xác định (0.5 / 1.0 / 0).
   double get refundRate {
-    if (approvedReason == 'PLATFORM_FAULT') return 1;
-    if (approvedReason == 'TOURIST_FAULT') return 0.5;
-    if (declaredReason == 'PLATFORM_FAULT') return 1;
-    if (declaredReason == 'TOURIST_FAULT') return 0.5;
-    return 0;
+    const rates = {
+      'PERSONAL': 0.5,
+      'PLATFORM_FAULT': 1.0,
+      'PROVIDER_FAULT': 1.0,
+      'FORCE_MAJEURE': 0.0,
+      'TOURIST_FAULT': 0.5,
+    };
+    final reason = approvedReason ?? declaredReason;
+    if (reason == null) return 0;
+    return rates[reason] ?? 0;
   }
+
+  /// Tỷ lệ hoàn hiển thị dạng phần trăm (VD: 50).
+  int get refundRatePercent => (refundRate * 100).round();
 }
 
+/// Tóm tắt trạng thái hoàn tiền của một đơn (từ nhiều yêu cầu).
+///
+/// ── Vì sao cần lớp này? ──
+/// Một đơn đặt tour có thể có nhiều giao dịch thanh toán ⇒ nhiều yêu cầu hoàn
+/// tiền. App cần MỘT nhãn duy nhất để hiển thị trên danh sách đơn / chuyến đi:
+///  • `processing` — đang trong quá trình hoàn tiền
+///  • `resolved`  — đã xử lý xong (đã hoàn / bị từ chối / lỗi)
+///  • `none`      — chưa có yêu cầu hoàn tiền nào
+enum RefundSummaryState { none, processing, resolved }
+
+/// Gộp nhiều yêu cầu hoàn tiền của một đơn thành MỘT trạng thái hiển thị.
+///
+/// ⚠️ Ưu tiên "đang xử lý" hơn "đã xử lý" — nếu còn yêu cầu nào đang bay thì đơn
+/// vẫn đang trong quá trình hoàn tiền.
+RefundSummaryState summarizeRefundState(List<RefundModel> refunds) {
+  if (refunds.isEmpty) return RefundSummaryState.none;
+  if (refunds.any((r) => r.isInProgress)) return RefundSummaryState.processing;
+  if (refunds.any((r) => r.isResolved)) return RefundSummaryState.resolved;
+  return RefundSummaryState.none;
+}
+
+/// Chỉ mục tra cứu trạng thái hoàn tiền theo `bookingId`.
+///
+/// ── Vì sao cần? ──
+/// Màn "Đơn đặt tour" và màn "Chuyến đi" đều cần biết mỗi đơn đang/có hoàn
+/// tiền hay không. Gọi 1 endpoint `GET /refunds/my` rồi gom theo `bookingId`
+/// ⇒ không N+1 request.
+class RefundStateIndex {
+  final Map<int, List<RefundModel>> _byBooking;
+
+  const RefundStateIndex(this._byBooking);
+
+  /// Gom danh sách yêu cầu hoàn tiền thành chỉ mục theo booking.
+  factory RefundStateIndex.fromRefunds(List<RefundModel> refunds) {
+    final map = <int, List<RefundModel>>{};
+    for (final r in refunds) {
+      final bookingId = r.bookingId;
+      if (bookingId == null) continue;
+      map.putIfAbsent(bookingId, () => <RefundModel>[]).add(r);
+    }
+    return RefundStateIndex(map);
+  }
+
+  /// Danh sách yêu cầu hoàn tiền của một đơn (rỗng nếu không có).
+  List<RefundModel> forBooking(int? bookingId) {
+    if (bookingId == null) return const [];
+    return _byBooking[bookingId] ?? const [];
+  }
+
+  /// Trạng thái hiển thị của một đơn.
+  RefundSummaryState stateFor(int? bookingId) =>
+      summarizeRefundState(forBooking(bookingId));
+
+  /// Đơn đang trong quá trình hoàn tiền.
+  bool isRefunding(int? bookingId) =>
+      stateFor(bookingId) == RefundSummaryState.processing;
+
+  /// Đơn đã xử lý hoàn tiền xong.
+  bool isRefundResolved(int? bookingId) =>
+      stateFor(bookingId) == RefundSummaryState.resolved;
+
+  /// Đơn CÓ dính vào hoàn tiền (đang xử lý HOẶC đã xử lý xong).
+  ///
+  /// ⚠️ Dùng cho các màn chỉ hiển thị tour "còn hiệu lực" (đã thanh toán và có
+  /// thể trải nghiệm) — đơn đang hoàn tiền hoặc đã hoàn xong thì không được
+  /// coi là còn trải nghiệm được.
+  bool hasRefund(int? bookingId) =>
+      stateFor(bookingId) != RefundSummaryState.none;
+}
 /// Nhật ký kiểm toán của yêu cầu hoàn tiền.
 class RefundAuditLogModel {
   final int id;

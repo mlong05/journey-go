@@ -20,6 +20,7 @@ import { moderationService } from "@/features/destination";
 import { dashboardService } from "@/features/dashboard";
 import { communityModerationService } from "@/features/community/services/communityModerationService";
 import { useQueueRefresh } from "@/context/NotificationContext";
+import { formatDateTimeVN } from "@/lib/money";
 
 /**
  * Bàn làm việc tổng quan của Kiểm duyệt viên — /moderator
@@ -93,8 +94,7 @@ function timeAgo(iso) {
 
 function formatDateTime(iso) {
   if (!iso) return "";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("vi-VN");
+  return formatDateTimeVN(iso);
 }
 
 /** Hạn xử lý theo tuổi hồ sơ. */

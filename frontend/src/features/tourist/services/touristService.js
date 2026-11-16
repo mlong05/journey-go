@@ -1,0 +1,358 @@
+/**
+ * API phía du khách trên web: xem tour công khai, đặt tour, thanh toán VNPay.
+ *
+ *  Công khai (không cần đăng nhập):
+ *   • GET  /tours/published?q=&regionId=&themeId=&format=&order=   → Page<TourResponse>
+ *   • GET  /tours/{id}/public-detail                               → TourPublicDetailResponse
+ *   • GET  /tours/{id}/availability                                → { dates: [{date, remaining, available}] }
+ *   • GET  /regions, /themes                                       → danh mục vùng miền / chủ đề
+ *   • POST /payments/return-result?vnp_...                         → xác minh kết quả VNPay (chữ ký HMAC)
+ *
+ *  Cần đăng nhập TOURIST:
+ *   • POST /bookings                         → tạo đơn PENDING_PAYMENT (giữ chỗ 10 phút)
+ *   • GET  /bookings/my, GET /bookings/{id}  → đơn của tôi
+ *   • POST /bookings/{id}/cancel             → hủy đơn chưa thanh toán
+ *   • POST /payments/bookings/{id}/init      → URL thanh toán VNPay (appRedirect=false ⇒ quay về web)
+ */
+import { apiClient } from "@/services/apiClient";
+
+const data = (res) => (res && Object.prototype.hasOwnProperty.call(res, "data") ? res.data : res);
+
+/**
+ * Tóm tắt tour đã thấy trong danh sách (ảnh bìa, tên…). Trang chi tiết dùng để hiện ngay ảnh lớn
+ * khi chuyển trang ⇒ hiệu ứng ảnh thẻ phóng thành ảnh lớn chạy được trước khi dữ liệu đầy đủ về.
+ */
+const previewCache = new Map();
+export const getTourPreview = (tourId) => previewCache.get(String(tourId)) || null;
+const list = (payload) => (Array.isArray(payload) ? payload : Array.isArray(payload?.content) ? payload.content : []);
+
+export const touristService = {
+  async publishedTours({ q, regionId, themeId, format, order, page = 0, size = 60 } = {}) {
+    const query = new URLSearchParams({ page: String(page), size: String(size) });
+    if (q) query.set("q", q);
+    if (regionId) query.set("regionId", String(regionId));
+    if (themeId) query.set("themeId", String(themeId));
+    if (format) query.set("format", format);
+    if (order) query.set("order", order);
+    const payload = data(await apiClient.get(`/tours/published?${query}`));
+    // Chỉ hiện tour còn ngày khởi hành sắp tới (đặt được). Tour luồng cũ / hết lịch không có
+    // nextDepartureDate ⇒ ẩn khỏi trang du khách.
+    const items = list(payload).filter((t) => t.nextDepartureDate);
+    items.forEach((t) => previewCache.set(String(t.tourId), t));
+    return { items, total: items.length };
+  },
+  async tourDetail(tourId) {
+    return data(await apiClient.get(`/tours/${tourId}/public-detail`));
+  },
+  async availability(tourId) {
+    const payload = data(await apiClient.get(`/tours/${tourId}/availability`));
+    return payload?.dates || [];
+  },
+  async regions() {
+    return list(data(await apiClient.get("/regions")));
+  },
+  async themes() {
+    return list(data(await apiClient.get("/themes")));
+  },
+
+  /** body: { tourId, experienceDate: "yyyy-MM-dd", passengers: [{fullName, birthDate, gender, email, guestType}], note } */
+  async createBooking(body) {
+    return data(await apiClient.post("/bookings", body));
+  },
+  async myBookings({ page = 0, size = 50 } = {}) {
+    return list(data(await apiClient.get(`/bookings/my?page=${page}&size=${size}`)));
+  },
+  /**
+   * Các đơn còn có thể trải nghiệm (đủ điều kiện mở hành trình trong app).
+   * ⚠️ Backend lọc chặt hơn `/bookings/my`: loại đơn đã hủy / hết hạn.
+   */
+  async accessibleBookings() {
+    return list(data(await apiClient.get("/bookings/accessible")));
+  },
+  async booking(bookingId) {
+    return data(await apiClient.get(`/bookings/${bookingId}`));
+  },
+  async cancelBooking(bookingId, reason) {
+    return data(await apiClient.post(`/bookings/${bookingId}/cancel`, reason ? { reason } : {}));
+  },
+
+  /**
+   * Khởi tạo thanh toán cho WEB.
+   *
+   * ⚠️ Gửi TƯỜNG MINH `appRedirect=false` ⇒ backend dùng `VNPAY_WEB_RETURN_URL`
+   * (trang `/payment/result` của web) làm `vnp_ReturnUrl` ⇒ sau khi thanh toán
+   * xong, trình duyệt quay lại ĐÚNG trang kết quả của web (thay vì deep link
+   * `journeygo://` của app mobile ⇒ trình duyệt báo "không tìm thấy trang").
+   *
+   * @param {number} bookingId
+   * @param {string} [bankCode] mã `vnp_BankCode` (VD `VNBANK`); bỏ trống ⇒ backend
+   *   dùng mặc định (VNBANK) theo cấu hình dự án.
+   */
+  async initPayment(bookingId, bankCode) {
+    const params = new URLSearchParams({ appRedirect: "false" });
+    if (bankCode) params.set("bankCode", bankCode);
+    return data(await apiClient.post(`/payments/bookings/${bookingId}/init?${params.toString()}`, {}));
+  },
+  /** search: chuỗi query VNPay trả về (gồm các tham số vnp_* đã ký). */
+  async verifyReturn(search) {
+    const qs = search.startsWith("?") ? search.slice(1) : search;
+    return data(await apiClient.post(`/payments/return-result?${qs}`, {}));
+  },
+  /** Các lần thử thanh toán của một đơn (lấy payment SUCCESS để gửi yêu cầu hoàn tiền). */
+  async bookingPayments(bookingId) {
+    return list(data(await apiClient.get(`/payments/bookings/${bookingId}`)));
+  },
+
+  // ── Tài khoản ───────────────────────────────────────────────────────────────
+  async me() {
+    return data(await apiClient.get("/auth/me"));
+  },
+  /** body: { fullName, phone } */
+  async updateProfile(body) {
+    return data(await apiClient.put("/auth/profile", body));
+  },
+  async uploadAvatar(file) {
+    const form = new FormData();
+    form.append("file", file);
+    return data(await apiClient.upload("/auth/profile/avatar", form));
+  },
+  /** body: { currentPassword, newPassword, confirmPassword } */
+  async changePassword(body) {
+    return data(await apiClient.post("/auth/change-password", body));
+  },
+
+  // ── Hoàn tiền ───────────────────────────────────────────────────────────────
+  //
+  // ⚠️ Contract đã đổi (PR #20):
+  //   • Khách KHÔNG chọn nhóm lý do — chỉ mô tả bằng văn bản
+  //     (`reasonSummary` + `reasonDetail`). Admin phân loại khi duyệt.
+  //   • `evidenceAttachments` BẮT BUỘC có ảnh (ảnh biên lai giao dịch thành công).
+  //   • Cửa sổ gửi yêu cầu tính theo NGÀY TRẢI NGHIỆM, không theo `paidAt`.
+  /** Danh sách yêu cầu hoàn tiền của tôi. */
+  async myRefunds() {
+    return list(data(await apiClient.get("/refunds/my?page=0&size=50")));
+  },
+  /** Yêu cầu hoàn tiền của một payment. */
+  async refundsForPayment(paymentId) {
+    return list(data(await apiClient.get(`/refunds/payments/${paymentId}`)));
+  },
+  /** Yêu cầu hoàn tiền của cả một đơn (gộp mọi payment của đơn). */
+  async refundsForBooking(bookingId) {
+    return list(data(await apiClient.get(`/refunds/bookings/${bookingId}`)));
+  },
+  /**
+   * Gửi yêu cầu hoàn tiền.
+   *
+   * body: {
+   *   paymentId, reasonSummary (bắt buộc), reasonDetail (bắt buộc),
+   *   evidenceAttachments: [url ảnh] (bắt buộc — phải có ít nhất 1 ẢNH),
+   *   bankAccountNumber?, bankAccountName?, bankName?,
+   *   contactPhone?, contactEmail?
+   * }
+   */
+  async createRefund(body) {
+    return data(await apiClient.post("/refunds", body));
+  },
+  /** Tải ảnh bằng chứng lên Cloudinary — trả về URL an toàn (https). */
+  async uploadImage(file, folder) {
+    const form = new FormData();
+    form.append("file", file);
+    if (folder) form.append("folder", folder);
+    const res = data(await apiClient.upload("/upload/image", form));
+    return res?.url || res?.secureUrl || res;
+  },
+
+  // ── Nhắn tin với nhà tour ───────────────────────────────────────────────────
+  async conversations() {
+    return list(data(await apiClient.get("/provider-chat/conversations")));
+  },
+  /** Mở (hoặc lấy lại) cuộc trò chuyện với nhà tour của tour đang xem. */
+  async startConversation(tourId) {
+    return data(await apiClient.post("/provider-chat/conversations", { tourId: Number(tourId) }));
+  },
+  async messages(conversationId) {
+    return list(data(await apiClient.get(`/provider-chat/conversations/${conversationId}/messages`)));
+  },
+  /** Hành trình trải nghiệm của tôi (mở trong app) — dùng để biết đơn nào đang trải nghiệm (IN_PROGRESS). */
+  async myJourneys() {
+    return list(data(await apiClient.get("/journeys/my")));
+  },
+  /** tourId: tour mà tin nhắn hỏi về (backend ghi lên tin nhắn để hiện thẻ tour trong khung chat). */
+  async sendMessage(conversationId, body, tourId) {
+    return data(await apiClient.post(`/provider-chat/conversations/${conversationId}/messages`, { body, tourId: tourId ? Number(tourId) : null }));
+  },
+
+  // ── Điểm thưởng & voucher ───────────────────────────────────────────────────
+  async myPoints() {
+    return data(await apiClient.get("/gamification/points/my"));
+  },
+  async pointHistory() {
+    return list(data(await apiClient.get("/gamification/points/history?page=0&size=20")));
+  },
+  async myVouchers() {
+    return list(data(await apiClient.get("/gamification/vouchers/my")));
+  },
+  async vouchers() {
+    return list(data(await apiClient.get("/gamification/vouchers")));
+  },
+  /** Đổi điểm lấy voucher — trả về voucher đã đổi. */
+  async redeemVoucher(voucherId) {
+    return data(await apiClient.post(`/gamification/vouchers/${voucherId}/redeem`, {}));
+  },
+  /** Danh mục huy hiệu đang mở trong hệ thống. */
+  async allBadges() {
+    return list(data(await apiClient.get("/gamification/badges")));
+  },
+  /** Huy hiệu tôi đã đạt (kèm ngày nhận). */
+  async myBadges() {
+    return list(data(await apiClient.get("/gamification/badges/my")));
+  },
+
+  // ── Thông báo ───────────────────────────────────────────────────────────────
+  /** Danh sách thông báo của tôi (mới nhất trước). */
+  async notifications({ page = 0, size = 30 } = {}) {
+    const payload = data(await apiClient.get(`/notifications?page=${page}&size=${size}`));
+    return { items: list(payload), total: payload?.totalElements ?? list(payload).length };
+  },
+  /** Số thông báo chưa đọc. */
+  async unreadCount() {
+    const res = data(await apiClient.get("/notifications/unread-count"));
+    return Number(res?.count ?? 0);
+  },
+  /** Đánh dấu đã đọc — trả về số chưa đọc còn lại. */
+  async markNotificationRead(id) {
+    const res = data(await apiClient.patch(`/notifications/${id}/read`));
+    return Number(res?.count ?? 0);
+  },
+  /** Đánh dấu đã đọc tất cả — trả về số chưa đọc còn lại. */
+  async markAllNotificationsRead() {
+    const res = data(await apiClient.patch("/notifications/read-all"));
+    return Number(res?.count ?? 0);
+  },
+
+  // ── Cộng đồng ───────────────────────────────────────────────────────────────
+  /** Bài viết đã được kiểm duyệt + đã công khai. */
+  /**
+   * Bảng tin cộng đồng có phân trang. sort: "createdAt,desc" (mới nhất) | "likesCount,desc" (nổi bật).
+   * Trả { items, last, total } để hiện nút "Xem thêm bài viết".
+   */
+  async communityFeed({ tourId, page = 0, size = 10, sort = "createdAt,desc" } = {}) {
+    const q = new URLSearchParams({ page: String(page), size: String(size), sort });
+    if (sort !== "createdAt,desc") q.append("sort", "createdAt,desc");
+    if (tourId) q.set("tourId", String(tourId));
+    const payload = data(await apiClient.get(`/community/posts?${q}`));
+    const items = list(payload);
+    return {
+      items,
+      last: payload?.last ?? items.length < size,
+      total: payload?.totalElements ?? items.length,
+    };
+  },
+  async communityPosts({ tourId, size = 6 } = {}) {
+    const q = new URLSearchParams({ page: "0", size: String(size), sort: "createdAt,desc" });
+    if (tourId) q.set("tourId", String(tourId));
+    return list(data(await apiClient.get(`/community/posts?${q}`)));
+  },
+  /** Bài viết của tôi (kể cả đang chờ kiểm duyệt). */
+  async myCommunityPosts() {
+    return list(data(await apiClient.get("/community/posts/my")));
+  },
+  /** Chi tiết một bài viết. */
+  async communityPost(id) {
+    return data(await apiClient.get(`/community/posts/${id}`));
+  },
+  /** Bình luận công khai của một bài viết. */
+  async communityComments(postId) {
+    return list(data(await apiClient.get(`/community/posts/${postId}/comments`)));
+  },
+  /** Đăng bài viết mới — body: { title, content, tourId?, mediaUrls? }. */
+  async createCommunityPost(body) {
+    return data(await apiClient.post("/community/posts", body));
+  },
+  /** Gửi bài viết đi kiểm duyệt (sau khi đăng ở dạng draft). */
+  async submitCommunityPost(id) {
+    return data(await apiClient.post(`/community/posts/${id}/submit`, {}));
+  },
+  /** Bình luận lên một bài viết — body: { content }. */
+  async addCommunityComment(postId, content) {
+    return data(await apiClient.post(`/community/posts/${postId}/comments`, { content }));
+  },
+  /** Thả tim / bỏ thả tim. */
+  async reactCommunityPost(postId) {
+    return data(await apiClient.post(`/community/posts/${postId}/react`, {}));
+  },
+  /** Sửa bài của tôi — bài đã đăng sẽ tự quay lại chờ kiểm duyệt. */
+  async updateCommunityPost(postId, body) {
+    return data(await apiClient.put(`/community/posts/${postId}`, body));
+  },
+  /** Xoá bài của tôi. */
+  async deleteCommunityPost(postId) {
+    return data(await apiClient.delete(`/community/posts/${postId}`));
+  },
+  /** Xoá bình luận của tôi. */
+  async deleteCommunityComment(commentId) {
+    return data(await apiClient.delete(`/community/comments/${commentId}`));
+  },
+  /** Báo cáo bài viết vi phạm — body: { reason, description? }. */
+  async reportCommunityPost(postId, body) {
+    return data(await apiClient.post(`/community/posts/${postId}/report`, body));
+  },
+  /** Báo cáo bình luận vi phạm — body: { reason, description? }. */
+  async reportCommunityComment(commentId, body) {
+    return data(await apiClient.post(`/community/comments/${commentId}/report`, body));
+  },
+
+  // ── Mời tham gia nhóm & đổi thông tin hành khách ──────────────────────────
+  /** Mời một hành khách tham gia đơn đặt tour (người đặt là người mời). */
+  async invitePassenger(bookingId, passengerId, email) {
+    const q = email ? `?email=${encodeURIComponent(email)}` : "";
+    return data(await apiClient.post(`/bookings/${bookingId}/passengers/${passengerId}/invitations${q}`, {}));
+  },
+  /** Danh sách lời mời đang chờ tôi xác nhận. */
+  async myInvitations() {
+    return list(data(await apiClient.get("/bookings/my-invitations")));
+  },
+  /** Chi tiết lời mời theo token (dùng cho link mời trong email). */
+  async invitationByToken(token) {
+    return data(await apiClient.get(`/bookings/invitations/${encodeURIComponent(token)}`));
+  },
+  /** Chấp nhận lời mời (thành công ⇒ thêm vào đơn). */
+  async acceptInvitation(token) {
+    return data(await apiClient.post(`/bookings/invitations/${encodeURIComponent(token)}/accept`, {}));
+  },
+  /** Xác nhận lời mời (dành cho tài khoản đã đăng nhập). */
+  async confirmInvitation(invitationId) {
+    return data(await apiClient.post(`/bookings/my-invitations/${invitationId}/confirm`, {}));
+  },
+  /** Gửi yêu cầu đổi thông tin hành khách (đối tác duyệt). */
+  async requestPassengerChange(bookingId, passengerId, body) {
+    return data(await apiClient.post(`/bookings/${bookingId}/passengers/${passengerId}/change-requests`, body));
+  },
+  /** Các yêu cầu đổi thông tin của một đơn. */
+  async bookingChangeRequests(bookingId) {
+    return list(data(await apiClient.get(`/bookings/${bookingId}/change-requests`)));
+  },
+  /** Danh sách hành khách trong một đơn. */
+  async bookingPassengers(bookingId) {
+    return list(data(await apiClient.get(`/bookings/${bookingId}/passengers`)));
+  },
+
+  // ── Tin nhắn trong đơn (khách ↔ nhà tour, gắn với đơn) ────────────────────
+  /** Tin nhắn của một đơn đặt tour. */
+  async bookingMessages(bookingId) {
+    return list(data(await apiClient.get(`/bookings/${bookingId}/messages`)));
+  },
+  /** Gửi tin nhắn trong đơn — body: { body }. */
+  async sendBookingMessage(bookingId, body) {
+    return data(await apiClient.post(`/bookings/${bookingId}/messages`, { body }));
+  },
+  /**
+   * Hội thoại thống nhất (du khách ↔ nhà tour) của một đơn — CÙNG với tab
+   * "Tin nhắn với nhà tour". Dùng để mở đúng tab khi bấm "Hỗ trợ trong đơn này".
+   */
+  async bookingConversation(bookingId) {
+    return data(await apiClient.post("/provider-chat/conversations", { bookingId: Number(bookingId) }));
+  },
+};
+
+export default touristService;

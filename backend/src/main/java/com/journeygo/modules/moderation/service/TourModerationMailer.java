@@ -46,7 +46,7 @@ public class TourModerationMailer {
         list.append("</ul>");
         String body = "<p>Tour <b>" + esc(tour.getTitle()) + "</b> cần chỉnh sửa trước khi được duyệt.</p>"
                 + (generalNote == null || generalNote.isBlank() ? "" : "<p>" + esc(generalNote) + "</p>")
-                + "<p>Danh sách ghi chú của Moderator:</p>" + list
+                + "<p>Danh sách ghi chú của kiểm duyệt viên:</p>" + list
                 + "<p>Vui lòng sửa theo ghi chú rồi gửi duyệt lại.</p>";
         send(tour.getCreatedBy(), "Yêu cầu chỉnh sửa tour trên JourneyGo", body);
     }

@@ -1,6 +1,7 @@
 /**
  * Utility functions
  */
+import { formatLocalDate } from "@/lib/money";
 
 /**
  * Nối class names đơn giản (hoặc thay bằng clsx + tailwind-merge nếu cài đặt)
@@ -10,16 +11,14 @@ export function cn(...classes) {
 }
 
 /**
- * Format ngày tháng theo định dạng VN
+ * Format ngày tháng theo định dạng VN — "dd/MM/yyyy".
+ *
+ * ⚠️ Dùng helper chuẩn `formatLocalDate` để mọi nơi hiển thị ngày theo CÙNG một
+ * định dạng (dd/MM/yyyy) và không lệch múi giờ với `LocalDate`.
  */
 export function formatDate(dateString) {
   if (!dateString) return "";
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(date);
+  return formatLocalDate(dateString);
 }
 
 /**

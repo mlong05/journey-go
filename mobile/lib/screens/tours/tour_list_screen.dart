@@ -101,9 +101,10 @@ class _TourListScreenState extends State<TourListScreen> {
   ///
   /// ⚠️ Lấy từ `getMine()` + `isPaid` (không dùng `getTickets()` vì hàm đó chỉ
   /// trả về vé đang dùng) — tour đã mua rồi thì KHÔNG được đặt tiếp.
+  /// ⚠️ `size: 200` để không bỏ sót tour đã mua khi du khách có nhiều đơn.
   Future<void> _loadOwned() async {
     try {
-      final bookings = await BookingService().getMine();
+      final bookings = await BookingService().getMine(size: 200);
       final ids = {for (final b in bookings) if (b.isPaid) b.tourId};
       if (mounted) setState(() => _owned = ids);
     } catch (_) {}

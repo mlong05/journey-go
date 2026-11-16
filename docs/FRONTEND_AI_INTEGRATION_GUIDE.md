@@ -497,6 +497,7 @@ Query: `page` (0-based), `size`, `sort`.
 | 400 | `BOOKING_INVALID_DATE` | Ngày trải nghiệm không hợp lệ | Bắt chọn ngày khác |
 | 400 | `BOOKING_SLOT_NOT_FOUND` | Chưa mở bán trải nghiệm cho ngày này | Disable ngày đó |
 | 409 | `BOOKING_SLOT_FULL` | Trải nghiệm đã hết chỗ cho ngày này | Báo hết chỗ |
+| 409 | `BOOKING_TOUR_ALREADY_PURCHASED` | Bạn đã mua tour này rồi | Khoá khung đặt tour, hiện "Đã thanh toán" |
 | 400 | `BOOKING_NO_AVAILABLE_EXPERIENCE` | Tour không có trải nghiệm khả dụng | Báo lỗi |
 
 ### 5.6. `GET /bookings/my` — danh sách booking của tôi
@@ -2211,6 +2212,7 @@ VNPay redirect về `VNPAY_RETURN_URL`. Nếu cấu hình URL đó trỏ về tr
 | `BOOKING_SLOT_NOT_FOUND` | 400 | Chưa mở bán trải nghiệm cho ngày này | Disable ngày |
 | `BOOKING_ALREADY_EXPIRED` | 409 | Booking đã hết hạn thanh toán | Về trang đơn, nút "Đặt lại" |
 | `BOOKING_CANNOT_CANCEL_PAID` | 409 | Booking đã thanh toán — không thể hủy trực tiếp | Hướng dẫn xin refund |
+| `BOOKING_TOUR_ALREADY_PURCHASED` | 409 | Bạn đã mua tour này rồi — không thể đặt lại | Khoá khung đặt tour, hiện "Đã thanh toán" |
 | `PAYMENT_NOT_RETRYABLE` | 409 | Giao dịch trước chưa rõ kết quả — cần xác minh trước khi thử lại | **Gọi QueryDR** |
 | `PAYMENT_ALREADY_SUCCEEDED` | 409 | Booking đã được thanh toán thành công | Về trang chi tiết đơn |
 | `PAYMENT_AMOUNT_MISMATCH` | 400 | Số tiền thanh toán không khớp với đơn hàng | Báo lỗi, không retry |

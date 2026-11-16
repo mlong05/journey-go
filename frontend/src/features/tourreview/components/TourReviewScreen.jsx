@@ -6,13 +6,16 @@ import {
   ArrowLeft, Loader2, Flag, BadgeCheck, MessageSquareWarning, Ban, Eye, FileText, History, CheckCircle2, XCircle, AlertTriangle, Info,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { LimitedField } from "@/components/ui/LimitedField";
 import TourContentView from "@/features/tourwizard/components/TourContentView";
 import { TOUR_STATUS, REVIEW_CRITERIA, CRITERIA_MIN_TO_APPROVE, REJECTION_REASONS, STEP_LABEL } from "@/features/tourwizard/constants";
 import { tourReviewService } from "../services/tourReviewService";
 import FlaggableBlock, { ReviewNotesContext, anchorId } from "./FlaggableBlock";
 import CustomerPreview from "./CustomerPreview";
+import { formatDateTimeVN } from "@/lib/money";
 
-const fmt = (iso) => (iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : "");
+/** Chuẩn thời gian CHUNG: "14:19 15/11/2026" (giờ Việt Nam). */
+const fmt = (iso) => (iso ? formatDateTimeVN(iso) || "" : "");
 const ACTION_LABEL = { SUBMITTED: "Gửi duyệt", APPROVED: "Đồng ý", CHANGES_REQUESTED: "Yêu cầu chỉnh sửa", REJECTED: "Từ chối" };
 const statusLabel = (s) => (s ? TOUR_STATUS[s]?.label || s : "—");
 const STEP_SHORT = { BASIC_INFO: "Thông tin cơ bản", PRICING: "Giá vé", STOPS: "Điểm đến", ITINERARY: "Lịch trình", SCHEDULE: "Lịch khởi hành" };
@@ -48,8 +51,8 @@ function RejectReasons({ value, onChange, other, onOther }) {
         ))}
       </div>
       {value.includes("OTHER") && (
-        <input value={other} onChange={(e) => onOther(e.target.value)} placeholder="Nội dung lý do khác"
-          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-rose-400/30" />
+        <LimitedField as="input" limit={OTHER_REASON_MAX} value={other} onChange={(e) => onOther(e.target.value)} placeholder="Nội dung lý do khác"
+          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-rose-400/30" />
       )}
     </div>
   );
@@ -58,6 +61,8 @@ function RejectReasons({ value, onChange, other, onOther }) {
 const AFTER_DECISION_HREF = "/moderator";
 const SCROLL = "[scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]";
 const GENERAL_NOTE_MAX = 500;
+/** Khớp TourReviewDecisionRequest.otherReason (@Size 500). */
+const OTHER_REASON_MAX = 500;
 const DECISION_COPY = {
   approve: { title: "Đã duyệt tour thành công", text: "Tour đang bán, slot đã được tạo và đối tác đã nhận thông báo, email.", Icon: CheckCircle2, tone: "emerald" },
   changes: { title: "Đã gửi yêu cầu chỉnh sửa thành công", text: "Tour chuyển sang Cần chỉnh sửa. Đã gửi thông báo và email kèm danh sách ghi chú cho đối tác.", Icon: MessageSquareWarning, tone: "amber" },
@@ -273,7 +278,7 @@ export default function TourReviewScreen({ tourId }) {
             {/* Tab "Xem trước": cột trái vẫn hiện nội dung để đối chiếu, điện thoại nằm ở cột phải */}
             {(tab === "content" || tab === "preview") && (
               <>
-                {pending && <p className="text-[11px] text-slate-500 mb-2">Rê chuột vào từng khối để <b>Gắn cờ / Ghi chú</b>. Khối bị gắn cờ có viền cam.</p>}
+                {pending && <p className="text-[11px] text-slate-500 mb-2">Bấm nút lá cờ ở góc phải mỗi khối để <b>Gắn cờ / Ghi chú</b>. Khối bị gắn cờ có viền cam.</p>}
                 <TourContentView tour={tour} Block={FlaggableBlock} />
 
                 {/* Ghi chú gắn cờ — cuối nội dung tour */}
@@ -390,15 +395,10 @@ export default function TourReviewScreen({ tourId }) {
 
             {pending && (
               <div className="shrink-0 rounded-2xl border border-slate-200 bg-white p-3.5 space-y-2">
-                {/* Ghi chú chung: cao cố định, không kéo giãn → cột không tràn màn hình */}
-                <div className="relative">
-                  <textarea rows={2} maxLength={GENERAL_NOTE_MAX} value={generalNote}
-                    onChange={(e) => setGeneralNote(e.target.value)} placeholder="Ghi chú chung (không bắt buộc)"
-                    className={`block w-full h-[60px] resize-none overflow-y-auto pl-2.5 pr-2.5 pt-2 pb-4 rounded-lg border border-slate-200 text-xs leading-snug text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 ${SCROLL}`} />
-                  <span className="pointer-events-none absolute right-2 bottom-1 text-[10px] text-slate-400 tabular-nums">
-                    {generalNote.length}/{GENERAL_NOTE_MAX}
-                  </span>
-                </div>
+                {/* Ghi chú chung: cao cố định, không kéo giãn → cột không tràn màn hình; bộ đếm nằm dưới ô */}
+                <LimitedField as="textarea" counter="always" rows={2} limit={GENERAL_NOTE_MAX} value={generalNote}
+                  onChange={(e) => setGeneralNote(e.target.value)} placeholder="Ghi chú chung (không bắt buộc)"
+                  className={`block w-full h-[60px] resize-none overflow-y-auto px-2.5 py-2 rounded-lg border border-slate-200 text-xs leading-snug text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 ${SCROLL}`} />
 
                 {rejectMode && (
                   <div className="p-2.5 rounded-lg border border-rose-200 bg-rose-50/50 space-y-1.5">

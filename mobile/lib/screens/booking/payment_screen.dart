@@ -209,22 +209,50 @@ class _PaymentScreenState extends State<PaymentScreen> {
     });
 
     // ① Booking — tải trước. Nếu lỗi ⇒ hiện màn hình lỗi (không có gì để thanh toán).
-    BookingModel booking;
-    try {
-      booking = widget.booking ?? await _bookingService.getBookingById(widget.bookingId);
-    } on ApiException catch (e) {
-      if (!mounted) return;
+    //
+    // ⚠️ Hiển thị NGAY từ `widget.booking` (nếu có) rồi mới đồng bộ server.
+    //
+    // ⚠️ Vì sao KHÔNG chỉ dùng `widget.booking`? Vì đó là ảnh chụp CŨ — khách
+    // quay lại từ trình duyệt VNPay thì đơn đã được thanh toán xong nhưng
+    // `widget.booking` vẫn ghi "Chờ thanh toán" ⇒ màn hình hiển thị sai.
+    //
+    // ⚠️ Vì sao KHÔNG bỏ hẳn `widget.booking`? Vì khi mạng chậm/lỗi, nếu chỉ
+    // chờ server thì người dùng phải nhìn màn trắng rồi mới thấy lỗi — và mất
+    // luôn thông tin đơn đã có sẵn. ⇒ Vẽ bằng dữ liệu cache trước, server
+    // ghi đè sau (nếu có).
+    BookingModel? booking = widget.booking;
+    if (booking != null) {
       setState(() {
-        _error = e.message;
+        _booking = booking;
         _loading = false;
       });
+      _startCountdown();
+    }
+
+    try {
+      booking = await _bookingService.getBookingById(widget.bookingId);
+    } on ApiException catch (e) {
+      // Đã có dữ liệu cache ⇒ chỉ hiện cảnh báo nhẹ, KHÔNG chặn màn hình.
+      if (!mounted) return;
+      if (widget.booking != null) {
+        setState(() => _error = e.message);
+      } else {
+        setState(() {
+          _error = e.message;
+          _loading = false;
+        });
+      }
       return;
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _error = 'Không thể tải thông tin thanh toán.';
-        _loading = false;
-      });
+      if (widget.booking != null) {
+        setState(() => _error = 'Không thể tải thông tin thanh toán.');
+      } else {
+        setState(() {
+          _error = 'Không thể tải thông tin thanh toán.';
+          _loading = false;
+        });
+      }
       return;
     }
 
@@ -312,6 +340,32 @@ class _PaymentScreenState extends State<PaymentScreen> {
         _statusMessage = 'Thanh toán thành công!';
       });
       _showSuccessDialog();
+      return;
+    }
+
+    // Giao dịch bị THAY THẾ ⇒ đơn đã được thanh toán bởi giao dịch khác.
+    // ⇒ Đọc lại booking: nếu đã CONFIRMED ⇒ coi như thanh toán THÀNH CÔNG.
+    if (result.payment?.isSuperseded == true) {
+      final fresh = await _bookingService.getBookingById(widget.bookingId);
+      if (!mounted) return;
+      if (fresh.isConfirmed || fresh.isCompleted) {
+        setState(() {
+          _booking = fresh;
+          _payment = result.payment;
+          _statusMessage = 'Thanh toán thành công!';
+        });
+        _showSuccessDialog();
+        return;
+      }
+      setState(() {
+        _booking = fresh;
+        _payment = result.payment;
+        _statusMessage = '';
+        _error = result.message.isNotEmpty
+            ? result.message
+            : 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
+                'bởi một giao dịch khác.';
+      });
       return;
     }
 
@@ -603,6 +657,34 @@ class _PaymentScreenState extends State<PaymentScreen> {
         return;
       }
 
+      // Giao dịch bị THAY THẾ ⇒ đơn hàng đã được thanh toán bởi giao dịch KHÁC
+      // ⇒ đọc lại booking để biết đã thành công hay chưa.
+      if (result.payment?.isSuperseded == true) {
+        await TokenStorage.clearPendingPayment(widget.bookingId);
+        if (!mounted) return;
+        final fresh = await _bookingService.getBookingById(widget.bookingId);
+        if (!mounted) return;
+        if (fresh.isConfirmed || fresh.isCompleted) {
+          setState(() {
+            _booking = fresh;
+            _polling = false;
+            _statusMessage = 'Thanh toán thành công!';
+          });
+          _showSuccessDialog();
+          return;
+        }
+        setState(() {
+          _booking = fresh;
+          _polling = false;
+          _statusMessage = '';
+          _error = result.message?.isNotEmpty == true
+              ? result.message!
+              : 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
+                  'bởi một giao dịch khác.';
+        });
+        return;
+      }
+
       // Có kết quả cuối nhưng không thành công → cho phép thử lại.
       await TokenStorage.clearPendingPayment(widget.bookingId);
       if (!mounted) return;
@@ -664,6 +746,38 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (result.isFinal) {
         await TokenStorage.clearPendingPayment(widget.bookingId);
         if (!mounted) return;
+
+        // Giao dịch bị THAY THẾ ⇒ đơn hàng đã được thanh toán bởi giao dịch KHÁC.
+        // ⇒ Đọc lại booking: nếu đã CONFIRMED thì coi như thanh toán THÀNH CÔNG
+        // (khách đã thanh toán thật, chỉ là giao dịch bị bỏ rơi) ⇒ hiện hộp thoại
+        // thành công thay vì báo lỗi.
+        final superseded = result.payment?.isSuperseded == true;
+        if (superseded) {
+          final fresh = await _bookingService.getBookingById(widget.bookingId);
+          if (!mounted) return;
+          if (fresh.isConfirmed || fresh.isCompleted) {
+            setState(() {
+              _booking = fresh;
+              _payment = result.payment;
+              _syncing = false;
+              _statusMessage = 'Thanh toán thành công!';
+            });
+            _showSuccessDialog();
+            return;
+          }
+          setState(() {
+            _booking = fresh;
+            _payment = result.payment;
+            _syncing = false;
+            _statusMessage = '';
+            _error = result.message.isNotEmpty
+                ? result.message
+                : 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
+                    'bởi một giao dịch khác.';
+          });
+          return;
+        }
+
         setState(() {
           _payment = result.payment;
           _syncing = false;

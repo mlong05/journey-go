@@ -18,6 +18,10 @@ public record ManualTransferRequest(
         @Size(max = 5000, message = "Bằng chứng không được vượt quá 5000 ký tự")
         String transferEvidence,
 
+        @Schema(description = "Ghi chú của nền tảng (nếu có) — hiển thị cho người dùng")
+        @Size(max = 2000, message = "Ghi chú không được vượt quá 2000 ký tự")
+        String transferNote,
+
         @Schema(description = "Thời điểm thực hiện chuyển khoản")
         Instant transferredAt
 ) {}

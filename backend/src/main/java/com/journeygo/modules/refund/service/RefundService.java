@@ -3,6 +3,10 @@ package com.journeygo.modules.refund.service;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
+import com.journeygo.modules.booking.entity.Booking;
+import com.journeygo.modules.booking.entity.enums.BookingStatus;
+import com.journeygo.modules.booking.repository.BookingPassengerRepository;
+import com.journeygo.modules.booking.repository.BookingRepository;
 import com.journeygo.modules.finance.config.FinanceProperties;
 import com.journeygo.modules.payment.entity.Payment;
 import com.journeygo.modules.payment.entity.enums.PaymentStatus;
@@ -13,6 +17,7 @@ import com.journeygo.modules.refund.dto.request.ManualTransferRequest;
 import com.journeygo.modules.refund.dto.request.ReviewRefundRequest;
 import com.journeygo.modules.refund.dto.response.RefundResponse;
 import com.journeygo.modules.refund.entity.RefundAuditLog;
+import com.journeygo.modules.refund.entity.RefundReasonCode;
 import com.journeygo.modules.refund.entity.RefundRequest;
 import com.journeygo.modules.refund.entity.enums.RefundMethod;
 import com.journeygo.modules.refund.entity.enums.RefundReason;
@@ -25,6 +30,8 @@ import com.journeygo.modules.notification.service.NotificationPublisher;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -40,8 +47,12 @@ import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -64,7 +75,7 @@ import java.util.UUID;
  *       chuyển khoản).</li>
  *   <li><b>Quy tắc 8</b> — mọi thao tác đều được ghi vào audit log.</li>
  *   <li><b>UC-04/UC-05</b> — VNPay Sandbox có thể trả "Chờ duyệt" → giữ trạng thái
- *       {@link RefundStatus#REFUND_PROCESSING}; KHÔNG tự động gửi lại hoặc chuyển sang
+ *       {@link RefundStatus#VNPAY_PROCESSING}; KHÔNG tự động gửi lại hoặc chuyển sang
  *       phương thức thủ công chỉ vì timeout.</li>
  *   <li><b>UC-06</b> — tổng số tiền hoàn thành công không được vượt quá số tiền thanh toán.</li>
  * </ul>
@@ -80,17 +91,23 @@ public class RefundService {
     private static final List<RefundStatus> OPEN_STATUSES = List.of(
             RefundStatus.PENDING_REVIEW,
             RefundStatus.APPROVED,
+            RefundStatus.VNPAY_PROCESSING,
+            RefundStatus.MANUAL_TRANSFER_PENDING,
             RefundStatus.REFUND_PROCESSING,
             RefundStatus.REFUNDED);
 
     private final RefundRequestRepository refundRepository;
     private final RefundAuditLogRepository auditLogRepository;
     private final PaymentRepository paymentRepository;
+    private final BookingRepository bookingRepository;
+    private final BookingPassengerRepository passengerRepository;
     private final UserRepository userRepository;
     private final VnPayClient vnPayClient;
     private final FinanceProperties financeProperties;
     private final ApplicationEventPublisher eventPublisher;
     private final NotificationPublisher notifications;
+    private final RefundReasonConfigService reasonConfig;
+    private final ObjectMapper objectMapper;
 
     // ── Create (Tourist) ──────────────────────────────────────────────────────
 
@@ -126,17 +143,29 @@ public class RefundService {
                             + "Trạng thái hiện tại: " + payment.getStatus());
         }
 
-        // 3. Thời hạn 24 giờ kể từ thời điểm thanh toán thành công đã xác minh
+        // 3. Tour chưa bắt đầu và chưa hoàn thành trải nghiệm
+        Booking booking = payment.getBooking();
+        if (booking == null || booking.getExperienceDate() == null) {
+            throw new AppException(ErrorCode.REFUND_NOT_FOUND,
+                    "Không tìm thấy thông tin lịch trình của đơn hàng");
+        }
+        LocalDate experienceDate = booking.getExperienceDate();
+        LocalDate today = LocalDate.now(VIETNAM_ZONE);
+        if (!experienceDate.isAfter(today)) {
+            throw new AppException(ErrorCode.REFUND_TOUR_ALREADY_STARTED,
+                    "Ngày trải nghiệm là " + experienceDate
+                            + " — yêu cầu hoàn tiền chỉ được gửi trước ngày khởi hành.");
+        }
+        if (booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new AppException(ErrorCode.REFUND_TOUR_ALREADY_STARTED,
+                    "Tour đã hoàn thành trải nghiệm — không thể gửi yêu cầu hoàn tiền.");
+        }
+
+        // 3b. Thời điểm thanh toán đã được xác minh — bắt buộc để tính tỷ lệ no-show
         Instant paidAt = payment.getPaidAt();
         if (paidAt == null) {
             throw new AppException(ErrorCode.REFUND_PAYMENT_NOT_SUCCESS,
                     "Giao dịch chưa có thời điểm thanh toán đã xác minh — không thể gửi yêu cầu hoàn tiền");
-        }
-        Instant deadline = paidAt.plus(Duration.ofHours(financeProperties.getRefundWindowHours()));
-        if (Instant.now().isAfter(deadline)) {
-            throw new AppException(ErrorCode.REFUND_WINDOW_EXPIRED,
-                    "Đã quá thời hạn " + financeProperties.getRefundWindowHours()
-                            + " giờ kể từ thời điểm thanh toán thành công để gửi yêu cầu hoàn tiền");
         }
 
         // 4. Chặn yêu cầu trùng
@@ -146,12 +175,13 @@ public class RefundService {
             if (current.getStatus() == RefundStatus.REJECTED) {
                 // Yêu cầu trước bị từ chối → chỉ cho gửi lại nếu còn trong thời hạn và
                 // chính sách cho phép (mặc định KHÔNG cho).
-                if (financeProperties.effectiveRefundResubmitWindowHours() <= 0) {
+                if (financeProperties.effectiveRefundResubmitHoursBeforeStart() <= 0) {
                     throw new AppException(ErrorCode.REFUND_ALREADY_EXISTS,
                             "Yêu cầu hoàn tiền trước đó đã bị từ chối. Vui lòng liên hệ hỗ trợ.");
                 }
-                Instant resubmitDeadline = paidAt.plus(Duration.ofHours(
-                        financeProperties.effectiveRefundResubmitWindowHours()));
+                Instant resubmitDeadline = experienceDate.atStartOfDay(VIETNAM_ZONE)
+                        .minusHours(financeProperties.effectiveRefundResubmitHoursBeforeStart())
+                        .toInstant();
                 if (Instant.now().isAfter(resubmitDeadline)) {
                     throw new AppException(ErrorCode.REFUND_ALREADY_EXISTS,
                             "Đã quá thời hạn gửi lại yêu cầu hoàn tiền");
@@ -163,8 +193,46 @@ public class RefundService {
             }
         }
 
-        // 5. Tính số tiền đề xuất — hệ thống tự tính, Tourist không tự nhập
-        BigDecimal proposed = calculateRefundAmount(payment.getAmount(), request.reason());
+        // 5. Nhóm lý do + mã lý do chi tiết — KHÔNG BẮT BUỘC.
+        //
+        //    Form hoàn tiền trên mobile đã được đơn giản hoá: khách chỉ mô tả bằng
+        //    văn bản (lý do ngắn gọn + mô tả chi tiết), KHÔNG chọn nhóm / mã lý do.
+        //    Việc phân loại là quyết định của ADMIN khi duyệt.
+        //
+        //    ⇒ Nếu khách có gửi kèm (web cũ / client khác) thì vẫn validate như
+        //      trước để dữ liệu không mâu thuẫn. Nếu không có ⇒ để null, Admin
+        //      sẽ xác định nhóm lý do khi review.
+        RefundReason group = request.reason();
+        RefundReasonCode reasonCode = null;
+        if (group != null) {
+            reasonCode = request.reasonCode() == null || request.reasonCode().isBlank()
+                    ? null
+                    : validateReasonCode(group, request.reasonCode());
+        }
+
+        // 6. Bằng chứng bắt buộc.
+        //
+        // ⚠️ BẮT BUỘC phải có ảnh chụp biên lai giao dịch thành công (không tính
+        // video) — quản trị viên cần đối chiếu số tiền thực trả.
+        // Ngoài ra, một số mã lý do do Admin cấu hình còn YÊU CẦU bằng chứng.
+        List<String> attachments = normalizeAttachments(request.evidenceAttachments());
+        if (!hasImageAttachment(attachments)) {
+            throw new AppException(ErrorCode.REFUND_EVIDENCE_REQUIRED,
+                    "Vui lòng đính kèm ảnh chụp biên lai giao dịch thành công.");
+        }
+        if (reasonCode != null && reasonCode.isRequireEvidence() && attachments.isEmpty()) {
+            throw new AppException(ErrorCode.REFUND_EVIDENCE_REQUIRED,
+                    "Lý do \"" + reasonCode.getName() + "\" yêu cầu đính kèm bằng chứng (ảnh hoặc video).");
+        }
+
+        // 7. Tính số tiền đề xuất — hệ thống tự tính, Tourist không tự nhập.
+        //    Mốc so sánh cửa sổ no-show là THỜI ĐIỂM KHÁCH GỬI YÊU CẦU (now).
+        //
+        //    ⚠️ Khách KHÔNG chọn nhóm lý do ⇒ chưa biết tỷ lệ hoàn ⇒ số tiền đề
+        //    xuất = 0 và ADMIN quyết định sau (xem `reviewRefund`).
+        BigDecimal proposed = group == null
+                ? BigDecimal.ZERO
+                : calculateRefundAmount(payment.getAmount(), group, experienceDate, Instant.now());
 
         User tourist = userRepository.findById(touristId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
@@ -174,14 +242,19 @@ public class RefundService {
                 .payment(payment)
                 .tourist(tourist)
                 .status(RefundStatus.PENDING_REVIEW)
-                .declaredReason(request.reason())
+                .declaredReason(group)
+                .declaredReasonCode(reasonCode != null ? reasonCode.getCode() : null)
+                .reasonSummary(request.reasonSummary() != null ? request.reasonSummary().trim() : null)
                 .reasonDetail(request.reasonDetail())
                 .evidence(request.evidence())
+                .evidenceAttachments(writeAttachments(attachments))
                 .proposedAmount(proposed)
                 .currency(payment.getCurrency())
                 .bankAccountNumber(request.bankAccountNumber())
                 .bankAccountName(request.bankAccountName())
                 .bankName(request.bankName())
+                .contactPhone(request.contactPhone() != null ? request.contactPhone().trim() : null)
+                .contactEmail(request.contactEmail() != null ? request.contactEmail().trim() : null)
                 .build();
 
         RefundRequest saved = refundRepository.save(refund);
@@ -195,33 +268,184 @@ public class RefundService {
                 saved.getId(), saved.getRefundCode(), payment.getId(), proposed);
 
         String bookingCode = payment.getBooking() != null ? payment.getBooking().getBookingCode() : "";
+        // ⚠️ Khách KHÔNG chọn nhóm lý do ⇒ chưa có tỷ lệ ⇒ chưa có số tiền đề
+        // xuất ⇒ thông báo cho Admin biết cần phân loại, không báo nhầm "0 đ".
+        String body = group == null
+                ? tourist.getFullName() + " gửi yêu cầu hoàn tiền cho đơn " + bookingCode
+                        + " (mã " + saved.getRefundCode() + "). Chưa phân loại nguyên nhân — cần duyệt."
+                : tourist.getFullName() + " yêu cầu hoàn " + NotificationPublisher.money(proposed)
+                        + " cho đơn " + bookingCode + " (mã " + saved.getRefundCode() + "). Cần duyệt.";
         notifications.send(NotificationType.REFUND_REQUESTED)
                 .toRole(Role.ADMIN)
                 .title("Yêu cầu hoàn tiền mới")
-                .body(tourist.getFullName() + " yêu cầu hoàn " + NotificationPublisher.money(proposed)
-                        + " cho đơn " + bookingCode + " (mã " + saved.getRefundCode() + "). Cần duyệt trong 24 giờ.")
+                .body(body)
                 .link("/admin/finance")
                 .ref("REFUND", saved.getId())
                 .queue(NotificationPublisher.Queue.REFUND_REVIEW)
                 .publish();
 
-        return RefundResponse.fromEntity(saved);
+        return toResponse(saved);
     }
 
     /**
-     * Tính số tiền hoàn theo nguyên nhân (Quy tắc 5).
+     * Kiểm tra mã lý do chi tiết thuộc đúng nhóm lý do đã chọn.
      *
-     * <p>50% cho lỗi Tourist / lý do cá nhân, 100% cho lỗi nền tảng.
+     * <p>Tourist BẮT BUỘC chọn mã lý do cụ thể trong nhóm — không chọn chung chung
+     * để Admin phải suy đoán.
      */
-    public BigDecimal calculateRefundAmount(BigDecimal paymentAmount, RefundReason reason) {
+    private RefundReasonCode validateReasonCode(RefundReason group, String reasonCode) {
+        if (reasonCode == null || reasonCode.isBlank()) {
+            throw new AppException(ErrorCode.REFUND_REASON_CODE_REQUIRED,
+                    "Vui lòng chọn lý do cụ thể trong nhóm \"" + groupLabel(group) + "\".");
+        }
+        RefundReasonCode entity = reasonConfig.requireReasonCode(reasonCode.trim());
+        if (entity.getGroup() == null || !entity.getGroup().getCode().equals(group.name())) {
+            throw new AppException(ErrorCode.REFUND_REASON_CODE_MISMATCH,
+                    "Mã lý do \"" + entity.getName() + "\" không thuộc nhóm lý do đã chọn.");
+        }
+        if (!entity.isActive()) {
+            throw new AppException(ErrorCode.REFUND_REASON_CODE_NOT_FOUND,
+                    "Lý do \"" + entity.getName() + "\" hiện không còn khả dụng. Vui lòng chọn lý do khác.");
+        }
+        return entity;
+    }
+
+    /** Nhãn tiếng Việt của nhóm lý do (fallback về mã khi chưa có cấu hình). */
+    private String groupLabel(RefundReason group) {
+        if (group == null) return "";
+        return reasonConfig.getGroups(false).stream()
+                .filter(g -> g.code().equals(group.name()))
+                .map(com.journeygo.modules.refund.dto.response.RefundReasonGroupResponse::name)
+                .findFirst()
+                .orElse(group.name());
+    }
+
+    /** Chuẩn hoá danh sách URL bằng chứng — bỏ rỗng, cắt khoảng trắng, giữ thứ tự. */
+    private List<String> normalizeAttachments(List<String> raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        return raw.stream()
+                .filter(url -> url != null && !url.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * Danh sách bằng chứng có chứa ít nhất MỘT ẢNH (không tính video) hay không.
+     *
+     * <p>Khách BẮT BUỘC phải tải lên ảnh chụp biên lai giao dịch thành công.
+     */
+    private boolean hasImageAttachment(List<String> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return false;
+        }
+        return attachments.stream().anyMatch(this::isImageAttachment);
+    }
+
+    /** Phân biệt URL ảnh với URL video (file mở rộng). */
+    private boolean isImageAttachment(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        String lower = url.toLowerCase(Locale.ROOT);
+        if (lower.contains(".mp4") || lower.contains(".mov") || lower.contains(".webm")
+                || lower.contains(".m3u8") || lower.contains(".mkv") || lower.contains(".avi")) {
+            return false;
+        }
+        return lower.contains(".jpg") || lower.contains(".jpeg") || lower.contains(".png")
+                || lower.contains(".webp") || lower.contains(".gif") || lower.contains(".heic")
+                || lower.contains(".bmp") || lower.contains(".avif");
+    }
+
+    /** Ghi danh sách bằng chứng xuống DB dưới dạng JSON array. */    private String writeAttachments(List<String> attachments) {
+        if (attachments.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(attachments);
+        } catch (JsonProcessingException e) {
+            log.warn("[Refund] Không ghi được danh sách bằng chứng: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Tính số tiền hoàn theo nhóm lý do + thời điểm hủy (Quy tắc 5).
+     *
+     * <p>Chính sách hoàn tiền:
+     * <ul>
+     *   <li>Nhóm cá nhân: hủy trước 3 ngày khởi hành → 50%; hủy trong vòng 48 giờ
+     *       hoặc không xuất hiện → 0%.</li>
+     *   <li>Nhóm nền tảng / đối tác → 100%.</li>
+     *   <li>Nhóm bất khả kháng → 0%.</li>
+     * </ul>
+     *
+     * <p>Tỷ lệ theo nhóm đọc từ cấu hình của Admin
+     * ({@code refund_reason_groups}); tỷ lệ 0% của cá nhân khi hủy quá muộn là
+     * ngoại lệ do chính sách quy định, không phụ thuộc cấu hình.
+     */
+    public BigDecimal calculateRefundAmount(BigDecimal paymentAmount,
+                                            RefundReason group,
+                                            LocalDate experienceDate,
+                                            Instant requestTime) {
         if (paymentAmount == null) {
             return BigDecimal.ZERO;
         }
-        BigDecimal rate = switch (reason) {
-            case TOURIST_FAULT -> financeProperties.getTouristFaultRefundRate();
-            case PLATFORM_FAULT -> financeProperties.getPlatformFaultRefundRate();
-        };
+        if (group == null) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal rate;
+
+        if (group == RefundReason.PERSONAL) {
+            // Lỗi cá nhân: hủy quá muộn (trong vòng 48 giờ) hoặc no-show → không hoàn.
+            if (isWithinNoShowWindow(experienceDate, requestTime)) {
+                rate = BigDecimal.ZERO;
+            } else {
+                rate = reasonConfig.refundRateOf(group);
+            }
+        } else {
+            rate = reasonConfig.refundRateOf(group);
+        }
+
         return paymentAmount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Tính số tiền hoàn từ nguyên nhân đã lưu — dùng khi Admin duyệt lại.
+     *
+     * <p>⚠️ Không dùng overload này cho nhóm PERSONAL: hàm không biết thời điểm khách
+     * gửi yêu cầu nên không áp dụng được cửa sổ no-show 48h. Dùng overload có
+     * {@code experienceDate} + {@code requestTime}.
+     */
+    public BigDecimal calculateRefundAmount(BigDecimal paymentAmount, RefundReason group) {
+        if (paymentAmount == null || group == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal rate = reasonConfig.refundRateOf(group);
+        return paymentAmount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Yêu cầu có nằm trong cửa sổ no-show không (hủy quá muộn / không xuất hiện).
+     *
+     * <p>Cửa sổ tính từ thời điểm bắt đầu ngày trải nghiệm lùi {@code noShowWindowHours}.
+     *
+     * <p>⚠️ Mốc so sánh là THỜI ĐIỂM KHÁCH GỬI YÊU CẦU ({@code requestTime}), KHÔNG phải
+     * thời điểm Admin duyệt. Nếu dùng "now" thì một yêu cầu hợp lệ gửi từ 3 ngày trước
+     * sẽ bị tính thành 0% chỉ vì Admin duyệt chậm 2 ngày.
+     */
+    private boolean isWithinNoShowWindow(LocalDate experienceDate, Instant requestTime) {
+        if (experienceDate == null) {
+            return false;
+        }
+        Instant when = requestTime != null ? requestTime : Instant.now();
+        int windowHours = financeProperties.effectiveRefundNoShowWindowHours();
+        Instant startOfExperience = experienceDate.atStartOfDay(VIETNAM_ZONE).toInstant();
+        Instant noShowDeadline = startOfExperience.minus(Duration.ofHours(windowHours));
+        return when.isAfter(noShowDeadline);
     }
 
     // ── Review (Admin) ────────────────────────────────────────────────────────
@@ -246,8 +470,32 @@ public class RefundService {
                 .orElseThrow(() -> new AppException(ErrorCode.REFUND_NOT_FOUND));
 
         if (refund.getStatus() != RefundStatus.PENDING_REVIEW) {
-            throw new AppException(ErrorCode.REFUND_INVALID_STATUS,
-                    "Yêu cầu hoàn tiền không ở trạng thái chờ duyệt (hiện tại: " + refund.getStatus() + ")");
+            // ⚠️ Đường thoát duy nhất cho yêu cầu đang chờ VNPay: DUYỆT LẠI với
+            // phương thức chuyển khoản thủ công. Chỉ cho phép khi VNPay đã
+            // xác nhận DỨT KHOÁT là không tạo được giao dịch hoàn (mã 99 —
+            // hạ tầng không hỗ trợ; hoặc 91/93/95/16, trạng thái 09 — từ chối)
+            // ⇒ chắc chắn không có giao dịch hoàn nào tồn tại ở phía VNPay ⇒
+            // không có rủi ro hoàn tiền hai lần.
+            boolean reReviewToManual =
+                    (refund.getStatus() == RefundStatus.VNPAY_PROCESSING
+                            || refund.getStatus() == RefundStatus.FAILED)
+                            && refund.getMethod() == RefundMethod.VNPAY_API
+                            && request.method() == RefundMethod.MANUAL_BANK_TRANSFER;
+            if (!reReviewToManual) {
+                throw new AppException(ErrorCode.REFUND_INVALID_STATUS,
+                        "Yêu cầu hoàn tiền không ở trạng thái chờ duyệt (hiện tại: " + refund.getStatus() + ")");
+            }
+            boolean unsupported = isVnPayUnsupportedFailure(
+                    refund.getVnpResponseCode(), refund.getVnpMessage());
+            boolean definiteRejection = isVnPayDefiniteRejection(
+                    refund.getVnpResponseCode(), refund.getVnpTransactionStatus());
+            if (!unsupported && !definiteRejection) {
+                throw new AppException(ErrorCode.REFUND_METHOD_NOT_ALLOWED,
+                        "Chỉ chuyển sang chuyển khoản thủ công khi VNPay đã xác nhận không tạo được "
+                                + "yêu cầu hoàn tiền (mã 99 hoặc từ chối dứt khoát 91/93/95/16). "
+                                + "Hiện tại chưa có phản hồi như vậy nên yêu cầu vẫn đang được giữ "
+                                + "ở trạng thái chờ VNPay xác nhận.");
+            }
         }
 
         User admin = userRepository.findById(adminId)
@@ -262,6 +510,8 @@ public class RefundService {
                         "Vui lòng nhập lý do từ chối yêu cầu hoàn tiền");
             }
             refund.reject(admin, reason);
+            refund.setAdminNote(request.note() != null && !request.note().isBlank()
+                    ? request.note().trim() : null);
             refundRepository.save(refund);
             audit(refund, RefundAuditLog.Action.REJECTED, fromStatus, RefundStatus.REJECTED, admin,
                     null, null, "Quản trị viên từ chối yêu cầu hoàn tiền. Lý do: " + reason);
@@ -274,12 +524,41 @@ public class RefundService {
                     .queue(NotificationPublisher.Queue.REFUNDS)
                     .publish();
             notifications.queueChanged(Role.ADMIN, NotificationPublisher.Queue.REFUND_REVIEW);
-            return RefundResponse.fromEntity(refund);
+            return toResponse(refund);
         }
 
         // ── Phê duyệt ──────────────────────────────────────────────────────────
         RefundReason approvedReason = request.reason() != null ? request.reason() : refund.getDeclaredReason();
-        BigDecimal policyAmount = calculateRefundAmount(refund.getPayment().getAmount(), approvedReason);
+        if (approvedReason == null) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                    "Vui lòng xác định nhóm lý do hoàn tiền trước khi phê duyệt.");
+        }
+
+        // Mã lý do chi tiết do Admin xác định — phải thuộc nhóm lý do đã chọn.
+        String approvedReasonCode = request.reasonCode() != null && !request.reasonCode().isBlank()
+                ? request.reasonCode().trim()
+                : refund.getDeclaredReasonCode();
+        if (approvedReasonCode != null && !approvedReasonCode.isBlank()) {
+            RefundReasonCode code = reasonConfig.requireReasonCode(approvedReasonCode);
+            if (code.getGroup() == null || !code.getGroup().getCode().equals(approvedReason.name())) {
+                throw new AppException(ErrorCode.REFUND_REASON_CODE_MISMATCH,
+                        "Mã lý do \"" + code.getName() + "\" không thuộc nhóm lý do đã chọn.");
+            }
+            approvedReasonCode = code.getCode();
+        }
+
+        // Số tiền do hệ thống tính theo nhóm lý do — Admin chỉ có thể điều chỉnh
+        // trong phạm vi chính sách (tức là bằng số tiền hệ thống tính cho nhóm đó).
+        //
+        // Lưu ý: với nhóm PERSONAL phải tính CẢ thời điểm khách gửi yêu cầu
+        // (cửa sổ no-show 48h) — nếu dùng "lúc Admin duyệt" thì một yêu cầu hợp lệ
+        // gửi từ 3 ngày trước sẽ bị tính thành 0% chỉ vì Admin duyệt chậm.
+        LocalDate experienceDate = refund.getPayment().getBooking() != null
+                ? refund.getPayment().getBooking().getExperienceDate()
+                : null;
+        BigDecimal policyAmount = calculateRefundAmount(
+                refund.getPayment().getAmount(), approvedReason,
+                experienceDate, refund.getCreatedAt());
 
         if (request.amount() != null && request.amount().compareTo(policyAmount) != 0) {
             throw new AppException(ErrorCode.REFUND_AMOUNT_MISMATCH,
@@ -302,8 +581,51 @@ public class RefundService {
         RefundMethod method = request.method() != null ? request.method() : RefundMethod.VNPAY_API;
 
         refund.approve(admin, approvedReason, policyAmount);
+        refund.setApprovedReasonCode(approvedReasonCode);
+        // Ghi chú của nền tảng — hiển thị cho người dùng ở lịch sử hoàn tiền.
+        refund.setAdminNote(request.note() != null && !request.note().isBlank()
+                ? request.note().trim() : null);
+        // ⚠️ BẮT BUỘC lưu phương thức hoàn — nếu không, cột `method` NULL ⇒
+        // tác vụ nền `findByStatusAndMethod(VNPAY_PROCESSING, VNPAY_API)` KHÔNG
+        // quét được yêu cầu này ⇒ yêu cầu kẹt vĩnh viễn ở "Chờ VNPay xác nhận hoàn tiền".
         refund.setMethod(method);
         refundRepository.save(refund);
+
+        // ── Hoàn 0%: không có giao dịch hoàn tiền nào để thực hiện ───────────────
+        // Áp dụng cho: bất khả kháng, hoặc khách hủy quá muộn / no-show.
+        // Yêu cầu vẫn được duyệt (ghi nhận tỷ lệ 0% + lý do quyết định) nhưng
+        // không gọi VNPay và không chuyển khoản.
+        if (policyAmount.compareTo(BigDecimal.ZERO) == 0) {
+            Instant resolvedAt = Instant.now();
+            refund.markRefunded(BigDecimal.ZERO, resolvedAt);
+            refundRepository.save(refund);
+
+            audit(refund, RefundAuditLog.Action.APPROVED, fromStatus, RefundStatus.APPROVED, admin,
+                    BigDecimal.ZERO, null,
+                    "Quản trị viên phê duyệt yêu cầu hoàn tiền theo chính sách 0% (nhóm "
+                            + approvedReason + ")"
+                            + (request.note() != null && !request.note().isBlank()
+                            ? ". Ghi chú: " + request.note() : ""));
+            audit(refund, RefundAuditLog.Action.STATUS_UPDATED, RefundStatus.APPROVED,
+                    RefundStatus.REFUNDED, admin, BigDecimal.ZERO, refund.getRefundCode(),
+                    "Yêu cầu được xử lý theo chính sách không hoàn tiền — không thực hiện giao dịch hoàn.");
+
+            log.info("[Refund] Admin {} duyệt hoàn 0% theo nhóm {} — refund id={}",
+                    adminId, approvedReason, refundId);
+
+            notifications.send(NotificationType.REFUND_APPROVED)
+                    .to(refund.getTourist() == null ? null : refund.getTourist().getId())
+                    .title("Yêu cầu hoàn tiền đã được xử lý")
+                    .body("Yêu cầu " + refund.getRefundCode() + " được xử lý theo chính sách không hoàn tiền. "
+                            + "Lý do: " + groupLabel(approvedReason) + ".")
+                    .ref("REFUND", refund.getId())
+                    .queue(NotificationPublisher.Queue.REFUNDS)
+                    .publish();
+            notifications.queueChanged(Role.ADMIN, NotificationPublisher.Queue.REFUND_REVIEW);
+
+            publishRefundedEvent(refund, resolvedAt);
+            return toResponse(refund);
+        }
 
         audit(refund, RefundAuditLog.Action.APPROVED, fromStatus, RefundStatus.APPROVED, admin,
                 policyAmount, null,
@@ -332,14 +654,14 @@ public class RefundService {
             return executeVnPayRefund(refund, admin);
         }
         // MANUAL_BANK_TRANSFER — chờ Admin xác nhận đã chuyển khoản (kèm bằng chứng)
-        refund.markProcessing();
+        refund.markManualTransferPending();
         refundRepository.save(refund);
         audit(refund, RefundAuditLog.Action.MANUAL_TRANSFER_RECORDED, RefundStatus.APPROVED,
-                RefundStatus.REFUND_PROCESSING, admin, policyAmount, null,
+                RefundStatus.MANUAL_TRANSFER_PENDING, admin, policyAmount, null,
                 "Yêu cầu hoàn tiền bằng chuyển khoản thủ công đã được tạo. "
                         + "Quản trị viên thực hiện chuyển khoản rồi nhập mã tham chiếu và bằng chứng để xác nhận.");
 
-        return RefundResponse.fromEntity(refund);
+        return toResponse(refund);
     }
 
     // ── VNPay Refund ──────────────────────────────────────────────────────────
@@ -350,8 +672,8 @@ public class RefundService {
      * <p>QUAN TRỌNG (UC-04): phản hồi {@code vnp_ResponseCode=00} chỉ có nghĩa "yêu cầu đã
      * được tiếp nhận" — KHÔNG có nghĩa tiền đã về tài khoản. Vì vậy:
      * <ul>
-     *   <li>Phản hồi không xác minh được (timeout / mất mạng) → giữ {@code REFUND_PROCESSING}.</li>
-     *   <li>Phản hồi cho biết đang xử lý (status 05/06) → giữ {@code REFUND_PROCESSING}.</li>
+     *   <li>Phản hồi không xác minh được (timeout / mất mạng) → giữ {@code VNPAY_PROCESSING}.</li>
+     *   <li>Phản hồi cho biết đang xử lý (status 05/06) → giữ {@code VNPAY_PROCESSING}.</li>
      *   <li>Chỉ khi trạng thái giao dịch là {@code 00} (thành công) mới chuyển {@code REFUNDED}.</li>
      *   <li>Trạng thái {@code 09} (bị từ chối) → {@code FAILED}.</li>
      * </ul>
@@ -366,29 +688,38 @@ public class RefundService {
 
         String createdBy = admin != null ? String.valueOf(admin.getId()) : "journeygo";
 
+        // ⚠️ Loại hoàn phải khớp với SỐ TIỀN thực tế:
+        //   • `02` = hoàn TOÀN PHẦN (số tiền = toàn bộ số tiền đã thanh toán)
+        //   • `03` = hoàn MỘT PHẦN (số tiền < số tiền đã thanh toán)
+        // Gửi `02` cho lần hoàn 50% ⇒ VNPay từ chối (mã 93/13) vì số tiền hoàn
+        // không khớp "toàn phần" ⇒ giao dịch không hề được ghi nhận trên
+        // trang quản trị VNPay.
+        boolean fullRefund = refund.getApprovedAmount() != null
+                && refund.getApprovedAmount().compareTo(payment.getAmount()) >= 0;
+
         Map<String, String> response = vnPayClient.requestRefund(
                 payment.getTxnRef(),
                 refund.getApprovedAmount(),
                 payment.getVnpTransactionNo(),
                 transactionDate,
                 createdBy,
-                true);
+                fullRefund);
 
         refund.setVnpRequestedAt(Instant.now());
         refund.setVnpTxnRef(payment.getTxnRef());
 
         if (response.isEmpty()) {
-            // UC-05 — timeout / không xác định được kết quả → giữ REFUND_PROCESSING.
+            // UC-05 — timeout / không xác định được kết quả → giữ VNPAY_PROCESSING.
             refund.setVnpMessage("Không nhận được phản hồi từ VNPay — giữ trạng thái chờ xác minh.");
-            refund.markProcessing();
+            refund.markVnPayProcessing();
             refundRepository.save(refund);
             audit(refund, RefundAuditLog.Action.VNPAY_REQUEST_SENT, RefundStatus.APPROVED,
-                    RefundStatus.REFUND_PROCESSING, admin, refund.getApprovedAmount(), refund.getRefundCode(),
+                    RefundStatus.VNPAY_PROCESSING, admin, refund.getApprovedAmount(), refund.getRefundCode(),
                     "Đã gửi yêu cầu hoàn tiền tới VNPay nhưng chưa nhận được phản hồi "
                             + "(kết nối chậm hoặc gián đoạn). Yêu cầu vẫn được giữ ở trạng thái "
                             + "đang xử lý và sẽ không bị gửi lại tự động để tránh hoàn trùng.");
-            log.warn("[Refund] Không nhận được phản hồi VNPay cho refund id={} — giữ REFUND_PROCESSING", refund.getId());
-            return RefundResponse.fromEntity(refund);
+            log.warn("[Refund] Không nhận được phản hồi VNPay cho refund id={} — giữ VNPAY_PROCESSING", refund.getId());
+            return toResponse(refund);
         }
 
         refund.setVnpResponseCode(response.get("vnp_ResponseCode"));
@@ -425,7 +756,7 @@ public class RefundService {
         log.info("[Refund] Đã gửi yêu cầu hoàn tiền VNPay id={} status={} code={}",
                 refund.getId(), refund.getStatus(), refund.getVnpResponseCode());
 
-        return RefundResponse.fromEntity(refund);
+        return toResponse(refund);
     }
 
     /**
@@ -450,18 +781,85 @@ public class RefundService {
     }
 
     /**
+     * VNPay có phản hồi "hạ tầng không hỗ trợ" không?
+     *
+     * <p><b>Bối cảnh (đã xác minh bằng thử nghiệm thực tế):</b> endpoint
+     * {@code https://sandbox.vnpayment.vn/merchant_webapi/api/transaction} trả
+     * {@code vnp_ResponseCode = 99} / {@code "Unexpected error"} cho MỌI lệnh
+     * ({@code querydr} và {@code refund}), với MỌI {@code vnp_TmnCode} (kể cả mã
+     * không tồn tại), với MỌI thuật toán checksum (HMAC-SHA512 / HMAC-SHA256 /
+     * SHA256 / MD5, chuỗi pipe hay chuỗi key=value), với cả kiểu dữ liệu JSON
+     * số lẫn chuỗi, và cả khi cố tình làm sai checksum.
+     *
+     * <p>Điểm mấu chốt: tài liệu chính thức quy địch mã {@code 97} cho checksum
+     * sai và mã {@code 02} cho {@code vnp_TmnCode} không hợp lệ — nhưng ta
+     * <b>không bao giờ</b> nhận được hai mã đó ⇒ request bị từ chối ở tầng
+     * trước bước kiểm tra checksum/merchant. Đây là đặc điểm của môi trường
+     * Sandbox, KHÔNG phải giới hạn quyền sử dụng (VNPay đã xác nhận bằng văn bản
+     * rằng API hoàn tiền được phép dùng bình thường với {@code G46V3SQ0}).
+     *
+     * <p>⇒ Khi gặp mã 99, yêu cầu hoàn sẽ kẹt ở {@code VNPAY_PROCESSING} mãi mãi
+     * (tác vụ nền cũng chỉ hỏi lại, không giải quyết được) ⇒ cần một đường thoát
+     * để Admin chuyển sang hoàn tiền thủ công.
+     *
+     * @return {@code true} nếu mã phản hồi là 99 (lỗi hạ tầng / tính năng bị giới hạn)
+     */
+    private boolean isVnPayUnsupportedFailure(String responseCode, String message) {
+        if ("99".equals(responseCode)) {
+            return true;
+        }
+        return message != null && message.trim().equalsIgnoreCase("Unexpected error");
+    }
+
+    /**
+     * VNPay đã <b>từ chối dứt khoát</b> yêu cầu hoàn tiền chưa?
+     *
+     * <p>Theo tài liệu chính thức, các mã dưới đây nghĩa là yêu cầu KHÔNG được
+     * tạo ở phía VNPay ⇒ giao dịch hoàn chắc chắn không tồn tại ⇒ Admin được
+     * phép chuyển sang chuyển khoản thủ công mà không lo hoàn tiền hai lần:
+     * <ul>
+     *   <li>{@code 09} — trạng thái giao dịch "Hoàn trả bị từ chối"</li>
+     *   <li>{@code 91} — không tìm thấy giao dịch yêu cầu hoàn trả</li>
+     *   <li>{@code 93} — số tiền hoàn trả không hợp lệ</li>
+     *   <li>{@code 95} — giao dịch không thành công bên VNPAY, từ chối xử lý</li>
+     *   <li>{@code 16} — không thực hiện được hoàn tiền trong thời gian này</li>
+     * </ul>
+     *
+     * <p>⚠️ Mã {@code 94} ("đã được gửi yêu cầu hoàn tiền trước đó, VNPAY đang
+     * xử lý") và {@code 08} ("hệ thống đang bảo trì") <b>KHÔNG</b> nằm trong danh
+     * sách này — chúng để ngỏ khả năng giao dịch hoàn ĐÃ được tạo ⇒ tuyệt đối
+     * không chuyển sang thủ công.
+     *
+     * @param responseCode mã phản hồi {@code vnp_ResponseCode}
+     * @param transactionStatus trạng thái giao dịch {@code vnp_TransactionStatus}
+     * @return {@code true} nếu VNPay đã dứt khoát từ chối
+     */
+    private boolean isVnPayDefiniteRejection(String responseCode, String transactionStatus) {
+        if ("09".equals(transactionStatus)) {
+            return true;
+        }
+        if (responseCode == null) {
+            return false;
+        }
+        return switch (responseCode) {
+            case "91", "93", "95", "16" -> true;
+            default -> false;
+        };
+    }
+
+    /**
      * Áp dụng trạng thái giao dịch hoàn tiền từ VNPay vào RefundRequest.
      */
     private void applyVnPayRefundStatus(RefundRequest refund, User admin) {
         String responseCode = refund.getVnpResponseCode();
         String transactionStatus = refund.getVnpTransactionStatus();
 
-        // Chưa xác minh được kết quả → giữ REFUND_PROCESSING
+        // Chưa xác minh được kết quả → giữ VNPAY_PROCESSING
         if (!"00".equals(responseCode)) {
-            refund.markProcessing();
+            refund.markVnPayProcessing();
             refundRepository.save(refund);
             audit(refund, RefundAuditLog.Action.VNPAY_STATUS_UPDATED, refund.getStatus(),
-                    RefundStatus.REFUND_PROCESSING, admin, null, refund.getVnpRequestId(),
+                    RefundStatus.VNPAY_PROCESSING, admin, null, refund.getVnpRequestId(),
                     "VNPay chưa xác nhận kết quả hoàn tiền. Yêu cầu vẫn được giữ ở trạng thái đang xử lý.",
                     true);
             return;
@@ -474,7 +872,7 @@ public class RefundService {
                 Instant resolvedAt = Instant.now();
                 refund.markRefunded(refund.getApprovedAmount(), resolvedAt);
                 refundRepository.save(refund);
-                audit(refund, RefundAuditLog.Action.VNPAY_STATUS_UPDATED, RefundStatus.REFUND_PROCESSING,
+                audit(refund, RefundAuditLog.Action.VNPAY_STATUS_UPDATED, RefundStatus.VNPAY_PROCESSING,
                         RefundStatus.REFUNDED, admin, refund.getRefundedAmount(), refund.getVnpTransactionNo(),
                         "VNPay xác nhận hoàn tiền thành công " + formatAmountForAudit(refund.getRefundedAmount())
                                 + ". Tiền đã được hoàn về tài khoản của khách.");
@@ -490,10 +888,10 @@ public class RefundService {
             }
             default -> {
                 // 05 (đang xử lý) / 06 (đã gửi ngân hàng) / 01 → chờ xác minh.
-                refund.markProcessing();
+                refund.markVnPayProcessing();
                 refundRepository.save(refund);
                 audit(refund, RefundAuditLog.Action.VNPAY_STATUS_UPDATED, refund.getStatus(),
-                        RefundStatus.REFUND_PROCESSING, admin, null, refund.getVnpTransactionNo(),
+                        RefundStatus.VNPAY_PROCESSING, admin, null, refund.getVnpTransactionNo(),
                         "VNPay đang xử lý yêu cầu hoàn tiền. Yêu cầu vẫn được giữ ở trạng thái đang xử lý.",
                         true);
             }
@@ -524,19 +922,34 @@ public class RefundService {
             throw new AppException(ErrorCode.REFUND_INVALID_STATUS,
                     "Yêu cầu hoàn tiền đã hoàn tất — không thể ghi nhận lại");
         }
-        if (refund.getStatus() != RefundStatus.APPROVED && refund.getStatus() != RefundStatus.REFUND_PROCESSING) {
+        // ⚠️ Chỉ yêu cầu đang chờ CHUYỂN KHOẢN THỦ CÔNG mới được ghi nhận.
+        // Yêu cầu đang chờ VNPay (VNPAY_PROCESSING) chưa kết thúc ⇒ chuyển sang
+        // thủ công lúc này có thể hoàn tiền hai lần.
+        if (refund.getStatus() != RefundStatus.MANUAL_TRANSFER_PENDING) {
             throw new AppException(ErrorCode.REFUND_INVALID_STATUS,
                     "Trạng thái hiện tại không cho phép ghi nhận chuyển khoản thủ công: " + refund.getStatus());
         }
 
-        // UC-06 — nếu đã gửi yêu cầu VNPay mà chưa xác minh được kết quả → chặn chuyển thủ công
-        if (refund.getVnpRequestedAt() != null
+        // UC-06 — CHỈ có MỘT phương thức hoàn tiền tại mỗi thời điểm.
+        //
+        // ⚠️ Bug đã sửa: trước đây điều kiện này xét vnpRequestedAt/vnpResponseCode
+        // một cách vô điều kiện ⇒ sau khi Admin đã chuyển sang thủ công
+        // (`switchToManualTransfer` giữ nguyên vnpRequestedAt + vnpResponseCode="99"
+        // để lưu dấu vết), lệnh ghi nhận "Đã chuyển khoản" bị chặn vĩnh viễn ⇒
+        // yêu cầu kẹt ở VNPAY_PROCESSING mà không thể đóng.
+        //
+        // ⇒ Chỉ chặn khi phương thức HIỆN TẠI vẫn là VNPay. Nếu đã chuyển sang
+        // thủ công thì VNPay đã được xác nhận không hỗ trợ ⇒ không còn rủi ro
+        // hoàn tiền hai lần.
+        if (refund.getMethod() == RefundMethod.VNPAY_API
+                && refund.getVnpRequestedAt() != null
                 && refund.getVnpResponseCode() != null
                 && !"00".equals(refund.getVnpResponseCode())
                 && !"09".equals(refund.getVnpTransactionStatus())) {
             throw new AppException(ErrorCode.REFUND_METHOD_NOT_ALLOWED,
-                    "Yêu cầu hoàn tiền đã được gửi tới VNPay nhưng chưa xác minh được kết quả — "
-                            + "không thể chuyển sang phương thức thủ công để tránh hoàn tiền hai lần.");
+                    "Yêu cầu hoàn tiền đang được gửi tới VNPay và chưa xác minh được kết quả — "
+                            + "không thể ghi nhận chuyển khoản thủ công để tránh hoàn tiền hai lần. "
+                            + "Hãy dùng thao tác “Chuyển thủ công” trước.");
         }
 
         User admin = userRepository.findById(adminId)
@@ -545,12 +958,13 @@ public class RefundService {
         Instant transferredAt = request.transferredAt() != null ? request.transferredAt() : Instant.now();
         refund.setTransferReference(request.transferReference());
         refund.setTransferEvidence(request.transferEvidence());
+        refund.setTransferNote(request.transferNote() != null && !request.transferNote().isBlank()
+                ? request.transferNote().trim() : null);
         refund.setTransferredAt(transferredAt);
-        refund.markProcessing();
         refundRepository.save(refund);
 
-        audit(refund, RefundAuditLog.Action.MANUAL_TRANSFER_CONFIRMED, refund.getStatus(),
-                RefundStatus.REFUND_PROCESSING, admin, refund.getApprovedAmount(),
+        audit(refund, RefundAuditLog.Action.MANUAL_TRANSFER_CONFIRMED, RefundStatus.MANUAL_TRANSFER_PENDING,
+                RefundStatus.MANUAL_TRANSFER_PENDING, admin, refund.getApprovedAmount(),
                 request.transferReference(),
                 "Quản trị viên đã thực hiện chuyển khoản thủ công. Mã tham chiếu: "
                         + request.transferReference() + ".");
@@ -559,15 +973,15 @@ public class RefundService {
         // Bằng chứng = mã tham chiếu (bắt buộc) + mô tả/URL bằng chứng.
         boolean hasEvidence = request.transferEvidence() != null && !request.transferEvidence().isBlank();
         if (!hasEvidence) {
-            log.warn("[Refund] Chuyển khoản thủ công id={} chưa có bằng chứng — giữ REFUND_PROCESSING", refundId);
-            return RefundResponse.fromEntity(refund);
+            log.warn("[Refund] Chuyển khoản thủ công id={} chưa có bằng chứng — giữ MANUAL_TRANSFER_PENDING", refundId);
+            return toResponse(refund);
         }
 
         Instant resolvedAt = Instant.now();
         refund.markRefunded(refund.getApprovedAmount(), resolvedAt);
         refundRepository.save(refund);
 
-        audit(refund, RefundAuditLog.Action.STATUS_UPDATED, RefundStatus.REFUND_PROCESSING,
+        audit(refund, RefundAuditLog.Action.STATUS_UPDATED, RefundStatus.MANUAL_TRANSFER_PENDING,
                 RefundStatus.REFUNDED, admin, refund.getRefundedAmount(), request.transferReference(),
                 "Đã xác minh chuyển khoản thủ công thành công " + formatAmountForAudit(refund.getRefundedAmount())
                         + ". Tiền đã được hoàn về tài khoản của khách.");
@@ -577,7 +991,91 @@ public class RefundService {
         log.info("[Refund] Xác nhận hoàn tiền thủ công thành công id={} amount={}",
                 refundId, refund.getRefundedAmount());
 
-        return RefundResponse.fromEntity(refund);
+        return toResponse(refund);
+    }
+
+    /**
+     * Chuyển yêu cầu hoàn từ phương thức VNPay sang chuyển khoản thủ công.
+     *
+     * <p><b>Vì sao cần?</b> Trên VNPay Sandbox, endpoint
+     * {@code merchant_webapi/api/transaction} trả {@code vnp_ResponseCode = 99}
+     * cho mọi lệnh (đã xác minh bằng thử nghiệm thực tế — xem
+     * {@link #isVnPayUnsupportedFailure}). Khi đó yêu cầu kẹt ở
+     * {@code VNPAY_PROCESSING} mãi mãi và không có đường nào để hoàn
+     * tiền cho khách.
+     *
+     * <p>⇒ Endpoint này cho phép Admin chuyển sang chuyển khoản ngân hàng thủ công
+     * (thực hiện ngoài hệ thống, rồi ghi nhận bằng chứng qua
+     * {@code confirmManualTransfer}).
+     *
+     * <p><b>Chống hoàn tiền hai lần:</b> chỉ cho chuyển khi VNPay đã phản hồi dứt
+     * khoát là KHÔNG hỗ trợ (mã 99) — tức là chắc chắn giao dịch hoàn KHÔNG được
+     * tạo ở phía VNPay. Nếu chưa có phản hồi rõ ràng ⇒ vẫn giữ nguyên trạng thái
+     * chờ xác minh để tránh rủi ro hoàn trùng.
+     *
+     * <p><b>Sau khi chuyển:</b> {@code method} = {@link RefundMethod#MANUAL_BANK_TRANSFER}
+     * ⇒ tác vụ nền {@code RefundStatusScheduler} NGỪNG hỏi VNPay cho yêu cầu này
+     * (nó chỉ quét {@code method = VNPAY_API}) ⇒ đảm bảo chỉ MỘT phương thức
+     * hoàn tiền tại mỗi thời điểm.
+     *
+     * @param refundId yêu cầu hoàn tiền
+     * @param adminId  quản trị viên thực hiện
+     * @return yêu cầu hoàn sau khi chuyển phương thức
+     */
+    @Transactional
+    public RefundResponse switchToManualTransfer(Long refundId, Long adminId) {
+        RefundRequest refund = refundRepository.findByIdForUpdate(refundId)
+                .orElseThrow(() -> new AppException(ErrorCode.REFUND_NOT_FOUND));
+
+        if (refund.getStatus() != RefundStatus.VNPAY_PROCESSING
+                && refund.getStatus() != RefundStatus.REFUND_PROCESSING
+                && refund.getStatus() != RefundStatus.APPROVED
+                && refund.getStatus() != RefundStatus.FAILED) {
+            throw new AppException(ErrorCode.REFUND_INVALID_STATUS,
+                    "Trạng thái hiện tại không cho phép chuyển phương thức hoàn tiền: "
+                            + refund.getStatus());
+        }
+        if (refund.getMethod() == RefundMethod.MANUAL_BANK_TRANSFER) {
+            // Đã là phương thức thủ công ⇒ không làm gì (idempotent).
+            return toResponse(refund);
+        }
+
+        // ⚠️ Chỉ chuyển được khi VNPay đã nói rõ "KHÔNG tạo được giao dịch hoàn":
+        //   • mã 99 (hạ tầng không hỗ trợ) — đã xác minh trên Sandbox
+        //   • mã 91/93/95/16 hoặc trạng thái 09 — VNPay từ chối dứt khoát
+        // Mọi trường hợp khác (chưa phản hồi, timeout, mã 08 bảo trì, mã 94 đang
+        // xử lý…) ⇒ chưa chắc chắn giao dịch hoàn chưa được tạo ⇒ KHÔNG chuyển.
+        boolean unsupported = isVnPayUnsupportedFailure(
+                refund.getVnpResponseCode(), refund.getVnpMessage());
+        boolean definiteRejection = isVnPayDefiniteRejection(
+                refund.getVnpResponseCode(), refund.getVnpTransactionStatus());
+
+        if (!unsupported && !definiteRejection) {
+            throw new AppException(ErrorCode.REFUND_METHOD_NOT_ALLOWED,
+                    "Chỉ chuyển sang chuyển khoản thủ công khi VNPay đã xác nhận không tạo được "
+                            + "yêu cầu hoàn tiền (mã 99 hoặc từ chối dứt khoát 91/93/95/16). "
+                            + "Hiện tại chưa có phản hồi như vậy nên yêu cầu vẫn đang được giữ "
+                            + "ở trạng thái chờ xác minh.");
+        }
+
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        RefundStatus fromStatus = refund.getStatus();
+        refund.setMethod(RefundMethod.MANUAL_BANK_TRANSFER);
+        refund.markManualTransferPending();
+        refundRepository.save(refund);
+
+        audit(refund, RefundAuditLog.Action.MANUAL_TRANSFER_RECORDED, fromStatus,
+                RefundStatus.MANUAL_TRANSFER_PENDING, admin, refund.getApprovedAmount(), null,
+                "Cổng thanh toán không hỗ trợ yêu cầu hoàn tiền tự động. "
+                        + "Chuyển sang phương thức chuyển khoản ngân hàng thủ công — "
+                        + "quản trị viên thực hiện chuyển khoản rồi nhập mã tham chiếu và bằng chứng.");
+
+        log.info("[Refund] Chuyển yêu cầu hoàn id={} sang chuyển khoản thủ công (VNPay không hỗ trợ)",
+                refundId);
+
+        return toResponse(refund);
     }
 
     // ── Status tracking (Admin) ──────────────────────────────────────────────
@@ -592,12 +1090,13 @@ public class RefundService {
         RefundRequest refund = refundRepository.findByIdForUpdate(refundId)
                 .orElseThrow(() -> new AppException(ErrorCode.REFUND_NOT_FOUND));
 
-        if (refund.getStatus() != RefundStatus.REFUND_PROCESSING) {
-            return RefundResponse.fromEntity(refund);
+        if (refund.getStatus() != RefundStatus.VNPAY_PROCESSING
+                && refund.getStatus() != RefundStatus.REFUND_PROCESSING) {
+            return toResponse(refund);
         }
         if (refund.getMethod() != RefundMethod.VNPAY_API) {
             // Chuyển khoản thủ công — Admin tự xác nhận qua endpoint confirmManualTransfer.
-            return RefundResponse.fromEntity(refund);
+            return toResponse(refund);
         }
 
         Payment payment = refund.getPayment();
@@ -616,9 +1115,9 @@ public class RefundService {
                 null);
 
         if (response.isEmpty()) {
-            refund.setVnpMessage("Không xác minh được trạng thái từ VNPay — giữ REFUND_PROCESSING.");
+            refund.setVnpMessage("Không xác minh được trạng thái từ VNPay — giữ VNPAY_PROCESSING.");
             refundRepository.save(refund);
-            return RefundResponse.fromEntity(refund);
+            return toResponse(refund);
         }
 
         String transactionStatus = response.get("vnp_TransactionStatus");
@@ -630,14 +1129,14 @@ public class RefundService {
 
         // Trạng thái giao dịch gốc vẫn là 00 (đã thanh toán) — không phải trạng thái hoàn tiền.
         // Vì vậy chỉ khi chính phản hồi refund đã ghi nhận thành công mới chuyển REFUNDED.
-        audit(refund, RefundAuditLog.Action.VNPAY_STATUS_UPDATED, RefundStatus.REFUND_PROCESSING,
-                RefundStatus.REFUND_PROCESSING, null, null, refund.getVnpRequestId(),
+        audit(refund, RefundAuditLog.Action.VNPAY_STATUS_UPDATED, RefundStatus.VNPAY_PROCESSING,
+                RefundStatus.VNPAY_PROCESSING, null, null, refund.getVnpRequestId(),
                 "Đã kiểm tra lại trạng thái hoàn tiền với VNPay. Yêu cầu vẫn đang được xử lý.",
                 true);
 
         applyVnPayRefundStatus(refund, null);
 
-        return RefundResponse.fromEntity(refund);
+        return toResponse(refund);
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
@@ -649,7 +1148,7 @@ public class RefundService {
         if (!isAdmin) {
             checkOwnership(refund, callerId);
         }
-        RefundResponse response = RefundResponse.fromEntity(refund);
+        RefundResponse response = toResponse(refund);
         return withAuditLogs(response, refund.getId());
     }
 
@@ -657,20 +1156,78 @@ public class RefundService {
     public RefundResponse getByCode(String refundCode) {
         RefundRequest refund = refundRepository.findByRefundCode(refundCode)
                 .orElseThrow(() -> new AppException(ErrorCode.REFUND_NOT_FOUND));
-        return withAuditLogs(RefundResponse.fromEntity(refund), refund.getId());
+        return withAuditLogs(toResponse(refund), refund.getId());
     }
 
     @Transactional(readOnly = true)
     public PageResponse<RefundResponse> getMyRefunds(Long touristId, Pageable pageable) {
         Page<RefundRequest> page = refundRepository.findByTourist_Id(touristId, pageable);
-        return PageResponse.from(page, RefundResponse::fromEntity);
+        Map<Long, List<RefundResponse.RefundAuditLogResponse>> logs = loadAuditLogs(page.getContent());
+        return PageResponse.from(page, r -> {
+            RefundResponse response = toResponse(r);
+            return response.toBuilder()
+                    .auditLogs(logs.getOrDefault(r.getId(), List.of()))
+                    .build();
+        });
     }
 
+    /**
+     * Danh sách yêu cầu hoàn tiền theo BOOKING (mọi payment của đơn) — dùng để app
+     * biết đơn đang/có yêu cầu hoàn tiền mà không cần gọi từng payment.
+     */
     @Transactional(readOnly = true)
-    public PageResponse<RefundResponse> getAll(RefundStatus status, Pageable pageable) {
-        Page<RefundRequest> page = (status != null)
-                ? refundRepository.findByStatus(status, pageable)
-                : refundRepository.findAll(pageable);
+    public List<RefundResponse> getByBooking(Long bookingId, Long callerId, boolean isAdmin) {
+        if (!isAdmin) {
+            Booking booking = bookingRepository.findById(bookingId)
+                    .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+            Long ownerId = booking.getTourist() != null ? booking.getTourist().getId() : null;
+            boolean isOwner = ownerId != null && ownerId.equals(callerId);
+            // Hành khách được MỜI (linked user) cũng cần xem trạng thái hoàn tiền
+            // của đơn mình tham gia — app dùng endpoint này để ẩn thẻ "Bạn đã mua
+            // tour này" khi đơn đang/đã hoàn tiền.
+            boolean isGuest = !isOwner && passengerRepository
+                    .findByLinkedUserIdAndBooking_StatusIn(
+                            callerId,
+                            List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED))
+                    .stream()
+                    .anyMatch(p -> p.getBooking() != null
+                            && bookingId.equals(p.getBooking().getId()));
+            if (!isOwner && !isGuest) {
+                throw new AppException(ErrorCode.UNAUTHORIZED, "Bạn không có quyền truy cập đơn hàng này");
+            }
+        }
+        List<RefundRequest> refunds = refundRepository
+                .findByBooking_IdOrderByCreatedAtDesc(bookingId);
+        Map<Long, List<RefundResponse.RefundAuditLogResponse>> logs = loadAuditLogs(refunds);
+        return refunds.stream()
+                .map(r -> {
+                    RefundResponse response = toResponse(r);
+                    return response.toBuilder()
+                            .auditLogs(logs.getOrDefault(r.getId(), List.of()))
+                            .build();
+                })
+                .toList();
+    }
+
+    /**
+     * Danh sách yêu cầu hoàn tiền (ADMIN) — có tìm kiếm theo từ khoá.
+     *
+     * @param keyword từ khoá (mã yêu cầu / mã đơn / mã giao dịch / mã lý do /
+     *               mô tả lý do). Rỗng ⇒ không lọc.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<RefundResponse> searchAll(RefundStatus status, String keyword, Pageable pageable) {
+        String kw = keyword == null ? "" : keyword.trim();
+        Page<RefundRequest> page;
+        if (kw.isEmpty()) {
+            page = (status != null)
+                    ? refundRepository.findByStatus(status, pageable)
+                    : refundRepository.findAll(pageable);
+        } else if (status != null) {
+            page = refundRepository.searchByKeywordAndStatus(kw, status, pageable);
+        } else {
+            page = refundRepository.searchByKeyword(kw, pageable);
+        }
         return PageResponse.from(page, RefundResponse::fromEntity);
     }
 
@@ -686,7 +1243,13 @@ public class RefundService {
             }
         }
         Page<RefundRequest> page = refundRepository.findByPayment_Id(paymentId, pageable);
-        return PageResponse.from(page, RefundResponse::fromEntity);
+        Map<Long, List<RefundResponse.RefundAuditLogResponse>> logs = loadAuditLogs(page.getContent());
+        return PageResponse.from(page, r -> {
+            RefundResponse response = toResponse(r);
+            return response.toBuilder()
+                    .auditLogs(logs.getOrDefault(r.getId(), List.of()))
+                    .build();
+        });
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -700,7 +1263,7 @@ public class RefundService {
                 .filter(r -> !r.getId().equals(excludeRefundId))
                 .filter(r -> r.getStatus() == RefundStatus.PENDING_REVIEW
                         || r.getStatus() == RefundStatus.APPROVED
-                        || r.getStatus() == RefundStatus.REFUND_PROCESSING)
+                        || r.getStatus().isPendingResult())
                 .map(RefundRequest::getApprovedAmount)
                 .filter(a -> a != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -734,6 +1297,55 @@ public class RefundService {
                 .map(RefundResponse.RefundAuditLogResponse::fromEntity)
                 .toList();
         return response.toBuilder().auditLogs(logs).build();
+    }
+
+    /**
+     * Gắn nhật ký kiểm toán cho NHIỀU yêu cầu cùng lúc (tránh N+1 query).
+     *
+     * <p>Dùng cho các endpoint trả danh sách. Nhật ký được sắp xếp theo thời gian
+     * TĂNG dần ⇒ cũ nhất ở trên, mới nhất ở dưới (đúng như mong muốn hiển thị).
+     *
+     * @param refunds danh sách response đã map từ entity
+     * @return map {@code refundId → danh sách nhật ký đã sắp xếp}
+     */
+    private Map<Long, List<RefundResponse.RefundAuditLogResponse>> loadAuditLogs(
+            List<RefundRequest> refunds) {
+        if (refunds == null || refunds.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = refunds.stream().map(RefundRequest::getId).toList();
+        Map<Long, List<RefundResponse.RefundAuditLogResponse>> grouped = new LinkedHashMap<>();
+        auditLogRepository.findByRefundRequest_IdInOrderByCreatedAtAsc(ids)
+                .forEach(log -> grouped
+                        .computeIfAbsent(log.getRefundRequest().getId(), k -> new ArrayList<>())
+                        .add(RefundResponse.RefundAuditLogResponse.fromEntity(log)));
+        return grouped;
+    }
+
+    /**
+     * Chuyển entity → response, kèm TÊN HIỂN THỊ tiếng Việt của lý do.
+     *
+     * <p>Mã kỹ thuật (nhóm: {@code PERSONAL} / mã lý do: {@code PERSONAL_7}) là chi
+     * tiết nội bộ ⇒ KHÔNG được hiển thị cho người dùng. Response luôn kèm sẵn tên
+     * tiếng Việt để web/mobile chỉ cần hiển thị, không phải tự map mã → nhãn.
+     */
+    private RefundResponse toResponse(RefundRequest refund) {
+        if (refund == null) {
+            return null;
+        }
+        RefundResponse response = RefundResponse.fromEntity(refund);
+        return response.toBuilder()
+                .declaredReasonName(
+                        response.declaredReason() != null
+                                ? reasonConfig.groupName(response.declaredReason().name())
+                                : null)
+                .approvedReasonName(
+                        response.approvedReason() != null
+                                ? reasonConfig.groupName(response.approvedReason().name())
+                                : null)
+                .declaredReasonCodeName(reasonConfig.reasonCodeName(response.declaredReasonCode()))
+                .approvedReasonCodeName(reasonConfig.reasonCodeName(response.approvedReasonCode()))
+                .build();
     }
 
     private void checkOwnership(RefundRequest refund, Long callerId) {

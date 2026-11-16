@@ -5,6 +5,7 @@ import { Plus, Loader2, Trash2, RotateCcw, Pencil, Check, X, ImagePlus } from "l
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import PaginationBar from "@/components/ui/PaginationBar";
 import CoverImageField from "@/features/destination/components/CoverImageField";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /** Bộ màu cố định (Tailwind cần class tĩnh). */
 const ACCENTS = {
@@ -130,10 +131,10 @@ export default function CatalogCard({
           {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
         </div>
         <div className="flex items-center gap-2">
-          <input ref={inputRef} type="text" maxLength={150} value={name}
+          <LimitedField as="input" counter="near" limit={150} ref={inputRef} type="text" value={name}
             onChange={(e) => { setName(e.target.value); if (error) setError(""); }}
             onKeyDown={(e) => e.key === "Enter" && add()} placeholder={placeholder}
-            className={`px-3 py-1.5 w-64 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 ${a.ring}`} />
+            wrapperClassName="w-64" className={`w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 ${a.ring}`} />
           <button type="button" disabled={busy} onClick={() => add()}
             className={`px-3.5 py-1.5 rounded-xl ${a.btn} text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0`}>
             {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={14} />} Thêm {noun}
@@ -178,10 +179,10 @@ export default function CatalogCard({
                   : <ImagePlus size={15} className="mx-auto" />}
               </button>
               {editingId === item.id ? (
-                <input autoFocus value={editing.name} maxLength={150}
+                <LimitedField as="input" counter="near" limit={150} wrapperClassName="flex-1" autoFocus value={editing.name}
                   onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditing(null); }}
-                  className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 ${a.ring}`} />
+                  className={`w-full px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 ${a.ring}`} />
               ) : (
                 <p className="flex-1 min-w-0 font-bold text-slate-900 text-sm truncate">{item.name}</p>
               )}

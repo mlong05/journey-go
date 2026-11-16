@@ -163,6 +163,13 @@ app:
     payment-reconcile-batch-size: ${PAYMENT_RECONCILE_BATCH_SIZE:50}
     # Số giờ cho phép gửi lại yêu cầu Refund sau khi yêu cầu trước bị từ chối (0 = không cho).
     refund-resubmit-window-hours: ${REFUND_RESUBMIT_WINDOW_HOURS:0}
+    # ── Chính sách hoàn tiền (mới) ──────────────────────────────────────────────
+    # Cửa sổ no-show: yêu cầu của nhóm cá nhân gửi trong vòng N giờ trước ngày trải
+    # nghiệm (hoặc muộn hơn) sẽ bị tính tỷ lệ hoàn 0%.
+    refund-no-show-window-hours: ${REFUND_NO_SHOW_WINDOW_HOURS:48}
+    # Số giờ trước ngày trải nghiệm mà Tourist được gửi lại yêu cầu sau khi bị từ chối
+    # (0 = không cho gửi lại).
+    refund-resubmit-hours-before-start: ${REFUND_RESUBMIT_HOURS_BEFORE_START:0}
 
   # ── VNPay Sandbox ─────────────────────────────────────────────────────────
   # Toàn bộ credentials đọc từ biến môi trường — KHÔNG hardcode.
@@ -179,9 +186,15 @@ app:
     # URL nhận kết quả trả về (Return URL) sau khi khách thanh toán.
     return-url: ${VNPAY_RETURN_URL:}
 
-    # ⚠️ KHÔNG còn Return URL cho WEB: thanh toán CHỈ diễn ra trên ứng dụng
-    # MOBILE (du khách đặt tour và thanh toán trong app). Web chỉ phục vụ
-    # admin / đối tác / moderator ở góc nhìn quản trị (không có màn checkout).
+    # ── Return URL cho WEB du khách ───────────────────────────────────────────
+    # Web khởi tạo thanh toán với appRedirect=false ⇒ VNPay đưa trình duyệt về
+    # trang kết quả của frontend; trang này gửi tham số vnp_* đã ký về
+    # POST /payments/return-result để backend kiểm tra chữ ký rồi áp dụng.
+    #   => VNPAY_WEB_RETURN_URL=http://localhost:3000/payment/result
+    # Để trống ⇒ web dùng Return URL của backend (/payments/return-page).
+    # ⚠️ TUYỆT ĐỐI KHÔNG để web rơi xuống custom scheme của app — xem
+    # VnPayClient#buildReturnUrl.
+    web-return-url: ${VNPAY_WEB_RETURN_URL:}
 
     # ── Return URL riêng cho APP MOBILE (deep link, custom scheme) ─────────────
     # ĐÃ KIỂM CHỨNG TRÊN SANDBOX: khi vnp_ReturnUrl là CUSTOM SCHEME, VNPay

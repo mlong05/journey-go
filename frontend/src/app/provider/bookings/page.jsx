@@ -180,14 +180,19 @@ function ProviderBookingDetail({ booking, onChanged }) {
   const [reloadKey, setReloadKey] = useState(0);
 
   // Tin nhắn mới trong booking này ⇒ hiện ngay, không cần tải lại danh sách.
+  //
+  // ⚠️ Kênh đã gộp: nhận cả scope `BOOKING_CHAT` (cũ) và `PROVIDER_CHAT` (mới).
   useRealtimeMessages(
     useCallback(
       (payload) => {
-        if (payload?.scope !== "BOOKING_CHAT") return;
-        if (Number(payload.bookingId) !== Number(bookingId)) return;
+        const scope = payload?.scope;
+        if (scope !== "BOOKING_CHAT" && scope !== "PROVIDER_CHAT") return;
+        if (scope === "BOOKING_CHAT" && Number(payload.bookingId) !== Number(bookingId)) return;
+        if (scope === "PROVIDER_CHAT" && payload.bookingId != null
+          && Number(payload.bookingId) !== Number(bookingId)) return;
         setMessages((prev) => {
           if (prev.some((m) => Number(m.id) === Number(payload.message?.id))) return prev;
-          return payload.message ? [payload.message, ...prev] : prev;
+          return payload.message ? [...prev, payload.message] : prev;
         });
       },
       [bookingId],
@@ -253,7 +258,10 @@ function ProviderBookingDetail({ booking, onChanged }) {
     if (!body) return;
     try {
       const created = await sendBookingMessage(booking.id, body);
-      setMessages((prev) => [created, ...prev]);
+      setMessages((prev) => {
+        if (prev.some((m) => Number(m.id) === Number(created.id))) return prev;
+        return [...prev, created];
+      });
       setText("");
     } catch (err) {
       setError(err?.message || "Không gửi được tin nhắn.");

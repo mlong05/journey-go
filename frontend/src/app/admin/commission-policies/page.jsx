@@ -22,6 +22,8 @@ import {
   getCurrentPolicy,
   listPolicies,
 } from "@/features/finance/services/commissionPolicyService";
+import { formatDateTimeVN } from "@/lib/money";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /* =========================================================================
    HẰNG SỐ
@@ -52,14 +54,7 @@ const STATUS_META = {
 
 function formatDateTime(value) {
   if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+  return formatDateTimeVN(value) || "—";
 }
 
 function formatRate(rate) {
@@ -362,7 +357,9 @@ export default function AdminCommissionPoliciesPage() {
               <span className="mb-1 block text-xs font-semibold text-slate-700">
                 Tên chính sách <span className="text-rose-500">*</span>
               </span>
-              <input
+              <LimitedField
+                as="input"
+                limit={150}
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Ví dụ: Chính sách hoa hồng 2026-Q1"
@@ -431,7 +428,9 @@ export default function AdminCommissionPoliciesPage() {
               <span className="mb-1 block text-xs font-semibold text-slate-700">
                 Lý do thay đổi <span className="text-rose-500">*</span>
               </span>
-              <textarea
+              <LimitedField
+                as="textarea"
+                limit={500}
                 value={form.changeReason}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, changeReason: e.target.value }))

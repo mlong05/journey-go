@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/models/experience_model.dart';
+import '../../core/models/refund_model.dart' show RefundSummaryState, summarizeRefundState;
 import '../../core/models/tour_detail_model.dart';
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
+import '../../core/services/refund_service.dart';
 import '../../core/services/tour_availability_service.dart';
 import '../../core/services/tour_service.dart';
 import '../../core/services/token_storage.dart';
@@ -67,6 +69,19 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   /// Du khách đang đi dở hoặc đã đi xong tour này; null nếu chưa đi.
   TourProgress? _myProgress;
 
+  /// Trạng thái hoàn tiền của booking đã mua (null = không có booking, hoặc
+  /// tải lỗi ⇒ coi như chưa có hoàn tiền).
+  ///
+  /// ⚠️ Dùng để ẨN thanh "Bạn đã mua tour này / Còn N ngày nữa lên đường" khi
+  /// đơn đang hoàn tiền hoặc đã xử lý xong — đơn đó không còn hiệu lực trải
+  /// nghiệm nên không được hiện đếm ngày.
+  RefundSummaryState? _bookedRefundState;
+
+  /// Booking đã mua có dính vào hoàn tiền không (đang xử lý HOẶC đã xử lý).
+  bool get _bookedHasRefund =>
+      _bookedRefundState != null &&
+      _bookedRefundState != RefundSummaryState.none;
+
   // ── Chọn ngày trải nghiệm còn chỗ ────────────────────────────────────────
   List<TourAvailableDate> _availableDates = [];
   String? _selectedDate;
@@ -81,6 +96,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     _loadMyProgress();
+    _loadBookedRefund();
 
     // Làm mới thông tin tour (giá có thể đã đổi), nếu lỗi thì dùng bản từ danh sách.
     final detailFuture = _loadDetail();
@@ -159,6 +175,20 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   Future<void> _loadMyProgress() async {
     final byTour = await TourProgress.load();
     if (mounted) setState(() => _myProgress = byTour[widget.tour.id]);
+  }
+
+  /// Tải trạng thái hoàn tiền của booking đã mua (nếu có) — để ẩn thanh
+  /// "Bạn đã mua tour này" khi đơn đang/đã hoàn tiền.
+  Future<void> _loadBookedRefund() async {
+    final bookingId = widget.bookedBooking?.id;
+    if (bookingId == null) return;
+    try {
+      final refunds = await RefundService().getRefundsByBooking(bookingId);
+      if (!mounted) return;
+      setState(() => _bookedRefundState = summarizeRefundState(refunds));
+    } catch (_) {
+      // Lỗi tải ⇒ coi như không có hoàn tiền (giữ hành vi cũ).
+    }
   }
 
   /// Nhãn ngày trải nghiệm đang chọn (VD "20/11/2026") — null nếu chưa chọn.
@@ -947,6 +977,21 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     final active = progress?.inProgress ?? false;
     final booked = widget.bookedBooking;
 
+    // ⚠️ Đơn đang hoàn tiền / đã xử lý hoàn tiền xong ⇒ KHÔNG hiện thanh
+    // "Bạn đã mua tour này / Còn N ngày nữa lên đường" (đơn đó không còn hiệu
+    // lực trải nghiệm, đếm ngày là thông tin sai). Thay bằng thông báo trạng
+    // thái hoàn tiền cho khách.
+    if (booked != null && !active && _bookedHasRefund) {
+      return _buildRefundNoticeBar(booked);
+    }
+
+    // ⚠️ Đơn đã HỦY / HẾT HẠN ⇒ chỗ đã được giải phóng, KHÔNG còn quyền trải
+    // nghiệm ⇒ KHÔNG hiện "Bạn đã mua tour này" (gây hiểu nhầm) và KHÔNG cho
+    // bấm "Bắt đầu trải nghiệm" (backend sẽ từ chối với lỗi khó hiểu).
+    if (booked != null && !active && _isClosedBooking(booked)) {
+      return _buildClosedBookingBar(booked);
+    }
+
     // Đã mua tour ⇒ hiện vé (không cho đặt lại ⇒ tránh mua trùng).
     if (booked != null && !active) {
       return SafeArea(
@@ -1135,6 +1180,141 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Thanh thông báo cho đơn đang/đã hoàn tiền.
+  ///
+  /// ⚠️ Thay thế thanh "Bạn đã mua tour này / Còn N ngày nữa lên đường" — đơn đã
+  /// dính hoàn tiền thì không còn hiệu lực trải nghiệm, đếm ngày là thông tin sai.
+  Widget _buildRefundNoticeBar(BookingModel booked) {
+    final processing = _bookedRefundState == RefundSummaryState.processing;
+    final color =
+        processing ? AppCultureColors.rewardText : AppCultureColors.oceanBlue;
+    final bg =
+        processing ? AppCultureColors.rewardBg : AppCultureColors.oceanLight;
+
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppCultureColors.border)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: bg),
+              child: Icon(
+                processing
+                    ? Icons.pending_actions_rounded
+                    : Icons.verified_rounded,
+                size: 20,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    processing
+                        ? 'Đang trong quá trình hoàn tiền'
+                        : 'Đã xử lý hoàn tiền',
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppCultureColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    processing
+                        ? 'Đơn đặt tour này đang được xử lý hoàn tiền.'
+                        : 'Đơn đặt tour này đã được xử lý xong.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppCultureColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Đơn đã hủy / hết hạn ⇒ không còn quyền trải nghiệm.
+  ///
+  /// ⚠️ Gồm cả `PENDING_PAYMENT` đã quá hạn 10 phút — hạn thanh toán hết thì
+  /// chỗ sẽ được trả lại cho khách khác ⇒ không được xem là "đã mua".
+  bool _isClosedBooking(BookingModel b) =>
+      b.isCancelled ||
+      b.isExpired ||
+      (b.isPendingPayment && !b.isPaymentWindowOpen);
+
+  /// Thanh thông báo cho đơn đã hủy / hết hạn.
+  Widget _buildClosedBookingBar(BookingModel booked) {
+    final cancelled = booked.isCancelled;
+
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppCultureColors.border)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFFEF2F2),
+              ),
+              child: Icon(
+                cancelled ? Icons.cancel_rounded : Icons.timer_off_rounded,
+                size: 20,
+                color: AppCultureColors.error,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    cancelled ? 'Đơn đặt tour đã hủy' : 'Đơn đặt tour đã hết hạn',
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppCultureColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    cancelled
+                        ? 'Chỗ đã được trả lại — bạn không thể trải nghiệm tour này.'
+                        : 'Đơn quá hạn thanh toán — chỗ đã được giải phóng.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppCultureColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

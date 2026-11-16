@@ -13,13 +13,8 @@ import java.time.Period;
  * (đặt hôm nay, đi tour 3 tháng sau ⇒ trẻ em thành người lớn). Tính theo ngày đặt sẽ tính
  * sai giá. Vì vậy tuổi luôn được tính tại {@code experienceDate} — ngày khởi hành thực tế.
  *
- * <p>Khoảng tuổi theo nền tảng quy định (trùng {@link GuestType}):
- * <ul>
- *   <li>Người lớn: từ 12 tuổi</li>
- *   <li>Trẻ em: 5 – 11 tuổi</li>
- *   <li>Trẻ nhỏ: 2 – 4 tuổi</li>
- *   <li>Em bé: dưới 2 tuổi (luôn miễn phí)</li>
- * </ul>
+ * <p>Khoảng tuổi do Admin cấu hình (mặc định: Người lớn từ 12, Trẻ em 5 – 11, Trẻ nhỏ 2 – 4,
+ * Em bé dưới 2 — miễn phí); xem {@link GuestType#forAge(int)}.
  */
 public final class GuestAgeResolver {
 
@@ -56,16 +51,8 @@ public final class GuestAgeResolver {
         if (age == null) {
             return null;
         }
-        if (age >= 12) {
-            return GuestType.ADULT;
-        }
-        if (age >= 5) {
-            return GuestType.CHILD;
-        }
-        if (age >= 2) {
-            return GuestType.TODDLER;
-        }
-        return GuestType.INFANT;
+        // Mốc tuổi do Admin cấu hình (trang "Loại khách & độ tuổi").
+        return GuestType.forAge(age);
     }
 
     /**

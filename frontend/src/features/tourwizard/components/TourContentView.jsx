@@ -1,17 +1,19 @@
 "use client";
 
 import React, { useState } from "react";
-import { Pencil, ChevronDown, ChevronUp, CheckCircle2, MapPin, Timer, Film, Clock, CalendarDays, Users } from "lucide-react";
-import { GUEST_TYPES } from "../constants";
+import { Pencil, ChevronDown, ChevronUp, CheckCircle2, MapPin, Timer, Film, Clock, CalendarDays, Users, BookOpen, Lock } from "lucide-react";
 import NoticeAccordion from "./NoticeAccordion";
 import ItineraryView from "./ItineraryView";
 import StopsOverviewMap, { stopLocation, googleMapsUrl } from "./stops/StopsOverviewMap";
 import CheckpointMap from "./stops/CheckpointMap";
 import ExperienceQr from "./stops/ExperienceQr";
 import VideoPreview from "./VideoPreview";
+import { formatLocalDate } from "@/lib/money";
+import { useGuestTypes } from "@/lib/guestTypes";
 
 const money = (v) => (v == null ? "—" : `${Number(v).toLocaleString("vi-VN")} đ`);
-const fmtDate = (s) => { const [y, m, d] = (s || "").split("-"); return d ? `${d}/${m}/${y}` : s; };
+/** Ngày `LocalDate` (YYYY-MM-DD) → "dd/MM/yyyy" — không lệch múi giờ. */
+const fmtDate = (s) => formatLocalDate(s) || s;
 
 export function durationText(tour) {
   if (tour.tourFormat === "MULTI_DAY") return `${tour.durationDays || "?"} ngày ${tour.durationNights ?? "?"} đêm`;
@@ -73,6 +75,56 @@ function QuestionView({ q, label, points }) {
 }
 
 /**
+ * "Câu chuyện (mở sau check-in)" — thẻ 2 cột theo bố cục chữ Z: cột trái nền tối (nhãn, khoá, số chữ)
+ * kéo mắt vào trước, cột phải là nội dung + ảnh + cổ vật. Điện thoại: cột tối thành dải đầu thẻ.
+ */
+function StoryCard({ stop: s }) {
+  const words = (s.culturalContent || "").trim().split(/\s+/).filter(Boolean).length;
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-800/10 sm:grid sm:grid-cols-[168px_minmax(0,1fr)]">
+      <div className="flex items-center gap-3 bg-slate-900 px-4 py-3 text-white sm:flex-col sm:items-start sm:justify-between sm:py-4">
+        <div className="flex items-center gap-2.5 sm:flex-col sm:items-start sm:gap-2">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/10 text-amber-300"><BookOpen size={18} /></span>
+          <div>
+            <p className="text-sm font-bold leading-tight">Câu chuyện</p>
+            <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-slate-300"><Lock size={11} />Mở sau khi khách check-in</p>
+          </div>
+        </div>
+        <p className="ml-auto shrink-0 whitespace-nowrap text-[11px] font-semibold tabular-nums text-slate-400 sm:ml-0">{words.toLocaleString("vi-VN")} chữ</p>
+      </div>
+      <div className="min-w-0 bg-white p-4">
+        <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">{s.culturalContent || <i className="text-slate-400">Chưa nhập</i>}</p>
+        {s.culturalImages?.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {s.culturalImages.map((u) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={u} src={u} alt="" className="h-14 w-20 rounded-lg object-cover" />
+            ))}
+          </div>
+        )}
+        {s.artifacts?.length > 0 && (
+          <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Cổ vật</p>
+            {s.artifacts.map((a) => (
+              <div key={a.id} className="flex items-center gap-2 text-xs text-slate-700">
+                {a.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.imageUrl} alt="" className="h-10 w-10 rounded object-cover" />
+                )}
+                <span><b>{a.name}</b> — {a.shortDescription}</span>
+                {a.videoUrl && (
+                  <a href={a.videoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-bold text-emerald-700"><Film size={11} />Video</a>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Nội dung tour chỉ đọc.
  * - onEdit(step): hiện nút "Sửa" mỗi mục (bước 5 của đối tác).
  * - Block({ anchor, label, children }): bọc từng khối (Moderator gắn cờ). anchor = { step, stopId, field }.
@@ -81,6 +133,7 @@ function QuestionView({ q, label, points }) {
 export default function TourContentView({ tour, onEdit, Block = DefaultBlock, collapsibleStops = false, showSchedule = true }) {
   const [openStops, setOpenStops] = useState({});
   const rp = tour.rewardPoints || {};
+  const guestTypes = useGuestTypes();
   const slotTypes = (tour.prices || []).filter((p) => p.countsTowardSlot).map((p) => p.label);
 
   return (
@@ -130,7 +183,7 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
           </div>
           <table className="w-full text-sm">
             <tbody>
-              {GUEST_TYPES.map((g) => {
+              {guestTypes.map((g) => {
                 const p = (tour.prices || []).find((x) => x.guestType === g.key);
                 return (
                   <tr key={g.key} className="border-t border-slate-100">
@@ -205,32 +258,7 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
                         <VideoPreview url={s.videoUrl} source={s.videoSource} />
                       </div>
                     )}
-                    <p className="text-xs font-bold text-slate-500 mb-1">Câu chuyện (mở sau check-in)</p>
-                    <p className="text-sm text-slate-700 whitespace-pre-line">{s.culturalContent || <i className="text-slate-400">Chưa nhập</i>}</p>
-                    {s.culturalImages?.length > 0 && (
-                      <div className="flex gap-1.5 mt-2">
-                        {s.culturalImages.map((u) => (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img key={u} src={u} alt="" className="w-16 h-12 rounded object-cover" />
-                        ))}
-                      </div>
-                    )}
-                    {s.artifacts?.length > 0 && (
-                      <div className="mt-2 space-y-1.5">
-                        {s.artifacts.map((a) => (
-                          <div key={a.id} className="flex items-center gap-2 text-xs text-slate-700">
-                            {a.imageUrl && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={a.imageUrl} alt="" className="w-10 h-10 rounded object-cover" />
-                            )}
-                            <span><b>{a.name}</b> — {a.shortDescription}</span>
-                            {a.videoUrl && (
-                              <a href={a.videoUrl} target="_blank" rel="noreferrer" className="text-emerald-700 inline-flex items-center gap-0.5 font-bold"><Film size={11} />Video</a>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <StoryCard stop={s} />
                   </Block>
                   {(s.quiz || []).length > 0 && <p className="text-xs font-bold text-slate-500">Câu hỏi (quiz) – trắc nghiệm</p>}
                   {(s.quiz || []).map((q, qi) => (

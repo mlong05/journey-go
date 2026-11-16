@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Ban, CheckCircle2, History, Search } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { moderationService } from "@/features/destination";
+import { formatDateTimeVN } from "@/lib/money";
 
 /**
  * Nhật ký & lịch sử duyệt (MODERATOR / ADMIN).
@@ -54,8 +55,7 @@ function contentOf(payload) {
 
 function formatTime(value) {
   if (!value) return "—";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("vi-VN", { hour12: false });
+  return formatDateTimeVN(value) || "—";
 }
 
 export default function ModeratorHistoryPage() {
