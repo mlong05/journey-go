@@ -21,5 +21,8 @@ public interface UserVoucherRepository extends JpaRepository<UserVoucher, Long> 
 
     Optional<UserVoucher> findByUserVoucherCode(String userVoucherCode);
 
+    @Query("SELECT uv FROM UserVoucher uv JOIN FETCH uv.voucher WHERE uv.userVoucherCode = :code AND uv.userId = :userId")
+    Optional<UserVoucher> findByUserVoucherCodeAndUserId(@Param("code") String userVoucherCode, @Param("userId") Long userId);
+
     boolean existsByUserVoucherCode(String userVoucherCode);
 }

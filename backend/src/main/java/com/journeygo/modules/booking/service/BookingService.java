@@ -19,10 +19,15 @@ import com.journeygo.modules.booking.repository.BookingPassengerRepository;
 import com.journeygo.modules.booking.repository.BookingRepository;
 import com.journeygo.modules.booking.repository.BookingSlotHoldRepository;
 import com.journeygo.modules.booking.support.GuestAgeResolver;
+import com.journeygo.modules.experience.entity.Experience;
 import com.journeygo.modules.experience.entity.ExperienceSlot;
 import com.journeygo.modules.experience.repository.ExperienceRepository;
 import com.journeygo.modules.experience.repository.ExperienceSlotRepository;
 import com.journeygo.modules.finance.config.FinanceProperties;
+import com.journeygo.modules.gamification.entity.UserVoucher;
+import com.journeygo.modules.gamification.entity.enums.UserVoucherStatus;
+import com.journeygo.modules.gamification.repository.UserVoucherRepository;
+import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
 import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourSlot;
@@ -31,6 +36,9 @@ import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.tour.repository.TourSlotRepository;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
+import com.journeygo.modules.voucher.dto.request.ValidateVoucherRequest;
+import com.journeygo.modules.voucher.entity.enums.VoucherScope;
+import com.journeygo.modules.voucher.service.VoucherService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -97,6 +105,9 @@ public class BookingService {
     private final TourBookingCatalogService catalogService;
     private final ApplicationEventPublisher eventPublisher;
     private final BookingInvitationService invitationService;
+    private final UserVoucherRepository userVoucherRepository;
+    private final VoucherService voucherService;
+    private final ProviderProfileRepository providerProfileRepository;
 
     // ── Create ────────────────────────────────────────────────────────────────
 
@@ -162,6 +173,52 @@ public class BookingService {
             legacySlot = slot;
         }
 
+        // ── Xử lý áp dụng Voucher ───────────────────────────────────────────
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        String appliedVoucherCode = null;
+        VoucherScope appliedScope = null;
+        UserVoucher appliedUserVoucher = null;
+
+        if (request.voucherCode() != null && !request.voucherCode().isBlank()) {
+            String code = request.voucherCode().trim();
+            UserVoucher uv = userVoucherRepository.findByUserVoucherCodeAndUserId(code, touristId)
+                    .orElseThrow(() -> new AppException(ErrorCode.VOUCHER_NOT_FOUND,
+                            "Mã voucher không tồn tại hoặc không thuộc về bạn"));
+
+            if (uv.getStatus() != UserVoucherStatus.AVAILABLE) {
+                throw new AppException(ErrorCode.VOUCHER_ALREADY_USED, "Voucher này đã được sử dụng");
+            }
+
+            LocalDate today = LocalDate.now(VIETNAM_ZONE);
+            if (uv.getExpiryDate() != null && uv.getExpiryDate().isBefore(today)) {
+                throw new AppException(ErrorCode.VOUCHER_EXPIRED, "Voucher đã hết hạn sử dụng");
+            }
+
+            Long partnerId = resolvePartnerId(tour);
+            var calc = voucherService.calculateAndValidateVoucher(
+                    ValidateVoucherRequest.builder()
+                            .voucherCode(uv.getVoucher().getCode())
+                            .tourPrice(price.totalAmount())
+                            .partnerId(partnerId)
+                            .build()
+            );
+
+            if (!calc.valid()) {
+                throw new AppException(ErrorCode.VOUCHER_INVALID, calc.errorMessage());
+            }
+
+            discountAmount = calc.discountAmount() != null ? calc.discountAmount() : BigDecimal.ZERO;
+            appliedVoucherCode = uv.getUserVoucherCode();
+            appliedScope = uv.getVoucher().getVoucherScope();
+            appliedUserVoucher = uv;
+        }
+
+        BigDecimal originalTotal = price.totalAmount() != null ? price.totalAmount() : BigDecimal.ZERO;
+        BigDecimal finalTotal = originalTotal.subtract(discountAmount);
+        if (finalTotal.compareTo(BigDecimal.ZERO) < 0) {
+            finalTotal = BigDecimal.ZERO;
+        }
+
         // ── Lưu Booking ──────────────────────────────────────────────────────
         Instant now = Instant.now();
         Booking booking = Booking.builder()
@@ -169,7 +226,10 @@ public class BookingService {
                 .tourist(tourist)
                 .tour(tour)
                 .experienceDate(request.experienceDate())
-                .totalAmount(price.totalAmount())
+                .totalAmount(finalTotal)
+                .discountAmount(discountAmount)
+                .appliedVoucherCode(appliedVoucherCode)
+                .voucherScope(appliedScope)
                 .currency("VND")
                 .status(BookingStatus.PENDING_PAYMENT)
                 .paymentDeadline(now.plus(PAYMENT_DEADLINE))
@@ -177,6 +237,13 @@ public class BookingService {
                 .build();
 
         Booking saved = bookingRepository.save(booking);
+
+        if (appliedUserVoucher != null) {
+            appliedUserVoucher.setStatus(UserVoucherStatus.USED);
+            appliedUserVoucher.setUsedAt(now);
+            appliedUserVoucher.setUsedOrderReference(saved.getBookingCode());
+            userVoucherRepository.save(appliedUserVoucher);
+        }
 
         // ── Lưu danh sách hành khách ─────────────────────────────────────────
         for (PassengerDraft draft : price.passengers()) {
@@ -505,6 +572,7 @@ public class BookingService {
         booking.cancel(reason);
         bookingRepository.save(booking);
         releaseSlots(booking);
+        releaseVoucherIfApplied(booking);
 
         // Lời mời chưa sử dụng bị vô hiệu hóa khi booking bị hủy.
         invitationService.revokeAllForBooking(bookingId);
@@ -610,6 +678,7 @@ public class BookingService {
         booking.expire();
         bookingRepository.save(booking);
         releaseSlots(booking);
+        releaseVoucherIfApplied(booking);
         // Lời mời chưa sử dụng cũng bị vô hiệu hóa khi booking hết hạn thanh toán.
         invitationService.revokeAllForBooking(booking.getId());
     }
@@ -819,6 +888,58 @@ public class BookingService {
             throw new AppException(ErrorCode.BOOKING_INVALID_DATE,
                     "Ngày " + experienceDate + " không có trong lịch khởi hành của tour");
         }
+    }
+
+    /**
+     * Hoàn trả voucher về trạng thái AVAILABLE nếu booking áp dụng voucher bị hủy hoặc hết hạn.
+     */
+    private void releaseVoucherIfApplied(Booking booking) {
+        if (booking.getAppliedVoucherCode() != null && !booking.getAppliedVoucherCode().isBlank()) {
+            userVoucherRepository.findByUserVoucherCode(booking.getAppliedVoucherCode())
+                    .filter(uv -> uv.getStatus() == UserVoucherStatus.USED)
+                    .ifPresent(uv -> {
+                        uv.setStatus(UserVoucherStatus.AVAILABLE);
+                        uv.setUsedAt(null);
+                        uv.setUsedOrderReference(null);
+                        userVoucherRepository.save(uv);
+                        log.info("Đã hoàn lại voucher {} về AVAILABLE cho user {} do booking {} bị hủy/hết hạn",
+                                uv.getUserVoucherCode(), uv.getUserId(), booking.getBookingCode());
+                    });
+        }
+    }
+
+    /**
+     * Xác định ProviderProfile ID đại diện cho Tour.
+     */
+    private Long resolvePartnerId(Tour tour) {
+        if (tour == null) {
+            return null;
+        }
+        if (tour.getCreatedBy() != null) {
+            var profile = providerProfileRepository.findByUserId(tour.getCreatedBy().getId());
+            if (profile.isPresent()) {
+                return profile.get().getId();
+            }
+        }
+        // Fallback: tìm qua destinations -> experiences -> createdBy
+        if (tour.getTourDestinations() != null) {
+            List<Long> destIds = tour.getTourDestinations().stream()
+                    .map(td -> td.getDestination() != null ? td.getDestination().getId() : null)
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+            if (!destIds.isEmpty()) {
+                List<Experience> exps = experienceRepository.findByDestination_IdInOrderById(destIds);
+                for (Experience exp : exps) {
+                    if (exp.getCreatedBy() != null) {
+                        var profile = providerProfileRepository.findByUserId(exp.getCreatedBy().getId());
+                        if (profile.isPresent()) {
+                            return profile.get().getId();
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private String generateBookingCode() {

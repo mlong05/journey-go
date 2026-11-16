@@ -160,7 +160,11 @@ public enum ErrorCode {
     BOOKING_TOUR_LOCKED("Tour chỉ mở từ ngày trải nghiệm — chưa thể bắt đầu hành trình", HttpStatus.CONFLICT),
     PROVIDER_CHAT_CONVERSATION_NOT_FOUND("Cuộc trò chuyện không tồn tại", HttpStatus.NOT_FOUND),
     PROVIDER_CHAT_TARGET_REQUIRED("Cần chọn tour hoặc nhà tour để bắt đầu trò chuyện", HttpStatus.BAD_REQUEST),
-    PROVIDER_CHAT_NO_PROVIDER("Tour này chưa có nhà tour liên hệ", HttpStatus.BAD_REQUEST);
+    PROVIDER_CHAT_NO_PROVIDER("Tour này chưa có nhà tour liên hệ", HttpStatus.BAD_REQUEST),
+    VOUCHER_NOT_FOUND("Mã voucher không tồn tại hoặc không thuộc về bạn", HttpStatus.NOT_FOUND),
+    VOUCHER_ALREADY_USED("Voucher đã được sử dụng", HttpStatus.BAD_REQUEST),
+    VOUCHER_EXPIRED("Voucher đã hết hạn sử dụng", HttpStatus.BAD_REQUEST),
+    VOUCHER_INVALID("Voucher không hợp lệ cho đơn hàng này", HttpStatus.BAD_REQUEST);
 
     private final String message;
     private final HttpStatus httpStatus;
