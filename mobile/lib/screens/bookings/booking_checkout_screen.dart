@@ -470,6 +470,52 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
             const SizedBox(height: 10),
             Text('Ngày trải nghiệm: ${formatDay(booking.experienceDate)}'),
             const SizedBox(height: 4),
+            if (booking.hasVoucher) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Giá gốc:', style: TextStyle(fontSize: 14, color: AppCultureColors.textMuted)),
+                  Text(
+                    formatMoney(booking.originalAmount),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppCultureColors.textMuted,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppCultureColors.jadeLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.local_offer_rounded, size: 14, color: AppCultureColors.heritageJade),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Voucher ${booking.appliedVoucherCode}',
+                        style: const TextStyle(fontSize: 12, color: AppCultureColors.jadeDark),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      '-${formatMoney(booking.discountAmount)}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppCultureColors.heritageJade,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
             Text(formatMoney(booking.totalAmount),
                 style: const TextStyle(
                     fontSize: 22, fontWeight: FontWeight.w700, color: AppCultureColors.jadeDark)),
