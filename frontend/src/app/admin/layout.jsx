@@ -15,6 +15,7 @@ import {
   UserCog,
   Sparkles,
   Medal,
+  Ticket,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -85,6 +86,13 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình huy hiệu",
     href: "/admin/badge-config",
     icon: Medal,
+    badge: null,
+  },
+  {
+    id: "vouchers",
+    label: "Cấu hình voucher",
+    href: "/admin/vouchers",
+    icon: Ticket,
     badge: null,
   },
   {
