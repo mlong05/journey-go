@@ -43,6 +43,9 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
 
   final List<ForumPost> _posts = [];
   ForumOption? _tour;
+
+  /// false = Mới nhất, true = Nổi bật (nhiều tim nhất).
+  bool _popular = false;
   bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = false;
@@ -80,6 +83,7 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
         page: 0,
         size: _pageSize,
         tourId: _tour?.id,
+        popular: _popular,
       );
       if (!mounted) return;
       setState(() {
@@ -107,6 +111,7 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
         page: _page + 1,
         size: _pageSize,
         tourId: _tour?.id,
+        popular: _popular,
       );
       if (!mounted) return;
       setState(() {
@@ -288,21 +293,40 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
     }
 
     final filtering = _tour != null;
+    // Giống trang Cộng đồng trên web: tiêu đề + ô viết bài cuộn đi, thanh "Mới nhất / Nổi bật / Lọc tour"
+    // dính ở đầu màn hình, chỉ bài viết trôi bên dưới.
     return RefreshIndicator(
       color: AppCultureColors.heritageJade,
       onRefresh: _load,
-      child: ListView(
+      child: CustomScrollView(
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
-        // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 40),
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 14),
-          _buildComposeCard(),
-          const SizedBox(height: 12),
-          _buildFilters(),
-          const SizedBox(height: 14),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            sliver: SliverList.list(children: [
+              _buildHeader(),
+              const SizedBox(height: 14),
+              _buildComposeCard(),
+              const SizedBox(height: 4),
+            ]),
+          ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _PinnedBarDelegate(
+              height: 64,
+              child: Container(
+                color: AppCultureColors.background,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                alignment: Alignment.center,
+                child: _buildFilters(),
+              ),
+            ),
+          ),
+          SliverPadding(
+            // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 40),
+            sliver: SliverList.list(children: [
           if (_loading)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 40),
@@ -336,6 +360,8 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
               ),
           ],
+            ]),
+          ),
         ],
       ),
     );
@@ -434,9 +460,59 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
       );
     }
 
+    // Sắp xếp: Mới nhất / Nổi bật — giống trang Cộng đồng trên web.
+    Widget sortButton(String label, IconData icon, bool popular) {
+      final on = _popular == popular;
+      return InkWell(
+        onTap: () {
+          if (on) return;
+          setState(() => _popular = popular);
+          _load();
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: on ? AppCultureColors.textDark : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: on ? Colors.white : AppCultureColors.textMuted),
+              const SizedBox(width: 4),
+              Text(label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: on ? Colors.white : AppCultureColors.textDark,
+                  )),
+            ],
+          ),
+        ),
+      );
+    }
+
     // Bài viết chỉ gắn tour (không gắn điểm đến nữa) nên chỉ lọc theo tour
     return Row(
       children: [
+        Container(
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppCultureColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              sortButton('Mới nhất', Icons.schedule_rounded, false),
+              sortButton('Nổi bật', Icons.local_fire_department_rounded, true),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
         chip(
           icon: Icons.route_rounded,
           hint: 'Lọc theo tour',
@@ -450,4 +526,35 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
       ],
     );
   }
+}
+
+/// Thanh dính ở đầu danh sách khi cuộn (thanh sắp xếp / lọc tour) — cao cố định [height].
+class _PinnedBarDelegate extends SliverPersistentHeaderDelegate {
+  final double height;
+  final Widget child;
+
+  const _PinnedBarDelegate({required this.height, required this.child});
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    // Có bóng nhẹ khi đã dính lên trên nội dung, để tách khỏi bài viết đang trôi bên dưới.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        boxShadow: overlapsContent || shrinkOffset > 0
+            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))]
+            : const [],
+      ),
+      child: SizedBox.expand(child: child),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_PinnedBarDelegate oldDelegate) =>
+      oldDelegate.height != height || oldDelegate.child != child;
 }
