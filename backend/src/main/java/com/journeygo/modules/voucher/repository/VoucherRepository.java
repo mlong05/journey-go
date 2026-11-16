@@ -43,12 +43,14 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
            "(:scope IS NULL OR v.voucherScope = :scope) AND " +
            "(:partnerId IS NULL OR v.partner.id = :partnerId) AND " +
            "(:active IS NULL OR v.active = :active) AND " +
-           "(:search IS NULL OR LOWER(v.code) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(v.title) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "(CAST(:searchPattern as string) IS NULL OR " +
+           " LOWER(v.code) LIKE :searchPattern OR " +
+           " LOWER(v.title) LIKE :searchPattern)")
     Page<Voucher> findVouchersWithFilter(
             @Param("scope") VoucherScope scope,
             @Param("partnerId") Long partnerId,
             @Param("active") Boolean active,
-            @Param("search") String search,
+            @Param("searchPattern") String searchPattern,
             Pageable pageable
     );
 }

@@ -147,7 +147,11 @@ public class VoucherService {
 
     @Transactional(readOnly = true)
     public Page<VoucherResponse> getVouchers(VoucherScope scope, Long partnerId, Boolean active, String search, Pageable pageable) {
-        return voucherRepository.findVouchersWithFilter(scope, partnerId, active, search, pageable)
+        String searchPattern = (search != null && !search.isBlank())
+                ? "%" + search.trim().toLowerCase() + "%"
+                : null;
+
+        return voucherRepository.findVouchersWithFilter(scope, partnerId, active, searchPattern, pageable)
                 .map(VoucherResponse::fromEntity);
     }
 
