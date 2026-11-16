@@ -15,6 +15,7 @@ import {
   getBookingMessages,
   sendBookingMessage,
 } from "@/features/booking/services/passengerService";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 export default function BookingChatPanel({ bookingId, currentUserId, className = "" }) {
   const [messages, setMessages] = useState([]);
@@ -150,13 +151,16 @@ export default function BookingChatPanel({ bookingId, currentUserId, className =
       )}
 
       <form onSubmit={handleSend} className="mt-3 flex gap-2">
-        <input
+        <LimitedField
+          as="input"
+          counter="near"
+          limit={1000}
+          wrapperClassName="flex-1"
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          maxLength={2000}
           placeholder="Nhập tin nhắn..."
-          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
         />
         <button
           type="submit"

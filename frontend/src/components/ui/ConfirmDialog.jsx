@@ -16,6 +16,7 @@ import {
   Loader2,
   X,
 } from "lucide-react";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /**
  * Hộp thoại xác nhận dùng chung cho mọi hành động quan trọng
@@ -254,11 +255,12 @@ export default function ConfirmDialog(props) {
                   {input.required && <span className="text-rose-500"> *</span>}
                 </span>
               )}
-              <textarea
+              <LimitedField
+                as="textarea"
+                limit={input.maxLength || 500}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 rows={3}
-                maxLength={500}
                 disabled={loading}
                 placeholder={input.placeholder}
                 className={`w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-200/60 ${FONT}`}

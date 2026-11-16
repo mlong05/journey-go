@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { BANKS, findBankName } from "@/constants/banks";
-import AccountLayout from "./AccountLayout";
 import { touristService } from "../services/touristService";
 import {
   REFUND_REASON, REFUND_STATUS, REFUND_OPEN_STATUSES, dateTime, vnd,
@@ -33,6 +32,7 @@ const BANK_ACCOUNT_NUMBER_MAX = 34; // số tài khoản ngân hàng VN (tối �
 const BANK_ACCOUNT_NAME_MAX = 80;   // tên chủ tài khoản
 /** Tối đa 5 file bằng chứng cho một yêu cầu (khớp mobile). */
 const MAX_EVIDENCE_FILES = 5;
+import { LimitedField } from "@/components/ui/LimitedField";
 
 const input = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20";
 
@@ -683,31 +683,33 @@ export function RefundPanel({ booking }) {
             <label htmlFor="refund-summary" className="mb-1 block text-sm font-bold text-slate-800">
               Lý do ngắn gọn <span className="text-rose-600">*</span>
             </label>
-            <input
+            <LimitedField
+              as="input"
+              counter="always"
+              limit={SUMMARY_MAX}
               id="refund-summary"
-              maxLength={SUMMARY_MAX}
               value={form.reasonSummary}
-              onChange={(e) => setForm((f) => ({ ...f, reasonSummary: clamp(e.target.value, SUMMARY_MAX) }))}
+              onChange={(e) => setForm((f) => ({ ...f, reasonSummary: e.target.value }))}
               placeholder="Ví dụ: Bị ốm đột xuất"
               className={input}
             />
-            <CharCount value={form.reasonSummary} max={SUMMARY_MAX} />
           </div>
 
           <div>
             <label htmlFor="refund-detail" className="mb-1 block text-sm font-bold text-slate-800">
               Mô tả chi tiết <span className="text-rose-600">*</span>
             </label>
-            <textarea
+            <LimitedField
+              as="textarea"
+              counter="always"
+              limit={DETAIL_MAX}
               id="refund-detail"
               rows={4}
-              maxLength={DETAIL_MAX}
               value={form.reasonDetail}
-              onChange={(e) => setForm((f) => ({ ...f, reasonDetail: clamp(e.target.value, DETAIL_MAX) }))}
+              onChange={(e) => setForm((f) => ({ ...f, reasonDetail: e.target.value }))}
               placeholder="Mô tả rõ tình huống: thời điểm xảy ra, bạn đã liên hệ ai, bằng chứng kèm theo…"
               className={`${input} resize-none`}
             />
-            <CharCount value={form.reasonDetail} max={DETAIL_MAX} />
           </div>
 
           {/* ⚠️ BẮT BUỘC: ảnh chụp biên lai giao dịch thành công. */}
@@ -891,59 +893,24 @@ export function RefundPanel({ booking }) {
   );
 }
 
-/** Trang /account/refunds — các yêu cầu hoàn tiền đã gửi + hướng dẫn. */
-export default function RefundsScreen() {
-  const [state, setState] = useState({ loading: true, items: [], error: "" });
-  useEffect(() => {
-    touristService.myRefunds().then((items) => setState({ loading: false, items, error: "" }))
-      .catch((err) => setState({ loading: false, items: [], error: err?.message || "Không tải được yêu cầu hoàn tiền." }));
-  }, []);
-
+/**
+ * Hướng dẫn hoàn tiền — hiện ở tab "Đang hoàn tiền" / "Đã hoàn tiền" của trang Chuyến đi của tôi
+ * (các đơn có yêu cầu hoàn tiền đã được gom vào 2 tab đó).
+ */
+export function RefundGuide() {
   return (
-    <AccountLayout title="Hoàn tiền & hỗ trợ">
-      <div className="mb-5 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-          <p className="font-bold text-slate-900">Cách gửi yêu cầu hoàn tiền</p>
-          <p className="mt-1">
-            Mở đơn đã thanh toán trong{" "}
-            <Link href={ROUTES.TRIPS} className="font-semibold text-teal-700 underline">Chuyến đi của tôi</Link>,
-            chọn &quot;Yêu cầu hoàn tiền&quot; trước ngày trải nghiệm.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-          <p className="flex items-center gap-1.5 font-bold text-slate-900"><LifeBuoy size={15} />Mức hoàn</p>
-          <p className="mt-1">
-            Huỷ trước {EARLY_CANCEL_DAYS} ngày: hoàn 50%. Lỗi từ nền tảng hoặc nhà tour: hoàn 100%
-            sau khi quản trị viên xác minh. Trong vòng {NO_SHOW_WINDOW_HOURS} giờ trước giờ khởi hành: không hoàn.
-          </p>
-        </div>
+    <div className="mb-4 grid gap-3 sm:grid-cols-2">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+        <p className="flex items-center gap-1.5 font-bold text-slate-900"><Info size={15} />Cách gửi yêu cầu</p>
+        <p className="mt-1">Mở đơn đã thanh toán ở tab <b>Đã mua</b>, chọn &quot;Yêu cầu hoàn tiền&quot; trước ngày trải nghiệm.</p>
       </div>
-
-      {state.loading ? (
-        <div className="space-y-3" aria-busy="true"><div className="jg-shimmer h-20 rounded-2xl" /><div className="jg-shimmer h-20 rounded-2xl" /></div>
-      ) : state.error ? (
-        <p role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
-          <AlertTriangle size={16} />{state.error}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+        <p className="flex items-center gap-1.5 font-bold text-slate-900"><LifeBuoy size={15} />Mức hoàn</p>
+        <p className="mt-1">
+          Huỷ trước {EARLY_CANCEL_DAYS} ngày: hoàn 50%. Lỗi từ nền tảng hoặc nhà tour: hoàn 100%
+          sau khi quản trị viên xác minh. Trong vòng {NO_SHOW_WINDOW_HOURS} giờ trước giờ khởi hành: không hoàn.
         </p>
-      ) : state.items.length ? (
-        <ul className="space-y-3">
-          {state.items.map((r) => (
-            <li key={r.id}>
-              <Link href={ROUTES.TRIP_DETAIL(r.bookingId)} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 hover:border-teal-300">
-                <div className="min-w-0 flex-1">
-                  <p className="mb-1 text-xs font-semibold text-slate-400">Đơn {r.bookingCode}</p>
-                  <RefundSummary r={r} />
-                </div>
-                <ChevronRight size={18} className="shrink-0 text-slate-300" />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          Bạn chưa gửi yêu cầu hoàn tiền nào.
-        </p>
-      )}
-    </AccountLayout>
+      </div>
+    </div>
   );
 }

@@ -226,13 +226,12 @@ function BookingPanel({ tour, dates }) {
       ) : (
         <button type="button" onClick={book} disabled={Boolean(problem) || purchasedLoading}
           className="mt-4 w-full rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] transition duration-200 hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-[0_10px_22px_rgba(234,88,12,0.38)] active:translate-y-0 active:scale-[0.98] disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none motion-reduce:transition-none cursor-pointer disabled:cursor-not-allowed">
-          {ready && !isLoggedIn ? "Đăng nhập để đặt tour" : "Đặt tour"}
+          Đặt tour
         </button>
       )}
       <LoginRequiredModal open={needLogin} onClose={() => setNeedLogin(false)} callbackUrl={target}
         title="Đăng nhập để đặt tour"
-        message="Bạn cần đăng nhập tài khoản du khách để đặt tour. Ngày và số khách đã chọn sẽ được giữ nguyên."
-        summary={`${shortDate(chosen)} · ${guests} khách · ${vnd(total)}`} />
+        message="Bạn cần đăng nhập tài khoản du khách để đặt tour." />
     </div>
   );
 }

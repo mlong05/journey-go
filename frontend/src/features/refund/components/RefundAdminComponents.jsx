@@ -32,6 +32,7 @@ import {
   vnpayMessageForUser,
   vnpayResponseCodeForUser,
 } from "@/lib/money";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /**
  * Parse 'YYYY-MM-DD' thành mốc 00:00 theo giờ địa phương — tránh lệch múi giờ
@@ -1149,30 +1150,28 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
               </>
             ) : (
               <Field label="Lý do từ chối (bắt buộc)">
-                <textarea
+                <LimitedField
+                  as="textarea"
+                  counter="always"
+                  limit={REJECTION_REASON_MAX}
                   value={rejectionReason}
-                  maxLength={REJECTION_REASON_MAX}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   rows={4}
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:bg-white focus:outline-none"
                 />
-                <p className="mt-1 text-right text-[10px] tabular-nums text-slate-400">
-                  {rejectionReason.length}/{REJECTION_REASON_MAX}
-                </p>
               </Field>
             )}
 
             <Field label="Ghi chú">
-              <textarea
+              <LimitedField
+                as="textarea"
+                counter="always"
+                limit={NOTE_MAX}
                 value={note}
-                maxLength={NOTE_MAX}
                 onChange={(e) => setNote(e.target.value)}
                 rows={2}
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:bg-white focus:outline-none"
               />
-              <p className="mt-1 text-right text-[10px] tabular-nums text-slate-400">
-                {note.length}/{NOTE_MAX}
-              </p>
             </Field>
 
             <div className="flex justify-end gap-2 pt-1">
@@ -1454,17 +1453,16 @@ export function ManualTransferModal({ refund, busy, onClose, onSubmit }) {
                   </p>
                 )}
 
-                <textarea
+                <LimitedField
+                  as="textarea"
+                  counter="always"
+                  limit={TRANSFER_EVIDENCE_MAX}
                   value={evidence}
-                  maxLength={TRANSFER_EVIDENCE_MAX}
                   onChange={(e) => setEvidence(e.target.value)}
                   rows={4}
                   placeholder="Mô tả giao dịch chuyển khoản hoặc dán link ảnh biên lai"
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:bg-white focus:outline-none"
                 />
-                <p className="text-right text-[10px] tabular-nums text-slate-400">
-                  {evidence.length}/{TRANSFER_EVIDENCE_MAX}
-                </p>
               </div>
             </Field>
 

@@ -23,6 +23,7 @@ import {
 import { formatDateTimeVN } from "@/lib/money";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { providerChatService } from "../services/providerChatService";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /** Nhãn thời gian rút gọn cho danh sách hội thoại: "10:30", "Hôm qua", "12/11". */
 function timeLabel(iso) {
@@ -394,13 +395,16 @@ function ConversationThread({ conversation, currentUserId, onSent }) {
           </p>
         )}
         <form onSubmit={handleSend} className="flex gap-2">
-          <input
+          <LimitedField
+            as="input"
+            counter="near"
+            limit={1000}
+            wrapperClassName="flex-1"
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            maxLength={2000}
             placeholder="Nhập tin nhắn trả lời khách hàng..."
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
           />
           <button
             type="submit"

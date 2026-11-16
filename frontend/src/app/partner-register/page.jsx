@@ -568,6 +568,7 @@ export default function PartnerRegisterPage() {
                   <div className="flex-1">
                     <TextInput
                       id="email"
+                  limit={150} counter="never"
                       type="email"
                       value={form.email}
                       onChange={(e) => setField("email", e.target.value)}
@@ -652,6 +653,7 @@ export default function PartnerRegisterPage() {
                     />
                     <TextInput
                       id="phone"
+                  limit={20} counter="never"
                       value={form.phone}
                       onChange={(e) => setField("phone", e.target.value)}
                       placeholder="0901234567"
@@ -669,6 +671,7 @@ export default function PartnerRegisterPage() {
                 >
                   <TextInput
                     id="representativeName"
+                  limit={150}
                     value={form.representativeName}
                     onChange={(e) => setField("representativeName", e.target.value)}
                     placeholder="Nguyễn Văn A"
@@ -720,6 +723,7 @@ export default function PartnerRegisterPage() {
               >
                 <TextInput
                   id="businessName"
+                  limit={200}
                   value={form.businessName}
                   onChange={(e) => setField("businessName", e.target.value)}
                   placeholder="Công ty TNHH Du lịch & Nghỉ dưỡng ABC"
@@ -780,6 +784,7 @@ export default function PartnerRegisterPage() {
                 <Field label="Mã số thuế" required htmlFor="taxCode" error={errors.taxCode}>
                   <TextInput
                     id="taxCode"
+                  limit={10} counter="never"
                     value={form.taxCode}
                     onChange={(e) => setField("taxCode", e.target.value)}
                     placeholder="0101234567"
@@ -795,6 +800,7 @@ export default function PartnerRegisterPage() {
                 >
                   <TextInput
                     id="businessRegistrationInfo"
+                  limit={500}
                     value={form.businessRegistrationInfo}
                     onChange={(e) => setField("businessRegistrationInfo", e.target.value)}
                     placeholder="Số GPKD / hộ kinh doanh, ngày cấp..."
@@ -896,6 +902,7 @@ export default function PartnerRegisterPage() {
               >
                 <TextInput
                   id="addressDetail"
+                  limit={255}
                   value={form.addressDetail}
                   onChange={(e) => setField("addressDetail", e.target.value)}
                   placeholder="Số nhà, tên đường, tòa nhà..."
@@ -911,6 +918,7 @@ export default function PartnerRegisterPage() {
               >
                 <TextArea
                   id="businessScope"
+                  limit={1000}
                   rows={3}
                   value={form.businessScope}
                   onChange={(e) => setField("businessScope", e.target.value)}
@@ -964,6 +972,7 @@ export default function PartnerRegisterPage() {
                 >
                   <TextInput
                     id="bankAccountNumber"
+                  limit={20} counter="never"
                     value={form.bankAccountNumber}
                     onChange={(e) => setField("bankAccountNumber", e.target.value)}
                     placeholder="0123456789"
@@ -979,6 +988,7 @@ export default function PartnerRegisterPage() {
                 >
                   <TextInput
                     id="bankAccountHolder"
+                  limit={150}
                     value={form.bankAccountHolder}
                     onChange={(e) => setField("bankAccountHolder", e.target.value)}
                     placeholder="NGUYEN VAN A"

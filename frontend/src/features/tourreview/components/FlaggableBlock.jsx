@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState } from "react";
 import { Flag, X, Check } from "lucide-react";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /** Chia sẻ danh sách ghi chú giữa các khối nội dung và cột tổng hợp. */
 export const ReviewNotesContext = createContext({ notes: [], addNote: () => {}, removeNote: () => {}, readOnly: true });
@@ -27,13 +28,16 @@ export default function FlaggableBlock({ anchor, label, children }) {
     setEditing(false);
   };
 
+  // Nút luôn hiện ở góc phải; khối chừa sẵn cột bên phải (pr-12) nên nút không bao giờ đè lên nội dung.
   return (
     <div id={anchorId(anchor)}
-      className={`group relative rounded-xl p-3 transition-colors scroll-mt-24 ${flagged ? "border-2 border-orange-400 bg-orange-50/40" : "border border-transparent hover:border-slate-200 hover:bg-slate-50/60"}`}>
-      {!readOnly && !editing && (
-        <button type="button" onClick={() => setEditing(true)}
-          className={`absolute top-2 right-2 z-10 px-2 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer shadow-sm transition-opacity ${flagged ? "bg-orange-500 text-white opacity-100" : "bg-white border border-slate-200 text-slate-600 opacity-0 group-hover:opacity-100 focus:opacity-100"}`}>
-          <Flag size={11} /> {flagged ? `${mine.length} ghi chú · thêm` : "Gắn cờ / Ghi chú"}
+      className={`group relative rounded-xl p-3 transition-colors scroll-mt-24 ${!readOnly ? "pr-12" : ""} ${flagged ? "border-2 border-orange-400 bg-orange-50/40" : "border border-slate-100 hover:border-slate-200 hover:bg-slate-50/60"}`}>
+      {!readOnly && (
+        <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing}
+          aria-label={flagged ? `${mine.length} ghi chú — thêm ghi chú cho: ${label}` : `Gắn cờ / ghi chú cho: ${label}`}
+          title={flagged ? `${mine.length} ghi chú · bấm để thêm` : "Gắn cờ / Ghi chú"}
+          className={`absolute top-2.5 right-2.5 z-10 inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-bold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 ${flagged ? "bg-orange-500 text-white hover:bg-orange-600" : editing ? "border border-orange-300 bg-orange-50 text-orange-600" : "border border-slate-200 bg-white text-slate-400 hover:border-orange-300 hover:text-orange-600"}`}>
+          <Flag size={14} />{flagged && <span className="tabular-nums">{mine.length}</span>}
         </button>
       )}
       {children}
@@ -55,7 +59,7 @@ export default function FlaggableBlock({ anchor, label, children }) {
       {editing && (
         <div className="mt-2 p-2 rounded-lg border border-orange-300 bg-white space-y-1.5">
           <p className="text-[11px] font-bold text-orange-700">Ghi chú cho: {label}</p>
-          <textarea autoFocus rows={2} value={text} onChange={(e) => setText(e.target.value)}
+          <LimitedField as="textarea" limit={500} autoFocus rows={2} value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) save(); }}
             placeholder="Ví dụ: Câu quiz số 2 có hai đáp án đúng"
             className="w-full px-2 py-1.5 rounded-md border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400/30" />
