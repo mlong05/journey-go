@@ -695,6 +695,8 @@ public class SettlementService {
                             .refundAmount(d.getRefundAmount())
                             .commissionRate(r.getCommissionRate())
                             .commissionAmount(d.getCommissionAmount())
+                            .voucherDiscount(r.getVoucherDiscount())
+                            .voucherScope(r.getVoucherScope())
                             .adjustmentAmount(d.getAdjustmentAmount())
                             .providerNetAmount(d.getProviderNetAmount())
                             .status(r.getStatus())

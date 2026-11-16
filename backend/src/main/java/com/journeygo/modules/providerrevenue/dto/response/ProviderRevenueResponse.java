@@ -28,6 +28,8 @@ public record ProviderRevenueResponse(
         @Schema(description = "Hoa hồng nền tảng") BigDecimal commissionAmount,
         @Schema(description = "Tổng điều chỉnh được duyệt") BigDecimal adjustmentAmount,
         @Schema(description = "Số tiền ProviderProfile được nhận") BigDecimal providerNetAmount,
+        @Schema(description = "Số tiền giảm giá voucher phân bổ") BigDecimal voucherDiscount,
+        @Schema(description = "Loại voucher áp dụng (PLATFORM / PARTNER)") com.journeygo.modules.voucher.entity.enums.VoucherScope voucherScope,
         @Schema(description = "Trạng thái đủ tư cách tất toán") ProviderRevenueStatus status,
         @Schema(description = "Lý do chưa đủ điều kiện") DeferredReason deferredReason,
         @Schema(description = "ID settlement đang giữ khoản doanh thu") Long settlementId,
@@ -53,6 +55,8 @@ public record ProviderRevenueResponse(
                 .commissionAmount(r.getCommissionAmount())
                 .adjustmentAmount(r.getAdjustmentAmount())
                 .providerNetAmount(r.getProviderNetAmount())
+                .voucherDiscount(r.getVoucherDiscount())
+                .voucherScope(r.getVoucherScope())
                 .status(r.getStatus())
                 .deferredReason(r.getDeferredReason())
                 .settlementId(r.getSettlementId())

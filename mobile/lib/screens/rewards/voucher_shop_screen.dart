@@ -118,7 +118,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
       backgroundColor: AppCultureColors.background,
       appBar: buildRewardsAppBar(
         context,
-        'Đổi thưởng',
+        'Voucher',
         actions: [
           IconButton(
             tooltip: 'Voucher của tôi',
