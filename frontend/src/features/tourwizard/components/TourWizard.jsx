@@ -2,7 +2,7 @@
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, AlertCircle, Loader2, CloudOff, CheckCircle2, RotateCw, PartyPopper, Lock } from "lucide-react";
+import { ArrowLeft, ArrowRight, AlertCircle, Loader2, CloudOff, CheckCircle2, RotateCw, PartyPopper } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useTourDraft, issuesForStep } from "../hooks/useTourDraft";
 import { providerTourService, catalogService, extractIssues } from "../services/providerTourService";
@@ -14,6 +14,7 @@ import StopsStep from "./steps/StopsStep";
 import ItineraryStep from "./steps/ItineraryStep";
 import ScheduleStep from "./steps/ScheduleStep";
 import ReviewStep from "./steps/ReviewStep";
+import StepNumber from "./StepNumber";
 
 const timeText = (d) => (d ? d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "");
 
@@ -118,9 +119,13 @@ export default function TourWizard({ tourId, initialStep }) {
   const [gateNotice, setGateNotice] = useState("");
   const [checking, setChecking] = useState(false);
 
+  // Bước xa nhất người dùng đã mở trong phiên này — bước chưa mở thì chưa báo lỗi trên thanh bước.
+  const [maxVisited, setMaxVisited] = useState(() => Math.max(0, WIZARD_STEPS.findIndex((s) => s.key === step)));
+
   const goTo = async (key, stopIndex = null) => {
     await flush();
     setStep(key);
+    setMaxVisited((m) => Math.max(m, WIZARD_STEPS.findIndex((s) => s.key === key)));
     setGateNotice("");
     setFocusStop(stopIndex != null ? { index: stopIndex, nonce: (focusSeq.current += 1) } : null);
     contentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -306,16 +311,16 @@ export default function TourWizard({ tourId, initialStep }) {
         <nav className="self-start rounded-2xl border border-slate-200 bg-white p-2 flex lg:flex-col gap-1 overflow-x-auto">
           {WIZARD_STEPS.map((s, i) => {
             const active = s.key === step;
-            const errors = stepState[s.key];
+            // Bản nháp: chỉ báo lỗi ở bước đã mở (chưa tới bước đó thì chưa báo). Tour đã gửi/đang bán: báo hết.
+            const seen = !gated || i <= Math.max(maxVisited, stepIndex);
+            const errors = seen ? stepState[s.key] : 0;
             const done = !errors && i < stepIndex;
             const locked = !active && isLocked(i);
             return (
               <button key={s.key} type="button" onClick={() => navigate(s.key)} disabled={checking}
                 title={locked ? "Hoàn thành các bước trước để mở bước này" : undefined}
                 className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left shrink-0 cursor-pointer disabled:cursor-wait ${active ? "bg-emerald-50 text-emerald-900" : locked ? "text-slate-400 hover:bg-slate-50" : "hover:bg-slate-50 text-slate-600"}`}>
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${active ? "bg-emerald-600 text-white" : locked ? "bg-slate-100 text-slate-400" : errors ? "bg-rose-100 text-rose-700" : done ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                  {locked ? <Lock size={12} /> : errors ? <AlertCircle size={13} /> : done ? <Check size={13} /> : i + 1}
-                </span>
+                <StepNumber n={i + 1} status={active ? (errors ? "error" : "active") : locked ? "locked" : errors ? "error" : done ? "done" : "idle"} />
                 <span className="text-xs font-bold whitespace-nowrap">
                   <span className="hidden sm:inline">{s.label}</span><span className="sm:hidden">{s.short}</span>
                 </span>

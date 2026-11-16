@@ -11,8 +11,10 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { providerTourService } from "../services/providerTourService";
 import TourImportDialog from "./TourImportDialog";
 import { TOUR_STATUS, TOUR_STATUS_ORDER, CONTENT_EDITABLE } from "../constants";
+import { formatDateTimeVN } from "@/lib/money";
 
-const fmt = (iso) => (iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
+/** Chuẩn thời gian CHUNG: "14:19 15/11/2026" (giờ Việt Nam). */
+const fmt = (iso) => (iso ? formatDateTimeVN(iso) || "—" : "—");
 
 /** Cột bảng: STT | Tour | Trạng thái | Cập nhật | Thao tác (mobile: STT | Tour, thao tác xuống dòng). */
 const ROW_GRID = "grid items-center gap-x-4 gap-y-2 grid-cols-[32px_minmax(0,1fr)] md:grid-cols-[40px_minmax(0,1fr)_130px_150px_88px]";

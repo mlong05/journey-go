@@ -686,7 +686,7 @@ public class DataInitializer {
         // ── REFUNDS ─────────────────────────────────────────────────────────────
         // Refund 50% đã hoàn thành (chuyển khoản thủ công)
         RefundRequest refund7 = ensureRefund("JGSAMPLERF01", pay7, tourist1, RefundStatus.REFUNDED,
-                RefundReason.TOURIST_FAULT, new BigDecimal("450000.00"),
+                RefundReason.PERSONAL, new BigDecimal("450000.00"),
                 new BigDecimal("450000.00"), new BigDecimal("450000.00"),
                 RefundMethod.MANUAL_BANK_TRANSFER, admin,
                 "Khách không thể đi được do thời tiết xấu, đề nghị hoàn một phần",
@@ -695,7 +695,7 @@ public class DataInitializer {
 
         // Refund 50% đang chờ Admin duyệt (giữ doanh thu ở trạng thái `held`)
         ensureRefund("JGSAMPLERF02", pay8, tourist2, RefundStatus.PENDING_REVIEW,
-                RefundReason.TOURIST_FAULT, new BigDecimal("450000.00"),
+                RefundReason.PERSONAL, new BigDecimal("450000.00"),
                 null, null, null, null,
                 "Điểm đến tạm đóng cửa do bảo trì, khách đề nghị hoàn một phần",
                 "9876543210", "NGUYEN VAN B", "Vietcombank",
@@ -1267,7 +1267,7 @@ public class DataInitializer {
             refundAuditLogRepository.save(RefundAuditLog.builder()
                     .refundRequest(refund)
                     .action(RefundAuditLog.Action.MANUAL_TRANSFER_CONFIRMED)
-                    .fromStatus(RefundStatus.REFUND_PROCESSING)
+                    .fromStatus(RefundStatus.MANUAL_TRANSFER_PENDING)
                     .toStatus(RefundStatus.REFUNDED)
                     .performedBy(admin)
                     .amount(refundedAmount)

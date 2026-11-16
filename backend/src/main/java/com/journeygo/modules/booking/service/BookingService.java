@@ -93,6 +93,12 @@ public class BookingService {
 
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
+    /**
+     * Trạng thái booking ĐÃ THANH TOÁN — dùng cho logic "tour đã mua rồi không đặt lại được".
+     */
+    private static final List<BookingStatus> PAID_BOOKING_STATUSES =
+            List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED);
+
     private final BookingRepository bookingRepository;
     private final BookingSlotHoldRepository slotHoldRepository;
     private final BookingPassengerRepository passengerRepository;
@@ -128,6 +134,11 @@ public class BookingService {
 
         validateTourBookable(tour);
         validateExperienceDate(tour, request.experienceDate());
+
+        // ── Chống đặt lại tour đã mua ──────────────────────────────────────────
+        // Logic quan trọng: du khách đã mua (đã thanh toán) một tour thì KHÔNG được
+        // đặt lại tour đó dưới bất kỳ hình thức nào (cùng ngày hay ngày khác).
+        validateTourNotAlreadyPurchased(tour.getTourId(), touristId);
 
         // ── Chuẩn bị danh sách hành khách + chốt giá ─────────────────────────
         PriceSnapshot price = buildPriceSnapshot(tour, request);
@@ -874,6 +885,24 @@ public class BookingService {
         if (tour.getStatus() != TourStatus.PUBLISHED || !tour.isApproved()) {
             throw new AppException(ErrorCode.BOOKING_TOUR_NOT_AVAILABLE,
                     "Tour chưa được xuất bản — không thể đặt");
+        }
+    }
+
+    /**
+     * Chặn đặt lại một tour mà du khách ĐÃ MUA (đã thanh toán).
+     *
+     * <p>Chỉ tính các booking {@code CONFIRMED} / {@code COMPLETED} — booking
+     * {@code PENDING_PAYMENT} (chưa thanh toán), {@code EXPIRED} hay {@code CANCELLED}
+     * không chặn đặt lại.
+     *
+     * @throws AppException {@link ErrorCode#BOOKING_TOUR_ALREADY_PURCHASED} nếu đã mua tour này
+     */
+    private void validateTourNotAlreadyPurchased(Long tourId, Long touristId) {
+        boolean alreadyBought = bookingRepository.existsByTour_TourIdAndTourist_IdAndStatusIn(
+                tourId, touristId, PAID_BOOKING_STATUSES);
+        if (alreadyBought) {
+            throw new AppException(ErrorCode.BOOKING_TOUR_ALREADY_PURCHASED,
+                    "Bạn đã mua tour này rồi — không thể đặt lại.");
         }
     }
 

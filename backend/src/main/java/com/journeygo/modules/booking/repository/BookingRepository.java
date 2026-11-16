@@ -93,6 +93,24 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     boolean existsByTour_TourIdAndTourist_IdAndStatusIn(Long tourId, Long touristId, List<BookingStatus> statuses);
 
     /**
+     * Booking ĐÃ THANH TOÁN của du khách cho một tour (CONFIRMED / COMPLETED).
+     *
+     * <p>Dùng cho logic "tour đã mua rồi thì không thể đặt lại" — cần biết đơn đó
+     * (để chặn tạo đơn mới VÀ để giao diện hiển thị đúng ngày/số khách đã chọn).
+     */
+    @EntityGraph(attributePaths = {"tourist", "tour", "tour.createdBy"})
+    @Query("""
+            SELECT b FROM Booking b
+            WHERE b.tour.tourId = :tourId
+              AND b.tourist.id = :touristId
+              AND b.status IN :statuses
+            ORDER BY b.experienceDate ASC, b.id ASC
+            """)
+    List<Booking> findPaidBookingsByTourAndTourist(@Param("tourId") Long tourId,
+                                                    @Param("touristId") Long touristId,
+                                                    @Param("statuses") List<BookingStatus> statuses);
+
+    /**
      * Booking đã thanh toán có ngày trải nghiệm trong khoảng cho trước — dùng cho tác vụ
      * nhắc nhở "sắp đến ngày trải nghiệm".
      */

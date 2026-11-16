@@ -43,3 +43,18 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ── Flutter Windows: file TỰ SINH, không track ──────────────────────────────────
+# ⚠️ Vì sao ignore?
+# Flutter tool tự sinh lại 3 file này mỗi lần `flutter pub get` / `flutter run`:
+#   generated_plugin_registrant.cc / .h / generated_plugins.cmake
+#
+# Trên Windows, `core.autocrlf=true` khiến Git đổi LF→CRLF mỗi lần checkout,
+# trong khi Flutter luôn ghi file bằng LF ⇒ file này bị coi là "đã sửa" mỗi
+# lần chạy mobile, dù nội dung KHÔNG đổi (chỉ khác ký tự xuống dòng).
+#
+# ⇒ Ignore + gỡ track: file vẫn có trên máy để build, và luôn được Flutter
+#   tự sinh lại. Không mất gì khi clone vì `flutter pub get` sẽ tạo lại.
+/windows/flutter/generated_plugin_registrant.cc
+/windows/flutter/generated_plugin_registrant.h
+/windows/flutter/generated_plugins.cmake

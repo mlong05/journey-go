@@ -85,10 +85,10 @@ export default function BasicInfoStep({ tour, regions, themes, issues, readOnly,
       <section className="space-y-4">
         <h3 className="text-sm font-bold text-slate-900">Thông tin chung</h3>
 
-        <Field label="Tên tour" required counter={`${form.title.trim().length}/${LIMITS.TITLE_MAX}`}
+        <Field label="Tên tour" required
           hint='Không viết hoa toàn bộ, không dùng từ như "rẻ nhất", "độc quyền". Nên có chủ đề rõ ràng.'
           error={localTitleError || err("title")}>
-          <TextInput value={form.title} maxLength={LIMITS.TITLE_MAX + 20} disabled={readOnly}
+          <TextInput value={form.title} limit={LIMITS.TEXT.TITLE} counter="always" disabled={readOnly}
             placeholder="Ví dụ: Theo chân thợ mộc khám phá kiến trúc gỗ Hội An"
             onChange={(e) => update({ title: e.target.value })} error={localTitleError || err("title")} />
         </Field>
@@ -155,7 +155,7 @@ export default function BasicInfoStep({ tour, regions, themes, issues, readOnly,
       <section className="space-y-4">
         <h3 className="text-sm font-bold text-slate-900">Mô tả</h3>
         <Field label="Mô tả tour" required hint="Câu đầu tiên hiển thị trên thẻ tour ở trang tìm kiếm." error={err("description")}>
-          <TextArea rows={5} value={form.description} disabled={readOnly}
+          <TextArea rows={5} value={form.description} limit={LIMITS.TEXT.DESCRIPTION} disabled={readOnly}
             placeholder="Theo chân nghệ nhân làng mộc Kim Bồng tự tay đục hoa văn gỗ…"
             onChange={(e) => update({ description: e.target.value })} error={err("description")} />
         </Field>
@@ -165,7 +165,7 @@ export default function BasicInfoStep({ tour, regions, themes, issues, readOnly,
             {form.highlights.map((h, i) => (
               <div key={i} className="flex items-center gap-2">
                 <span className="w-5 text-xs font-bold text-slate-400 text-right">{i + 1}.</span>
-                <TextInput value={h} maxLength={300} disabled={readOnly}
+                <TextInput value={h} limit={LIMITS.TEXT.HIGHLIGHT} wrapperClassName="flex-1" disabled={readOnly}
                   onChange={(e) => update({ highlights: form.highlights.map((x, j) => (j === i ? e.target.value : x)) })} />
                 {!readOnly && form.highlights.length > 1 && (
                   <button type="button" title="Xóa ý này"
@@ -192,8 +192,8 @@ export default function BasicInfoStep({ tour, regions, themes, issues, readOnly,
           <p className="text-[11px] text-slate-500 mt-0.5">Không bắt buộc. Khách thấy mỗi mục là một dòng tiêu đề, bấm vào để đọc nội dung.</p>
         </div>
         {NOTICE_SECTIONS.map((s) => (
-          <Field key={s.key} label={s.label} counter={`${form[s.key].length}/${s.max}`}>
-            <TextArea rows={3} maxLength={s.max} value={form[s.key]} disabled={readOnly}
+          <Field key={s.key} label={s.label}>
+            <TextArea rows={3} limit={s.max} value={form[s.key]} disabled={readOnly}
               onChange={(e) => update({ [s.key]: e.target.value })} />
           </Field>
         ))}

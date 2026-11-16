@@ -39,6 +39,26 @@ Future<MediaType> _imageMediaType(String filePath) async {
   return MediaType('image', 'jpeg');
 }
 
+const _videoSubtypesByExtension = {
+  'mp4': 'mp4',
+  'm4v': 'mp4',
+  'webm': 'webm',
+  'mov': 'quicktime',
+};
+
+/// Đoán kiểu MIME cho video theo đuôi tệp — backend chỉ nhận mp4 / webm / mov.
+Future<MediaType> _videoMediaType(String filePath) async {
+  final dot = filePath.lastIndexOf('.');
+  final ext = dot >= 0 ? filePath.substring(dot + 1).toLowerCase() : '';
+  final subtype = _videoSubtypesByExtension[ext];
+  if (subtype != null) {
+    return subtype == 'quicktime'
+        ? MediaType('video', 'quicktime')
+        : MediaType('video', subtype);
+  }
+  return MediaType('video', 'mp4');
+}
+
 /// Lỗi gọi API, `message` đã là tiếng Việt để hiển thị trực tiếp cho người dùng.
 class ApiException implements Exception {
   final String message;
@@ -257,6 +277,49 @@ class ApiClient {
       );
     } on TimeoutException {
       throw const ApiException('Tải ảnh quá hạn. Vui lòng thử lại.');
+    } on SocketException {
+      throw const ApiException('Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và địa chỉ API.');
+    } on FormatException {
+      throw const ApiException('Máy chủ trả về dữ liệu không hợp lệ.');
+    }
+  }
+
+  /// Tải một video lên (POST /upload/video) và trả về đường dẫn https của video.
+  ///
+  /// Dùng cho bằng chứng video của yêu cầu hoàn tiền.
+  static Future<String> uploadVideo(String filePath, {String folder = 'journeygo/refund-evidence'}) async {
+    final baseUrl = await TokenStorage.getBaseUrl();
+    final token = await TokenStorage.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw const ApiException('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', statusCode: 401);
+    }
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/upload/video'))
+        ..headers['Authorization'] = 'Bearer $token'
+        ..headers['Accept'] = 'application/json'
+        ..fields['folder'] = folder
+        ..files.add(await http.MultipartFile.fromPath(
+          'file',
+          filePath,
+          contentType: await _videoMediaType(filePath),
+        ));
+      final streamed = await request.send().timeout(const Duration(seconds: 180));
+      final response = await http.Response.fromStream(streamed);
+      final text = utf8.decode(response.bodyBytes);
+      final dynamic decoded = text.isEmpty ? null : jsonDecode(text);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = decoded is Map ? decoded['data'] : null;
+        final url = data is Map ? data['url']?.toString() : null;
+        if (url != null && url.isNotEmpty) return url;
+        throw const ApiException('Máy chủ không trả về đường dẫn video.');
+      }
+      final message = decoded is Map ? decoded['message']?.toString() : null;
+      throw ApiException(
+        (message != null && message.isNotEmpty) ? message : 'Không thể tải video lên (mã ${response.statusCode}).',
+        statusCode: response.statusCode,
+      );
+    } on TimeoutException {
+      throw const ApiException('Tải video quá hạn. Vui lòng thử lại.');
     } on SocketException {
       throw const ApiException('Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và địa chỉ API.');
     } on FormatException {

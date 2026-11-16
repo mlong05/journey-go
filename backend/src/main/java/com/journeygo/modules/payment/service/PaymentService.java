@@ -201,6 +201,18 @@ public class PaymentService {
             }
         }
 
+        // ── Đóng các giao dịch cũ đã bị BỎ RƠI ────────────────────────────────
+        // Giao dịch #1 (mở trình duyệt VNPay rồi quay lại app) bị bỏ rơi ở
+        // PENDING/PROCESSING. Khi khách bấm "Thanh toán" LẦN 2, giao dịch #1
+        // không còn ý nghĩa (khách đã quyết định thanh toán bằng giao dịch mới)
+        // ⇒ đánh dấu SUPERSEDED để không treo vô thời hạn.
+        //
+        // ⚠️ Giao dịch cũ vẫn có thể "thành công" ở VNPay nếu khách hoàn tất ở
+        // cửa sổ trình duyệt cũ ⇒ callback về sau sẽ được `applyVnPayResult`
+        // xử lý ⇒ `confirmBookingAfterVerifiedPayment` đánh dấu DUPLICATE
+        // (khoản tiền dư) ⇒ không xác nhận Booking 2 lần. KHÔNG mất tiền khách.
+        supersedeStrandedAttempts(bookingId, previous);
+
         // ── Tạo Payment attempt mới ───────────────────────────────────────────
         Instant now = Instant.now();
         String txnRef = generateTxnRef(booking.getId());
@@ -380,7 +392,12 @@ public class PaymentService {
         verifyAmountMatchesBooking(payment, params);
 
         // Nếu đã có kết quả rõ ràng → trả về luôn, không cần truy vấn lại.
-        if (payment.getStatus().isFinal()) {
+        //
+        // ⚠️ Ngoại lệ: `SUPERSEDED` (giao dịch bị thay thế) vẫn phải áp dụng kết quả
+        // khi có Return URL ĐÃ KÝ — vì khách có thể đã hoàn tất thanh toán ở cửa sổ
+        // trình duyệt CŨ ⇒ tiền ĐÃ trôi ⇒ phải ghi nhận thành công + đánh dấu
+        // DUPLICATE (khoản tiền dư) để chuyển quy trình hoàn tiền/đối soát.
+        if (payment.getStatus().isFinal() && payment.getStatus() != PaymentStatus.SUPERSEDED) {
             return toVerificationResponse(payment, payment.isSuccess()
                     ? "Thanh toán thành công"
                     : "Thanh toán không thành công: " + (payment.getVnpMessage() != null ? payment.getVnpMessage() : ""));
@@ -454,6 +471,16 @@ public class PaymentService {
             scanned++;
 
             try {
+                // ── Booking đã được thanh toán bởi giao dịch khác ─────────────
+                // Giao dịch này bị bỏ rơi ⇒ đóng lại thay vì hỏi VNPay (QueryDR
+                // trên Sandbox luôn trả 99 ⇒ treo vô thời hạn).
+                if (closeSupersededBecauseBookingPaid(payment)) {
+                    resolved++;
+                    log.info("[Payment][Reconcile] txnRef={} đã bị thay thế — booking đã được thanh toán bởi giao dịch khác.",
+                            payment.getTxnRef());
+                    continue;
+                }
+
                 PaymentOutcome outcome = verifyWithVnPay(payment, null);
                 if (outcome == PaymentOutcome.SUCCESS || outcome == PaymentOutcome.DUPLICATE) {
                     resolved++;
@@ -486,7 +513,19 @@ public class PaymentService {
                 .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_NOT_FOUND));
 
         if (payment.getStatus().isFinal()) {
+            if (payment.getStatus() == PaymentStatus.SUPERSEDED) {
+                // Giao dịch bị thay thế ⇒ KHÔNG phải thất bại.
+                return PaymentOutcome.SUPERSEDED;
+            }
             return payment.isSuccess() ? PaymentOutcome.SUCCESS : PaymentOutcome.FAILED;
+        }
+
+        // ── Booking đã được thanh toán bởi giao dịch KHÁC ─────────────────────
+        // Giao dịch này không có kết quả (khách bỏ rơi cửa sổ trình duyệt) và
+        // đơn đã được thanh toán bằng giao dịch mới ⇒ đóng giao dịch này lại
+        // thay vì hỏi VNPay (QueryDR trên Sandbox luôn trả 99 ⇒ treo vô thời hạn).
+        if (closeSupersededBecauseBookingPaid(payment)) {
+            return PaymentOutcome.SUPERSEDED;
         }
 
         PaymentOutcome outcome = verifyWithVnPay(payment, clientIp);
@@ -681,6 +720,115 @@ public class PaymentService {
     }
 
     /**
+     * Đóng các giao dịch bị BỎ RƠI thuộc về Booking đã được thanh toán.
+     *
+     * <p>Dùng khi đọc DANH SÁCH giao dịch: các giao dịch treo ở PENDING/PROCESSING
+     * của một Booking đã {@code CONFIRMED}/{@code COMPLETED} được đánh dấu
+     * {@code SUPERSEDED} ⇒ danh sách không còn hiển thị "đang chờ" cho đơn đã mua.
+     *
+     * <p>⚠️ Truy vấn theo tập booking của trang hiện tại (không quét toàn hệ thống)
+     * ⇒ không gây tải nặng khi mở danh sách.
+     *
+     * @param payments các giao dịch đang hiển thị trong trang
+     */
+    private void closeStrandedOfPaidBookings(List<Payment> payments) {
+        if (payments == null || payments.isEmpty()) {
+            return;
+        }
+        List<Long> bookingIds = payments.stream()
+                .map(p -> p.getBooking() != null ? p.getBooking().getId() : null)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (bookingIds.isEmpty()) {
+            return;
+        }
+        List<Payment> stranded = paymentRepository.findStrandedPaymentsOfPaidBookings(
+                bookingIds, List.of(PaymentStatus.PENDING, PaymentStatus.PROCESSING));
+        for (Payment payment : stranded) {
+            payment.markSuperseded("Giao dịch đã bị thay thế: đơn hàng đã được thanh toán thành công "
+                    + "bởi một giao dịch khác.");
+            paymentRepository.save(payment);
+            log.info("[Payment] txnRef={} đã bị thay thế — booking {} đã được thanh toán bởi giao dịch khác.",
+                    payment.getTxnRef(), payment.getBooking().getId());
+        }
+    }
+
+    /**
+     * Đóng các giao dịch cũ đã bị BỎ RƠI (chưa có kết quả) khi khách tạo giao dịch mới.
+     *
+     * <p>── Bối cảnh ──
+     * Khách bấm "Thanh toán" (giao dịch #1) ⇒ mở trình duyệt VNPay ⇒ quay lại app
+     * mà KHÔNG thanh toán ⇒ bấm "Thanh toán" lần nữa (giao dịch #2) ⇒ thành công.
+     * Giao dịch #1 không có callback/IPN nào tới ⇒ treo ở {@code PENDING} vô thời hạn.
+     * Bấm "Kiểm tra lại" ⇒ QueryDR trên Sandbox trả {@code 99} ⇒ UI hiện
+     * "Đang chờ kết quả thanh toán" mãi mãi dù đơn đã được thanh toán.
+     *
+     * <p>⇒ Khi khách tạo giao dịch MỚI, các giao dịch cũ chưa có kết quả bị đánh dấu
+     * {@code SUPERSEDED} ⇒ chúng KHÔNG còn hiện "đang chờ" nữa.
+     *
+     * <p>⚠️ An toàn: nếu giao dịch cũ thực sự thành công ở VNPay (khách hoàn tất ở
+     * cửa sổ trình duyệt cũ), callback về sau vẫn được {@code applyVnPayResult}
+     * xử lý ⇒ {@code confirmBookingAfterVerifiedPayment} đánh dấu DUPLICATE
+     * (khoản tiền dư) ⇒ KHÔNG xác nhận Booking 2 lần, KHÔNG ghi nhận doanh thu
+     * 2 lần ⇒ không mất tiền của khách.
+     *
+     * @param bookingId booking đang tạo giao dịch mới
+     * @param attempts  danh sách giao dịch của booking (đã tải sẵn)
+     */
+    private void supersedeStrandedAttempts(Long bookingId, List<Payment> attempts) {
+        for (Payment attempt : attempts) {
+            if (attempt.getStatus() != PaymentStatus.PENDING
+                    && attempt.getStatus() != PaymentStatus.PROCESSING) {
+                continue;
+            }
+            attempt.markSuperseded("Giao dịch đã bị thay thế: khách tạo giao dịch mới cho cùng đơn hàng "
+                    + "(booking " + bookingId + ").");
+            paymentRepository.save(attempt);
+            log.info("[Payment] txnRef={} đã bị thay thế (booking {} đã có giao dịch mới) — "
+                            + "không còn hiển thị 'đang chờ kết quả thanh toán'.",
+                    attempt.getTxnRef(), bookingId);
+        }
+    }
+
+    /**
+     * Đóng các giao dịch còn "kẹt" khi Booking ĐÃ được thanh toán bởi giao dịch khác.
+     *
+     * <p>── Vì sao cần? ──
+     * Kịch bản: khách thanh toán thành công ở giao dịch #2 ⇒ Booking chuyển
+     * {@code CONFIRMED}. Giao dịch #1 (bị bỏ rơi) vẫn treo ở {@code PENDING}.
+     * Khi khách bấm "Kiểm tra lại" trên giao dịch #1, hệ thống phải nhận ra
+     * "đơn này đã được thanh toán rồi" chứ không phải "đang chờ kết quả".
+     *
+     * <p>⇒ Gọi từ {@link #queryAndResolve(Long, String)} TRƯỚC khi hỏi VNPay:
+     * nếu Booking đã {@code CONFIRMED}/{@code COMPLETED} mà giao dịch này chưa có
+     * kết quả ⇒ đóng nó lại (SUPERSEDED) ⇒ trả về kết quả DỨT KHOÁT.
+     *
+     * @return {@code true} nếu giao dịch đã bị đóng vì Booking đã được thanh toán
+     */
+    private boolean closeSupersededBecauseBookingPaid(Payment payment) {
+        if (payment.getStatus() != PaymentStatus.PENDING
+                && payment.getStatus() != PaymentStatus.PROCESSING) {
+            return false;
+        }
+        Booking booking = payment.getBooking();
+        if (booking == null) {
+            return false;
+        }
+        BookingStatus bookingStatus = booking.getStatus();
+        if (bookingStatus != BookingStatus.CONFIRMED && bookingStatus != BookingStatus.COMPLETED) {
+            return false;
+        }
+        // Booking đã được thanh toán ⇒ giao dịch này (chưa có kết quả) bị thay thế.
+        payment.markSuperseded("Giao dịch đã bị thay thế: đơn hàng đã được thanh toán thành công "
+                + "bởi một giao dịch khác.");
+        paymentRepository.save(payment);
+        log.info("[Payment] txnRef={} đã bị thay thế — booking {} đã được thanh toán bởi giao dịch khác.",
+                payment.getTxnRef(), booking.getId());
+        return true;
+    }
+
+    /**
      * Ghi nhận doanh thu ProviderProfile cho Booking vừa được xác nhận.
      *
      * <p>Idempotent — bản ghi doanh thu được tạo/cập nhật theo cặp (Booking, ProviderProfile), nên
@@ -790,6 +938,29 @@ public class PaymentService {
                 // Slot đã được giải phóng → có thể đã có người khác giữ.
                 return false;
             }
+            int count = Math.max(1, hold.getSlotCount());
+
+            // ⚠️ Tour luồng 5 bước giữ chỗ trên TourSlot (capacity/bookedCount),
+            //     còn tour luồng cũ giữ chỗ trên ExperienceSlot (maxTourPerDay).
+            //     Trước đây chỉ kiểm tra ExperienceSlot ⇒ với wizard tour
+            //     `getExperienceSlot()` luôn null ⇒ canReacquireCapacity luôn false
+            //     ⇒ thanh toán đến muộn LUÔN rơi vào nhánh "không còn sức chứa".
+            var tourSlot = hold.getTourSlot();
+            if (tourSlot != null) {
+                if (tourSlot.getStatus() != com.journeygo.modules.tour.entity.TourSlotStatus.OPEN) {
+                    return false;
+                }
+                if (tourSlot.getCapacity() == null || tourSlot.getBookedCount() == null) {
+                    return false;
+                }
+                // bookedCount đã bao gồm chỗ của booking này ⇒ sức chứa còn trống
+                // là capacity - bookedCount + count (phần của chính booking đang giữ).
+                if (tourSlot.getCapacity() - tourSlot.getBookedCount() + count < count) {
+                    return false;
+                }
+                continue;
+            }
+
             var slot = hold.getExperienceSlot();
             if (slot == null) {
                 return false;
@@ -804,29 +975,37 @@ public class PaymentService {
 
     // ── Read ──────────────────────────────────────────────────────────────────
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PaymentResponse getById(Long paymentId, Long callerId, boolean isAdmin) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_NOT_FOUND));
         if (!isAdmin) {
             checkOwnership(payment.getBooking(), callerId);
         }
+        // Đối soát trước khi trả về: nếu Booking đã được thanh toán bởi giao dịch
+        // khác mà giao dịch này chưa có kết quả ⇒ đóng lại (SUPERSEDED) để app
+        // KHÔNG hiện "Đang chờ kết quả thanh toán" nữa.
+        closeSupersededBecauseBookingPaid(payment);
         return PaymentResponse.fromEntity(payment);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PageResponse<PaymentResponse> getMyPayments(Long touristId, Pageable pageable) {
         Page<Payment> page = paymentRepository.findByBooking_Tourist_Id(touristId, pageable);
+        // Đóng các giao dịch bị bỏ rơi (xem `closeStrandedOfPaidBookings`).
+        closeStrandedOfPaidBookings(page.getContent());
         return PageResponse.from(page, PaymentResponse::fromEntity);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PageResponse<PaymentResponse> getByBooking(Long bookingId, Long callerId, boolean isAdmin, Pageable pageable) {
         Booking booking = bookingService.findOrThrow(bookingId);
         if (!isAdmin) {
             checkOwnership(booking, callerId);
         }
         Page<Payment> page = paymentRepository.findByBooking_Id(bookingId, pageable);
+        // Đóng các giao dịch kẹt của booking này (xem `closeStrandedOfPaidBookings`).
+        closeStrandedOfPaidBookings(page.getContent());
         return PageResponse.from(page, PaymentResponse::fromEntity);
     }
 
@@ -837,7 +1016,7 @@ public class PaymentService {
      * @param search  từ khoá tìm theo mã giao dịch / mã đơn / mã giao dịch VNPay
      *                (null hoặc rỗng = không lọc)
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public PageResponse<PaymentResponse> getAll(PaymentStatus status, String search, Pageable pageable) {
         String keyword = (search != null && !search.isBlank()) ? search.trim() : null;
 
@@ -848,6 +1027,8 @@ public class PaymentService {
                 ? paymentRepository.findByStatusPage(status, pageable)
                 : paymentRepository.searchByKeyword(status, keyword, pageable);
 
+        // Đóng các giao dịch bị bỏ rơi (xem `closeStrandedOfPaidBookings`).
+        closeStrandedOfPaidBookings(page.getContent());
         return PageResponse.from(page, PaymentResponse::fromEntity);
     }
 
@@ -864,7 +1045,8 @@ public class PaymentService {
         long pendingCount = paymentRepository.countByStatusIn(List.of(
                 PaymentStatus.PENDING, PaymentStatus.PROCESSING));
         long failedCount = paymentRepository.countByStatusIn(List.of(
-                PaymentStatus.FAILED, PaymentStatus.CANCELLED, PaymentStatus.EXPIRED));
+                PaymentStatus.FAILED, PaymentStatus.CANCELLED, PaymentStatus.EXPIRED,
+                PaymentStatus.SUPERSEDED));
         long totalCount = paymentRepository.count();
 
         return PaymentSummaryResponse.fromEntity(

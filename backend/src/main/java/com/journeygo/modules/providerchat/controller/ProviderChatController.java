@@ -39,13 +39,20 @@ public class ProviderChatController {
     // ── Du khách ──────────────────────────────────────────────────────────────
 
     @PostMapping("/conversations")
-    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('TOURIST', 'CONTENT_PROVIDER', 'ADMIN')")
     @Operation(summary = "Mở (hoặc lấy lại) cuộc trò chuyện với nhà tour",
-            description = "Nhận tourId để xác định nhà tour. Mỗi cặp du khách – nhà tour chỉ có "
-                    + "một cuộc trò chuyện nên lịch sử được gom lại theo từng nhà tour.")
+            description = "Nhận tourId để xác định nhà tour, hoặc bookingId cho khung "
+                    + "'Hỗ trợ trong đơn này'. Mỗi cặp du khách – nhà tour chỉ có một cuộc "
+                    + "trò chuyện nên lịch sử được gom lại theo từng nhà tour ⇒ 'Hỗ trợ trong "
+                    + "đơn này' và 'Tin nhắn với nhà tour' là MỘT kênh liên lạc.")
     public ResponseEntity<ApiResponse<ProviderConversationResponse>> start(
-            @RequestBody(required = false) StartProviderConversationRequest request,
+            @RequestBody(required = false) @Valid StartProviderConversationRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        // Có bookingId ⇒ mở hội thoại gắn với đơn (khung "Hỗ trợ trong đơn này").
+        if (request != null && request.bookingId() != null) {
+            return ResponseEntity.ok(ApiResponse.success("Mở cuộc trò chuyện thành công",
+                    chatService.startForBooking(request.bookingId(), userPrincipal.getId())));
+        }
         return ResponseEntity.ok(ApiResponse.success("Mở cuộc trò chuyện thành công",
                 chatService.start(userPrincipal.getId(), request)));
     }

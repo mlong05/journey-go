@@ -287,6 +287,25 @@ class _ForumPostCardState extends State<ForumPostCard> {
                             color: AppCultureColors.textDark,
                           ),
                         ),
+                        if (post.authorJoinedTour) ...[
+                          const SizedBox(height: 3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.verified_rounded, size: 12, color: Color(0xFF047857)),
+                                SizedBox(width: 3),
+                                Text('Đã tham gia tour',
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF047857))),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 2),
                         Row(
                           children: [
@@ -627,14 +646,29 @@ class _ForumImages extends StatelessWidget {
     );
   }
 
+  /// Bấm ảnh ⇒ mở trình xem toàn màn hình (vuốt qua lại, chụm để phóng to).
+  void _openViewer(BuildContext context, int index) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        pageBuilder: (_, _, _) => _ForumImageViewer(urls: urls, initialIndex: index),
+        transitionsBuilder: (_, animation, _, child) => FadeTransition(opacity: animation, child: child),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (urls.length == 1) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: _image(urls.first, height: 210),
+        child: GestureDetector(
+          onTap: () => _openViewer(context, 0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: _image(urls.first, height: 210),
+          ),
         ),
       );
     }
@@ -651,7 +685,9 @@ class _ForumImages extends StatelessWidget {
               for (var i = 0; i < shown.length; i++) ...[
                 if (i > 0) const SizedBox(width: 2),
                 Expanded(
-                  child: Stack(
+                  child: GestureDetector(
+                    onTap: () => _openViewer(context, i),
+                    child: Stack(
                     fit: StackFit.expand,
                     children: [
                       _image(shown[i], height: 150),
@@ -669,12 +705,89 @@ class _ForumImages extends StatelessWidget {
                           ),
                         ),
                     ],
+                    ),
                   ),
                 ),
               ],
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Xem ảnh bài viết toàn màn hình: vuốt ngang chuyển ảnh, chụm hai ngón để phóng to, nút ✕ để đóng.
+class _ForumImageViewer extends StatefulWidget {
+  final List<String> urls;
+  final int initialIndex;
+
+  const _ForumImageViewer({required this.urls, required this.initialIndex});
+
+  @override
+  State<_ForumImageViewer> createState() => _ForumImageViewerState();
+}
+
+class _ForumImageViewerState extends State<_ForumImageViewer> {
+  late final PageController _controller = PageController(initialPage: widget.initialIndex);
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _controller,
+            itemCount: widget.urls.length,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (_, i) => InteractiveViewer(
+              minScale: 1,
+              maxScale: 4,
+              child: Center(
+                child: Image.network(
+                  widget.urls[i],
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) =>
+                      const Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    tooltip: 'Đóng',
+                  ),
+                  const Spacer(),
+                  if (widget.urls.length > 1)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text('${_index + 1} / ${widget.urls.length}',
+                          style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                    ),
+                  const SizedBox(width: 8),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

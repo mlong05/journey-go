@@ -27,6 +27,8 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { communityModerationService as api } from "@/features/community/services/communityModerationService";
 import { useQueueRefresh } from "@/context/NotificationContext";
+import { formatDateTimeVN } from "@/lib/money";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /**
  * Trang Duyệt Bài Viết Cộng Đồng của Kiểm duyệt viên.
@@ -90,8 +92,7 @@ const TONES = {
 
 function formatTime(value) {
   if (!value) return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("vi-VN");
+  return formatDateTimeVN(value);
 }
 
 function initialOf(name) {
@@ -148,24 +149,19 @@ function NoteDialog({ config, busy, onClose, onConfirm }) {
             {config.required && <span className="text-rose-500"> *</span>}
           </label>
           <div className="relative">
-            <textarea
+            <LimitedField
+              as="textarea"
+              counter="always"
+              limit={NOTE_MAX}
               value={note}
               onChange={(e) => {
                 setNote(e.target.value);
                 if (error) setError("");
               }}
-              maxLength={NOTE_MAX}
               rows={4}
               disabled={busy}
-              className="w-full px-3.5 pt-2.5 pb-7 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 resize-none leading-relaxed transition-colors"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 resize-none leading-relaxed transition-colors"
             />
-            <span
-              className={`pointer-events-none absolute right-3 bottom-2 text-[11px] font-mono font-semibold ${
-                note.length >= NOTE_MAX * 0.9 ? "text-rose-500" : "text-slate-400"
-              }`}
-            >
-              {note.length}/{NOTE_MAX}
-            </span>
           </div>
           {error && (
             <p className="text-[11px] font-medium text-rose-600 flex items-center gap-1.5">

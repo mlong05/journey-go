@@ -135,6 +135,17 @@ class PaymentLauncher {
         );
       }
 
+      // Giao dịch bị THAY THẾ — đơn đã được thanh toán bởi giao dịch khác ⇒
+      // dừng poll (kết quả đã rõ, không còn "đang chờ").
+      if (payment.isSuperseded) {
+        return PaymentWatchResult(
+          payment: payment,
+          isFinal: true,
+          message: 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
+              'bởi một giao dịch khác.',
+        );
+      }
+
       // PENDING / PROCESSING → đang xử lý, KHÔNG phải lỗi. Tiếp tục poll.
       await Future.delayed(pollInterval);
     }

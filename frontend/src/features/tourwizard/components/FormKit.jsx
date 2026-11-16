@@ -5,6 +5,7 @@ import { ImagePlus, Loader2, Trash2, Star, Link2, Upload, AlertCircle } from "lu
 import { uploadMedia } from "../services/providerTourService";
 import { LIMITS, VIDEO_SOURCES } from "../constants";
 import VideoPreview from "./VideoPreview";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /* ── Ô nhập có nhãn, gợi ý, lỗi ─────────────────────────────────────────── */
 
@@ -37,12 +38,20 @@ const inputCls = (error) =>
    focus:outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-500
    ${error ? "border-rose-300 focus:ring-rose-500/20" : "border-slate-200 focus:ring-emerald-500/20 focus:border-emerald-400"}`;
 
-export function TextInput({ error, className = "", ...props }) {
-  return <input {...props} className={`${inputCls(error)} ${className}`} />;
+/**
+ * limit: số ký tự tối đa (xem LIMITS.TEXT) ⇒ dùng LimitedField: cắt phần dán dư, bộ đếm ngay dưới ô.
+ * counter: "always" | "auto" | "never" (mặc định auto: ô một dòng chỉ hiện bộ đếm khi đã dùng ≥ 80%).
+ */
+export function TextInput({ error, className = "", limit, counter, wrapperClassName, ...props }) {
+  const cls = `${inputCls(error)} ${className}`;
+  if (limit) return <LimitedField as="input" limit={limit} counter={counter} wrapperClassName={wrapperClassName} {...props} className={cls} />;
+  return <input {...props} className={cls} />;
 }
 
-export function TextArea({ error, rows = 4, className = "", ...props }) {
-  return <textarea rows={rows} {...props} className={`${inputCls(error)} resize-y ${className}`} />;
+export function TextArea({ error, rows = 4, className = "", limit, counter, wrapperClassName, ...props }) {
+  const cls = `${inputCls(error)} resize-y ${className}`;
+  if (limit) return <LimitedField as="textarea" rows={rows} limit={limit} counter={counter} wrapperClassName={wrapperClassName} {...props} className={cls} />;
+  return <textarea rows={rows} {...props} className={cls} />;
 }
 
 export function Select({ error, children, className = "", ...props }) {

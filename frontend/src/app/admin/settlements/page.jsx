@@ -46,6 +46,7 @@ import {
   SETTLEMENT_STATUS_LABELS,
   settlementCheckLabel,
 } from "@/lib/money";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /** Số đợt tất toán mỗi trang. */
 const PAGE_SIZE = 10;
@@ -1180,18 +1181,20 @@ function RejectSettlementModal({
         >
           Lý do từ chối <span className="text-rose-500">*</span>
         </label>
-        <textarea
+        <LimitedField
+          as="textarea"
+          counter="always"
+          limit={1000}
           id="reject-reason"
           value={reason}
           onChange={(e) => onReasonChange(e.target.value)}
-          maxLength={2000}
           rows={4}
           autoFocus
           placeholder="VD: Số tiền chưa khớp với báo cáo đối soát — cần kiểm tra lại đơn đặt tour số 9."
           className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none"
         />
         <p className="mt-1 text-[11px] text-slate-400">
-          {reason.trim().length}/2000 ký tự — lý do sẽ được lưu vào lịch sử đợt tất toán.
+          Lý do sẽ được lưu vào lịch sử đợt tất toán.
         </p>
       </div>
 
@@ -1640,7 +1643,10 @@ function StatusPill({ status, label }) {
           status === "FAILED" ||
           status === "EXPIRED"
         ? "bg-rose-50 text-rose-700"
-        : "bg-amber-50 text-amber-700";
+        : // Giao dịch bị THAY THẾ — KHÔNG phải lỗi ⇒ màu trung tính.
+          status === "SUPERSEDED"
+          ? "bg-slate-100 text-slate-600"
+          : "bg-amber-50 text-amber-700";
 
   return (
     <span

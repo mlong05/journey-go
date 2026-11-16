@@ -15,6 +15,9 @@ import {
   UserCog,
   Sparkles,
   Medal,
+  RotateCcw,
+  FileText,
+  UsersRound,
   Ticket,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
@@ -75,6 +78,13 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
+    id: "guest-types",
+    label: "Cấu hình loại khách & độ tuổi",
+    href: "/admin/guest-types",
+    icon: UsersRound,
+    badge: null,
+  },
+  {
     id: "experience-rewards",
     label: "Cấu hình trải nghiệm và điểm thưởng",
     href: "/admin/experience-rewards",
@@ -100,6 +110,20 @@ const ADMIN_NAV_ITEMS = [
     label: "Tài chính & Thanh toán",
     href: "/admin/finance",
     icon: CreditCard,
+    badge: null,
+  },
+  {
+    id: "refunds",
+    label: "Yêu cầu hoàn tiền",
+    href: "/admin/refunds",
+    icon: FileText,
+    badge: null,
+  },
+  {
+    id: "refund-reasons",
+    label: "Cấu hình lý do hoàn tiền",
+    href: "/admin/refund-reasons",
+    icon: RotateCcw,
     badge: null,
   },
   {

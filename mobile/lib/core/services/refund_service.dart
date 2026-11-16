@@ -8,9 +8,12 @@
 ///  • GET  /refunds/code/{refundCode}
 ///
 /// ── Luật nghiệp vụ ──
-///  • Chỉ hoàn được khi Payment đã SUCCESS (đã xác minh) và trong vòng 24h từ `paidAt`.
-///  • Số tiền do HỆ THỐNG tự tính theo nguyên nhân (50% lỗi khách / 100% lỗi nền tảng) —
-///    Tourist KHÔNG tự nhập số tiền.
+///  • Chỉ hoàn được khi Payment đã SUCCESS (đã xác minh) và yêu cầu gửi TRƯỚC
+///    ngày khởi hành (booking.experienceDate) — không có cửa sổ 24h từ `paidAt`.
+///  • KHÁCH KHÔNG chọn nhóm lý do / mã lý do — chỉ mô tả bằng văn bản
+///    (`reasonSummary` + `reasonDetail`). Việc phân loại nguyên nhân và tính số
+///    tiền là quyết định của ADMIN khi duyệt (PERSONAL 50% trừ khi hủy trong
+///    48h, PLATFORM_FAULT / PROVIDER_FAULT 100%, FORCE_MAJEURE 0%).
 ///  • Phương thức hoàn (`VNPAY_API` / `MANUAL_BANK_TRANSFER`) do ADMIN quyết ở bước review.
 ///    Vì vậy form của Tourist luôn thu thập số TK / tên chủ TK / ngân hàng để tránh lỗi
 ///    `REFUND_BANK_INFO_REQUIRED` khi Admin chọn chuyển khoản thủ công.
@@ -29,30 +32,42 @@ class RefundService {
 
   /// Gửi yêu cầu hoàn tiền.
   ///
-  /// [reason] là `TOURIST_FAULT` (lý do cá nhân) hoặc `PLATFORM_FAULT` (lỗi nền tảng) —
-  /// quyết định tỷ lệ hoàn 50%/100% mà HỆ THỐNG tính.
+  /// Khách KHÔNG chọn nhóm lý do / mã lý do — chỉ mô tả bằng văn bản:
+  ///  • [reasonSummary] — lý do ngắn gọn (VD: "Bị ốm đột xuất")
+  ///  • [reasonDetail]  — mô tả chi tiết tình huống
+  ///
+  /// Việc phân loại vào nhóm lý do và mã lý do là quyết định của ADMIN khi duyệt.
+  /// Số tiền do HỆ THỐNG tính theo nhóm lý do mà Admin xác định — khách KHÔNG
+  /// nhập số tiền.
   Future<RefundModel> createRefund({
     required int paymentId,
-    required String reason,
+    required String reasonSummary,
     required String reasonDetail,
-    String? evidence,
+    List<String> evidenceAttachments = const [],
     String? bankAccountNumber,
     String? bankAccountName,
     String? bankName,
+    String? contactPhone,
+    String? contactEmail,
   }) async {
     final data = await ApiClient.request(
       'POST',
       _endpoint,
       body: {
         'paymentId': paymentId,
-        'reason': reason,
+        'reasonSummary': reasonSummary,
         'reasonDetail': reasonDetail,
-        if (evidence != null && evidence.isNotEmpty) 'evidence': evidence,
+        if (evidenceAttachments.isNotEmpty)
+          'evidenceAttachments': evidenceAttachments,
         if (bankAccountNumber != null && bankAccountNumber.isNotEmpty)
           'bankAccountNumber': bankAccountNumber,
         if (bankAccountName != null && bankAccountName.isNotEmpty)
           'bankAccountName': bankAccountName,
         if (bankName != null && bankName.isNotEmpty) 'bankName': bankName,
+        if (contactPhone != null && contactPhone.isNotEmpty)
+          'contactPhone': contactPhone,
+        if (contactEmail != null && contactEmail.isNotEmpty)
+          'contactEmail': contactEmail,
       },
     );
     return RefundModel.fromJson(data as Map<String, dynamic>);
@@ -87,6 +102,14 @@ class RefundService {
       'GET',
       '$_endpoint/payments/$paymentId?page=$page&size=$size',
     );
+    return ApiClient.asList(data).map(RefundModel.fromJson).toList();
+  }
+
+  /// Tất cả yêu cầu hoàn tiền của một đơn đặt tour (gộp mọi payment của đơn).
+  ///
+  /// Kèm nhật ký kiểm toán đầy đủ, sắp xếp theo thời gian tăng dần (cũ nhất ở trên).
+  Future<List<RefundModel>> getRefundsByBooking(int bookingId) async {
+    final data = await ApiClient.request('GET', '$_endpoint/bookings/$bookingId');
     return ApiClient.asList(data).map(RefundModel.fromJson).toList();
   }
 

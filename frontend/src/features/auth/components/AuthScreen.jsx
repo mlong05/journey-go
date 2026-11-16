@@ -22,6 +22,16 @@ import HeritageLandmarksArt from "./HeritageLandmarksArt";
 import BronzeDrumMotif from "@/components/ui/BronzeDrumMotif";
 import { translateAuthError } from "@/services/errorMessage";
 
+/**
+ * Trang du khách cần quay lại sau khi đăng nhập / đăng ký (`/login?callbackUrl=/tours/38`).
+ * Chỉ nhận đường dẫn nội bộ (bắt đầu bằng một dấu "/") để tránh chuyển hướng ra trang ngoài.
+ */
+function touristCallback(defaultPath) {
+  if (typeof window === "undefined") return defaultPath;
+  const url = new URLSearchParams(window.location.search).get("callbackUrl");
+  return url && url.startsWith("/") && !url.startsWith("//") && !url.startsWith("/\\") ? url : defaultPath;
+}
+
 export default function AuthScreen({ initialTab = "login" }) {
   const router = useRouter();
   const { loginWithGoogle } = useAuth();
@@ -137,7 +147,7 @@ export default function AuthScreen({ initialTab = "login" }) {
         roleTitle = "Đối tác cung cấp nội dung";
         roleScope = "Nội dung, tour, doanh thu & tất toán";
       } else {
-        targetPath = ROUTES.HOME || "/";
+        targetPath = touristCallback(ROUTES.HOME || "/");
         roleTitle = "Du khách khám phá";
         roleScope = "Khám phá di sản";
       }
@@ -266,7 +276,7 @@ export default function AuthScreen({ initialTab = "login" }) {
         targetPath = ROUTES.PROVIDER || "/provider";
         roleTitle = "Đối tác cung cấp nội dung";
       } else {
-        targetPath = ROUTES.HOME || "/";
+        targetPath = touristCallback(ROUTES.HOME || "/");
         roleTitle = "Du khách khám phá";
       }
 
@@ -356,7 +366,9 @@ export default function AuthScreen({ initialTab = "login" }) {
         }
 
         const roleTitle = res.roleTitle || "Người dùng";
-        const targetPath = res.targetPath || ROUTES.HOME || "/";
+        const rolePath = res.targetPath || ROUTES.HOME || "/";
+        // Du khách (đường dẫn mặc định là trang chủ) quay lại đúng trang đang xem trước khi đăng nhập.
+        const targetPath = rolePath === (ROUTES.HOME || "/") ? touristCallback(rolePath) : rolePath;
 
         setFeedbackModal({
           isOpen: true,

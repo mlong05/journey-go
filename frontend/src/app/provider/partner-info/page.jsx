@@ -39,6 +39,8 @@ import {
   PARTNER_PROFILE_FIELD_LABELS,
   PARTNER_PROFILE_GROUPS,
 } from "@/features/partnerprofileupdate/services/partnerProfileUpdateService";
+import { formatDateTimeVN } from "@/lib/money";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /** Nhãn tiếng Việt ↔ mã enum của chức vụ người đại diện. */
 const POSITIONS = [
@@ -77,14 +79,7 @@ const HISTORY_TONE = {
 
 function formatDateTime(value) {
   if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+  return formatDateTimeVN(value) || "—";
 }
 
 function getErrorMessage(err, fallback) {
@@ -525,7 +520,10 @@ function ProfileEditModal({
               </h4>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Số điện thoại" error={errors.phone}>
-                  <input
+                  <LimitedField
+                    as="input"
+                    limit={20}
+                    counter="never"
                     value={form.phone}
                     onChange={(e) => onChange("phone", e.target.value)}
                     placeholder="0912345678"
@@ -533,7 +531,9 @@ function ProfileEditModal({
                   />
                 </Field>
                 <Field label="Họ tên người đại diện">
-                  <input
+                  <LimitedField
+                    as="input"
+                    limit={150}
                     value={form.representativeName}
                     onChange={(e) => onChange("representativeName", e.target.value)}
                     className={inputCls}
@@ -565,14 +565,19 @@ function ProfileEditModal({
               </h4>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Tên doanh nghiệp / Cơ sở" required error={errors.businessName}>
-                  <input
+                  <LimitedField
+                    as="input"
+                    limit={200}
                     value={form.businessName}
                     onChange={(e) => onChange("businessName", e.target.value)}
                     className={inputCls}
                   />
                 </Field>
                 <Field label="Mã số thuế" error={errors.taxCode}>
-                  <input
+                  <LimitedField
+                    as="input"
+                    limit={20}
+                    counter="never"
                     value={form.taxCode}
                     onChange={(e) => onChange("taxCode", e.target.value)}
                     className={inputCls}
@@ -581,7 +586,9 @@ function ProfileEditModal({
               </div>
               <div className="mt-3 grid gap-3">
                 <Field label="Thông tin đăng ký kinh doanh">
-                  <textarea
+                  <LimitedField
+                    as="textarea"
+                    limit={1000}
                     rows={2}
                     value={form.businessRegistrationInfo}
                     onChange={(e) => onChange("businessRegistrationInfo", e.target.value)}
@@ -597,14 +604,18 @@ function ProfileEditModal({
                   errors={errors}
                 />
                 <Field label="Số nhà, tên đường...">
-                  <input
+                  <LimitedField
+                    as="input"
+                    limit={255}
                     value={form.addressDetail}
                     onChange={(e) => onChange("addressDetail", e.target.value)}
                     className={inputCls}
                   />
                 </Field>
                 <Field label="Phạm vi hoạt động">
-                  <textarea
+                  <LimitedField
+                    as="textarea"
+                    limit={1000}
                     rows={2}
                     value={form.businessScope}
                     onChange={(e) => onChange("businessScope", e.target.value)}
@@ -647,14 +658,19 @@ function ProfileEditModal({
                   </Tooltip>
                 </Field>
                 <Field label="Số tài khoản">
-                  <input
+                  <LimitedField
+                    as="input"
+                    limit={50}
+                    counter="never"
                     value={form.bankAccountNumber}
                     onChange={(e) => onChange("bankAccountNumber", e.target.value)}
                     className={inputCls}
                   />
                 </Field>
                 <Field label="Tên chủ tài khoản">
-                  <input
+                  <LimitedField
+                    as="input"
+                    limit={150}
                     value={form.bankAccountHolder}
                     onChange={(e) => onChange("bankAccountHolder", e.target.value)}
                     className={inputCls}

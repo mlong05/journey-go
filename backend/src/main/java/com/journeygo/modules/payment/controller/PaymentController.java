@@ -218,6 +218,7 @@ public class PaymentController {
             case FAILED -> "Giao dịch đã được xác minh thất bại";
             case CANCELLED -> "Khách hàng đã hủy giao dịch";
             case DUPLICATE -> "Giao dịch trùng — đã được xử lý trước đó";
+            case SUPERSEDED -> "Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán bởi giao dịch khác";
             case UNKNOWN -> "Chưa xác minh được kết quả — vẫn đang chờ";
         });
         return ResponseEntity.ok(ApiResponse.success("Truy vấn kết quả giao dịch", data));

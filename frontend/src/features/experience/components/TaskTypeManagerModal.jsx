@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { taskTypeService } from "../services/taskTypeService";
 import { VERIFICATION_METHOD_LABELS, verificationMethodLabel } from "../constants";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 const VERIFICATION_METHODS = [
   { value: "ANSWER_MATCH", icon: HelpCircle },
@@ -441,7 +442,9 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
             <label className="text-xs font-bold text-slate-700">
               Tên hiển thị <span className="text-rose-500">*</span>
             </label>
-            <input
+            <LimitedField
+              as="input"
+              limit={100}
               type="text"
               disabled={loading}
               value={form.name}

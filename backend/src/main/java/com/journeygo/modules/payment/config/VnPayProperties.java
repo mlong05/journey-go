@@ -75,13 +75,23 @@ public class VnPayProperties {
      * <p>App gửi kèm các tham số này lên backend để backend kiểm tra chữ ký
      * rồi áp dụng — xem {@code POST /payments/return-result}.
      *
-     * <p>⚠️ Thanh toán CHỈ diễn ra trên ứng dụng MOBILE. Web không có màn checkout
-     * nên KHÔNG cần Return URL riêng cho web.
-     *
      * <p>Nếu để trống ⇒ dùng {@link #returnUrl} (https) + gắn {@code app_redirect=1}
      * ⇒ trang kết quả của backend tự chuyển hướng trình duyệt về app (cần tunnel).
      */
     private String appReturnUrl = "";
+
+    /**
+     * Return URL cho WEB du khách (trang kết quả của frontend), ví dụ
+     * {@code http://localhost:3000/payment/result}.
+     *
+     * <p>Chỉ dùng khi client khởi tạo thanh toán với {@code appRedirect=false} (web).
+     * Trang web nhận các tham số {@code vnp_*} đã ký rồi gửi về
+     * {@code POST /payments/return-result} để backend kiểm tra chữ ký và áp dụng kết quả.
+     * Vì trình duyệt trên cùng máy mở được localhost nên không cần tunnel cho bước này.
+     *
+     * <p>Để trống ⇒ web dùng chung Return URL với app như trước (không đổi hành vi).
+     */
+    private String webReturnUrl = "";
 
     /**
      * Bật tự chuyển hướng về app mobile sau khi thanh toán xong.

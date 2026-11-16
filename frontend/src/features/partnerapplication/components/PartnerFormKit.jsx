@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import Tooltip from "@/components/ui/Tooltip";
+import { LimitedField } from "@/components/ui/LimitedField";
 
 /* ── Nhãn ─────────────────────────────────────────────────────────────── */
 
@@ -145,20 +146,17 @@ export function Field({
   );
 }
 
-export function TextInput({ error, className = "", accent = "emerald", ...props }) {
-  return (
-    <input {...props} className={`${controlCls(error, "h-11", accent)} ${className}`} />
-  );
+/** limit: số ký tự tối đa ⇒ LimitedField (cắt phần dán dư, bộ đếm dưới ô). counter: "always" | "auto" | "never". */
+export function TextInput({ error, className = "", accent = "emerald", limit, counter, ...props }) {
+  const cls = `${controlCls(error, "h-11", accent)} ${className}`;
+  if (limit) return <LimitedField as="input" limit={limit} counter={counter} {...props} className={cls} />;
+  return <input {...props} className={cls} />;
 }
 
-export function TextArea({ error, rows = 3, className = "", accent = "emerald", ...props }) {
-  return (
-    <textarea
-      rows={rows}
-      {...props}
-      className={`${controlCls(error, "h-auto py-2.5", accent)} resize-y ${className}`}
-    />
-  );
+export function TextArea({ error, rows = 3, className = "", accent = "emerald", limit, counter, ...props }) {
+  const cls = `${controlCls(error, "h-auto py-2.5", accent)} resize-y ${className}`;
+  if (limit) return <LimitedField as="textarea" rows={rows} limit={limit} counter={counter} {...props} className={cls} />;
+  return <textarea rows={rows} {...props} className={cls} />;
 }
 
 /** Ô chọn, luôn kèm mũi tên để mọi dropdown trong luồng trông giống nhau. */

@@ -133,4 +133,34 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             ORDER BY p.createdAt ASC
             """)
     List<Payment> findStuckPayments(@Param("statuses") List<PaymentStatus> statuses);
+
+    /**
+     * Các Payment còn "kẹt" thuộc về Booking ĐÃ được thanh toán bởi giao dịch khác.
+     *
+     * <p>Dùng cho danh sách giao dịch (của tôi / của một booking / toàn hệ thống)
+     * để đóng dứt khoát các giao dịch bị bỏ rơi — tránh hiển thị "đang chờ kết quả
+     * thanh toán" cho đơn vốn đã được thanh toán.
+     *
+     * <p>Điều kiện: Booking ở {@code CONFIRMED}/{@code COMPLETED} VÀ có ít nhất một
+     * giao dịch {@code SUCCESS} khác (giao dịch đã thực sự thu tiền).
+     *
+     * @param bookingIds các booking cần quét (rỗng ⇒ không quét gì)
+     */
+    @Query("""
+            SELECT p FROM Payment p
+            WHERE p.status IN :statuses
+              AND p.booking.id IN :bookingIds
+              AND p.booking.status IN (
+                    com.journeygo.modules.booking.entity.enums.BookingStatus.CONFIRMED,
+                    com.journeygo.modules.booking.entity.enums.BookingStatus.COMPLETED
+              )
+              AND EXISTS (
+                    SELECT 1 FROM Payment ok
+                    WHERE ok.booking.id = p.booking.id
+                      AND ok.id <> p.id
+                      AND ok.status = com.journeygo.modules.payment.entity.enums.PaymentStatus.SUCCESS
+              )
+            """)
+    List<Payment> findStrandedPaymentsOfPaidBookings(@Param("bookingIds") List<Long> bookingIds,
+                                                      @Param("statuses") List<PaymentStatus> statuses);
 }

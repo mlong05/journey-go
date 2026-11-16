@@ -27,7 +27,25 @@ public record RefundResponse(
         @Schema(description = "Trạng thái refund") RefundStatus status,
         @Schema(description = "Nguyên nhân khai báo bởi tourist") RefundReason declaredReason,
         @Schema(description = "Nguyên nhân do Admin xác định") RefundReason approvedReason,
+        @Schema(description = "Tên tiếng Việt của nhóm lý do khai báo (VD: Lỗi khách hàng) — "
+                + "KHÔNG hiển thị mã kỹ thuật cho người dùng")
+        String declaredReasonName,
+        @Schema(description = "Tên tiếng Việt của nhóm lý do do Admin xác định")
+        String approvedReasonName,
+        @Schema(description = "Mã lý do cụ thể do Tourist chọn") String declaredReasonCode,
+        @Schema(description = "Mã lý do cụ thể do Admin xác định") String approvedReasonCode,
+        @Schema(description = "Tên tiếng Việt của lý do cụ thể do Tourist chọn — "
+                + "KHÔNG hiển thị mã kỹ thuật cho người dùng")
+        String declaredReasonCodeName,
+        @Schema(description = "Tên tiếng Việt của lý do cụ thể do Admin xác định")
+        String approvedReasonCodeName,
+        @Schema(description = "Lý do NGẮN GỌN do Tourist nhập (VD: Bị ốm đột xuất)")
+        String reasonSummary,
         @Schema(description = "Chi tiết lý do") String reasonDetail,
+        @Schema(description = "Ngày trải nghiệm của booking — dùng để Admin đối chiếu "
+                + "thời điểm gửi yêu cầu với lịch khởi hành (cửa sổ no-show 48h)")
+        java.time.LocalDate experienceDate,
+        @Schema(description = "Danh sách URL file bằng chứng đính kèm") List<String> evidenceAttachments,
         @Schema(description = "Số tiền gốc của giao dịch thanh toán (100% — cơ sở tính tỷ lệ hoàn)")
         BigDecimal paymentAmount,
         @Schema(description = "Số tiền đề xuất (hệ thống tự tính)") BigDecimal proposedAmount,
@@ -48,8 +66,16 @@ public record RefundResponse(
         @Schema(description = "Số tài khoản nhận tiền") String bankAccountNumber,
         @Schema(description = "Tên chủ tài khoản") String bankAccountName,
         @Schema(description = "Ngân hàng") String bankName,
+        @Schema(description = "Số điện thoại liên hệ do Tourist cung cấp")
+        String contactPhone,
+        @Schema(description = "Email dự phòng do Tourist cung cấp")
+        String contactEmail,
         @Schema(description = "Mã tham chiếu chuyển khoản thủ công") String transferReference,
         @Schema(description = "Bằng chứng chuyển khoản") String transferEvidence,
+        @Schema(description = "Ghi chú của nền tảng khi ghi nhận chuyển khoản thủ công")
+        String transferNote,
+        @Schema(description = "Ghi chú của nền tảng khi Admin xử lý yêu cầu (duyệt / từ chối)")
+        String adminNote,
         @Schema(description = "Thời điểm chuyển khoản") Instant transferredAt,
         @Schema(description = "Thời điểm tạo yêu cầu") Instant createdAt,
         @Schema(description = "Nhật ký kiểm toán") List<RefundAuditLogResponse> auditLogs
@@ -69,7 +95,14 @@ public record RefundResponse(
                 .status(r.getStatus())
                 .declaredReason(r.getDeclaredReason())
                 .approvedReason(r.getApprovedReason())
+                .declaredReasonCode(r.getDeclaredReasonCode())
+                .approvedReasonCode(r.getApprovedReasonCode())
+                .reasonSummary(r.getReasonSummary())
                 .reasonDetail(r.getReasonDetail())
+                .experienceDate(r.getPayment() != null && r.getPayment().getBooking() != null
+                        ? r.getPayment().getBooking().getExperienceDate()
+                        : null)
+                .evidenceAttachments(parseAttachments(r.getEvidenceAttachments()))
                 .paymentAmount(r.getPayment() != null ? r.getPayment().getAmount() : null)
                 .proposedAmount(r.getProposedAmount())
                 .approvedAmount(r.getApprovedAmount())
@@ -89,12 +122,37 @@ public record RefundResponse(
                 .bankAccountNumber(r.getBankAccountNumber())
                 .bankAccountName(r.getBankAccountName())
                 .bankName(r.getBankName())
+                .contactPhone(r.getContactPhone())
+                .contactEmail(r.getContactEmail())
                 .transferReference(r.getTransferReference())
                 .transferEvidence(r.getTransferEvidence())
+                .transferNote(r.getTransferNote())
+                .adminNote(r.getAdminNote())
                 .transferredAt(r.getTransferredAt())
                 .createdAt(r.getCreatedAt())
                 .auditLogs(List.of())
                 .build();
+    }
+
+    /**
+     * Đọc danh sách URL bằng chứng từ cột JSON — dữ liệu hỏng không được làm hỏng
+     * cả response ⇒ bỏ qua và trả về danh sách rỗng.
+     */
+    static List<String> parseAttachments(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper =
+                    new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.core.type.TypeReference<List<String>> type =
+                    new com.fasterxml.jackson.core.type.TypeReference<>() {
+                    };
+            List<String> list = mapper.readValue(raw, type);
+            return list == null ? List.of() : list;
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     /** Nhật ký kiểm toán của yêu cầu hoàn tiền. */
