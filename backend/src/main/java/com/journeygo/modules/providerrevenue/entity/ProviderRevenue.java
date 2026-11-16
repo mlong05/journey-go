@@ -5,6 +5,7 @@ import com.journeygo.modules.providerprofile.entity.ProviderProfile;
 import com.journeygo.modules.providerrevenue.entity.enums.DeferredReason;
 import com.journeygo.modules.providerrevenue.entity.enums.ProviderRevenueStatus;
 import com.journeygo.modules.payment.entity.Payment;
+import com.journeygo.modules.voucher.entity.enums.VoucherScope;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -96,6 +97,16 @@ public class ProviderRevenue {
     @Builder.Default
     private BigDecimal adjustmentAmount = BigDecimal.ZERO;
 
+    /** Số tiền giảm giá voucher phân bổ cho khoản doanh thu này. */
+    @Column(name = "voucher_discount", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal voucherDiscount = BigDecimal.ZERO;
+
+    /** Loại voucher đã áp dụng (PLATFORM hoặc PARTNER). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "voucher_scope", length = 20)
+    private VoucherScope voucherScope;
+
     /** Số tiền ProviderProfile được nhận sau tính toán. */
     @Column(name = "provider_net_amount", nullable = false, precision = 14, scale = 2)
     @Builder.Default
@@ -144,28 +155,50 @@ public class ProviderRevenue {
     }
 
     /**
-     * Tính lại toàn bộ số tiền theo công thức:
-     * <pre>
-     * NetCollected    = GrossAmount − SuccessfulRefundAmount
-     * Commission      = NetCollected × CommissionRate
-     * ProviderNetAmount = NetCollected − Commission + ApprovedAdjustments
-     * </pre>
+     * Tính lại toàn bộ số tiền theo quy tắc Voucher:
+     * - Voucher Nền tảng (PLATFORM): Giảm giá trừ vào hoa hồng nền tảng, đối tác nhận trọn vẹn.
+     * - Voucher Đối tác (PARTNER): Giảm giá trừ vào doanh thu đối tác, nền tảng giữ đủ hoa hồng.
      */
     public void recalculate() {
         BigDecimal gross = grossAmount != null ? grossAmount : BigDecimal.ZERO;
         BigDecimal refund = refundAmount != null ? refundAmount : BigDecimal.ZERO;
         BigDecimal rate = commissionRate != null ? commissionRate : BigDecimal.ZERO;
         BigDecimal adjustment = adjustmentAmount != null ? adjustmentAmount : BigDecimal.ZERO;
+        BigDecimal discount = voucherDiscount != null ? voucherDiscount : BigDecimal.ZERO;
 
         BigDecimal netCollected = gross.subtract(refund);
         if (netCollected.compareTo(BigDecimal.ZERO) < 0) {
             netCollected = BigDecimal.ZERO;
         }
-        BigDecimal commission = netCollected.multiply(rate).setScale(2, java.math.RoundingMode.HALF_UP);
-        BigDecimal providerNet = netCollected.subtract(commission).add(adjustment);
 
-        this.commissionAmount = commission;
-        this.providerNetAmount = providerNet;
+        BigDecimal originalCommission = netCollected.multiply(rate).setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal originalProviderNet = netCollected.subtract(originalCommission);
+
+        BigDecimal finalCommission;
+        BigDecimal finalProviderNet;
+
+        if (voucherScope == VoucherScope.PLATFORM) {
+            // Voucher nền tảng: trừ vào hoa hồng nền tảng, đối tác nhận đủ
+            finalCommission = originalCommission.subtract(discount);
+            if (finalCommission.compareTo(BigDecimal.ZERO) < 0) {
+                finalCommission = BigDecimal.ZERO;
+            }
+            finalProviderNet = originalProviderNet.add(adjustment);
+        } else if (voucherScope == VoucherScope.PARTNER) {
+            // Voucher đối tác: trừ vào doanh thu đối tác, nền tảng giữ đủ hoa hồng
+            finalCommission = originalCommission;
+            finalProviderNet = originalProviderNet.subtract(discount).add(adjustment);
+            if (finalProviderNet.compareTo(BigDecimal.ZERO) < 0) {
+                finalProviderNet = BigDecimal.ZERO;
+            }
+        } else {
+            // Không áp dụng voucher
+            finalCommission = originalCommission;
+            finalProviderNet = originalProviderNet.add(adjustment);
+        }
+
+        this.commissionAmount = finalCommission;
+        this.providerNetAmount = finalProviderNet;
     }
 
     /** Chuyển sang ELIGIBLE — ghi nhận thời điểm đáp ứng điều kiện lần đầu. */

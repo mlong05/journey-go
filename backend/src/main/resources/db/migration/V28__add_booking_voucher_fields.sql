@@ -24,3 +24,7 @@ ALTER TABLE bookings ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(14, 2) NOT
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS voucher_scope VARCHAR(20);
 
 CREATE INDEX IF NOT EXISTS idx_bookings_applied_voucher ON bookings(applied_voucher_code);
+
+-- 3. Bổ sung các cột voucher vào bảng provider_revenues
+ALTER TABLE provider_revenues ADD COLUMN IF NOT EXISTS voucher_discount NUMERIC(14, 2) NOT NULL DEFAULT 0;
+ALTER TABLE provider_revenues ADD COLUMN IF NOT EXISTS voucher_scope VARCHAR(20);
