@@ -977,22 +977,28 @@ export default function AdminVouchersPage() {
                       <ActiveBadge active={v.active} />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end gap-2">
                         {/* Toggle hoạt động */}
                         <button
                           type="button"
                           onClick={() => handleToggleActive(v)}
                           title={v.active ? "Tắt voucher" : "Kích hoạt voucher"}
-                          className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
                             v.active
                               ? "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
                               : "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
                           }`}
                         >
                           {v.active ? (
-                            <ToggleRight size={15} />
+                            <>
+                              <ToggleRight size={15} />
+                              <span>Tắt</span>
+                            </>
                           ) : (
-                            <ToggleLeft size={15} />
+                            <>
+                              <ToggleLeft size={15} />
+                              <span>Bật</span>
+                            </>
                           )}
                         </button>
                         {/* Sửa */}
@@ -1002,9 +1008,10 @@ export default function AdminVouchersPage() {
                             setModal({ mode: "edit", data: v })
                           }
                           title="Chỉnh sửa"
-                          className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
                         >
-                          <Pencil size={15} />
+                          <Pencil size={13} />
+                          <span>Sửa</span>
                         </button>
                       </div>
                     </td>
