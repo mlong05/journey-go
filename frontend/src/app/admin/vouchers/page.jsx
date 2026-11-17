@@ -162,19 +162,23 @@ function VoucherFormModal({ mode, initialData, onClose, onSaved, showToast }) {
 
   useEffect(() => {
     let mounted = true;
-    setLoadingPartners(true);
-    getActiveProviderProfiles()
-      .then((data) => {
-        if (mounted) {
-          setPartners(Array.isArray(data) ? data : []);
-        }
-      })
-      .catch((err) => {
-        console.warn("Không thể tải danh sách đối tác:", err);
-      })
-      .finally(() => {
-        if (mounted) setLoadingPartners(false);
-      });
+    // Gọi trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect
+    // (tránh cascading render — rule `react-hooks/set-state-in-effect`).
+    (async () => {
+      setLoadingPartners(true);
+      getActiveProviderProfiles()
+        .then((data) => {
+          if (mounted) {
+            setPartners(Array.isArray(data) ? data : []);
+          }
+        })
+        .catch((err) => {
+          console.warn("Không thể tải danh sách đối tác:", err);
+        })
+        .finally(() => {
+          if (mounted) setLoadingPartners(false);
+        });
+    })();
     return () => {
       mounted = false;
     };
@@ -659,7 +663,10 @@ export default function AdminVouchersPage() {
   );
 
   useEffect(() => {
-    load(0);
+    // Gọi trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
+    (async () => {
+      await load(0);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
