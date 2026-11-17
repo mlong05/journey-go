@@ -661,10 +661,10 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             const SizedBox(width: 12),
             Expanded(
               child: _HeritageTile(
-                icon: Icons.card_giftcard_rounded,
+                icon: Icons.confirmation_number_outlined,
                 color: const Color(0xFFDB2777),
                 background: const Color(0xFFFCE7F3),
-                title: 'Đổi thưởng',
+                title: 'Voucher',
                 value: '${formatThousands(_points.currentBalance)} điểm khả dụng',
                 onTap: _openWallet,
               ),
@@ -745,7 +745,7 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             ),
             icon: const Icon(Icons.account_balance_wallet_outlined, size: 19),
             label: const Text(
-              'Xem toàn bộ & đổi thưởng',
+              'Xem ví & đổi voucher',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ),

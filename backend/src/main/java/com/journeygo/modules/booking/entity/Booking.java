@@ -3,6 +3,7 @@ package com.journeygo.modules.booking.entity;
 import com.journeygo.modules.booking.entity.enums.BookingStatus;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.user.entity.User;
+import com.journeygo.modules.voucher.entity.enums.VoucherScope;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -57,9 +58,23 @@ public class Booking {
     @Column(name = "experience_date", nullable = false)
     private LocalDate experienceDate;
 
-    /** Tổng tiền đã chốt tại thời điểm đặt. */
+    /** Tổng tiền đã chốt tại thời điểm đặt (đã trừ discount nếu có). */
     @Column(name = "total_amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal totalAmount;
+
+    /** Mã UserVoucher đã áp dụng (null nếu không dùng voucher). */
+    @Column(name = "applied_voucher_code", length = 100)
+    private String appliedVoucherCode;
+
+    /** Số tiền giảm giá do voucher (0 nếu không dùng voucher). */
+    @Column(name = "discount_amount", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    /** Phạm vi voucher đã áp dụng (PLATFORM / PARTNER / null). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "voucher_scope", length = 20)
+    private VoucherScope voucherScope;
 
     @Column(name = "currency", nullable = false, length = 3)
     @Builder.Default

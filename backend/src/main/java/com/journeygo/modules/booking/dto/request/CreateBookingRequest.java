@@ -41,7 +41,11 @@ public record CreateBookingRequest(
 
         @Schema(description = "Ghi chú của người đặt (không bắt buộc)")
         @Size(max = 1000)
-        String note
+        String note,
+
+        @Schema(description = "Mã voucher người dùng đã quy đổi (không bắt buộc)", example = "PLATFORM10-A3B2C1")
+        @Size(max = 100)
+        String voucherCode
 ) {
 
     /**

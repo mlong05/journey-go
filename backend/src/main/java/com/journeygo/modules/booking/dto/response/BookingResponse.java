@@ -2,6 +2,7 @@ package com.journeygo.modules.booking.dto.response;
 
 import com.journeygo.modules.booking.entity.Booking;
 import com.journeygo.modules.booking.entity.enums.BookingStatus;
+import com.journeygo.modules.voucher.entity.enums.VoucherScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
@@ -22,6 +23,9 @@ public record BookingResponse(
         @Schema(description = "Tên tour") String tourTitle,
         @Schema(description = "Ngày trải nghiệm") LocalDate experienceDate,
         @Schema(description = "Tổng tiền đã chốt (VND)") BigDecimal totalAmount,
+        @Schema(description = "Mã voucher đã áp dụng") String appliedVoucherCode,
+        @Schema(description = "Số tiền giảm giá voucher (VND)") BigDecimal discountAmount,
+        @Schema(description = "Phạm vi voucher") VoucherScope voucherScope,
         @Schema(description = "Loại tiền") String currency,
         @Schema(description = "Trạng thái booking") BookingStatus status,
         @Schema(description = "Thời điểm tạo") Instant createdAt,
@@ -80,6 +84,9 @@ public record BookingResponse(
                 .tourTitle(b.getTour() != null ? b.getTour().getTitle() : null)
                 .experienceDate(b.getExperienceDate())
                 .totalAmount(b.getTotalAmount())
+                .appliedVoucherCode(b.getAppliedVoucherCode())
+                .discountAmount(b.getDiscountAmount())
+                .voucherScope(b.getVoucherScope())
                 .currency(b.getCurrency())
                 .status(b.getStatus())
                 .createdAt(b.getCreatedAt())

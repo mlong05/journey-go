@@ -1,10 +1,12 @@
 package com.journeygo.modules.gamification.entity;
 
 import com.journeygo.modules.gamification.entity.enums.UserVoucherStatus;
+import com.journeygo.modules.voucher.entity.Voucher;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "user_vouchers", indexes = {
@@ -46,7 +48,7 @@ public class UserVoucher {
     private Instant redeemedAt;
 
     @Column(name = "expiry_date", nullable = false)
-    private Instant expiryDate;
+    private LocalDate expiryDate;
 
     @Column(name = "used_at")
     private Instant usedAt;

@@ -1317,6 +1317,14 @@ function ProviderRevenueDetailModal({ revenue, onClose }) {
             />
             <InfoRow label="Tổng thanh toán" value={formatVND(r?.grossAmount)} mono />
             <InfoRow label="Hoàn tiền" value={formatVND(r?.refundAmount)} mono />
+            {Number(r?.voucherDiscount ?? 0) > 0 ? (
+              <InfoRow
+                label={`Giảm giá voucher (${r?.voucherScope === "PLATFORM" ? "Sàn chịu" : "Đối tác chịu"})`}
+                value={`-${formatVND(r?.voucherDiscount)}`}
+                mono
+                tone={r?.voucherScope === "PLATFORM" ? "rose" : "amber"}
+              />
+            ) : null}
             <InfoRow label="Hoa hồng" value={formatVND(r?.commissionAmount)} mono />
             <InfoRow label="Điều chỉnh" value={formatVND(r?.adjustmentAmount)} mono />
             <InfoRow
@@ -1530,6 +1538,7 @@ function SettlementDetailModal({ settlementId, onClose }) {
                     <th className="py-2 px-2">Mã giao dịch</th>
                     <th className="py-2 px-2">Kỳ</th>
                     <th className="py-2 px-2 text-right">Tổng tiền</th>
+                    <th className="py-2 px-2 text-center">Voucher</th>
                     <th className="py-2 px-2 text-right">Hoa hồng</th>
                     <th className="py-2 px-2 text-right">Đối tác nhận</th>
                   </tr>
@@ -1548,6 +1557,26 @@ function SettlementDetailModal({ settlementId, onClose }) {
                       </td>
                       <td className="py-2 px-2 text-right font-mono text-slate-600">
                         {formatVND(d?.grossAmount)}
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        {Number(d?.voucherDiscount ?? 0) > 0 ? (
+                          <div className="inline-flex flex-col items-center">
+                            <span className="font-mono text-rose-600 font-semibold">
+                              -{formatVND(d?.voucherDiscount)}
+                            </span>
+                            <span
+                              className={`text-[9.5px] px-1 rounded font-medium ${
+                                d?.voucherScope === "PLATFORM"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}
+                            >
+                              {d?.voucherScope === "PLATFORM" ? "Sàn" : "Đối tác"}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="py-2 px-2 text-right font-mono text-slate-600">
                         {formatVND(d?.commissionAmount)}

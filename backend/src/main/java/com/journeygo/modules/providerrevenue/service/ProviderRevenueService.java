@@ -121,6 +121,9 @@ public class ProviderRevenueService {
             return List.of();
         }
 
+        BigDecimal totalOriginalGross = grossPerProviderProfile.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         List<ProviderRevenue> saved = new ArrayList<>();
         for (Map.Entry<Long, BigDecimal> entry : grossPerProviderProfile.entrySet()) {
             ProviderProfile providerProfile = providerProfileRepository.findById(entry.getKey()).orElse(null);
@@ -140,6 +143,21 @@ public class ProviderRevenueService {
             revenue.setPayment(payment);
             revenue.setGrossAmount(entry.getValue());
             revenue.setCommissionRate(resolveCommissionRate(providerProfile));
+
+            // Phân bổ voucher giảm giá cho khoản doanh thu này
+            BigDecimal voucherShare = BigDecimal.ZERO;
+            com.journeygo.modules.voucher.entity.enums.VoucherScope scope = booking.getVoucherScope();
+            if (booking.getDiscountAmount() != null && booking.getDiscountAmount().compareTo(BigDecimal.ZERO) > 0 && scope != null) {
+                if (totalOriginalGross.compareTo(BigDecimal.ZERO) > 0) {
+                    voucherShare = booking.getDiscountAmount()
+                            .multiply(entry.getValue())
+                            .divide(totalOriginalGross, 2, RoundingMode.HALF_UP);
+                } else {
+                    voucherShare = booking.getDiscountAmount();
+                }
+            }
+            revenue.setVoucherDiscount(voucherShare);
+            revenue.setVoucherScope(scope);
 
             // Kỳ doanh thu: ưu tiên tháng hoàn thành trải nghiệm; nếu chưa hoàn thành thì
             // tạm dùng tháng ngày trải nghiệm — sẽ cập nhật lại khi Booking hoàn thành.
