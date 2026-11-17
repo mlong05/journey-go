@@ -130,18 +130,27 @@ export default function PartnerAddressFields({
   useEffect(() => {
     if (provinces.length === 0 || provinceCode) return;
     const match = provinces.find((p) => buildLabel(p) === value.province);
-    if (match) setProvinceCode(match.code);
+    // Bọc trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
+    (async () => {
+      if (match) setProvinceCode(match.code);
+    })();
   }, [provinces, provinceCode, value.province]);
 
   // ── 2. Phường / Xã theo tỉnh đã chọn ─────────────────────────────────────
   useEffect(() => {
     if (!provinceCode) {
-      setWards([]);
-      setWardLoading(false);
+      // Bọc trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
+      (async () => {
+        setWards([]);
+        setWardLoading(false);
+      })();
       return;
     }
     const controller = new AbortController();
-    setWardLoading(true);
+    // Bọc trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
+    (async () => {
+      setWardLoading(true);
+    })();
     partnerAddressService
       .getWardsByProvince(provinceCode, { signal: controller.signal })
       .then((list) => setWards(Array.isArray(list) ? list : []))
@@ -160,7 +169,10 @@ export default function PartnerAddressFields({
   useEffect(() => {
     if (wards.length === 0 || wardCode) return;
     const match = wards.find((w) => buildLabel(w) === value.ward);
-    if (match) setWardCode(match.code);
+    // Bọc trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
+    (async () => {
+      if (match) setWardCode(match.code);
+    })();
   }, [wards, wardCode, value.ward]);
 
   const labelOf = (list, code) =>

@@ -172,11 +172,16 @@ export default function AdminPartnersPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    // Gọi trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   useEffect(() => {
-    loadStats();
+    (async () => {
+      await loadStats();
+    })();
   }, [loadStats]);
 
   const showToast = useCallback((msg) => {
