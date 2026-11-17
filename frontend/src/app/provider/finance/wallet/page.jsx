@@ -48,7 +48,10 @@ export default function ProviderFinanceWalletPage() {
   }, [providerProfileId, page]);
 
   useEffect(() => {
-    load();
+    // Gọi trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   if (loadingProfile || loading) {
