@@ -7,7 +7,17 @@ class ApiConstants {
   static const int defaultPort = 8088;
 
   // Đường dẫn cơ sở mặc định tự động nhận diện theo môi trường
+  //
+  // ⚠️ ƯU TIÊN theo thứ tự:
+  //   1. `API_BASE_URL` trong file `.env` (khuyến nghị — dùng cho bản build thật,
+  //      VD: domain public `https://journeygo.id.vn/api/v1`).
+  //   2. Fallback localhost/10.0.2.2 (chỉ dùng khi dev trên máy).
   static String getDefaultBaseUrl() {
+    // 1) Env — luôn ưu tiên để cùng một bản build chạy được ở dev lẫn production.
+    final fromEnv = dotenv.maybeGet('API_BASE_URL')?.trim();
+    if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
+
+    // 2) Fallback theo môi trường chạy (chỉ khi thiếu env).
     if (kIsWeb) {
       return 'http://localhost:$defaultPort/api/v1';
     }
