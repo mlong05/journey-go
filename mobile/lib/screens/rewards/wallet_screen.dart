@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/gamification_model.dart';
 import '../../core/services/gamification_service.dart';
+import 'achievements_screen.dart';
 import 'my_vouchers_screen.dart';
 import 'rewards_widgets.dart';
 import 'voucher_shop_screen.dart';
@@ -110,6 +111,13 @@ class _WalletScreenState extends State<WalletScreen> {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const MyVouchersScreen()));
+  }
+
+  Future<void> _openAchievements() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AchievementsScreen()));
+    if (mounted) _load(); // điểm có thể tăng sau khi nhận thưởng thành tựu
   }
 
   @override
@@ -337,19 +345,82 @@ class _WalletScreenState extends State<WalletScreen> {
 
     return Padding(
       padding: const EdgeInsets.only(top: 14),
-      child: Row(
+      child: Column(
         children: [
-          action(
-            Icons.card_giftcard_rounded,
-            'Đổi thưởng',
-            _openShop,
-            primary: true,
+          Row(
+            children: [
+              action(
+                Icons.card_giftcard_rounded,
+                'Đổi thưởng',
+                _openShop,
+                primary: true,
+              ),
+              const SizedBox(width: 10),
+              action(
+                Icons.local_activity_outlined,
+                'Voucher của tôi',
+                _openMyVouchers,
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          action(
-            Icons.local_activity_outlined,
-            'Voucher của tôi',
-            _openMyVouchers,
+          const SizedBox(height: 10),
+          Material(
+            color: AppCultureColors.rewardBg,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _openAchievements,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppCultureColors.rewardBorder),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.emoji_events_rounded,
+                      size: 20,
+                      color: AppCultureColors.amberDark,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Thành tựu & Huy hiệu',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppCultureColors.rewardText,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Mở khóa mốc hành trình để nhận thêm điểm thưởng',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: AppCultureColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: AppCultureColors.amberDark,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),

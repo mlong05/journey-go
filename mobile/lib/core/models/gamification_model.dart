@@ -176,6 +176,8 @@ class PointTransactionModel {
         return 'Trải nghiệm';
       case 'EARNED_TOUR':
         return 'Hoàn thành tour';
+      case 'EARNED_ACHIEVEMENT':
+        return 'Thưởng thành tựu';
       case 'REDEEM_VOUCHER':
         return 'Đổi voucher';
       case 'ADMIN_ADJUST':
@@ -302,4 +304,178 @@ class UserVoucherModel {
 
   bool get isUsable => status == 'AVAILABLE' && !isExpired;
   bool get isUsed => status == 'USED';
+}
+
+/// Thành tựu cá nhân của du khách (GET /api/v1/tourist/achievements).
+class TouristAchievementModel {
+  final int id;
+  final String code;
+  final String name;
+  final String description;
+  final String category; // TOUR | CHECKIN | CULTURE_QUIZ | EXPERIENCE | STREAK_LOYALTY
+  final String tier; // BRONZE | SILVER | GOLD | LEGENDARY
+  final int targetValue;
+  final int currentProgress;
+  final String status; // LOCKED | CLAIMABLE | CLAIMED
+  final int pointsReward;
+  final String? badgeName;
+  final String? badgeIcon;
+  final int? badgeId;
+  final DateTime? achievedAt;
+  final DateTime? claimedAt;
+
+  const TouristAchievementModel({
+    required this.id,
+    required this.code,
+    required this.name,
+    required this.description,
+    required this.category,
+    required this.tier,
+    required this.targetValue,
+    required this.currentProgress,
+    required this.status,
+    required this.pointsReward,
+    this.badgeName,
+    this.badgeIcon,
+    this.badgeId,
+    this.achievedAt,
+    this.claimedAt,
+  });
+
+  bool get isClaimable => status == 'CLAIMABLE';
+  bool get isClaimed => status == 'CLAIMED';
+  bool get isLocked => status == 'LOCKED';
+  bool get isAchieved => isClaimable || isClaimed;
+
+  int get safeTarget => targetValue > 0 ? targetValue : 1;
+  int get displayProgress =>
+      isLocked ? currentProgress.clamp(0, safeTarget) : safeTarget;
+  double get progressRatio => (displayProgress / safeTarget).clamp(0.0, 1.0);
+  int get progressPercent => (progressRatio * 100).round().clamp(0, 100);
+
+  TouristAchievementModel copyWith({
+    String? status,
+    DateTime? claimedAt,
+  }) {
+    return TouristAchievementModel(
+      id: id,
+      code: code,
+      name: name,
+      description: description,
+      category: category,
+      tier: tier,
+      targetValue: targetValue,
+      currentProgress: currentProgress,
+      status: status ?? this.status,
+      pointsReward: pointsReward,
+      badgeName: badgeName,
+      badgeIcon: badgeIcon,
+      badgeId: badgeId,
+      achievedAt: achievedAt,
+      claimedAt: claimedAt ?? this.claimedAt,
+    );
+  }
+
+  factory TouristAchievementModel.fromJson(Map<String, dynamic> json) {
+    final badgeName = json['badgeName']?.toString();
+    final badgeIcon = json['badgeIcon']?.toString();
+    return TouristAchievementModel(
+      id: _asInt(json['id']),
+      code: json['code']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      category: json['category']?.toString() ?? 'TOUR',
+      tier: json['tier']?.toString() ?? 'BRONZE',
+      targetValue: _asInt(json['targetValue']),
+      currentProgress: _asInt(json['currentProgress']),
+      status: json['status']?.toString() ?? 'LOCKED',
+      pointsReward: _asInt(json['pointsReward']),
+      badgeName: (badgeName != null && badgeName.isNotEmpty) ? badgeName : null,
+      badgeIcon: (badgeIcon != null && badgeIcon.isNotEmpty) ? badgeIcon : null,
+      badgeId: json['badgeId'] == null ? null : _asInt(json['badgeId']),
+      achievedAt: _parseDate(json['achievedAt']),
+      claimedAt: _parseDate(json['claimedAt']),
+    );
+  }
+}
+
+/// Thống kê tổng quan thành tựu (GET /api/v1/tourist/achievements/summary).
+class AchievementSummaryModel {
+  final int totalAchieved;
+  final int unclaimedCount;
+  final int totalClaimed;
+  final int totalPointsEarned;
+
+  const AchievementSummaryModel({
+    required this.totalAchieved,
+    required this.unclaimedCount,
+    required this.totalClaimed,
+    required this.totalPointsEarned,
+  });
+
+  AchievementSummaryModel copyWith({
+    int? totalAchieved,
+    int? unclaimedCount,
+    int? totalClaimed,
+    int? totalPointsEarned,
+  }) {
+    return AchievementSummaryModel(
+      totalAchieved: totalAchieved ?? this.totalAchieved,
+      unclaimedCount: unclaimedCount ?? this.unclaimedCount,
+      totalClaimed: totalClaimed ?? this.totalClaimed,
+      totalPointsEarned: totalPointsEarned ?? this.totalPointsEarned,
+    );
+  }
+
+  factory AchievementSummaryModel.fromJson(Map<String, dynamic> json) =>
+      AchievementSummaryModel(
+        totalAchieved: _asInt(json['totalAchieved']),
+        unclaimedCount: _asInt(json['unclaimedCount']),
+        totalClaimed: _asInt(json['totalClaimed']),
+        totalPointsEarned: _asInt(json['totalPointsEarned']),
+      );
+}
+
+/// Kết quả khi bấm nhận thưởng thành tựu (POST /api/v1/tourist/achievements/{id}/claim).
+class ClaimAchievementResultModel {
+  final int achievementId;
+  final String achievementCode;
+  final String achievementName;
+  final String status;
+  final int pointsAwarded;
+  final int newPointBalance;
+  final String? badgeName;
+  final String? badgeIcon;
+  final int? badgeId;
+  final DateTime? claimedAt;
+
+  const ClaimAchievementResultModel({
+    required this.achievementId,
+    required this.achievementCode,
+    required this.achievementName,
+    required this.status,
+    required this.pointsAwarded,
+    required this.newPointBalance,
+    this.badgeName,
+    this.badgeIcon,
+    this.badgeId,
+    this.claimedAt,
+  });
+
+  factory ClaimAchievementResultModel.fromJson(Map<String, dynamic> json) {
+    final badgeName = json['badgeName']?.toString();
+    final badgeIcon = json['badgeIcon']?.toString();
+    return ClaimAchievementResultModel(
+      achievementId: _asInt(json['achievementId']),
+      achievementCode: json['achievementCode']?.toString() ?? '',
+      achievementName: json['achievementName']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'CLAIMED',
+      pointsAwarded: _asInt(json['pointsAwarded']),
+      newPointBalance: _asInt(json['newPointBalance']),
+      badgeName: (badgeName != null && badgeName.isNotEmpty) ? badgeName : null,
+      badgeIcon: (badgeIcon != null && badgeIcon.isNotEmpty) ? badgeIcon : null,
+      badgeId: json['badgeId'] == null ? null : _asInt(json['badgeId']),
+      claimedAt: _parseDate(json['claimedAt']),
+    );
+  }
 }

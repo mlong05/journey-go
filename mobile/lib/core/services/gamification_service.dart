@@ -24,14 +24,16 @@ class GamificationService {
   GamificationService._internal();
 
   static const String _base = '/gamification';
+  static const String _achievementsBase = '/tourist/achievements';
 
   Future<dynamic> _request(
     String method,
     String path, {
     bool auth = true,
+    String base = _base,
   }) async {
     final baseUrl = await TokenStorage.getBaseUrl();
-    final uri = Uri.parse('$baseUrl$_base$path');
+    final uri = Uri.parse('$baseUrl$base$path');
     final headers = <String, String>{'Accept': 'application/json'};
 
     if (auth) {
@@ -138,6 +140,52 @@ class GamificationService {
   Future<UserVoucherModel> redeemVoucher(int voucherId) async {
     final data = await _request('POST', '/vouchers/$voucherId/redeem');
     return UserVoucherModel.fromJson(
+      data is Map<String, dynamic> ? data : <String, dynamic>{},
+    );
+  }
+
+  /// GET /tourist/achievements
+  Future<List<TouristAchievementModel>> getAchievements({
+    String? category,
+    String? status,
+    int page = 0,
+    int size = 100,
+  }) async {
+    final params = <String, String>{
+      'page': '$page',
+      'size': '$size',
+      if (category != null && category.isNotEmpty) 'category': category,
+      if (status != null && status.isNotEmpty) 'status': status,
+    };
+    final query = Uri(queryParameters: params).query;
+    final data = await _request(
+      'GET',
+      '?$query',
+      base: _achievementsBase,
+    );
+    return _asList(data).map(TouristAchievementModel.fromJson).toList();
+  }
+
+  /// GET /tourist/achievements/summary
+  Future<AchievementSummaryModel> getAchievementSummary() async {
+    final data = await _request(
+      'GET',
+      '/summary',
+      base: _achievementsBase,
+    );
+    return AchievementSummaryModel.fromJson(
+      data is Map<String, dynamic> ? data : <String, dynamic>{},
+    );
+  }
+
+  /// POST /tourist/achievements/{id}/claim
+  Future<ClaimAchievementResultModel> claimAchievement(int achievementId) async {
+    final data = await _request(
+      'POST',
+      '/$achievementId/claim',
+      base: _achievementsBase,
+    );
+    return ClaimAchievementResultModel.fromJson(
       data is Map<String, dynamic> ? data : <String, dynamic>{},
     );
   }
