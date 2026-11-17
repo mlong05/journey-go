@@ -70,6 +70,15 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM roles WHERE name = 'CONTENT_PROVIDER') THEN
         UPDATE roles SET name = 'CONTENT_PROVIDER' WHERE name = 'PROVIDER';
     ELSE
+        -- Đã có CONTENT_PROVIDER: chuyển user của PROVIDER sang role CONTENT_PROVIDER
+        -- TRƯỚC khi xóa role cũ — nếu không, lệnh DELETE sẽ vi phạm foreign key
+        -- `users.role_id → roles.id` (lỗi: "update or delete on table roles violates
+        -- foreign key constraint ... on table users").
+        IF to_regclass('users') IS NOT NULL THEN
+            UPDATE users u
+            SET role_id = (SELECT id FROM roles WHERE name = 'CONTENT_PROVIDER' LIMIT 1)
+            WHERE u.role_id IN (SELECT id FROM roles WHERE name = 'PROVIDER');
+        END IF;
         DELETE FROM roles WHERE name = 'PROVIDER';
     END IF;
 END $$;
@@ -123,6 +132,20 @@ DO $$
 BEGIN
     IF to_regclass('roles') IS NULL THEN
         RETURN;
+    END IF;
+
+    -- Chuyển user của các role cũ sang role tương ứng TRƯỚC khi xóa — nếu không,
+    -- lệnh DELETE sẽ vi phạm foreign key `users.role_id → roles.id`.
+    IF to_regclass('users') IS NOT NULL THEN
+        UPDATE users u
+        SET role_id = (SELECT id FROM roles WHERE name = 'CONTENT_PROVIDER' LIMIT 1)
+        WHERE u.role_id IN (SELECT id FROM roles WHERE name IN ('PARTNER', 'PROVIDER'))
+          AND EXISTS (SELECT 1 FROM roles WHERE name = 'CONTENT_PROVIDER');
+
+        UPDATE users u
+        SET role_id = (SELECT id FROM roles WHERE name = 'CONTENT_MODERATOR' LIMIT 1)
+        WHERE u.role_id IN (SELECT id FROM roles WHERE name = 'MODERATOR')
+          AND EXISTS (SELECT 1 FROM roles WHERE name = 'CONTENT_MODERATOR');
     END IF;
 
     DELETE FROM roles WHERE name IN ('PARTNER', 'PROVIDER', 'MODERATOR');
