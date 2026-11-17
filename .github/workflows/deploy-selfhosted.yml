@@ -108,7 +108,7 @@ jobs:
       # và KHÔNG có Docker trong PATH (Docker Desktop cài trong user profile).
       # Bước này nạp đủ biến môi trường cho các bước sau.
       - name: Chuẩn bị môi trường Windows (PATH cho Docker + PowerShell)
-        shell: powershell
+        shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           $ErrorActionPreference = "Continue"
 
@@ -144,7 +144,9 @@ jobs:
             }
 
             # 3) Ghi PATH vào GITHUB_PATH để các bước SAU cũng dùng được.
-            $dockerBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            #    Dùng -Encoding ascii để KHÔNG ghi BOM (BOM sẽ dính vào phần tử
+            #    PATH đầu tiên và làm hỏng việc resolve lệnh).
+            $dockerBin | Out-File -FilePath $env:GITHUB_PATH -Encoding ascii -Append
             Write-Host "[OK] PATH đã được ghi vào GITHUB_PATH."
           } else {
             Write-Host "[WARN] Không tìm thấy docker.exe — kiểm tra cài đặt Docker Desktop."
@@ -155,7 +157,7 @@ jobs:
       # `actions/checkout` với `clean: true` sẽ XOÁ file untracked (kể cả `.env`)
       # trong workspace của runner ⇒ phải sao lưu TRƯỚC rồi khôi phục SAU checkout.
       - name: Sao lưu file .env trước khi checkout
-        shell: powershell
+        shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           $envFile = Join-Path $env:GITHUB_WORKSPACE ".env"
           $backupFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup"
@@ -176,7 +178,7 @@ jobs:
 
       - name: Khôi phục file .env sau khi checkout
         if: always()
-        shell: powershell
+        shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           $envFile = Join-Path $env:GITHUB_WORKSPACE ".env"
           $backupFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup"
@@ -190,7 +192,7 @@ jobs:
           }
 
       - name: Kiểm tra Docker Engine
-        shell: powershell
+        shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           docker version
           docker compose version
@@ -198,7 +200,7 @@ jobs:
       # File .env đã tồn tại sẵn trên máy chủ (gitignored, không đẩy lên GitHub).
       # Nếu thiếu ⇒ dừng với thông báo rõ ràng thay vì deploy với config sai.
       - name: Kiểm tra file .env (secrets nằm cục bộ, KHÔNG có trong GitHub)
-        shell: powershell
+        shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           if (-not (Test-Path .env) {
             Write-Error "Thiếu file .env trên máy chủ. Copy từ .env.example và điền secrets, KHÔNG commit file này lên Git."
@@ -210,15 +212,15 @@ jobs:
             ForEach-Object { ($_ -split '=', 2)[0] } | Sort-Object | ForEach-Object { "  - $_" }
 
       - name: Backup PostgreSQL trước khi deploy
-        shell: powershell
+        shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: .\scripts\backup\backup-postgres.ps1
 
       - name: Build & deploy (docker compose)
-        shell: powershell
+        shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: .\scripts\deploy\deploy.ps1 -SkipBackup
 
       - name: Smoke test qua nginx nội bộ
-        shell: powershell
+        shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           $urls = @("/", "/api/v1/destinations", "/actuator/health/liveness")
           foreach ($u in $urls) {
@@ -229,10 +231,10 @@ jobs:
 
       - name: Ghi log trạng thái container
         if: always()
-        shell: powershell
+        shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: docker compose ps
 
       - name: Ghi log lỗi backend (khi deploy fail)
         if: failure()
-        shell: powershell
+        shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: docker compose logs --tail 200 backend
