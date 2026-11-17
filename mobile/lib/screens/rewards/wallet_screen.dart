@@ -340,8 +340,8 @@ class _WalletScreenState extends State<WalletScreen> {
       child: Row(
         children: [
           action(
-            Icons.card_giftcard_rounded,
-            'Đổi thưởng',
+            Icons.confirmation_number_outlined,
+            'Đổi voucher',
             _openShop,
             primary: true,
           ),

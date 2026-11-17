@@ -18,6 +18,7 @@ import {
   RotateCcw,
   FileText,
   UsersRound,
+  Ticket,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -98,6 +99,13 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
+    id: "vouchers",
+    label: "Cấu hình voucher",
+    href: "/admin/vouchers",
+    icon: Ticket,
+    badge: null,
+  },
+  {
     id: "finance",
     label: "Tài chính & Thanh toán",
     href: "/admin/finance",
@@ -171,8 +179,6 @@ export default function AdminLayout({ children }) {
     pathname?.startsWith("/admin/regions") ||
     pathname?.startsWith("/admin/themes") ||
     pathname?.startsWith("/admin/finance") ||
-    pathname?.startsWith("/admin/refunds") ||
-    pathname?.startsWith("/admin/refund-reasons") ||
     pathname?.startsWith("/admin/settlements");
 
   // Xử lý tìm kiếm nhanh từ Topbar

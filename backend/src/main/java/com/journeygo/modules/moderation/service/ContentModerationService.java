@@ -19,6 +19,9 @@ import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import com.journeygo.modules.aiguide.event.ContentApprovedEvent;
+import com.journeygo.modules.aiguide.event.ContentInvalidatedEvent;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,6 +37,7 @@ public class ContentModerationService {
     private final CulturalContentRepository contentRepository;
     private final UserRepository userRepository;
     private final NotificationPublisher notifications;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ContentReviewResponse submit(Long contentId, Long callerId, Role role) {
@@ -182,6 +186,24 @@ public class ContentModerationService {
                 .queue(NotificationPublisher.Queue.MY_CONTENT)
                 .publish();
         notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.CONTENT_REVIEW);
+
+        // Phát sự kiện đồng bộ Vector cho AI Guide Module
+        if (approved) {
+            eventPublisher.publishEvent(new ContentApprovedEvent(
+                    contentId,
+                    destination.getId(),
+                    destination.getName(),
+                    review.getContent().getContentType(),
+                    review.getContent().getTitle(),
+                    review.getContent().getContentText()
+            ));
+        } else {
+            eventPublisher.publishEvent(new ContentInvalidatedEvent(
+                    contentId,
+                    "CONTENT_REJECTED"
+            ));
+        }
+
         return toResponse(saved);
     }
 

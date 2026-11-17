@@ -68,11 +68,13 @@ class BookingService {
   /// [experienceDate] nhận cả `String` (`YYYY-MM-DD`) lẫn `DateTime`.
   /// [passengers] là danh sách hành khách (có thể đặt cho cả nhóm);
   /// hành khách đầu tiên là người đặt tour.
+  /// [voucherCode] mã voucher quy đổi của người dùng (nếu có).
   Future<BookingModel> createBooking({
     required int tourId,
     required Object experienceDate,
     List<BookingPassengerInput> passengers = const [],
     String? note,
+    String? voucherCode,
   }) async {
     final date = experienceDate is DateTime
         ? _formatDate(experienceDate)
@@ -82,6 +84,7 @@ class BookingService {
       body['passengers'] = passengers.map((p) => p.toJson()).toList();
     }
     if (note != null && note.isNotEmpty) body['note'] = note;
+    if (voucherCode != null && voucherCode.isNotEmpty) body['voucherCode'] = voucherCode;
     final data = await ApiClient.request('POST', _endpoint, body: body);
     return BookingModel.fromJson(data as Map<String, dynamic>);
   }
@@ -92,12 +95,14 @@ class BookingService {
     required DateTime experienceDate,
     List<BookingPassengerInput> passengers = const [],
     String? note,
+    String? voucherCode,
   }) =>
       createBooking(
         tourId: tourId,
         experienceDate: experienceDate,
         passengers: passengers,
         note: note,
+        voucherCode: voucherCode,
       );
 
   /// Danh sách booking của tôi.

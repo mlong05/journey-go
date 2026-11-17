@@ -143,6 +143,12 @@ public enum ErrorCode {
     // ── Notification ──────────────────────────────────────────────────────────
     NOTIFICATION_NOT_FOUND("Thông báo không tồn tại", HttpStatus.NOT_FOUND),
 
+    // ── AI Virtual Guide ──────────────────────────────────────────────────────
+    AI_SERVICE_UNAVAILABLE("Dịch vụ AI chưa sẵn sàng hoặc chưa được cấu hình API Key", HttpStatus.SERVICE_UNAVAILABLE),
+    AI_EMBEDDING_FAILED("Không thể tính toán vector nhúng từ mô hình AI", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_CHAT_FAILED("Xử lý hội thoại AI thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
+    AI_SESSION_NOT_FOUND("Phiên hội thoại AI không tồn tại", HttpStatus.NOT_FOUND),
+
     // ── Booking nhóm (Đặt - Thanh toán tour) ────────────────────────────────
     BOOKING_GUEST_TYPE_NOT_AVAILABLE("Tour hiện không bán vé cho loại khách này", HttpStatus.BAD_REQUEST),
     BOOKING_PASSENGER_NOT_FOUND("Hành khách không tồn tại trong đơn đặt này", HttpStatus.NOT_FOUND),
@@ -163,7 +169,11 @@ public enum ErrorCode {
     BOOKING_TOUR_LOCKED("Tour chỉ mở từ ngày trải nghiệm — chưa thể bắt đầu hành trình", HttpStatus.CONFLICT),
     PROVIDER_CHAT_CONVERSATION_NOT_FOUND("Cuộc trò chuyện không tồn tại", HttpStatus.NOT_FOUND),
     PROVIDER_CHAT_TARGET_REQUIRED("Cần chọn tour hoặc nhà tour để bắt đầu trò chuyện", HttpStatus.BAD_REQUEST),
-    PROVIDER_CHAT_NO_PROVIDER("Tour này chưa có nhà tour liên hệ", HttpStatus.BAD_REQUEST);
+    PROVIDER_CHAT_NO_PROVIDER("Tour này chưa có nhà tour liên hệ", HttpStatus.BAD_REQUEST),
+    VOUCHER_NOT_FOUND("Mã voucher không tồn tại hoặc không thuộc về bạn", HttpStatus.NOT_FOUND),
+    VOUCHER_ALREADY_USED("Voucher đã được sử dụng", HttpStatus.BAD_REQUEST),
+    VOUCHER_EXPIRED("Voucher đã hết hạn sử dụng", HttpStatus.BAD_REQUEST),
+    VOUCHER_INVALID("Voucher không hợp lệ cho đơn hàng này", HttpStatus.BAD_REQUEST);
 
     private final String message;
     private final HttpStatus httpStatus;

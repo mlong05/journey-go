@@ -27,6 +27,8 @@ public record SettlementDetailResponse(
         @Schema(description = "Tổng refund thành công") BigDecimal refundAmount,
         @Schema(description = "Tỷ lệ hoa hồng") BigDecimal commissionRate,
         @Schema(description = "Hoa hồng nền tảng") BigDecimal commissionAmount,
+        @Schema(description = "Số tiền voucher giảm giá") BigDecimal voucherDiscount,
+        @Schema(description = "Phạm vi voucher áp dụng") com.journeygo.modules.voucher.entity.enums.VoucherScope voucherScope,
         @Schema(description = "Tổng điều chỉnh") BigDecimal adjustmentAmount,
         @Schema(description = "Số tiền ProviderProfile được nhận") BigDecimal providerNetAmount,
         @Schema(description = "Trạng thái khoản doanh thu") ProviderRevenueStatus status

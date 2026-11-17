@@ -4,6 +4,9 @@ import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.gamification.dto.*;
+import com.journeygo.modules.voucher.dto.response.VoucherResponse;
+import com.journeygo.modules.voucher.repository.VoucherRepository;
+import com.journeygo.modules.voucher.entity.Voucher;
 import com.journeygo.modules.gamification.entity.*;
 import com.journeygo.modules.gamification.entity.enums.BadgeType;
 import com.journeygo.modules.gamification.entity.enums.PointTransactionType;
@@ -22,8 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -256,7 +258,7 @@ public class GamificationService {
             throw new BusinessException("VOUCHER-OUT-OF-STOCK", "Voucher này đã hết lượt quy đổi");
         }
 
-        Instant now = Instant.now();
+        LocalDate now = LocalDate.now();
         if (voucher.getStartDate() != null && voucher.getStartDate().isAfter(now)) {
             throw new BusinessException("VOUCHER-NOT-STARTED", "Chương trình quy đổi voucher này chưa bắt đầu");
         }
@@ -279,7 +281,7 @@ public class GamificationService {
         String randomSuffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         String generatedCode = voucher.getCode() + "-" + randomSuffix;
 
-        Instant expiryDate = now.plus(voucher.getValidDays(), ChronoUnit.DAYS);
+        LocalDate expiryDate = now.plusDays(voucher.getValidDays());
 
         UserVoucher userVoucher = UserVoucher.builder()
                 .userId(userId)

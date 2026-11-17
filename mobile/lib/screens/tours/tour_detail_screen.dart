@@ -23,6 +23,7 @@ import 'tour_detail_sections.dart';
 import 'tour_route_map.dart';
 import 'tour_style.dart';
 import 'experience_date_calendar.dart';
+import 'voucher_selection_sheet.dart';
 
 /// Chi tiết tour: hành trình theo thứ tự điểm đến, trải nghiệm của từng điểm và giá trọn gói.
 ///
@@ -251,6 +252,23 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     );
     if (group == null || !mounted) return;
 
+    // 2.5) Chọn voucher giảm giá (tùy chọn).
+    String? voucherCode;
+    VoucherSelectionResult? voucherResult;
+    try {
+      voucherResult = await showVoucherSelectionSheet(
+        context: context,
+        tourPrice: _tour.price,
+        partnerId: _tour.providerId,
+      );
+    } catch (_) {
+      // Lỗi khi mở bottom sheet ⇒ bỏ qua voucher, tiếp tục đặt tour.
+    }
+    if (!mounted) return;
+    if (voucherResult != null) {
+      voucherCode = voucherResult.userVoucherCode;
+    }
+
     // 3) Tạo booking thật (giữ chỗ 10 phút) rồi sang màn thanh toán VNPay.
     setState(() => _bookingInProgress = true);
     try {
@@ -258,6 +276,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         tourId: _tour.id,
         experienceDate: bookedDate,
         passengers: group.passengers,
+        voucherCode: voucherCode,
       );
       if (!mounted) return;
       // Đơn chưa thanh toán vẫn nằm ở "Đơn đặt tour > Chờ thanh toán" nếu khách thoát giữa chừng.
