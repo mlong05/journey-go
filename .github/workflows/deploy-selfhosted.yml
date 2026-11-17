@@ -161,21 +161,38 @@ jobs:
           Write-Host "[OK] PATH exported to GITHUB_PATH."
 
       # -- Keep the local .env file on the server ------------------------------
-      # "actions/checkout" with "clean: true" deletes untracked files
-      # (including .env) in the runner workspace, so back it up BEFORE the
-      # checkout and restore it AFTER.
+      # The .env file lives OUTSIDE the runner workspace, in a stable folder
+      # next to the runner installation (see .runner\.secrets\.env). This is
+      # required because "actions/checkout" with "clean: true" wipes the
+      # whole workspace directory, so anything stored inside it is lost on
+      # every run.
       - name: Back up .env before checkout
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
-          $envFile = Join-Path $env:GITHUB_WORKSPACE ".env"
+          # Locate the runner installation root by walking up from the
+          # workspace until a folder named ".runner" is found.
+          # GITHUB_WORKSPACE = <runnerRoot>\.runner\_work\<repo>\<repo>
+          $dir = Split-Path -Parent $env:GITHUB_WORKSPACE
+          $runnerRoot = $null
+          for ($i = 0; $i -lt 8 -and $dir; $i++) {
+            if ((Split-Path -Leaf $dir) -eq ".runner") { $runnerRoot = $dir; break }
+            $dir = Split-Path -Parent $dir
+          }
+          if (-not $runnerRoot) {
+            Write-Error "Could not locate the .runner folder from GITHUB_WORKSPACE=$env:GITHUB_WORKSPACE"
+            exit 1
+          }
+          $stableEnv = Join-Path $runnerRoot ".secrets\.env"
           $backupFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup"
           $flagFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup.flag"
-          if (Test-Path $envFile) {
-            Copy-Item -Path $envFile -Destination $backupFile -Force
+          Write-Host "[INFO] Runner root  : $runnerRoot"
+          Write-Host "[INFO] Stable .env  : $stableEnv"
+          if (Test-Path $stableEnv) {
+            Copy-Item -Path $stableEnv -Destination $backupFile -Force
             Write-Host "[OK] .env backed up to $backupFile"
             "true" | Out-File -FilePath $flagFile -Encoding ascii
           } else {
-            Write-Host "[WARN] No .env found on the server - using .env.example as template."
+            Write-Host "[WARN] No .env found at $stableEnv - using .env.example as template."
             "false" | Out-File -FilePath $flagFile -Encoding ascii
           }
 
@@ -195,7 +212,7 @@ jobs:
           $hasBackup = (Test-Path $flagFile) -and ((Get-Content $flagFile -Raw).Trim() -eq "true")
           if ($hasBackup -and (Test-Path $backupFile)) {
             Copy-Item -Path $backupFile -Destination $envFile -Force
-            Write-Host "[OK] .env restored on the server."
+            Write-Host "[OK] .env restored into the workspace."
           } else {
             Write-Host "[WARN] No .env backup found - keeping the current state (if any)."
           }
