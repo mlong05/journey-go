@@ -47,8 +47,10 @@ function validate(passengers, date, guestTypes) {
       if (age === null || age < 0) e.birthDate = "Ngày sinh không hợp lệ";
       else if (age < meta.min || age > meta.max) e.birthDate = `${meta.label} phải ${meta.age} vào ngày đi tour (hiện ${age} tuổi)`;
     }
+    // Chỉ người lớn có ô email; trẻ em/trẻ nhỏ/em bé không cần nên bỏ qua kiểm tra.
+    if (p.guestType !== "ADULT") return;
     const email = p.email.trim().toLowerCase();
-    if (p.guestType === "ADULT" && !email) e.email = "Người lớn cần email để nhận vé";
+    if (!email) e.email = "Người lớn cần email để nhận vé";
     else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Email không hợp lệ";
     else if (email && seen.has(email)) e.email = `Trùng email với hành khách ${seen.get(email) + 1}`;
     if (email) seen.set(email, i);
@@ -108,7 +110,7 @@ function CheckoutForm({ tourId }) {
         note: note.trim() || null,
         passengers: passengers.map((p) => ({
           fullName: p.fullName.trim(), birthDate: p.birthDate, gender: p.gender,
-          email: p.email.trim() || null, guestType: p.guestType,
+          email: p.guestType === "ADULT" ? p.email.trim() || null : null, guestType: p.guestType,
         })),
       });
       setPendingBooking(booking);
@@ -207,11 +209,13 @@ function CheckoutForm({ tourId }) {
                     </div>
                     {err.gender && <p className="mt-1 text-xs font-semibold text-rose-600">{err.gender}</p>}
                   </div>
-                  <div className="sm:col-span-2">
-                    <label htmlFor={id("email")} className="mb-1 block text-xs font-bold text-slate-600">Email {p.guestType === "ADULT" ? "" : <span className="font-normal text-slate-400">(không bắt buộc)</span>}</label>
-                    <input id={id("email")} type="email" className={input} value={p.email} onChange={(e) => set(i, { email: e.target.value })} aria-invalid={Boolean(err.email)} autoComplete={p.isBooker ? "email" : "off"} />
-                    {err.email && <p className="mt-1 text-xs font-semibold text-rose-600">{err.email}</p>}
-                  </div>
+                  {p.guestType === "ADULT" && (
+                    <div className="sm:col-span-2">
+                      <label htmlFor={id("email")} className="mb-1 block text-xs font-bold text-slate-600">Email</label>
+                      <input id={id("email")} type="email" className={input} value={p.email} onChange={(e) => set(i, { email: e.target.value })} aria-invalid={Boolean(err.email)} autoComplete={p.isBooker ? "email" : "off"} />
+                      {err.email && <p className="mt-1 text-xs font-semibold text-rose-600">{err.email}</p>}
+                    </div>
+                  )}
                 </div>
               </fieldset>
             );
@@ -265,11 +269,21 @@ function CheckoutForm({ tourId }) {
 }
 
 /** Trang /checkout/[tourId]?date=yyyy-MM-dd&adult=2&child=1 — cần đăng nhập du khách. */
+/**
+ * Dựng lại form mỗi khi tour / ngày / số khách trên đường dẫn thay đổi.
+ * ⚠️ cacheComponents giữ lại trang cũ khi điều hướng: không có `key` thì danh sách hành khách (tạo 1 lần
+ * bằng useState) vẫn là của lần đặt trước — vd. chọn lại 2 người lớn mà vẫn hiện ô trẻ em, em bé.
+ */
+function KeyedCheckoutForm({ tourId }) {
+  const params = useSearchParams();
+  return <CheckoutForm key={`${tourId}?${params.toString()}`} tourId={tourId} />;
+}
+
 export default function CheckoutScreen({ tourId }) {
   return (
     <TouristShell>
       <RequireTourist>
-        <CheckoutForm tourId={tourId} />
+        <KeyedCheckoutForm tourId={tourId} />
       </RequireTourist>
     </TouristShell>
   );
