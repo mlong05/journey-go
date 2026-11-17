@@ -6,6 +6,12 @@ server:
 spring:
   application:
     name: journey-go-backend
+  # Profile mặc định khi không set biến môi trường.
+  #   dev  → chạy local (application-dev.yml)
+  #   prod → chạy trong Docker / máy chủ thật (application-prod.yml)
+  # Biến môi trường SPRING_PROFILES_ACTIVE sẽ ghi đè giá trị này.
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   servlet:
     multipart:
       # Ảnh tối đa 10MB, video cổ vật tối đa 100MB (kiểm tra chi tiết trong CloudinaryService)
