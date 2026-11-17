@@ -149,7 +149,10 @@ export default function ProviderPartnerInfoPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    // Gọi trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   const showToast = useCallback((msg) => {

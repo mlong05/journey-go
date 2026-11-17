@@ -193,7 +193,11 @@ export default function AdminCommissionPoliciesPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    // Gọi trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect
+    // (tránh cascading render — rule `react-hooks/set-state-in-effect`).
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   const handleCreate = async (e) => {
