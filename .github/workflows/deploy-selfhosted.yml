@@ -1,0 +1,190 @@
+name: CI/CD Self-Hosted Deploy
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Deploy JourneyGo lên máy chủ cá nhân (self-hosted runner) qua Docker Compose.
+#
+#  Luồng: push/merge vào `main` → Test (GitHub-hosted, nhanh & cô lập)
+#                                    → Deploy (self-hosted runner trên PC)
+#
+#  Yêu cầu bảo mật:
+#   - Job `deploy` CHỈ chạy trên runner có label `self-hosted` + `windows` +
+#     `journeygo-deploy`. Label riêng ⇒ workflow chỉ được gán cho runner
+#     mà bạn kiểm soát.
+#   - Mọi secret nằm trong file `.env` trên máy chủ (được gitignore) ⇒
+#     workflow KHÔNG cần chứa secret nào trong GitHub.
+#   - Job deploy dùng `environment: production` ⇒ có thể thêm Protection Rule
+#     (required reviewers) trong Settings → Environments.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_deploy:
+        description: "Chỉ chạy test, không deploy"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: cicd-selfhosted-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  #  1. TEST — chạy trên GitHub-hosted runner (nhanh, không ảnh hưởng máy chủ)
+  # ────────────────────────────────────────────────────────────────────────────
+  test:
+    name: Test (Backend + Frontend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Backend ──
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Backend — compile & unit test
+        working-directory: backend
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -ntp clean test
+
+      # ── Frontend ──
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend — install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend — check imports
+        working-directory: frontend
+        run: node scripts/check-imports.cjs src
+
+      - name: Frontend — lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Frontend — build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8088/api/v1
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ci-placeholder
+          NEXT_PUBLIC_GOONG_MAPTILES_KEY: ci-placeholder
+          NEXT_PUBLIC_MOCK_PAYMENT: "true"
+        run: npm run build
+
+  # ────────────────────────────────────────────────────────────────────────────
+  #  2. DEPLOY — self-hosted runner trên PC (Windows)
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy (Docker Compose, self-hosted)
+    needs: test
+    if: ${{ !inputs.skip_deploy }}
+    runs-on: [self-hosted, windows, journeygo-deploy]
+    timeout-minutes: 90
+    environment: production
+
+    steps:
+      # ── Giữ lại file `.env` trên máy chủ ───────────────────────────────────
+      # `actions/checkout` với `clean: true` sẽ XOÁ file untracked (kể cả `.env`)
+      # trong workspace của runner ⇒ phải sao lưu TRƯỚC rồi khôi phục SAU checkout.
+      - name: Sao lưu file .env trước khi checkout
+        shell: pwsh
+        run: |
+          $envFile = Join-Path $env:GITHUB_WORKSPACE ".env"
+          $backupFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup"
+          if (Test-Path $envFile) {
+            Copy-Item -Path $envFile -Destination $backupFile -Force
+            Write-Host "Đã sao lưu .env → $backupFile"
+            "true" | Out-File -FilePath (Join-Path $env:RUNNER_TEMP "journeygo-env-backup.flag") -Encoding ascii
+          } else {
+            Write-Host "Không tìm thấy .env trên máy chủ — sẽ dùng .env.example làm mẫu."
+            "false" | Out-File -FilePath (Join-Path $env:RUNNER_TEMP "journeygo-env-backup.flag") -Encoding ascii
+          }
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Giữ lại file `.env` trên máy chủ khi runner checkout lại.
+          clean: true
+
+      - name: Khôi phục file .env sau khi checkout
+        if: always()
+        shell: pwsh
+        run: |
+          $envFile = Join-Path $env:GITHUB_WORKSPACE ".env"
+          $backupFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup"
+          $flagFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup.flag"
+          $hasBackup = (Test-Path $flagFile) -and ((Get-Content $flagFile -Raw).Trim() -eq "true")
+          if ($hasBackup -and (Test-Path $backupFile)) {
+            Copy-Item -Path $backupFile -Destination $envFile -Force
+            Write-Host "Đã khôi phục .env trên máy chủ."
+          } else {
+            Write-Host "Không có bản sao lưu .env — giữ nguyên trạng thái hiện tại (nếu có)."
+          }
+
+      - name: Kiểm tra Docker Engine
+        shell: pwsh
+        run: |
+          docker version
+          docker compose version
+
+      # File .env đã tồn tại sẵn trên máy chủ (gitignored, không đẩy lên GitHub).
+      # Nếu thiếu ⇒ dừng với thông báo rõ ràng thay vì deploy với config sai.
+      - name: Kiểm tra file .env (secrets nằm cục bộ, KHÔNG có trong GitHub)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path .env) {
+            Write-Error "Thiếu file .env trên máy chủ. Copy từ .env.example và điền secrets, KHÔNG commit file này lên Git."
+            exit 1
+          }
+          # In ra danh sách KEY (không in VALUE) để audit.
+          Write-Host "Các biến đã cấu hình:"
+          Get-Content .env | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } |
+            ForEach-Object { ($_ -split '=', 2)[0] } | Sort-Object | ForEach-Object { "  - $_" }
+
+      - name: Backup PostgreSQL trước khi deploy
+        shell: pwsh
+        run: .\scripts\backup\backup-postgres.ps1
+
+      - name: Build & deploy (docker compose)
+        shell: pwsh
+        run: .\scripts\deploy\deploy.ps1 -SkipBackup
+
+      - name: Smoke test qua nginx nội bộ
+        shell: pwsh
+        run: |
+          $urls = @("/", "/api/v1/destinations", "/actuator/health/liveness")
+          foreach ($u in $urls) {
+            $code = curl.exe -s -o NUL -w "%{http_code}" -m 20 "http://127.0.0.1:8080$u"
+            Write-Host "$u -> $code"
+            if ($code -ne "200") { Write-Error "Smoke test thất bại tại $u"; exit 1 }
+          }
+
+      - name: Ghi log trạng thái container
+        if: always()
+        shell: pwsh
+        run: docker compose ps
+
+      - name: Ghi log lỗi backend (khi deploy fail)
+        if: failure()
+        shell: pwsh
+        run: docker compose logs --tail 200 backend
