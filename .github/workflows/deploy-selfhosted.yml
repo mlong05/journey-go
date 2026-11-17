@@ -103,11 +103,59 @@ jobs:
     environment: production
 
     steps:
+      # ── Môi trường Windows cho runner ───────────────────────────────────────
+      # Runner chạy dưới tài khoản SYSTEM (Scheduled Task) ⇒ KHÔNG có PowerShell 7
+      # và KHÔNG có Docker trong PATH (Docker Desktop cài trong user profile).
+      # Bước này nạp đủ biến môi trường cho các bước sau.
+      - name: Chuẩn bị môi trường Windows (PATH cho Docker + PowerShell)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Continue"
+
+          # 1) Docker CLI — Docker Desktop nằm trong user profile của tài khoản
+          #    đã đăng nhập. Dưới SYSTEM, $env:LOCALAPPDATA trỏ về profile SYSTEM
+          #    ⇒ phải dò thủ công các profile có sẵn trên máy.
+          $dockerRoots = @(
+            "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin",
+            "C:\Program Files\Docker\Docker\resources\bin",
+            "C:\ProgramData\DockerDesktop\resources\bin"
+          )
+          $dockerRoots += (Get-ChildItem "C:\Users" -Directory -ErrorAction SilentlyContinue |
+            ForEach-Object { Join-Path $_.FullName "AppData\Local\Programs\DockerDesktop\resources\bin" })
+
+          $dockerBin = $dockerRoots | Where-Object { Test-Path (Join-Path $_ "docker.exe") } | Select-Object -First 1
+          if ($dockerBin) {
+            $env:PATH = "$dockerBin;$env:PATH"
+            Write-Host "[OK] Docker CLI: $dockerBin"
+
+            # 2) Docker Compose plugin — nằm ở ~/.docker/cli-plugins của user.
+            #    SYSTEM không thấy ⇒ copy sang ~/.docker/cli-plugins của SYSTEM.
+            $pluginSrc = Get-ChildItem "C:\Users" -Directory -ErrorAction SilentlyContinue |
+              ForEach-Object { Join-Path $_.FullName ".docker\cli-plugins" } |
+              Where-Object { Test-Path (Join-Path $_ "docker-compose.exe") } |
+              Select-Object -First 1
+            if ($pluginSrc) {
+              $pluginDst = Join-Path $env:USERPROFILE ".docker\cli-plugins"
+              New-Item -ItemType Directory -Force -Path $pluginDst | Out-Null
+              Copy-Item -Path (Join-Path $pluginSrc "docker-compose.exe") -Destination $pluginDst -Force
+              Write-Host "[OK] Docker Compose plugin: $pluginSrc -> $pluginDst"
+            } else {
+              Write-Host "[WARN] Không tìm thấy docker-compose plugin trong ~/.docker/cli-plugins"
+            }
+
+            # 3) Ghi PATH vào GITHUB_PATH để các bước SAU cũng dùng được.
+            $dockerBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            Write-Host "[OK] PATH đã được ghi vào GITHUB_PATH."
+          } else {
+            Write-Host "[WARN] Không tìm thấy docker.exe — kiểm tra cài đặt Docker Desktop."
+            exit 1
+          }
+
       # ── Giữ lại file `.env` trên máy chủ ───────────────────────────────────
       # `actions/checkout` với `clean: true` sẽ XOÁ file untracked (kể cả `.env`)
       # trong workspace của runner ⇒ phải sao lưu TRƯỚC rồi khôi phục SAU checkout.
       - name: Sao lưu file .env trước khi checkout
-        shell: pwsh
+        shell: powershell
         run: |
           $envFile = Join-Path $env:GITHUB_WORKSPACE ".env"
           $backupFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup"
@@ -128,7 +176,7 @@ jobs:
 
       - name: Khôi phục file .env sau khi checkout
         if: always()
-        shell: pwsh
+        shell: powershell
         run: |
           $envFile = Join-Path $env:GITHUB_WORKSPACE ".env"
           $backupFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup"
@@ -142,7 +190,7 @@ jobs:
           }
 
       - name: Kiểm tra Docker Engine
-        shell: pwsh
+        shell: powershell
         run: |
           docker version
           docker compose version
@@ -150,7 +198,7 @@ jobs:
       # File .env đã tồn tại sẵn trên máy chủ (gitignored, không đẩy lên GitHub).
       # Nếu thiếu ⇒ dừng với thông báo rõ ràng thay vì deploy với config sai.
       - name: Kiểm tra file .env (secrets nằm cục bộ, KHÔNG có trong GitHub)
-        shell: pwsh
+        shell: powershell
         run: |
           if (-not (Test-Path .env) {
             Write-Error "Thiếu file .env trên máy chủ. Copy từ .env.example và điền secrets, KHÔNG commit file này lên Git."
@@ -162,15 +210,15 @@ jobs:
             ForEach-Object { ($_ -split '=', 2)[0] } | Sort-Object | ForEach-Object { "  - $_" }
 
       - name: Backup PostgreSQL trước khi deploy
-        shell: pwsh
+        shell: powershell
         run: .\scripts\backup\backup-postgres.ps1
 
       - name: Build & deploy (docker compose)
-        shell: pwsh
+        shell: powershell
         run: .\scripts\deploy\deploy.ps1 -SkipBackup
 
       - name: Smoke test qua nginx nội bộ
-        shell: pwsh
+        shell: powershell
         run: |
           $urls = @("/", "/api/v1/destinations", "/actuator/health/liveness")
           foreach ($u in $urls) {
@@ -181,10 +229,10 @@ jobs:
 
       - name: Ghi log trạng thái container
         if: always()
-        shell: pwsh
+        shell: powershell
         run: docker compose ps
 
       - name: Ghi log lỗi backend (khi deploy fail)
         if: failure()
-        shell: pwsh
+        shell: powershell
         run: docker compose logs --tail 200 backend
