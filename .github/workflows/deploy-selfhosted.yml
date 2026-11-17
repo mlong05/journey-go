@@ -103,18 +103,25 @@ jobs:
     environment: production
 
     steps:
-      # ── Môi trường Windows cho runner ───────────────────────────────────────
-      # Runner chạy dưới tài khoản SYSTEM (Scheduled Task) ⇒ KHÔNG có PowerShell 7
-      # và KHÔNG có Docker trong PATH (Docker Desktop cài trong user profile).
-      # Bước này nạp đủ biến môi trường cho các bước sau.
-      - name: Chuẩn bị môi trường Windows (PATH cho Docker + PowerShell)
+      # -- Windows environment bootstrap for the runner ------------------------
+      # The runner runs as SYSTEM (Windows Scheduled Task):
+      #   * PowerShell 7 (pwsh) is NOT installed -> use Windows PowerShell 5.1.
+      #   * ExecutionPolicy for SYSTEM is Restricted -> scripts cannot run.
+      #   * Docker Desktop lives in a user profile -> not on SYSTEM's PATH.
+      #   * Inline "run:" scripts are written as UTF-8 without BOM, but
+      #     PowerShell 5.1 reads .ps1 files as ANSI -> any non-ASCII character
+      #     (e.g. Vietnamese text) breaks string literals and causes
+      #     ParseError ("The string is missing the terminator").
+      # => Every inline script below is intentionally ASCII-only.
+      # => Every step runs with -ExecutionPolicy Bypass.
+      - name: Prepare Windows environment (Docker PATH + execution policy)
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           $ErrorActionPreference = "Continue"
 
-          # 1) Docker CLI — Docker Desktop nằm trong user profile của tài khoản
-          #    đã đăng nhập. Dưới SYSTEM, $env:LOCALAPPDATA trỏ về profile SYSTEM
-          #    ⇒ phải dò thủ công các profile có sẵn trên máy.
+          # 1) Locate the Docker CLI.
+          #    Under SYSTEM, $env:LOCALAPPDATA points to the SYSTEM profile,
+          #    so scan the real user profiles explicitly.
           $dockerRoots = @(
             "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin",
             "C:\Program Files\Docker\Docker\resources\bin",
@@ -124,59 +131,61 @@ jobs:
             ForEach-Object { Join-Path $_.FullName "AppData\Local\Programs\DockerDesktop\resources\bin" })
 
           $dockerBin = $dockerRoots | Where-Object { Test-Path (Join-Path $_ "docker.exe") } | Select-Object -First 1
-          if ($dockerBin) {
-            $env:PATH = "$dockerBin;$env:PATH"
-            Write-Host "[OK] Docker CLI: $dockerBin"
-
-            # 2) Docker Compose plugin — nằm ở ~/.docker/cli-plugins của user.
-            #    SYSTEM không thấy ⇒ copy sang ~/.docker/cli-plugins của SYSTEM.
-            $pluginSrc = Get-ChildItem "C:\Users" -Directory -ErrorAction SilentlyContinue |
-              ForEach-Object { Join-Path $_.FullName ".docker\cli-plugins" } |
-              Where-Object { Test-Path (Join-Path $_ "docker-compose.exe") } |
-              Select-Object -First 1
-            if ($pluginSrc) {
-              $pluginDst = Join-Path $env:USERPROFILE ".docker\cli-plugins"
-              New-Item -ItemType Directory -Force -Path $pluginDst | Out-Null
-              Copy-Item -Path (Join-Path $pluginSrc "docker-compose.exe") -Destination $pluginDst -Force
-              Write-Host "[OK] Docker Compose plugin: $pluginSrc -> $pluginDst"
-            } else {
-              Write-Host "[WARN] Không tìm thấy docker-compose plugin trong ~/.docker/cli-plugins"
-            }
-
-            # 3) Ghi PATH vào GITHUB_PATH để các bước SAU cũng dùng được.
-            #    Dùng -Encoding ascii để KHÔNG ghi BOM (BOM sẽ dính vào phần tử
-            #    PATH đầu tiên và làm hỏng việc resolve lệnh).
-            $dockerBin | Out-File -FilePath $env:GITHUB_PATH -Encoding ascii -Append
-            Write-Host "[OK] PATH đã được ghi vào GITHUB_PATH."
-          } else {
-            Write-Host "[WARN] Không tìm thấy docker.exe — kiểm tra cài đặt Docker Desktop."
+          if (-not $dockerBin) {
+            Write-Error "docker.exe not found. Please install Docker Desktop on this machine."
             exit 1
           }
+          $env:PATH = "$dockerBin;$env:PATH"
+          Write-Host "[OK] Docker CLI: $dockerBin"
 
-      # ── Giữ lại file `.env` trên máy chủ ───────────────────────────────────
-      # `actions/checkout` với `clean: true` sẽ XOÁ file untracked (kể cả `.env`)
-      # trong workspace của runner ⇒ phải sao lưu TRƯỚC rồi khôi phục SAU checkout.
-      - name: Sao lưu file .env trước khi checkout
+          # 2) Copy the Docker Compose CLI plugin into the SYSTEM profile.
+          #    Docker Desktop installs it under the user profile's
+          #    .docker\cli-plugins folder, which SYSTEM cannot see.
+          $pluginSrc = Get-ChildItem "C:\Users" -Directory -ErrorAction SilentlyContinue |
+            ForEach-Object { Join-Path $_.FullName ".docker\cli-plugins" } |
+            Where-Object { Test-Path (Join-Path $_ "docker-compose.exe") } |
+            Select-Object -First 1
+          if ($pluginSrc) {
+            $pluginDst = Join-Path $env:USERPROFILE ".docker\cli-plugins"
+            New-Item -ItemType Directory -Force -Path $pluginDst | Out-Null
+            Copy-Item -Path (Join-Path $pluginSrc "docker-compose.exe") -Destination $pluginDst -Force
+            Write-Host "[OK] Docker Compose plugin: $pluginSrc -> $pluginDst"
+          } else {
+            Write-Host "[WARN] docker-compose plugin not found in any user profile"
+          }
+
+          # 3) Export PATH so later steps can resolve "docker".
+          #    Use -Encoding ascii so no BOM is written (a BOM would corrupt
+          #    the first PATH entry and break command resolution).
+          $dockerBin | Out-File -FilePath $env:GITHUB_PATH -Encoding ascii -Append
+          Write-Host "[OK] PATH exported to GITHUB_PATH."
+
+      # -- Keep the local .env file on the server ------------------------------
+      # "actions/checkout" with "clean: true" deletes untracked files
+      # (including .env) in the runner workspace, so back it up BEFORE the
+      # checkout and restore it AFTER.
+      - name: Back up .env before checkout
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           $envFile = Join-Path $env:GITHUB_WORKSPACE ".env"
           $backupFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup"
+          $flagFile = Join-Path $env:RUNNER_TEMP "journeygo-env-backup.flag"
           if (Test-Path $envFile) {
             Copy-Item -Path $envFile -Destination $backupFile -Force
-            Write-Host "Đã sao lưu .env → $backupFile"
-            "true" | Out-File -FilePath (Join-Path $env:RUNNER_TEMP "journeygo-env-backup.flag") -Encoding ascii
+            Write-Host "[OK] .env backed up to $backupFile"
+            "true" | Out-File -FilePath $flagFile -Encoding ascii
           } else {
-            Write-Host "Không tìm thấy .env trên máy chủ — sẽ dùng .env.example làm mẫu."
-            "false" | Out-File -FilePath (Join-Path $env:RUNNER_TEMP "journeygo-env-backup.flag") -Encoding ascii
+            Write-Host "[WARN] No .env found on the server - using .env.example as template."
+            "false" | Out-File -FilePath $flagFile -Encoding ascii
           }
 
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Giữ lại file `.env` trên máy chủ khi runner checkout lại.
+          # Keep the local .env file on the server when the runner re-checks out.
           clean: true
 
-      - name: Khôi phục file .env sau khi checkout
+      - name: Restore .env after checkout
         if: always()
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
@@ -186,55 +195,56 @@ jobs:
           $hasBackup = (Test-Path $flagFile) -and ((Get-Content $flagFile -Raw).Trim() -eq "true")
           if ($hasBackup -and (Test-Path $backupFile)) {
             Copy-Item -Path $backupFile -Destination $envFile -Force
-            Write-Host "Đã khôi phục .env trên máy chủ."
+            Write-Host "[OK] .env restored on the server."
           } else {
-            Write-Host "Không có bản sao lưu .env — giữ nguyên trạng thái hiện tại (nếu có)."
+            Write-Host "[WARN] No .env backup found - keeping the current state (if any)."
           }
 
-      - name: Kiểm tra Docker Engine
+      - name: Check Docker Engine
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           docker version
           docker compose version
 
-      # File .env đã tồn tại sẵn trên máy chủ (gitignored, không đẩy lên GitHub).
-      # Nếu thiếu ⇒ dừng với thông báo rõ ràng thay vì deploy với config sai.
-      - name: Kiểm tra file .env (secrets nằm cục bộ, KHÔNG có trong GitHub)
+      # The .env file already exists on the server (gitignored, never pushed
+      # to GitHub). If it is missing, stop with a clear message instead of
+      # deploying with a broken configuration.
+      - name: Check .env file (secrets live locally, NOT in GitHub)
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
-          if (-not (Test-Path .env) {
-            Write-Error "Thiếu file .env trên máy chủ. Copy từ .env.example và điền secrets, KHÔNG commit file này lên Git."
+          if (-not (Test-Path .env)) {
+            Write-Error "Missing .env on the server. Copy it from .env.example and fill in the secrets. Do NOT commit this file."
             exit 1
           }
-          # In ra danh sách KEY (không in VALUE) để audit.
-          Write-Host "Các biến đã cấu hình:"
+          # Print the configured KEYS only (never the VALUES) for auditing.
+          Write-Host "Configured variables:"
           Get-Content .env | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } |
             ForEach-Object { ($_ -split '=', 2)[0] } | Sort-Object | ForEach-Object { "  - $_" }
 
-      - name: Backup PostgreSQL trước khi deploy
+      - name: Backup PostgreSQL before deploy
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: .\scripts\backup\backup-postgres.ps1
 
-      - name: Build & deploy (docker compose)
+      - name: Build and deploy (docker compose)
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: .\scripts\deploy\deploy.ps1 -SkipBackup
 
-      - name: Smoke test qua nginx nội bộ
+      - name: Smoke test through internal nginx
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           $urls = @("/", "/api/v1/destinations", "/actuator/health/liveness")
           foreach ($u in $urls) {
             $code = curl.exe -s -o NUL -w "%{http_code}" -m 20 "http://127.0.0.1:8080$u"
             Write-Host "$u -> $code"
-            if ($code -ne "200") { Write-Error "Smoke test thất bại tại $u"; exit 1 }
+            if ($code -ne "200") { Write-Error "Smoke test failed at $u"; exit 1 }
           }
 
-      - name: Ghi log trạng thái container
+      - name: Show container status
         if: always()
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: docker compose ps
 
-      - name: Ghi log lỗi backend (khi deploy fail)
+      - name: Show backend logs (on deploy failure)
         if: failure()
         shell: powershell -ExecutionPolicy Bypass -command ". '{0}'"
         run: docker compose logs --tail 200 backend
