@@ -40,6 +40,16 @@ const APP_STEPS = [
 
 /** Giới hạn số mục mỗi phần ở trang chủ (phần dư dẫn sang /tours). */
 const LIMIT = { soonest: 4, moreTours: 8, regions: 6, themes: 8 };
+/**
+ * Số cột (máy tính) cho lưới ô chủ đề sao cho hàng cuối ít ô trống nhất — tránh 1 ô nằm lẻ một mình
+ * (vd. 5 ô ⇒ 5 cột, 6 ô ⇒ 3 cột, 7–8 ô ⇒ 4 cột). Class viết sẵn để Tailwind nhận ra.
+ */
+const LG_COLS = { 3: "lg:grid-cols-3", 4: "lg:grid-cols-4", 5: "lg:grid-cols-5" };
+function lgColsFor(n) {
+  if (n <= 5) return LG_COLS[Math.max(3, n)] || LG_COLS[4];
+  const empty = (c) => (n % c === 0 ? 0 : c - (n % c));
+  return LG_COLS[[4, 5, 3].reduce((best, c) => (empty(c) < empty(best) ? c : best), 4)];
+}
 /** Lưới thẻ tour cố định số cột theo màn hình (1 / 2 / 4) để tính được "đủ hàng". */
 const CARD_GRID = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4";
 
@@ -316,12 +326,15 @@ export default function HomePage() {
         {themeCards.items.length > 0 && (
           <section aria-labelledby="h-theme">
             <SectionHead id="h-theme" title="Khám phá theo chủ đề" sub="Chọn kiểu trải nghiệm bạn thích" />
-            <Reveal className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+            <Reveal className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${lgColsFor(themeCards.items.length + (themeCards.rest > 0 ? 1 : 0))}`}>
               {themeCards.items.map((th, i) => {
                 const cover = themeCover[th.id];
+                const tiles = themeCards.items.length + (themeCards.rest > 0 ? 1 : 0);
+                // Điện thoại 2 cột: số ô lẻ ⇒ ô cuối trải rộng hết hàng, không nằm lẻ một mình.
+                const spanLast = tiles % 2 === 1 && i === tiles - 1 ? "col-span-2 sm:col-span-1" : "";
                 return (
                   <Link key={th.id} href={`${ROUTES.TOURS}?themeId=${th.id}`} title={th.name} style={{ "--i": i }}
-                    className={`jg-item group relative flex min-h-[104px] min-w-0 flex-col justify-end overflow-hidden rounded-2xl p-3 transition duration-300 active:scale-[0.98] motion-reduce:transition-none sm:min-h-[120px] sm:p-3.5 ${cover ? "bg-teal-900 text-white" : "border border-slate-200 bg-white text-slate-900 hover:border-teal-400"}`}>
+                    className={`jg-item group relative flex min-h-[104px] min-w-0 flex-col justify-end overflow-hidden rounded-2xl p-3 transition duration-300 active:scale-[0.98] motion-reduce:transition-none sm:min-h-[120px] sm:p-3.5 ${spanLast} ${cover ? "bg-teal-900 text-white" : "border border-slate-200 bg-white text-slate-900 hover:border-teal-400"}`}>
                     {cover && <>
                       <img src={cover} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.07] motion-reduce:transition-none" />
                       <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/5 transition-opacity duration-300 group-hover:from-black/80" />
@@ -338,7 +351,7 @@ export default function HomePage() {
               })}
               {themeCards.rest > 0 && (
                 <Link href={ROUTES.TOURS} style={{ "--i": themeCards.items.length }}
-                  className="jg-item flex min-h-[104px] min-w-0 items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50 p-3 text-center text-sm font-bold text-teal-800 transition hover:border-teal-500 active:scale-[0.98] sm:min-h-[120px]">
+                  className={`jg-item flex min-h-[104px] min-w-0 items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50 p-3 text-center text-sm font-bold text-teal-800 transition hover:border-teal-500 active:scale-[0.98] sm:min-h-[120px] ${(themeCards.items.length + 1) % 2 === 1 ? "col-span-2 sm:col-span-1" : ""}`}>
                   + {themeCards.rest} chủ đề khác<ArrowRight size={15} />
                 </Link>
               )}
