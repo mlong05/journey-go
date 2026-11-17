@@ -1,0 +1,105 @@
+# =====================================================================================
+#  Spring Profile: DEV — chạy trên máy cá nhân, kết nối PostgreSQL/Redis local.
+#  Kích hoạt: SPRING_PROFILES_ACTIVE=dev  (hoặc mặc định khi không set)
+#
+#  Mọi giá trị nhạy cảm vẫn đọc từ biến môi trường / file `backend/.env`
+#  (spring-dotenv nạp `.env` tự động khi chạy từ thư mục `backend/`).
+# =====================================================================================
+
+spring:
+  # ── Datasource (local) ──────────────────────────────────────────────────────
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/journeygo_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:1}
+
+  # ── Redis (local) ───────────────────────────────────────────────────────────
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+
+  jpa:
+    hibernate:
+      # Dev: Hibernate tự cập nhật schema cho các bảng không có migration.
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        show-sql: false
+
+  # ── Flyway ──────────────────────────────────────────────────────────────────
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+
+  # ── Mail ────────────────────────────────────────────────────────────────────
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+  # ── OAuth2 (Google) ─────────────────────────────────────────────────────────
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:journeygo-client-id.apps.googleusercontent.com}
+            client-secret: ${GOOGLE_CLIENT_SECRET:journeygo-client-secret}
+            scope:
+              - email
+              - profile
+              - openid
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+
+server:
+  port: ${PORT:8088}
+  # Dev: không cần xử lý header của reverse proxy.
+  forward-headers-strategy: none
+
+app:
+  # ── CORS: chỉ cho phép frontend local ───────────────────────────────────────
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+
+  # ── WebSocket/STOMP ─────────────────────────────────────────────────────────
+  websocket:
+    allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,*}
+
+  # ── OAuth2 redirect ────────────────────────────────────────────────────────
+  oauth2:
+    default-redirect-uri: ${OAUTH2_DEFAULT_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
+    authorized-redirect-uris: ${OAUTH2_AUTHORIZED_REDIRECT_URIS:http://localhost:3000/oauth2/redirect,http://127.0.0.1:3000/oauth2/redirect,journeygo://oauth2/redirect,journeygo://auth/callback}
+
+  # ── Partner links ──────────────────────────────────────────────────────────
+  partner:
+    web-login-url: ${PARTNER_WEB_LOGIN_URL:http://localhost:3000/login}
+    activation-url: ${PARTNER_ACTIVATION_URL:http://localhost:3000/activate}
+    support-contact: ${PARTNER_SUPPORT_CONTACT:support@journeygo.com}
+
+  # ── VNPay ──────────────────────────────────────────────────────────────────
+  vnpay:
+    enabled: ${VNPAY_ENABLED:true}
+    web-return-url: ${VNPAY_WEB_RETURN_URL:http://localhost:3000/payment/result}
+    ip-addr: ${VNPAY_IP_ADDR:127.0.0.1}
+
+logging:
+  level:
+    root: ${LOGGING_LEVEL:INFO}
+    com.journeygo: ${LOGGING_LEVEL:DEBUG}
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
