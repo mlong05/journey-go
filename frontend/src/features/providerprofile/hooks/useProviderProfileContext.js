@@ -47,7 +47,10 @@ export function useProviderProfileContext() {
       router.push("/login");
       return;
     }
-    load();
+    // Gọi trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
+    (async () => {
+      await load();
+    })();
   }, [authData?.token, load, router]);
 
   return {
