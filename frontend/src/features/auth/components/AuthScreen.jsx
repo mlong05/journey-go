@@ -15,7 +15,7 @@ import AuthHeroCarousel from "./AuthHeroCarousel";
 import AuthFeedbackModal from "./AuthFeedbackModal";
 import AuthToast from "./AuthToast";
 import LoginForm from "./LoginForm";
-import RegisterForm from "./RegisterForm";
+import RegisterForm, { validateRegister } from "./RegisterForm";
 import ForgotPasswordFlow from "./ForgotPasswordFlow";
 import SocialLoginButtons from "./SocialLoginButtons";
 import HeritageLandmarksArt from "./HeritageLandmarksArt";
@@ -219,24 +219,10 @@ export default function AuthScreen({ initialTab = "login" }) {
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
 
-    if (!registerForm.fullName.trim()) {
-      showToast("error", "Vui lòng điền Họ và tên người đại diện.");
-      return;
-    }
-    if (!registerForm.phone.trim()) {
-      showToast("error", "Vui lòng cung cấp Số điện thoại liên hệ.");
-      return;
-    }
-    if (!registerForm.email.trim()) {
-      showToast("error", "Vui lòng nhập Email hợp lệ.");
-      return;
-    }
-    if (registerForm.password.length < 6) {
-      showToast("error", "Mật khẩu cần tối thiểu 6 ký tự.");
-      return;
-    }
-    if (registerForm.password !== registerForm.confirmPassword) {
-      showToast("error", "Mật khẩu xác nhận không trùng khớp.");
+    // Cùng bộ kiểm tra với RegisterForm (lỗi chi tiết đã hiện dưới từng ô) — báo lỗi đầu tiên.
+    const firstError = Object.values(validateRegister(registerForm))[0];
+    if (firstError) {
+      showToast("error", `${firstError}.`);
       return;
     }
     if (!registerForm.agreeTerms) {
@@ -250,7 +236,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       const targetRoleEnum = "TOURIST";
 
       const result = await authService.register({
-        fullName: registerForm.fullName.trim(),
+        fullName: registerForm.fullName.trim().replace(/\s+/g, " "),
         phone: registerForm.phone.trim(),
         email: registerForm.email.trim(),
         password: registerForm.password,
