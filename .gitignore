@@ -44,6 +44,9 @@ backups/
 .runner/
 _work/
 
+# Secrets dùng cho self-hosted deploy (KHÔNG commit — file .env để deploy)
+.secrets/
+
 # Next.js build output (frontend/.next) — không commit
 frontend/.next/
 .next/
