@@ -14,7 +14,9 @@ class ApiConstants {
   //   2. Fallback localhost/10.0.2.2 (chỉ dùng khi dev trên máy).
   static String getDefaultBaseUrl() {
     // 1) Env — luôn ưu tiên để cùng một bản build chạy được ở dev lẫn production.
-    final fromEnv = dotenv.maybeGet('API_BASE_URL')?.trim();
+    final fromEnv = dotenv.isInitialized
+        ? dotenv.maybeGet('API_BASE_URL')?.trim()
+        : null;
     if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
 
     // 2) Fallback theo môi trường chạy (chỉ khi thiếu env).
@@ -56,7 +58,7 @@ class ApiConstants {
   // Web Client ID: audience của idToken gửi lên backend (serverClientId của google_sign_in).
   // Cùng giá trị với NEXT_PUBLIC_GOOGLE_CLIENT_ID của frontend.
   static String get googleWebClientId {
-    final fromEnv = dotenv.maybeGet('GOOGLE_WEB_CLIENT_ID');
+    final fromEnv = dotenv.isInitialized ? dotenv.maybeGet('GOOGLE_WEB_CLIENT_ID') : null;
     if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
     return const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
   }
@@ -67,7 +69,7 @@ class ApiConstants {
   //   3. Rỗng (sẽ báo lỗi rõ ràng khi khởi tạo GoogleAuthService)
   static String get googleAndroidClientId {
     // 1) Đọc từ .env (đã được dotenv.load() trong main.dart)
-    final fromEnv = dotenv.maybeGet('GOOGLE_ANDROID_CLIENT_ID');
+    final fromEnv = dotenv.isInitialized ? dotenv.maybeGet('GOOGLE_ANDROID_CLIENT_ID') : null;
     if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
 
     // 2) Fallback: --dart-define khi build

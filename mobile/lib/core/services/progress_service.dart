@@ -1,6 +1,7 @@
 import '../models/booking_model.dart' show BookingModel;
 import '../models/gamification_model.dart'
     show
+        AchievementSummaryModel,
         BadgeModel,
         PointTransactionModel,
         UserPointModel,
@@ -37,6 +38,10 @@ class ProgressService {
 
   /// Danh mục mọi huy hiệu đang mở, để hiện cả huy hiệu chưa đạt.
   Future<List<BadgeModel>> getBadgeCatalog() => _gamification.getAllBadges();
+
+  /// Thống kê thành tựu tổng quan (đạt được, chờ nhận thưởng, điểm đã nhận).
+  Future<AchievementSummaryModel> getAchievementSummary() =>
+      _gamification.getAchievementSummary();
 
   Future<List<BadgeItem>> getBadges() async {
     final badges = await _gamification.getMyBadges();

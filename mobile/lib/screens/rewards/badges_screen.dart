@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/gamification_model.dart';
 import '../../core/services/gamification_service.dart';
+import 'achievements_screen.dart';
 import 'rewards_widgets.dart';
 
 /// Bộ sưu tập huy hiệu: mọi huy hiệu đang mở trong hệ thống, đánh dấu cái đã đạt kèm ngày nhận.
@@ -191,6 +192,48 @@ class _BadgesScreenState extends State<BadgesScreen> {
               minHeight: 8,
               backgroundColor: AppCultureColors.surfaceSubtle,
               color: AppCultureColors.gold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AchievementsScreen()),
+              );
+              if (mounted) _load();
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: AppCultureColors.jadeLight,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.emoji_events_outlined,
+                    size: 18,
+                    color: AppCultureColors.heritageJade,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Xem tiến độ & nhận thưởng thành tựu',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppCultureColors.jadeDark,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: AppCultureColors.heritageJade,
+                  ),
+                ],
+              ),
             ),
           ),
         ],

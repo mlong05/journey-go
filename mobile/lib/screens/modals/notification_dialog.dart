@@ -12,6 +12,7 @@ import '../../core/services/forum_service.dart';
 import '../forum/my_posts_screen.dart';
 import '../forum/post_detail_screen.dart';
 import '../refunds_screen.dart';
+import '../rewards/achievements_screen.dart';
 import '../rewards/badges_screen.dart';
 
 // ── Kiểu hiển thị theo nhóm (backend: NotificationType.Category) ─────────────
@@ -53,8 +54,15 @@ String _timeAgo(DateTime? t) {
 }
 
 /// Thông báo có màn đích để mở hay không (thông báo về báo cáo vi phạm thì chỉ đánh dấu đã đọc).
-bool _hasTarget(AppNotification n) =>
-    const {'BOOKING', 'REFUND', 'BADGE', 'POST', 'PROVIDER_CHAT', 'TOUR_INVITATION'}.contains(n.refType);
+bool _hasTarget(AppNotification n) => const {
+  'BOOKING',
+  'REFUND',
+  'BADGE',
+  'ACHIEVEMENT',
+  'POST',
+  'PROVIDER_CHAT',
+  'TOUR_INVITATION',
+}.contains(n.refType);
 
 /// Thông báo chat (tin nhắn từ đối tác / khách).
 ///
@@ -80,6 +88,7 @@ Future<void> openNotificationTarget(NavigatorState navigator, AppNotification n)
     'BOOKING' => const MyBookingsScreen(),
     'REFUND' => const RefundsScreen(),
     'BADGE' => const BadgesScreen(),
+    'ACHIEVEMENT' => const AchievementsScreen(),
     'POST' => const MyPostsScreen(),
     'PROVIDER_CHAT' => ProviderChatListScreen(openConversationId: n.refId),
     'TOUR_INVITATION' => InvitationConfirmScreen(invitationId: n.refId),

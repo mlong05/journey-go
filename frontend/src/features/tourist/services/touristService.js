@@ -208,6 +208,20 @@ export const touristService = {
     return list(data(await apiClient.get("/gamification/badges/my")));
   },
 
+  // ── Thành tựu & Huy hiệu ────────────────────────────────────────────────────
+  async achievements({ category, status, page = 0, size = 100 } = {}) {
+    const q = new URLSearchParams({ page: String(page), size: String(size) });
+    if (category) q.set("category", category);
+    if (status) q.set("status", status);
+    return list(data(await apiClient.get(`/tourist/achievements?${q}`)));
+  },
+  async achievementSummary() {
+    return data(await apiClient.get("/tourist/achievements/summary"));
+  },
+  async claimAchievement(achievementId) {
+    return data(await apiClient.post(`/tourist/achievements/${achievementId}/claim`, {}));
+  },
+
   // ── Thông báo ───────────────────────────────────────────────────────────────
   /** Danh sách thông báo của tôi (mới nhất trước). */
   async notifications({ page = 0, size = 30 } = {}) {

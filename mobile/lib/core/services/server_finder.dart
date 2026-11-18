@@ -26,6 +26,7 @@ class ServerFinder {
 
   /// Địa chỉ khai báo trong .env (API_BASE_URL), nếu có.
   static String? get envBaseUrl {
+    if (!dotenv.isInitialized) return null;
     final value = dotenv.maybeGet('API_BASE_URL')?.trim();
     return (value == null || value.isEmpty) ? null : value;
   }
