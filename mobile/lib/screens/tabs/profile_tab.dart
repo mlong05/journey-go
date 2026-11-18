@@ -4,7 +4,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/auth_models.dart';
 import '../../core/models/gamification_model.dart'
-    show PointTransactionModel, UserPointModel, formatDate, formatThousands;
+    show
+        AchievementSummaryModel,
+        PointTransactionModel,
+        UserPointModel,
+        formatDate,
+        formatThousands;
 import '../../core/models/journey_model.dart';
 import '../../core/models/booking_model.dart' show BookingModel;
 import '../../core/services/auth_service.dart';
@@ -21,6 +26,7 @@ import '../common/tab_refresh.dart';
 import '../forum/forum_widgets.dart' show ForumAvatar;
 import '../modals/edit_profile_modal.dart';
 import '../modals/notification_dialog.dart';
+import '../rewards/achievements_screen.dart';
 import '../rewards/badges_screen.dart';
 import '../rewards/rewards_widgets.dart' show BadgeIcon, PointTransactionTile;
 import '../rewards/wallet_screen.dart';
@@ -58,9 +64,16 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
     lifetimeEarned: 0,
     lifetimeSpent: 0,
   );
+  static const _emptyAchievementSummary = AchievementSummaryModel(
+    totalAchieved: 0,
+    unclaimedCount: 0,
+    totalClaimed: 0,
+    totalPointsEarned: 0,
+  );
 
   late UserModel _user;
   UserPointModel _points = _emptyPoints;
+  AchievementSummaryModel _achievementSummary = _emptyAchievementSummary;
   List<PointTransactionModel> _recentPoints = [];
   List<BadgeItem> _badges = [];
   List<JourneyTimelineItem> _timeline = [];
@@ -97,6 +110,10 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
         _recentPoints,
       ),
       keep<List<RefundModel>>(RefundService().getMine, _refunds),
+      keep<AchievementSummaryModel>(
+        _progress.getAchievementSummary,
+        _achievementSummary,
+      ),
     ]);
 
     if (mounted) {
@@ -107,9 +124,17 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
         _tickets = results[3] as List<BookingModel>;
         _recentPoints = results[4] as List<PointTransactionModel>;
         _refunds = results[5] as List<RefundModel>;
+        _achievementSummary = results[6] as AchievementSummaryModel;
         _firstLoad = false;
       });
     }
+  }
+
+  Future<void> _openAchievements() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AchievementsScreen()));
+    if (mounted) _loadProfileData();
   }
 
   Future<void> _openWallet() async {
@@ -593,13 +618,134 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
 
   // ─────────────────────── Hành trình di sản ───────────────────────
 
-  /// Bốn ô lối tắt; nội dung chi tiết chỉ mở ra khi bấm vào.
+  /// Banner Thành tựu & Nhận thưởng cùng bốn ô lối tắt; nội dung chi tiết chỉ mở ra khi bấm vào.
   Widget _buildHeritageSection() {
     final lastGain = _recentPoints.where((t) => t.isEarning).firstOrNull;
+    final unclaimed = _achievementSummary.unclaimedCount;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Hành trình di sản', 'Dấu ấn văn hoá bạn đã ghi lại'),
+        const SizedBox(height: 12),
+        Pressable(
+          onTap: _openAchievements,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF093B37), Color(0xFF0F524C)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: unclaimed > 0
+                    ? const Color(0xFFFBBF24)
+                    : AppCultureColors.heritageJade,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF093B37).withValues(alpha: 0.2),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFBBF24).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFFCD34D).withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.emoji_events_rounded,
+                    color: Color(0xFFFCD34D),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Thành tựu & Nhận thưởng',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_achievementSummary.totalAchieved} đã đạt • +${formatThousands(_achievementSummary.totalPointsEarned)} JP',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.82),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (unclaimed > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE11D48),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '$unclaimed chờ nhận',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Xem',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFFDE68A),
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withValues(alpha: 0.85),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 12),
         Row(
           children: [

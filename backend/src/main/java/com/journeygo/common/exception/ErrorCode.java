@@ -173,7 +173,10 @@ public enum ErrorCode {
     VOUCHER_NOT_FOUND("Mã voucher không tồn tại hoặc không thuộc về bạn", HttpStatus.NOT_FOUND),
     VOUCHER_ALREADY_USED("Voucher đã được sử dụng", HttpStatus.BAD_REQUEST),
     VOUCHER_EXPIRED("Voucher đã hết hạn sử dụng", HttpStatus.BAD_REQUEST),
-    VOUCHER_INVALID("Voucher không hợp lệ cho đơn hàng này", HttpStatus.BAD_REQUEST);
+    VOUCHER_INVALID("Voucher không hợp lệ cho đơn hàng này", HttpStatus.BAD_REQUEST),
+    ACHIEVEMENT_NOT_FOUND("Thành tựu không tồn tại", HttpStatus.NOT_FOUND),
+    ACHIEVEMENT_NOT_CLAIMABLE("Thành tựu chưa đủ điều kiện hoặc đã được nhận thưởng", HttpStatus.BAD_REQUEST),
+    ACHIEVEMENT_CODE_EXISTED("Mã thành tựu này đã tồn tại trong hệ thống", HttpStatus.CONFLICT);
 
     private final String message;
     private final HttpStatus httpStatus;

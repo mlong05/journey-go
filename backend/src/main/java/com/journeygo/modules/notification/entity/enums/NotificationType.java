@@ -48,6 +48,7 @@ public enum NotificationType {
     REFUND_REJECTED(Category.REJECTED),
     REFUND_COMPLETED(Category.REFUND),
     BADGE_AWARDED(Category.REWARD),
+    ACHIEVEMENT_UNLOCKED(Category.REWARD),
     POST_APPROVED(Category.APPROVED),
     POST_REJECTED(Category.REJECTED),
     POST_NEEDS_REVISION(Category.COMMUNITY),
