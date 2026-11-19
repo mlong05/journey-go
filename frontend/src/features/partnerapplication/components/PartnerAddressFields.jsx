@@ -20,13 +20,13 @@
  * ── Cấp phường/xã chỉ bật khi tỉnh đã chọn ──
  *  Tránh gửi tỉnh và phường lạc nhau.
  *
- * ── Ô gõ + gợi ý (HTML5 datalist) ──
- *  Vừa gõ vừa lọc thay cho dropdown dài. Mỗi gợi ý có nhãn không dấu nên gõ "phu my" vẫn ra
- *  "Phường Phú Mỹ". Chỉ nhận tên có trong danh sách (so khớp không phân biệt hoa thường / dấu);
+ * ── Ô gõ + gợi ý (AddressCombobox) ──
+ *  Vừa gõ vừa lọc, danh sách xổ ngay dưới ô. Lọc theo chữ không dấu nên gõ "phu my" vẫn ra
+ *  "Phường Phú Mỹ", nhưng chỉ hiển thị tên có dấu. Chỉ nhận tên có trong danh sách (so khớp không phân biệt hoa thường / dấu);
  *  gõ tên lạ thì báo lỗi khi rời ô và không gửi tên đó ra ngoài.
  */
-import React, { useEffect, useId, useMemo, useState } from "react";
-import { Loader2, MapPin, TriangleAlert } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Loader2, MapPin, TriangleAlert } from "lucide-react";
 import partnerAddressService from "../services/partnerAddressService";
 import { ACCENTS, TextInput, labelCls } from "./PartnerFormKit";
 
@@ -73,6 +73,107 @@ function SubLabel({ children, loading, accent = "teal" }) {
   );
 }
 
+/**
+ * Ô gõ + danh sách gợi ý xổ ngay bên dưới ô.
+ * Không dùng <datalist> vì trình duyệt tự quyết vị trí popup (có thể bật sang ngang)
+ * và hiện kèm nhãn phụ. Lọc theo chữ không dấu nhưng chỉ hiển thị tên có dấu.
+ */
+function AddressCombobox({ units, display, query, onType, onPick, onBlur, disabled, placeholder, error, accent }) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const listRef = useRef(null);
+
+  // query === null ⇒ đang hiện tên đã chọn ⇒ cho xem toàn bộ danh sách.
+  const filtered = useMemo(() => {
+    const k = query == null ? "" : norm(query);
+    if (!k) return units;
+    return units.filter((u) => norm(buildLabel(u)).includes(k));
+  }, [units, query]);
+
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    listRef.current.children[active]?.scrollIntoView({ block: "nearest" });
+  }, [active, open]);
+
+  const pick = (u) => {
+    onPick(u.code);
+    setOpen(false);
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      setActive((i) => Math.min(i + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter" && open && filtered[active]) {
+      e.preventDefault();
+      pick(filtered[active]);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <TextInput
+        value={display}
+        accent={accent}
+        disabled={disabled}
+        autoComplete="off"
+        role="combobox"
+        aria-expanded={open}
+        aria-autocomplete="list"
+        aria-invalid={Boolean(error)}
+        placeholder={placeholder}
+        className="pr-9"
+        onFocus={() => { setOpen(true); setActive(0); }}
+        onClick={() => setOpen(true)}
+        onChange={(e) => { onType(e.target.value); setOpen(true); setActive(0); }}
+        onKeyDown={onKeyDown}
+        onBlur={() => { setOpen(false); onBlur?.(); }}
+        error={error}
+      />
+      <ChevronDown
+        size={16}
+        className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+      />
+      {open && !disabled && (
+        <ul
+          ref={listRef}
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+        >
+          {filtered.length === 0 ? (
+            <li className="px-3.5 py-2 text-sm text-slate-400">Không tìm thấy kết quả</li>
+          ) : (
+            filtered.map((u, i) => {
+              const label = buildLabel(u);
+              const selected = label === display;
+              return (
+                <li
+                  key={u.code}
+                  role="option"
+                  aria-selected={selected}
+                  onMouseDown={(e) => { e.preventDefault(); pick(u); }}
+                  onMouseEnter={() => setActive(i)}
+                  className={`cursor-pointer px-3.5 py-2 text-sm ${i === active ? "bg-slate-100" : ""} ${
+                    selected ? `font-semibold ${ACCENTS[accent]?.text ?? ACCENTS.teal.text}` : "text-slate-700"
+                  }`}
+                >
+                  {label}
+                </li>
+              );
+            })
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /** Thông báo lỗi của một cấp hành chính. */
 function AddressFieldError({ children }) {
   if (!children) return null;
@@ -106,9 +207,6 @@ export default function PartnerAddressFields({
   const [wardText, setWardText] = useState(null);
   const [provPickErr, setProvPickErr] = useState("");
   const [wardPickErr, setWardPickErr] = useState("");
-  const uid = useId();
-  const provListId = `${uid}-provinces`;
-  const wardListId = `${uid}-wards`;
 
   // ── 1. Tỉnh / Thành phố ───────────────────────────────────────────────────
   useEffect(() => {
@@ -259,23 +357,22 @@ export default function PartnerAddressFields({
           <SubLabel loading={provLoading} accent={accent}>
             Tỉnh / Thành phố
           </SubLabel>
-          <TextInput
-            list={provListId}
-            value={provDisplay}
+          <AddressCombobox
+            units={provinces}
+            display={provDisplay}
+            query={provText}
             accent={accent}
             disabled={disabled || provLoading}
-            autoComplete="off"
-            aria-invalid={Boolean(provError)}
             placeholder={provLoading ? "Đang tải..." : "Gõ để tìm Tỉnh/Thành phố"}
-            onChange={(e) => typeProvince(e.target.value)}
+            onType={typeProvince}
+            onPick={(code) => {
+              setProvText(null);
+              setProvPickErr("");
+              if (code !== provinceCode) handleProvince(code);
+            }}
             onBlur={() => { if (provText && !findUnit(provinces, provText)) setProvPickErr("Chọn Tỉnh/Thành phố trong danh sách gợi ý"); }}
             error={provError}
           />
-          <datalist id={provListId}>
-            {provinces.map((p) => (
-              <option key={p.code} value={buildLabel(p)} label={norm(buildLabel(p))} />
-            ))}
-          </datalist>
           <AddressFieldError>{provError}</AddressFieldError>
         </div>
 
@@ -284,23 +381,22 @@ export default function PartnerAddressFields({
           <SubLabel loading={wardLoading} accent={accent}>
             Phường / Xã
           </SubLabel>
-          <TextInput
-            list={wardListId}
-            value={wardDisplay}
+          <AddressCombobox
+            units={wards}
+            display={wardDisplay}
+            query={wardText}
             accent={accent}
             disabled={disabled || !provinceCode || wardLoading}
-            autoComplete="off"
-            aria-invalid={Boolean(wardError)}
             placeholder={!provinceCode ? "Chọn Tỉnh/Thành phố trước" : wardLoading ? "Đang tải..." : "Gõ để tìm Phường/Xã"}
-            onChange={(e) => typeWard(e.target.value)}
+            onType={typeWard}
+            onPick={(code) => {
+              setWardText(null);
+              setWardPickErr("");
+              if (code !== wardCode) handleWard(code);
+            }}
             onBlur={() => { if (wardText && !findUnit(wards, wardText)) setWardPickErr("Chọn Phường/Xã trong danh sách gợi ý"); }}
             error={wardError}
           />
-          <datalist id={wardListId}>
-            {wards.map((w) => (
-              <option key={w.code} value={buildLabel(w)} label={norm(buildLabel(w))} />
-            ))}
-          </datalist>
           <AddressFieldError>{wardError}</AddressFieldError>
         </div>
       </div>
