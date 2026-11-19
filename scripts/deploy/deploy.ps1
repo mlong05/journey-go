@@ -204,8 +204,19 @@ $checks = @(
     @{ path = "/actuator/health/liveness";      expect = 200 }
 )
 $failed = $false
+# Container vừa tạo lại có IP mới; nginx chỉ resolve lại tên service sau tối đa 10s
+# (`resolver ... valid=10s`) ⇒ ngay sau deploy có thể nhận 502 thoáng qua. Thử lại vài lần.
+$maxAttempts = 6
 foreach ($c in $checks) {
-    $code = curl.exe -s -o NUL -w "%{http_code}" -m 20 "http://127.0.0.1:8080$($c.path)" 2>$null
+    $code = ""
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        $code = curl.exe -s -o NUL -w "%{http_code}" -m 20 "http://127.0.0.1:8080$($c.path)" 2>$null
+        if ($code -eq "$($c.expect)") { break }
+        if ($attempt -lt $maxAttempts) {
+            Write-Host "    $($c.path) → $code, thử lại sau 5s ($attempt/$maxAttempts)"
+            Start-Sleep -Seconds 5
+        }
+    }
     if ($code -eq "$($c.expect)") {
         Write-Ok "$($c.path) → $code"
     } else {
