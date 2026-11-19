@@ -64,7 +64,9 @@ public class FlywayConfig {
         return flyway -> {
             DataSource dataSource = flyway.getConfiguration().getDataSource();
             forgetRenumberedTourTaskMigrations(dataSource);
+            cleanupFailedAchievementMigration(dataSource);
             if (hibernateTablesExist(dataSource)) {
+                syncMissingColumnDefaults(dataSource);
                 flyway.migrate();
                 return;
             }
@@ -335,6 +337,33 @@ public class FlywayConfig {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Không dọn được lịch sử Flyway của migration nhiệm vụ tour", e);
+        }
+    }
+
+    /**
+     * Dọn dòng lịch sử V41 bị fail (success = FALSE) trên DB production trước đó do cột
+     * {@code badges.created_at} thiếu DEFAULT, để Flyway có thể chạy lại V41 sạch sẽ.
+     * Không đụng vào bất kỳ bản ghi nào đã thành công (success = TRUE).
+     */
+    private static void cleanupFailedAchievementMigration(DataSource dataSource) {
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement check = conn.prepareStatement("SELECT to_regclass('flyway_schema_history') IS NOT NULL");
+                 ResultSet rs = check.executeQuery()) {
+                if (!rs.next() || !rs.getBoolean(1)) return;
+            }
+            try (PreparedStatement ps = conn.prepareStatement("""
+                    DELETE FROM flyway_schema_history
+                    WHERE version = '41'
+                      AND description = 'achievement system'
+                      AND success = FALSE
+                    """)) {
+                int removed = ps.executeUpdate();
+                if (removed > 0) {
+                    log.warn("[Flyway] Đã xóa {} dòng lịch sử lỗi của V41 (achievement system) để chạy lại migration.", removed);
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không dọn được lịch sử Flyway lỗi của V41", e);
         }
     }
 
