@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +30,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/ai-guide")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 @Tag(name = "AI Virtual Guide", description = "Các API hỏi đáp thuyết minh viên ảo du lịch RAG và gợi ý nhiệm vụ")
 @SecurityRequirement(name = "Bearer Authentication")
 public class AiGuideChatController {
@@ -41,20 +43,22 @@ public class AiGuideChatController {
     public ResponseEntity<ApiResponse<AiChatResponse>> chat(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @Valid @RequestBody AiChatRequest request) {
-        log.info("Du khách userId={} đặt câu hỏi cho AI Guide: '{}', destinationId={}, taskId={}",
-                currentUser.getId(), request.getQuestion(), request.getDestinationId(), request.getTaskId());
+        log.info("Du khách userId={} đặt câu hỏi cho AI Guide, destinationId={}, taskId={}",
+                currentUser.getId(), request.getDestinationId(), request.getTaskId());
 
         AiChatResponse response = virtualGuideChatService.chat(currentUser.getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Phản hồi từ AI Virtual Guide thành công", response));
     }
 
     @Operation(summary = "Tạo mới hoặc lấy phiên hội thoại",
-            description = "Khởi tạo một phiên trò chuyện mới cho du khách, có thể gắn với điểm đến cụ thể.")
+            description = "Khởi tạo một phiên trò chuyện mới cho du khách (forceNew=true) hoặc lấy lại phiên gần nhất.")
     @PostMapping("/sessions")
     public ResponseEntity<ApiResponse<AiChatSessionDto>> createOrGetSession(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @RequestParam(required = false) Long destinationId) {
-        AiChatSessionDto session = virtualGuideChatService.getOrCreateSession(currentUser.getId(), destinationId);
+            @RequestParam(required = false) Long destinationId,
+            @RequestParam(defaultValue = "false") boolean forceNew) {
+        AiChatSessionDto session = virtualGuideChatService.getOrCreateSession(
+                currentUser.getId(), destinationId, forceNew);
         return ResponseEntity.ok(ApiResponse.success("Khởi tạo phiên hội thoại thành công", session));
     }
 
@@ -65,7 +69,9 @@ public class AiGuideChatController {
             @AuthenticationPrincipal UserPrincipal currentUser,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        Pageable pageable = PageRequest.of(safePage, safeSize);
         Page<AiChatSessionDto> sessions = virtualGuideChatService.getUserSessions(currentUser.getId(), pageable);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách phiên hội thoại thành công", PageResponse.from(sessions)));
     }
@@ -78,5 +84,15 @@ public class AiGuideChatController {
             @Parameter(description = "ID phiên trò chuyện") @PathVariable UUID sessionId) {
         List<AiChatMessageDto> messages = virtualGuideChatService.getSessionMessages(sessionId, currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử tin nhắn thành công", messages));
+    }
+
+    @Operation(summary = "Xóa phiên trò chuyện",
+            description = "Xóa vĩnh viễn một phiên trò chuyện và lịch sử tin nhắn thuộc quyền sở hữu của du khách.")
+    @DeleteMapping("/sessions/{sessionId}")
+    public ResponseEntity<ApiResponse<Void>> deleteSession(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "ID phiên trò chuyện") @PathVariable UUID sessionId) {
+        virtualGuideChatService.deleteSession(sessionId, currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success("Xóa phiên trò chuyện thành công", null));
     }
 }

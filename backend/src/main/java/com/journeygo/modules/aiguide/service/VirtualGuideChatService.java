@@ -12,7 +12,6 @@ import com.journeygo.modules.aiguide.entity.AiChatSession;
 import com.journeygo.modules.aiguide.entity.AiKnowledgeChunk;
 import com.journeygo.modules.aiguide.repository.AiChatMessageRepository;
 import com.journeygo.modules.aiguide.repository.AiChatSessionRepository;
-import com.journeygo.modules.aiguide.repository.AiKnowledgeChunkRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -23,7 +22,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -39,21 +37,29 @@ public class VirtualGuideChatService {
 
     private final AiChatSessionRepository sessionRepository;
     private final AiChatMessageRepository messageRepository;
-    private final AiKnowledgeChunkRepository chunkRepository;
-    private final AiEmbeddingService embeddingService;
     private final GeminiChatClient chatClient;
     private final VirtualGuidePromptTemplate promptTemplate;
     private final GeminiAiProperties properties;
     private final AiRetrievalService aiRetrievalService;
+    private final AiRateLimiterService aiRateLimiterService;
 
     /**
-     * Khởi tạo hoặc lấy lại một phiên hội thoại cho du khách.
+     * Khởi tạo hoặc lấy lại một phiên hội thoại cho du khách (tương thích chữ ký cũ).
      */
     @Transactional
     public AiChatSessionDto getOrCreateSession(Long userId, Long destinationId) {
-        if (destinationId != null) {
-            var existingSession = sessionRepository
-                    .findFirstByUserIdAndCurrentDestinationIdOrderByUpdatedAtDesc(userId, destinationId);
+        return getOrCreateSession(userId, destinationId, false);
+    }
+
+    /**
+     * Khởi tạo mới ({@code forceNew = true}) hoặc lấy lại phiên gần nhất cho du khách.
+     */
+    @Transactional
+    public AiChatSessionDto getOrCreateSession(Long userId, Long destinationId, boolean forceNew) {
+        if (!forceNew) {
+            var existingSession = destinationId != null
+                    ? sessionRepository.findFirstByUserIdAndCurrentDestinationIdOrderByUpdatedAtDesc(userId, destinationId)
+                    : sessionRepository.findFirstByUserIdAndCurrentDestinationIdIsNullOrderByUpdatedAtDesc(userId);
             if (existingSession.isPresent()) {
                 return toSessionDto(existingSession.get());
             }
@@ -89,17 +95,37 @@ public class VirtualGuideChatService {
     }
 
     /**
+     * Xóa một phiên trò chuyện thuộc quyền sở hữu của du khách.
+     */
+    @Transactional
+    public void deleteSession(UUID sessionId, Long userId) {
+        AiChatSession session = findSessionOwnedByUser(sessionId, userId);
+        messageRepository.deleteBySessionId(session.getId());
+        sessionRepository.delete(session);
+        log.info("Du khách userId={} đã xóa phiên trò chuyện AI sessionId={}", userId, sessionId);
+    }
+
+    /**
      * Xử lý luồng Chat RAG chính:
-     * 1. Xác thực hoặc tạo phiên chat.
-     * 2. Lưu tin nhắn của User vào DB.
-     * 3. Nhúng (embed) câu hỏi của user thành Vector.
-     * 4. Tìm kiếm Top-K chunks tương đồng từ AiKnowledgeChunkRepository.
-     * 5. Lấy 6-8 tin nhắn gần nhất làm Memory.
+     * 1. Kiểm tra Rate Limit và độ dài câu hỏi.
+     * 2. Xác thực hoặc tìm/tạo phiên chat.
+     * 3. Lưu tin nhắn của User vào DB.
+     * 4. Truy xuất ngữ cảnh Vector (cô lập REQUIRES_NEW).
+     * 5. Lấy lịch sử tin nhắn làm Memory.
      * 6. Lắp ráp Prompt và gọi Gemini LLM.
      * 7. Lưu câu trả lời của AI vào DB và trả về cho du khách.
      */
     @Transactional
     public AiChatResponse chat(Long userId, AiChatRequest request) {
+        aiRateLimiterService.checkAndConsume(userId);
+
+        String trimmedQuestion = request.getQuestion() != null ? request.getQuestion().trim() : "";
+        int maxLen = properties.getMaxQuestionLength() > 0 ? properties.getMaxQuestionLength() : 1000;
+        if (!StringUtils.hasText(trimmedQuestion) || trimmedQuestion.length() > maxLen) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                    "Câu hỏi phải từ 1 đến " + maxLen + " ký tự");
+        }
+
         // 1. Xác định Session
         AiChatSession session;
         if (request.getSessionId() != null) {
@@ -109,19 +135,18 @@ public class VirtualGuideChatService {
                 session = sessionRepository.save(session);
             }
         } else {
-            // Tự động tìm hoặc tạo session mới theo destinationId
             Long destId = request.getDestinationId();
-            session = sessionRepository
-                    .findFirstByUserIdAndCurrentDestinationIdOrderByUpdatedAtDesc(userId, destId)
-                    .orElseGet(() -> sessionRepository.save(
-                            AiChatSession.builder()
-                                    .userId(userId)
-                                    .currentDestinationId(destId)
-                                    .build()
-                    ));
+            var found = destId != null
+                    ? sessionRepository.findFirstByUserIdAndCurrentDestinationIdOrderByUpdatedAtDesc(userId, destId)
+                    : sessionRepository.findFirstByUserIdAndCurrentDestinationIdIsNullOrderByUpdatedAtDesc(userId);
+            session = found.orElseGet(() -> sessionRepository.save(
+                    AiChatSession.builder()
+                            .userId(userId)
+                            .currentDestinationId(destId)
+                            .build()
+            ));
         }
 
-        // Cập nhật updatedAt cho session
         session.setUpdatedAt(Instant.now());
         sessionRepository.save(session);
 
@@ -129,7 +154,7 @@ public class VirtualGuideChatService {
         AiChatMessage userMessage = AiChatMessage.builder()
                 .sessionId(session.getId())
                 .role("USER")
-                .content(request.getQuestion().trim())
+                .content(trimmedQuestion)
                 .build();
         messageRepository.save(userMessage);
 
@@ -140,32 +165,45 @@ public class VirtualGuideChatService {
                 ? VirtualGuidePromptTemplate.TASK_HINT_SYSTEM_PROMPT
                 : VirtualGuidePromptTemplate.NORMAL_GUIDE_SYSTEM_PROMPT;
 
-        // 4. Retrieval: Nhúng câu hỏi & Truy vấn Vector Chunks (transaction riêng để tránh abort cascade)
+        // 4. Retrieval: Nhúng câu hỏi & Truy vấn Vector Chunks (REQUIRES_NEW)
         Long targetDestinationId = request.getDestinationId() != null
                 ? request.getDestinationId()
                 : session.getCurrentDestinationId();
 
-        // Gọi qua AiRetrievalService với REQUIRES_NEW để lỗi pgvector không làm abort transaction chính
         List<AiKnowledgeChunk> relevantChunks = aiRetrievalService.retrieveRelevantChunks(
-                request.getQuestion().trim(),
+                trimmedQuestion,
                 targetDestinationId,
                 isTaskHintMode
         );
 
         List<String> citations = new ArrayList<>();
+        String resolvedDestinationName = null;
         for (AiKnowledgeChunk chunk : relevantChunks) {
-            if (chunk.getMetadata() != null && chunk.getMetadata().containsKey("title")) {
-                citations.add(String.valueOf(chunk.getMetadata().get("title")));
+            if (chunk.getMetadata() != null) {
+                Object title = chunk.getMetadata().get("title");
+                if (title != null && StringUtils.hasText(String.valueOf(title))) {
+                    citations.add(String.valueOf(title));
+                } else {
+                    citations.add(chunk.getSourceId());
+                }
+                if (resolvedDestinationName == null && chunk.getMetadata().get("destination_name") != null) {
+                    String candidateName = String.valueOf(chunk.getMetadata().get("destination_name"));
+                    if (StringUtils.hasText(candidateName)) {
+                        resolvedDestinationName = candidateName;
+                    }
+                }
             } else {
                 citations.add(chunk.getSourceId());
             }
         }
+        if (resolvedDestinationName == null && targetDestinationId != null) {
+            resolvedDestinationName = "Điểm đến #" + targetDestinationId;
+        }
 
-        // 5. Memory: Lấy 6 tin nhắn gần nhất trước tin nhắn vừa tạo để làm ngữ cảnh
+        // 5. Memory: Lấy tối đa 8 tin nhắn gần nhất trước tin nhắn vừa tạo để làm ngữ cảnh
         List<AiChatMessage> recentMessages = messageRepository.findRecentMessagesAsc(session.getId(), 8);
         List<GeminiChatClient.ChatTurn> historyTurns = new ArrayList<>();
         for (AiChatMessage msg : recentMessages) {
-            // Không lặp lại tin nhắn user vừa gửi
             if (!msg.getId().equals(userMessage.getId())) {
                 historyTurns.add(new GeminiChatClient.ChatTurn(msg.getRole(), msg.getContent()));
             }
@@ -178,8 +216,8 @@ public class VirtualGuideChatService {
 
         String augmentedPrompt = promptTemplate.buildAugmentedPrompt(
                 contextText,
-                targetDestinationId != null ? ("Điểm đến #" + targetDestinationId) : null,
-                request.getQuestion()
+                resolvedDestinationName,
+                trimmedQuestion
         );
 
         // 7. Gọi Gemini Chat Client
@@ -220,10 +258,18 @@ public class VirtualGuideChatService {
     }
 
     private AiChatSessionDto toSessionDto(AiChatSession session) {
+        String preview = messageRepository.findFirstBySessionIdOrderByCreatedAtDesc(session.getId())
+                .map(AiChatMessage::getContent)
+                .map(c -> c != null && c.length() > 80 ? c.substring(0, 77) + "..." : c)
+                .orElse(null);
+        long msgCount = messageRepository.countBySessionId(session.getId());
+
         return AiChatSessionDto.builder()
                 .id(session.getId())
                 .userId(session.getUserId())
                 .currentDestinationId(session.getCurrentDestinationId())
+                .lastMessagePreview(preview)
+                .messageCount(msgCount)
                 .createdAt(session.getCreatedAt())
                 .updatedAt(session.getUpdatedAt())
                 .build();
