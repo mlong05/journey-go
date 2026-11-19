@@ -14,6 +14,7 @@ import '../../core/services/destination_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/progress_service.dart';
 import '../../core/services/tour_service.dart';
+import '../chat/ai_guide_chat_screen.dart';
 import '../journey/journey_launcher.dart';
 import '../journey/task_screen.dart';
 import '../modals/notification_dialog.dart';
@@ -246,6 +247,10 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
   }
 
   Future<void> _openMission(JourneyMission mission) async {
+    final destId = _journey?.destinations
+        .where((d) => d.tasks.any((t) => t.taskId == mission.taskId))
+        .firstOrNull
+        ?.destinationId;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => TaskScreen(
@@ -253,10 +258,20 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
           taskId: mission.taskId,
           fallbackName: mission.title,
           destinationName: mission.siteName,
+          destinationId: destId,
         ),
       ),
     );
     if (mounted) _loadAllData();
+  }
+
+  void _openAiGuide() {
+    final currentDest = _journey?.destinations.where((d) => d.isCurrent).firstOrNull;
+    AiGuideChatScreen.open(
+      context,
+      destinationId: currentDest?.destinationId,
+      destinationName: currentDest?.name,
+    );
   }
 
   // ── Điều hướng ─────────────────────────────────────────────────────────────
@@ -343,6 +358,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
             ),
           ),
         ),
+      block(_buildAiGuideEntryCard()),
       if (_toursError != null && _tours.isEmpty)
         block(_buildToursError())
       else if (_tours.isEmpty)
@@ -533,6 +549,54 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
   }
 
   /// Đầu trang nền trắng: lời chào + khu vực, điểm thưởng, chuông; ô tìm kiếm lớn luôn ghim khi cuộn.
+  Widget _buildAiGuideEntryCard() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Pressable(
+        onTap: _openAiGuide,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppCultureColors.jadeLight.withValues(alpha: 0.65),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppCultureColors.heritageJade.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppCultureColors.heritageJade,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hướng dẫn viên ảo AI',
+                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Hỏi đáp văn hóa, lịch sử & gợi ý nhiệm vụ thông minh',
+                      style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppCultureColors.heritageJade),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     return SliverAppBar(
       pinned: true,
