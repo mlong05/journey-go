@@ -173,6 +173,7 @@ export function ModalShell({
   subtitle,
   onClose,
   children,
+  footer = null,
   wide = false,
   extraWide = false,
   fillHeight = false,
@@ -281,6 +282,16 @@ export function ModalShell({
             children
           )}
         </div>
+        {/*
+          ⚠️ CHÂN MODAL — nút hành động luôn NHÌN THẤY, không phải cuộn xuống
+            cuối mới thấy. Chân modal nằm NGOÀI thân cuộn (`overflow-y-auto`)
+            ⇒ ghim cố định ở đáy modal.
+        */}
+        {footer && (
+          <div className="mt-4 flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body,
