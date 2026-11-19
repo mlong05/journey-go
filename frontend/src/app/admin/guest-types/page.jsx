@@ -129,7 +129,7 @@ export default function AdminGuestTypesPage() {
             <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-3">Mã</th>
+                  <th className="px-5 py-3">STT</th>
                   <th className="px-3 py-3">Tên hiển thị</th>
                   <th className="px-3 py-3">Tuổi từ</th>
                   <th className="px-3 py-3">Tuổi đến</th>
@@ -142,8 +142,8 @@ export default function AdminGuestTypesPage() {
                   return (
                     <tr key={r.guestType} className="border-b border-slate-50 align-top last:border-b-0">
                       <td className="px-5 py-3">
-                        <span className="inline-flex items-center gap-2 font-mono text-xs font-bold text-slate-600">
-                          <span className={`h-2.5 w-2.5 rounded-full ${TONE[r.guestType].dot}`} />{r.guestType}
+                        <span className="inline-flex items-center gap-2 text-sm font-bold tabular-nums text-slate-600">
+                          <span className={`h-2.5 w-2.5 rounded-full ${TONE[r.guestType].dot}`} />{i + 1}
                         </span>
                       </td>
                       <td className="px-3 py-2.5">
