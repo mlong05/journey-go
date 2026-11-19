@@ -131,6 +131,18 @@ app:
     from-name: ${MAIL_FROM_NAME:JourneyGo Platform}
     otp-expiration-minutes: ${MAIL_OTP_EXPIRATION_MINUTES:10}
 
+  # ── Seed Runner (dữ liệu DEMO) ──────────────────────────────────────────────
+  # Dữ liệu nền tảng cố định (Role, TaskType, PointRule, Region, Theme, chính sách
+  # hoa hồng) do DataInitializer tự đảm bảo khi Backend khởi động.
+  #
+  # Dữ liệu DEMO (tài khoản, tour, booking, doanh thu…) nằm ở src/main/resources/seed/*.sql
+  # và CHỈ chạy khi bật cờ dưới đây — tức là thủ công, có chủ đích:
+  #   • Local : SEED_ENABLED=true mvn spring-boot:run
+  #   • Docker: docker compose run --rm backend-seed
+  seed:
+    enabled: ${SEED_ENABLED:false}
+    location: classpath*:seed/*.sql
+
   # ── Partner Application (Đăng ký đối tác) ────────────────────────────────
   partner:
     # Thời hạn hiệu lực mã OTP xác minh email khi đăng ký đối tác (phút).
