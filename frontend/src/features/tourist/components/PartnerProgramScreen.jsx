@@ -14,13 +14,6 @@ import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { durationLabel } from "../utils";
 
-const SECTIONS = [
-  ["doi-tuong", "Ai có thể tham gia"],
-  ["quyen-loi", "Quyền lợi"],
-  ["quy-trinh", "Quy trình"],
-  ["hoi-dap", "Hỏi đáp"],
-];
-
 const TRUST = ["Miễn phí đăng ký", "Xét duyệt trong 1–3 ngày làm việc", "Không ràng buộc doanh thu"];
 
 /**
@@ -133,7 +126,7 @@ function LiveTourCard() {
   const { tour, quiz } = info;
   return (
     <Link href={ROUTES.TOUR_DETAIL(tour.tourId)}
-      className="absolute -left-2 bottom-6 z-10 w-64 rounded-2xl bg-white p-4 text-slate-900 shadow-[0_18px_40px_rgba(0,0,0,0.28)] hover:ring-2 hover:ring-orange-300 sm:-left-6">
+      className="absolute -bottom-10 -left-2 z-10 w-60 rounded-2xl bg-white p-4 text-slate-900 shadow-[0_18px_40px_rgba(0,0,0,0.28)] hover:ring-2 hover:ring-orange-300 sm:-left-8">
       <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700"><ShieldCheck size={12} />Đã duyệt · Đang mở bán</span>
       <span className="mt-2 block text-sm font-bold leading-snug">{tour.title}</span>
       <span className="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs text-slate-500">
@@ -189,22 +182,6 @@ function Hero() {
         </div>
       </div>
     </section>
-  );
-}
-
-/** Thanh mục dính ngay dưới header (header cao 64px). */
-function SectionNav() {
-  return (
-    <nav aria-label="Mục trong trang" className="sticky top-16 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-2 sm:px-6">
-        <div className="flex min-w-0 flex-wrap gap-1">
-          {SECTIONS.map(([id, label]) => (
-            <a key={id} href={`#${id}`} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-teal-50 hover:text-teal-800">{label}</a>
-          ))}
-        </div>
-        <span className="ml-auto hidden md:block"><CtaButton size="sm" /></span>
-      </div>
-    </nav>
   );
 }
 
@@ -346,7 +323,6 @@ export default function PartnerProgramScreen() {
   return (
     <TouristShell>
       <Hero />
-      <SectionNav />
       <PartnerTypes />
       <Benefits />
       <Process />
