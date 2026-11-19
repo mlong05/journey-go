@@ -443,7 +443,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       <AuthHeroCarousel />
 
       {/* Cột phải: logo + form, nội dung căn giữa */}
-      <div className="relative isolate lg:col-span-6 xl:col-span-7 col-span-12 h-screen overflow-y-auto overflow-x-hidden flex flex-col bg-white">
+      <div className="relative isolate lg:col-span-6 xl:col-span-7 col-span-12 h-screen overflow-hidden flex flex-col bg-white">
         {/* Trống đồng Đông Sơn mờ ở góc dưới phải: nằm dưới mọi nội dung (-z-10), không bắt sự kiện chuột */}
         <BronzeDrumMotif className="pointer-events-none absolute -z-10 -right-44 -bottom-44 w-[520px] h-[520px] text-amber-800/[0.07] motion-safe:animate-[spin_180s_linear_infinite]" />
 
@@ -483,7 +483,7 @@ export default function AuthScreen({ initialTab = "login" }) {
 
 
         {/* Logo thương hiệu (giống thanh bên trang quản trị) */}
-        <header className="relative z-10 shrink-0 px-6 sm:px-10 xl:px-14 pt-6 sm:pt-8 flex items-center justify-between gap-4">
+        <header className="relative z-10 shrink-0 px-6 sm:px-10 xl:px-14 pt-5 [@media(max-height:760px)]:pt-3 flex items-center justify-between gap-4">
           <Link href={ROUTES.HOME} className="flex items-center gap-1.5 min-w-0" title="Về trang chủ JourneyGo">
             <Image
               src="/image/logo-emblem.png"
@@ -513,8 +513,10 @@ export default function AuthScreen({ initialTab = "login" }) {
           </Link>
         </header>
 
-        <main className="relative z-10 flex-1 flex items-center justify-center px-6 sm:px-10 xl:px-14 py-8">
-          <div className="w-full max-w-[440px] space-y-5">
+        {/* Vùng form chiếm phần còn lại của màn hình, căn giữa; không hiện thanh cuộn
+            (chỉ cuộn ngầm khi màn hình quá thấp để không mất nội dung) */}
+        <main className="relative z-10 flex-1 min-h-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex flex-col px-6 sm:px-10 xl:px-14 py-4">
+          <div className="m-auto w-full max-w-[440px] space-y-5 [@media(max-height:760px)]:space-y-3.5">
             {/* Chế độ Quên mật khẩu & Khôi phục bằng OTP */}
             {activeTab === "forgot_password" ? (
               <ForgotPasswordFlow
@@ -597,12 +599,14 @@ export default function AuthScreen({ initialTab = "login" }) {
           </div>
         </main>
 
-        {/* Chân trang: bản quyền + hình bóng di sản Việt (nằm trong luồng, không đè lên form) */}
-        <footer className="relative shrink-0 h-28 md:h-32">
-          <p className="relative z-10 text-center text-[11px] text-slate-400 leading-normal">
+        {/* Hình bóng di sản Việt: trang trí mờ phía sau, sát đáy cột, không chiếm chỗ của form */}
+        <HeritageLandmarksArt />
+
+        {/* Chân trang: dòng bản quyền gọn, nằm trong luồng */}
+        <footer className="relative z-10 shrink-0 pb-4 pt-1">
+          <p className="text-center text-[11px] text-slate-400 leading-normal">
             Bảo hộ bởi JourneyGo Identity Service • Phiên bản 2.5
           </p>
-          <HeritageLandmarksArt />
         </footer>
       </div>
 
