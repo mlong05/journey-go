@@ -586,8 +586,8 @@ public class PartnerApplicationService {
                 user.getId(),
                 existingAccount,
                 existingAccount
-                        ? "Hồ sơ đã được phê duyệt. Tài khoản đối tác đã được nâng cấp quyền CONTENT_PROVIDER."
-                        : "Hồ sơ đã được phê duyệt. Tài khoản đối tác đã được tạo và cấp quyền CONTENT_PROVIDER."
+                        ? "Duyệt hồ sơ thành công. Tài khoản đã được nâng cấp thành Đối tác."
+                        : "Duyệt hồ sơ thành công. Tài khoản Đối tác đã được tạo."
         );
     }
 
@@ -769,9 +769,12 @@ public class PartnerApplicationService {
         if (existing.isPresent()) {
             PartnerApplication application = existing.get();
             if (!application.getStatus().isEditable()) {
-                throw new AppException(ErrorCode.PARTNER_APPLICATION_INVALID_STATUS,
-                        "Đơn đăng ký hiện đang ở trạng thái "
-                                + application.getStatus() + " — không thể chỉnh sửa");
+                String message = switch (application.getStatus()) {
+                    case PENDING -> "Đơn đăng ký của bạn đã được gửi và đang chờ duyệt, nên không thể chỉnh sửa thêm";
+                    case APPROVED -> "Đơn đăng ký của bạn đã được duyệt, nên không thể chỉnh sửa thêm";
+                    default -> "Đơn đăng ký hiện không thể chỉnh sửa";
+                };
+                throw new AppException(ErrorCode.PARTNER_APPLICATION_INVALID_STATUS, message);
             }
             return application;
         }
