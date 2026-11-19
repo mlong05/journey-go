@@ -53,43 +53,49 @@ export default function ProviderLayout({ children }) {
     pathname?.startsWith("/provider/partner-info") ||
     pathname?.startsWith("/provider/finance");
 
-  // Danh mục điều hướng Sidebar của Đối tác
+  // Danh mục điều hướng Sidebar của Đối tác — nhóm theo luồng nghiệp vụ
   const navMenuItems = [
     {
       id: "overview",
       label: "Tổng quan",
       href: "/provider",
       icon: LayoutDashboard,
+      group: "Vận hành",
     },
     {
       id: "tours",
       label: "Quản lý Tour Du Lịch",
       href: "/provider/tours",
       icon: Route,
+      group: "Vận hành",
     },
     {
       id: "bookings",
       label: "Khách hàng đã đặt tour",
       href: "/provider/bookings",
       icon: Users,
+      group: "Vận hành",
     },
     {
       id: "support",
       label: "Hỗ trợ khách hàng",
       href: "/provider/support",
       icon: Headphones,
+      group: "Vận hành",
     },
     {
       id: "finance",
       label: "Tài chính & Doanh thu",
       href: "/provider/finance",
       icon: Wallet,
+      group: "Tài chính",
     },
     {
       id: "partner-info",
       label: "Thông tin đối tác",
       href: "/provider/partner-info",
       icon: UserCog,
+      group: "Hồ sơ đối tác",
     },
   ];
 

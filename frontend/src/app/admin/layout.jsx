@@ -26,13 +26,16 @@ import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout"
 import { NotificationProvider } from "@/context/NotificationContext";
 import NotificationToaster from "@/components/notifications/NotificationToaster";
 
-// Navigation items được định nghĩa ngoài component để tránh re-create mỗi render
+// Navigation items được định nghĩa ngoài component để tránh re-create mỗi render.
+// Thứ tự được nhóm theo luồng nghiệp vụ: Vận hành → Người dùng → Cấu hình → Tài chính → Giám sát.
+// Mỗi item có `group` để Sidebar render nhãn nhóm giữa các mục.
 const ADMIN_NAV_ITEMS = [
   {
     id: "overview",
     label: "Tổng quan vận hành",
     href: "/admin",
     icon: LayoutDashboard,
+    group: "Vận hành",
     badge: null,
   },
   {
@@ -40,6 +43,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Quản lý người dùng",
     href: "/admin/users",
     icon: Users,
+    group: "Người dùng & Đối tác",
     badge: null,
   },
   {
@@ -47,6 +51,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Quản lý đối tác",
     href: "/admin/partners",
     icon: Handshake,
+    group: "Người dùng & Đối tác",
     badge: null,
   },
   {
@@ -54,6 +59,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Yêu cầu đổi thông tin",
     href: "/admin/partner-profile-updates",
     icon: UserCog,
+    group: "Người dùng & Đối tác",
     badge: null,
   },
   {
@@ -61,6 +67,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Chính sách hoa hồng",
     href: "/admin/commission-policies",
     icon: BadgePercent,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -68,6 +75,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình khu vực",
     href: "/admin/regions",
     icon: Globe2,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -75,6 +83,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình chủ đề",
     href: "/admin/themes",
     icon: Tags,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -82,6 +91,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình loại khách & độ tuổi",
     href: "/admin/guest-types",
     icon: UsersRound,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -89,6 +99,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình trải nghiệm và điểm thưởng",
     href: "/admin/experience-rewards",
     icon: Sparkles,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -96,6 +107,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình huy hiệu",
     href: "/admin/badge-config",
     icon: Medal,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -103,6 +115,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình voucher",
     href: "/admin/vouchers",
     icon: Ticket,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -110,6 +123,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Tài chính & Thanh toán",
     href: "/admin/finance",
     icon: CreditCard,
+    group: "Tài chính & Tất toán",
     badge: null,
   },
   {
@@ -117,6 +131,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Yêu cầu hoàn tiền",
     href: "/admin/refunds",
     icon: FileText,
+    group: "Tài chính & Tất toán",
     badge: null,
   },
   {
@@ -124,6 +139,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình lý do hoàn tiền",
     href: "/admin/refund-reasons",
     icon: RotateCcw,
+    group: "Tài chính & Tất toán",
     badge: null,
   },
   {
@@ -131,6 +147,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Tất toán doanh thu",
     href: "/admin/settlements",
     icon: HandCoins,
+    group: "Tài chính & Tất toán",
     badge: null,
   },
   {
@@ -138,6 +155,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Nhật ký kiểm toán",
     href: "/admin/audit-logs",
     icon: ShieldAlert,
+    group: "Giám sát",
     badge: null,
   },
 ];
@@ -178,6 +196,7 @@ export default function AdminLayout({ children }) {
     pathname?.startsWith("/admin/users") ||
     pathname?.startsWith("/admin/regions") ||
     pathname?.startsWith("/admin/themes") ||
+    pathname?.startsWith("/admin/commission-policies") ||
     pathname?.startsWith("/admin/finance") ||
     pathname?.startsWith("/admin/settlements");
 

@@ -35,13 +35,14 @@ export default function ModeratorLayout({ children }) {
   // Trang tổng quan (/moderator) cũng khóa khung: chỉ "Hàng chờ cần xử lý" tự cuộn.
   const isScrollLockedPage = /^\/moderator(\/(tours|community|tours\/[^/]+))?\/?$/.test(pathname || "");
 
-  // Menu điều hướng của kiểm duyệt viên
+  // Menu điều hướng của kiểm duyệt viên — nhóm theo luồng nghiệp vụ
   const moderatorNavItems = [
     {
       id: "overview",
       label: "Bàn làm việc tổng quan",
       href: "/moderator",
       icon: LayoutDashboard,
+      group: "Vận hành",
       badge: null,
     },
     {
@@ -49,6 +50,7 @@ export default function ModeratorLayout({ children }) {
       label: "Thẩm định tour",
       href: "/moderator/tours",
       icon: Route,
+      group: "Hàng chờ duyệt",
       badge: null,
     },
     {
@@ -56,6 +58,7 @@ export default function ModeratorLayout({ children }) {
       label: "Duyệt Bài Cộng đồng",
       href: "/moderator/community",
       icon: MessageSquare,
+      group: "Hàng chờ duyệt",
       badge: null,
     },
     {
@@ -63,6 +66,7 @@ export default function ModeratorLayout({ children }) {
       label: "Nhật ký & Lịch sử duyệt",
       href: "/moderator/history",
       icon: History,
+      group: "Giám sát",
       badge: null,
     },
   ];
