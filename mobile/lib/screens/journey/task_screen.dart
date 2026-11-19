@@ -12,6 +12,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/route_service.dart';
+import '../chat/ai_guide_chat_screen.dart';
 import 'journey_widgets.dart';
 import 'qr_scan_screen.dart';
 import 'map_kit.dart' show MapRoundButton, MapAttributionText, formatDistance;
@@ -42,6 +43,7 @@ class TaskScreen extends StatefulWidget {
   final int taskId;
   final String fallbackName;
   final String destinationName;
+  final int? destinationId;
 
   const TaskScreen({
     super.key,
@@ -49,6 +51,7 @@ class TaskScreen extends StatefulWidget {
     required this.taskId,
     required this.fallbackName,
     required this.destinationName,
+    this.destinationId,
   });
 
   @override
@@ -649,6 +652,22 @@ class _TaskScreenState extends State<TaskScreen> {
                     ),
                   ],
                 ),
+                actions: [
+                  TextButton.icon(
+                    onPressed: () => AiGuideChatScreen.showSheet(
+                      context,
+                      destinationId: widget.destinationId,
+                      destinationName: widget.destinationName,
+                      taskId: widget.taskId,
+                      taskName: _content?.name ?? widget.fallbackName,
+                    ),
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 17, color: AppCultureColors.gold),
+                    label: const Text(
+                      'Gợi ý AI',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppCultureColors.amberDark),
+                    ),
+                  ),
+                ],
               ),
         body: AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
