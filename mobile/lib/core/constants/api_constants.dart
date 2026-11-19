@@ -3,8 +3,28 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiConstants {
-  // Cổng mặc định của Spring Boot backend
+  // Cổng mặc định của Spring Boot backend (chạy trực tiếp bằng mvnw / IntelliJ)
   static const int defaultPort = 8088;
+
+  // Cổng nginx của bộ Docker Compose (`127.0.0.1:8080` → backend trong container)
+  static const int dockerPort = 8080;
+
+  /// Các địa chỉ backend local để dò khi `.env` không khai báo `API_BASE_URL`, theo thứ tự ưu tiên:
+  /// backend chạy trực tiếp (8088 — cùng backend web dev `localhost:3000` đang dùng) rồi tới
+  /// Docker Compose (8080); qua 10.0.2.2 (máy ảo Android) và 127.0.0.1 (web / desktop /
+  /// điện thoại thật cắm USB + `adb reverse`).
+  static List<String> localBaseUrls() {
+    var isAndroid = false;
+    try {
+      isAndroid = !kIsWeb && Platform.isAndroid;
+    } catch (_) {}
+    return [
+      for (final port in const [defaultPort, dockerPort]) ...[
+        if (isAndroid) 'http://10.0.2.2:$port/api/v1',
+        'http://127.0.0.1:$port/api/v1',
+      ],
+    ];
+  }
 
   // Đường dẫn cơ sở mặc định tự động nhận diện theo môi trường
   //
