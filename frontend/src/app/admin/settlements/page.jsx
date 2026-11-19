@@ -1,28 +1,37 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
+  CalendarDays,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
   Eye,
   FileCheck,
   Loader2,
   Plus,
   RefreshCw,
+  Search,
   TrendingUp,
+  Users,
   Wallet,
   XCircle,
 } from "lucide-react";
 import PaginationBar from "@/components/ui/PaginationBar";
 import {
+  approveBatchSettlement,
   approveSettlement,
-  createSettlement,
+  createBatchSettlement,
   getAllSettlements,
+  getBatchSettlementCandidates,
   getPlatformRevenueSummary,
   getSettlementById,
-  getSettlementCandidates,
   getSettlementDetails,
+  getSettlementOverview,
   rejectSettlement,
 } from "@/features/settlement/services/settlementService";
 import {
@@ -31,20 +40,23 @@ import {
 } from "@/features/settlement/services/providerRevenueService";
 import { getBookingById } from "@/features/booking/services/bookingService";
 import { getPaymentsByBooking } from "@/features/payment/services/paymentService";
-import { getActiveProviderProfiles } from "@/features/providerprofile/services/providerProfileService";
 import {
   BOOKING_STATUS_LABELS,
   DEFERRED_REASON_LABELS,
   formatDateTimeVN,
   formatLocalDate,
   formatPeriod,
+  formatPeriodVN,
+  formatShortPeriod,
   formatVND,
+  MONTH_NAMES_VI,
   normalizePage,
   PROVIDER_REVENUE_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   previousMonth,
   SETTLEMENT_STATUS_LABELS,
   settlementCheckLabel,
+  VN_TIME_ZONE,
 } from "@/lib/money";
 import { LimitedField } from "@/components/ui/LimitedField";
 
@@ -53,7 +65,7 @@ const PAGE_SIZE = 10;
 
 const TABS = [
   { id: "overview", label: "Tổng quan & Duyệt đợt" },
-  { id: "candidates", label: "Ứng viên tất toán" },
+  { id: "candidates", label: "Tạo đợt tất toán" },
 ];
 
 /**
@@ -65,12 +77,12 @@ const TABS = [
  *    Quản lý VÒNG ĐỜI của các đợt tất toán: danh sách, lọc, xem chi tiết,
  *    duyệt / từ chối. Đây là màn hình làm việc chính của Admin.
  *
- *  TAB 2 — "Ứng viên tất toán"
- *    Xem & TẠO đợt mới cho một đối tác + kỳ cụ thể. Đây là quy trình
- *    "chuẩn bị" (draft) — tách khỏi tab 1 để không trộn hai loại thao tác.
+ *  TAB 2 — "Tạo đợt tất toán"
+ *    Xem & TẠO đợt mới cho MỘT KỲ doanh thu — đợt bao gồm TOÀN BỘ đối tác.
+ *    Đây là quy trình "chuẩn bị" (draft) — tách khỏi tab 1 để không trộn hai loại thao tác.
  *
  * ── Luồng nghiệp vụ ──
- *  1. Tab 2: chọn đối tác + kỳ đã đóng → xem ứng viên (đủ điều kiện / bị giữ lại).
+ *  1. Tab 2: chọn kỳ đã đóng → xem ứng viên (đủ điều kiện / bị giữ lại) của toàn sàn.
  *  2. Tạo bản nháp → các khoản doanh thu chuyển sang IN_SETTLEMENT (bị khoá trong đợt).
  *  3. Tab 1: duyệt (ghi tiền vào ví nguyên tử) hoặc từ chối (giải phóng khoản doanh thu).
  */
@@ -134,8 +146,14 @@ function SettlementOverviewTab() {
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectError, setRejectError] = useState("");
+  // Modal XÁC NHẬN duyệt — thay cho window.confirm (giao diện mặc định của trình duyệt,
+  // không đồng bộ với design system, và không hiển thị đủ thông tin để Admin đối soát).
+  const [approveTarget, setApproveTarget] = useState(null);
+  const [approveError, setApproveError] = useState("");
   // Tổng hợp doanh thu nền tảng — dùng cho dải số liệu và bảng theo kỳ.
   const revenue = usePlatformRevenue();
+  // Tổng hợp 5 ô chỉ số của tab Tổng quan — số liệu TOÀN HỆ THỐNG.
+  const overview = useSettlementOverview();
 
   const loadSettlements = useCallback(async () => {
     setLoading(true);
@@ -172,24 +190,36 @@ function SettlementOverviewTab() {
     setPage(0);
   };
 
-  const handleApprove = async (settlement) => {
-    if (
-      !window.confirm(
-        `Duyệt đợt tất toán ${settlement?.settlementCode}?\nSố tiền ${formatVND(
-          settlement?.settlementAmount,
-        )} sẽ được ghi vào ví đối tác.`,
-      )
-    ) {
-      return;
-    }
+  const handleApprove = (settlement) => {
+    // Mở modal xác nhận — KHÔNG dùng window.confirm vì:
+    //  • Giao diện mặc định của trình duyệt không đồng bộ với design system.
+    //  • Không đủ thông tin để Admin đối soát (mã đợt, kỳ, số tiền, số đối tác).
+    //  • Không cho nhập / hiện lỗi API ngay trong hộp thoại.
+    setApproveError("");
+    setApproveTarget(settlement);
+  };
+
+  const confirmApprove = async () => {
+    const settlement = approveTarget;
+    if (!settlement) return;
+    const isBatch = settlement?.scope === "BATCH";
     setBusyId(settlement.id);
     setError("");
+    setApproveError("");
     try {
-      await approveSettlement(settlement.id);
+      if (isBatch) {
+        await approveBatchSettlement(settlement.id);
+      } else {
+        await approveSettlement(settlement.id);
+      }
       // Duyệt xong ⇒ doanh thu nền tảng thay đổi, tải lại cả hai khối.
-      await Promise.all([loadSettlements(), revenue.load()]);
+      setApproveTarget(null);
+      await Promise.all([loadSettlements(), revenue.load(), overview.load()]);
     } catch (err) {
-      setError(err?.message || "Không thể duyệt đợt tất toán.");
+      const msg = err?.message || "Không thể duyệt đợt tất toán.";
+      // Lỗi hiển thị NGAY TRONG modal (không chỉ ở đầu tab) để người dùng thấy.
+      setApproveError(msg);
+      setError(msg);
     } finally {
       setBusyId(null);
     }
@@ -217,7 +247,7 @@ function SettlementOverviewTab() {
       await rejectSettlement(settlement.id, reason);
       setRejectTarget(null);
       setRejectReason("");
-      await loadSettlements();
+      await Promise.all([loadSettlements(), overview.load()]);
     } catch (err) {
       const msg = err?.message || "Không thể từ chối đợt tất toán.";
       // Hiển thị lỗi NGAY TRONG modal (không chỉ ở đầu tab) để người dùng thấy.
@@ -228,18 +258,6 @@ function SettlementOverviewTab() {
     }
   };
 
-  // Thống kê nhanh trên trang hiện tại.
-  const stats = useMemo(() => {
-    const pending = settlements.filter((s) => s?.status === "DRAFT");
-    return {
-      pendingCount: pending.length,
-      pendingAmount: pending.reduce((sum, s) => sum + Number(s?.settlementAmount ?? 0), 0),
-      approvedAmount: settlements
-        .filter((s) => s?.status === "APPROVED")
-        .reduce((sum, s) => sum + Number(s?.settlementAmount ?? 0), 0),
-    };
-  }, [settlements]);
-
   return (
     // Màn lớn (lg+): vừa khít khung, KHÔNG cuộn trang — chỉ 2 bảng tự cuộn bên trong.
     // Màn nhỏ: các khối xếp dọc, cho phép cuộn cả tab.
@@ -247,48 +265,40 @@ function SettlementOverviewTab() {
       {error && <ErrorBox text={error} />}
 
       {/* ── Dải số liệu ──────────────────────────────────────────────────────
-          4 ô đầu: doanh thu nền tảng (chỉ tính các đợt đã DUYỆT — lúc tiền thực sự
-          về ví đối tác; = tổng thanh toán − hoàn tiền − chi trả đối tác).
-          3 ô sau: tình trạng các đợt trên trang danh sách đang xem. */}
-      <div className="shrink-0 grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2.5">
+          5 ô theo đúng yêu cầu, mỗi ô có CHÚ THÍCH ngắn bên dưới (xếp thẳng đứng):
+            1. Thực thu nền tảng — dòng tiền thực tế nhận được
+            2. Doanh thu nền tảng — tổng doanh thu gốc
+            3. Doanh thu đối tác  — tổng tiền đã chi trả cho toàn bộ đối tác
+            4. Số đợt đã duyệt
+            5. Đợt chờ duyệt
+          Số liệu là TOÀN HỆ THỐNG (không phụ thuộc phân trang) — lấy từ endpoint riêng. */}
+      <div className="shrink-0 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5">
+        <MiniStat
+          label="Thực thu nền tảng"
+          value={overview.loading && !overview.data ? "…" : formatVND(overview.data?.netPlatformRevenue)}
+          tone="emerald"
+          hint="Dòng tiền thực tế nền tảng nhận được"
+        />
         <MiniStat
           label="Doanh thu nền tảng"
-          value={revenue.loading && !revenue.summary ? "…" : formatVND(revenue.summary?.totalPlatformRevenue)}
-          tone="emerald"
-          hint="Hoa hồng giữ lại sau khi tất toán (các đợt đã duyệt)"
+          value={overview.loading && !overview.data ? "…" : formatVND(overview.data?.totalGrossAmount)}
+          hint="Tổng tiền khách đã thanh toán"
         />
         <MiniStat
-          label="Khách đã thanh toán"
-          value={revenue.loading && !revenue.summary ? "…" : formatVND(revenue.summary?.totalGrossAmount)}
-          hint="Sau khi trừ hoàn tiền"
-        />
-        <MiniStat
-          label="Chi trả đối tác"
-          value={revenue.loading && !revenue.summary ? "…" : formatVND(revenue.summary?.totalProviderNetAmount)}
-          hint="Tổng tiền đã ghi vào ví đối tác"
+          label="Doanh thu đối tác"
+          value={overview.loading && !overview.data ? "…" : formatVND(overview.data?.totalProviderNetAmount)}
+          hint="Tổng tiền đã chi trả cho toàn bộ đối tác"
         />
         <MiniStat
           label="Số đợt đã duyệt"
-          value={String(revenue.summary?.approvedSettlementCount ?? 0)}
-          hint={`${revenue.periods.length} kỳ có doanh thu`}
+          value={String(overview.data?.approvedSettlementCount ?? 0)}
+          hint="Các đợt tất toán đã hoàn tất"
         />
         <MiniStat
           label="Đợt chờ duyệt"
-          value={String(stats.pendingCount)}
-          tone={stats.pendingCount > 0 ? "amber" : "slate"}
-          hint="Trên trang danh sách đang xem"
-        />
-        <MiniStat
-          label="Tiền chờ chi trả"
-          value={formatVND(stats.pendingAmount)}
-          tone="amber"
-          hint="Tổng tiền các đợt chờ duyệt trên trang đang xem"
-        />
-        <MiniStat
-          label="Đã chi trả (trang này)"
-          value={formatVND(stats.approvedAmount)}
-          tone="emerald"
-          hint="Tổng tiền các đợt đã duyệt trên trang đang xem"
+          value={String(overview.data?.pendingSettlementCount ?? 0)}
+          tone={(overview.data?.pendingSettlementCount ?? 0) > 0 ? "amber" : "slate"}
+          hint="Đang chờ Admin duyệt hoặc từ chối"
         />
       </div>
 
@@ -336,43 +346,53 @@ function SettlementOverviewTab() {
             <Empty icon={FileCheck} text="Chưa có đợt tất toán nào" />
           ) : (
             <div className="overflow-auto">
-              <table className="w-full text-left text-xs border-collapse min-w-[760px]">
+              <table className="w-full text-center text-xs border-collapse min-w-[760px]">
                 {/* Sticky header — tiêu đề cột luôn nhìn thấy khi cuộn danh sách */}
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-50 text-[11px] font-semibold text-slate-500 border-b border-slate-200">
-                    <th className="py-2.5 px-4">Mã đợt</th>
-                    <th className="py-2.5 px-3">Đối tác</th>
-                    <th className="py-2.5 px-3">Kỳ</th>
-                    <th className="py-2.5 px-3 text-right">Tổng tiền</th>
-                    <th className="py-2.5 px-3 text-right">Hoa hồng</th>
-                    <th className="py-2.5 px-3 text-right">Đối tác nhận</th>
-                    <th className="py-2.5 px-3">Trạng thái</th>
+                    <th className="py-2.5 px-4 text-center">Mã đợt</th>
+                    <th className="py-2.5 px-3 text-center">Kỳ</th>
+                    <th className="py-2.5 px-3 text-center">Tổng DT</th>
+                    <th className="py-2.5 px-3 text-center">DT đối tác</th>
+                    <th className="py-2.5 px-3 text-center">DT nền tảng</th>
+                    <th className="py-2.5 px-3 text-center">Trạng thái</th>
                     {/* Cột thao tác ghim mép phải — nút luôn nhìn thấy khi bảng cuộn ngang */}
-                    <th className="sticky right-0 z-10 bg-slate-50 py-2.5 px-4 text-right shadow-[-1px_0_0_0_#e2e8f0]">Thao tác</th>
+                    <th className="sticky right-0 z-10 bg-slate-50 py-2.5 px-4 text-center shadow-[-1px_0_0_0_#e2e8f0]">Thao tác</th>
                   </tr>
                 </thead>
               <tbody className="divide-y divide-slate-100">
                 {settlements.map((s) => (
-                  <tr key={s.id} className="group hover:bg-slate-50 align-top">
-                    <td className="py-2.5 px-4 font-mono font-semibold text-slate-900">
-                      {s?.settlementCode ?? `#${s?.id}`}
+                  /* `align-middle` (mặc định của table-cell) ⇒ mọi ô trong hàng
+                     ĐỒNG ĐỀU theo trục dọc. Trước đây dùng `align-top` nên các
+                     ô 1 dòng (Kỳ / Tổng DT / Trạng thái) dồn sát lên trên,
+                     còn "5 đối tác" nằm rất thấp ⇒ hàng nhìn sát và lệch. */
+                  <tr key={s.id} className="group hover:bg-slate-50 align-middle">
+                    <td className="py-2.5 px-4 text-center">
+                      <span className="block font-mono font-semibold text-slate-900">
+                        {s?.settlementCode ?? `#${s?.id}`}
+                      </span>
+                      {s?.scope === "BATCH" ? (
+                        <span className="mt-0.5 block text-[10.5px] text-slate-400">
+                          {s?.partnerCount ?? 0} đối tác
+                        </span>
+                      ) : null}
                     </td>
-                    <td className="py-2.5 px-3 font-medium text-slate-700">
-                      {s?.providerName ?? `#${s?.providerProfileId}`}
-                    </td>
-                    <td className="py-2.5 px-3 text-slate-600">
+                    <td className="py-2.5 px-3 text-center text-slate-600">
                       {formatPeriod(s?.revenuePeriod)}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-600">
+                    <td className="py-2.5 px-3 text-center font-mono text-slate-600">
                       {formatVND(s?.grossAmount)}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-600">
-                      {formatVND(s?.commissionAmount)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-semibold text-emerald-700">
+                    <td className="py-2.5 px-3 text-center font-mono font-semibold text-sky-700">
                       {formatVND(s?.settlementAmount)}
                     </td>
-                    <td className="py-2.5 px-3">
+                    <td className="py-2.5 px-3 text-center font-mono font-semibold text-emerald-700">
+                      {formatVND(
+                        (Number(s?.commissionAmount ?? 0) || 0) +
+                          (Number(s?.adjustmentAmount ?? 0) || 0),
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
                       <StatusPill status={s?.status} />
                       {s?.approvedAt && (
                         <p className="mt-1 text-[11px] text-slate-400">
@@ -380,12 +400,13 @@ function SettlementOverviewTab() {
                         </p>
                       )}
                     </td>
-                    <td className="sticky right-0 bg-white group-hover:bg-slate-50 py-2.5 px-4 text-right shadow-[-1px_0_0_0_#f1f5f9]">
-                      <div className="flex justify-end gap-1.5">
+                    <td className="sticky right-0 bg-white group-hover:bg-slate-50 py-2.5 px-4 text-center shadow-[-1px_0_0_0_#f1f5f9]">
+                      {/* Thao tác xếp THẲNG HÀNG THEO HÀNG DỌC — các nút cùng độ lớn */}
+                      <div className="mx-auto flex w-fit flex-col items-stretch gap-1.5">
                         <button
                           type="button"
                           onClick={() => setDetailId(s.id)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                          className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
                         >
                           <Eye size={11} />
                           Chi tiết
@@ -396,7 +417,7 @@ function SettlementOverviewTab() {
                               type="button"
                               onClick={() => handleApprove(s)}
                               disabled={busyId === s.id}
-                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                             >
                               {busyId === s.id ? (
                                 <Loader2 size={11} className="animate-spin" />
@@ -409,7 +430,7 @@ function SettlementOverviewTab() {
                               type="button"
                               onClick={() => handleReject(s)}
                               disabled={busyId === s.id}
-                              className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
                             >
                               <XCircle size={11} /> Từ chối
                             </button>
@@ -462,53 +483,64 @@ function SettlementOverviewTab() {
           }}
         />
       )}
+
+      {approveTarget && (
+        <ApproveSettlementModal
+          settlement={approveTarget}
+          error={approveError}
+          busy={busyId === approveTarget?.id}
+          onConfirm={confirmApprove}
+          onClose={() => {
+            if (busyId === approveTarget?.id) return;
+            setApproveTarget(null);
+            setApproveError("");
+          }}
+        />
+      )}
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   TAB 2 — ỨNG VIÊN TẤT TOÁN (TẠO ĐỢT MỚI)
+   TAB 2 — TẠO ĐỢT TẤT TOÁN (TỔNG — TOÀN BỘ ĐỐI TÁC)
    ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Tab "Tạo đợt tất toán" — chuẩn bị & TẠO đợt tất toán.
+ *
+ * ── Thay đổi nghiệp vụ ──
+ * Trước đây: chọn MỘT đối tác + kỳ ⇒ tạo đợt riêng lẻ cho đối tác đó.
+ * Khi sàn có nhiều đối tác thì rất chậm và dễ sót.
+ *
+ * NAY: chỉ cần chọn KỲ doanh thu ⇒ đợt sẽ bao gồm TOÀN BỘ đối tác.
+ *  • Chỉ khoản ĐỦ ĐIỀU KIỆN mới vào đợt (giữ nguyên logic lọc hiện tại).
+ *  • Khoản BỊ GIỮ LẠI không vào đợt — vẫn hiện kèm lý do, xét lại ở kỳ sau.
+ */
 function SettlementCandidatesTab() {
-  const [providerProfiles, setProviderProfiles] = useState([]);
-  const [providerProfileId, setProviderProfileId] = useState("");
   const [revenuePeriod, setRevenuePeriod] = useState(previousMonth());
   const [candidates, setCandidates] = useState(null);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [error, setError] = useState("");
-  const [busyId, setBusyId] = useState(null);
+  const [busyId, setBusyId] = useState("");
   const [note, setNote] = useState("");
   // Modal chi tiết khoản doanh thu (dùng chung cho "đủ điều kiện" và "bị giữ lại").
   const [detailTarget, setDetailTarget] = useState(null);
   // Modal chi tiết ĐƠN đặt tour (mở từ nút "Xem chi tiết đơn").
   const [bookingDetailId, setBookingDetailId] = useState(null);
+  // Lọc theo đối tác trong danh sách ứng viên (chỉ là bộ lọc hiển thị, KHÔNG ảnh hưởng
+  // việc gom vào đợt — đợt luôn gom TOÀN BỘ đối tác).
+  const [partnerFilter, setPartnerFilter] = useState("");
 
-  // ── Đối tác ───────────────────────────────────────────────────────────────
-  useEffect(() => {
-    let active = true;
-    getActiveProviderProfiles()
-      .then((data) => {
-        if (!active) return;
-        setProviderProfiles(Array.isArray(data) ? data : []);
-        if (data?.length > 0) setProviderProfileId(String(data[0].id));
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // ── Ứng viên tất toán ─────────────────────────────────────────────────────
+  // ── Ứng viên tất toán TỔNG ────────────────────────────────────────────────
   const loadCandidates = useCallback(async () => {
-    if (!providerProfileId || !revenuePeriod) {
+    if (!revenuePeriod) {
       setCandidates(null);
       return;
     }
     setLoadingCandidates(true);
     setError("");
     try {
-      const data = await getSettlementCandidates(Number(providerProfileId), revenuePeriod);
+      const data = await getBatchSettlementCandidates(revenuePeriod);
       setCandidates(data);
     } catch (err) {
       setError(err?.message || "Không thể tải ứng viên tất toán.");
@@ -516,7 +548,7 @@ function SettlementCandidatesTab() {
     } finally {
       setLoadingCandidates(false);
     }
-  }, [providerProfileId, revenuePeriod]);
+  }, [revenuePeriod]);
 
   useEffect(() => {
     let cancelled = false;
@@ -532,8 +564,7 @@ function SettlementCandidatesTab() {
     setBusyId("create");
     setError("");
     try {
-      await createSettlement({
-        providerProfileId: Number(providerProfileId),
+      await createBatchSettlement({
         revenuePeriod,
         note: note.trim() || undefined,
       });
@@ -546,51 +577,55 @@ function SettlementCandidatesTab() {
     }
   };
 
-  const eligible = candidates?.eligible ?? [];
-  const held = candidates?.held ?? [];
+  // ⚠️ Bọc trong useMemo để tham chiếu ổn định giữa các render
+  // (nếu không, useMemo bên dưới sẽ recompute mỗi lần render).
+  const eligible = useMemo(() => candidates?.eligible ?? [], [candidates]);
+  const held = useMemo(() => candidates?.held ?? [], [candidates]);
   const totals = candidates?.totals;
-  // Đợt tất toán đang chờ duyệt của cùng đối tác + kỳ (nếu có).
-  // Khi đợt này tồn tại, các khoản doanh thu đã bị "gom" vào đợt (IN_SETTLEMENT)
-  // nên danh sách ứng viên sẽ RỖNG — không phải lỗi dữ liệu.
-  const openSettlement = candidates?.openSettlement ?? null;
 
-  const canCreate = useMemo(
-    () => eligible.length > 0 && !openSettlement,
-    [eligible.length, openSettlement],
+  // Danh sách đối tác có khoản đủ điều kiện — dùng cho bộ lọc hiển thị.
+  const partners = useMemo(() => {
+    const map = new Map();
+    for (const r of eligible) {
+      if (r?.providerProfileId != null && !map.has(r.providerProfileId)) {
+        map.set(r.providerProfileId, r.providerName ?? `#${r.providerProfileId}`);
+      }
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [eligible]);
+
+  // Bộ lọc đối tác chỉ áp dụng cho danh sách HIỂN THỊ.
+  const visibleEligible = useMemo(
+    () =>
+      partnerFilter
+        ? eligible.filter((r) => String(r?.providerProfileId) === partnerFilter)
+        : eligible,
+    [eligible, partnerFilter],
   );
+  const visibleHeld = useMemo(
+    () =>
+      partnerFilter
+        ? held.filter((h) => String(h?.providerProfileId) === partnerFilter)
+        : held,
+    [held, partnerFilter],
+  );
+
+  // Đã có đợt tổng đang chờ duyệt cho kỳ này thì không tạo thêm.
+  const hasOpenBatch = Boolean(candidates?.openSettlement);
+  const canCreate = eligible.length > 0 && !hasOpenBatch;
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-4">
       {error && <ErrorBox text={error} />}
 
-      {/* Bộ lọc */}
+      {/* Bộ lọc — chỉ chọn KỲ doanh thu, KHÔNG chọn đối tác (đợt gom toàn bộ). */}
       <div className="shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 sm:p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
-          <Field label="Đối tác">
-            <select
-              value={providerProfileId}
-              onChange={(e) => setProviderProfileId(e.target.value)}
-              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs focus:bg-white focus:outline-none"
-            >
-              <option value="">-- Chọn đối tác --</option>
-              {providerProfiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p?.providerName ?? p?.email}
-                </option>
-              ))}
-            </select>
-          </Field>
-
           <Field
             label="Kỳ doanh thu"
             hint="Chỉ tạo được cho tháng đã kết thúc. Mặc định là tháng trước."
           >
-            <input
-              type="month"
-              value={revenuePeriod}
-              onChange={(e) => setRevenuePeriod(e.target.value)}
-              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs focus:bg-white focus:outline-none"
-            />
+            <MonthPicker value={revenuePeriod} onChange={setRevenuePeriod} />
           </Field>
 
           <Field
@@ -614,8 +649,7 @@ function SettlementCandidatesTab() {
 
               ⚠️ CHỈ bù ở `lg` trở lên. Ở `sm`/`md` lưới có 2 cột ⇒ nút chiếm
               `col-span-2` nên rơi xuống HÀNG RIÊNG; nếu bù 22px ở đó thì nút bị
-              đẩy lệch xuống dưới một khoảng trống vô nghĩa ⇒ đây chính là lỗi
-              "nút bị lệch" mà người dùng thấy. Ở 2 cột, nút nên nằm sát mép trên
+              đẩy lệch xuống dưới một khoảng trống vô nghĩa. Ở 2 cột, nút nên nằm sát mép trên
               như một khối độc lập. */}
           <div className="sm:col-span-2 lg:col-span-1 lg:pt-[22px]">
             <button
@@ -623,8 +657,8 @@ function SettlementCandidatesTab() {
               onClick={handleCreate}
               disabled={!canCreate || busyId === "create"}
               title={
-                openSettlement
-                  ? "Đã có đợt tất toán đang chờ duyệt cho đối tác + kỳ này."
+                hasOpenBatch
+                  ? "Đã có đợt tất toán tổng đang chờ duyệt cho kỳ này."
                   : eligible.length === 0
                     ? "Không có khoản doanh thu nào đủ điều kiện tất toán."
                     : undefined
@@ -638,63 +672,88 @@ function SettlementCandidatesTab() {
               )}
               Tạo đợt tất toán
             </button>
-            <p className="mt-1 text-[11px] leading-snug text-slate-400">
-              {openSettlement
-                ? "Đã có đợt đang chờ duyệt cho kỳ này."
-                : eligible.length === 0
-                  ? "Không có khoản nào đủ điều kiện."
-                  : `Gom ${eligible.length} khoản đủ điều kiện.`}
-            </p>
+            {hasOpenBatch ? (
+              <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                Đã có đợt đang chờ duyệt cho kỳ này.
+              </p>
+            ) : eligible.length === 0 ? (
+              <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                Không có khoản nào đủ điều kiện.
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
 
-        {/* Kết quả đánh giá ứng viên — cuộn RIÊNG bên trong */}
-        <div className="flex-1 min-h-0 overflow-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-          {loadingCandidates ? (
+      {/* Kết quả đánh giá ứng viên — KHÔNG cuộn ở cấp ngoài (desktop).
+          Chỉ 2 danh sách "Đủ điều kiện" & "Bị giữ lại" mới có thanh cuộn riêng,
+          ⇒ không có thanh cuộn lồng nhau (cuộn ngoài làm đè thanh cuộn trong).
+
+          Trên màn hình hẹp (mobile) thì bố cục dọc, không thể vừa 2 danh sách
+          + dải tổng mà không cuộn ⇒ cấp ngoài cuộn, mỗi danh sách vẫn cuộn riêng
+          với chiều cao tối đa 46vh. */}
+      <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+        {loadingCandidates ? (
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-center gap-2 py-12 text-xs text-slate-400">
             <Loader2 size={16} className="animate-spin" /> Đang đánh giá ứng viên tất toán...
           </div>
         ) : candidates ? (
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 sm:p-6">
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 lg:h-full lg:min-h-0 lg:flex lg:flex-col">
           {/* Đợt tất toán đang chờ duyệt — giải thích vì sao ứng viên có thể rỗng. */}
-          {openSettlement && (
-            <div className="mb-5 flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+          {hasOpenBatch && (
+            <div className="mb-5 flex shrink-0 items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
               <FileCheck size={16} className="mt-0.5 shrink-0 text-sky-600" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-sky-900">
                   Đợt tất toán{" "}
-                  <span className="font-mono">{openSettlement.settlementCode}</span> đang chờ
+                  <span className="font-mono">{candidates.openSettlement.settlementCode}</span> đang chờ
                   duyệt
                 </p>
                 <p className="mt-1 text-[11px] leading-relaxed text-sky-700">
-                  {openSettlement.detailCount ?? 0} khoản doanh thu đã được gom vào đợt này
-                  (tổng{" "}
+                  {candidates.openSettlement.detailCount ?? 0} khoản doanh thu đã được gom
+                  vào đợt {formatPeriodVN(candidates.revenuePeriod)} (tổng{" "}
                   <span className="font-mono font-bold">
-                    {formatVND(openSettlement.settlementAmount)}
+                    {formatVND(
+                      candidates.openSettlement.grossAmount ??
+                        candidates.openSettlement.settlementAmount,
+                    )}
                   </span>
-                  ). Các khoản đó không còn nằm trong danh sách ứng viên — hãy duyệt hoặc từ
-                  chối đợt này ở tab <span className="font-bold">Tổng quan & Duyệt đợt</span>{" "}
-                  trước, rồi tạo đợt mới cho kỳ sau.
+                  ).
                 </p>
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div>
-              <h3 className="text-xs font-semibold text-slate-600">
-                Đủ điều kiện ({eligible.length})
+          {/* Bộ lọc theo đối tác — CHỈ lọc hiển thị, không ảnh hưởng việc gom vào đợt.
+              Dùng DROPDOWN có ô tìm kiếm (thay vì dãy nút) vì sàn có thể lên tới
+              hàng trăm đối tác — dãy nút sẽ làm vỡ layout. */}
+          {partners.length > 1 && (
+            <PartnerFilterSelect
+              partners={partners}
+              value={partnerFilter}
+              onChange={setPartnerFilter}
+            />
+          )}
+
+          {/* ── 2 cột: "Đủ điều kiện" & "Bị giữ lại" ──
+              Mỗi cột có THANH CUỘN RIÊNG ⇒ cuộn cột bên trái không làm dịch
+              cột bên phải, và mỗi cột không kéo dài chiều cao trang.
+              Desktop: chiều cao do `flex-1` của khối cha quyết định (không cuộn ngoài).
+              Mobile: `max-h-[46vh]` để mỗi danh sách vẫn cuộn riêng. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-5 lg:flex-1 lg:min-h-0">
+            <div className="flex min-h-0 flex-col">
+              <h3 className="text-xs font-semibold text-slate-600 shrink-0">
+                Đủ điều kiện ({visibleEligible.length})
               </h3>
-              {eligible.length === 0 ? (
+              {visibleEligible.length === 0 ? (
                 <p className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                  {openSettlement
+                  {hasOpenBatch
                     ? "Không có ứng viên mới — tất cả khoản doanh thu của kỳ này đã nằm trong đợt tất toán đang chờ duyệt."
                     : "Không có khoản doanh thu nào đủ điều kiện tất toán trong kỳ này."}
                 </p>
               ) : (
-                <ul className="mt-3 space-y-2">
-                  {eligible.map((r) => (
+                <ul className="mt-3 max-h-[46vh] lg:max-h-none lg:min-h-0 lg:flex-1 space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+                  {visibleEligible.map((r) => (
                     <li
                       key={r.id}
                       className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50/60 px-4 py-3"
@@ -705,6 +764,10 @@ function SettlementCandidatesTab() {
                         </p>
                         <p className="mt-0.5 text-[11px] text-slate-500">
                           {r?.txnRef ?? "—"} · Kỳ {formatPeriod(r?.revenuePeriod)}
+                        </p>
+                        {/* Tên đối tác — quan trọng vì đợt gom nhiều đối tác. */}
+                        <p className="mt-0.5 text-[11px] font-medium text-emerald-700">
+                          {r?.providerName ?? "—"}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
@@ -739,17 +802,17 @@ function SettlementCandidatesTab() {
               )}
             </div>
 
-            <div>
-              <h3 className="text-xs font-semibold text-slate-600">
-                Bị giữ lại ({held.length})
+            <div className="flex min-h-0 flex-col">
+              <h3 className="text-xs font-semibold text-slate-600 shrink-0">
+                Bị giữ lại ({visibleHeld.length})
               </h3>
-              {held.length === 0 ? (
+              {visibleHeld.length === 0 ? (
                 <p className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
                   Không có khoản nào bị giữ lại.
                 </p>
               ) : (
-                <ul className="mt-3 space-y-2">
-                  {held.map((h) => (
+                <ul className="mt-3 max-h-[46vh] lg:max-h-none lg:min-h-0 lg:flex-1 space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+                  {visibleHeld.map((h) => (
                     <li
                       key={h.revenueId}
                       className="flex items-center justify-between gap-3 rounded-xl bg-amber-50/60 px-4 py-3"
@@ -762,6 +825,17 @@ function SettlementCandidatesTab() {
                         {/* Kỳ gốc ngay dưới mã đơn */}
                         <p className="mt-0.5 text-[11px] text-slate-500">
                           Kỳ gốc: {formatPeriod(h?.revenuePeriod)}
+                        </p>
+                        {/* Tên đối tác — đợt gom nhiều đối tác nên cần biết ai bị giữ. */}
+                        <p className="mt-0.5 text-[11px] font-medium text-amber-700">
+                          {h?.providerName ?? "—"}
+                        </p>
+                        {/* LÝ DO BỊ GIỮ LẠI — hiện thẳng ở danh sách để Admin
+                            không phải mở modal mới biết vì sao khoản này chưa
+                            được tất toán. */}
+                        <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-800">
+                          <AlertTriangle size={9} className="shrink-0" />
+                          {DEFERRED_REASON_LABELS[h?.deferredReason] ?? h?.deferredReason ?? "Chưa đủ điều kiện"}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
@@ -805,26 +879,37 @@ function SettlementCandidatesTab() {
               )}
             </div>
           </div>
-
-          {totals && (
-            <div className="mt-6 grid grid-cols-2 lg:grid-cols-5 gap-3 border-t border-slate-100 pt-5">
-              <Total label="Tổng thanh toán" value={totals.grossAmount} />
-              <Total label="Hoàn tiền" value={totals.refundAmount} />
-              <Total label="Hoa hồng" value={totals.commissionAmount} />
-              <Total label="Điều chỉnh" value={totals.adjustmentAmount} />
-              <Total label="Đối tác nhận" value={totals.settlementAmount} tone="emerald" />
-            </div>
-          )}
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs py-12 text-center text-slate-400">
           <Wallet size={28} className="mx-auto text-slate-300 mb-2" />
           <p className="text-xs font-semibold text-slate-600">
-            Chọn đối tác và kỳ doanh thu để xem ứng viên tất toán
+            Chọn kỳ doanh thu để xem ứng viên tất toán của toàn bộ đối tác
           </p>
         </div>
         )}
       </div>
+
+      {/* ── Dải tổng số tiền — Ghim ở ĐÁY màn hình ──
+          Nằm NGOÀI vùng cuộn (đã đóng `</div>` ở trên) và là `shrink-0` ⇒ luôn
+          hiện ngay dưới màn hình, không phải cuộn xuống cuối mới thấy.
+          Khi màn hình hẹp, các ô xuống 2 cột → cao hơn, vẫn giữ nguyên vị trí đáy. */}
+      {totals && (
+        <div className="shrink-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs">
+          <Total label="Tổng thanh toán" value={totals.grossAmount} />
+          <Total label="Hoàn tiền" value={totals.refundAmount} />
+          {/* Voucher — tách 2 dòng: nền tảng chịu / đối tác chịu. */}
+          <Total
+            label="Áp dụng voucher"
+            rows={[
+              { label: "của nền tảng", value: totals.voucherPlatformAmount },
+              { label: "của đối tác", value: totals.voucherPartnerAmount },
+            ]}
+          />
+          <Total label="Doanh thu nền tảng" value={totals.commissionAmount} />
+          <Total label="Doanh thu đối tác" value={totals.settlementAmount} tone="emerald" />
+        </div>
+      )}
 
       {detailTarget && (
         <ProviderRevenueDetailModal
@@ -842,7 +927,6 @@ function SettlementCandidatesTab() {
     </div>
   );
 }
-
 /* ══════════════════════════════════════════════════════════════════════════
    DOANH THU NỀN TẢNG — phần tiền thu được sau khi tất toán cho đối tác
    ══════════════════════════════════════════════════════════════════════════ */
@@ -871,7 +955,9 @@ function usePlatformRevenue() {
     setLoading(true);
     setError("");
     try {
-      const data = await getPlatformRevenueSummary(12);
+      // 24 kỳ = 2 năm ⇒ đủ dữ liệu để so sánh theo NĂM (biểu đồ cột) bên cạnh
+      // so sánh theo THÁNG.
+      const data = await getPlatformRevenueSummary(24);
       setSummary(data);
     } catch (err) {
       setError(err?.message || "Không thể tải tổng hợp doanh thu nền tảng.");
@@ -895,6 +981,42 @@ function usePlatformRevenue() {
 }
 
 /**
+ * Tổng hợp 5 ô chỉ số của tab "Tổng quan & Duyệt đợt" (hook).
+ *
+ * Số liệu TOÀN HỆ THỐNG — không phụ thuộc phân trang hay bộ lọc đang xem.
+ */
+function useSettlementOverview() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await getSettlementOverview();
+      setData(res);
+    } catch (err) {
+      setError(err?.message || "Không thể tải tổng hợp tất toán.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) load();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
+
+  return { data, loading, error, load };
+}
+
+/**
  * Bảng doanh thu nền tảng theo kỳ — bản gọn cho cột trái (~1/3 chiều rộng).
  *
  * Mỗi dòng: Kỳ (kèm dòng phụ Hoàn tiền / Chi trả đối tác) | Khách thanh toán |
@@ -903,10 +1025,37 @@ function usePlatformRevenue() {
  */
 function PeriodRevenuePanel({ revenue, className = "" }) {
   const { summary, periods, loading, error, load } = revenue;
+  // Mức tổng hợp của biểu đồ cột: theo THÁNG hay theo NĂM.
+  const [granularity, setGranularity] = useState("month");
   const maxPlatform = periods.reduce(
     (max, p) => Math.max(max, Number(p?.platformRevenue ?? 0)),
     0,
   );
+
+  // ── Chuỗi dữ liệu cho biểu đồ cột ──
+  // Theo tháng: mỗi kỳ doanh thu (yyyy-MM) là một cột.
+  // Theo năm: gom các kỳ của cùng một năm lại (so sánh doanh thu giữa các năm).
+  const chartRows = useMemo(() => {
+    const rows = periods.map((p) => ({
+      key: p?.revenuePeriod,
+      label: formatShortPeriod(p?.revenuePeriod),
+      platform: Number(p?.platformRevenue ?? 0),
+      partner: Number(p?.providerNetAmount ?? 0),
+    }));
+    if (granularity === "month") {
+      // Cũ → mới để biểu đồ đọc theo chiều thời gian.
+      return [...rows].reverse();
+    }
+    const byYear = new Map();
+    for (const r of rows) {
+      const year = String(r.key ?? "").slice(0, 4) || "—";
+      const acc = byYear.get(year) ?? { key: year, label: year, platform: 0, partner: 0 };
+      acc.platform += r.platform;
+      acc.partner += r.partner;
+      byYear.set(year, acc);
+    }
+    return Array.from(byYear.values()).sort((a, b) => a.key.localeCompare(b.key));
+  }, [periods, granularity]);
 
   return (
     <div
@@ -922,17 +1071,41 @@ function PeriodRevenuePanel({ revenue, className = "" }) {
             Tính trên các đợt tất toán đã duyệt
           </p>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-        >
-          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-          Làm mới
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Chuyển mức tổng hợp: theo tháng ↔ theo năm */}
+          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            {[
+              { id: "month", label: "Tháng" },
+              { id: "year", label: "Năm" },
+            ].map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => setGranularity(g.id)}
+                className={`rounded-md px-2 py-1 text-[10.5px] font-semibold transition-colors ${
+                  granularity === g.id
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={load}
+            className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+            Làm mới
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+      {/* ── Biểu đồ: CỐ ĐỊNH (không cuộn theo) ──
+          Biểu đồ luôn nằm trên cùng để Admin so sánh nhanh với bảng bên dưới. */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {error ? (
           <div className="p-4">
             <ErrorBox text={error} />
@@ -945,12 +1118,26 @@ function PeriodRevenuePanel({ revenue, className = "" }) {
             duyệt đợt tất toán đầu tiên.
           </p>
         ) : (
-          <table className="w-full text-left text-[11px] border-collapse">
+          <>
+            {/* ── Biểu đồ cột so sánh doanh thu nền tảng vs đối tác ── */}
+            <div className="shrink-0">
+              <RevenueBarChart rows={chartRows} />
+            </div>
+
+            {/* ── Bảng chi tiết theo kỳ — CUỘN RIÊNG ──
+                Chỉ phần bảng cuộn dọc; biểu đồ phía trên đứng yên. */}
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+            <table className="w-full text-left text-[11px] border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="bg-slate-50 text-[10.5px] font-semibold text-slate-500 border-b border-slate-200">
                 <th className="py-2 px-3">Kỳ</th>
-                <th className="py-2 px-3 text-right">Khách TT</th>
-                <th className="py-2 px-3 text-right">Hoa hồng</th>
+                <th className="py-2 px-3 text-right">
+                  Tổng DT
+                  <span className="mt-0.5 block text-[9.5px] font-normal normal-case text-slate-400">
+                    Tổng tiền của đợt tất toán tháng đó
+                  </span>
+                </th>
+                <th className="py-2 px-3 text-right">DT đối tác</th>
                 <th className="py-2 px-3 text-right">DT nền tảng</th>
               </tr>
             </thead>
@@ -966,15 +1153,14 @@ function PeriodRevenuePanel({ revenue, className = "" }) {
                         {formatPeriod(p?.revenuePeriod)}
                       </p>
                       <p className="mt-0.5 text-[10px] text-slate-400 leading-snug">
-                        Hoàn {formatVND(p?.refundAmount)} · Chi trả{" "}
-                        {formatVND(p?.providerNetAmount)}
+                        {p?.settlementCount ?? 0} đợt
                       </p>
                     </td>
                     <td className="py-2 px-3 text-right font-mono text-slate-600 whitespace-nowrap">
                       {formatVND(p?.grossAmount)}
                     </td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                      {formatVND(p?.commissionAmount)}
+                    <td className="py-2 px-3 text-right font-mono text-sky-700 whitespace-nowrap">
+                      {formatVND(p?.providerNetAmount)}
                     </td>
                     <td className="py-2 px-3 text-right">
                       <p className="font-mono font-bold text-emerald-700 whitespace-nowrap">
@@ -993,7 +1179,99 @@ function PeriodRevenuePanel({ revenue, className = "" }) {
               })}
             </tbody>
           </table>
+            </div>
+          </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Biểu đồ cột so sánh DOANH THU NỀN TẢNG vs DOANH THU ĐỐI TÁC theo từng kỳ.
+ *
+ * ── Vì sao tự vẽ bằng CSS (không dùng thư viện chart)? ──
+ * Dự án không cài thư viện biểu đồ (recharts/chart.js) — thêm sẽ làm nặng bundle.
+ * Biểu đồ ở đây chỉ cần 2 series dạng cột ⇒ CSS flex + height% là đủ, nhẹ và
+ * không phụ thuộc thư viện ngoài.
+ *
+ * Mỗi cột = 1 kỳ (tháng) hoặc 1 năm, gồm 2 thanh đứng cạnh nhau:
+ *   • Xanh (emerald) — doanh thu nền tảng (hoa hồng + điều chỉnh).
+ *   • Xanh dương (sky)   — doanh thu đối tác (tiền đã chi trả).
+ */
+function RevenueBarChart({ rows }) {
+  if (!rows || rows.length === 0) return null;
+
+  const max = rows.reduce(
+    (m, r) => Math.max(m, Number(r?.platform ?? 0), Number(r?.partner ?? 0)),
+    0,
+  );
+  // Cột cao nhất chiếm ~78% chiều cao vùng vẽ ⇒ chừa chỗ cho nhãn giá trị.
+  //
+  // QUAN TRỌNG: dùng PIXEL cố định (không %) — vì phần tử cha dùng `items-end`
+  // nên chiều cao % của con sẽ không có gốc tính % (không resolve được) ⇒ cột bị co về 0px
+  // và không hiển thị. Tính sẵn pixel theo giá trị ⇒ luôn hiển thị đúng.
+  const CHART_HEIGHT = 130; // px — vùng vẽ
+  const LABEL_HEIGHT = 16; // px — nhãn kỳ dưới trục X
+  const BAR_MAX = CHART_HEIGHT - LABEL_HEIGHT - 10; // px — bỏ chừa nhãn + padding
+  const barHeight = (value) => {
+    const v = Number(value) || 0;
+    if (max <= 0 || v <= 0) return 0;
+    return Math.max(3, Math.round((v / max) * BAR_MAX));
+  };
+
+  return (
+    <div className="border-b border-slate-100 px-4 py-3">
+      {/* Chú giải */}
+      <div className="mb-2 flex items-center gap-3 text-[10.5px] text-slate-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-sm bg-emerald-500" />
+          Doanh thu nền tảng
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-sm bg-sky-500" />
+          Doanh thu đối tác
+        </span>
+      </div>
+
+      {/* Vùng vẽ — cuộn ngang nếu nhiều cột */}
+      <div className="overflow-x-auto [scrollbar-width:thin]">
+        <div
+          className="flex min-w-full items-end gap-1.5"
+          style={{ height: `${CHART_HEIGHT}px` }}
+        >
+          {rows.map((r) => (
+            <div
+              key={r.key}
+              className="group relative flex min-w-[42px] flex-1 flex-col items-center justify-end"
+              title={`${r.label} — Nền tảng: ${formatVND(r.platform)} · Đối tác: ${formatVND(r.partner)}`}
+            >
+              {/* Nhãn giá trị (hiện khi hover để tránh rối) */}
+              <div className="pointer-events-none absolute -top-1 left-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white shadow-lg group-hover:block">
+                <div>Nền tảng: {formatVND(r.platform)}</div>
+                <div>Đối tác: {formatVND(r.partner)}</div>
+              </div>
+
+              {/* 2 thanh: nền tảng (trái) + đối tác (phải).
+                  Chiều cao tính sẵn theo PIXEL (không %) để cột luôn hiển thị. */}
+              <div className="flex w-full items-end justify-center gap-0.5">
+                <div
+                  className="w-2.5 rounded-t bg-emerald-500/90 transition-all group-hover:bg-emerald-600"
+                  style={{ height: `${barHeight(r.platform)}px` }}
+                />
+                <div
+                  className="w-2.5 rounded-t bg-sky-500/90 transition-all group-hover:bg-sky-600"
+                  style={{ height: `${barHeight(r.partner)}px` }}
+                />
+              </div>
+
+              {/* Nhãn kỳ dưới trục X */}
+              <span className="mt-1 truncate text-[9.5px] font-medium text-slate-400">
+                {r.label}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1133,6 +1411,266 @@ function BookingDetailModal({ bookingId, onClose }) {
 }
 
 /**
+ * Modal XÁC NHẬN duyệt đợt tất toán.
+ *
+ * ── Vì sao thay cho window.confirm ──
+ * `window.confirm` hiển thị hộp thoại mặc định của trình duyệt: giao diện không
+ * đồng bộ với design system, nội dung là text thuần nên KHÔNG định dạng được số
+ * tiền, và không có chỗ báo lỗi API. Modal này:
+ *  • Hiển thị đủ thông tin để Admin đối soát: mã đợt, kỳ, phạm vi, số đối tác,
+ *    tổng thanh toán, tiền hoàn, doanh thu nền tảng và tiền đối tác nhận.
+ *  • Cảnh báo rõ tác động bất biến (không thể hoàn tác sau khi duyệt).
+ *  • Lỗi API hiển thị ngay trong modal.
+ *  • Có nút Hủy rõ ràng.
+ */
+function ApproveSettlementModal({ settlement, error, busy, onConfirm, onClose }) {
+  const isBatch = settlement?.scope === "BATCH";
+  const partnerCount = settlement?.partnerCount ?? 0;
+  const gross = Number(settlement?.grossAmount ?? 0) || 0;
+  const refund = Number(settlement?.refundAmount ?? 0) || 0;
+  const commission =
+    (Number(settlement?.commissionAmount ?? 0) || 0) +
+    (Number(settlement?.adjustmentAmount ?? 0) || 0);
+  const net = Number(settlement?.settlementAmount ?? 0) || 0;
+
+  // ── Mở rộng: chi tiết doanh thu của TỪNG đối tác ──
+  // Dùng chung endpoint /settlements/{id}/details với modal "Chi tiết đợt tất toán".
+  //
+  // ⚠️ Gọi API TRONG HANDLER (không phải trong useEffect) — để tuân thủ quy tắc
+  // "không setState đồng bộ trong effect" (tránh cascading render) và chỉ gọi
+  // API 1 lần mỗi lần bấm nút "Mở rộng".
+  const [expanded, setExpanded] = useState(false);
+  const [details, setDetails] = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const [loadedId, setLoadedId] = useState(null);
+
+  const toggleExpanded = () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (!next) return;
+    // Đã tải rồi ⇒ không gọi lại API.
+    if (loadedId === settlement?.id) return;
+    setDetailLoading(true);
+    setDetailError("");
+    getSettlementDetails(settlement?.id)
+      .then((d) => {
+        setDetails(Array.isArray(d) ? d : []);
+        setLoadedId(settlement?.id ?? null);
+      })
+      .catch((err) => {
+        setDetailError(err?.message || "Không thể tải chi tiết doanh thu của các đối tác.");
+      })
+      .finally(() => {
+        setDetailLoading(false);
+      });
+  };
+
+  // Gom theo đối tác — mỗi dòng là tiền của MỘT đối tác trong đợt.
+  const partnerRows = useMemo(() => {
+    const map = new Map();
+    for (const d of details) {
+      const key = d?.providerProfileId ?? `unknown-${d?.providerName ?? "?"}`;
+      const acc = map.get(key) ?? {
+        id: d?.providerProfileId ?? null,
+        name: d?.providerName ?? "—",
+        count: 0,
+        gross: 0,
+        commission: 0,
+        net: 0,
+      };
+      acc.count += 1;
+      acc.gross += Number(d?.grossAmount ?? 0);
+      acc.commission += Number(d?.commissionAmount ?? 0);
+      acc.net += Number(d?.providerNetAmount ?? 0);
+      map.set(key, acc);
+    }
+    // Đối tác nhận nhiều tiền nhất lên đầu.
+    return Array.from(map.values()).sort((a, b) => b.net - a.net);
+  }, [details]);
+
+  return (
+    <ModalShell title="Xác nhận duyệt đợt tất toán" onClose={onClose} wide>
+      {/* Cảnh báo hành động không thể hoàn tác */}
+      <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+        <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-emerald-900">
+            Duyệt đợt tất toán này sẽ cộng tiền vào ví đối tác
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-emerald-700">
+            Hành động này <strong>không thể hoàn tác</strong> — các khoản doanh thu
+            trong đợt sẽ chuyển sang trạng thái đã tất toán.
+          </p>
+        </div>
+      </div>
+
+      {/* Tóm tắt đợt bị tác động — để Admin xác nhận đúng đợt. */}
+      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-mono text-xs font-semibold text-slate-800">
+            {settlement?.settlementCode ?? `#${settlement?.id}`}
+          </span>
+          <span className="text-[11px] font-semibold text-slate-500">
+            {formatPeriodVN(settlement?.revenuePeriod)}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-slate-600">
+          {isBatch
+            ? `Đợt tổng — toàn bộ ${partnerCount} đối tác`
+            : `Một đối tác — ${settlement?.providerName ?? `#${settlement?.providerProfileId}`}`}
+        </p>
+
+        <dl className="mt-3 space-y-1.5 border-t border-slate-200 pt-3 text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-slate-500">Tổng thanh toán</dt>
+            <dd className="font-mono font-semibold text-slate-800">
+              {formatVND(gross)}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-slate-500">Hoàn tiền</dt>
+            <dd className="font-mono font-semibold text-slate-800">
+              {formatVND(refund)}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-slate-500">Doanh thu nền tảng</dt>
+            <dd className="font-mono font-semibold text-emerald-700">
+              {formatVND(commission)}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-1.5">
+            <dt className="font-bold text-slate-700">
+              {isBatch ? "Tổng tiền của toàn bộ đối tác" : "Tiền ghi vào ví đối tác"}
+            </dt>
+            <dd className="font-mono text-sm font-bold text-sky-700">
+              {formatVND(net)}
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      {/* ── Nút mở rộng: chi tiết doanh thu của từng đối tác ── */}
+      {isBatch ? (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            aria-expanded={expanded}
+            className="inline-flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Users size={13} className="text-slate-400" />
+              Xem chi tiết doanh thu từng đối tác
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+              {expanded ? "Thu gọn" : "Mở rộng"}
+              {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </span>
+          </button>
+
+          {expanded && (
+            <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white">
+              {detailLoading ? (
+                <div className="flex items-center justify-center gap-2 py-6 text-[11px] text-slate-400">
+                  <Loader2 size={13} className="animate-spin" /> Đang tải chi tiết...
+                </div>
+              ) : detailError ? (
+                <div className="p-3">
+                  <ErrorBox text={detailError} />
+                </div>
+              ) : partnerRows.length === 0 ? (
+                <p className="py-6 text-center text-[11px] text-slate-400">
+                  Đợt này chưa có khoản doanh thu nào.
+                </p>
+              ) : (
+                <>
+                  {/* Vùng cuộn RIÊNG — đợt gom nhiều đối tác vẫn theo dõi được
+                      mà không phải cuộn cả modal. */}
+                  <div className="max-h-[240px] overflow-y-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+                    <table className="w-full text-left text-[11px] border-collapse">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-slate-50 text-[10.5px] font-semibold text-slate-500 border-b border-slate-200">
+                          <th className="py-2 px-3">Đối tác</th>
+                          <th className="py-2 px-2 text-right">Số đơn</th>
+                          <th className="py-2 px-2 text-right">Tổng tiền</th>
+                          <th className="py-2 px-2 text-right">DT nền tảng</th>
+                          <th className="py-2 px-3 text-right">Tiền đối tác nhận</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {partnerRows.map((p) => (
+                          <tr key={p.id ?? p.name} className="hover:bg-slate-50/70">
+                            <td className="py-2 px-3 font-semibold text-slate-800">
+                              {p.name}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono text-slate-600">
+                              {p.count}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono text-slate-600">
+                              {formatVND(p.gross)}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono text-slate-600">
+                              {formatVND(p.commission)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">
+                              {formatVND(p.net)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-3 py-2 text-[11px]">
+                    <span className="font-semibold text-slate-600">
+                      Tổng cộng {partnerRows.length} đối tác
+                    </span>
+                    <span className="font-mono font-bold text-sky-700">
+                      {formatVND(partnerRows.reduce((s, p) => s + p.net, 0))}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {error && (
+        <div className="mt-3">
+          <ErrorBox text={error} />
+        </div>
+      )}
+
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={busy}
+          className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+        >
+          Hủy
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {busy ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <CheckCircle2 size={13} />
+          )}
+          {busy ? "Đang duyệt…" : "Xác nhận duyệt"}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+/**
  * Modal nhập lý do từ chối / hủy đợt tất toán.
  *
  * ── Vì sao thay cho window.prompt ──
@@ -1167,7 +1705,9 @@ function RejectSettlementModal({
           </span>
         </div>
         <p className="mt-1 text-xs text-slate-600">
-          {settlement?.providerName ?? `#${settlement?.providerProfileId}`}
+          {settlement?.scope === "BATCH"
+            ? `Toàn bộ đối tác (${settlement?.partnerCount ?? 0})`
+            : (settlement?.providerName ?? `#${settlement?.providerProfileId}`)}
         </p>
         <p className="mt-2 text-sm font-semibold text-emerald-700">
           {formatVND(settlement?.settlementAmount)}
@@ -1288,6 +1828,46 @@ function ProviderRevenueDetailModal({ revenue, onClose }) {
       title={isHeld ? "Chi tiết đơn bị giữ lại" : "Chi tiết khoản doanh thu"}
       onClose={onClose}
       wide
+      footer={
+        /* ── Kết luận đủ điều kiện — GHIM Ở ĐÁY MODAL ──
+           Admin bấm "Chi tiết" là thấy ngay kết luận (đủ / chưa đủ + lý do),
+           không phải cuộn xuống cuối modal mới thấy. Đặt ở chân modal nên
+           vị trí vẫn là "cuối modal" nhưng KHÔNG bị cuộn mất. */
+        !loading && !error && eligibility ? (
+          <div
+            className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${
+              eligible
+                ? "border-emerald-200 bg-emerald-50"
+                : "border-amber-200 bg-amber-50"
+            }`}
+          >
+            {eligible ? (
+              <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+            ) : (
+              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+            )}
+            <div className="min-w-0">
+              <p
+                className={`text-xs font-bold ${
+                  eligible ? "text-emerald-900" : "text-amber-900"
+                }`}
+              >
+                {eligible
+                  ? "Đủ điều kiện tất toán"
+                  : `Chưa đủ điều kiện — ${
+                      DEFERRED_REASON_LABELS[eligibility.deferredReason] ??
+                      eligibility.deferredReason ??
+                      "cần đối soát thêm"
+                    }`}
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                Kết quả được đánh giá lại tại thời điểm mở, dựa trên 9 điều kiện
+                bắt buộc — không dựa vào trạng thái lưu sẵn.
+              </p>
+            </div>
+          </div>
+        ) : null
+      }
     >
       {loading ? (
         <Loading />
@@ -1319,16 +1899,15 @@ function ProviderRevenueDetailModal({ revenue, onClose }) {
             <InfoRow label="Hoàn tiền" value={formatVND(r?.refundAmount)} mono />
             {Number(r?.voucherDiscount ?? 0) > 0 ? (
               <InfoRow
-                label={`Giảm giá voucher (${r?.voucherScope === "PLATFORM" ? "Sàn chịu" : "Đối tác chịu"})`}
+                label={`Giảm giá voucher (${r?.voucherScope === "PLATFORM" ? "Nền tảng chịu" : "Đối tác chịu"})`}
                 value={`-${formatVND(r?.voucherDiscount)}`}
                 mono
                 tone={r?.voucherScope === "PLATFORM" ? "rose" : "amber"}
               />
             ) : null}
-            <InfoRow label="Hoa hồng" value={formatVND(r?.commissionAmount)} mono />
-            <InfoRow label="Điều chỉnh" value={formatVND(r?.adjustmentAmount)} mono />
+            <InfoRow label="Doanh thu nền tảng" value={formatVND(r?.commissionAmount)} mono />
             <InfoRow
-              label="Đối tác nhận"
+              label="Doanh thu đối tác"
               value={formatVND(r?.providerNetAmount)}
               mono
               tone="emerald"
@@ -1397,42 +1976,6 @@ function ProviderRevenueDetailModal({ revenue, onClose }) {
               </div>
             </DetailBlock>
           )}
-
-          {/* Kết luận đủ điều kiện — đặt DƯỚI bảng điều kiện tất toán */}
-          {eligibility && (
-            <div
-              className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${
-                eligible
-                  ? "border-emerald-200 bg-emerald-50"
-                  : "border-amber-200 bg-amber-50"
-              }`}
-            >
-              {eligible ? (
-                <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
-              ) : (
-                <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
-              )}
-              <div className="min-w-0">
-                <p
-                  className={`text-xs font-bold ${
-                    eligible ? "text-emerald-900" : "text-amber-900"
-                  }`}
-                >
-                  {eligible
-                    ? "Đủ điều kiện tất toán"
-                    : `Chưa đủ điều kiện — ${
-                        DEFERRED_REASON_LABELS[eligibility.deferredReason] ??
-                        eligibility.deferredReason ??
-                        "cần đối soát thêm"
-                      }`}
-                </p>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                  Kết quả được đánh giá lại tại thời điểm mở, dựa trên 9 điều kiện
-                  bắt buộc — không dựa vào trạng thái lưu sẵn.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </ModalShell>
@@ -1447,6 +1990,9 @@ function SettlementDetailModal({ settlementId, onClose }) {
   const [details, setDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Đối tác đang chọn trong bảng tổng hợp — lọc bảng chi tiết bên dưới.
+  // null = xem tất cả.
+  const [partnerFilter, setPartnerFilter] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -1470,126 +2016,300 @@ function SettlementDetailModal({ settlementId, onClose }) {
     };
   }, [settlementId]);
 
+  // ── Tổng hợp TOÀN BỘ đối tác trong đợt ──
+  // Đợt TỔNG gom doanh thu của nhiều đối tác ⇒ Admin cần thấy ngay ai được
+  // nhận bao nhiêu, trước khi duyệt.
+  const partnerSummary = useMemo(() => {
+    const map = new Map();
+    for (const d of details) {
+      const key = d?.providerProfileId ?? `unknown-${d?.providerName ?? "?"}`;
+      const acc = map.get(key) ?? {
+        id: d?.providerProfileId ?? null,
+        name: d?.providerName ?? "—",
+        count: 0,
+        gross: 0,
+        commission: 0,
+        net: 0,
+      };
+      acc.count += 1;
+      acc.gross += Number(d?.grossAmount ?? 0);
+      acc.commission += Number(d?.commissionAmount ?? 0);
+      acc.net += Number(d?.providerNetAmount ?? 0);
+      map.set(key, acc);
+    }
+    // Sắp xếp: đối tác nhận nhiều tiền nhất lên đầu.
+    return Array.from(map.values()).sort((a, b) => b.net - a.net);
+  }, [details]);
+
+  const visibleDetails = useMemo(() => {
+    if (partnerFilter == null) return details;
+    return details.filter((d) => String(d?.providerProfileId) === String(partnerFilter));
+  }, [details, partnerFilter]);
+
   return (
-    <ModalShell title="Chi tiết đợt tất toán" onClose={onClose} wide>
+    <ModalShell title="Chi tiết đợt tất toán" onClose={onClose} xwide fill>
       {loading ? (
         <Loading />
       ) : error ? (
         <ErrorBox text={error} />
       ) : (
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            <InfoRow
-              label="Mã đợt"
-              value={settlement?.settlementCode}
-              mono
-            />
-            <InfoRow
-              label="Trạng thái"
-              value={SETTLEMENT_STATUS_LABELS[settlement?.status] ?? settlement?.status}
-              pill
-              status={settlement?.status}
-            />
-            <InfoRow label="Đối tác" value={settlement?.providerName} />
-            <InfoRow
-              label="Kỳ doanh thu"
-              value={formatPeriod(settlement?.revenuePeriod)}
-            />
-            <InfoRow label="Tổng thanh toán" value={formatVND(settlement?.grossAmount)} mono />
-            <InfoRow label="Hoàn tiền" value={formatVND(settlement?.refundAmount)} mono />
-            <InfoRow label="Hoa hồng" value={formatVND(settlement?.commissionAmount)} mono />
-            <InfoRow label="Điều chỉnh" value={formatVND(settlement?.adjustmentAmount)} mono />
-            <InfoRow
-              label="Đối tác nhận"
-              value={formatVND(settlement?.settlementAmount)}
-              mono
-              tone="emerald"
-            />
-            <InfoRow label="Thời điểm tạo" value={formatDateTimeVN(settlement?.createdAt)} />
-            {settlement?.approvedAt && (
-              <InfoRow
-                label="Thời điểm duyệt"
-                value={formatDateTimeVN(settlement.approvedAt)}
-              />
-            )}
-            {settlement?.rejectionReason && (
-              <InfoRow label="Lý do từ chối" value={settlement.rejectionReason} tone="rose" />
-            )}
+        <div className="flex h-full min-h-0 flex-col gap-5">
+          {/* ── 2 CỘT ──
+              TRÁI  : từ đầu (thông tin đợt) → "Tổng hợp N đối tác trong đợt"
+              PHẢI  : "Các khoản doanh thu trong đợt"
+              Mỗi cột có thanh cuộn RIÊNG ⇒ đợt gom nhiều đối tác / nhiều khoản
+              vẫn theo dõi được mà không phải cuộn cả modal. */}
+          <div className="grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:grid-rows-1 gap-5 flex-1 min-h-0">
+            {/* ══ CỘT TRÁI ══
+                Toàn bộ cột trái là MỘT vùng cuộn riêng (thông tin đợt → tổng hợp
+                đối tác) ⇒ không bị "đè" khi danh sách đối tác dài, và không phải
+                cuộn cả modal. */}
+            <div className="flex min-h-0 flex-col overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+              <div className="grid grid-cols-2 gap-3 shrink-0">
+                <InfoRow
+                  label="Mã đợt"
+                  value={settlement?.settlementCode}
+                  mono
+                />
+                <InfoRow
+                  label="Trạng thái"
+                  value={SETTLEMENT_STATUS_LABELS[settlement?.status] ?? settlement?.status}
+                  pill
+                  status={settlement?.status}
+                />
+                <InfoRow
+                  label="Phạm vi"
+                  value={
+                    settlement?.scope === "BATCH"
+                      ? "Tổng — toàn bộ đối tác"
+                      : "Một đối tác"
+                  }
+                />
+                <InfoRow
+                  label="Đối tác"
+                  value={
+                    settlement?.scope === "BATCH"
+                      ? `Toàn bộ đối tác (${settlement?.partnerCount ?? 0})`
+                      : settlement?.providerName
+                  }
+                />
+                <InfoRow
+                  label="Kỳ doanh thu"
+                  value={formatPeriod(settlement?.revenuePeriod)}
+                />
+                <InfoRow label="Tổng thanh toán" value={formatVND(settlement?.grossAmount)} mono />
+                <InfoRow label="Hoàn tiền" value={formatVND(settlement?.refundAmount)} mono />
+                <InfoRow
+                  label="Doanh thu nền tảng"
+                  value={formatVND(settlement?.commissionAmount)}
+                  mono
+                />
+                <InfoRow
+                  label="Doanh thu đối tác"
+                  value={formatVND(settlement?.settlementAmount)}
+                  mono
+                  tone="emerald"
+                />
+                <InfoRow label="Thời điểm tạo" value={formatDateTimeVN(settlement?.createdAt)} />
+                {settlement?.approvedAt && (
+                  <InfoRow
+                    label="Thời điểm duyệt"
+                    value={formatDateTimeVN(settlement.approvedAt)}
+                  />
+                )}
+                {settlement?.rejectionReason && (
+                  <InfoRow label="Lý do từ chối" value={settlement.rejectionReason} tone="rose" />
+                )}
+              </div>
+
+              {settlement?.note && (
+                <div className="shrink-0">
+                  <DetailBlock title="Ghi chú đối soát">
+                    <p className="text-xs text-slate-700 leading-relaxed">{settlement.note}</p>
+                  </DetailBlock>
+                </div>
+              )}
+
+              {/* ── Tổng hợp TOÀN BỘ đối tác trong đợt ──
+                  Bấm "Chi tiết" ở danh sách đợt ⇒ thấy ngay ai được nhận bao nhiêu.
+                  Bấm vào 1 đối tác để lọc bảng khoản doanh thu ở cột phải. */}
+              <div className="mt-4 shrink-0">
+                <div className="mb-2 flex items-center justify-between gap-2 shrink-0">
+                  <h3 className="text-[11px] font-semibold text-slate-500">
+                    Tổng hợp {partnerSummary.length} đối tác trong đợt
+                  </h3>
+                  {partnerFilter != null ? (
+                    <button
+                      type="button"
+                      onClick={() => setPartnerFilter(null)}
+                      className="rounded-lg border border-slate-200 px-2 py-1 text-[10.5px] font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      Xem tất cả
+                    </button>
+                  ) : null}
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white">
+                  <table className="w-full text-left text-[11px] border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-[10.5px] font-semibold text-slate-500 border-b border-slate-200">
+                        <th className="py-2 px-2">Đối tác</th>
+                        <th className="py-2 px-2 text-right">Số đơn</th>
+                        <th className="py-2 px-2 text-right">Tổng tiền</th>
+                        <th className="py-2 px-2 text-right">Doanh thu nền tảng</th>
+                        <th className="py-2 px-2 text-right">Doanh thu đối tác</th>
+                        <th className="py-2 px-2 text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {partnerSummary.map((p) => {
+                        const active =
+                          partnerFilter != null && String(partnerFilter) === String(p.id);
+                        return (
+                          <tr
+                            key={p.id ?? p.name}
+                            className={active ? "bg-sky-50/70" : "hover:bg-slate-50/70"}
+                          >
+                            <td className="py-2 px-2 font-semibold text-slate-800">{p.name}</td>
+                            <td className="py-2 px-2 text-right font-mono text-slate-600">
+                              {p.count}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono text-slate-600">
+                              {formatVND(p.gross)}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono text-slate-600">
+                              {formatVND(p.commission)}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono font-bold text-emerald-700">
+                              {formatVND(p.net)}
+                            </td>
+                            <td className="py-2 px-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPartnerFilter(active ? null : (p.id ?? p.name))
+                                }
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-0.5 text-[10.5px] font-semibold text-slate-600 hover:bg-slate-50"
+                              >
+                                <Eye size={10} />
+                                {active ? "Đang xem" : "Chi tiết"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot className="sticky bottom-0 z-10">
+                      <tr className="border-t border-slate-200 bg-slate-50 text-[10.5px] font-bold text-slate-700">
+                        <td className="py-2 px-2">TỔNG CỘNG</td>
+                        <td className="py-2 px-2 text-right font-mono">{details.length}</td>
+                        <td className="py-2 px-2 text-right font-mono">
+                          {formatVND(settlement?.grossAmount)}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono">
+                          {formatVND(settlement?.commissionAmount)}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono text-emerald-700">
+                          {formatVND(settlement?.settlementAmount)}
+                        </td>
+                        <td className="py-2 px-2" />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* ══ CỘT PHẢI: Các khoản doanh thu trong đợt ══ */}
+            <div className="flex min-h-0 flex-col">
+              <div className="mb-2 flex items-center justify-between gap-2 shrink-0">
+                <h3 className="text-[11px] font-semibold text-slate-500">
+                  {partnerFilter != null
+                    ? `Khoản doanh thu của đối tác đang chọn (${visibleDetails.length})`
+                    : `Các khoản doanh thu trong đợt (${details.length})`}
+                </h3>
+              </div>
+              <div
+                className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-100 bg-white [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
+              >
+                {visibleDetails.length === 0 ? (
+                  <p className="px-4 py-3 text-xs text-slate-500">
+                    Đợt này không có khoản doanh thu nào.
+                  </p>
+                ) : (
+                  // Container cha đã `overflow-auto` ⇒ đây chính là scroll
+                  // container, sticky header bám đúng vào nó.
+                  // `min-w-[760px]` ⇒ khi khung hẹp, bảng cuộn NGANG thay vì bị
+                  // bóp dẹp làm các cột "Mã GD / Mã đơn" dồn chữ.
+                  <table className="w-full min-w-[760px] text-left text-[11px] border-collapse">
+                    {/* Sticky header — tiêu đề cột luôn nhìn thấy khi cuộn */}
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-white border-b border-slate-200 text-[10.5px] font-semibold text-slate-500">
+                        <th className="py-2 px-2">Mã GD / Mã đơn</th>
+                        <th className="py-2 px-2">Đối tác</th>
+                        <th className="py-2 px-2">Kỳ</th>
+                        <th className="py-2 px-2 text-right">Tổng tiền</th>
+                        <th className="py-2 px-2 text-center">Voucher</th>
+                        <th className="py-2 px-2 text-right">Doanh thu nền tảng</th>
+                        <th className="py-2 px-2 text-right">Doanh thu đối tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {visibleDetails.map((d) => (
+                        <tr key={d.id}>
+                          {/* Mã GD ở dòng trên, Mã đơn ở dòng dưới — giống tab
+                              "Tài chính & Thanh toán". Hiển thị ĐẦY ĐỦ (không
+                              cắt bằng "…") vì mã giao dịch cần đối chiếu thủ công.
+                              `w-[220px]` + `whitespace-nowrap` ⇒ mã không bị dồn
+                              xuống nhiều dòng khi modal hẹp. */}
+                          <td className="py-2 px-2 align-middle w-[220px]">
+                            <span className="block font-mono text-[11px] font-semibold text-slate-900 whitespace-nowrap">
+                              {d?.txnRef ?? "—"}
+                            </span>
+                            <span className="block font-mono text-[10.5px] text-slate-500 whitespace-nowrap mt-0.5">
+                              {d?.bookingCode ?? `#${d?.bookingId}`}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 text-slate-600">{d?.providerName ?? "—"}</td>
+                          <td className="py-2 px-2 text-slate-600">
+                            {formatPeriod(d?.revenuePeriod)}
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono text-slate-600">
+                            {formatVND(d?.grossAmount)}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            {Number(d?.voucherDiscount ?? 0) > 0 ? (
+                              <div className="inline-flex flex-col items-center">
+                                <span className="font-mono text-rose-600 font-semibold">
+                                  -{formatVND(d?.voucherDiscount)}
+                                </span>
+                                <span
+                                  className={`text-[9.5px] px-1 rounded font-medium ${
+                                    d?.voucherScope === "PLATFORM"
+                                      ? "bg-purple-100 text-purple-700"
+                                      : "bg-amber-100 text-amber-700"
+                                  }`}
+                                >
+                                  {d?.voucherScope === "PLATFORM" ? "Nền tảng" : "Đối tác"}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono text-slate-600">
+                            {formatVND(d?.commissionAmount)}
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono font-semibold text-emerald-700">
+                            {formatVND(d?.providerNetAmount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
           </div>
-
-          {settlement?.note && (
-            <DetailBlock title="Ghi chú đối soát">
-              <p className="text-xs text-slate-700 leading-relaxed">{settlement.note}</p>
-            </DetailBlock>
-          )}
-
-          <DetailBlock title={`Các khoản doanh thu trong đợt (${details.length})`}>
-            {details.length === 0 ? (
-              <p className="text-xs text-slate-500">Đợt này không có khoản doanh thu nào.</p>
-            ) : (
-              // Không bọc `overflow-x-auto` — nếu không container con sẽ trở thành
-              // scroll container riêng và làm sticky header không bám theo modal.
-              // Bảng vừa khung modal nên không cần cuộn ngang.
-              <table className="w-full text-left text-[11px] border-collapse">
-                {/* Sticky header — tiêu đề cột luôn nhìn thấy khi cuộn */}
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-white border-b border-slate-200 text-[10.5px] font-semibold text-slate-500">
-                    <th className="py-2 px-2">Mã đơn</th>
-                    <th className="py-2 px-2">Mã giao dịch</th>
-                    <th className="py-2 px-2">Kỳ</th>
-                    <th className="py-2 px-2 text-right">Tổng tiền</th>
-                    <th className="py-2 px-2 text-center">Voucher</th>
-                    <th className="py-2 px-2 text-right">Hoa hồng</th>
-                    <th className="py-2 px-2 text-right">Đối tác nhận</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {details.map((d) => (
-                    <tr key={d.id}>
-                      <td className="py-2 px-2 font-mono font-semibold text-slate-800">
-                        {d?.bookingCode ?? `#${d?.bookingId}`}
-                      </td>
-                      <td className="py-2 px-2 font-mono text-slate-500">
-                        {d?.txnRef ?? "—"}
-                      </td>
-                      <td className="py-2 px-2 text-slate-600">
-                        {formatPeriod(d?.revenuePeriod)}
-                      </td>
-                      <td className="py-2 px-2 text-right font-mono text-slate-600">
-                        {formatVND(d?.grossAmount)}
-                      </td>
-                      <td className="py-2 px-2 text-center">
-                        {Number(d?.voucherDiscount ?? 0) > 0 ? (
-                          <div className="inline-flex flex-col items-center">
-                            <span className="font-mono text-rose-600 font-semibold">
-                              -{formatVND(d?.voucherDiscount)}
-                            </span>
-                            <span
-                              className={`text-[9.5px] px-1 rounded font-medium ${
-                                d?.voucherScope === "PLATFORM"
-                                  ? "bg-purple-100 text-purple-700"
-                                  : "bg-amber-100 text-amber-700"
-                              }`}
-                            >
-                              {d?.voucherScope === "PLATFORM" ? "Sàn" : "Đối tác"}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-2 text-right font-mono text-slate-600">
-                        {formatVND(d?.commissionAmount)}
-                      </td>
-                      <td className="py-2 px-2 text-right font-mono font-semibold text-emerald-700">
-                        {formatVND(d?.providerNetAmount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </DetailBlock>
         </div>
       )}
     </ModalShell>
@@ -1600,7 +2320,12 @@ function SettlementDetailModal({ settlementId, onClose }) {
    THÀNH PHẦN DÙNG CHUNG
    ══════════════════════════════════════════════════════════════════════════ */
 
-/** Ô số liệu gọn — dùng cho dải số liệu trên cùng (gợi ý hiện khi rê chuột). */
+/**
+ * Ô số liệu gọn — dải số liệu trên cùng.
+ *
+ * Cấu trúc theo yêu cầu: TÊN → SỐ → CHÚ THÍCH, xếp THẲNG ĐỨNG.
+ * Chú thích hiển thị LUÔN (không chỉ tooltip) để Admin hiểu ngay ý nghĩa số liệu.
+ */
 function MiniStat({ label, value, tone = "slate", hint }) {
   const tones = {
     slate: "text-slate-900",
@@ -1609,14 +2334,18 @@ function MiniStat({ label, value, tone = "slate", hint }) {
     rose: "text-rose-600",
   };
   return (
-    <div
-      title={hint}
-      className="min-w-0 bg-white rounded-xl px-3.5 py-2.5 border border-slate-200/85 shadow-2xs"
-    >
-      <p className="text-[11px] font-medium text-slate-500 truncate">{label}</p>
+    <div className="min-w-0 bg-white rounded-xl px-3.5 py-2.5 border border-slate-200/85 shadow-2xs">
+      <p className="text-[11px] font-medium text-slate-500 truncate" title={label}>
+        {label}
+      </p>
       <div className={`mt-0.5 text-base sm:text-lg font-semibold font-mono truncate ${tones[tone]}`}>
         {value}
       </div>
+      {hint ? (
+        <p className="mt-0.5 text-[10.5px] text-slate-400 leading-snug line-clamp-2" title={hint}>
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -1631,17 +2360,175 @@ function Field({ label, children, hint }) {
   );
 }
 
-function Total({ label, value, tone = "slate" }) {
+/**
+ * Ô tổng số tiền.
+ *
+ * ── `rows` ──
+ * Khi cần hiển thị NHIỀU dòng số tiền trong cùng một ô (ví dụ "Áp dụng voucher"
+ * tách theo bên chịu: của nền tảng / của đối tác) thì truyền `rows`.
+ * Mỗi dòng có nhãn riêng nằm ngay dưới nhãn ô.
+ */
+function Total({ label, value, tone = "slate", rows }) {
   const tones = {
     slate: "text-slate-900",
     emerald: "text-emerald-700",
   };
   return (
-    <div className="rounded-xl bg-slate-50 px-4 py-3">
-      <p className="text-[10px] font-medium text-slate-500">{label}</p>
-      <p className={`mt-1 font-mono text-sm font-semibold ${tones[tone]}`}>
-        {formatVND(value)}
-      </p>
+    <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+      {/* Nhãn ô — đậm hơn (slate-600) để dễ đọc. */}
+      <p className="text-[11px] font-semibold text-slate-600">{label}</p>
+      {rows ? (
+        <div className="mt-1 space-y-0.5">
+          {rows.map((r) => (
+            <div key={r.label} className="flex items-baseline justify-between gap-2">
+              <span className="text-[10.5px] font-medium text-slate-600">{r.label}</span>
+              <span className="font-mono text-[13px] font-bold text-slate-900">
+                {formatVND(r.value)}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className={`mt-1 font-mono text-[15px] font-bold leading-tight ${tones[tone]}`}>
+          {formatVND(value)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Bộ lọc theo đối tác — DROPDOWN có ô tìm kiếm.
+ *
+ * ── Vì sao không dùng dãy nút? ──
+ * Sàn có thể có tới hàng trăm đối tác. Một dãy nút "Tất cả / A / B / C / ..."
+ * sẽ tràn ngang, phá vỡ layout và không tìm được đối tác cần xem.
+ * ⇒ Dùng 1 nút dropdown, mở ra có ô tìm kiếm lọc theo tên + danh sách cuộn.
+ *
+ * ── Giới hạn chiều cao ──
+ * Danh sách chỉ hiển thị tối đa 5 dòng (cao ~ 5 * 30px) ⇒ dropdown không bao giờ
+ * dài xuống kín màn hình. Khi có nhiều đối tác, đưa chuột vào là cuộn được
+ * (overflow-y: auto trên chính vùng danh sách).
+ *
+ * Bộ lọc CHỈ ảnh hưởng hiển thị — đợt tất toán luôn gom TOÀN BỘ đối tác.
+ */
+const PARTNER_OPTION_H = 30; // chiều cao 1 dòng (py-1.5 + text-[11px])
+const PARTNER_MAX_VISIBLE = 5; // số dòng hiển thị tối đa
+
+function PartnerFilterSelect({ partners, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [keyword, setKeyword] = useState("");
+  const wrapRef = useRef(null);
+
+  // Đóng dropdown khi click ra ngoài.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDocClick = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // Mở dropdown ⇒ xóa từ khoá cũ (đặt trong handler, không dùng effect để
+  // tránh setState đồng bộ trong effect → cascading render).
+  const toggle = () => {
+    if (!open) setKeyword("");
+    setOpen(!open);
+  };
+
+  const selected = partners.find((p) => String(p.id) === String(value));
+  const label = selected ? selected.name : `Tất cả (${partners.length})`;
+
+  const filtered = useMemo(() => {
+    const kw = keyword.trim().toLowerCase();
+    if (!kw) return partners;
+    return partners.filter((p) => String(p.name ?? "").toLowerCase().includes(kw));
+  }, [partners, keyword]);
+
+  const pick = (id) => {
+    onChange(id == null ? "" : String(id));
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative mb-5 shrink-0" ref={wrapRef}>
+      <span className="mb-1.5 block text-[11px] font-semibold text-slate-500">
+        Lọc theo đối tác:
+      </span>
+      <button
+        type="button"
+        onClick={toggle}
+        className="inline-flex h-9 min-w-[240px] max-w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+      >
+        <span className="truncate">{label}</span>
+        <span className="shrink-0 text-slate-400">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1 w-[320px] max-w-[90vw] rounded-xl border border-slate-200 bg-white shadow-xl">
+          <div className="border-b border-slate-100 p-2">
+            <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5">
+              <Search size={12} className="shrink-0 text-slate-400" />
+              <input
+                autoFocus
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="Tìm tên đối tác..."
+                className="h-8 w-full bg-transparent text-[11px] text-slate-700 outline-none placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+
+          {/* Vùng danh sách — CHỈ cao tối đa 5 dòng, cuộn khi có nhiều đối tác. */}
+          <div
+            className="overflow-y-auto py-1 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
+            style={{ maxHeight: PARTNER_MAX_VISIBLE * PARTNER_OPTION_H }}
+          >
+            <button
+              type="button"
+              onClick={() => pick(null)}
+              className="flex w-full items-center justify-between px-3 py-1.5 text-left text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+            >
+              <span>Tất cả</span>
+              <span className="text-slate-400">{partners.length}</span>
+            </button>
+
+            {filtered.length === 0 ? (
+              <p className="px-3 py-3 text-[11px] text-slate-400">
+                Không tìm thấy đối tác nào.
+              </p>
+            ) : (
+              filtered.map((p) => {
+                const active = String(p.id) === String(value);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => pick(p.id)}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                  >
+                    <span className="truncate">{p.name}</span>
+                    {/* Đánh dấu đang chọn bằng dấu ✓ — KHÔNG bôi đen nền. */}
+                    {active ? (
+                      <span className="shrink-0 font-bold text-emerald-600">✓</span>
+                    ) : null}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1728,7 +2615,7 @@ function Pagination({ page, totalPages, totalElements, unit, onChange, pageSize,
  * `body` là chưa đủ vì trên desktop `html` mới là phần tử cuộn chính) và bù
  * lại bằng `padding-right` để trang không nhảy ngang.
  */
-function ModalShell({ title, onClose, children, wide = false }) {
+function ModalShell({ title, onClose, children, footer, wide = false, xwide = false, fill = false }) {
   // Portal chỉ render được ở phía client ⇒ chờ mount xong mới render.
   // Dùng `queueMicrotask` để không gọi setState đồng bộ trong thân effect
   // (tránh cascading render — xem convention của các trang admin khác).
@@ -1780,7 +2667,11 @@ function ModalShell({ title, onClose, children, wide = false }) {
         role="dialog"
         aria-modal="true"
         className={`flex max-h-[calc(100dvh-2rem)] w-full ${
-          wide ? "max-w-3xl" : "max-w-lg"
+          xwide
+            ? "max-w-[1680px]"
+            : wide
+              ? "max-w-3xl"
+              : "max-w-lg"
         } flex-col overflow-hidden rounded-2xl bg-white p-6 shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1795,12 +2686,174 @@ function ModalShell({ title, onClose, children, wide = false }) {
             <XCircle size={18} />
           </button>
         </div>
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+        <div
+          className={`mt-4 min-h-0 flex-1 ${
+            fill
+              ? "flex flex-col overflow-hidden"
+              : "overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
+          }`}
+        >
           {children}
         </div>
+        {/* Chân modal — luôn ghim ở ĐÁY modal, không cuộn theo nội dung.
+            Dùng cho kết luận "Đủ điều kiện tất toán" (Admin mở modal là thấy
+            ngay kết luận, không phải cuộn xuống cuối mới thấy). */}
+        {footer ? (
+          <div className="mt-4 shrink-0">{footer}</div>
+        ) : null}
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * Ô chọn KỲ doanh thu — LỊCH TIẾNG VIỆT (thay cho `<input type="month">`).
+ *
+ * ── Vì sao không dùng `<input type="month">` ──
+ * Trình duyệt dùng bảng chọn tháng theo NGÔN NGỮ của hệ điều hành (Chrome/Edge
+ * trên Windows mở picker tiếng Anh: "month", "year", "January"…). Admin dùng
+ * tiếng Việt ⇒ giao diện không nhất quán. Component này dựng lại lịch hoàn toàn
+ * bằng tiếng Việt: "Tháng 1/2026", các nút "‹" / "›" đổi năm, lưới 12 tháng.
+ *
+ * ── Ràng buộc nghiệp vụ ──
+ * Kỳ tất toán chỉ được tạo cho tháng ĐÃ KẾT THÚC ⇒ các tháng trong năm hiện tại
+ * sau tháng hiện tại bị VÔ HIỆU (disabled, mờ đi).
+ */
+function MonthPicker({ value, onChange, disabled = false }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  // Kỳ đang chọn: "YYYY-MM". Nếu value rỗng ⇒ mặc định tháng trước.
+  const [fallback] = useState(() => previousMonth());
+  const current = value || fallback;
+  const match = /^(\d{4})-(\d{2})$/.exec(String(current).slice(0, 7));
+  const [viewYear, setViewYear] = useState(() => (match ? Number(match[1]) : new Date().getFullYear()));
+
+  // Đóng dropdown khi click ra ngoài / bấm Esc.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDocClick = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // Tháng hiện tại (múi giờ VN) — để chặn kỳ chưa kết thúc.
+  const now = useMemo(() => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: VN_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const [y, m] = parts.split("-");
+    return { year: Number(y), month: Number(m) };
+  }, []);
+
+  const isFuture = (year, month) =>
+    year > now.year || (year === now.year && month > now.month);
+
+  const pick = (year, month) => {
+    if (isFuture(year, month)) return;
+    onChange(`${year}-${String(month).padStart(2, "0")}`);
+    setOpen(false);
+  };
+
+  const toggle = () => {
+    if (!open) {
+      // Mở ⇒ nhảy về năm của kỳ đang chọn.
+      const m = /^(\d{4})-(\d{2})$/.exec(String(current).slice(0, 7));
+      if (m) setViewYear(Number(m[1]));
+    }
+    setOpen(!open);
+  };
+
+  const label = match ? formatPeriodVN(current) : "Chọn kỳ";
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={disabled}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-800 transition-colors hover:bg-white focus:bg-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span className="truncate">{label}</span>
+        <CalendarDays size={14} className="shrink-0 text-slate-400" />
+      </button>
+
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Chọn kỳ doanh thu"
+          className="absolute left-0 top-full z-40 mt-1 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
+        >
+          {/* Điều hướng năm */}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y - 1)}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              aria-label="Năm trước"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="text-xs font-bold text-slate-800">Năm {viewYear}</span>
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y + 1)}
+              disabled={viewYear >= now.year}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Năm sau"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* Lưới 12 tháng */}
+          <div className="mt-3 grid grid-cols-3 gap-1.5">
+            {MONTH_NAMES_VI.map((name, idx) => {
+              const month = idx + 1;
+              const future = isFuture(viewYear, month);
+              const selected =
+                match && Number(match[1]) === viewYear && Number(match[2]) === month;
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  disabled={future}
+                  onClick={() => pick(viewYear, month)}
+                  className={`rounded-lg px-1 py-2 text-[11px] font-semibold transition-colors ${
+                    selected
+                      ? "bg-sky-600 text-white"
+                      : future
+                        ? "cursor-not-allowed text-slate-300"
+                        : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="mt-2.5 border-t border-slate-100 pt-2 text-[10.5px] leading-snug text-slate-400">
+            Chỉ chọn được tháng đã kết thúc.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1822,12 +2875,13 @@ function InfoRow({ label, value, mono = false, pill = false, status, tone }) {
   );
 }
 
-function DetailBlock({ title, children, flush = false }) {
+function DetailBlock({ title, children, flush = false, action = null }) {
   return (
     <div>
-      <h3 className="mb-2 text-[11px] font-semibold text-slate-500">
-        {title}
-      </h3>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-[11px] font-semibold text-slate-500">{title}</h3>
+        {action}
+      </div>
       <div
         className={
           flush
