@@ -1,5 +1,6 @@
 package com.journeygo.modules.settlement.entity;
 
+import com.journeygo.modules.providerprofile.entity.ProviderProfile;
 import com.journeygo.modules.providerrevenue.entity.ProviderRevenue;
 import jakarta.persistence.*;
 import lombok.*;
@@ -18,7 +19,8 @@ import java.time.Instant;
         @UniqueConstraint(name = "uk_settlement_detail_provider_revenue", columnNames = {"settlement_id", "provider_revenue_id"})
 }, indexes = {
         @Index(name = "idx_settlement_detail_settlement", columnList = "settlement_id"),
-        @Index(name = "idx_settlement_detail_provider_revenue", columnList = "provider_revenue_id")
+        @Index(name = "idx_settlement_detail_provider_revenue", columnList = "provider_revenue_id"),
+        @Index(name = "idx_settlement_detail_provider_profile", columnList = "provider_profile_id")
 })
 @Getter
 @Setter
@@ -38,6 +40,19 @@ public class SettlementDetail {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "provider_revenue_id", nullable = false)
     private ProviderRevenue providerRevenue;
+
+    /**
+     * Đối tác sở hữu khoản doanh thu này.
+     *
+     * <p>Với đợt TỔNG ({@code scope = BATCH}) thì {@code Settlement.providerProfile} là NULL
+     * ⇒ cần cột này để biết khoản doanh thu thuộc đối tác nào (để cộng tiền vào đúng ví
+     * khi duyệt, và để hiển thị trong danh sách chi tiết).
+     *
+     * <p>Với đợt của MỘT đối tác thì cột này trùng với {@code Settlement.providerProfile}.
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "provider_profile_id", nullable = false)
+    private ProviderProfile providerProfile;
 
     /** Kỳ doanh thu gốc của khoản doanh thu (yyyy-MM) — có thể khác kỳ của Settlement (chuyển tiếp). */
     @Column(name = "revenue_period", nullable = false, length = 7)

@@ -1,6 +1,7 @@
 package com.journeygo.modules.settlement.repository;
 
 import com.journeygo.modules.settlement.entity.Settlement;
+import com.journeygo.modules.settlement.entity.enums.SettlementScope;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +22,17 @@ public interface SettlementRepository extends JpaRepository<Settlement, Long> {
     Page<Settlement> findByProviderProfile_IdOrderByCreatedAtDesc(Long providerProfileId, Pageable pageable);
 
     Page<Settlement> findByStatus(SettlementStatus status, Pageable pageable);
+
+    /**
+     * Đếm số đợt theo trạng thái — TOÀN HỆ THỐNG (không phụ thuộc phân trang).
+     */
+    long countByStatus(SettlementStatus status);
+
+    /**
+     * Tổng tiền của các đợt theo trạng thái — dùng cho ô "Tiền chờ chi trả".
+     */
+    @Query("SELECT COALESCE(SUM(s.settlementAmount), 0) FROM Settlement s WHERE s.status = :status")
+    java.math.BigDecimal sumSettlementAmountByStatus(@Param("status") SettlementStatus status);
 
     List<Settlement> findByProviderProfile_IdAndRevenuePeriod(Long providerProfileId, String revenuePeriod);
 
@@ -43,6 +55,20 @@ public interface SettlementRepository extends JpaRepository<Settlement, Long> {
               AND s.revenuePeriod = :period
             """)
     List<Settlement> findByProviderProfileAndPeriod(@Param("providerProfileId") Long providerProfileId, @Param("period") String period);
+
+    /**
+     * Đợt tất toán TỔNG của một kỳ (scope = BATCH) — nhiều nhất có 1 bản ghi.
+     *
+     * <p>Ràng buộc "mỗi kỳ chỉ 1 đợt tổng" được đảm bảo ở tầng DB bằng unique index
+     * `uk_settlement_batch_period` (xem migration V41).
+     */
+    Optional<Settlement> findFirstByScopeAndRevenuePeriod(SettlementScope scope, String revenuePeriod);
+
+    /**
+     * Tất cả đợt tất toán TỔNG của một kỳ — dùng khi cần xem lịch sử (đợt đã bị từ chối
+     * vẫn giữ để tra cứu).
+     */
+    List<Settlement> findByScopeAndRevenuePeriod(SettlementScope scope, String revenuePeriod);
 
     /**
      * Tổng hợp số tiền theo kỳ doanh thu cho các đợt đã duyệt.
