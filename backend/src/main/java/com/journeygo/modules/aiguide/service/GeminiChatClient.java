@@ -17,7 +17,7 @@ import org.springframework.web.client.RestClientResponseException;
 import java.util.List;
 
 /**
- * Client kết nối Google Gemini REST API (model gemini-1.5-flash / gemini-2.0-flash / gemini-2.5-flash)
+ * Client kết nối Google Gemini REST API (mặc định gemini-3.5-flash-lite, tương thích gemini-2.5-flash / 3.8-flash)
  * để sinh câu trả lời cho tính năng AI Virtual Guide.
  */
 @Service
@@ -47,7 +47,7 @@ public class GeminiChatClient {
      * @param systemInstruction Chỉ thị hệ thống định hình phong cách, vai trò và guardrails
      * @param history           Lịch sử các lượt chat gần nhất (USER / MODEL)
      * @param prompt            Câu hỏi hiện tại của người dùng kèm ngữ cảnh RAG
-     * @param temperature       Độ sáng tạo (0.0 - 1.0, khuyến nghị 0.2 - 0.4 cho factual RAG)
+     * @param temperature       Độ sáng tạo (chỉ gửi cho thế hệ trước Gemini 3.x)
      * @param maxTokens         Giới hạn token phản hồi
      * @return Nội dung phản hồi dạng chuỗi văn bản
      */
@@ -68,10 +68,9 @@ public class GeminiChatClient {
 
         validateApiKey();
 
-        String url = String.format("%s/models/%s:generateContent?key=%s",
+        String url = String.format("%s/models/%s:generateContent",
                 properties.getBaseUrl(),
-                properties.getChatModel(),
-                properties.getApiKey());
+                properties.getChatModel());
 
         try {
             ObjectNode root = objectMapper.createObjectNode();
@@ -83,37 +82,30 @@ public class GeminiChatClient {
                 partsNode.addObject().put("text", systemInstruction);
             }
 
-            // 2. Contents (History + Current Prompt)
+            // 2. Contents (History chuẩn hóa luân phiên + Current Prompt)
             ArrayNode contentsNode = root.putArray("contents");
-
-            if (history != null) {
-                for (ChatTurn turn : history) {
-                    if (turn != null && StringUtils.hasText(turn.text())) {
-                        ObjectNode turnNode = contentsNode.addObject();
-                        // Google Gemini chấp nhận 'user' và 'model'
-                        String apiRole = "ASSISTANT".equalsIgnoreCase(turn.role()) || "MODEL".equalsIgnoreCase(turn.role())
-                                ? "model"
-                                : "user";
-                        turnNode.put("role", apiRole);
-                        turnNode.putArray("parts").addObject().put("text", turn.text());
-                    }
-                }
+            List<ChatTurn> normalizedTurns = normalizeTurns(history, prompt);
+            for (ChatTurn turn : normalizedTurns) {
+                ObjectNode turnNode = contentsNode.addObject();
+                turnNode.put("role", turn.role());
+                turnNode.putArray("parts").addObject().put("text", turn.text());
             }
 
-            // Thêm lượt hiện tại của người dùng
-            ObjectNode currentTurn = contentsNode.addObject();
-            currentTurn.put("role", "user");
-            currentTurn.putArray("parts").addObject().put("text", prompt);
-
-            // 3. Generation Config
+            // 3. Generation Config (Gemini 3.5+ không cho phép temperature/top_p/top_k)
             ObjectNode genConfig = root.putObject("generationConfig");
-            genConfig.put("temperature", temperature != null ? temperature : 0.3);
+            String chatModel = properties.getChatModel();
+            boolean isGemini3OrNewer = chatModel != null
+                    && chatModel.trim().toLowerCase(java.util.Locale.ROOT).startsWith("gemini-3");
+            if (!isGemini3OrNewer && temperature != null) {
+                genConfig.put("temperature", temperature);
+            }
             genConfig.put("maxOutputTokens", maxTokens != null ? maxTokens : 1024);
 
             String requestBody = objectMapper.writeValueAsString(root);
 
             String rawResponse = restClient.post()
                     .uri(url)
+                    .header("x-goog-api-key", properties.getApiKey())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(requestBody)
                     .retrieve()
@@ -135,12 +127,61 @@ public class GeminiChatClient {
         }
     }
 
+    /**
+     * Chuẩn hóa danh sách lượt chat đảm bảo bắt đầu bằng "user", luân phiên user/model,
+     * gộp các lượt trùng vai trò liên tiếp và luôn kết thúc bằng prompt hiện tại ở vai trò "user".
+     */
+    List<ChatTurn> normalizeTurns(List<ChatTurn> history, String currentPrompt) {
+        java.util.List<ChatTurn> normalized = new java.util.ArrayList<>();
+        if (history != null) {
+            for (ChatTurn turn : history) {
+                if (turn == null || !StringUtils.hasText(turn.text())) {
+                    continue;
+                }
+                String apiRole = ("ASSISTANT".equalsIgnoreCase(turn.role()) || "MODEL".equalsIgnoreCase(turn.role()))
+                        ? "model"
+                        : "user";
+                String text = turn.text().trim();
+                if (normalized.isEmpty()) {
+                    if ("model".equals(apiRole)) {
+                        continue; // Bỏ lượt model đứng đầu nếu thiếu lượt mở đầu từ user
+                    }
+                    normalized.add(new ChatTurn(apiRole, text));
+                } else {
+                    ChatTurn prev = normalized.get(normalized.size() - 1);
+                    if (prev.role().equals(apiRole)) {
+                        normalized.set(normalized.size() - 1, new ChatTurn(apiRole, prev.text() + "\n\n" + text));
+                    } else {
+                        normalized.add(new ChatTurn(apiRole, text));
+                    }
+                }
+            }
+        }
+
+        String trimmedPrompt = currentPrompt.trim();
+        if (!normalized.isEmpty() && "user".equals(normalized.get(normalized.size() - 1).role())) {
+            ChatTurn prev = normalized.get(normalized.size() - 1);
+            normalized.set(normalized.size() - 1, new ChatTurn("user", prev.text() + "\n\n" + trimmedPrompt));
+        } else {
+            normalized.add(new ChatTurn("user", trimmedPrompt));
+        }
+        return normalized;
+    }
+
     private String parseGeminiResponse(String rawResponse) {
+        if (!StringUtils.hasText(rawResponse)) {
+            return "Tôi chưa tìm thấy thông tin phù hợp cho câu hỏi của bạn.";
+        }
         try {
             JsonNode root = objectMapper.readTree(rawResponse);
             JsonNode candidates = root.path("candidates");
             if (candidates.isArray() && !candidates.isEmpty()) {
                 JsonNode firstCandidate = candidates.get(0);
+                String finishReason = firstCandidate.path("finishReason").asText("");
+                if ("SAFETY".equalsIgnoreCase(finishReason)) {
+                    log.warn("Gemini API chặn phản hồi vì SAFETY guardrail");
+                    return "Xin lỗi, tôi chưa thể phản hồi nội dung này. Bạn vui lòng đặt câu hỏi khác liên quan đến điểm đến hoặc hành trình nhé!";
+                }
                 JsonNode parts = firstCandidate.path("content").path("parts");
                 if (parts.isArray() && !parts.isEmpty()) {
                     StringBuilder sb = new StringBuilder();
@@ -149,13 +190,16 @@ public class GeminiChatClient {
                             sb.append(part.get("text").asText());
                         }
                     }
-                    return sb.toString().trim();
+                    String text = sb.toString().trim();
+                    if (StringUtils.hasText(text)) {
+                        return text;
+                    }
                 }
             }
-            log.warn("Gemini API trả về candidates rỗng: {}", rawResponse);
+            log.warn("Gemini API trả về candidates rỗng hoặc không có text");
             return "Tôi chưa tìm thấy thông tin phù hợp cho câu hỏi của bạn.";
         } catch (Exception e) {
-            log.error("Lỗi giải mã JSON phản hồi từ Gemini: {}", rawResponse, e);
+            log.error("Lỗi giải mã JSON phản hồi từ Gemini", e);
             throw new AppException(ErrorCode.AI_CHAT_FAILED, "Lỗi phân tích cú pháp dữ liệu AI");
         }
     }
