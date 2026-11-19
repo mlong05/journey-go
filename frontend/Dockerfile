@@ -1,7 +1,9 @@
-# syntax=docker/dockerfile:1
 # =====================================================================================
 #  Frontend (Next.js) — multi-stage build, kết quả chạy bằng `output: 'standalone'`
 #  ⇒ image nhỏ gọn, không cần node_modules trong image cuối.
+#
+#  ⚠️ KHÔNG dùng cú pháp chỉ BuildKit mới hiểu (vd `RUN --mount=type=cache`):
+#     runner deploy self-hosted build bằng builder cũ (legacy) ⇒ deploy sẽ thất bại.
 # =====================================================================================
 
 # ── Stage 1: dependencies ───────────────────────────────────────────────────────
@@ -9,8 +11,7 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 # Chỉ copy manifest trước để cache layer npm ci theo lockfile.
 COPY package.json package-lock.json ./
-# Cache mount giữ ~/.npm giữa các lần build ⇒ đổi lockfile cũng không tải lại toàn bộ gói.
-RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 
 # ── Stage 2: build ──────────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
@@ -32,10 +33,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production
 
-# Next 16 ghi cache Turbopack vào .next/cache, nhưng mỗi lần build Docker bắt đầu từ layer sạch
-# nên cache bị bỏ đi. Cache mount (BuildKit) giữ thư mục này giữa các lần build ⇒ build sau
-# chỉ biên dịch lại phần code đã đổi.
-RUN --mount=type=cache,target=/app/.next/cache npm run build
+RUN npm run build
 
 # ── Stage 3: runtime ────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
