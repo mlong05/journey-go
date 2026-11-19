@@ -216,7 +216,7 @@ class TourSubmissionValidatorTest {
         tour.setCoverImageUrl("https://cdn/anh-1.jpg");
         for (GuestType type : GuestType.values()) {
             tour.getPrices().add(TourPrice.builder().tour(tour).guestType(type)
-                    .price(type.isAlwaysFree() ? BigDecimal.ZERO : BigDecimal.valueOf(300000))
+                    .price(type == GuestType.INFANT ? BigDecimal.ZERO : BigDecimal.valueOf(300000))
                     .countsTowardSlot(type == GuestType.ADULT).build());
         }
 

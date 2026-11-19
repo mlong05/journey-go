@@ -99,7 +99,8 @@ public class TourDetailMapper {
             result.add(new TourDetailResponse.Price(type, type.getLabel(), type.getAgeRange(),
                     price == null ? null : price.getPrice(),
                     price != null && price.isCountsTowardSlot(),
-                    type.isAlwaysFree()));
+                    // "Miễn phí" = đối tác đặt giá 0đ cho loại khách này.
+                    price != null && price.getPrice() != null && price.getPrice().signum() == 0));
         }
         return result;
     }

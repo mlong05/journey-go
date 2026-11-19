@@ -189,7 +189,7 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
                   <tr key={g.key} className="border-t border-slate-100">
                     <td className="py-1.5 font-semibold text-slate-800">{g.label}</td>
                     <td className="py-1.5 text-xs text-slate-500">{g.age}</td>
-                    <td className="py-1.5 text-right font-bold text-slate-900">{g.alwaysFree ? "Miễn phí" : money(p?.price)}</td>
+                    <td className="py-1.5 text-right font-bold text-slate-900">{p?.price != null && Number(p.price) === 0 ? "Miễn phí" : money(p?.price)}</td>
                   </tr>
                 );
               })}
