@@ -1,6 +1,8 @@
 package com.journeygo.modules.aiguide.repository;
 
 import com.journeygo.modules.aiguide.entity.AiKnowledgeChunk;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -53,6 +55,19 @@ public interface AiKnowledgeChunkRepository extends JpaRepository<AiKnowledgeChu
      * Lấy danh sách chunks theo nguồn gốc dữ liệu.
      */
     List<AiKnowledgeChunk> findBySourceId(String sourceId);
+
+    List<AiKnowledgeChunk> findByDestinationId(Long destinationId);
+
+    List<AiKnowledgeChunk> findByDestinationIdAndContentType(Long destinationId, String contentType);
+
+    Page<AiKnowledgeChunk> findByDestinationId(Long destinationId, Pageable pageable);
+
+    Page<AiKnowledgeChunk> findByContentType(String contentType, Pageable pageable);
+
+    Page<AiKnowledgeChunk> findByDestinationIdAndContentType(Long destinationId, String contentType, Pageable pageable);
+
+    @Query("SELECT c.contentType, COUNT(c) FROM AiKnowledgeChunk c GROUP BY c.contentType")
+    List<Object[]> countGroupedByContentType();
 
     /**
      * Đếm số lượng chunks của một nguồn gốc dữ liệu.
