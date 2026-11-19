@@ -36,6 +36,18 @@ export async function getPaymentById(paymentId) {
   return res?.data ?? res;
 }
 
+/**
+ * Chi tiết GIAO DỊCH + ĐƠN đặt tour (gộp) — dùng cho modal chi tiết ở trang
+ * Quản trị Tài chính & Thanh toán.
+ *
+ * Trả về: giao dịch, đơn liên quan, các lần thử thanh toán khác của cùng đơn,
+ * các yêu cầu hoàn tiền và bảng kê "chi tiết dòng tiền".
+ */
+export async function getPaymentDetail(paymentId) {
+  const res = await apiClient.get(`${ENDPOINT}/${paymentId}/detail`);
+  return res?.data ?? res;
+}
+
 /** Các lần thử thanh toán của một booking (dùng để tìm `paymentId` khi quay lại từ VNPay). */
 export async function getPaymentsByBooking(bookingId, { page = 0, size = 10 } = {}) {
   const res = await apiClient.get(`${ENDPOINT}/bookings/${bookingId}?page=${page}&size=${size}`);
@@ -208,6 +220,7 @@ export function isRetryable(status) {
 const paymentService = {
   getMethods: getPaymentMethods,
   getById: getPaymentById,
+  getDetail: getPaymentDetail,
   getByBooking: (bookingId, options) => toPage(getPaymentsByBooking(bookingId, options)),
   query: queryPayment,
   getAll: (options) => toPage(getAllPayments(options)),

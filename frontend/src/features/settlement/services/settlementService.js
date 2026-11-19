@@ -45,6 +45,42 @@ export async function createSettlement({ providerProfileId, revenuePeriod, note 
   return res?.data ?? res;
 }
 
+/**
+ * Ứng viên tất toán TỔNG của kỳ — gom mọi đối tác lại.
+ *
+ * Chỉ khoản ĐỦ ĐIỀU KIỆN mới vào danh sách `eligible`; khoản bị giữ lại nằm ở `held`
+ * kèm lý do (giữ nguyên logic lọc hiện tại).
+ */
+export async function getBatchSettlementCandidates(revenuePeriod) {
+  const query = new URLSearchParams({ revenuePeriod: String(revenuePeriod) });
+  const res = await apiClient.get(`${ENDPOINT}/batch/candidates?${query.toString()}`);
+  return res?.data ?? res;
+}
+
+/** Tạo đợt tất toán TỔNG cho kỳ — bao gồm TOÀN BỘ đối tác. */
+export async function createBatchSettlement({ revenuePeriod, note }) {
+  const res = await apiClient.post(`${ENDPOINT}/batch`, { revenuePeriod, note });
+  return res?.data ?? res;
+}
+
+/** Duyệt đợt tất toán TỔNG — cộng tiền vào ví của từng đối tác. */
+export async function approveBatchSettlement(settlementId) {
+  const res = await apiClient.post(`${ENDPOINT}/batch/${settlementId}/approve`);
+  return res?.data ?? res;
+}
+
+/** Tổng hợp số liệu cho tab "Tổng quan & Duyệt đợt" (5 ô chỉ số). */
+export async function getSettlementOverview() {
+  const res = await apiClient.get(`${ENDPOINT}/overview`);
+  return res?.data ?? res;
+}
+
+/** Tổng hợp số liệu cho tab "Tài chính & Thanh toán" (4 ô chỉ số). */
+export async function getFinanceSummary() {
+  const res = await apiClient.get(`${ENDPOINT}/finance-summary`);
+  return res?.data ?? res;
+}
+
 /** Duyệt đợt tất toán — ghi tiền vào ví nguyên tử. */
 export async function approveSettlement(settlementId) {
   const res = await apiClient.post(`${ENDPOINT}/${settlementId}/approve`);
