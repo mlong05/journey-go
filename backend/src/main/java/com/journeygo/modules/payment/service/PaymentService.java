@@ -7,11 +7,14 @@ import com.journeygo.modules.booking.entity.Booking;
 import com.journeygo.modules.booking.entity.enums.BookingStatus;
 import com.journeygo.modules.booking.repository.BookingRepository;
 import com.journeygo.modules.booking.service.BookingService;
+import com.journeygo.modules.booking.dto.response.BookingResponse;
+import com.journeygo.modules.finance.config.FinanceProperties;
 import com.journeygo.modules.notification.entity.enums.NotificationType;
 import com.journeygo.modules.notification.service.NotificationPublisher;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.providerrevenue.service.ProviderRevenueService;
 import com.journeygo.modules.payment.config.VnPayProperties;
+import com.journeygo.modules.payment.dto.response.PaymentDetailResponse;
 import com.journeygo.modules.payment.dto.response.PaymentInitResponse;
 import com.journeygo.modules.payment.dto.response.PaymentResponse;
 import com.journeygo.modules.payment.dto.response.PaymentSummaryResponse;
@@ -20,6 +23,8 @@ import com.journeygo.modules.payment.entity.Payment;
 import com.journeygo.modules.payment.entity.enums.PaymentOutcome;
 import com.journeygo.modules.payment.entity.enums.PaymentStatus;
 import com.journeygo.modules.payment.repository.PaymentRepository;
+import com.journeygo.modules.refund.dto.response.RefundResponse;
+import com.journeygo.modules.refund.repository.RefundRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,6 +37,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +92,7 @@ public class PaymentService {
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final PaymentRepository paymentRepository;
+    private final RefundRequestRepository refundRepository;
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
     private final NotificationPublisher notifications;
@@ -93,6 +100,7 @@ public class PaymentService {
     private final VnPayProperties vnPayProperties;
     private final ProviderRevenueService providerRevenueService;
     private final PaymentMethodService paymentMethodService;
+    private final FinanceProperties financeProperties;
 
     // ── Khởi tạo thanh toán ───────────────────────────────────────────────────
 
@@ -427,6 +435,115 @@ public class PaymentService {
         return toVerificationResponse(payment, payment.isSuccess()
                 ? "Thanh toán thành công"
                 : "Thanh toán không thành công: " + (payment.getVnpMessage() != null ? payment.getVnpMessage() : ""));
+    }
+
+    // ── Timeout / expiry ──────────────────────────────────────────────────────
+
+    /**
+     * Quét và đóng các giao dịch ĐÃ QUÁ HẠN thanh toán mà chưa có kết quả cuối cùng.
+     *
+     * <p>── Vì sao cần? ──
+     * Giao dịch VNPay có hạn thanh toán 10 phút (cố định theo {@code paymentDeadline}
+     * của Booking). Khách không hoàn tất thanh toán ⇒ giao dịch treo ở
+     * {@code PENDING}/{@code PROCESSING}.
+     *
+     * <p>Tác vụ đối soá KHÔNG đóng được chúng vì QueryDR trên VNPay Sandbox luôn
+     * trả {@code vnp_ResponseCode=99} ⇒ giao dịch treo VÔ THỜI HẠN và hiển thị
+     * "Đang xử lý" hàng tháng trên trang Quản trị Tài chính, dù hạn thanh toán đã
+     * qua từ lâu.
+     *
+     * <p>⇒ Chuyển sang {@code EXPIRED} — trạng thái đã có sẵn trong enum nhưng trước
+     * đây KHÔNG có code nào gọi tới.
+     *
+     * <p>⚠️ KHÔNG mất tiền khách: {@code EXPIRED} KHÔNG nằm trong
+     * {@code PaymentStatus.isFinal()} ⇒ khi callback/IPN đến muộn, kết quả vẫn được
+     * áp dụng bình thường (thành công → xác nhận Booking hoặc đánh dấu khoản tiền
+     * dư; thất bại → chuyển sang quy trình hoàn tiền/đối soát).
+     *
+     * @return số giao dịch vừa được chuyển sang EXPIRED
+     */
+    @Transactional
+    public int expireOverduePayments() {
+        Instant now = Instant.now();
+        List<Payment> overdue = paymentRepository.findExpiredPendingPayments(
+                List.of(PaymentStatus.PENDING, PaymentStatus.PROCESSING), now);
+        if (overdue.isEmpty()) {
+            return 0;
+        }
+
+        int count = 0;
+        for (Payment payment : overdue) {
+            // Khóa pessimistic write + kiểm tra lại trạng thái: một luồng khác
+            // (IPN/callback) có thể vừa xác minh thành công ⇒ KHÔNG được ghi đè.
+            Payment locked = paymentRepository.findByIdForUpdate(payment.getId()).orElse(null);
+            if (locked == null) {
+                continue;
+            }
+            if (locked.getStatus() != PaymentStatus.PENDING
+                    && locked.getStatus() != PaymentStatus.PROCESSING) {
+                continue;
+            }
+            if (!isReallyOverdue(locked, now)) {
+                continue;
+            }
+            locked.markExpired("Giao dịch đã quá hạn thanh toán (hạn "
+                    + locked.getExpiresAt() + ") và không có kết quả xác minh từ VNPay.");
+            paymentRepository.save(locked);
+            count++;
+        }
+        if (count > 0) {
+            log.info("[Payment][Expiry] Đã chuyển {} giao dịch quá hạn thanh toán sang EXPIRED", count);
+        }
+        return count;
+    }
+
+    /**
+     * Giao dịch đã quá hạn THẬT sự chưa? (quá hạn + đã qua khoảng lướt an toàn).
+     *
+     * <p>Khoảng lướt an toàn cho tác vụ đối soá (QueryDR) có cơ hội xác minh giao dịch
+     * mà khách ĐÃ thanh toán thành công nhưng callback/IPN bị mất.
+     */
+    private boolean isReallyOverdue(Payment payment, Instant now) {
+        if (payment.getExpiresAt() == null || !payment.getExpiresAt().isBefore(now)) {
+            return false;
+        }
+        long graceSeconds = Math.max(0, financeProperties.getPaymentExpiryGraceSeconds());
+        return !payment.getExpiresAt().plusSeconds(graceSeconds).isAfter(now);
+    }
+
+    /**
+     * Đóng các giao dịch quá hạn thanh toán NGAY TRONG LÚC ĐỌC DANH SÁCH (lazy check).
+     *
+     * <p>── Vì sao cần thêm bước này? ──
+     * Tác vụ nền {@link #expireOverduePayments()} quét mỗi 60 giây ⇒ có thể trễ tới
+     * 1 phút. Nhưng người dùng thấy "Đang xử lý" cho một giao dịch đã hết hạn từ
+     * 4 ngày trước là rất khó chịu ⇒ khi mở danh sách, quét luôn các giao dịch quá
+     * hạn TRONG TRANG ĐANG XEM và đóng chúng ngay.
+     *
+     * <p>⚠️ Truy vấn theo tập payment của trang hiện tại (không quét toàn hệ thống)
+     * ⇒ không gây tải nặng khi mở danh sách.
+     *
+     * @param payments các giao dịch đang hiển thị trong trang
+     */
+    private void closeExpiredPayments(List<Payment> payments) {
+        if (payments == null || payments.isEmpty()) {
+            return;
+        }
+        Instant now = Instant.now();
+        for (Payment payment : payments) {
+            if (payment.getStatus() != PaymentStatus.PENDING
+                    && payment.getStatus() != PaymentStatus.PROCESSING) {
+                continue;
+            }
+            if (!isReallyOverdue(payment, now)) {
+                continue;
+            }
+            payment.markExpired("Giao dịch đã quá hạn thanh toán (hạn "
+                    + payment.getExpiresAt() + ") và không có kết quả xác minh từ VNPay.");
+            paymentRepository.save(payment);
+            log.info("[Payment][Expiry] txnRef={} đã quá hạn thanh toán (hạn {}) — chuyển sang EXPIRED.",
+                    payment.getTxnRef(), payment.getExpiresAt());
+        }
     }
 
     // ── QueryDR ───────────────────────────────────────────────────────────────
@@ -986,6 +1103,9 @@ public class PaymentService {
         // khác mà giao dịch này chưa có kết quả ⇒ đóng lại (SUPERSEDED) để app
         // KHÔNG hiện "Đang chờ kết quả thanh toán" nữa.
         closeSupersededBecauseBookingPaid(payment);
+        // Giao dịch đã quá hạn thanh toán mà chưa có kết quả ⇒ chuyển sang EXPIRED
+        // (để UI không hiện "Đang xử lý" cho giao dịch đã hết hạn từ lâu).
+        closeExpiredPayments(List.of(payment));
         return PaymentResponse.fromEntity(payment);
     }
 
@@ -994,6 +1114,8 @@ public class PaymentService {
         Page<Payment> page = paymentRepository.findByBooking_Tourist_Id(touristId, pageable);
         // Đóng các giao dịch bị bỏ rơi (xem `closeStrandedOfPaidBookings`).
         closeStrandedOfPaidBookings(page.getContent());
+        // Đóng các giao dịch quá hạn thanh toán (xem `closeExpiredPayments`).
+        closeExpiredPayments(page.getContent());
         return PageResponse.from(page, PaymentResponse::fromEntity);
     }
 
@@ -1006,6 +1128,8 @@ public class PaymentService {
         Page<Payment> page = paymentRepository.findByBooking_Id(bookingId, pageable);
         // Đóng các giao dịch kẹt của booking này (xem `closeStrandedOfPaidBookings`).
         closeStrandedOfPaidBookings(page.getContent());
+        // Đóng các giao dịch quá hạn thanh toán (xem `closeExpiredPayments`).
+        closeExpiredPayments(page.getContent());
         return PageResponse.from(page, PaymentResponse::fromEntity);
     }
 
@@ -1029,7 +1153,113 @@ public class PaymentService {
 
         // Đóng các giao dịch bị bỏ rơi (xem `closeStrandedOfPaidBookings`).
         closeStrandedOfPaidBookings(page.getContent());
-        return PageResponse.from(page, PaymentResponse::fromEntity);
+        // Đóng các giao dịch quá hạn thanh toán (xem `closeExpiredPayments`).
+        closeExpiredPayments(page.getContent());
+
+        // Gắn số tiền đã hoàn cho từng dòng (gom 1 câu truy vấn, không N+1).
+        Map<Long, BigDecimal> refundedByPayment = loadRefundedByPaymentId(page.getContent());
+
+        return PageResponse.from(page, p -> PaymentResponse.fromEntity(p, refundedByPayment.get(p.getId())));
+    }
+
+    /**
+     * Gom tổng số tiền đã hoàn theo payment id — 1 câu truy vấn cho cả trang.
+     */
+    private Map<Long, BigDecimal> loadRefundedByPaymentId(List<Payment> payments) {
+        if (payments == null || payments.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = payments.stream().map(Payment::getId).toList();
+        Map<Long, BigDecimal> result = new HashMap<>();
+        for (Object[] row : refundRepository.sumRefundedAmountByPaymentIds(ids)) {
+            Object id = row[0];
+            Object amount = row[1];
+            if (id instanceof Long paymentId && amount instanceof BigDecimal value) {
+                result.put(paymentId, value);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Chi tiết GIAO DỊCH + ĐƠN đặt tour — gộp lại cho một modal.
+     *
+     * <p>Gộp để Admin không phải nhảy qua lại giữa tab "Giao dịch" và "Đơn đặt tour":
+     * bấm "Chi tiết" là thấy ngay giao dịch, đơn, dòng tiền và các yêu cầu hoàn tiền
+     * liên quan của cùng một đơn.
+     *
+     * @param paymentId id giao dịch cần xem
+     * @param callerId  id người gọi (dùng cho kiểm tra quyền khi không phải admin)
+     * @param isAdmin   có phải Admin không (Admin xem được mọi giao dịch)
+     */
+    @Transactional
+    public PaymentDetailResponse getDetail(Long paymentId, Long callerId, boolean isAdmin) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_NOT_FOUND));
+        if (!isAdmin) {
+            checkOwnership(payment.getBooking(), callerId);
+        }
+
+        // Đối soát trước khi trả về: giao dịch treo của đơn đã thanh toán ⇒ đóng lại.
+        closeStrandedOfPaidBookings(List.of(payment));
+        // Giao dịch đã quá hạn thanh toán mà chưa có kết quả ⇒ chuyển sang EXPIRED.
+        closeExpiredPayments(List.of(payment));
+
+        Booking booking = payment.getBooking();
+        Long bookingId = booking != null ? booking.getId() : null;
+
+        // Số tiền đã hoàn của giao dịch này.
+        BigDecimal refunded = refundRepository.sumRefundedAmountByPayment(paymentId);
+
+        // Các lần thử thanh toán khác của cùng đơn (đối chiếu trùng lặp UC-04).
+        List<PaymentResponse> siblings = List.of();
+        if (bookingId != null) {
+            List<Payment> siblingEntities = paymentRepository.findByBooking_IdOrderByCreatedAtDesc(bookingId);
+            Map<Long, BigDecimal> refundedMap = loadRefundedByPaymentId(siblingEntities);
+            siblings = siblingEntities.stream()
+                    .map(p -> PaymentResponse.fromEntity(p, refundedMap.get(p.getId())))
+                    .toList();
+        }
+
+        // Các yêu cầu hoàn tiền của giao dịch này.
+        List<RefundResponse> refunds = refundRepository
+                .findByPayment_IdOrderByCreatedAtDesc(paymentId).stream()
+                .map(RefundResponse::fromEntity)
+                .toList();
+
+        // Thông tin đơn đặt tour.
+        BookingResponse bookingResponse = (bookingId != null)
+                ? bookingService.buildResponse(booking, callerId, isAdmin)
+                : null;
+
+        BigDecimal amount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+        BigDecimal discount = booking != null && booking.getDiscountAmount() != null
+                ? booking.getDiscountAmount()
+                : BigDecimal.ZERO;
+        BigDecimal refundedAmount = refunded != null ? refunded : BigDecimal.ZERO;
+
+        // ⚠️ Thực thu = 0 nếu giao dịch CHƯA THÀNH CÔNG — không có dòng tiền
+        // nào thu được. Xem `PaymentResponse.fromEntity`.
+        BigDecimal netAmount = payment.getStatus() == PaymentStatus.SUCCESS
+                ? amount.subtract(refundedAmount)
+                : BigDecimal.ZERO;
+
+        return PaymentDetailResponse.builder()
+                .payment(PaymentResponse.fromEntity(payment, refundedAmount))
+                .booking(bookingResponse)
+                .siblingPayments(siblings)
+                .refunds(refunds)
+                .cashFlow(PaymentDetailResponse.CashFlow.builder()
+                        .originalAmount(amount.add(discount))
+                        .discountAmount(discount)
+                        .voucherCode(booking != null ? booking.getAppliedVoucherCode() : null)
+                        .voucherScope(booking != null && booking.getVoucherScope() != null
+                                ? booking.getVoucherScope().name() : null)
+                        .paidAmount(amount)
+                        .refundedAmount(refundedAmount)
+                        .netAmount(netAmount)
+                        .build())
+                .build();
     }
 
     /**
