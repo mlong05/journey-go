@@ -161,6 +161,10 @@ app:
     auto-open-slot-capacity: ${BOOKING_AUTO_OPEN_SLOT_CAPACITY:50}
     # Số giây giữa các lần quét Booking quá hạn thanh toán.
     booking-expiry-scan-interval-seconds: ${BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS:60}
+    # Số giây giữa các lần quét Payment quá hạn thanh toán (chuyển sang EXPIRED).
+    payment-expiry-scan-interval-seconds: ${PAYMENT_EXPIRY_SCAN_INTERVAL_SECONDS:60}
+    # Số giây lướt an toàn sau hạn thanh toán trước khi đóng giao dịch sang EXPIRED.
+    payment-expiry-grace-seconds: ${PAYMENT_EXPIRY_GRACE_SECONDS:900}
     # Số giây giữa các lần kiểm tra trạng thái Refund đang chờ kết quả từ VNPay.
     refund-status-check-interval-seconds: ${REFUND_STATUS_CHECK_INTERVAL_SECONDS:300}
     # Số giây giữa các lần đối soát lại giao dịch thanh toán còn "kẹt" (PENDING/PROCESSING).
