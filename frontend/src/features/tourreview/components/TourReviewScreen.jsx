@@ -279,7 +279,7 @@ export default function TourReviewScreen({ tourId }) {
             {(tab === "content" || tab === "preview") && (
               <>
                 {pending && <p className="text-[11px] text-slate-500 mb-2">Bấm nút lá cờ ở góc phải mỗi khối để <b>Gắn cờ / Ghi chú</b>. Khối bị gắn cờ có viền cam.</p>}
-                <TourContentView tour={tour} Block={FlaggableBlock} />
+                <TourContentView tour={tour} Block={FlaggableBlock} storyPanel={false} />
 
                 {/* Ghi chú gắn cờ — cuối nội dung tour */}
                 <section className="mt-5 rounded-2xl border border-slate-200 bg-white px-4 py-3 space-y-2">
@@ -333,7 +333,7 @@ export default function TourReviewScreen({ tourId }) {
               </div>
               <p className="text-[11px] text-slate-500">
                 {pending
-                  ? <>Đánh giá đủ 5 tiêu chí. Cần tối thiểu {CRITERIA_MIN_TO_APPROVE}/5 để duyệt. Bấm <Info size={10} className="inline -mt-0.5" /> để xem mô tả.</>
+                  ? <>Đánh giá đủ 5 tiêu chí. Cần đạt đủ {CRITERIA_MIN_TO_APPROVE}/5 để duyệt. Bấm <Info size={10} className="inline -mt-0.5" /> để xem mô tả.</>
                   : answered ? "Các tiêu chí đã đánh giá ở lần duyệt gần nhất." : "Lần duyệt gần nhất chưa có đánh giá tiêu chí."}
               </p>
               {REVIEW_CRITERIA.map((c) => (
@@ -410,7 +410,7 @@ export default function TourReviewScreen({ tourId }) {
                 {actionError && <p className="text-[11px] font-bold text-rose-600 flex items-start gap-1"><AlertTriangle size={12} className="mt-px shrink-0" />{actionError}</p>}
 
                 <button type="button" disabled={!canApprove || busy} onClick={() => runAction("approve")}
-                  title={notes.length ? "Còn ghi chú lỗi — hãy gửi yêu cầu chỉnh sửa" : !answered ? "Đánh giá đủ 5 tiêu chí" : passed < 3 ? "Cần đạt tối thiểu 3/5 tiêu chí" : ""}
+                  title={notes.length ? "Còn ghi chú lỗi — hãy gửi yêu cầu chỉnh sửa" : !answered ? "Đánh giá đủ 5 tiêu chí" : passed < CRITERIA_MIN_TO_APPROVE ? `Cần đạt đủ ${CRITERIA_MIN_TO_APPROVE}/5 tiêu chí` : ""}
                   className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer">
                   {busy ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />} Đồng ý
                 </button>

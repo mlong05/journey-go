@@ -84,7 +84,7 @@ export const LIMITS = {
 
 export const BANNED_TITLE_WORDS = ["rẻ nhất", "độc quyền", "tốt nhất", "số 1", "số một"];
 
-/** 5 tiêu chí kiểm duyệt; cần đạt tối thiểu 3/5 để duyệt. */
+/** 5 tiêu chí kiểm duyệt; cần đạt đủ 5/5 để duyệt. */
 export const REVIEW_CRITERIA = [
   { key: "interactive", label: "Tính tương tác", hint: "Khách được thực hành, chạm, thử nghiệm — không chỉ đứng nhìn hay nghe thuyết minh." },
   { key: "localExpertise", label: "Tính bản địa", hint: "Người dẫn / người chia sẻ có chuyên môn hoặc là người địa phương am hiểu sâu sắc." },
@@ -92,7 +92,7 @@ export const REVIEW_CRITERIA = [
   { key: "culturalRatio", label: "Tỷ trọng văn hóa > 50%", hint: "Hoạt động văn hóa chiếm đa số, không lồng điểm mua sắm đại trà (trừ làng nghề)." },
   { key: "authenticMedia", label: "Hình ảnh / video trực quan", hint: "Tập trung vào con người, hoạt động trải nghiệm; không dùng ảnh mạng, phong cảnh chung chung." },
 ];
-export const CRITERIA_MIN_TO_APPROVE = 3;
+export const CRITERIA_MIN_TO_APPROVE = 5;
 
 /** Lý do từ chối dạng mã — khớp TourRejectionReason. */
 export const REJECTION_REASONS = [
