@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -87,6 +88,22 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     /** Số lượng giao dịch theo trạng thái. */
     long countByStatus(PaymentStatus status);
 
+    /**
+     * Tổng số tiền VOUCHER đã giảm trên các giao dịch theo trạng thái.
+     *
+     * <p>Dùng cho ô "Tổng tiền giao dịch" — hiển thị GIÁ GỐC (trước khi áp voucher)
+     * chứ không phải số tiền khách thực trả.
+     *
+     * @see com.journeygo.modules.booking.entity.Booking#getDiscountAmount()
+     */
+    @Query("""
+            SELECT COALESCE(SUM(b.discountAmount), 0)
+            FROM Payment p
+            JOIN p.booking b
+            WHERE p.status = :status
+            """)
+    BigDecimal sumVoucherDiscountByStatus(@Param("status") PaymentStatus status);
+
     /** Số lượng giao dịch theo nhóm trạng thái (vd: PENDING + PROCESSING). */
     @Query("SELECT COUNT(p) FROM Payment p WHERE p.status IN :statuses")
     long countByStatusIn(@Param("statuses") List<PaymentStatus> statuses);
@@ -133,6 +150,30 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             ORDER BY p.createdAt ASC
             """)
     List<Payment> findStuckPayments(@Param("statuses") List<PaymentStatus> statuses);
+
+    /**
+     * Các Payment ĐÃ QUÁ HẠN thanh toán mà chưa có kết quả cuối cùng.
+     *
+     * <p>── Vì sao cần? ──
+     * Giao dịch VNPay có hạn thanh toán (10 phút, cố định theo {@code paymentDeadline}
+     * của Booking). Nếu khách không hoàn tất thanh toán, giao dịch treo ở
+     * {@code PENDING}/{@code PROCESSING} — và vì QueryDR trên VNPay Sandbox luôn trả
+     * {@code vnp_ResponseCode=99} nên tác vụ đối soát KHÔNG bao giờ đóng được chúng
+     * ⇒ giao dịch treo VÔ THỜI HẠN, hiển thị "Đang xử lý" hàng tháng trên
+     * trang Quản trị Tài chính.
+     *
+     * <p>⇒ Tác vụ quét hết hạn dùng query này để chuyển chúng sang {@code EXPIRED}.
+     *
+     * <p>Sắp xếp theo {@code expiresAt} tăng dần ⇒ xử lý giao dịch quá hạn lâu nhất trước.
+     */
+    @Query("""
+            SELECT p FROM Payment p
+            WHERE p.status IN :statuses
+              AND p.expiresAt < :now
+            ORDER BY p.expiresAt ASC
+            """)
+    List<Payment> findExpiredPendingPayments(@Param("statuses") List<PaymentStatus> statuses,
+                                             @Param("now") Instant now);
 
     /**
      * Các Payment còn "kẹt" thuộc về Booking ĐÃ được thanh toán bởi giao dịch khác.
