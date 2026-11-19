@@ -19,9 +19,11 @@ import com.journeygo.modules.settlement.dto.request.RejectSettlementRequest;
 import com.journeygo.modules.settlement.dto.response.PlatformRevenueSummaryResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementCandidatesResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementDetailResponse;
+import com.journeygo.modules.settlement.dto.response.SettlementOverviewResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementResponse;
 import com.journeygo.modules.settlement.entity.Settlement;
 import com.journeygo.modules.settlement.entity.SettlementDetail;
+import com.journeygo.modules.settlement.entity.enums.SettlementScope;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
 import com.journeygo.modules.settlement.repository.ApprovedSettlementAggregate;
 import com.journeygo.modules.settlement.repository.SettlementDetailRepository;
@@ -176,6 +178,7 @@ public class SettlementService {
                     .settlementCode(existing.getSettlementCode())
                     .status(existing.getStatus())
                     .settlementAmount(existing.getSettlementAmount())
+                    .grossAmount(existing.getGrossAmount())
                     .detailCount(detailRepository.findBySettlementIdWithRevenue(existing.getId()).size())
                     .createdAt(existing.getCreatedAt())
                     .build();
@@ -277,6 +280,45 @@ public class SettlementService {
                 .build();
     }
 
+    // ── Tổng hợp số liệu cho UI ───────────────────────────────────────────────
+
+    /**
+     * Tổng hợp số liệu cho tab "Tổng quan &amp; Duyệt đợt".
+     *
+     * <p>Công thức thực thu nền tảng:
+     * <pre>
+     * Thực thu nền tảng = Tổng thanh toán − Tổng hoàn tiền − Tổng chi trả đối tác
+     *                    = Tổng hoa hồng + Tổng điều chỉnh
+     * </pre>
+     *
+     * <p>Chỉ tính các đợt đã DUYỆT — đó là lúc tiền thực sự về ví đối tác. Số đợt chờ
+     * duyệt thì đếm trên toàn hệ thống (không phụ thuộc phân trang).
+     */
+    @Transactional(readOnly = true)
+    public SettlementOverviewResponse getOverviewSummary() {
+        PlatformRevenueSummaryResponse revenue = getPlatformRevenueSummary(1);
+
+        long pendingCount = settlementRepository.countByStatus(SettlementStatus.DRAFT);
+        BigDecimal pendingAmount = settlementRepository.sumSettlementAmountByStatus(SettlementStatus.DRAFT);
+
+        BigDecimal gross = nz(revenue.totalGrossAmount());
+        BigDecimal refund = nz(revenue.totalRefundAmount());
+        BigDecimal providerNet = nz(revenue.totalProviderNetAmount());
+        BigDecimal platform = nz(revenue.totalPlatformRevenue());
+
+        return SettlementOverviewResponse.builder()
+                // Thực thu = dòng tiền thực tế còn lại của nền tảng.
+                .netPlatformRevenue(platform)
+                // Doanh thu nền tảng = tổng tiền khách đã thanh toán (gốc).
+                .totalGrossAmount(gross)
+                .totalRefundAmount(refund)
+                .totalProviderNetAmount(providerNet)
+                .approvedSettlementCount(revenue.approvedSettlementCount())
+                .pendingSettlementCount(pendingCount)
+                .pendingSettlementAmount(nz(pendingAmount))
+                .build();
+    }
+
     // ── Tạo bản nháp ──────────────────────────────────────────────────────────
 
     /**
@@ -363,6 +405,8 @@ public class SettlementService {
             detailRepository.save(SettlementDetail.builder()
                     .settlement(saved)
                     .providerRevenue(revenue)
+                    // Đối tác của khoản doanh thu — BẮT BUỘC (cột NOT NULL).
+                    .providerProfile(revenue.getProviderProfile())
                     .revenuePeriod(revenue.getRevenuePeriod())
                     .grossAmount(nz(revenue.getGrossAmount()))
                     .refundAmount(nz(revenue.getRefundAmount()))
@@ -412,6 +456,12 @@ public class SettlementService {
     public SettlementResponse approveSettlement(Long settlementId, Long adminId) {
         Settlement settlement = settlementRepository.findByIdForUpdate(settlementId)
                 .orElseThrow(() -> new AppException(ErrorCode.SETTLEMENT_NOT_FOUND));
+
+        // Đợt TỔNG có luồng duyệt riêng (cộng tiền vào ví của NHIỀU đối tác).
+        if (settlement.getScope() == SettlementScope.BATCH) {
+            throw new AppException(ErrorCode.SETTLEMENT_INVALID_STATUS,
+                    "Đợt tất toán tổng phải dùng luồng duyệt riêng");
+        }
 
         if (settlement.getStatus().isApproved()) {
             throw new AppException(ErrorCode.SETTLEMENT_ALREADY_APPROVED,
@@ -587,17 +637,21 @@ public class SettlementService {
         log.info("[Settlement] Đã từ chối settlement {} — giải phóng các khoản doanh thu",
                 settlement.getSettlementCode());
 
-        notifications.send(NotificationType.SETTLEMENT_REJECTED)
-                .to(NotificationPublisher.idOf(settlement.getProviderProfile().getUser()))
-                .title("Đợt đối soát chưa được duyệt")
-                .body("Đợt " + settlement.getSettlementCode() + " kỳ " + settlement.getRevenuePeriod()
-                        + " chưa được duyệt" + (request.reason() == null || request.reason().isBlank()
-                        ? "." : ". Lý do: " + request.reason().trim())
-                        + " Doanh thu sẽ được đối soát lại ở đợt sau.")
-                .link("/provider")
-                .ref("SETTLEMENT", settlement.getId())
-                .queue(NotificationPublisher.Queue.SETTLEMENTS)
-                .publish();
+        // Thông báo đối tác — đợt TỔNG không có đối tác duy nhất ⇒ bỏ qua thông báo
+        // cá nhân (đợt tổng sẽ thông báo khi được duyệt).
+        if (settlement.getProviderProfile() != null) {
+            notifications.send(NotificationType.SETTLEMENT_REJECTED)
+                    .to(NotificationPublisher.idOf(settlement.getProviderProfile().getUser()))
+                    .title("Đợt đối soát chưa được duyệt")
+                    .body("Đợt " + settlement.getSettlementCode() + " kỳ " + settlement.getRevenuePeriod()
+                            + " chưa được duyệt" + (request.reason() == null || request.reason().isBlank()
+                            ? "." : ". Lý do: " + request.reason().trim())
+                            + " Doanh thu sẽ được đối soát lại ở đợt sau.")
+                    .link("/provider")
+                    .ref("SETTLEMENT", settlement.getId())
+                    .queue(NotificationPublisher.Queue.SETTLEMENTS)
+                    .publish();
+        }
         notifications.queueChanged(Role.ADMIN, NotificationPublisher.Queue.SETTLEMENTS);
 
         return SettlementResponse.fromEntity(settlement);
@@ -669,6 +723,7 @@ public class SettlementService {
     public SettlementResponse getById(Long settlementId) {
         Settlement settlement = settlementRepository.findById(settlementId)
                 .orElseThrow(() -> new AppException(ErrorCode.SETTLEMENT_NOT_FOUND));
+        requireBatchAdminAccess(settlement);
         requireFinanceAccess(settlement.getProviderProfile());
         return SettlementResponse.fromEntity(settlement);
     }
@@ -677,6 +732,7 @@ public class SettlementService {
     public List<SettlementDetailResponse> getDetails(Long settlementId) {
         Settlement settlement = settlementRepository.findById(settlementId)
                 .orElseThrow(() -> new AppException(ErrorCode.SETTLEMENT_NOT_FOUND));
+        requireBatchAdminAccess(settlement);
         requireFinanceAccess(settlement.getProviderProfile());
 
         return detailRepository.findBySettlementIdWithRevenue(settlementId).stream()
@@ -686,6 +742,12 @@ public class SettlementService {
                             .id(d.getId())
                             .settlementId(d.getSettlement().getId())
                             .providerRevenueId(r.getId())
+                            .providerProfileId(d.getProviderProfile() != null
+                                    ? d.getProviderProfile().getId()
+                                    : (r.getProviderProfile() != null ? r.getProviderProfile().getId() : null))
+                            .providerName(d.getProviderProfile() != null
+                                    ? d.getProviderProfile().getProviderName()
+                                    : (r.getProviderProfile() != null ? r.getProviderProfile().getProviderName() : null))
                             .bookingId(r.getBooking() != null ? r.getBooking().getId() : null)
                             .bookingCode(r.getBooking() != null ? r.getBooking().getBookingCode() : null)
                             .paymentId(r.getPayment() != null ? r.getPayment().getId() : null)
@@ -733,6 +795,18 @@ public class SettlementService {
         }
         User owner = providerProfile.getUser();
         AuthorizationGuard.requireFinanceOwnerOrAdmin(owner == null ? null : owner.getId());
+    }
+
+    /**
+     * Đợt tất toán TỔNG chứa dữ liệu của NHIỀU đối tác ⇒ chỉ ADMIN được xem.
+     *
+     * <p>Không áp dụng {@code requireFinanceOwnerOrAdmin} vì đợt tổng không thuộc đối tác nào.
+     */
+    private void requireBatchAdminAccess(Settlement settlement) {
+        if (settlement.getScope() != SettlementScope.BATCH) {
+            return;
+        }
+        AuthorizationGuard.requireAdmin();
     }
 
     /**

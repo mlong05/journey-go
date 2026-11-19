@@ -2,13 +2,19 @@ package com.journeygo.modules.settlement.controller;
 
 import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
+import com.journeygo.modules.settlement.dto.request.CreateBatchSettlementRequest;
 import com.journeygo.modules.settlement.dto.request.CreateSettlementRequest;
 import com.journeygo.modules.settlement.dto.request.RejectSettlementRequest;
+import com.journeygo.modules.settlement.dto.response.BatchSettlementCandidatesResponse;
+import com.journeygo.modules.settlement.dto.response.FinanceSummaryResponse;
 import com.journeygo.modules.settlement.dto.response.PlatformRevenueSummaryResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementCandidatesResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementDetailResponse;
+import com.journeygo.modules.settlement.dto.response.SettlementOverviewResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementResponse;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
+import com.journeygo.modules.settlement.service.BatchSettlementService;
+import com.journeygo.modules.settlement.service.FinanceSummaryService;
 import com.journeygo.modules.settlement.service.SettlementService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +42,8 @@ import java.util.List;
 public class SettlementController {
 
     private final SettlementService settlementService;
+    private final BatchSettlementService batchSettlementService;
+    private final FinanceSummaryService financeSummaryService;
 
     // ── Ứng viên tất toán ────────────────────────────────────────────────────
 
@@ -50,6 +58,73 @@ public class SettlementController {
             @RequestParam String revenuePeriod) {
         return ResponseEntity.ok(ApiResponse.success("Lấy ứng viên tất toán thành công",
                 settlementService.getCandidates(providerProfileId, revenuePeriod)));
+    }
+
+    // ── Đợt tất toán TỔNG cho cả sàn ─────────────────────────────────────────
+
+    @GetMapping("/batch/candidates")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Xem ứng viên tất toán TỔNG của kỳ (toàn bộ đối tác)",
+            description = "Gom khoản doanh thu đủ điều kiện của TẤT CẢ đối tác trong kỳ "
+                    + "(kèm doanh thu chuyển tiếp từ kỳ trước). Khoản chưa đủ điều kiện được "
+                    + "giữ lại kèm lý do và KHÔNG vào đợt — sẽ được xét lại ở kỳ sau.")
+    public ResponseEntity<ApiResponse<BatchSettlementCandidatesResponse>> getBatchCandidates(
+            @RequestParam String revenuePeriod) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy ứng viên tất toán tổng thành công",
+                batchSettlementService.getBatchCandidates(revenuePeriod)));
+    }
+
+    @PostMapping("/batch")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Tạo đợt tất toán TỔNG cho kỳ (toàn bộ đối tác)",
+            description = "Chỉ cần chọn KỲ doanh thu — đợt sẽ gom mọi khoản doanh thu đủ điều kiện "
+                    + "của tất cả đối tác trong kỳ. Admin duyệt MỘT lần; tiền vẫn cộng vào ví "
+                    + "của từng đối tác theo đúng số tiền của họ.")
+    public ResponseEntity<ApiResponse<SettlementResponse>> createBatch(
+            @Valid @RequestBody CreateBatchSettlementRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Tạo đợt tất toán tổng thành công",
+                        batchSettlementService.createBatchSettlement(request, principal.getId())));
+    }
+
+    @PostMapping("/batch/{settlementId}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Duyệt đợt tất toán TỔNG",
+            description = "Cộng tiền vào ví của TỪNG đối tác theo đúng số tiền của họ — tất cả trong "
+                    + "CÙNG một transaction (lỗi một đối tác ⇒ rollback cả đợt).")
+    public ResponseEntity<ApiResponse<SettlementResponse>> approveBatch(
+            @PathVariable Long settlementId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Duyệt đợt tất toán tổng thành công",
+                batchSettlementService.approveBatchSettlement(settlementId, principal.getId())));
+    }
+
+    // ── Tổng hợp số liệu ─────────────────────────────────────────────────────
+
+    @GetMapping("/overview")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Tổng hợp số liệu tab Tổng quan & Duyệt đợt",
+            description = "Gồm thực thu nền tảng, doanh thu nền tảng, doanh thu đối tác, "
+                    + "số đợt đã duyệt và số đợt chờ duyệt.")
+    public ResponseEntity<ApiResponse<SettlementOverviewResponse>> getOverview() {
+        return ResponseEntity.ok(ApiResponse.success("Lấy tổng hợp tất toán thành công",
+                settlementService.getOverviewSummary()));
+    }
+
+    @GetMapping("/finance-summary")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Tổng hợp số liệu tab Tài chính & Thanh toán",
+            description = "Gồm số đơn thanh toán thành công, tổng tiền giao dịch, tổng tiền đã hoàn "
+                    + "và thực thu nền tảng. Số liệu toàn hệ thống, không phụ thuộc phân trang.")
+    public ResponseEntity<ApiResponse<FinanceSummaryResponse>> getFinanceSummary() {
+        return ResponseEntity.ok(ApiResponse.success("Lấy tổng hợp tài chính thành công",
+                financeSummaryService.getSummary()));
     }
 
     // ── Doanh thu nền tảng ───────────────────────────────────────────────────
