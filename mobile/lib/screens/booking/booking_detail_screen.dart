@@ -4,8 +4,9 @@
 ///
 /// ── Luật nghiệp vụ hiển thị ──
 ///  • Nút "Thanh toán" chỉ hiện khi booking còn `PENDING_PAYMENT` **và** còn trong hạn 10 phút.
-///  • Nút "Yêu cầu hoàn tiền" chỉ hiện khi booking đã `CONFIRMED`/`COMPLETED`,
-///    đã có ít nhất một payment `SUCCESS`, và còn trong 24h từ `paidAt`.
+///  • Thẻ "Hủy chuyến & hoàn tiền" (cuối trang, không nằm ở thanh đáy) chỉ hiện
+///    khi booking đã `CONFIRMED`, có payment `SUCCESS`, chưa tới ngày khởi hành và
+///    chưa có yêu cầu hoàn tiền nào.
 ///  • Nút "Hủy đơn" chỉ hiện khi `PENDING_PAYMENT` (giải phóng slot đã giữ).
 library;
 
@@ -472,7 +473,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     final canPay = booking.isPendingPayment && booking.isPaymentWindowOpen;
     final canCancel = booking.isPendingPayment;
 
-    if (!canPay && !canCancel && !_canRequestRefund) return null;
+    // Thanh đáy chỉ dành cho đơn đang chờ thanh toán. "Yêu cầu hoàn tiền" nằm ở
+    // thẻ cuối trang (_buildRefundEntryCard) — không nhắc hoàn tiền ngay sau khi
+    // khách vừa thanh toán xong.
+    if (!canPay && !canCancel) return null;
 
     return SafeArea(
       child: Container(
@@ -499,7 +503,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   ),
                 ),
               ),
-            if (canCancel && (canPay || _canRequestRefund)) const SizedBox(width: 10),
+            if (canCancel && canPay) const SizedBox(width: 10),
             if (canPay)
               Expanded(
                 flex: 2,
@@ -512,25 +516,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   ),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppCultureColors.heritageJade,
-                    minimumSize: const Size(0, 48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-              )
-            else if (_canRequestRefund)
-              Expanded(
-                flex: 2,
-                child: FilledButton.icon(
-                  onPressed: _openRefundForm,
-                  icon: const Icon(Icons.assignment_return_outlined, size: 19),
-                  label: const Text(
-                    'Yêu cầu hoàn tiền',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppCultureColors.oceanBlue,
                     minimumSize: const Size(0, 48),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -561,6 +546,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         _buildOrderInfoCard(booking),
         const SizedBox(height: 14),
         _buildPaymentCard(),
+        if (_canRequestRefund) ...[
+          const SizedBox(height: 14),
+          _buildRefundEntryCard(booking),
+        ],
         if (_refunds.isNotEmpty) ...[
           const SizedBox(height: 14),
           _buildRefundStatusBanner(),
@@ -1439,6 +1428,62 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           else
             ..._payments.map(_buildPaymentRow),
         ],
+      ),
+    );
+  }
+
+  // ── Lối vào "Hủy chuyến & hoàn tiền" ────────────────────────────────────
+  /// Thẻ nhỏ cuối trang, thay cho nút to ở thanh đáy: khách cần thì cuộn xuống
+  /// tìm, không bị nhắc hoàn tiền ngay sau khi vừa thanh toán.
+  Widget _buildRefundEntryCard(BookingModel booking) {
+    final date = booking.formattedExperienceDate;
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: _busy ? null : _openRefundForm,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppCultureColors.border),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.assignment_return_outlined,
+                  size: 20, color: AppCultureColors.textMuted),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Hủy chuyến & hoàn tiền',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppCultureColors.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      date.isEmpty
+                          ? 'Gửi yêu cầu trước ngày khởi hành'
+                          : 'Gửi yêu cầu trước ngày $date',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppCultureColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 22, color: AppCultureColors.textMuted),
+            ],
+          ),
+        ),
       ),
     );
   }
