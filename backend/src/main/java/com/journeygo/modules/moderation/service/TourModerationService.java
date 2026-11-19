@@ -58,7 +58,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class TourModerationService {
-    private static final int CRITERIA_MIN_TO_APPROVE = 3;
+    private static final int CRITERIA_MIN_TO_APPROVE = 5;
 
     private final TourRepository tourRepository;
     private final TourReviewRepository reviewRepository;
