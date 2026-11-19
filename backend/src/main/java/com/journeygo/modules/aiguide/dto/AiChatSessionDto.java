@@ -23,6 +23,12 @@ public class AiChatSessionDto {
     @Schema(description = "ID điểm đến gắn với phiên")
     private Long currentDestinationId;
 
+    @Schema(description = "Đoạn xem trước tin nhắn gần nhất trong phiên")
+    private String lastMessagePreview;
+
+    @Schema(description = "Tổng số tin nhắn trong phiên")
+    private long messageCount;
+
     @Schema(description = "Thời gian tạo phiên")
     private Instant createdAt;
 

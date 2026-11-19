@@ -26,4 +26,9 @@ public interface AiChatSessionRepository extends JpaRepository<AiChatSession, UU
      * Tìm phiên gần đây nhất của du khách tại một địa điểm cụ thể.
      */
     Optional<AiChatSession> findFirstByUserIdAndCurrentDestinationIdOrderByUpdatedAtDesc(Long userId, Long currentDestinationId);
+
+    /**
+     * Tìm phiên trò chuyện chung gần nhất (không gắn địa điểm) của du khách.
+     */
+    Optional<AiChatSession> findFirstByUserIdAndCurrentDestinationIdIsNullOrderByUpdatedAtDesc(Long userId);
 }
