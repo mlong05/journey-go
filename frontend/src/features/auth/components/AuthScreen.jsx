@@ -243,73 +243,16 @@ export default function AuthScreen({ initialTab = "login" }) {
         role: targetRoleEnum,
       });
 
-      const payload = result?.data || result;
-      const user = payload?.user;
-      const accessToken = payload?.accessToken || payload?.token;
-      const refreshToken = payload?.refreshToken;
-
-      const roleStr = String(user?.role || targetRoleEnum).toUpperCase();
-      let targetPath = ROUTES.HOME || "/";
-      let roleTitle = "Du khách khám phá";
-
-      if (roleStr === "ADMIN") {
-        targetPath = ROUTES.ADMIN || "/admin";
-        roleTitle = "Quản trị viên";
-      } else if (roleStr === "CONTENT_MODERATOR") {
-        targetPath = ROUTES.MODERATOR || "/moderator";
-        roleTitle = "Kiểm duyệt viên";
-      } else if (roleStr === "CONTENT_PROVIDER") {
-        targetPath = ROUTES.PROVIDER || "/provider";
-        roleTitle = "Đối tác cung cấp nội dung";
-      } else {
-        targetPath = touristCallback(ROUTES.HOME || "/");
-        roleTitle = "Du khách khám phá";
+      if (result?.success === false) {
+        throw new Error(result?.message || "Đăng ký không thành công. Vui lòng thử lại.");
       }
 
-      const authSession = {
-        user: {
-          id: user?.id,
-          name: registerForm.fullName,
-          fullName: registerForm.fullName,
-          email: registerForm.email,
-          phone: registerForm.phone,
-          role: roleStr.toLowerCase(),
-          roleRaw: roleStr,
-          roleTitle,
-          roleScope: "Khám phá di sản",
-        },
-        token: accessToken,
-        accessToken,
-        refreshToken,
-        role: roleStr.toLowerCase(),
-        rolePath: targetPath,
-        loginAt: new Date().toISOString(),
-      };
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("journey_go_auth", JSON.stringify(authSession));
-        if (accessToken) localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN || "jg_access_token", accessToken);
-        if (refreshToken) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN || "jg_refresh_token", refreshToken);
-        if (user) localStorage.setItem(STORAGE_KEYS.USER_INFO || "jg_user_info", JSON.stringify(user));
-        window.dispatchEvent(new Event("storage"));
-      }
-
+      // Đăng ký xong KHÔNG tự đăng nhập/chuyển trang: ở lại trang xác thực, chuyển sang tab
+      // Đăng nhập với email vừa tạo để người dùng tự đăng nhập.
       setLoading(false);
-
-      setFeedbackModal({
-        isOpen: true,
-        type: "register",
-        title: "Chào mừng thành viên mới!",
-        subtitle: "Đang tự động đăng nhập và đưa bạn tới cổng khám phá...",
-        roleBadge: roleTitle,
-        targetLabel: targetPath === "/" ? "Cổng khám phá (Tourist)" : targetPath,
-        redirectPath: targetPath,
-      });
-
-      setTimeout(() => {
-        setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
-        router.push(targetPath);
-      }, 1250);
+      setLoginForm((prev) => ({ ...prev, identifier: registerForm.email.trim(), password: "" }));
+      setActiveTab("login");
+      showToast("success", "Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.");
     } catch (err) {
       console.error("[Register Error]", err);
       showToast("error", err?.message || "Đăng ký không thành công. Vui lòng thử lại.");
