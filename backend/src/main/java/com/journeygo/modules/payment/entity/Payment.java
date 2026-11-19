@@ -31,6 +31,9 @@ import java.time.Instant;
 }, indexes = {
         @Index(name = "idx_payments_booking", columnList = "booking_id"),
         @Index(name = "idx_payments_status", columnList = "status"),
+        // Phục vụ tác vụ quét giao dịch quá hạn thanh toán (PaymentExpiryScheduler):
+        // WHERE status IN ('PENDING','PROCESSING') AND expires_at < now
+        @Index(name = "idx_payments_status_expires_at", columnList = "status, expires_at"),
         @Index(name = "idx_payments_method", columnList = "method")
 })
 @Getter
@@ -211,18 +214,36 @@ public class Payment {
      *
      * <p>⚠️ KHÔNG ghi đè {@code SUPERSEDED} — giao dịch đã bị đóng dứt khoát thì
      * không được "mở lại" khi có kết quả chưa rõ.
+     *
+     * <p>⚠️ KHÔNG ghi đè {@code EXPIRED} — giao dịch đã quá hạn thanh toán (10 phút).
+     * Một lượt QueryDR không xác minh được kết quả KHÔNG được phép mở lại giao dịch
+     * đã hết hạn ⇒ nếu không chặn, giao dịch sẽ bật lại "Đang xử lý" rồi lại bị quét
+     * hết hạn ⇒ nhấp nháy trạng thái vô nghĩa. Kết quả RÕ RÀNG vẫn được áp dụng bình
+     * thường vì {@link #markSuccess}, {@link #markFailed}, {@link #markCancelled}
+     * không có điều kiện này ⇒ không mất tiền khách khi callback đến muộn.
      */
     public void markProcessing() {
-        if (this.status != PaymentStatus.SUCCESS && this.status != PaymentStatus.SUPERSEDED) {
+        if (this.status != PaymentStatus.SUCCESS
+                && this.status != PaymentStatus.SUPERSEDED
+                && this.status != PaymentStatus.EXPIRED) {
             this.status = PaymentStatus.PROCESSING;
         }
     }
 
-    /** Đánh dấu quá hạn thanh toán — chỉ dùng khi chưa xác minh được kết quả. */
-    public void markExpired() {
+    /**
+     * Đánh dấu quá hạn thanh toán — chỉ dùng khi chưa xác minh được kết quả.
+     *
+     * <p>⚠️ KHÔNG phải "thất bại": tiền có thể vẫn đã trôi ở VNPay (khách hoàn tất
+     * ở cửa sổ trình duyệt cũ) ⇒ kết quả xác minh đến muộn vẫn được áp dụng bình
+     * thường, không mất tiền khách.
+     *
+     * @param note ghi chú giải thích cho Admin (VD: "quá hạn thanh toán")
+     */
+    public void markExpired(String note) {
         if (this.status == PaymentStatus.PENDING || this.status == PaymentStatus.PROCESSING) {
             this.status = PaymentStatus.EXPIRED;
             this.resolvedAt = Instant.now();
+            this.note = note;
         }
     }
 

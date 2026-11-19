@@ -17,6 +17,10 @@ public record SettlementResponse(
         @Schema(description = "Mã settlement") String settlementCode,
         @Schema(description = "ID providerProfile") Long providerProfileId,
         @Schema(description = "Tên providerProfile") String providerName,
+        @Schema(description = "Phạm vi đợt (PROVIDER = một đối tác, BATCH = tổng cả sàn)")
+        com.journeygo.modules.settlement.entity.enums.SettlementScope scope,
+        @Schema(description = "Số đối tác có trong đợt (1 với đợt của một đối tác)")
+        Integer partnerCount,
         @Schema(description = "Kỳ doanh thu (yyyy-MM)") String revenuePeriod,
         @Schema(description = "Ngày bắt đầu kỳ") LocalDate periodStart,
         @Schema(description = "Ngày kết thúc kỳ") LocalDate periodEnd,
@@ -41,6 +45,8 @@ public record SettlementResponse(
                 .settlementCode(s.getSettlementCode())
                 .providerProfileId(s.getProviderProfile() != null ? s.getProviderProfile().getId() : null)
                 .providerName(s.getProviderProfile() != null ? s.getProviderProfile().getProviderName() : null)
+                .scope(s.getScope())
+                .partnerCount(s.getPartnerCount())
                 .revenuePeriod(s.getRevenuePeriod())
                 .periodStart(s.getPeriodStart())
                 .periodEnd(s.getPeriodEnd())
