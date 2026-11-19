@@ -44,6 +44,8 @@ public record SettlementCandidatesResponse(
             @Schema(description = "Mã đợt tất toán") String settlementCode,
             @Schema(description = "Trạng thái") SettlementStatus status,
             @Schema(description = "Tổng tiền đối tác nhận") BigDecimal settlementAmount,
+            @Schema(description = "Tổng thanh toán ban đầu (khớp cột \"Tổng DT\" trong danh sách đợt)")
+            BigDecimal grossAmount,
             @Schema(description = "Số khoản doanh thu trong đợt") Integer detailCount,
             @Schema(description = "Thời điểm tạo") Instant createdAt
     ) {

@@ -238,7 +238,62 @@ services:
       - journeygo-network
 
   # ===========================================================================
-  #  6. Cloudflare Tunnel — đưa nginx ra Internet qua https://journeygo.id.vn
+  #  6. backend-seed — CHẠY THỦ CÔNG dữ liệu DEMO (không tự chạy khi `up`)
+  # ===========================================================================
+  #  Dùng chung image với service `backend`. Service này KHÔNG có nhiệm vụ phục vụ web —
+  #  nhiệm vụ duy nhất là khởi chạy Java Seed Runner để:
+  #    1. chạy Flyway/Hibernate (đảm bảo schema đủ),
+  #    2. chạy DataInitializer (dữ liệu nền tảng cố định: Role, TaskType, Region, Theme…),
+  #    3. đọc & thực thi các file SQL trong src/main/resources/seed/*.sql theo thứ tự tên file,
+  #    4. thoát (exit code 0) sau khi seed xong.
+  #
+  #  ⚠️ KHÔNG chạy tự động — phải gọi thủ công:
+  #     docker compose run --rm backend-seed
+  #     docker compose --profile seed run --rm backend-seed     (nếu muốn profile)
+  #
+  #  Script seed nằm trong image backend (đã COPY src/main/resources/seed).
+  # ===========================================================================
+  backend-seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: journeygo-backend-seed
+    restart: "no"
+    profiles:
+      - seed
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      LOGGING_LEVEL: ${LOGGING_LEVEL:-INFO}
+      TZ: Asia/Ho_Chi_Minh
+      # ── Database ─────────────────────────────────────────────────────────────
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-journeygo_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-journeygo}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD chưa được đặt trong .env}
+      # ── Redis (không bắt buộc cho seeder nhưng backend vẫn khởi tạo kết nối) ──
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # ── Secret ───────────────────────────────────────────────────────────────
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET chưa được đặt trong .env}
+      # ── BẬT SEED RUNNER ────────────────────────────────────────────────────
+      SEED_ENABLED: "true"
+      APP_SEED_EXIT_AFTER_RUN: "true"
+      # ── Nghiệp vụ ────────────────────────────────────────────────────────────
+      FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
+      DEFAULT_COMMISSION_RATE: ${DEFAULT_COMMISSION_RATE:-0.2000}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+    networks:
+      - journeygo-network
+
+  # ===========================================================================
+  #  7. Cloudflare Tunnel — đưa nginx ra Internet qua https://journeygo.id.vn
   # ===========================================================================
   cloudflared:
     image: cloudflare/cloudflared:latest

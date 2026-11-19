@@ -7,6 +7,7 @@ import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.common.security.AuthorizationGuard;
 import com.journeygo.modules.payment.dto.response.PaymentInitResponse;
 import com.journeygo.modules.payment.dto.response.PaymentMethodResponse;
+import com.journeygo.modules.payment.dto.response.PaymentDetailResponse;
 import com.journeygo.modules.payment.dto.response.PaymentResponse;
 import com.journeygo.modules.payment.dto.response.PaymentSummaryResponse;
 import com.journeygo.modules.payment.dto.response.PaymentVerificationResponse;
@@ -175,6 +176,20 @@ public class PaymentController {
         boolean isAdmin = AuthorizationGuard.isAdmin();
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin giao dịch thành công",
                 paymentService.getById(paymentId, principal.getId(), isAdmin)));
+    }
+
+    @GetMapping("/{paymentId}/detail")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Chi tiết giao dịch + đơn đặt tour (gộp)",
+            description = "Gộp thông tin giao dịch, đơn đặt tour liên quan, các lần thử thanh toán "
+                    + "khác của cùng đơn, các yêu cầu hoàn tiền và bảng kê dòng tiền — "
+                    + "dùng cho một modal duy nhất trong trang Quản trị Tài chính & Thanh toán.")
+    public ResponseEntity<ApiResponse<PaymentDetailResponse>> getDetail(
+            @PathVariable Long paymentId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        boolean isAdmin = AuthorizationGuard.isAdmin();
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết giao dịch thành công",
+                paymentService.getDetail(paymentId, principal.getId(), isAdmin)));
     }
 
     @GetMapping("/my")

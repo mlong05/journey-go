@@ -17,6 +17,8 @@ public record SettlementDetailResponse(
         @Schema(description = "ID chi tiết") Long id,
         @Schema(description = "ID settlement") Long settlementId,
         @Schema(description = "ID khoản doanh thu") Long providerRevenueId,
+        @Schema(description = "ID đối tác sở hữu khoản doanh thu") Long providerProfileId,
+        @Schema(description = "Tên đối tác") String providerName,
         @Schema(description = "ID booking") Long bookingId,
         @Schema(description = "Mã đơn") String bookingCode,
         @Schema(description = "ID payment") Long paymentId,

@@ -1,6 +1,7 @@
 package com.journeygo.modules.settlement.entity;
 
 import com.journeygo.modules.providerprofile.entity.ProviderProfile;
+import com.journeygo.modules.settlement.entity.enums.SettlementScope;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
 import com.journeygo.modules.user.entity.User;
 import jakarta.persistence.*;
@@ -28,7 +29,8 @@ import java.time.LocalDate;
 }, indexes = {
         @Index(name = "idx_settlement_provider_profile", columnList = "provider_profile_id"),
         @Index(name = "idx_settlement_status", columnList = "status"),
-        @Index(name = "idx_settlement_period", columnList = "revenue_period")
+        @Index(name = "idx_settlement_period", columnList = "revenue_period"),
+        @Index(name = "idx_settlement_scope", columnList = "scope")
 })
 @Getter
 @Setter
@@ -44,9 +46,22 @@ public class Settlement {
     @Column(name = "settlement_code", nullable = false, unique = true, length = 32)
     private String settlementCode;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "provider_profile_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "provider_profile_id")
     private ProviderProfile providerProfile;
+
+    /**
+     * Phạm vi đợt tất toán.
+     *
+     * <p>{@link SettlementScope#PROVIDER} — đợt của MỘT đối tác (mặc định, tương thích dữ liệu cũ).
+     * {@link SettlementScope#BATCH} — đợt TỔNG cho cả sàn: gom khoản doanh thu đủ điều kiện
+     * của TẤT CẢ đối tác trong kỳ vào một đợt; duyệt một lần, tiền vẫn cộng vào ví
+     * của từng đối tác theo đúng số tiền của họ.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scope", nullable = false, length = 20)
+    @Builder.Default
+    private SettlementScope scope = SettlementScope.PROVIDER;
 
     /** Kỳ doanh thu (yyyy-MM) mà Settlement này tổng hợp. */
     @Column(name = "revenue_period", nullable = false, length = 7)
@@ -82,6 +97,16 @@ public class Settlement {
     @Column(name = "settlement_amount", nullable = false, precision = 16, scale = 2)
     @Builder.Default
     private BigDecimal settlementAmount = BigDecimal.ZERO;
+
+    /**
+     * Số đối tác có khoản doanh thu trong đợt.
+     *
+     * <p>Đợt của MỘT đối tác ⇒ luôn = 1. Đợt TỔNG ⇒ bằng số đối tác có khoản đủ điều kiện
+     * trong kỳ (dùng để hiển thị "N đối tác" trên UI mà không phải đếm lại mỗi lần).
+     */
+    @Column(name = "partner_count", nullable = false, precision = 8, scale = 0)
+    @Builder.Default
+    private Integer partnerCount = 1;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)

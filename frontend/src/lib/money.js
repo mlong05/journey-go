@@ -123,6 +123,48 @@ export function formatPeriod(value) {
   return `Tháng ${m}/${y}`;
 }
 
+/** Tên tháng tiếng Việt (1 → "Tháng 1", 9 → "Tháng 9"). */
+export const MONTH_NAMES_VI = [
+  "Tháng 1",
+  "Tháng 2",
+  "Tháng 3",
+  "Tháng 4",
+  "Tháng 5",
+  "Tháng 6",
+  "Tháng 7",
+  "Tháng 8",
+  "Tháng 9",
+  "Tháng 10",
+  "Tháng 11",
+  "Tháng 12",
+];
+
+/**
+ * Định dạng kỳ doanh thu `YYYY-MM` → nhãn tiếng Việt dễ đọc: "Tháng 1/2026".
+ *
+ * Khác `formatPeriod` ("Tháng 01/2026") ở chỗ không giữ số 0 ở đầu tháng.
+ */
+export function formatPeriodVN(value) {
+  if (!value) return "";
+  const match = /^(\d{4})-(\d{2})$/.exec(String(value).slice(0, 7));
+  if (!match) return String(value);
+  const [, y, m] = match;
+  return `Tháng ${Number(m)}/${y}`;
+}
+
+/**
+ * Định dạng kỳ doanh thu `YYYY-MM` → nhãn ngắn cho biểu đồ: "T09/26".
+ *
+ * Dùng khi nhãn dài sẽ chồng lên nhau trên trục X (nhiều cột).
+ */
+export function formatShortPeriod(value) {
+  if (!value) return "";
+  const match = /^(\d{4})-(\d{2})$/.exec(String(value).slice(0, 7));
+  if (!match) return String(value);
+  const [, y, m] = match;
+  return `T${m}/${y.slice(2)}`;
+}
+
 /**
  * Kỳ doanh thu của tháng trước, định dạng `YYYY-MM`.
  *

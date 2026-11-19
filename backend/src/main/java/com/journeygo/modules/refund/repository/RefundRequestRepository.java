@@ -79,6 +79,37 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, Lo
             @Param("statuses") List<RefundStatus> statuses);
 
     /**
+     * TỔNG số tiền đã hoàn thành thành công trên TOÀN HỆ THỐNG.
+     *
+     * <p>Dùng cho ô chỉ số "Tổng tiền đã hoàn" ở tab Tài chính & Thanh toán —
+     * số tiền thực đã trả lại cho khách (chỉ tính yêu cầu hoàn đã hoàn tất).
+     */
+    @Query("""
+            SELECT COALESCE(SUM(r.refundedAmount), 0)
+            FROM RefundRequest r
+            WHERE r.status = com.journeygo.modules.refund.entity.enums.RefundStatus.REFUNDED
+            """)
+    java.math.BigDecimal sumTotalRefundedAmount();
+
+    /**
+     * Tổng số tiền đã hoàn theo TỪNG giao dịch — dùng cho cột "Chi tiết dòng tiền"
+     * của bảng Nhật ký giao dịch toàn sàn.
+     *
+     * <p>Gom theo payment trong MỘT câu truy vấn (không N+1): trả về cặp
+     * {@code [paymentId, tổng tiền đã hoàn]} cho các payment đã hoàn thành.
+     *
+     * @param paymentIds danh sách id payment của trang đang xem
+     */
+    @Query("""
+            SELECT r.payment.id, COALESCE(SUM(r.refundedAmount), 0)
+            FROM RefundRequest r
+            WHERE r.status = com.journeygo.modules.refund.entity.enums.RefundStatus.REFUNDED
+              AND r.payment.id IN :paymentIds
+            GROUP BY r.payment.id
+            """)
+    List<Object[]> sumRefundedAmountByPaymentIds(@Param("paymentIds") List<Long> paymentIds);
+
+    /**
      * Tổng số tiền đã hoàn thành thành công cho một Payment — dùng để chặn hoàn vượt quá
      * số tiền thanh toán (UC-06).
      */
