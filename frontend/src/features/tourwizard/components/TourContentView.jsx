@@ -78,11 +78,11 @@ function QuestionView({ q, label, points }) {
  * "Câu chuyện (mở sau check-in)" — thẻ 2 cột theo bố cục chữ Z: cột trái nền tối (nhãn, khoá, số chữ)
  * kéo mắt vào trước, cột phải là nội dung + ảnh + cổ vật. Điện thoại: cột tối thành dải đầu thẻ.
  */
-function StoryCard({ stop: s }) {
+function StoryCard({ stop: s, panel = true }) {
   const words = (s.culturalContent || "").trim().split(/\s+/).filter(Boolean).length;
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-800/10 sm:grid sm:grid-cols-[168px_minmax(0,1fr)]">
-      <div className="flex items-center gap-3 bg-slate-900 px-4 py-3 text-white sm:flex-col sm:items-start sm:justify-between sm:py-4">
+    <div className={`overflow-hidden rounded-xl border ${panel ? "border-slate-800/10 sm:grid sm:grid-cols-[168px_minmax(0,1fr)]" : "border-slate-200"}`}>
+      {panel && <div className="flex items-center gap-3 bg-slate-900 px-4 py-3 text-white sm:flex-col sm:items-start sm:justify-between sm:py-4">
         <div className="flex items-center gap-2.5 sm:flex-col sm:items-start sm:gap-2">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/10 text-amber-300"><BookOpen size={18} /></span>
           <div>
@@ -91,7 +91,7 @@ function StoryCard({ stop: s }) {
           </div>
         </div>
         <p className="ml-auto shrink-0 whitespace-nowrap text-[11px] font-semibold tabular-nums text-slate-400 sm:ml-0">{words.toLocaleString("vi-VN")} chữ</p>
-      </div>
+      </div>}
       <div className="min-w-0 bg-white p-4">
         <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">{s.culturalContent || <i className="text-slate-400">Chưa nhập</i>}</p>
         {s.culturalImages?.length > 0 && (
@@ -129,8 +129,9 @@ function StoryCard({ stop: s }) {
  * - onEdit(step): hiện nút "Sửa" mỗi mục (bước 5 của đối tác).
  * - Block({ anchor, label, children }): bọc từng khối (Moderator gắn cờ). anchor = { step, stopId, field }.
  * - collapsibleStops: điểm đến thu gọn, có nút "Xem chi tiết".
+ * - storyPanel: hiện cột tối "Câu chuyện · Mở sau khi khách check-in" (Moderator tắt — chỉ cần đọc nội dung).
  */
-export default function TourContentView({ tour, onEdit, Block = DefaultBlock, collapsibleStops = false, showSchedule = true }) {
+export default function TourContentView({ tour, onEdit, Block = DefaultBlock, collapsibleStops = false, showSchedule = true, storyPanel = true }) {
   const [openStops, setOpenStops] = useState({});
   const rp = tour.rewardPoints || {};
   const guestTypes = useGuestTypes();
@@ -253,12 +254,12 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
                     {s.videoUrl && (
                       <div className="mb-3">
                         <p className="text-xs font-bold text-slate-500 mb-1 inline-flex items-center gap-1">
-                          <Film size={13} className="shrink-0" />Video giới thiệu điểm đến
+                          <Film size={13} className="shrink-0" />Video câu chuyện văn hóa
                         </p>
                         <VideoPreview url={s.videoUrl} source={s.videoSource} />
                       </div>
                     )}
-                    <StoryCard stop={s} />
+                    <StoryCard stop={s} panel={storyPanel} />
                   </Block>
                   {(s.quiz || []).length > 0 && <p className="text-xs font-bold text-slate-500">Câu hỏi (quiz) – trắc nghiệm</p>}
                   {(s.quiz || []).map((q, qi) => (

@@ -188,7 +188,7 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
               Nội dung văn hóa chỉ mở cho khách <b>sau khi check-in</b> tại điểm đến.
             </div>
-            <Field label="Video giới thiệu điểm đến" hint="Không bắt buộc. Dán link YouTube / MP4 hoặc tải video lên."
+            <Field label="Video câu chuyện văn hóa" hint="Không bắt buộc. Dán link YouTube / MP4 hoặc tải video lên."
               error={stopErr("videoSource")}>
               <VideoField url={stop.videoUrl} source={stop.videoSource} disabled={readOnly}
                 onChange={(videoUrl, videoSource) => set({ videoUrl, videoSource })} />

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Sparkles, X, MapPin } from "lucide-react";
+import { ChevronDown, ChevronRight, X, MapPin } from "lucide-react";
 
 /** "Đón khách **tại sân bay**" → ["Đón khách ", <strong>tại sân bay</strong>] */
 export function renderBold(text) {
@@ -26,8 +26,7 @@ export function ItineraryDayBody({ day, compact = false }) {
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       {day.mainActivity && (
-        <div className={`flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 ${compact ? "px-2.5 py-2" : "px-3.5 py-2.5"}`}>
-          <Sparkles size={compact ? 12 : 15} className="text-amber-600 shrink-0 mt-0.5" />
+        <div className={`rounded-lg bg-amber-50 border-l-4 border-amber-400 ${compact ? "px-2.5 py-2" : "px-3.5 py-2.5"}`}>
           <p className={`text-amber-900 leading-snug ${compact ? "text-[11px]" : "text-sm"}`}>
             <span className="font-bold">Hoạt động chính: </span>{renderBold(day.mainActivity)}
           </p>
@@ -188,9 +187,8 @@ export default function ItineraryView({ tour, compact = false, title = "Lịch t
                     Ngày {d.dayNumber}{d.title ? `: ${d.title}` : ""}
                   </span>
                   {d.mainActivity && (
-                    <span className={`mt-0.5 flex items-center gap-1 text-slate-500 ${compact ? "text-[10px]" : "text-xs"}`}>
-                      <Sparkles size={compact ? 10 : 12} className="text-amber-500 shrink-0" />
-                      <span className="truncate">{plain(d.mainActivity)}</span>
+                    <span className={`mt-0.5 block truncate text-slate-500 ${compact ? "text-[10px]" : "text-xs"}`}>
+                      <span className="font-semibold text-slate-600">Hoạt động chính: </span>{plain(d.mainActivity)}
                     </span>
                   )}
                 </span>
