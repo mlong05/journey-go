@@ -95,6 +95,7 @@ public class FlywayConfig {
             // Đồng bộ DEFAULT cho các cột NOT NULL mà Hibernate tạo thiếu (xem giải thích
             // trong {@link #syncMissingColumnDefaults}).
             syncMissingColumnDefaults(dataSource);
+            restoreLegacyGuestTypeColumn(dataSource);
             var result = flyway.migrate();
             if (result.migrationsExecuted > 0) {
                 log.info("[Flyway] Đã chạy thêm {} migration sau khi Hibernate tạo bảng.", result.migrationsExecuted);
@@ -364,6 +365,31 @@ public class FlywayConfig {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Không dọn được lịch sử Flyway lỗi của V41", e);
+        }
+    }
+
+    /**
+     * DB trống: Hibernate tạo {@code guest_type_configs} theo entity hiện tại — không còn cột
+     * {@code always_free} (V42 đã bỏ). Nhưng V34 vẫn INSERT vào cột đó và không được sửa (lệch checksum)
+     * ⇒ thêm tạm cột khi V34 chưa chạy; V42 sẽ xoá lại.
+     */
+    private static void restoreLegacyGuestTypeColumn(DataSource dataSource) {
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement check = conn.prepareStatement("""
+                    SELECT to_regclass('guest_type_configs') IS NOT NULL
+                       AND (to_regclass('flyway_schema_history') IS NULL
+                            OR NOT EXISTS (SELECT 1 FROM flyway_schema_history
+                                           WHERE version = '34' AND success = TRUE))
+                    """);
+                 ResultSet rs = check.executeQuery()) {
+                if (!rs.next() || !rs.getBoolean(1)) return;
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "ALTER TABLE guest_type_configs ADD COLUMN IF NOT EXISTS always_free BOOLEAN NOT NULL DEFAULT FALSE")) {
+                ps.execute();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không chuẩn bị được bảng guest_type_configs cho V34", e);
         }
     }
 

@@ -26,7 +26,10 @@ import java.util.*;
  *
  * <p>Quy tắc khi lưu (4 loại theo tuổi tăng dần: Em bé &lt; Trẻ nhỏ &lt; Trẻ em &lt; Người lớn):
  * loại nhỏ tuổi nhất bắt đầu từ 0 tuổi; tuổi bắt đầu tăng dần (mỗi loại ít nhất 1 năm tuổi) — khoảng tuổi
- * vì vậy luôn liền nhau, không chồng, không hở; Người lớn (không giới hạn trên) không được miễn phí.
+ * vì vậy luôn liền nhau, không chồng, không hở.
+ *
+ * <p>Admin chỉ quy định tên và độ tuổi. Giá (kể cả miễn phí) và việc tính chỗ do đối tác khai báo
+ * theo từng tour ({@code tour_prices}).
  */
 @Slf4j
 @Service
@@ -50,7 +53,7 @@ public class GuestTypeConfigService {
         try {
             Map<GuestType, GuestType.Settings> map = new EnumMap<>(GuestType.class);
             for (GuestTypeConfig c : repository.findAll()) {
-                map.put(c.getGuestType(), new GuestType.Settings(c.getLabel(), c.getMinAge(), c.isAlwaysFree()));
+                map.put(c.getGuestType(), new GuestType.Settings(c.getLabel(), c.getMinAge()));
             }
             if (map.size() == GuestType.values().length) GuestType.applySettings(map);
         } catch (RuntimeException e) {
@@ -100,17 +103,12 @@ public class GuestTypeConfigService {
             }
             prevMin = it.minAge();
         }
-        UpdateGuestTypeConfigsRequest.Item adult = byType.get(GuestType.ADULT);
-        if (adult.alwaysFree()) {
-            throw new AppException(ErrorCode.VALIDATION_ERROR, "\"" + adult.label().trim() + "\" không được đặt là miễn phí");
-        }
 
         for (GuestType t : GuestType.values()) {
             UpdateGuestTypeConfigsRequest.Item it = byType.get(t);
             GuestTypeConfig row = repository.findById(t).orElseGet(() -> GuestTypeConfig.builder().guestType(t).build());
             row.setLabel(it.label().trim());
             row.setMinAge(it.minAge());
-            row.setAlwaysFree(it.alwaysFree());
             row.setUpdatedBy(adminId);
             repository.save(row);
         }

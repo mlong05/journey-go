@@ -1,6 +1,7 @@
 /**
  * Loại khách & độ tuổi — Admin cấu hình ở /admin/guest-types (backend: GET /guest-types).
- * Mã loại cố định (ADULT, CHILD, TODDLER, INFANT); tên, độ tuổi và loại miễn phí đọc từ API.
+ * Mã loại cố định (ADULT, CHILD, TODDLER, INFANT); tên và độ tuổi đọc từ API.
+ * Giá (kể cả miễn phí = 0đ) và việc tính chỗ do đối tác khai báo theo từng tour (tour.prices).
  *
  * useGuestTypes() trả ngay giá trị mặc định rồi cập nhật khi API trả về (giữ 5 phút trong bộ nhớ).
  * Thứ tự hiển thị: Người lớn → Em bé (lớn tuổi trước), giống bảng giá.
@@ -9,10 +10,10 @@ import { useEffect, useState } from "react";
 import { apiClient } from "@/services/apiClient";
 
 const DEFAULTS = [
-  { guestType: "ADULT", label: "Người lớn", minAge: 12, maxAge: null, ageRange: "12 tuổi trở lên", alwaysFree: false, sortOrder: 3 },
-  { guestType: "CHILD", label: "Trẻ em", minAge: 5, maxAge: 11, ageRange: "5 – 11 tuổi", alwaysFree: false, sortOrder: 2 },
-  { guestType: "TODDLER", label: "Trẻ nhỏ", minAge: 2, maxAge: 4, ageRange: "2 – 4 tuổi", alwaysFree: false, sortOrder: 1 },
-  { guestType: "INFANT", label: "Em bé", minAge: 0, maxAge: 1, ageRange: "Dưới 2 tuổi", alwaysFree: true, sortOrder: 0 },
+  { guestType: "ADULT", label: "Người lớn", minAge: 12, maxAge: null, ageRange: "12 tuổi trở lên", sortOrder: 3 },
+  { guestType: "CHILD", label: "Trẻ em", minAge: 5, maxAge: 11, ageRange: "5 – 11 tuổi", sortOrder: 2 },
+  { guestType: "TODDLER", label: "Trẻ nhỏ", minAge: 2, maxAge: 4, ageRange: "2 – 4 tuổi", sortOrder: 1 },
+  { guestType: "INFANT", label: "Em bé", minAge: 0, maxAge: 1, ageRange: "Dưới 2 tuổi", sortOrder: 0 },
 ];
 
 /** Dạng dùng chung cho mọi màn hình: có cả `type` (trang du khách) và `key` (trang tạo tour). */
@@ -23,7 +24,6 @@ export const shapeGuestType = (g) => ({
   age: g.ageRange,
   min: g.minAge,
   max: g.maxAge ?? 200,
-  alwaysFree: !!g.alwaysFree,
   raw: g,
 });
 const shapeAll = (list) => [...list].sort((a, b) => (b.sortOrder ?? 0) - (a.sortOrder ?? 0)).map(shapeGuestType);

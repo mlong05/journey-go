@@ -157,9 +157,6 @@ public class TourSubmissionValidator {
             if (price.getPrice().signum() < 0) {
                 issues.add(TourValidationIssue.of(step, field, "Giá " + type.getLabel() + " không được âm"));
             }
-            if (type.isAlwaysFree() && price.getPrice().compareTo(BigDecimal.ZERO) != 0) {
-                issues.add(TourValidationIssue.of(step, field, type.getLabel() + " luôn miễn phí"));
-            }
             anyCountsSlot |= price.isCountsTowardSlot();
         }
         if (!anyCountsSlot) {

@@ -324,7 +324,6 @@ final class TourExcelParser {
                 return;
             }
             BigDecimal price = toNumber(row.getCell(1), true, SHEET_PRICES, r, PRICE_COLUMNS[1]);
-            if (type.isAlwaysFree()) price = BigDecimal.ZERO;
             Boolean counts = toYesNo(row.getCell(2), SHEET_PRICES, r, PRICE_COLUMNS[2]);
             int i = prices.size();
             result.locator.put("pricing.prices[" + i + "]", SHEET_PRICES, r, null);

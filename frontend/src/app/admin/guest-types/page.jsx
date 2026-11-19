@@ -10,10 +10,10 @@ import { setGuestTypesCache } from "@/lib/guestTypes";
 /** Thứ tự theo tuổi tăng dần — khoảng tuổi liền nhau theo thứ tự này (khớp GuestType.BY_AGE ở backend). */
 const ORDER = ["INFANT", "TODDLER", "CHILD", "ADULT"];
 const DEFAULTS = {
-  INFANT: { label: "Em bé", minAge: 0, alwaysFree: true },
-  TODDLER: { label: "Trẻ nhỏ", minAge: 2, alwaysFree: false },
-  CHILD: { label: "Trẻ em", minAge: 5, alwaysFree: false },
-  ADULT: { label: "Người lớn", minAge: 12, alwaysFree: false },
+  INFANT: { label: "Em bé", minAge: 0 },
+  TODDLER: { label: "Trẻ nhỏ", minAge: 2 },
+  CHILD: { label: "Trẻ em", minAge: 5 },
+  ADULT: { label: "Người lớn", minAge: 12 },
 };
 const TONE = {
   INFANT: { bar: "bg-pink-400", dot: "bg-pink-400", text: "text-pink-700" },
@@ -24,11 +24,11 @@ const TONE = {
 
 const toRows = (list) => ORDER.map((t) => {
   const g = list.find((x) => x.guestType === t) || { guestType: t, ...DEFAULTS[t] };
-  return { guestType: t, label: g.label, minAge: String(g.minAge), alwaysFree: !!g.alwaysFree };
+  return { guestType: t, label: g.label, minAge: String(g.minAge) };
 });
 const ageRangeText = (min, max) => (max == null ? `${min} tuổi trở lên` : min === 0 ? `Dưới ${max + 1} tuổi` : min === max ? `${min} tuổi` : `${min} – ${max} tuổi`);
 
-/** Kiểm tra giống backend: loại nhỏ nhất từ 0 tuổi, tuổi bắt đầu tăng dần, tên không trùng, Người lớn không miễn phí. */
+/** Kiểm tra giống backend: loại nhỏ nhất từ 0 tuổi, tuổi bắt đầu tăng dần, tên không trùng. */
 function validate(rows) {
   const errs = {};
   const names = new Map();
@@ -44,7 +44,6 @@ function validate(rows) {
     else if (i === 0 && n !== 0) e.minAge = "Phải bắt đầu từ 0";
     else if (i > 0 && n <= prev) e.minAge = `Phải lớn hơn ${prev}`;
     if (Number.isInteger(n)) prev = n;
-    if (r.guestType === "ADULT" && r.alwaysFree) e.alwaysFree = "Người lớn không được miễn phí";
     if (Object.keys(e).length) errs[r.guestType] = e;
   });
   return errs;
@@ -80,7 +79,7 @@ export default function AdminGuestTypesPage() {
     setBusy(true); setMsg(null);
     try {
       const res = await apiClient.put("/guest-types", {
-        items: rows.map((r) => ({ guestType: r.guestType, label: r.label.trim(), minAge: Number(r.minAge), alwaysFree: r.alwaysFree })),
+        items: rows.map((r) => ({ guestType: r.guestType, label: r.label.trim(), minAge: Number(r.minAge) })),
       });
       const list = res?.data || [];
       setGuestTypesCache(list);
@@ -97,7 +96,7 @@ export default function AdminGuestTypesPage() {
   return (
     <div className="space-y-4">
       <PageHeader eyebrow="Danh mục" title="Loại khách & độ tuổi"
-        description="Đặt tên hiển thị, độ tuổi và loại miễn phí cho 4 loại khách. Đối tác nhập giá theo từng loại; khi khách đặt tour, loại vé được tính theo tuổi tại ngày đi tour." />
+        description="Đặt tên hiển thị và độ tuổi cho 4 loại khách. Giá (kể cả miễn phí) và việc tính chỗ do đối tác khai báo ở từng tour; khi khách đặt tour, loại vé được tính theo tuổi tại ngày đi tour." />
 
       {loadError && <p role="alert" className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"><AlertTriangle size={16} />{loadError}</p>}
 
@@ -127,16 +126,14 @@ export default function AdminGuestTypesPage() {
 
           {/* Bảng cấu hình */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
                   <th className="px-5 py-3">Mã</th>
                   <th className="px-3 py-3">Tên hiển thị</th>
                   <th className="px-3 py-3">Tuổi từ</th>
                   <th className="px-3 py-3">Tuổi đến</th>
-                  <th className="px-3 py-3">Độ tuổi hiển thị</th>
-                  <th className="px-3 py-3">Miễn phí</th>
-                  <th className="px-5 py-3">Tính chỗ</th>
+                  <th className="px-5 py-3">Độ tuổi hiển thị</th>
                 </tr>
               </thead>
               <tbody>
@@ -163,16 +160,7 @@ export default function AdminGuestTypesPage() {
                         {e.minAge && <p className="mt-1 text-[11px] font-semibold text-rose-600">{e.minAge}</p>}
                       </td>
                       <td className="px-3 py-3 tabular-nums text-slate-600">{r.max == null ? "Không giới hạn" : r.ok ? r.max : "—"}</td>
-                      <td className={`px-3 py-3 font-semibold ${TONE[r.guestType].text}`}>{r.ok ? ageRangeText(r.min, r.max) : "—"}</td>
-                      <td className="px-3 py-3">
-                        <label className={`inline-flex items-center gap-2 ${r.guestType === "ADULT" ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
-                          <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={r.alwaysFree} disabled={r.guestType === "ADULT"}
-                            onChange={(ev) => set(r.guestType, { alwaysFree: ev.target.checked })} />
-                          <span className="text-xs text-slate-600">{r.alwaysFree ? "Giá 0đ" : "Có giá"}</span>
-                        </label>
-                        {e.alwaysFree && <p className="mt-1 text-[11px] font-semibold text-rose-600">{e.alwaysFree}</p>}
-                      </td>
-                      <td className="px-5 py-3 text-xs text-slate-600">{r.alwaysFree ? "Không" : "Có"}</td>
+                      <td className={`px-5 py-3 font-semibold ${TONE[r.guestType].text}`}>{r.ok ? ageRangeText(r.min, r.max) : "—"}</td>
                     </tr>
                   );
                 })}
@@ -183,7 +171,7 @@ export default function AdminGuestTypesPage() {
           <div className="flex flex-col gap-3 border-t border-slate-100 p-5 lg:flex-row lg:items-center lg:justify-between">
             <p className="flex items-start gap-2 text-xs text-slate-500 lg:max-w-xl">
               <Info size={14} className="mt-0.5 shrink-0 text-slate-400" />
-              Chỉ áp dụng cho đơn đặt sau khi lưu — đơn đã đặt giữ nguyên loại khách và giá. Loại miễn phí luôn 0đ và không chiếm chỗ trong slot.
+              Chỉ áp dụng cho đơn đặt sau khi lưu — đơn đã đặt giữ nguyên loại khách và giá. Giá và việc chiếm chỗ trong slot của từng loại do đối tác đặt khi tạo tour.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={() => { setMsg(null); setRows(toRows(ORDER.map((t) => ({ guestType: t, ...DEFAULTS[t] })))); }}

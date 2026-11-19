@@ -28,12 +28,12 @@ export const CONTENT_EDITABLE = ["DRAFT", "CHANGES_REQUESTED"];
 /** Đối tác được sửa giá / lịch (bước 2, 4) ở các trạng thái này (BR-05). */
 export const PRICING_EDITABLE = ["DRAFT", "CHANGES_REQUESTED", "PUBLISHED"];
 
-/** Mã loại khách + giá trị mặc định. Tên / độ tuổi / miễn phí do Admin cấu hình — hiển thị dùng useGuestTypes(). */
+/** Mã loại khách + giá trị mặc định. Tên / độ tuổi do Admin cấu hình — hiển thị dùng useGuestTypes(). */
 export const GUEST_TYPES = [
   { key: "ADULT", label: "Người lớn", age: "12 tuổi trở lên" },
   { key: "CHILD", label: "Trẻ em", age: "5 – 11 tuổi" },
   { key: "TODDLER", label: "Trẻ nhỏ", age: "2 – 4 tuổi" },
-  { key: "INFANT", label: "Em bé", age: "Dưới 2 tuổi", alwaysFree: true },
+  { key: "INFANT", label: "Em bé", age: "Dưới 2 tuổi" },
 ];
 
 export const VIDEO_SOURCES = [

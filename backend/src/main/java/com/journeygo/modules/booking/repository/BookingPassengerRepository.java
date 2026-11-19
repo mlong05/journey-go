@@ -3,8 +3,11 @@ package com.journeygo.modules.booking.repository;
 import com.journeygo.modules.booking.entity.BookingPassenger;
 import com.journeygo.modules.booking.entity.enums.BookingPassengerStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,4 +27,23 @@ public interface BookingPassengerRepository extends JpaRepository<BookingPasseng
     /** Tất cả hành khách đang hoạt động của một User (dùng để tính quyền xem tour). */
     List<BookingPassenger> findByLinkedUserIdAndBooking_StatusIn(Long linkedUserId,
                                                                 List<com.journeygo.modules.booking.entity.enums.BookingStatus> statuses);
+
+    /**
+     * Thống kê hành khách ĐANG HOẠT ĐỘNG theo (tour, ngày, trạng thái booking, loại khách)
+     * cho các tour của một đối tác — dùng cho màn "Theo lịch khởi hành".
+     *
+     * <p>Mỗi dòng: {@code [tourId, experienceDate, bookingStatus, guestType, guestCount, seatCount]}.
+     */
+    @Query("""
+            SELECT b.tour.tourId, b.experienceDate, b.status, p.guestType,
+                   COUNT(p), SUM(CASE WHEN p.countsTowardSlot = true THEN 1 ELSE 0 END)
+            FROM BookingPassenger p JOIN p.booking b
+            WHERE b.tour.createdBy.id = :providerId
+              AND b.experienceDate BETWEEN :from AND :to
+              AND p.status = com.journeygo.modules.booking.entity.enums.BookingPassengerStatus.ACTIVE
+            GROUP BY b.tour.tourId, b.experienceDate, b.status, p.guestType
+            """)
+    List<Object[]> aggregateProviderPassengers(@Param("providerId") Long providerId,
+                                               @Param("from") LocalDate from,
+                                               @Param("to") LocalDate to);
 }

@@ -81,7 +81,8 @@ function BookingPanel({ tour, dates }) {
   const open = dates.filter((d) => d.available && (d.remaining ?? 0) > 0);
   const [date, setDate] = useState("");
   const [allDates, setAllDates] = useState(false);
-  const prices = (tour.prices || []).filter((p) => p.alwaysFree || Number(p.price) > 0 || p.guestType === "ADULT");
+  // Đối tác khai báo giá cho cả 4 loại khách (0đ = miễn phí).
+  const prices = (tour.prices || []).filter((p) => p.price != null);
   const [counts, setCounts] = useState({ ADULT: 1 });
   const [needLogin, setNeedLogin] = useState(false);
   const chosen = date || open[0]?.date || "";
@@ -119,7 +120,7 @@ function BookingPanel({ tour, dates }) {
     : counts;
 
   const seats = prices.reduce((s, p) => s + (p.countsTowardSlot ? effectiveCounts[p.guestType] || 0 : 0), 0);
-  const total = prices.reduce((s, p) => s + (p.alwaysFree ? 0 : Number(p.price) * (effectiveCounts[p.guestType] || 0)), 0);
+  const total = prices.reduce((s, p) => s + Number(p.price || 0) * (effectiveCounts[p.guestType] || 0), 0);
   const guests = Object.values(effectiveCounts).reduce((a, b) => a + b, 0);
   const problem = paid ? "" : !open.length ? "Tour chưa có ngày khởi hành còn chỗ."
     : (counts.ADULT || 0) < 1 ? "Cần ít nhất 1 người lớn đi cùng."
@@ -189,7 +190,7 @@ function BookingPanel({ tour, dates }) {
           <div key={p.guestType} className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-800">{p.label} <span className="font-normal text-slate-500">· {p.ageRange}</span></p>
-              <p className="text-xs text-slate-500">{p.alwaysFree ? "Miễn phí, không tính chỗ" : `${vnd(p.price)}${p.countsTowardSlot ? "" : " · không tính chỗ"}`}</p>
+              <p className="text-xs text-slate-500">{`${Number(p.price) > 0 ? vnd(p.price) : "Miễn phí"}${p.countsTowardSlot ? "" : " · không tính chỗ"}`}</p>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => change(p.guestType, -1)} disabled={paid || !effectiveCounts[p.guestType]} aria-label={`Bớt ${p.label}`}

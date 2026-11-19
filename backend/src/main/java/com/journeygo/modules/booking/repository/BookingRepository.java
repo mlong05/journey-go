@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,7 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface BookingRepository extends JpaRepository<Booking, Long> {
+public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpecificationExecutor<Booking> {
 
     Optional<Booking> findByBookingCode(String bookingCode);
 
@@ -59,6 +60,22 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /** Booking của một tour cụ thể thuộc đối tác (góc nhìn đối tác). */
     Page<Booking> findByTour_TourIdAndTour_CreatedBy_Id(Long tourId, Long providerId, Pageable pageable);
+
+    /**
+     * Thống kê đơn theo (tour, ngày, trạng thái) cho các tour của một đối tác.
+     *
+     * <p>Mỗi dòng: {@code [tourId, experienceDate, status, bookingCount, totalAmount]}.
+     */
+    @Query("""
+            SELECT b.tour.tourId, b.experienceDate, b.status, COUNT(b), COALESCE(SUM(b.totalAmount), 0)
+            FROM Booking b
+            WHERE b.tour.createdBy.id = :providerId
+              AND b.experienceDate BETWEEN :from AND :to
+            GROUP BY b.tour.tourId, b.experienceDate, b.status
+            """)
+    List<Object[]> aggregateProviderBookings(@Param("providerId") Long providerId,
+                                             @Param("from") LocalDate from,
+                                             @Param("to") LocalDate to);
 
     List<Booking> findByTour_TourIdOrderByCreatedAtDesc(Long tourId);
 

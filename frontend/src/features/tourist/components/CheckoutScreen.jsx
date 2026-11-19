@@ -83,7 +83,7 @@ function CheckoutForm({ tourId }) {
 
   const priceOf = (type) => {
     const p = tour?.prices?.find((x) => x.guestType === type);
-    return p?.alwaysFree ? 0 : Number(p?.price || 0);
+    return Number(p?.price || 0);
   };
   const total = passengers.reduce((s, p) => s + priceOf(p.guestType), 0);
   const errors = useMemo(() => validate(passengers, date, guestTypes), [passengers, date, guestTypes]);

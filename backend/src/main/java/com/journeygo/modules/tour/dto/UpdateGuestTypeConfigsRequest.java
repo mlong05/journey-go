@@ -17,8 +17,7 @@ public record UpdateGuestTypeConfigsRequest(
             @Size(max = 50, message = "Tên loại khách tối đa 50 ký tự") String label,
             @NotNull(message = "Thiếu tuổi bắt đầu")
             @Min(value = 0, message = "Tuổi không được âm")
-            @Max(value = 120, message = "Tuổi tối đa 120") Integer minAge,
-            boolean alwaysFree
+            @Max(value = 120, message = "Tuổi tối đa 120") Integer minAge
     ) {
     }
 }

@@ -124,7 +124,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                 ageRange: p.ageRange,
                 price: p.price,
                 alwaysFree: p.alwaysFree,
-                // Em bé đi kèm KHÔNG tính slot; các loại khác theo cấu hình đối tác.
+                // Tính slot theo khai báo của đối tác cho từng loại khách.
                 countsTowardSlot: p.countsTowardSlot,
               ))
           .toList()

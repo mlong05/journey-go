@@ -95,9 +95,8 @@ export default function AuthHeroCarousel() {
                 type="button"
                 onClick={() => go(i)}
                 aria-current={i === index ? "true" : undefined}
-                className={`h-7 px-2.5 xl:px-3 rounded-full text-[11px] font-medium leading-none whitespace-nowrap transition-colors cursor-pointer ${
-                  i === index ? "bg-white text-stone-900 font-semibold" : "text-white/80 hover:bg-white/15"
-                }`}
+                className={`h-7 px-2.5 xl:px-3 rounded-full text-[11px] font-medium leading-none whitespace-nowrap transition-colors cursor-pointer ${i === index ? "bg-white text-stone-900 font-semibold" : "text-white/80 hover:bg-white/15"
+                  }`}
               >
                 {s.shortName}
               </button>
@@ -138,9 +137,8 @@ export default function AuthHeroCarousel() {
                   type="button"
                   onClick={() => go(i)}
                   aria-label={`Xem ${s.name}`}
-                  className={`relative h-1 rounded-full overflow-hidden bg-white/25 transition-all duration-500 cursor-pointer ${
-                    i === index ? "w-12" : "w-5 hover:bg-white/40"
-                  }`}
+                  className={`relative h-1 rounded-full overflow-hidden bg-white/25 transition-all duration-500 cursor-pointer ${i === index ? "w-12" : "w-5 hover:bg-white/40"
+                    }`}
                 >
                   {i === index && (
                     <span

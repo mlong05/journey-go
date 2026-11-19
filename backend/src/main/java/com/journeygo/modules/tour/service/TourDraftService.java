@@ -164,12 +164,12 @@ public class TourDraftService {
                         tour.getPrices().add(created);
                         return created;
                     });
-            BigDecimal value = item.guestType().isAlwaysFree() ? BigDecimal.ZERO : item.price();
-            price.setPrice(value == null ? BigDecimal.ZERO : value);
+            // Giá 0đ = miễn phí — đối tác tự quyết cho từng loại khách.
+            price.setPrice(item.price() == null ? BigDecimal.ZERO : item.price());
             price.setCountsTowardSlot(Boolean.TRUE.equals(item.countsTowardSlot()));
         }
         // Loại khách chưa nhập giá: xóa dòng để validator báo "Vui lòng nhập giá".
-        tour.getPrices().removeIf(p -> !p.getGuestType().isAlwaysFree() && items.stream()
+        tour.getPrices().removeIf(p -> items.stream()
                 .anyMatch(i -> i.guestType() == p.getGuestType() && i.price() == null));
 
         tour.setMaxGuestsPerSlot(request.maxGuestsPerSlot());
