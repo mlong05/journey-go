@@ -1,386 +1,294 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Users,
-  MapPin,
-  QrCode,
-  DollarSign,
-  CreditCard,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  ChevronRight,
-  ShieldAlert,
-  ArrowUpRight,
   AlertTriangle,
-  RefreshCw,
+  BadgeDollarSign,
+  CalendarCheck,
+  CheckCircle2,
+  Handshake,
+  Percent,
+  Ticket,
+  TrendingUp,
+  Users,
 } from "lucide-react";
-import { SURFACE, TABLE, BADGE, BUTTON } from "./dashboard.tokens";
-import { PageHeader, StatCard } from "@/components/dashboard/DashboardUI";
-import { formatDateTimeVN } from "@/lib/money";
 import { dashboardService } from "@/features/dashboard";
 import { useQueueRefresh } from "@/context/NotificationContext";
+import { formatDateTimeVN } from "@/lib/money";
 
-// Màu nhấn của từng thẻ KPI
-const KPI_TONE = {
-  users: "sky",
-  destinations: "emerald",
-  checkins: "amber",
-  gmv: "rose",
-};
-
-const PAYMENT_STATUS = {
-  SUCCESS: { label: "Thành công", badge: BADGE.success, icon: CheckCircle2 },
-  PENDING: { label: "Chờ thanh toán", badge: BADGE.warning, icon: Clock },
-  PROCESSING: { label: "Đang xử lý", badge: BADGE.warning, icon: Clock },
-  FAILED: { label: "Thất bại", badge: BADGE.danger, icon: XCircle },
-  EXPIRED: { label: "Hết hạn", badge: BADGE.neutral, icon: XCircle },
-  CANCELLED: { label: "Đã hủy", badge: BADGE.neutral, icon: XCircle },
-  // Giao dịch bị thay thế — khách đã tạo giao dịch mới và đơn đã được thanh toán.
-  SUPERSEDED: { label: "Đã bị thay thế", badge: BADGE.neutral, icon: XCircle },
-};
-
-const TASK_BADGE = {
-  REFUND: "Hoàn tiền",
-  DESTINATION: "Thẩm định điểm đến",
-  TOUR: "Thẩm định tour",
-};
-
-const fmtNumber = (n) => Number(n || 0).toLocaleString("vi-VN");
+import OverviewHeader from "./overview/OverviewHeader";
+import { KpiCard } from "./overview/KpiCard";
+import RevenueTrendChart from "./overview/RevenueTrendChart";
+import BookingStatusChart from "./overview/BookingStatusChart";
+import ActionCenter from "./overview/ActionCenter";
+import FinanceSnapshot from "./overview/FinanceSnapshot";
+import {
+  TopToursCard,
+  ExperienceStatsCard,
+  TopDestinationsCard,
+} from "./overview/TourPerformance";
+import {
+  TouristActivityCard,
+  PartnerActivityCard,
+} from "./overview/PartnerTouristActivity";
+import { RecentSettlementsCard } from "./overview/RecentSettlements";
+import RecentActivities from "./overview/RecentActivities";
+import { GRID } from "./overview.tokens";
 
 /**
- * Định dạng mốc thời gian theo chuẩn CHUNG của toàn hệ thống:
- * "14:19 15/11/2026" (giờ Việt Nam, dd/MM/yyyy).
+ * Trang Tổng quan vận hành (Operations Overview) — JourneyGo Admin.
  *
- * ⚠️ Dùng helper `formatDateTimeVN` thay vì `toLocaleString` rời rạc:
- * • cố định múi giờ Asia/Ho_Chi_Minh (server render UTC vs client render local
- *   ⇒ "Hydration failed" nếu để múi giờ hệ thống),
- * • định dạng giờ phút giống hệt các trang admin khác.
- */
-const fmtDateTime = (iso) => formatDateTimeVN(iso) || "—";
-
-/**
- * Trang Tổng Quan Vận Hành & Tăng Trưởng Toàn Sàn - JourneyGo
- * Số liệu lấy từ GET /api/v1/dashboard/admin
+ * Ba trụ cột: Business Performance · Operational Health · Action Center.
+ *
+ * Vai trò Admin là GIÁM SÁT: chỉ đọc số liệu của toàn sàn (du khách, đối tác,
+ * tour, tài chính) và xử lý các việc thuộc quyền quản trị (duyệt đối tác,
+ * quyết toán, hoàn tiền, cấu hình). Không nhúng bảng CRUD chi tiết.
  */
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  const loadDashboard = useCallback(async (silent = false) => {
-    if (!silent) {
-      setIsLoading(true);
+  // Bộ lọc thời gian — "30 ngày qua" là mặc định.
+  const [range, setRange] = useState("month");
+  const [customRange, setCustomRange] = useState({ from: "", to: "" });
+
+  // Toggle biểu đồ Doanh thu / GMV.
+  const [metric, setMetric] = useState("revenue");
+
+  const loadDashboard = useCallback(
+    async (silent = false) => {
+      if (silent) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
       setError("");
-    }
-    try {
-      setData(await dashboardService.getAdmin());
-    } catch (err) {
-      console.error("Lỗi tải dữ liệu dashboard:", err);
-      if (!silent) setError(err?.message || "Không tải được số liệu tổng quan.");
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
-  }, []);
+      try {
+        const result = await dashboardService.getAdminOperations(range, customRange);
+        setData(result);
+      } catch (err) {
+        console.error("Lỗi tải dữ liệu tổng quan vận hành:", err);
+        if (!silent) setError(err?.message || "Không tải được số liệu tổng quan.");
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [range, customRange],
+  );
 
   useEffect(() => {
-    queueMicrotask(loadDashboard);
+    // queueMicrotask ⇒ không gọi setState đồng bộ trong thân effect ⇒ tránh render dây chuyền.
+    queueMicrotask(() => loadDashboard());
   }, [loadDashboard]);
 
-  // Thời gian thực: yêu cầu hoàn tiền, giao dịch, đối soát mới thì tự cập nhật thẻ và bảng (không cần bấm "Làm mới")
+  // Tự cập nhật khi có yêu cầu mới trong hàng đợi (hoàn tiền, booking, quyết toán…).
   useQueueRefresh(
-    ["refund-review", "adjustment-review", "bookings", "settlements", "destination-review", "tour-review"],
+    ["refund-review", "adjustment-review", "bookings", "settlements", "tour-review", "partner-review"],
     () => loadDashboard(true),
   );
 
-  const users = data?.users;
-  const destinations = data?.destinations;
-  const checkIns = data?.checkIns;
-  const revenue = data?.revenue;
-  const recentPayments = data?.recentPayments ?? [];
-  const approvalTasks = data?.pendingTasks ?? [];
-  const pendingTaskTotal = data?.pendingTaskTotal ?? 0;
-  const placeholder = isLoading && !data ? "…" : "0";
+  const kpis = data?.kpis;
+  const previousKpis = data?.previousKpis;
 
-  // 4 Thẻ KPI cấu hình theo giao diện
+  /**
+   * % thay đổi so với kỳ trước.
+   * @returns {number|null} null = không so sánh được (kỳ trước bằng 0)
+   */
+  const percentChange = useMemo(() => {
+    return (current, previous) => {
+      const cur = Number(current) || 0;
+      const prev = Number(previous) || 0;
+      if (prev === 0) return null;
+      return ((cur - prev) / prev) * 100;
+    };
+  }, []);
+
+  /** Chuỗi số liệu rút gọn cho sparkline của từng KPI. */
+  const sparks = useMemo(() => {
+    const revenue = (data?.revenueTrend || []).map((p) => Number(p.value) || 0);
+    const gmv = (data?.gmvTrend || []).map((p) => Number(p.value) || 0);
+    const bookings = (data?.bookingTrend || []).map(
+      (p) => (p.success || 0) + (p.pendingPayment || 0) + (p.cancelled || 0) + (p.failed || 0),
+    );
+    const tourists = (data?.bookingTrend || []).map((p) => p.success || 0);
+    const successes = (data?.bookingTrend || []).map((p) => p.success || 0);
+    // ⚠️ KPI "Đối tác đang hoạt động" KHÔNG có chuỗi số liệu riêng trong API.
+    // Dùng nhầm chuỗi doanh thu sẽ vẽ ra đường sparkline vô nghĩa (số tiền cho
+    // một chỉ số đếm hồ sơ) ⇒ bỏ sparkline, chỉ hiện badge % thay đổi.
+    return { revenue, gmv, bookings, tourists, successes };
+  }, [data]);
+
   const kpiCards = [
     {
-      id: "users",
-      title: "Tổng Người dùng Hoạt động",
-      count: users ? fmtNumber(users.active) : placeholder,
-      unit: "tài khoản",
-      trend: users ? `+${fmtNumber(users.newThisMonth)} tháng này` : "Đang tải",
-      icon: Users,
-    },
-    {
-      id: "destinations",
-      title: "Điểm di tích & Lộ trình xuất bản",
-      count: destinations ? fmtNumber(destinations.published) : placeholder,
-      unit: "điểm",
-      trend: "Đã xuất bản",
-      icon: MapPin,
-    },
-    {
-      id: "checkins",
-      title: "Lượt Kích hoạt Thực tế",
-      count: checkIns ? fmtNumber(checkIns.total) : placeholder,
-      unit: "lượt",
-      trend: checkIns ? `Hôm nay: ${fmtNumber(checkIns.today)}` : "Đang tải",
-      icon: QrCode,
+      id: "revenue",
+      label: "Tổng doanh thu nền tảng",
+      tooltip:
+        "Phần hoa hồng JourneyGo thu được từ các booking đã thanh toán thành công. KHÔNG phải toàn bộ tiền khách thanh toán.",
+      value: (kpis?.platformRevenue ?? 0).toLocaleString("vi-VN"),
+      unit: "đ",
+      change: percentChange(kpis?.platformRevenue, previousKpis?.platformRevenue),
+      sparkline: sparks.revenue,
+      icon: TrendingUp,
+      tone: "indigo",
     },
     {
       id: "gmv",
-      title: "Tổng Doanh số Toàn Sàn",
-      count: revenue ? fmtNumber(revenue.gross) : placeholder,
+      label: "Tổng giá trị giao dịch (GMV)",
+      tooltip:
+        "Tổng tiền của các booking đã thanh toán thành công trong kỳ. Không tính booking đang chờ thanh toán.",
+      value: (kpis?.gmv ?? 0).toLocaleString("vi-VN"),
       unit: "đ",
-      trend: revenue ? `Tháng này: ${fmtNumber(revenue.thisMonth)} đ` : "Đang tải",
-      icon: DollarSign,
+      change: percentChange(kpis?.gmv, previousKpis?.gmv),
+      sparkline: sparks.gmv,
+      icon: BadgeDollarSign,
+      tone: "sky",
+    },
+    {
+      id: "bookings",
+      label: "Tổng lượt đặt tour",
+      tooltip: "Tổng số booking được tạo trong kỳ, bất kể trạng thái thanh toán.",
+      value: (kpis?.totalBookings ?? 0).toLocaleString("vi-VN"),
+      unit: "lượt",
+      change: percentChange(kpis?.totalBookings, previousKpis?.totalBookings),
+      sparkline: sparks.bookings,
+      icon: Ticket,
+      tone: "amber",
+    },
+    {
+      id: "success",
+      label: "Booking thành công",
+      tooltip: "Booking đã thanh toán và được xác nhận (đã xác minh giao dịch thành công).",
+      value: (kpis?.successfulBookings ?? 0).toLocaleString("vi-VN"),
+      unit: "lượt",
+      change: percentChange(kpis?.successfulBookings, previousKpis?.successfulBookings),
+      sparkline: sparks.successes,
+      icon: CheckCircle2,
+      tone: "emerald",
+    },
+    {
+      id: "tourists",
+      label: "Khách hàng hoạt động",
+      tooltip: "Số khách du lịch có đặt tour trong kỳ (đếm theo khách duy nhất).",
+      value: (kpis?.activeTourists ?? 0).toLocaleString("vi-VN"),
+      unit: "khách",
+      change: percentChange(kpis?.activeTourists, previousKpis?.activeTourists),
+      sparkline: sparks.tourists,
+      icon: Users,
+      tone: "sky",
+    },
+    {
+      id: "providers",
+      label: "Đối tác đang hoạt động",
+      tooltip: "Số đối tác có ít nhất một tour đang mở bán (xuất bản) trong kỳ.",
+      value: (kpis?.activeProviders ?? 0).toLocaleString("vi-VN"),
+      unit: "đối tác",
+      change: percentChange(kpis?.activeProviders, previousKpis?.activeProviders),
+      icon: Handshake,
+      tone: "emerald",
     },
   ];
 
+  const lastUpdated = data?.updatedAt
+    ? formatDateTimeVN(data.updatedAt)
+    : formatDateTimeVN(new Date().toISOString());
+
+  const handleApplyCustom = (next) => {
+    setCustomRange(next);
+    setRange("custom");
+  };
+
   return (
-    // Khung 1 màn hình: trên desktop chỉ bảng giao dịch & danh sách phê duyệt tự cuộn;
-    // màn hình nhỏ không đủ chỗ nên cả trang cuộn như bình thường.
-    <div className="h-full min-h-0 flex flex-col gap-3 overflow-y-auto lg:overflow-hidden animate-in fade-in-50 duration-200">
-      <PageHeader
-        compact
-        title="Tổng quan vận hành"
-        description="Theo dõi người dùng, điểm đến, lượt kích hoạt và doanh số toàn sàn JourneyGo."
-      >
-        <button
-          type="button"
-          onClick={() => loadDashboard()}
-          disabled={isLoading}
-          className={`${BUTTON.secondary} disabled:opacity-60`}
-        >
-          <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
-          Làm mới
-        </button>
-      </PageHeader>
+    <div className="flex flex-col gap-4">
+      {/* ── Sticky header + bộ lọc thời gian ── */}
+      <OverviewHeader
+        range={range}
+        onRangeChange={(next) => {
+          setRange(next);
+          if (next !== "custom") setCustomRange({ from: "", to: "" });
+        }}
+        customRange={customRange}
+        onApplyCustom={handleApplyCustom}
+        lastUpdated={lastUpdated}
+        onRefresh={() => loadDashboard(true)}
+        isRefreshing={isRefreshing}
+        health={data?.systemHealth}
+      />
 
       {error && (
-        <div className="shrink-0 flex items-center gap-2 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
           <AlertTriangle size={15} className="shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      <section className="shrink-0 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      {/* ── Hàng 1: 6 thẻ KPI ── */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         {kpiCards.map((card) => (
-          <StatCard
-            key={card.id}
-            title={card.title}
-            value={card.count}
-            unit={card.unit}
-            icon={card.icon}
-            tone={KPI_TONE[card.id]}
-            badge={{ text: card.trend }}
-            compact
-          />
+          <KpiCard key={card.id} {...card} loading={isLoading && !data} />
         ))}
       </section>
 
-      {/* ────────────────────────────────────────────────────────
-          3. KHỐI 2 CỘT GIÁM SÁT
-      ──────────────────────────────────────────────────────── */}
-      <section className="shrink-0 lg:shrink lg:flex-1 lg:min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
-        {/* CỘT TRÁI (8/12): Giao Dịch Mới Nhất */}
-        <div className={`lg:col-span-8 lg:min-h-0 ${SURFACE.card} overflow-hidden flex flex-col`}>
-          <div className={`${SURFACE.cardHeader} shrink-0 !px-4 !py-3`}>
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center">
-                <CreditCard size={16} />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                  Giao dịch vé trải nghiệm mới nhất
-                </h2>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Các lượt thanh toán vé tour gần nhất trên toàn sàn
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/admin/finance"
-              className="text-xs font-bold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1"
-            >
-              <span>Xem tất cả</span>
-              <ChevronRight size={13} />
-            </Link>
-          </div>
-
-          <div className="max-h-[520px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-            <table className={TABLE.base}>
-              <thead className="sticky top-0 z-10">
-                <tr className={TABLE.theadRow}>
-                  <th className={TABLE.th}>Mã đơn &amp; khách</th>
-                  <th className={TABLE.th}>Tên lộ trình di tích</th>
-                  <th className={TABLE.th}>Cổng</th>
-                  <th className={TABLE.th}>Số tiền</th>
-                  <th className={`${TABLE.th} text-right`}>Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody className={TABLE.tbody}>
-                {recentPayments.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className={TABLE.emptyCell}>
-                      <CreditCard size={28} className="mx-auto text-slate-300 mb-2" />
-                      <p className="text-sm font-bold text-slate-600">
-                        {isLoading ? "Đang tải giao dịch…" : "Chưa có giao dịch phát sinh"}
-                      </p>
-                      {!isLoading && (
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Giao dịch sẽ hiển thị tại đây khi du khách thanh toán vé tour.
-                        </p>
-                      )}
-                    </td>
-                  </tr>
-                ) : (
-                  recentPayments.map((tx) => {
-                    const status = PAYMENT_STATUS[tx.status] ?? {
-                      label: tx.status,
-                      badge: BADGE.neutral,
-                      icon: Clock,
-                    };
-                    const StatusIcon = status.icon;
-                    return (
-                      <tr key={tx.paymentId} className={TABLE.tr}>
-                        <td className={`${TABLE.td} !py-2.5`}>
-                          <div className="font-bold text-slate-900">{tx.touristName || "Du khách"}</div>
-                          <div className="text-[11px] font-mono text-slate-400 mt-0.5">
-                            {tx.bookingCode || tx.txnRef}
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-4 max-w-[200px]">
-                          <p className="font-semibold text-slate-800 truncate" title={tx.tourTitle}>
-                            {tx.tourTitle}
-                          </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {fmtDateTime(tx.paidAt || tx.createdAt)}
-                          </p>
-                        </td>
-                        <td className={`${TABLE.td} !py-2.5`}>
-                          <span className={`${BADGE.base} ${BADGE.info}`}>
-                            {tx.method}
-                            {tx.bankCode ? ` · ${tx.bankCode}` : ""}
-                          </span>
-                        </td>
-                        <td className={`${TABLE.td} !py-2.5`}>
-                          <span className="font-bold text-slate-900 tabular-nums">
-                            {fmtNumber(tx.amount)} đ
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4 text-right">
-                          <span className={`${BADGE.base} ${status.badge}`}>
-                            <StatusIcon size={11} />
-                            <span>{status.label}</span>
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className={`${SURFACE.cardFooter} shrink-0 flex items-center justify-between`}>
-            <span className="inline-flex items-center gap-1.5 font-semibold">
-              <span className={`w-1.5 h-1.5 rounded-full ${error ? "bg-rose-500" : "bg-emerald-500"}`} />
-              {error ? "Mất kết nối máy chủ" : `${recentPayments.length} giao dịch gần nhất`}
-            </span>
-            <span className="font-semibold text-slate-600">Nguồn: cổng thanh toán VNPay</span>
-          </div>
+      {/* ── Hàng 2: Biểu đồ doanh thu/GMV + Trạng thái booking ── */}
+      <section className={GRID.row}>
+        <div className={GRID.col8}>
+          <RevenueTrendChart
+            trend={data?.revenueTrend}
+            previousTrend={data?.previousRevenueTrend}
+            metric={metric}
+            onMetricChange={setMetric}
+            isLoading={isLoading}
+          />
         </div>
+        <div className={GRID.col4}>
+          <BookingStatusChart
+            breakdown={data?.bookingBreakdown}
+            trend={data?.bookingTrend}
+            isLoading={isLoading}
+          />
+        </div>
+      </section>
 
-        {/* CỘT PHẢI (4/12): Yêu Cầu Cần Phê Duyệt Cấp Quản Trị */}
-        <div className={`lg:col-span-4 lg:min-h-0 ${SURFACE.card} overflow-hidden flex flex-col`}>
-          <div className="flex-1 min-h-0 flex flex-col">
-            <div className={`${SURFACE.cardHeader} shrink-0 !px-4 !py-3`}>
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-md bg-rose-50 text-rose-700 flex items-center justify-center">
-                  <ShieldAlert size={16} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                    Yêu cầu cần phê duyệt
-                  </h2>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    {pendingTaskTotal} tác vụ chờ bạn ra quyết định
-                  </p>
-                </div>
-              </div>
+      {/* ── Hàng 3: Action Center (5) + Tài chính (7) ── */}
+      <section className={GRID.row}>
+        <div className={GRID.col5}>
+          <ActionCenter actions={data?.pendingActions} isLoading={isLoading} />
+        </div>
+        <div className={GRID.col7}>
+          <FinanceSnapshot finance={data?.finance} isLoading={isLoading} />
+        </div>
+      </section>
 
-              <span className={`${BADGE.base} ${BADGE.danger}`}>
-                {pendingTaskTotal} chờ
-              </span>
-            </div>
+      {/* ── Hàng 4: Top tour (7) + Experience & Địa điểm (5) ── */}
+      <section className={GRID.row}>
+        <div className={GRID.col7}>
+          <TopToursCard tours={data?.topTours} isLoading={isLoading} />
+        </div>
+        <div className={`${GRID.col5} flex flex-col gap-4`}>
+          <ExperienceStatsCard experience={data?.experience} isLoading={isLoading} />
+          <TopDestinationsCard destinations={data?.topDestinations} isLoading={isLoading} />
+        </div>
+      </section>
 
-            <div className="p-3 space-y-2.5 flex-1 min-h-0 overflow-y-auto max-h-[640px] lg:max-h-none [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-              {approvalTasks.length === 0 ? (
-                <div className={TABLE.emptyCell}>
-                  <CheckCircle2 size={28} className="mx-auto text-emerald-500 mb-2" />
-                  <p className="text-sm font-bold text-slate-700">
-                    {isLoading ? "Đang tải tác vụ…" : "Tất cả tác vụ đã được xử lý xong"}
-                  </p>
-                  {!isLoading && (
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Không còn yêu cầu hoàn tiền hay hồ sơ thẩm định nào tồn đọng.
-                    </p>
-                  )}
-                </div>
-              ) : (
-                approvalTasks.map((task) => (
-                  <div
-                    key={`${task.type}-${task.id}`}
-                    className="p-4 rounded-lg bg-white border border-slate-200 hover:border-slate-300 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className={`${BADGE.base} ${BADGE.warning} mb-1.5`}>
-                          {TASK_BADGE[task.type] ?? task.type}
-                        </span>
-                        <h3 className="text-sm font-bold text-slate-900 leading-snug">
-                          {task.title}
-                        </h3>
-                        <p className="text-xs text-slate-600 mt-0.5">{task.subtitle}</p>
-                      </div>
+      {/* ── Hàng 5: Khách du lịch + Đối tác ── */}
+      <section className={GRID.row}>
+        <div className={GRID.col6}>
+          <TouristActivityCard tourists={data?.tourists} isLoading={isLoading} />
+        </div>
+        <div className={GRID.col6}>
+          <PartnerActivityCard partners={data?.partners} isLoading={isLoading} />
+        </div>
+      </section>
 
-                      <span className="text-[11px] text-slate-400 whitespace-nowrap font-mono">
-                        {fmtDateTime(task.submittedAt)}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-md border border-slate-100 leading-relaxed mt-2.5">
-                      {task.description}
-                    </p>
-
-                    <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-100">
-                      <span className="text-[11px] font-mono text-slate-400">Mã: {task.code}</span>
-                      <Link href={task.href} className={BUTTON.primary}>
-                        <span>Xử lý ngay</span>
-                        <ArrowUpRight size={13} />
-                      </Link>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className={`${SURFACE.cardFooter} shrink-0 flex items-center justify-between`}>
-            <span className="font-bold text-rose-700">
-              Cam kết SLA duyệt đối tác: &lt; 24h
-            </span>
-            <span className="text-slate-400">
-              {pendingTaskTotal > approvalTasks.length
-                ? `Hiển thị ${approvalTasks.length} cũ nhất`
-                : "Quyền: Quản trị viên"}
-            </span>
-          </div>
+      {/* ── Hàng 6: Quyết toán gần đây (7) + Nhật ký hoạt động (5) ── */}
+      <section className={GRID.row}>
+        <div className={GRID.col7}>
+          <RecentSettlementsCard settlements={data?.recentSettlements} isLoading={isLoading} />
+        </div>
+        <div className={GRID.col5}>
+          <RecentActivities activities={data?.recentActivities} isLoading={isLoading} />
         </div>
       </section>
     </div>
