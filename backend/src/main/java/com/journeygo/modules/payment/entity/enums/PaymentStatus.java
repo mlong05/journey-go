@@ -10,7 +10,13 @@ package com.journeygo.modules.payment.entity.enums;
  *       Không được coi là thất bại (UC-03, UC-05).</li>
  *   <li>{@code SUCCESS} — đã được xác minh thành công từ nguồn đáng tin cậy (IPN hoặc QueryDR).</li>
  *   <li>{@code FAILED} — đã xác minh là thất bại (vnp_TransactionStatus = 02 / vnp_ResponseCode != 00).</li>
- *   <li>{@code EXPIRED} — quá thời hạn thanh toán mà chưa có kết quả xác minh.</li>
+ *   <li>{@code EXPIRED} — quá thời hạn thanh toán mà chưa có kết quả xác minh.
+ *       Được đặt bởi {@code PaymentExpiryScheduler} và bởi lazy-check khi đọc danh sách.
+ *
+ *       <p>⚠️ KHÔNG phải "thất bại" và KHÔNG nằm trong {@link #isFinal()} ⇒ kết quả
+ *       xác minh đến muộn (callback/IPN) vẫn được áp dụng bình thường ⇒ KHÔNG mất
+ *       tiền khách. Đồng thời {@code EXPIRED} cho phép khách thử thanh toán lại
+ *       (xem {@code isRetryable()} ở frontend).</li>
  *   <li>{@code CANCELLED} — khách hủy giao dịch trên trang VNPay.</li>
  * </ul>
  */

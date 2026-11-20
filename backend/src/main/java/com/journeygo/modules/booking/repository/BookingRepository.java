@@ -2,10 +2,12 @@ package com.journeygo.modules.booking.repository;
 
 import com.journeygo.modules.booking.entity.Booking;
 import com.journeygo.modules.booking.entity.enums.BookingStatus;
+import com.journeygo.modules.refund.entity.enums.RefundStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,7 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface BookingRepository extends JpaRepository<Booking, Long> {
+public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpecificationExecutor<Booking> {
 
     Optional<Booking> findByBookingCode(String bookingCode);
 
@@ -59,6 +61,57 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /** Booking của một tour cụ thể thuộc đối tác (góc nhìn đối tác). */
     Page<Booking> findByTour_TourIdAndTour_CreatedBy_Id(Long tourId, Long providerId, Pageable pageable);
+
+    /**
+     * Thống kê đơn theo (tour, ngày, trạng thái) cho các tour của một đối tác.
+     *
+     * <p>Mỗi dòng: {@code [tourId, experienceDate, status, bookingCount, totalAmount]}.
+     *
+     * <p>⚠️ Đơn đã được Admin duyệt hoàn tiền bị LOẠI — khách đã hoàn tiền thì không
+     * còn tham gia chuyến đi, nên đối tác không được thấy họ trong danh sách khách.
+     * Việc chỉ tính đơn đã THANH TOÁN được thực hiện ở tầng service.
+     */
+    @Query("""
+            SELECT b.tour.tourId, b.experienceDate, b.status, COUNT(b), COALESCE(SUM(b.totalAmount), 0)
+            FROM Booking b
+            WHERE b.tour.createdBy.id = :providerId
+              AND b.experienceDate BETWEEN :from AND :to
+              AND NOT EXISTS (
+                  SELECT rr.id FROM RefundRequest rr
+                  WHERE rr.payment.booking.id = b.id
+                    AND rr.status IN :refundStatuses
+              )
+            GROUP BY b.tour.tourId, b.experienceDate, b.status
+            """)
+    List<Object[]> aggregateProviderBookings(@Param("providerId") Long providerId,
+                                             @Param("from") LocalDate from,
+                                             @Param("to") LocalDate to,
+                                             @Param("refundStatuses") List<RefundStatus> refundStatuses);
+
+    /**
+     * Tổng số chỗ đang bị GIỮ bởi các đơn đã được Admin duyệt hoàn tiền.
+     *
+     * <p>Đơn bị hoàn tiền vẫn giữ chỗ trên slot (chưa có luồng giải phóng) ⇒ số chỗ
+     * chiếm thực tế của chuyến đi = {@code slot.booked_count} − số chỗ của các đơn này.
+     *
+     * <p>Mỗi dòng: {@code [tourId, experienceDate, refundedSlots]}.
+     */
+    @Query("""
+            SELECT b.tour.tourId, b.experienceDate, COALESCE(SUM(b.slotCount), 0)
+            FROM Booking b
+            WHERE b.tour.createdBy.id = :providerId
+              AND b.experienceDate BETWEEN :from AND :to
+              AND EXISTS (
+                  SELECT rr.id FROM RefundRequest rr
+                  WHERE rr.payment.booking.id = b.id
+                    AND rr.status IN :refundStatuses
+              )
+            GROUP BY b.tour.tourId, b.experienceDate
+            """)
+    List<Object[]> aggregateProviderRefundedSlots(@Param("providerId") Long providerId,
+                                                   @Param("from") LocalDate from,
+                                                   @Param("to") LocalDate to,
+                                                   @Param("refundStatuses") List<RefundStatus> refundStatuses);
 
     List<Booking> findByTour_TourIdOrderByCreatedAtDesc(Long tourId);
 

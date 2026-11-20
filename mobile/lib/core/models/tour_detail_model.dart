@@ -66,9 +66,10 @@ class TourGuestPrice {
   final String label;
   final String ageRange;
   final double price;
+  /// Miễn phí — đối tác đặt giá 0đ cho loại khách này.
   final bool alwaysFree;
 
-  /// Loại khách này có chiếm 1 chỗ trong slot hay không (em bé luôn false).
+  /// Loại khách này có chiếm 1 chỗ trong slot hay không (theo khai báo của đối tác).
   final bool countsTowardSlot;
 
   const TourGuestPrice({
@@ -86,10 +87,7 @@ class TourGuestPrice {
         ageRange: json['ageRange']?.toString() ?? '',
         price: _asDoubleOrNull(json['price']) ?? 0,
         alwaysFree: json['alwaysFree'] == true,
-        // Em bé luôn miễn phí và không chiếm chỗ.
-        countsTowardSlot: json['guestType']?.toString() == 'INFANT'
-            ? false
-            : json['countsTowardSlot'] != false,
+        countsTowardSlot: json['countsTowardSlot'] != false,
       );
 
   String get formattedPrice => alwaysFree || price <= 0 ? 'Miễn phí' : '${formatThousands(price)} đ';

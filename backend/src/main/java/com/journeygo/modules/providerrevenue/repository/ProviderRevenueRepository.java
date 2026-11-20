@@ -73,6 +73,21 @@ public interface ProviderRevenueRepository extends JpaRepository<ProviderRevenue
     List<ProviderRevenue> findEligibleByProviderProfile(@Param("providerProfileId") Long providerProfileId);
 
     /**
+     * Các khoản doanh thu CHƯA được tất toán và CHƯA thuộc đợt tất toán
+     * nào đang xử lý — của TẤT CẢ đối tác.
+     *
+     * <p>Dùng cho đợt tất toán TỔNG: gom khoản chưa tất toán của mọi đối tác để xét
+     * (bao gồm cả khoản đang {@code PENDING} vì lý do "kỳ doanh thu chưa kết thúc" —
+     * khoản này sẽ đủ điều kiện khi kỳ đóng lại và cần được xét lại).
+     */
+    @Query("""
+            SELECT r FROM ProviderRevenue r
+            WHERE r.status <> com.journeygo.modules.providerrevenue.entity.enums.ProviderRevenueStatus.SETTLED
+              AND r.status <> com.journeygo.modules.providerrevenue.entity.enums.ProviderRevenueStatus.IN_SETTLEMENT
+            """)
+    List<ProviderRevenue> findUnsettledByAllProviders();
+
+    /**
      * Tất cả khoản doanh thu của một ProviderProfile theo kỳ (bất kể trạng thái) — dùng để báo cáo
      * doanh thu chuyển tiếp giữa các kỳ.
      */
@@ -83,6 +98,13 @@ public interface ProviderRevenueRepository extends JpaRepository<ProviderRevenue
             """)
     List<ProviderRevenue> findByProviderProfileAndPeriod(@Param("providerProfileId") Long providerProfileId,
                                                 @Param("period") String period);
+
+    /**
+     * Tất cả khoản doanh thu theo kỳ — của MỌI đối tác.
+     *
+     * <p>Dùng cho đợt tất toán TỔNG (scope = BATCH).
+     */
+    List<ProviderRevenue> findByRevenuePeriod(String revenuePeriod);
 
     /**
      * Lấy ProviderRevenue kèm khóa pessimistic write — dùng khi chuyển trạng thái

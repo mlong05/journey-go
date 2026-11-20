@@ -53,12 +53,8 @@ public class TourBookingCatalogService {
             return p == null || p.getPrice() == null ? BigDecimal.ZERO : p.getPrice();
         }
 
-        /** Loại khách này có chiếm slot hay không (mặc định: có). */
+        /** Loại khách này có chiếm slot hay không — theo khai báo của đối tác (mặc định: có). */
         public boolean countsTowardSlot(GuestType guestType) {
-            // Em bé luôn miễn phí và không chiếm chỗ — bất kể đối tác khai báo thế nào.
-            if (guestType != null && guestType.isAlwaysFree()) {
-                return false;
-            }
             TourPrice p = prices.get(guestType);
             return p == null || p.isCountsTowardSlot();
         }
@@ -100,16 +96,18 @@ public class TourBookingCatalogService {
      *
      * <p>Mọi loại khách có cùng một mức giá — giá trả trước đây của tour. Giá này do
      * {@code TourPricingService} tính từ tổng giá các Experience PUBLISHED của các điểm đến
-     * trong tour.
+     * trong tour. Tour cũ không có khai báo của đối tác nên giữ quy ước trước đây:
+     * em bé miễn phí và không chiếm chỗ.
      */
-    public PriceTable legacyFlatPriceTable(BigDecimal flatPrice) {        Map<GuestType, TourPrice> map = new EnumMap<>(GuestType.class);
+    public PriceTable legacyFlatPriceTable(BigDecimal flatPrice) {
+        Map<GuestType, TourPrice> map = new EnumMap<>(GuestType.class);
         BigDecimal value = flatPrice == null ? BigDecimal.ZERO : flatPrice;
         for (GuestType g : GuestType.values()) {
+            boolean infant = g == GuestType.INFANT;
             map.put(g, TourPrice.builder()
                     .guestType(g)
-                    .price(value)
-                    // Em bé luôn miễn phí và KHÔNG chiếm chỗ (theo quy định nền tảng).
-                    .countsTowardSlot(!g.isAlwaysFree())
+                    .price(infant ? BigDecimal.ZERO : value)
+                    .countsTowardSlot(!infant)
                     .build());
         }
         return new PriceTable(map);

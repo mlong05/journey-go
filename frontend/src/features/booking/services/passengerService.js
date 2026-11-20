@@ -108,10 +108,34 @@ export async function sendBookingMessage(bookingId, body) {
 // ── Góc nhìn đối tác ───────────────────────────────────────────────────────
 
 /** Booking của các tour đối tác tạo (CONTENT_PROVIDER). */
-export async function getProviderBookings({ tourId, page = 0, size = 20 } = {}) {
+export async function getProviderBookings({ tourId, date, statuses, page = 0, size = 20 } = {}) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (tourId) query.set("tourId", String(tourId));
+  if (date) query.set("date", date);
+  (statuses || []).forEach((s) => query.append("status", s));
   const res = await apiClient.get(`/provider/bookings?${query.toString()}`);
+  return res?.data ?? res;
+}
+
+/**
+ * Lịch khởi hành (tour × ngày) của đối tác kèm số khách đã đăng ký.
+ * scope: "UPCOMING" | "PAST" | "ALL"; includeEmpty = hiện cả ngày chưa có đơn.
+ */
+export async function getProviderDepartures({
+  tourId,
+  scope = "UPCOMING",
+  includeEmpty = false,
+  page = 0,
+  size = 20,
+} = {}) {
+  const query = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    scope,
+    includeEmpty: String(includeEmpty),
+  });
+  if (tourId) query.set("tourId", String(tourId));
+  const res = await apiClient.get(`/provider/bookings/departures?${query.toString()}`);
   return res?.data ?? res;
 }
 

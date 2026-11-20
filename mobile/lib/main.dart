@@ -24,6 +24,7 @@ void main() async {
   try {
     await dotenv.load(fileName: '.env');
   } catch (e) {
+    dotenv.testLoad();
     debugPrint('Không tìm thấy file .env, sẽ dùng --dart-define làm fallback. Lỗi: $e');
   }
 

@@ -48,7 +48,8 @@ class TourPublicDetailResponseTest {
                 .prices(List.of(
                         new TourDetailResponse.Price(GuestType.ADULT, "Người lớn", "12+", new BigDecimal("450000"), true, false),
                         new TourDetailResponse.Price(GuestType.CHILD, "Trẻ em", "5-11", null, false, false),
-                        new TourDetailResponse.Price(GuestType.INFANT, "Em bé", "<2", null, false, true)))
+                        // Miễn phí = đối tác đặt giá 0đ (backend trả price = 0, alwaysFree = true).
+                        new TourDetailResponse.Price(GuestType.INFANT, "Em bé", "<2", BigDecimal.ZERO, false, true)))
                 .stops(List.of(stop))
                 .departureDates(List.of(TODAY.minusDays(1), TODAY, TODAY.plusDays(3)))
                 .latestReview(new TourDetailResponse.LatestReview(1L, "APPROVED", 1, "Mod", "ghi chú nội bộ",

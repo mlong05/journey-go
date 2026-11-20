@@ -410,10 +410,8 @@ public class BookingService {
                         "Email \"" + email + "\" bị trùng trong nhóm hành khách");
             }
 
+            // Giá theo bảng giá đối tác khai báo (0đ = miễn phí).
             BigDecimal price = table.priceOf(guestType);
-            if (guestType.isAlwaysFree()) {
-                price = BigDecimal.ZERO;
-            }
 
             boolean countsSlot = table.countsTowardSlot(guestType);
 

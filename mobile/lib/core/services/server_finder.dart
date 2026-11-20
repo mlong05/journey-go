@@ -20,22 +20,26 @@ class ServerFinder {
   /// Hướng dẫn hiển thị khi không tìm thấy máy chủ.
   static const String unreachableHint =
       'Không tìm thấy máy chủ JourneyGo.\n'
-      '• Cắm USB: chạy "adb reverse tcp:${ApiConstants.defaultPort} tcp:${ApiConstants.defaultPort}" '
-      '(hoặc mobile/run-usb.sh) rồi thử lại.\n'
-      '• Dùng Wi-Fi: điện thoại và máy tính phải cùng mạng, API_BASE_URL trong .env là IP máy tính.';
+      '• Kiểm tra backend local đã chạy (Docker: cổng ${ApiConstants.dockerPort}, mvnw: cổng ${ApiConstants.defaultPort}).\n'
+      '• Cắm USB: chạy mobile/run-usb.sh (adb reverse cổng ${ApiConstants.dockerPort} và ${ApiConstants.defaultPort}) rồi thử lại.\n'
+      '• Dùng domain public: đặt API_BASE_URL trong mobile/.env.';
 
   /// Địa chỉ khai báo trong .env (API_BASE_URL), nếu có.
   static String? get envBaseUrl {
+    if (!dotenv.isInitialized) return null;
     final value = dotenv.maybeGet('API_BASE_URL')?.trim();
     return (value == null || value.isEmpty) ? null : value;
   }
 
   /// Các địa chỉ sẽ thử, theo thứ tự ưu tiên khi không địa chỉ nào trả lời.
-  static List<String> get candidates => {
-        ?envBaseUrl,
-        ApiConstants.getDefaultBaseUrl(),
-        'http://127.0.0.1:${ApiConstants.defaultPort}/api/v1',
-      }.toList();
+  ///
+  /// Có `API_BASE_URL` trong .env ⇒ CHỈ dùng đúng địa chỉ đó (không tự nhảy sang backend khác).
+  /// Bỏ trống ⇒ dò các backend local (Docker 8080, mvnw 8088).
+  static List<String> get candidates {
+    final env = envBaseUrl;
+    if (env != null) return [env];
+    return ApiConstants.localBaseUrls();
+  }
 
   /// Kết quả được nhớ trong phiên; gọi [reset] để dò lại.
   static Future<String> find() => _found ??= _probeAll();
@@ -61,24 +65,21 @@ class ServerFinder {
     }
   }
 
-  static Future<String> _probeAll() {
+  /// Thử song song mọi địa chỉ nhưng chọn theo THỨ TỰ ƯU TIÊN (không phải địa chỉ trả lời
+  /// nhanh nhất): khi cả backend 8088 lẫn Docker 8080 cùng chạy, app luôn dùng cùng một backend.
+  static Future<String> _probeAll() async {
     final list = candidates;
-    final done = Completer<String>();
-    var pending = list.length;
-    for (final url in list) {
-      isReachable(url, timeout: const Duration(milliseconds: 2500)).then((ok) {
-        pending--;
-        if (done.isCompleted) return;
-        if (ok) {
-          lastProbeFailed = false;
-          done.complete(url);
-        } else if (pending == 0) {
-          _found = null; // không thấy máy chủ: lần gọi sau thử lại
-          lastProbeFailed = true;
-          done.complete(list.first);
-        }
-      });
+    final results = await Future.wait(
+      list.map((url) => isReachable(url, timeout: const Duration(milliseconds: 2500))),
+    );
+    for (var i = 0; i < list.length; i++) {
+      if (results[i]) {
+        lastProbeFailed = false;
+        return list[i];
+      }
     }
-    return done.future;
+    _found = null; // không thấy máy chủ: lần gọi sau thử lại
+    lastProbeFailed = true;
+    return list.first;
   }
 }

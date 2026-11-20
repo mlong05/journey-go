@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */
+  // ── Docker: sinh sẵn .next/standalone (node_modules tối thiểu) để image runtime
+  //    không cần cài lại dependencies. Xem frontend/Dockerfile.
+  output: "standalone",
   experimental: {
     agentFeedback: true,
     // Đánh dấu app đã được nâng cấp Next.js theo hướng "security"

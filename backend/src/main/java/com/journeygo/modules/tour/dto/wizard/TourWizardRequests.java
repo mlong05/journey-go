@@ -136,7 +136,7 @@ public final class TourWizardRequests {
             @Size(max = 2000) String shortDescription,
             @Size(max = 2000) String guestNote,
             @Size(max = 1000) String imageUrl,
-            @Schema(description = "Video giới thiệu điểm đến (không bắt buộc)")
+            @Schema(description = "Video câu chuyện văn hóa (không bắt buộc)")
             @Size(max = 1000) String videoUrl,
             VideoSource videoSource,
             @Schema(description = "Nội dung văn hóa (câu chuyện) — chỉ mở cho khách sau khi check-in")

@@ -21,6 +21,16 @@ public interface TourSlotRepository extends JpaRepository<TourSlot, Long> {
 
     Optional<TourSlot> findByTour_TourIdAndSlotDate(Long tourId, LocalDate slotDate);
 
+    /** Slot của mọi tour do một đối tác tạo trong khoảng ngày (kèm tour). */
+    @Query("""
+            SELECT s FROM TourSlot s JOIN FETCH s.tour t
+            WHERE t.createdBy.id = :providerId
+              AND s.slotDate BETWEEN :from AND :to
+            """)
+    List<TourSlot> findProviderSlotsBetween(@Param("providerId") Long providerId,
+                                            @Param("from") LocalDate from,
+                                            @Param("to") LocalDate to);
+
     List<TourSlot> findByTour_TourIdAndSlotDateInAndStatus(Long tourId, List<LocalDate> dates, TourSlotStatus status);
 
     /**

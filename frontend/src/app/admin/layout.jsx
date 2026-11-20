@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -22,17 +22,22 @@ import {
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
+import { dashboardService } from "@/features/dashboard";
+import { useQueueRefresh } from "@/context/NotificationContext";
 import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout";
 import { NotificationProvider } from "@/context/NotificationContext";
 import NotificationToaster from "@/components/notifications/NotificationToaster";
 
-// Navigation items được định nghĩa ngoài component để tránh re-create mỗi render
+// Navigation items được định nghĩa ngoài component để tránh re-create mỗi render.
+// Thứ tự được nhóm theo luồng nghiệp vụ: Vận hành → Người dùng → Cấu hình → Tài chính → Giám sát.
+// Mỗi item có `group` để Sidebar render nhãn nhóm giữa các mục.
 const ADMIN_NAV_ITEMS = [
   {
     id: "overview",
     label: "Tổng quan vận hành",
     href: "/admin",
     icon: LayoutDashboard,
+    group: "Vận hành",
     badge: null,
   },
   {
@@ -40,6 +45,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Quản lý người dùng",
     href: "/admin/users",
     icon: Users,
+    group: "Người dùng & Đối tác",
     badge: null,
   },
   {
@@ -47,6 +53,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Quản lý đối tác",
     href: "/admin/partners",
     icon: Handshake,
+    group: "Người dùng & Đối tác",
     badge: null,
   },
   {
@@ -54,6 +61,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Yêu cầu đổi thông tin",
     href: "/admin/partner-profile-updates",
     icon: UserCog,
+    group: "Người dùng & Đối tác",
     badge: null,
   },
   {
@@ -61,6 +69,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Chính sách hoa hồng",
     href: "/admin/commission-policies",
     icon: BadgePercent,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -68,6 +77,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình khu vực",
     href: "/admin/regions",
     icon: Globe2,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -75,6 +85,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình chủ đề",
     href: "/admin/themes",
     icon: Tags,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -82,6 +93,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình loại khách & độ tuổi",
     href: "/admin/guest-types",
     icon: UsersRound,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -89,6 +101,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình trải nghiệm và điểm thưởng",
     href: "/admin/experience-rewards",
     icon: Sparkles,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -96,6 +109,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình huy hiệu",
     href: "/admin/badge-config",
     icon: Medal,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -103,6 +117,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình voucher",
     href: "/admin/vouchers",
     icon: Ticket,
+    group: "Cấu hình nền tảng",
     badge: null,
   },
   {
@@ -110,6 +125,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Tài chính & Thanh toán",
     href: "/admin/finance",
     icon: CreditCard,
+    group: "Tài chính & Tất toán",
     badge: null,
   },
   {
@@ -117,6 +133,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Yêu cầu hoàn tiền",
     href: "/admin/refunds",
     icon: FileText,
+    group: "Tài chính & Tất toán",
     badge: null,
   },
   {
@@ -124,6 +141,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình lý do hoàn tiền",
     href: "/admin/refund-reasons",
     icon: RotateCcw,
+    group: "Tài chính & Tất toán",
     badge: null,
   },
   {
@@ -131,6 +149,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Tất toán doanh thu",
     href: "/admin/settlements",
     icon: HandCoins,
+    group: "Tài chính & Tất toán",
     badge: null,
   },
   {
@@ -138,6 +157,7 @@ const ADMIN_NAV_ITEMS = [
     label: "Nhật ký kiểm toán",
     href: "/admin/audit-logs",
     icon: ShieldAlert,
+    group: "Giám sát",
     badge: null,
   },
 ];
@@ -172,13 +192,59 @@ export default function AdminLayout({ children }) {
   const [isSidebarWide, setIsSidebarWide] = useState(true);
   const [topSearch, setTopSearch] = useState("");
 
+  // Badge số lượng việc đang chờ trên Sidebar (đối tác, quyết toán, hoàn tiền…)
+  const [navBadges, setNavBadges] = useState({});
+
+  const loadNavBadges = useCallback(async () => {
+    try {
+      const badges = await dashboardService.getAdminOperationBadges();
+      setNavBadges(badges || {});
+    } catch {
+      // Badge là thông tin phụ — lỗi không chặn hiển thị trang.
+    }
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => loadNavBadges());
+  }, [loadNavBadges]);
+
+  // Tự làm mới badge khi có yêu cầu mới trong hàng đợi thông báo.
+  useQueueRefresh(
+    ["refund-review", "adjustment-review", "settlements", "partner-review", "tour-review"],
+    () => loadNavBadges(),
+  );
+
+  // Gắn badge động vào các mục Sidebar có việc đang chờ.
+  const navItemsWithBadges = useMemo(
+    () =>
+      ADMIN_NAV_ITEMS.map((item) => {
+        const count = navBadges?.[item.id];
+        if (!count || count < 1) return item;
+        // Hoàn tiền là việc khẩn cấp ⇒ badge màu đỏ; còn lại dùng chip mặc định.
+        const isUrgent = item.id === "refunds";
+        return {
+          ...item,
+          badge: {
+            text: count > 99 ? "99+" : String(count),
+            color: isUrgent
+              ? "bg-rose-50 text-rose-700 ring-rose-200/80"
+              : "bg-amber-50 text-amber-700 ring-amber-200/80",
+          },
+        };
+      }),
+    [navBadges],
+  );
+
   // Các trang khóa khung 100vh: header, thẻ số liệu & bộ lọc đứng yên, chỉ danh sách trong thẻ tự cuộn
+  // ⚠️ "/admin" (Tổng quan vận hành) KHÔNG khóa — trang này dài, cần cuộn toàn trang.
   const isScrollLockedPage =
-    pathname === "/admin" ||
     pathname?.startsWith("/admin/users") ||
     pathname?.startsWith("/admin/regions") ||
     pathname?.startsWith("/admin/themes") ||
+    pathname?.startsWith("/admin/commission-policies") ||
     pathname?.startsWith("/admin/finance") ||
+    pathname?.startsWith("/admin/vouchers") ||
+    pathname?.startsWith("/admin/refunds") ||
     pathname?.startsWith("/admin/settlements");
 
   // Xử lý tìm kiếm nhanh từ Topbar
@@ -202,7 +268,7 @@ export default function AdminLayout({ children }) {
       <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
         <Sidebar
           role="admin"
-          navItems={ADMIN_NAV_ITEMS}
+          navItems={navItemsWithBadges}
           onLogout={performLogout}
           isOpenMobile={isSidebarOpen}
           onCloseMobile={() => setIsSidebarOpen(false)}
@@ -234,11 +300,12 @@ export default function AdminLayout({ children }) {
             }
           >
             <div
-              className={
+              key={pathname}
+              className={`jg-page-enter ${
                 isScrollLockedPage
                   ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
                   : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
-              }
+              }`}
             >
               {children}
             </div>

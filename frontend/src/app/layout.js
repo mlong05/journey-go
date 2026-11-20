@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
@@ -25,6 +25,16 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+/**
+ * Inter — font cho các màn hình quản trị dạng SaaS (trang Tổng quan vận hành).
+ * Nạp subset "vietnamese" với lý do giống trên.
+ */
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin", "latin-ext", "vietnamese"],
+  display: "swap",
+});
+
 export const metadata = {
   title: "Journey Go - Nền tảng Du lịch & Di sản Việt Nam",
   description: "Cổng thông tin, số hóa điểm đến và quản trị du lịch di sản Việt Nam.",
@@ -39,7 +49,7 @@ export default function RootLayout({ children }) {
       // BIS chèn thuộc tính bis_skin_checked="1" vào DOM và phá vỡ hydration của React.
       // Đặt attribute này trên <html> giúp BIS bỏ qua toàn bộ trang.
       data-bisskin="disabled"
-      className={`${geistSans.variable} ${geistMono.variable} font-sans h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} font-sans h-full antialiased`}
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         {children}

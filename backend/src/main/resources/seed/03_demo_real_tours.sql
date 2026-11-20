@@ -1,5 +1,5 @@
 -- =====================================================================================
---  SEED — 5 TOUR THẬT ĐÃ XUẤT BẢN (dữ liệu tham quan có thật, ảnh chụp thật)
+--  SEED 03 — 5 TOUR THẬT ĐÃ XUẤT BẢN (dữ liệu tham quan có thật, ảnh chụp thật)
 --
 --  • Địa điểm, sự kiện, niên đại lấy theo Wikipedia tiếng Việt / tiếng Anh (tháng 11/2026).
 --  • Ảnh lấy từ Wikimedia Commons: chỉ dùng ảnh JPEG có dữ liệu EXIF máy ảnh (ảnh chụp thật),
@@ -11,8 +11,11 @@
 --    là toạ độ gần đúng nên bán kính để rộng hơn (200–400 m).
 --  • IDEMPOTENT: tour trùng tên (chưa xoá) sẽ được bỏ qua.
 --
+--  ⚠️ YÊU CẦU: chạy `01_demo_accounts.sql` TRƯỚC (cần tài khoản CONTENT_PROVIDER +
+--     CONTENT_MODERATOR + khu vực/chủ đề do DataInitializer tạo sẵn).
+--
 --  Cách chạy:
---     psql -h localhost -U postgres -d journeygo_db -f seed_real_tours.sql
+--     psql -h localhost -U postgres -d journeygo_db -f 03_demo_real_tours.sql
 --
 --  Nguồn ảnh (Wikimedia Commons):
 --   • 2024 Hội An - Japanese Covered Bridge (Chùa Cầu) after renovation - img 11.jpg — Chainwit. — CC BY 4.0
@@ -85,7 +88,7 @@ BEGIN
         approved, status, cover_image_url, deleted, created_by, created_at, updated_at, description,
         price_includes, price_excludes, force_majeure, refund_policy, contact_info, cancellation_policy,
         max_guests_per_slot, content_rights_confirmed, version_number, submitted_at, published_at)
-    VALUES ('Bát Tràng nửa ngày: đình làng, chợ gốm và bàn xoay', 'CULTURAL', 1, 0, 240, 'DAY_TRIP', 2, 1,
+    VALUES ('Bát Tràng nửa ngày: đình làng, chợ gốm và bàn xoay', 'CULTURAL', 1, 0, 240, 'DAY_TRIP', (SELECT id FROM regions WHERE slug = 'mien-bac' LIMIT 1), (SELECT id FROM themes WHERE slug = 'lang-nghe' LIMIT 1),
         TRUE, 'PUBLISHED', 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/B%C3%A1t_Tr%C3%A0ng_DSC_0096.JPG/960px-B%C3%A1t_Tr%C3%A0ng_DSC_0096.JPG', FALSE, v_provider, NOW() - INTERVAL '10 days', NOW(), 'Nửa ngày ở làng gốm Bát Tràng bên bờ sông Hồng, cách trung tâm Hà Nội khoảng 13 km. Bạn thăm ngôi đình làng dựng lại năm 1720, đi bộ qua chợ gốm với hàng nghìn món men lam, men rạn, rồi ngồi vào bàn xoay để tự tay nặn một chiếc bát hoặc lọ hoa dưới sự hướng dẫn của thợ gốm trong làng. Mỗi điểm dừng có quiz và hoạt động check-in trên ứng dụng JourneyGo.',
         'Hướng dẫn viên người địa phương
 Một lượt nặn gốm trên bàn xoay (khoảng 45 phút), đất sét và dụng cụ
@@ -226,7 +229,7 @@ BEGIN
         approved, status, cover_image_url, deleted, created_by, created_at, updated_at, description,
         price_includes, price_excludes, force_majeure, refund_policy, contact_info, cancellation_policy,
         max_guests_per_slot, content_rights_confirmed, version_number, submitted_at, published_at)
-    VALUES ('Phố cổ Hội An: Chùa Cầu, nhà cổ Tấn Ký và hội quán Phúc Kiến', 'HISTORICAL', 1, 0, 210, 'DAY_TRIP', 1, 5,
+    VALUES ('Phố cổ Hội An: Chùa Cầu, nhà cổ Tấn Ký và hội quán Phúc Kiến', 'HISTORICAL', 1, 0, 210, 'DAY_TRIP', (SELECT id FROM regions WHERE slug = 'mien-trung' LIMIT 1), (SELECT id FROM themes WHERE slug = 'lich-su' LIMIT 1),
         TRUE, 'PUBLISHED', 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/H%E1%BB%99i_An%2C_Ch%C3%B9a_C%E1%BA%A7u%2C_2020-01_CN-02.jpg/960px-H%E1%BB%99i_An%2C_Ch%C3%B9a_C%E1%BA%A7u%2C_2020-01_CN-02.jpg', FALSE, v_provider, NOW() - INTERVAL '10 days', NOW(), 'Buổi đi bộ qua khu phố cổ Hội An, di sản thế giới được UNESCO ghi danh năm 1999. Bắt đầu từ Chùa Cầu do thương nhân Nhật Bản góp tiền xây, ghé nhà cổ Tấn Ký với hai mặt tiền ra phố và ra sông, rồi kết thúc ở hội quán Phúc Kiến của cộng đồng người Hoa. Tại mỗi điểm, ứng dụng JourneyGo mở câu chuyện khi bạn check-in, kèm quiz và một nhiệm vụ quan sát tại chỗ.',
         'Hướng dẫn viên tiếng Việt suốt tuyến
 Vé tham quan phố cổ Hội An (gồm vé vào các điểm trong tuyến)
@@ -396,7 +399,7 @@ BEGIN
         approved, status, cover_image_url, deleted, created_by, created_at, updated_at, description,
         price_includes, price_excludes, force_majeure, refund_policy, contact_info, cancellation_policy,
         max_guests_per_slot, content_rights_confirmed, version_number, submitted_at, published_at)
-    VALUES ('Đại Nội Huế và chùa Thiên Mụ trong một buổi', 'HISTORICAL', 1, 0, 300, 'DAY_TRIP', 1, 5,
+    VALUES ('Đại Nội Huế và chùa Thiên Mụ trong một buổi', 'HISTORICAL', 1, 0, 300, 'DAY_TRIP', (SELECT id FROM regions WHERE slug = 'mien-trung' LIMIT 1), (SELECT id FROM themes WHERE slug = 'lich-su' LIMIT 1),
         TRUE, 'PUBLISHED', 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Hu%E1%BA%BF_%282024%29_-_Meridian_Gate_-_Ng%E1%BB%8D_M%C3%B4n_%28Ho%C3%A0ng_th%C3%A0nh_Hu%E1%BA%BF%29_-_img_02.jpg/960px-Hu%E1%BA%BF_%282024%29_-_Meridian_Gate_-_Ng%E1%BB%8D_M%C3%B4n_%28Ho%C3%A0ng_th%C3%A0nh_Hu%E1%BA%BF%29_-_img_02.jpg', FALSE, v_provider, NOW() - INTERVAL '10 days', NOW(), 'Một buổi sáng trong quần thể di tích Cố đô Huế, di sản thế giới được UNESCO ghi danh năm 1993. Đi qua Ngọ Môn, cổng chính của Hoàng thành, vào điện Thái Hòa nơi triều Nguyễn thiết triều và cử hành đại lễ, rồi đến chùa Thiên Mụ trên đồi Hà Khê bên bờ sông Hương. Mỗi điểm dừng có câu chuyện, quiz và nhiệm vụ quan sát trên ứng dụng JourneyGo.',
         'Hướng dẫn viên tiếng Việt suốt tuyến
 Vé tham quan Đại Nội
@@ -569,7 +572,7 @@ BEGIN
         approved, status, cover_image_url, deleted, created_by, created_at, updated_at, description,
         price_includes, price_excludes, force_majeure, refund_policy, contact_info, cancellation_policy,
         max_guests_per_slot, content_rights_confirmed, version_number, submitted_at, published_at)
-    VALUES ('Văn Miếu – Quốc Tử Giám và đền Ngọc Sơn: nửa ngày đất học', 'HISTORICAL', 1, 0, 210, 'DAY_TRIP', 2, 5,
+    VALUES ('Văn Miếu – Quốc Tử Giám và đền Ngọc Sơn: nửa ngày đất học', 'HISTORICAL', 1, 0, 210, 'DAY_TRIP', (SELECT id FROM regions WHERE slug = 'mien-bac' LIMIT 1), (SELECT id FROM themes WHERE slug = 'lich-su' LIMIT 1),
         TRUE, 'PUBLISHED', 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Constellation_of_Literature_pavilion_%28Temple_of_Literature%2C_Hanoi%29.jpg/960px-Constellation_of_Literature_pavilion_%28Temple_of_Literature%2C_Hanoi%29.jpg', FALSE, v_provider, NOW() - INTERVAL '10 days', NOW(), 'Nửa ngày đi qua hai di tích gắn với chuyện học hành, khoa cử của Thăng Long. Ở Văn Miếu – Quốc Tử Giám, trường đại học đầu tiên của Việt Nam, bạn qua Khuê Văn Các và đứng giữa hàng bia tiến sĩ đặt trên lưng rùa đá. Sau đó tour sang hồ Hoàn Kiếm, qua cầu Thê Húc vào đền Ngọc Sơn thờ Văn Xương Đế Quân, vị thần chủ việc văn chương. Mỗi điểm có quiz và nhiệm vụ quan sát trên ứng dụng JourneyGo.',
         'Hướng dẫn viên tiếng Việt suốt tuyến
 Vé tham quan Văn Miếu – Quốc Tử Giám và đền Ngọc Sơn
@@ -743,7 +746,7 @@ BEGIN
         approved, status, cover_image_url, deleted, created_by, created_at, updated_at, description,
         price_includes, price_excludes, force_majeure, refund_policy, contact_info, cancellation_policy,
         max_guests_per_slot, content_rights_confirmed, version_number, submitted_at, published_at)
-    VALUES ('Cần Thơ sông nước: chợ nổi Cái Răng, lò hủ tiếu và nhà cổ Bình Thủy', 'GASTRONOMY', 1, 0, 360, 'DAY_TRIP', 3, 2,
+    VALUES ('Cần Thơ sông nước: chợ nổi Cái Răng, lò hủ tiếu và nhà cổ Bình Thủy', 'GASTRONOMY', 1, 0, 360, 'DAY_TRIP', (SELECT id FROM regions WHERE slug = 'mien-nam' LIMIT 1), (SELECT id FROM themes WHERE slug = 'am-thuc' LIMIT 1),
         TRUE, 'PUBLISHED', 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Cai_Rang_Floating_Market_1.jpg/960px-Cai_Rang_Floating_Market_1.jpg', FALSE, v_provider, NOW() - INTERVAL '10 days', NOW(), 'Một buổi sáng sông nước ở Cần Thơ. Xuất phát từ bến Ninh Kiều lúc trời còn sớm, đi ghe ra chợ nổi Cái Răng, chợ đầu mối trái cây trên sông Cần Thơ được công nhận Di sản văn hóa phi vật thể quốc gia năm 2016, ăn sáng ngay trên ghe. Tiếp đó ghé một lò hủ tiếu truyền thống xem tráng bánh, phơi bánh, rồi lên bờ thăm nhà cổ Bình Thủy xây từ năm 1870. Mỗi điểm có quiz và nhiệm vụ trên ứng dụng JourneyGo.',
         'Hướng dẫn viên người địa phương
 Ghe máy từ bến Ninh Kiều đi chợ nổi và lò hủ tiếu

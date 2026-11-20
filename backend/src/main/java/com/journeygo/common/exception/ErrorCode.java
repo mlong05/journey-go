@@ -37,7 +37,7 @@ public enum ErrorCode {
     INVALID_TOUR_STATUS("Trạng thái tour không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
     TOUR_SUBMISSION_INVALID("Tour chưa đủ điều kiện gửi duyệt, vui lòng sửa các mục được chỉ ra", HttpStatus.BAD_REQUEST),
     TOUR_REVIEW_CRITERIA_REQUIRED("Vui lòng đánh giá đủ 5 tiêu chí kiểm duyệt", HttpStatus.BAD_REQUEST),
-    TOUR_REVIEW_CRITERIA_NOT_MET("Tour cần đạt tối thiểu 3/5 tiêu chí để được duyệt", HttpStatus.BAD_REQUEST),
+    TOUR_REVIEW_CRITERIA_NOT_MET("Tour cần đạt đủ 5/5 tiêu chí để được duyệt", HttpStatus.BAD_REQUEST),
     TOUR_REVIEW_NOTES_REQUIRED("Yêu cầu chỉnh sửa phải có ít nhất một ghi chú", HttpStatus.BAD_REQUEST),
     TOUR_SLOT_HAS_BOOKINGS("Không thể đóng ngày đã có booking", HttpStatus.CONFLICT),
     PROVIDER_NOT_APPROVED("Tài khoản đối tác chưa được Admin duyệt hoặc đang bị khóa", HttpStatus.FORBIDDEN),
@@ -173,7 +173,10 @@ public enum ErrorCode {
     VOUCHER_NOT_FOUND("Mã voucher không tồn tại hoặc không thuộc về bạn", HttpStatus.NOT_FOUND),
     VOUCHER_ALREADY_USED("Voucher đã được sử dụng", HttpStatus.BAD_REQUEST),
     VOUCHER_EXPIRED("Voucher đã hết hạn sử dụng", HttpStatus.BAD_REQUEST),
-    VOUCHER_INVALID("Voucher không hợp lệ cho đơn hàng này", HttpStatus.BAD_REQUEST);
+    VOUCHER_INVALID("Voucher không hợp lệ cho đơn hàng này", HttpStatus.BAD_REQUEST),
+    ACHIEVEMENT_NOT_FOUND("Thành tựu không tồn tại", HttpStatus.NOT_FOUND),
+    ACHIEVEMENT_NOT_CLAIMABLE("Thành tựu chưa đủ điều kiện hoặc đã được nhận thưởng", HttpStatus.BAD_REQUEST),
+    ACHIEVEMENT_CODE_EXISTED("Mã thành tựu này đã tồn tại trong hệ thống", HttpStatus.CONFLICT);
 
     private final String message;
     private final HttpStatus httpStatus;

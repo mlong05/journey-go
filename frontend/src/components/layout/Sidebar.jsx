@@ -165,12 +165,24 @@ export default function Sidebar({
           )}
 
           <ul className="space-y-0.5">
-            {navItems.map((item) => {
+            {navItems.map((item, index) => {
               const Icon = item.icon;
               const active = isItemActive(item.href);
+              // Nhãn nhóm chỉ hiện khi mở rộng menu VÀ bắt đầu 1 nhóm mới.
+              const prevItem = index > 0 ? navItems[index - 1] : null;
+              const showGroupLabel =
+                isWide && !!item.group && item.group !== prevItem?.group;
 
               return (
-                <li key={item.id}>
+                <React.Fragment key={item.id}>
+                  {showGroupLabel && (
+                    <li className="px-3 pt-3 pb-1 first:pt-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        {item.group}
+                      </p>
+                    </li>
+                  )}
+                  <li>
                   <Link
                     href={item.href}
                     onClick={onCloseMobile}
@@ -212,7 +224,8 @@ export default function Sidebar({
                       />
                     )}
                   </Link>
-                </li>
+                  </li>
+                </React.Fragment>
               );
             })}
           </ul>

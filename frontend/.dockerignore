@@ -1,0 +1,20 @@
+# =====================================================================================
+#  JourneyGo — frontend build context
+# =====================================================================================
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+npm-debug.log*
+Dockerfile
+.dockerignore
+README.md
+dev.log
+.agents
+.claude
+
+# File test thừa (~50MB) không được code nào tham chiếu ⇒ loại khỏi image cho nhẹ.
+public/image/Try_N3_TiengViet.pdf

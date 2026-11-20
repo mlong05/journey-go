@@ -1,6 +1,10 @@
 package com.journeygo.config;
 
 import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.metamodel.Attribute;
+import jakarta.persistence.metamodel.EntityType;
+import jakarta.persistence.metamodel.SingularAttribute;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.InitializingBean;
@@ -8,12 +12,18 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.flyway.FlywayMigrationStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Chạy Flyway theo HAI PHA khi database còn trống.
@@ -54,7 +64,10 @@ public class FlywayConfig {
         return flyway -> {
             DataSource dataSource = flyway.getConfiguration().getDataSource();
             forgetRenumberedTourTaskMigrations(dataSource);
+            cleanupFailedAchievementMigration(dataSource);
+            forgetStaleRenumberedFeatureMigrations(dataSource);
             if (hibernateTablesExist(dataSource)) {
+                syncMissingColumnDefaults(dataSource);
                 flyway.migrate();
                 return;
             }
@@ -74,13 +87,229 @@ public class FlywayConfig {
      * Trên DB đã migrate đủ thì migrate() không làm gì.
      */
     @Bean
-    public InitializingBean flywayPostHibernateMigration(Flyway flyway, EntityManagerFactory entityManagerFactory) {
+    public InitializingBean flywayPostHibernateMigration(Flyway flyway, EntityManagerFactory entityManagerFactory,
+                                                       DataSource dataSource) {
         return () -> {
+            // Pha 2 chạy SAU khi Hibernate đã tạo bảng ⇒ lúc này các CHECK constraint do
+            // Hibernate sinh cho cột enum đã tồn tại và có thể chặn các migration còn lại.
+            dropHibernateEnumCheckConstraints(dataSource, entityManagerFactory);
+            // Đồng bộ DEFAULT cho các cột NOT NULL mà Hibernate tạo thiếu (xem giải thích
+            // trong {@link #syncMissingColumnDefaults}).
+            syncMissingColumnDefaults(dataSource);
+            restoreLegacyGuestTypeColumn(dataSource);
             var result = flyway.migrate();
             if (result.migrationsExecuted > 0) {
                 log.info("[Flyway] Đã chạy thêm {} migration sau khi Hibernate tạo bảng.", result.migrationsExecuted);
             }
         };
+    }
+
+    /**
+     * Bổ sung DEFAULT cho các cột NOT NULL mà Hibernate tạo thiếu.
+     *
+     * <p>─── Vì sao cần? ───
+     * Các bảng nghiệp vụ được định nghĩa trong file migration với dạng
+     * {@code active BOOLEAN NOT NULL DEFAULT TRUE}. Nhưng khi DB còn trống, Flyway chạy 2 pha:
+     * pha 1 tới V5, Hibernate tạo bảng (theo entity — <b>không khai báo DEFAULT</b>), rồi pha 2
+     * chạy các migration còn lại. Vì bảng đã tồn tại, {@code CREATE TABLE IF NOT EXISTS} bị
+     * skip ⇒ cột {@code active} có NOT NULL nhưng <b>không có DEFAULT</b>.
+     *
+     * <p>Hậu quả: {@code INSERT} của chính file migration đó (bỏ trối {@code active}) ⇒ NULL
+     * ⇒ vi phạm NOT NULL ⇒ Flyway fail ⇒ ứng dụng không khởi động được trên DB tạo mới.
+     *
+     * <p>Giải pháp: đọc DDL trong các file migration (classpath {@code db/migration}), tìm
+     * cột {@code NOT NULL DEFAULT ...}, rồi {@code ALTER TABLE ... SET DEFAULT} cho các cột
+     * hiện đang thiếu DEFAULT trong DB.
+     *
+     * <p>⚠️ KHÔNG sửa nội dung file migration ⇒ checksum giữ nguyên ⇒ máy khác không lỗi validate.
+     */
+    private static void syncMissingColumnDefaults(DataSource dataSource) {
+        Map<String, String> expectedDefaults = readDefaultsFromMigrationFiles();
+        if (expectedDefaults.isEmpty()) return;
+
+        for (Map.Entry<String, String> entry : expectedDefaults.entrySet()) {
+            String qualified = entry.getKey();
+            String defaultExpr = entry.getValue();
+            String[] parts = qualified.split("\\.", 2);
+            if (parts.length != 2) continue;
+            String table = parts[0];
+            String column = parts[1];
+
+            String checkSql = "SELECT pg_get_expr(d.adbin, d.adrelid) FROM pg_attrdef d "
+                    + "JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum "
+                    + "WHERE d.adrelid = to_regclass(?) AND a.attname = ?";
+            try (Connection conn = dataSource.getConnection()) {
+                String currentDefault = null;
+                try (PreparedStatement ps = conn.prepareStatement(checkSql)) {
+                    ps.setString(1, "public." + table);
+                    ps.setString(2, column);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) currentDefault = rs.getString(1);
+                    }
+                }
+                if (currentDefault != null) continue; // đã có DEFAULT ⇒ không cần sửa
+
+                String alterSql = "ALTER TABLE public." + quoteIdentifier(table)
+                        + " ALTER COLUMN " + quoteIdentifier(column)
+                        + " SET DEFAULT " + defaultExpr;
+                try (PreparedStatement ps = conn.prepareStatement(alterSql)) {
+                    ps.execute();
+                    log.info("[Flyway] Đã bổ sung DEFAULT cho cột {}.{} = {}", table, column, defaultExpr);
+                }
+            } catch (SQLException e) {
+                log.warn("[Flyway] Không bổ sung được DEFAULT cho {}.{}: {}", table, column, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Đọc các file migration trong classpath và trích ra mapping {@code table.column -> DEFAULT expr}
+     * cho những cột khai báo {@code NOT NULL DEFAULT ...}.
+     */
+    private static Map<String, String> readDefaultsFromMigrationFiles() {
+        Map<String, String> result = new LinkedHashMap<>();
+        // Regex: tên cột, rồi "NOT NULL DEFAULT <expr>".
+        Pattern columnPattern = Pattern.compile(
+                "(?i)^\\s*([a-z_][a-z0-9_]*)\\s+[A-Za-z][A-Za-z0-9_ ]*?\\s+NOT\\s+NULL\\s+DEFAULT\\s+(.+)");
+
+        try {
+            var resourceResolver = new PathMatchingResourcePatternResolver();
+            var resources = resourceResolver.getResources("classpath*:db/migration/*.sql");
+            for (org.springframework.core.io.Resource resource : resources) {
+                String content;
+                try (var in = resource.getInputStream()) {
+                    content = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                }
+                String currentTable = null;
+                for (String rawLine : content.split("\\R")) {
+                    String line = rawLine;
+                    // Bỏ comment đầu dòng.
+                    int commentIdx = line.indexOf("--");
+                    if (commentIdx >= 0) line = line.substring(0, commentIdx);
+                    var tableMatcher = Pattern.compile(
+                            "(?i)CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?([a-z_][a-z0-9_]*)\\s*\\(")
+                            .matcher(line);
+                    if (tableMatcher.find()) {
+                        currentTable = tableMatcher.group(1).toLowerCase();
+                        continue;
+                    }
+                    if (currentTable == null) continue;
+                    var m = columnPattern.matcher(line);
+                    if (m.find()) {
+                        String column = m.group(1).toLowerCase();
+                        String defaultExpr = extractDefaultExpression(m.group(2).trim());
+                        if (defaultExpr != null) {
+                            result.putIfAbsent(currentTable + "." + column, defaultExpr);
+                        }
+                    }
+                    if (line.contains(");")) currentTable = null;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[Flyway] Không đọc được định nghĩa DEFAULT trong file migration: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * Tách biểu thức DEFAULT khỏi phần còn lại của dòng, xử lý ngoặc lồng nhau.
+     *
+     * <p>VD: {@code "NOW()," → "NOW()"}, {@code "0," → "0"}, {@code "'ADULT'," → "'ADULT'"}.
+     */
+    private static String extractDefaultExpression(String rest) {
+        int depth = 0;
+        boolean inSingleQuote = false;
+        for (int i = 0; i < rest.length(); i++) {
+            char c = rest.charAt(i);
+            if (c == '\'') inSingleQuote = !inSingleQuote;
+            if (inSingleQuote) continue;
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                return rest.substring(0, i).trim();
+            }
+        }
+        return rest.trim().isEmpty() ? null : rest.trim();
+    }
+
+    /**
+     * Gỡ các CHECK constraint mà Hibernate tự sinh cho cột kiểu enum.
+     *
+     * <p>─── Vì sao cần? ───
+     * Hibernate 6 (dùng ở đây) luôn sinh CHECK constraint cho cột map bằng enum, ví dụ
+     * {@code reward_settings.code}:
+     * {@code CHECK (code IN ('QUIZ_QUESTION','REAL_WORLD_EXPERIENCE'))}.
+     *
+     * <p>Các migration giai đoạn trung gian (V17/V18) lại {@code INSERT} các mã reward đã bị
+     * gỡ khỏi enum hiện tại (VD: {@code 'TOUR_TASK'}). Trên DB cũ, bảng do Flyway V7 tạo
+     * (không có constraint) nên chạy được; nhưng trên DB TẠO MỚI, Hibernate tạo bảng trước
+     * (kèm constraint) ⇒ migration V17 VI PHẠM constraint ⇒ Flyway fail ⇒ ứng dụng không
+     * khởi động được.
+     *
+     * <p>Không thể tắt bằng annotation (`@Enumerated` / `@JdbcTypeCode` / `columnDefinition`
+     * đều không có tác dụng với Hibernate 6). Giải pháp duy nhất mà không phá checksum
+     * migration là gỡ constraint trước khi chạy các migration còn lại.
+     *
+     * <p>Danh sách cột enum lấy từ Hibernate Metamodel ⇒ chính xác, không đoán theo tên.
+     * Tên constraint do Hibernate sinh theo mẫu {@code <table>_<column>_check}.
+     */
+    private static void dropHibernateEnumCheckConstraints(DataSource dataSource,
+                                                          EntityManagerFactory entityManagerFactory) {
+        List<String> enumColumns = collectHibernateEnumColumns(entityManagerFactory);
+        if (enumColumns.isEmpty()) return;
+
+        for (String qualified : enumColumns) {
+            String[] parts = qualified.split("\\.", 2);
+            String table = parts[0];
+            String column = parts[1];
+            // Hibernate đặt tên CHECK constraint theo mẫu <table>_<column>_check.
+            String constraint = table + "_" + column + "_check";
+            String sql = "ALTER TABLE public." + quoteIdentifier(table)
+                    + " DROP CONSTRAINT IF EXISTS " + quoteIdentifier(constraint);
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.execute();
+                log.info("[Flyway] Đã gỡ CHECK constraint enum do Hibernate sinh: {}", constraint);
+            } catch (SQLException e) {
+                log.warn("[Flyway] Không gỡ được CHECK constraint {}: {}", constraint, e.getMessage());
+            }
+        }
+    }
+
+    /** Quét Metamodel, tìm các thuộc tính map bằng enum ⇒ trả về "table.column" tương ứng. */
+    private static List<String> collectHibernateEnumColumns(EntityManagerFactory emf) {
+        List<String> result = new ArrayList<>();
+        try {
+            for (EntityType<?> entityType : emf.getMetamodel().getEntities()) {
+                jakarta.persistence.Table tableAnnotation =
+                        entityType.getJavaType().getAnnotation(jakarta.persistence.Table.class);
+                if (tableAnnotation == null || tableAnnotation.name().isBlank()) continue;
+                String table = tableAnnotation.name();
+
+                for (Attribute<?, ?> attribute : entityType.getAttributes()) {
+                    if (!(attribute instanceof SingularAttribute<?, ?> singular)) continue;
+                    if (singular.isAssociation()) continue;
+                    if (!singular.getJavaType().isEnum()) continue;
+
+                    if (!(singular.getJavaMember() instanceof java.lang.reflect.Field field)) continue;
+                    jakarta.persistence.Column columnAnnotation =
+                            field.getAnnotation(jakarta.persistence.Column.class);
+                    if (columnAnnotation == null || columnAnnotation.name().isBlank()) continue;
+
+                    result.add(table + "." + columnAnnotation.name());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[Flyway] Không quét được Metamodel để tìm cột enum: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    /** Bọc identifier trong dấu nháy kép để tránh lỗi với tên bảng/cột viết hoa hoặc chứa ký tự đặc biệt. */
+    private static String quoteIdentifier(String name) {
+        return "\"" + name.replace("\"", "\"\"") + "\"";
     }
 
     /**
@@ -110,6 +339,105 @@ public class FlywayConfig {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Không dọn được lịch sử Flyway của migration nhiệm vụ tour", e);
+        }
+    }
+
+    /**
+     * Dọn dòng lịch sử V41 bị fail (success = FALSE) trên DB production trước đó do cột
+     * {@code badges.created_at} thiếu DEFAULT, để Flyway có thể chạy lại V41 sạch sẽ.
+     * Không đụng vào bất kỳ bản ghi nào đã thành công (success = TRUE).
+     */
+    private static void cleanupFailedAchievementMigration(DataSource dataSource) {
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement check = conn.prepareStatement("SELECT to_regclass('flyway_schema_history') IS NOT NULL");
+                 ResultSet rs = check.executeQuery()) {
+                if (!rs.next() || !rs.getBoolean(1)) return;
+            }
+            try (PreparedStatement ps = conn.prepareStatement("""
+                    DELETE FROM flyway_schema_history
+                    WHERE version = '41'
+                      AND description = 'achievement system'
+                      AND success = FALSE
+                    """)) {
+                int removed = ps.executeUpdate();
+                if (removed > 0) {
+                    log.warn("[Flyway] Đã xóa {} dòng lịch sử lỗi của V41 (achievement system) để chạy lại migration.", removed);
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không dọn được lịch sử Flyway lỗi của V41", e);
+        }
+    }
+
+    /**
+     * Dọn lịch sử Flyway của các migration đã bị ĐỔI SỐ PHIÊN BẢN trên các nhánh feature.
+     *
+     * <p>─── Vì sao cần? ───
+     * <p>Trước đây các nhánh feature (settlement batch, payment expiry) tạo migration với số
+     * version tạm (V41 = settlement batch scope, V42 = payment expiry index). Sau khi merge vào
+     * {@code main}, số version bị đánh lại cho khớp với các migration đã có trên main:
+     * <pre>
+     *   DB cũ (đã chạy)          →  Mã nguồn hiện tại (main)
+     *   V41 settlement batch scope → V43 settlement batch scope
+     *   V42 payment expiry index   → V44 payment expiry index
+     *   V41 achievement system     → V41 achievement system   (mới)
+     *   V42 guest type pricing     → V42 guest type pricing   (mới)
+     * </pre>
+     * ⇒ Flyway validate fail: "Migration checksum mismatch for migration version 41 / 42"
+     * ⇒ {@code flywayInitializer} chết ⇒ {@code entityManagerFactory} không tạo được ⇒
+     * ứng dụng không khởi động được ("Unable to start embedded Tomcat").
+     *
+     * <p>Cách xử lý: xoá đúng các dòng lịch sử CŨ (khớp cả version lẫn description), để
+     * Flyway chạy lại các migration tương ứng với số version MỚI. Các migration này đều
+     * idempotent (IF NOT EXISTS / DO $$ ... IF NOT EXISTS) nên chạy lại trên DB đã có bảng vẫn an toàn.
+     *
+     * <p>DB chưa từng chạy bản cũ: không làm gì.
+     */
+    private static void forgetStaleRenumberedFeatureMigrations(DataSource dataSource) {
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement check = conn.prepareStatement("SELECT to_regclass('flyway_schema_history') IS NOT NULL");
+                 ResultSet rs = check.executeQuery()) {
+                if (!rs.next() || !rs.getBoolean(1)) return;
+            }
+            try (PreparedStatement ps = conn.prepareStatement("""
+                    DELETE FROM flyway_schema_history
+                    WHERE (version = '41' AND description = 'settlement batch scope')
+                       OR (version = '42' AND description = 'payment expiry index')
+                    """)) {
+                int removed = ps.executeUpdate();
+                if (removed > 0) {
+                    log.warn("[Flyway] Đã xóa {} dòng lịch sử của migration đã đổi số phiên bản "
+                            + "(V41 settlement batch scope → V43, V42 payment expiry index → V44); "
+                            + "chúng sẽ được chạy lại với số mới.", removed);
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không dọn được lịch sử Flyway của migration đã đổi số phiên bản", e);
+        }
+    }
+
+    /**
+     * DB trống: Hibernate tạo {@code guest_type_configs} theo entity hiện tại — không còn cột
+     * {@code always_free} (V42 đã bỏ). Nhưng V34 vẫn INSERT vào cột đó và không được sửa (lệch checksum)
+     * ⇒ thêm tạm cột khi V34 chưa chạy; V42 sẽ xoá lại.
+     */
+    private static void restoreLegacyGuestTypeColumn(DataSource dataSource) {
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement check = conn.prepareStatement("""
+                    SELECT to_regclass('guest_type_configs') IS NOT NULL
+                       AND (to_regclass('flyway_schema_history') IS NULL
+                            OR NOT EXISTS (SELECT 1 FROM flyway_schema_history
+                                           WHERE version = '34' AND success = TRUE))
+                    """);
+                 ResultSet rs = check.executeQuery()) {
+                if (!rs.next() || !rs.getBoolean(1)) return;
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "ALTER TABLE guest_type_configs ADD COLUMN IF NOT EXISTS always_free BOOLEAN NOT NULL DEFAULT FALSE")) {
+                ps.execute();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không chuẩn bị được bảng guest_type_configs cho V34", e);
         }
     }
 

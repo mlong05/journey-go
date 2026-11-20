@@ -1,25 +1,15 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- ảnh Wikimedia Commons (đã ghi nguồn ở cuối trang) */
 
-import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight, BookOpenText, Building2, CheckCircle2, ChevronDown, FileSpreadsheet, FileText, LayoutDashboard,
-  LogIn, QrCode, ShieldCheck, Store, Wallet, Clock, Footprints, Info,
+  LogIn, QrCode, Store, Wallet, Info,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
-import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
-import { durationLabel } from "../utils";
-
-const SECTIONS = [
-  ["doi-tuong", "Ai có thể tham gia"],
-  ["quyen-loi", "Quyền lợi"],
-  ["quy-trinh", "Quy trình"],
-  ["hoi-dap", "Hỏi đáp"],
-];
 
 const TRUST = ["Miễn phí đăng ký", "Xét duyệt trong 1–3 ngày làm việc", "Không ràng buộc doanh thu"];
 
@@ -114,37 +104,6 @@ function SectionHead({ eyebrow, title, description, children }) {
   );
 }
 
-/** Thẻ tour thật đang bán (lấy từ API) — thay cho thẻ minh hoạ cố định trước đây. */
-function LiveTourCard() {
-  const [info, setInfo] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    touristService.publishedTours({ size: 60 }).then(async ({ items }) => {
-      const pick = [...items].filter((t) => t.coverImageUrl)
-        .sort((a, b) => (b.stopCount || 0) - (a.stopCount || 0) || b.tourId - a.tourId)[0];
-      if (!pick) return;
-      const detail = await touristService.tourDetail(pick.tourId).catch(() => null);
-      const quiz = (detail?.stops || []).reduce((s, x) => s + (x.quizCount || 0), 0);
-      if (alive) setInfo({ tour: pick, quiz, total: items.length });
-    }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
-  if (!info) return null;
-  const { tour, quiz } = info;
-  return (
-    <Link href={ROUTES.TOUR_DETAIL(tour.tourId)}
-      className="absolute -left-2 bottom-6 z-10 w-64 rounded-2xl bg-white p-4 text-slate-900 shadow-[0_18px_40px_rgba(0,0,0,0.28)] hover:ring-2 hover:ring-orange-300 sm:-left-6">
-      <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700"><ShieldCheck size={12} />Đã duyệt · Đang mở bán</span>
-      <span className="mt-2 block text-sm font-bold leading-snug">{tour.title}</span>
-      <span className="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs text-slate-500">
-        <span className="inline-flex items-center gap-1"><Footprints size={12} />{tour.stopCount} điểm dừng</span>
-        {quiz > 0 && <span className="inline-flex items-center gap-1"><QrCode size={12} />{quiz} câu quiz</span>}
-        <span className="inline-flex items-center gap-1"><Clock size={12} />{durationLabel(tour)}</span>
-      </span>
-    </Link>
-  );
-}
-
 function Hero() {
   const cta = useCta();
   return (
@@ -185,26 +144,9 @@ function Hero() {
               <Image src="/image/hoian-lanterns.jpg" alt="Đèn lồng phố cổ Hội An" fill sizes="(min-width: 1024px) 18vw, 40vw" className="object-cover" />
             </div>
           </div>
-          <LiveTourCard />
         </div>
       </div>
     </section>
-  );
-}
-
-/** Thanh mục dính ngay dưới header (header cao 64px). */
-function SectionNav() {
-  return (
-    <nav aria-label="Mục trong trang" className="sticky top-16 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-2 sm:px-6">
-        <div className="flex min-w-0 flex-wrap gap-1">
-          {SECTIONS.map(([id, label]) => (
-            <a key={id} href={`#${id}`} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-teal-50 hover:text-teal-800">{label}</a>
-          ))}
-        </div>
-        <span className="ml-auto hidden md:block"><CtaButton size="sm" /></span>
-      </div>
-    </nav>
   );
 }
 
@@ -346,7 +288,6 @@ export default function PartnerProgramScreen() {
   return (
     <TouristShell>
       <Hero />
-      <SectionNav />
       <PartnerTypes />
       <Benefits />
       <Process />

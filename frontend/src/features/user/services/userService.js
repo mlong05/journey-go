@@ -14,6 +14,7 @@
  * Tất cả endpoint yêu cầu Bearer token + role ADMIN.
  */
 import { apiClient } from "@/services/apiClient";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 const ENDPOINTS = {
   ROOT: "/users",
@@ -57,7 +58,7 @@ function normalizePage(pageData, fallbackItems = []) {
       size:
         typeof pageData.size === "number"
           ? pageData.size
-          : pageData.pageable?.pageSize ?? 20,
+          : pageData.pageable?.pageSize ?? PAGE_SIZE,
       totalElements: pageData.totalElements ?? 0,
       totalPages: pageData.totalPages ?? 0,
       first: pageData.first ?? false,
