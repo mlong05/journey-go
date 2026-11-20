@@ -16,7 +16,7 @@ import { subscribeRealtime } from "@/services/realtimeService";
  */
 const NotificationContext = createContext(null);
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 const MAX_TOASTS = 3;
 
 export function NotificationProvider({ children }) {

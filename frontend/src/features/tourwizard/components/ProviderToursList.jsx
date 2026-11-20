@@ -4,10 +4,12 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Layers, Pencil, Clock, Store, Loader2, Eye, Trash2, MapPin, ImageOff,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileSpreadsheet,
+  FileSpreadsheet,
 } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import PaginationBar from "@/components/ui/PaginationBar";
+import { PAGE_SIZE } from "@/lib/pagination";
 import { providerTourService } from "../services/providerTourService";
 import TourImportDialog from "./TourImportDialog";
 import { TOUR_STATUS, TOUR_STATUS_ORDER, CONTENT_EDITABLE } from "../constants";
@@ -18,24 +20,6 @@ const fmt = (iso) => (iso ? formatDateTimeVN(iso) || "—" : "—");
 
 /** Cột bảng: STT | Tour | Trạng thái | Cập nhật | Thao tác (mobile: STT | Tour, thao tác xuống dòng). */
 const ROW_GRID = "grid items-center gap-x-4 gap-y-2 grid-cols-[32px_minmax(0,1fr)] md:grid-cols-[40px_minmax(0,1fr)_130px_150px_88px]";
-const PAGE_SIZES = [4, 8, 12, 20];
-
-/** Dãy số trang gọn: 1 … 4 5 6 … 12 */
-function pageNumbers(current, total) {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const pages = new Set([1, total, current - 1, current, current + 1]);
-  const list = [...pages].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
-  return list.flatMap((n, i) => (i > 0 && n - list[i - 1] > 1 ? ["…", n] : [n]));
-}
-
-function PageBtn({ children, onClick, disabled, active, label }) {
-  return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} aria-current={active ? "page" : undefined}
-      className={`min-w-7 h-7 px-1.5 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${active ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
-      {children}
-    </button>
-  );
-}
 
 /** Trang Quản lý tour của Đối tác (luồng 5 bước). */
 export default function ProviderToursList() {
@@ -49,7 +33,6 @@ export default function ProviderToursList() {
   const [importOpen, setImportOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]); // mặc định 4 tour / trang
   const { confirm, confirmDialog } = useConfirm();
 
   /** Tải danh sách (setState chỉ sau await). */
@@ -80,9 +63,9 @@ export default function ProviderToursList() {
     return c;
   }, [tours]);
   const visible = filter === "all" ? tours : tours.filter((t) => t.status === filter);
-  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages); // xóa bớt tour ở trang cuối → lùi về trang hợp lệ
-  const paged = visible.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const paged = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const act = async (tour, fn, message) => {
     setBusyId(tour.tourId);
@@ -197,7 +180,7 @@ export default function ProviderToursList() {
               const open = () => router.push(`/provider/tours/${t.tourId}/edit`);
               return (
                 <li key={t.tourId} className={`${ROW_GRID} px-4 py-2 hover:bg-slate-50/60 transition-colors`}>
-                  <span className="text-xs font-bold text-slate-400 tabular-nums">{(safePage - 1) * pageSize + i + 1}</span>
+                  <span className="text-xs font-bold text-slate-400 tabular-nums">{(safePage - 1) * PAGE_SIZE + i + 1}</span>
 
                   <button type="button" onClick={open} className="flex items-center gap-3 min-w-0 text-left cursor-pointer">
                     <div className="w-14 h-10 rounded-lg overflow-hidden bg-slate-100 shrink-0 flex items-center justify-center">
@@ -251,26 +234,14 @@ export default function ProviderToursList() {
 
         {/* Phân trang */}
         {!loading && !error && visible.length > 0 && (
-          <div className="shrink-0 px-4 py-2.5 border-t border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2 text-slate-500">
-              <span>Số dòng/trang:</span>
-              <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-                className="px-2 py-1 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 cursor-pointer focus:outline-none">
-                {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-              <span className="font-semibold">Trang {safePage}/{totalPages} · {visible.length} tour</span>
-            </div>
-            <nav className="flex items-center gap-1" aria-label="Phân trang">
-              <PageBtn disabled={safePage === 1} onClick={() => setPage(1)} label="Trang đầu"><ChevronsLeft size={14} /></PageBtn>
-              <PageBtn disabled={safePage === 1} onClick={() => setPage(safePage - 1)} label="Trang trước"><ChevronLeft size={14} /></PageBtn>
-              {pageNumbers(safePage, totalPages).map((n, idx) => (n === "…" ? (
-                <span key={`gap${idx}`} className="w-7 text-center text-slate-400">…</span>
-              ) : (
-                <PageBtn key={n} active={n === safePage} onClick={() => setPage(n)} label={`Trang ${n}`}>{n}</PageBtn>
-              )))}
-              <PageBtn disabled={safePage === totalPages} onClick={() => setPage(safePage + 1)} label="Trang sau"><ChevronRight size={14} /></PageBtn>
-              <PageBtn disabled={safePage === totalPages} onClick={() => setPage(totalPages)} label="Trang cuối"><ChevronsRight size={14} /></PageBtn>
-            </nav>
+          <div className="shrink-0 border-t border-slate-100">
+            <PaginationBar
+              page={safePage - 1}
+              totalPages={totalPages}
+              totalElements={visible.length}
+              unit="tour"
+              onChange={(p) => setPage(p + 1)}
+            />
           </div>
         )}
       </div>
