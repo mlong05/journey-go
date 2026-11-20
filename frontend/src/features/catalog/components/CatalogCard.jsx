@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import PaginationBar from "@/components/ui/PaginationBar";
 import CoverImageField from "@/features/destination/components/CoverImageField";
 import { LimitedField } from "@/components/ui/LimitedField";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 /** Bộ màu cố định (Tailwind cần class tĩnh). */
 const ACCENTS = {
@@ -41,7 +42,6 @@ export default function CatalogCard({
   const [photo, setPhoto] = useState(null); // { id, name, imageUrl, imageCredit } — đang sửa ảnh đại diện
   const [error, setError] = useState("");
   const [page, setPage] = useState(0); // 0-based
-  const [pageSize, setPageSize] = useState(10);
   const inputRef = useRef(null);
   const { confirm, confirmDialog } = useConfirm();
 
@@ -110,9 +110,9 @@ export default function CatalogCard({
   };
 
   const rows = tab === "active" ? items : deleted;
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1); // xóa bớt dòng ở trang cuối → tự lùi trang
-  const pageRows = rows.slice(safePage * pageSize, safePage * pageSize + pageSize);
+  const pageRows = rows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
   const editingId = editing?.id ?? null;
   const switchTab = (next) => { setTab(next); setPage(0); setEditing(null); setPhoto(null); };
   const openPhoto = (item) => setPhoto(photo?.id === item.id ? null : {
@@ -167,7 +167,7 @@ export default function CatalogCard({
           {pageRows.map((item, idx) => (
             <li key={item.id} className={item.deleted ? "bg-rose-50/30" : "bg-white"}>
             <div className={`px-4 py-3 flex items-center gap-3 transition-colors ${item.deleted ? "" : "hover:bg-slate-50/70"}`}>
-              <span className="w-7 shrink-0 text-xs font-bold text-slate-400 tabular-nums">{safePage * pageSize + idx + 1}</span>
+              <span className="w-7 shrink-0 text-xs font-bold text-slate-400 tabular-nums">{safePage * PAGE_SIZE + idx + 1}</span>
               {/* Ảnh đại diện (hiện trên trang chủ app); bấm để đổi */}
               <button type="button" disabled={item.deleted} onClick={() => openPhoto(item)}
                 title={item.imageUrl ? "Đổi ảnh đại diện" : "Thêm ảnh đại diện"}
@@ -239,8 +239,7 @@ export default function CatalogCard({
         </ul>
         <div className="shrink-0">
           <PaginationBar page={safePage} totalPages={totalPages} totalElements={rows.length} unit={noun}
-          onChange={setPage} pageSize={pageSize} sizeOptions={[5, 10, 20, 50]}
-          onSizeChange={(size) => { setPageSize(size); setPage(0); }} />
+          onChange={setPage} />
         </div>
         </div>
       )}

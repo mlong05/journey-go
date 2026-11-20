@@ -3,19 +3,23 @@
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 /**
- * Thanh phân trang dùng chung — có số trang + nút nhảy trang đầu/cuối.
+ * Thanh phân trang dùng chung cho TOÀN BỘ web.
  *
- * Giao diện bám sát trang "Quản lý người dùng" (`UsersClient.jsx`):
+ * Thiết kế chuẩn (giống trang "Quản lý người dùng"):
  *   ‹‹ (trang đầu) › (trang trước) [1] [2] … [N] › (trang sau) ›› (trang cuối)
  *
- * @param {number}   page         trang hiện tại (0-based)
- * @param {number}   totalPages   tổng số trang
- * @param {number}   totalElements tổng số bản ghi
- * @param {string}   unit         tên đơn vị tiếng Việt (vd. "giao dịch")
- * @param {Function} onChange     nhận trang mới (0-based)
- * @param {number}   [pageSize]   số dòng/trang hiện tại — có cùng onSizeChange thì hiện ô "Số dòng/trang"
- * @param {number[]} [sizeOptions] các lựa chọn số dòng/trang
- * @param {Function} [onSizeChange] nhận số dòng/trang mới
+ * Quy ước bắt buộc:
+ *   • Mỗi trang luôn hiển thị **10 dòng** — không có ô chọn số dòng/trang.
+ *     Xem `PAGE_SIZE` trong `@/lib/pagination`.
+ *   • Bên trái: "Đang xem trang X / Y (Tổng N <đơn vị>)".
+ *   • Bên phải: nút nhảy trang đầu/cuối + số trang.
+ *
+ * @param {number}   page           trang hiện tại (0-based)
+ * @param {number}   totalPages     tổng số trang
+ * @param {number}   totalElements  tổng số bản ghi
+ * @param {string}   unit           tên đơn vị tiếng Việt (vd. "giao dịch")
+ * @param {Function} onChange       nhận trang mới (0-based)
+ * @param {string}  [className]    class bổ sung cho thẻ bọc ngoài
  */
 export default function PaginationBar({
   page,
@@ -23,9 +27,7 @@ export default function PaginationBar({
   totalElements,
   unit = "bản ghi",
   onChange,
-  pageSize,
-  sizeOptions = [5, 10, 20, 50],
-  onSizeChange,
+  className = "",
 }) {
   const total = Math.max(Number(totalPages) || 0, 1);
   const current = Math.min(Math.max((Number(page) || 0) + 1, 1), total);
@@ -55,35 +57,24 @@ export default function PaginationBar({
   const navBtn =
     "p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
   const pageBtn =
-    "min-w-[32px] h-7 px-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer";
+    "min-w-[32px] h-7 px-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer";
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-3 bg-slate-50/60 border-t border-slate-100">
-      {/* Bên trái: thông tin tổng số bản ghi (+ chọn số dòng/trang nếu có) */}
+    <div
+      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-3 bg-slate-50/60 border-t border-slate-100 ${className}`}
+    >
+      {/* Bên trái: thông tin tổng số bản ghi */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-        <span className="text-xs text-slate-600">
+        <span className="text-xs text-slate-600 font-semibold">
           Đang xem trang{" "}
-          <strong className="text-slate-900">{current}</strong> /{" "}
-          <strong className="text-slate-900">{total}</strong>{" "}
+          <strong className="font-bold text-slate-900">{current}</strong> /{" "}
+          <strong className="font-bold text-slate-900">{total}</strong>{" "}
           <span className="text-slate-400">
-            (Tổng <strong className="text-slate-700">{count.toLocaleString("vi-VN")}</strong>{" "}
+            (Tổng{" "}
+            <strong className="text-slate-700">{count.toLocaleString("vi-VN")}</strong>{" "}
             {unit})
           </span>
         </span>
-        {onSizeChange && pageSize != null && (
-          <label className="flex items-center gap-1.5">
-            <span className="text-[11px] text-slate-600 font-bold">Số dòng/trang:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => onSizeChange(Number(e.target.value))}
-              className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/20 cursor-pointer"
-            >
-              {sizeOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </label>
-        )}
       </div>
 
       {/* Bên phải: nút điều hướng + số trang */}
@@ -113,7 +104,7 @@ export default function PaginationBar({
           p === "..." ? (
             <span
               key={`dots-${idx}`}
-              className="px-2 text-xs text-slate-400 font-semibold select-none"
+              className="px-2 text-xs text-slate-400 font-bold select-none"
             >
               …
             </span>
