@@ -17,16 +17,23 @@ function DonutChart({ segments, total }) {
   // ⚠️ Các cung PHẢI phân vỡ toàn bộ "Tổng" ⇒ tổng giá trị cung = total. Nếu vượt quá
   // (VD: cộng thêm "mới tham gia" vào "đang hoạt động" trong khi mới tham gia vốn đã nằm
   // trong đang hoạt động) thì vòng cung vẽ vượt 100% ⇒ SVG vỡ hình.
+  // ⚠️ React Compiler (eslint react-hooks/immutability) cấm GÁN LẠI biến sau khi render
+  // xong ⇒ tính offset bằng TỔNG LŨY KẾ (cộng dồn các dash trước đó) thay vì `cursor +=`.
   const arcs = React.useMemo(() => {
     const sum = segments.reduce((acc, s) => acc + Math.max(0, Number(s.value) || 0), 0);
     const scale = sum > total && total > 0 ? total / sum : 1;
-    let cursor = 0;
-    return segments.map((segment) => {
+
+    // Độ dài vòng cung (theo chu kỳ) của từng cung.
+    const dashes = segments.map((segment) => {
       const value = Math.max(0, Number(segment.value) || 0) * scale;
-      const dash = (value / safeTotal) * circumference;
-      const arc = { ...segment, dash: Math.max(0, dash - 2), offset: cursor };
-      cursor += dash;
-      return arc;
+      return (value / safeTotal) * circumference;
+    });
+
+    return segments.map((segment, index) => {
+      const dash = dashes[index];
+      // Offset = tổng độ dài các cung phía trước (cộng dồn thuần túy, không mutate).
+      const offset = dashes.slice(0, index).reduce((a, b) => a + b, 0);
+      return { ...segment, dash: Math.max(0, dash - 2), offset };
     });
   }, [segments, safeTotal, circumference, total]);
 
