@@ -62,6 +62,7 @@ public class FlywayConfig {
     @Bean
     public FlywayMigrationStrategy twoPhaseFlywayMigrationStrategy() {
         return flyway -> {
+            flyway.repair();
             DataSource dataSource = flyway.getConfiguration().getDataSource();
             forgetRenumberedTourTaskMigrations(dataSource);
             cleanupFailedAchievementMigration(dataSource);
