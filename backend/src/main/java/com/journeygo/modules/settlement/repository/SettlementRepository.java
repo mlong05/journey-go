@@ -71,7 +71,29 @@ public interface SettlementRepository extends JpaRepository<Settlement, Long> {
     List<Settlement> findByScopeAndRevenuePeriod(SettlementScope scope, String revenuePeriod);
 
     /**
-     * Tổng hợp số tiền theo kỳ doanh thu cho các đợt đã duyệt.
+     * Các đợt tất toán ĐÃ DUYỆT mà đối tác này có khoản doanh thu bên trong.
+     *
+     * <p>Bao gồm cả hai loại phạm vi:
+     * <ul>
+     *   <li>{@code PROVIDER} — đợt của riêng đối tác ({@code settlement.provider_profile_id}).</li>
+     *   <li>{@code BATCH} — đợt TỔNG cả sàn, đối tác có mặt qua {@code settlement_details}.</li>
+     * </ul>
+     *
+     * <p>Chỉ lấy đợt {@code APPROVED} — đó là lúc tiền thực sự về ví đối tác.
+     */
+    @Query("""
+            SELECT s FROM Settlement s
+            WHERE s.status = com.journeygo.modules.settlement.entity.enums.SettlementStatus.APPROVED
+              AND (s.providerProfile.id = :providerProfileId
+                   OR EXISTS (SELECT 1 FROM SettlementDetail d
+                              WHERE d.settlement.id = s.id
+                                AND d.providerProfile.id = :providerProfileId))
+            """)
+    Page<Settlement> findApprovedByProviderProfile(@Param("providerProfileId") Long providerProfileId,
+                                                   Pageable pageable);
+
+    /**
+     * Tổng hợp số liệu theo kỳ doanh thu cho các đợt đã duyệt.
      *
      * <p>Gom theo {@code revenuePeriod} để dựng bảng "Doanh thu nền tảng" theo tháng.
      * Chỉ lấy {@code APPROVED} — đó là lúc tiền thực sự được ghi vào ví đối tác.
