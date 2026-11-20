@@ -44,11 +44,9 @@ import {
   PARTNER_PROFILE_GROUPS,
 } from "@/features/partnerprofileupdate/services/partnerProfileUpdateService";
 import { formatDateTimeVN } from "@/lib/money";
+import { PAGE_SIZE } from "@/lib/pagination";
 
-const PAGE_SIZE = 10;
-
-const STATUS_TABS = [
-  { id: "ALL", label: "Tất cả" },
+const STATUS_TABS = [  { id: "ALL", label: "Tất cả" },
   { id: "PENDING", label: "Chờ duyệt" },
   { id: "APPROVED", label: "Đã duyệt" },
   { id: "REJECTED", label: "Bị từ chối" },

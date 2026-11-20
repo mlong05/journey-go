@@ -22,6 +22,7 @@ import {
   updateRefundReasonCode,
 } from "@/features/refund/services/refundReasonConfigService";
 import { LimitedField, limitCounterClass } from "@/components/ui/LimitedField";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 /* =========================================================================
    HẰNG SỐ
@@ -60,8 +61,7 @@ const GROUP_STYLES = {
   },
 };
 
-/** Số lý do chi tiết hiển thị trên mỗi trang (cố định). */
-const PAGE_SIZE = 10;
+/** Số lý do chi tiết hiển thị trên mỗi trang (cố định 10). */
 
 function formatRate(rate) {
   if (rate === null || rate === undefined) return "—";
