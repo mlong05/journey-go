@@ -16,6 +16,61 @@ import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout"
 import { NotificationProvider } from "@/context/NotificationContext";
 import NotificationToaster from "@/components/notifications/NotificationToaster";
 
+/**
+ * Danh mục điều hướng Sidebar của Đối tác — nhóm theo luồng nghiệp vụ.
+ * Định nghĩa ngoài component để tránh re-create mỗi render (đồng nhất với admin).
+ */
+const PROVIDER_NAV_ITEMS = [
+  {
+    id: "overview",
+    label: "Tổng quan",
+    href: "/provider",
+    icon: LayoutDashboard,
+    group: "Vận hành",
+    badge: null,
+  },
+  {
+    id: "tours",
+    label: "Quản lý Tour Du Lịch",
+    href: "/provider/tours",
+    icon: Route,
+    group: "Vận hành",
+    badge: null,
+  },
+  {
+    id: "bookings",
+    label: "Khách hàng đã đặt tour",
+    href: "/provider/bookings",
+    icon: Users,
+    group: "Vận hành",
+    badge: null,
+  },
+  {
+    id: "support",
+    label: "Hỗ trợ khách hàng",
+    href: "/provider/support",
+    icon: Headphones,
+    group: "Vận hành",
+    badge: null,
+  },
+  {
+    id: "finance",
+    label: "Tài chính & Doanh thu",
+    href: "/provider/finance",
+    icon: Wallet,
+    group: "Tài chính",
+    badge: null,
+  },
+  {
+    id: "partner-info",
+    label: "Thông tin đối tác",
+    href: "/provider/partner-info",
+    icon: UserCog,
+    group: "Hồ sơ đối tác",
+    badge: null,
+  },
+];
+
 
 export default function ProviderLayout({ children }) {
   const pathname = usePathname();
@@ -53,55 +108,8 @@ export default function ProviderLayout({ children }) {
     pathname?.startsWith("/provider/partner-info") ||
     pathname?.startsWith("/provider/finance");
 
-  // Danh mục điều hướng Sidebar của Đối tác — nhóm theo luồng nghiệp vụ
-  const navMenuItems = [
-    {
-      id: "overview",
-      label: "Tổng quan",
-      href: "/provider",
-      icon: LayoutDashboard,
-      group: "Vận hành",
-    },
-    {
-      id: "tours",
-      label: "Quản lý Tour Du Lịch",
-      href: "/provider/tours",
-      icon: Route,
-      group: "Vận hành",
-    },
-    {
-      id: "bookings",
-      label: "Khách hàng đã đặt tour",
-      href: "/provider/bookings",
-      icon: Users,
-      group: "Vận hành",
-    },
-    {
-      id: "support",
-      label: "Hỗ trợ khách hàng",
-      href: "/provider/support",
-      icon: Headphones,
-      group: "Vận hành",
-    },
-    {
-      id: "finance",
-      label: "Tài chính & Doanh thu",
-      href: "/provider/finance",
-      icon: Wallet,
-      group: "Tài chính",
-    },
-    {
-      id: "partner-info",
-      label: "Thông tin đối tác",
-      href: "/provider/partner-info",
-      icon: UserCog,
-      group: "Hồ sơ đối tác",
-    },
-  ];
-
-
   const currentTitle =
-    [...navMenuItems]
+    [...PROVIDER_NAV_ITEMS]
       .sort((a, b) => b.href.length - a.href.length)
       .find((i) => {
         const p = i.href.split("#")[0];
@@ -113,7 +121,7 @@ export default function ProviderLayout({ children }) {
       <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 font-sans antialiased text-slate-800">
         <Sidebar
           role="provider"
-          navItems={navMenuItems}
+          navItems={PROVIDER_NAV_ITEMS}
           onLogout={performLogout}
           isOpenMobile={isSidebarOpen}
           onCloseMobile={() => setIsSidebarOpen(false)}
@@ -136,8 +144,8 @@ export default function ProviderLayout({ children }) {
           <main
             className={
               isScrollLockedPage
-                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col px-4 sm:px-6 lg:px-8 pt-4 lg:pt-5 pb-4 sm:pb-6"
-                : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
+                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-3 sm:p-4 lg:p-5 bg-slate-50"
+                : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-5 bg-slate-50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
             }
           >
             {/* key theo đường dẫn: mỗi lần chuyển trang chạy lại hiệu ứng hiện dần */}

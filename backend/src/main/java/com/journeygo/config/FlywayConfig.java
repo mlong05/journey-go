@@ -65,6 +65,7 @@ public class FlywayConfig {
             DataSource dataSource = flyway.getConfiguration().getDataSource();
             forgetRenumberedTourTaskMigrations(dataSource);
             cleanupFailedAchievementMigration(dataSource);
+            forgetStaleRenumberedFeatureMigrations(dataSource);
             if (hibernateTablesExist(dataSource)) {
                 syncMissingColumnDefaults(dataSource);
                 flyway.migrate();
@@ -365,6 +366,53 @@ public class FlywayConfig {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Không dọn được lịch sử Flyway lỗi của V41", e);
+        }
+    }
+
+    /**
+     * Dọn lịch sử Flyway của các migration đã bị ĐỔI SỐ PHIÊN BẢN trên các nhánh feature.
+     *
+     * <p>─── Vì sao cần? ───
+     * <p>Trước đây các nhánh feature (settlement batch, payment expiry) tạo migration với số
+     * version tạm (V41 = settlement batch scope, V42 = payment expiry index). Sau khi merge vào
+     * {@code main}, số version bị đánh lại cho khớp với các migration đã có trên main:
+     * <pre>
+     *   DB cũ (đã chạy)          →  Mã nguồn hiện tại (main)
+     *   V41 settlement batch scope → V43 settlement batch scope
+     *   V42 payment expiry index   → V44 payment expiry index
+     *   V41 achievement system     → V41 achievement system   (mới)
+     *   V42 guest type pricing     → V42 guest type pricing   (mới)
+     * </pre>
+     * ⇒ Flyway validate fail: "Migration checksum mismatch for migration version 41 / 42"
+     * ⇒ {@code flywayInitializer} chết ⇒ {@code entityManagerFactory} không tạo được ⇒
+     * ứng dụng không khởi động được ("Unable to start embedded Tomcat").
+     *
+     * <p>Cách xử lý: xoá đúng các dòng lịch sử CŨ (khớp cả version lẫn description), để
+     * Flyway chạy lại các migration tương ứng với số version MỚI. Các migration này đều
+     * idempotent (IF NOT EXISTS / DO $$ ... IF NOT EXISTS) nên chạy lại trên DB đã có bảng vẫn an toàn.
+     *
+     * <p>DB chưa từng chạy bản cũ: không làm gì.
+     */
+    private static void forgetStaleRenumberedFeatureMigrations(DataSource dataSource) {
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement check = conn.prepareStatement("SELECT to_regclass('flyway_schema_history') IS NOT NULL");
+                 ResultSet rs = check.executeQuery()) {
+                if (!rs.next() || !rs.getBoolean(1)) return;
+            }
+            try (PreparedStatement ps = conn.prepareStatement("""
+                    DELETE FROM flyway_schema_history
+                    WHERE (version = '41' AND description = 'settlement batch scope')
+                       OR (version = '42' AND description = 'payment expiry index')
+                    """)) {
+                int removed = ps.executeUpdate();
+                if (removed > 0) {
+                    log.warn("[Flyway] Đã xóa {} dòng lịch sử của migration đã đổi số phiên bản "
+                            + "(V41 settlement batch scope → V43, V42 payment expiry index → V44); "
+                            + "chúng sẽ được chạy lại với số mới.", removed);
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không dọn được lịch sử Flyway của migration đã đổi số phiên bản", e);
         }
     }
 

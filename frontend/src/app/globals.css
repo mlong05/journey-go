@@ -67,6 +67,14 @@ html {
   font-family: 'Dancing Script', cursive, sans-serif;
 }
 
+/*
+ * Inter — dùng cho các màn hình quản trị dạng SaaS (Tổng quan vận hành).
+ * Biến --font-inter được nạp bởi next/font ở app/layout.js.
+ */
+.font-inter {
+  font-family: var(--font-inter), var(--font-geist-sans), system-ui, sans-serif;
+}
+
 .font-jakarta {
   font-family: 'Plus Jakarta Sans', var(--font-geist-sans), system-ui, sans-serif;
 }

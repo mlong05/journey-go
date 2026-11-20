@@ -14,6 +14,100 @@
 #     ⚠️ KHÔNG dùng `docker compose down -v` (sẽ XOÁ toàn bộ dữ liệu).
 # =====================================================================================
 
+# =====================================================================================
+#  Env DÙNG CHUNG cho `backend` và `backend-seed` (YAML anchor).
+#
+#  ⚠️ Vì sao cần anchor?
+#  `application-prod.yml` KHÔNG đặt giá trị mặc định cho các biến "fail-fast":
+#  mail, OAuth2 (Google), VNPay, JWT, datasource password…
+#  ⇒ Thiếu MỘT biến ⇒ ứng dụng fail lúc khởi động với lỗi kiểu:
+#     "Could not resolve placeholder 'SPRING_MAIL_USERNAME' in value "${SPRING_MAIL_USERNAME}""
+#
+#  Trước đây `backend-seed` khai báo MỘT danh sách env riêng ⇒ dễ sót biến
+#  (đã xảy ra: thiếu SPRING_MAIL_* ⇒ container seed không khởi động được).
+#  Giờ CẢ HAI service dùng chung khối `<<: *backend-env` ⇒ không còn khả năng lệch.
+# =====================================================================================
+x-backend-env: &backend-env
+  # ── Profile & logging ──────────────────────────────────────────────────────
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+  LOGGING_LEVEL: ${LOGGING_LEVEL:-INFO}
+  TZ: Asia/Ho_Chi_Minh
+  # ── Database (service name trong Docker network) ───────────────────────────
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-journeygo_db}
+  SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-journeygo}
+  SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD chưa được đặt trong .env}
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  SPRING_DATA_REDIS_HOST: redis
+  SPRING_DATA_REDIS_PORT: 6379
+  SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  # ── Secret ─────────────────────────────────────────────────────────────────
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET chưa được đặt trong .env}
+  JWT_ACCESS_EXPIRATION_MS: ${JWT_ACCESS_EXPIRATION_MS:-900000}
+  JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-604800000}
+  # ── Google OAuth2 ──────────────────────────────────────────────────────────
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  # ── Mail (Gmail App Password) ─────────────────────────────────────────────
+  SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
+  SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+  SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+  SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-JourneyGo Platform}
+  MAIL_OTP_EXPIRATION_MINUTES: ${MAIL_OTP_EXPIRATION_MINUTES:-10}
+  # ── Cloudinary (upload ảnh/video) ──────────────────────────────────────────
+  CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+  CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+  CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+  # ── CORS / OAuth2 redirect (domain public) ────────────────────────────────
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://journeygo.id.vn}
+  OAUTH2_DEFAULT_REDIRECT_URI: ${OAUTH2_DEFAULT_REDIRECT_URI:-https://journeygo.id.vn/oauth2/redirect}
+  OAUTH2_AUTHORIZED_REDIRECT_URIS: ${OAUTH2_AUTHORIZED_REDIRECT_URIS:-https://journeygo.id.vn/oauth2/redirect,journeygo://oauth2/redirect,journeygo://auth/callback}
+  WEBSOCKET_ALLOWED_ORIGINS: ${WEBSOCKET_ALLOWED_ORIGINS:-https://journeygo.id.vn}
+  PARTNER_WEB_LOGIN_URL: ${PARTNER_WEB_LOGIN_URL:-https://journeygo.id.vn/login}
+  PARTNER_ACTIVATION_URL: ${PARTNER_ACTIVATION_URL:-https://journeygo.id.vn/activate}
+  # ── VNPay Sandbox ──────────────────────────────────────────────────────────
+  VNPAY_ENABLED: ${VNPAY_ENABLED:-true}
+  VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+  VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+  VNPAY_VERSION: ${VNPAY_VERSION:-2.1.0}
+  VNPAY_PAYMENT_URL: ${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  VNPAY_MERCHANT_API_URL: ${VNPAY_MERCHANT_API_URL:-https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+  VNPAY_IPN_URL: ${VNPAY_IPN_URL:-}
+  VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-}
+  VNPAY_WEB_RETURN_URL: ${VNPAY_WEB_RETURN_URL:-}
+  VNPAY_APP_REDIRECT_ENABLED: ${VNPAY_APP_REDIRECT_ENABLED:-false}
+  VNPAY_APP_SCHEME: ${VNPAY_APP_SCHEME:-journeygo}
+  VNPAY_APP_RETURN_URL: ${VNPAY_APP_RETURN_URL:-journeygo://payment/return}
+  VNPAY_IP_ADDR: ${VNPAY_IP_ADDR:-127.0.0.1}
+  VNPAY_TIMEZONE: ${VNPAY_TIMEZONE:-Asia/Ho_Chi_Minh}
+  VNPAY_EXPIRY_MINUTES: ${VNPAY_EXPIRY_MINUTES:-10}
+  VNPAY_API_TIMEOUT_MS: ${VNPAY_API_TIMEOUT_MS:-15000}
+  VNPAY_VERIFY_SIGNATURE: ${VNPAY_VERIFY_SIGNATURE:-true}
+  VNPAY_LOCALE: ${VNPAY_LOCALE:-vn}
+  VNPAY_ORDER_TYPE: ${VNPAY_ORDER_TYPE:-other}
+  VNPAY_BANK_CODE: ${VNPAY_BANK_CODE:-}
+  VNPAY_BANK_LIST_URL: ${VNPAY_BANK_LIST_URL:-https://sandbox.vnpayment.vn/qrpayauth/api/merchant/get_bank_list}
+  VNPAY_QR_BANK_TYPE: ${VNPAY_QR_BANK_TYPE:-1}
+  VNPAY_DOMESTIC_CARD_BANK_TYPE: ${VNPAY_DOMESTIC_CARD_BANK_TYPE:-2}
+  VNPAY_INTERNATIONAL_CARD_BANK_TYPE: ${VNPAY_INTERNATIONAL_CARD_BANK_TYPE:-3}
+  # ── AI & Maps ──────────────────────────────────────────────────────────────
+  GOONG_API_KEY: ${GOONG_API_KEY:-}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
+  GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-1.5-flash}
+  # ── Nghiệp vụ ──────────────────────────────────────────────────────────────
+  FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
+  REFUND_WINDOW_HOURS: ${REFUND_WINDOW_HOURS:-24}
+  DEFAULT_COMMISSION_RATE: ${DEFAULT_COMMISSION_RATE:-0.2000}
+  REFUND_RATE_TOURIST_FAULT: ${REFUND_RATE_TOURIST_FAULT:-0.50}
+  REFUND_RATE_PLATFORM_FAULT: ${REFUND_RATE_PLATFORM_FAULT:-1.00}
+  SETTLEMENT_GRACE_MINUTES: ${SETTLEMENT_GRACE_MINUTES:-0}
+  ALLOW_OPEN_PERIOD_SETTLEMENT: ${ALLOW_OPEN_PERIOD_SETTLEMENT:-false}
+  BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS: ${BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS:-60}
+  BOOKING_INVITATION_APP_URL: ${BOOKING_INVITATION_APP_URL:-journeygo://booking/invitations/accept}
+  REFUND_STATUS_CHECK_INTERVAL_SECONDS: ${REFUND_STATUS_CHECK_INTERVAL_SECONDS:-300}
+  REFUND_RESUBMIT_WINDOW_HOURS: ${REFUND_RESUBMIT_WINDOW_HOURS:-0}
+  JOURNEY_SKIP_LOCATION_CHECK: ${JOURNEY_SKIP_LOCATION_CHECK:-false}
 services:
   # ===========================================================================
   #  1. PostgreSQL — cơ sở dữ liệu chính (có pgvector cho AI Virtual Guide)
@@ -88,86 +182,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # ── Profile & logging ──────────────────────────────────────────────────────
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
-      LOGGING_LEVEL: ${LOGGING_LEVEL:-INFO}
-      TZ: Asia/Ho_Chi_Minh
-      # ── Database (service name trong Docker network) ───────────────────────────
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-journeygo_db}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-journeygo}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD chưa được đặt trong .env}
-      # ── Redis ──────────────────────────────────────────────────────────────────
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      # ── Secret ─────────────────────────────────────────────────────────────────
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET chưa được đặt trong .env}
-      JWT_ACCESS_EXPIRATION_MS: ${JWT_ACCESS_EXPIRATION_MS:-900000}
-      JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-604800000}
-      # ── Google OAuth2 ──────────────────────────────────────────────────────────
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      # ── Mail (Gmail App Password) ──────────────────────────────────────────────
-      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
-      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
-      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
-      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
-      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-JourneyGo Platform}
-      MAIL_OTP_EXPIRATION_MINUTES: ${MAIL_OTP_EXPIRATION_MINUTES:-10}
-      # ── Cloudinary (upload ảnh/video) ──────────────────────────────────────────
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
-      # ── CORS / OAuth2 redirect (domain public) ────────────────────────────────
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://journeygo.id.vn}
-      OAUTH2_DEFAULT_REDIRECT_URI: ${OAUTH2_DEFAULT_REDIRECT_URI:-https://journeygo.id.vn/oauth2/redirect}
-      OAUTH2_AUTHORIZED_REDIRECT_URIS: ${OAUTH2_AUTHORIZED_REDIRECT_URIS:-https://journeygo.id.vn/oauth2/redirect,journeygo://oauth2/redirect,journeygo://auth/callback}
-      WEBSOCKET_ALLOWED_ORIGINS: ${WEBSOCKET_ALLOWED_ORIGINS:-https://journeygo.id.vn}
-      PARTNER_WEB_LOGIN_URL: ${PARTNER_WEB_LOGIN_URL:-https://journeygo.id.vn/login}
-      PARTNER_ACTIVATION_URL: ${PARTNER_ACTIVATION_URL:-https://journeygo.id.vn/activate}
-      # ── VNPay Sandbox ──────────────────────────────────────────────────────────
-      VNPAY_ENABLED: ${VNPAY_ENABLED:-true}
-      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
-      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
-      VNPAY_VERSION: ${VNPAY_VERSION:-2.1.0}
-      VNPAY_PAYMENT_URL: ${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-      VNPAY_MERCHANT_API_URL: ${VNPAY_MERCHANT_API_URL:-https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
-      VNPAY_IPN_URL: ${VNPAY_IPN_URL:-}
-      VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-}
-      VNPAY_WEB_RETURN_URL: ${VNPAY_WEB_RETURN_URL:-}
-      VNPAY_APP_REDIRECT_ENABLED: ${VNPAY_APP_REDIRECT_ENABLED:-false}
-      VNPAY_APP_SCHEME: ${VNPAY_APP_SCHEME:-journeygo}
-      VNPAY_APP_RETURN_URL: ${VNPAY_APP_RETURN_URL:-journeygo://payment/return}
-      VNPAY_IP_ADDR: ${VNPAY_IP_ADDR:-127.0.0.1}
-      VNPAY_TIMEZONE: ${VNPAY_TIMEZONE:-Asia/Ho_Chi_Minh}
-      VNPAY_EXPIRY_MINUTES: ${VNPAY_EXPIRY_MINUTES:-10}
-      VNPAY_API_TIMEOUT_MS: ${VNPAY_API_TIMEOUT_MS:-15000}
-      VNPAY_VERIFY_SIGNATURE: ${VNPAY_VERIFY_SIGNATURE:-true}
-      VNPAY_LOCALE: ${VNPAY_LOCALE:-vn}
-      VNPAY_ORDER_TYPE: ${VNPAY_ORDER_TYPE:-other}
-      VNPAY_BANK_CODE: ${VNPAY_BANK_CODE:-}
-      VNPAY_BANK_LIST_URL: ${VNPAY_BANK_LIST_URL:-https://sandbox.vnpayment.vn/qrpayauth/api/merchant/get_bank_list}
-      VNPAY_QR_BANK_TYPE: ${VNPAY_QR_BANK_TYPE:-1}
-      VNPAY_DOMESTIC_CARD_BANK_TYPE: ${VNPAY_DOMESTIC_CARD_BANK_TYPE:-2}
-      VNPAY_INTERNATIONAL_CARD_BANK_TYPE: ${VNPAY_INTERNATIONAL_CARD_BANK_TYPE:-3}
-      # ── AI & Maps ──────────────────────────────────────────────────────────────
-      GOONG_API_KEY: ${GOONG_API_KEY:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
-      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-1.5-flash}
-      # ── Nghiệp vụ ──────────────────────────────────────────────────────────────
-      FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
-      REFUND_WINDOW_HOURS: ${REFUND_WINDOW_HOURS:-24}
-      DEFAULT_COMMISSION_RATE: ${DEFAULT_COMMISSION_RATE:-0.2000}
-      REFUND_RATE_TOURIST_FAULT: ${REFUND_RATE_TOURIST_FAULT:-0.50}
-      REFUND_RATE_PLATFORM_FAULT: ${REFUND_RATE_PLATFORM_FAULT:-1.00}
-      SETTLEMENT_GRACE_MINUTES: ${SETTLEMENT_GRACE_MINUTES:-0}
-      ALLOW_OPEN_PERIOD_SETTLEMENT: ${ALLOW_OPEN_PERIOD_SETTLEMENT:-false}
-      BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS: ${BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS:-60}
-      BOOKING_INVITATION_APP_URL: ${BOOKING_INVITATION_APP_URL:-journeygo://booking/invitations/accept}
-      REFUND_STATUS_CHECK_INTERVAL_SECONDS: ${REFUND_STATUS_CHECK_INTERVAL_SECONDS:-300}
-      REFUND_RESUBMIT_WINDOW_HOURS: ${REFUND_RESUBMIT_WINDOW_HOURS:-0}
-      JOURNEY_SKIP_LOCATION_CHECK: ${JOURNEY_SKIP_LOCATION_CHECK:-false}
+      <<: *backend-env
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8088/actuator/health/liveness || exit 1"]
       interval: 15s
@@ -267,28 +282,13 @@ services:
       redis:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
-      LOGGING_LEVEL: ${LOGGING_LEVEL:-INFO}
-      TZ: Asia/Ho_Chi_Minh
-      # ── Database ─────────────────────────────────────────────────────────────
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-journeygo_db}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-journeygo}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD chưa được đặt trong .env}
-      # ── Redis (không bắt buộc cho seeder nhưng backend vẫn khởi tạo kết nối) ──
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      # ── Secret ───────────────────────────────────────────────────────────────
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET chưa được đặt trong .env}
+      <<: *backend-env
       # ── BẬT SEED RUNNER ────────────────────────────────────────────────────
       SEED_ENABLED: "true"
       APP_SEED_EXIT_AFTER_RUN: "true"
-      # ── Nghiệp vụ ────────────────────────────────────────────────────────────
+      # ── Nghiệp vụ (seed) ───────────────────────────────────────────────────
       FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
       DEFAULT_COMMISSION_RATE: ${DEFAULT_COMMISSION_RATE:-0.2000}
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
     networks:
       - journeygo-network
 

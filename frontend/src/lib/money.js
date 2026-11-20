@@ -810,7 +810,7 @@ export function paymentMatchesKeyword(payment, keyword) {
  *
  * @returns {{ content: Array, page: number, size: number, totalElements: number, totalPages: number }}
  */
-export function normalizePage(data, fallbackSize = 20) {
+export function normalizePage(data, fallbackSize = 10) {
   if (Array.isArray(data)) {
     return {
       content: data,

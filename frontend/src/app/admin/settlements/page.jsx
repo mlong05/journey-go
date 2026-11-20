@@ -59,9 +59,7 @@ import {
   VN_TIME_ZONE,
 } from "@/lib/money";
 import { LimitedField } from "@/components/ui/LimitedField";
-
-/** Số đợt tất toán mỗi trang. */
-const PAGE_SIZE = 10;
+import { PAGE_SIZE } from "@/lib/pagination";
 
 const TABS = [
   { id: "overview", label: "Tổng quan & Duyệt đợt" },
@@ -134,7 +132,6 @@ export default function AdminSettlementsPage() {
 function SettlementOverviewTab() {
   const [settlements, setSettlements] = useState([]);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -162,9 +159,9 @@ function SettlementOverviewTab() {
       const data = await getAllSettlements({
         status: statusFilter || undefined,
         page,
-        size: pageSize,
+        size: PAGE_SIZE,
       });
-      const normalized = normalizePage(data, pageSize);
+      const normalized = normalizePage(data, PAGE_SIZE);
       setSettlements(normalized.content);
       setTotalPages(normalized.totalPages);
       setTotalElements(normalized.totalElements);
@@ -173,7 +170,7 @@ function SettlementOverviewTab() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, statusFilter]);
+  }, [page, statusFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -453,11 +450,6 @@ function SettlementOverviewTab() {
             totalElements={totalElements}
             unit="đợt tất toán"
             onChange={setPage}
-            pageSize={pageSize}
-            onSizeChange={(size) => {
-              setPageSize(size);
-              setPage(0);
-            }}
           />
         </div>
       </div>
@@ -2046,6 +2038,20 @@ function SettlementDetailModal({ settlementId, onClose }) {
     return details.filter((d) => String(d?.providerProfileId) === String(partnerFilter));
   }, [details, partnerFilter]);
 
+  // Tổng cộng các cột của bảng "Các khoản doanh thu trong đợt" — để Admin đối chiếu
+  // trực tiếp với các ô ở cột trái (Tổng thanh toán / Hoàn tiền / Doanh thu nền tảng).
+  const detailTotals = useMemo(() => {
+    const acc = { gross: 0, voucher: 0, refund: 0, commission: 0, net: 0 };
+    for (const d of visibleDetails) {
+      acc.gross += Number(d?.grossAmount ?? 0) || 0;
+      acc.voucher += Number(d?.voucherDiscount ?? 0) || 0;
+      acc.refund += Number(d?.refundAmount ?? 0) || 0;
+      acc.commission += Number(d?.commissionAmount ?? 0) || 0;
+      acc.net += Number(d?.providerNetAmount ?? 0) || 0;
+    }
+    return acc;
+  }, [visibleDetails]);
+
   return (
     <ModalShell title="Chi tiết đợt tất toán" onClose={onClose} xwide fill>
       {loading ? (
@@ -2058,8 +2064,11 @@ function SettlementDetailModal({ settlementId, onClose }) {
               TRÁI  : từ đầu (thông tin đợt) → "Tổng hợp N đối tác trong đợt"
               PHẢI  : "Các khoản doanh thu trong đợt"
               Mỗi cột có thanh cuộn RIÊNG ⇒ đợt gom nhiều đối tác / nhiều khoản
-              vẫn theo dõi được mà không phải cuộn cả modal. */}
-          <div className="grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:grid-rows-1 gap-5 flex-1 min-h-0">
+              vẫn theo dõi được mà không phải cuộn cả modal.
+              ⚠️ Cột phải chiếm nhiều không gian hơn (4fr / 8fr) vì bảng "Các khoản
+              doanh thu trong đợt" có tới 8 cột (thêm "Hoàn tiền") ⇒ cần đủ rộng để
+              các số tiền không bị chen chúc. */}
+          <div className="grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,3fr)_minmax(0,9fr)] lg:grid-rows-1 gap-5 flex-1 min-h-0">
             {/* ══ CỘT TRÁI ══
                 Toàn bộ cột trái là MỘT vùng cuộn riêng (thông tin đợt → tổng hợp
                 đối tác) ⇒ không bị "đè" khi danh sách đối tác dài, và không phải
@@ -2238,9 +2247,10 @@ function SettlementDetailModal({ settlementId, onClose }) {
                 ) : (
                   // Container cha đã `overflow-auto` ⇒ đây chính là scroll
                   // container, sticky header bám đúng vào nó.
-                  // `min-w-[760px]` ⇒ khi khung hẹp, bảng cuộn NGANG thay vì bị
-                  // bóp dẹp làm các cột "Mã GD / Mã đơn" dồn chữ.
-                  <table className="w-full min-w-[760px] text-left text-[11px] border-collapse">
+                  // `min-w-[1000px]` ⇒ khi khung hẹp, bảng cuộn NGANG thay vì bị
+                  // bóp dẹp làm các cột "Mã GD / Mã đơn" dồn chữ, và đủ rộng cho
+                  // cả cột "Voucher" + "Hoàn tiền" mà không chen chúc.
+                  <table className="w-full min-w-[1150px] text-left text-[11px] border-collapse">
                     {/* Sticky header — tiêu đề cột luôn nhìn thấy khi cuộn */}
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-white border-b border-slate-200 text-[10.5px] font-semibold text-slate-500">
@@ -2248,7 +2258,10 @@ function SettlementDetailModal({ settlementId, onClose }) {
                         <th className="py-2 px-2">Đối tác</th>
                         <th className="py-2 px-2">Kỳ</th>
                         <th className="py-2 px-2 text-right">Tổng tiền</th>
+                        {/* Voucher & Hoàn tiền là TUỲ CHỌN THEO GIAO DỊCH — không
+                            phải giao dịch nào cũng có ⇒ giao dịch không có thì "—". */}
                         <th className="py-2 px-2 text-center">Voucher</th>
+                        <th className="py-2 px-2 text-right">Hoàn tiền</th>
                         <th className="py-2 px-2 text-right">Doanh thu nền tảng</th>
                         <th className="py-2 px-2 text-right">Doanh thu đối tác</th>
                       </tr>
@@ -2296,6 +2309,17 @@ function SettlementDetailModal({ settlementId, onClose }) {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
+                          {/* Hoàn tiền — chỉ hiện khi giao dịch BỊ hoàn tiền.
+                              Giao dịch không hoàn tiền ⇒ "—". */}
+                          <td className="py-2 px-2 text-right font-mono">
+                            {Number(d?.refundAmount ?? 0) > 0 ? (
+                              <span className="font-semibold text-rose-600">
+                                -{formatVND(d?.refundAmount)}
+                              </span>
+                            ) : (
+                              <span className="font-sans text-slate-400">—</span>
+                            )}
+                          </td>
                           <td className="py-2 px-2 text-right font-mono text-slate-600">
                             {formatVND(d?.commissionAmount)}
                           </td>
@@ -2305,6 +2329,31 @@ function SettlementDetailModal({ settlementId, onClose }) {
                         </tr>
                       ))}
                     </tbody>
+                    {/* TỔNG CỘNG — để Admin tự đối chiếu với các ô ở cột trái
+                        (Tổng thanh toán / Hoàn tiền / Doanh thu nền tảng / Doanh thu đối tác).
+                        Voucher cũng được cộng để thấy rõ tổng giảm giá của đợt. */}
+                    <tfoot className="sticky bottom-0 z-10">
+                      <tr className="border-t border-slate-200 bg-slate-50 text-[10.5px] font-bold text-slate-700">
+                        <td className="py-2 px-2">TỔNG CỘNG ({visibleDetails.length})</td>
+                        <td className="py-2 px-2" />
+                        <td className="py-2 px-2" />
+                        <td className="py-2 px-2 text-right font-mono">
+                          {formatVND(detailTotals.gross)}
+                        </td>
+                        <td className="py-2 px-2 text-center font-mono text-rose-600">
+                          {detailTotals.voucher > 0 ? `-${formatVND(detailTotals.voucher)}` : "—"}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono text-rose-600">
+                          {detailTotals.refund > 0 ? `-${formatVND(detailTotals.refund)}` : "—"}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono">
+                          {formatVND(detailTotals.commission)}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono text-emerald-700">
+                          {formatVND(detailTotals.net)}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 )}
               </div>
@@ -2573,9 +2622,9 @@ function StatusPill({ status, label }) {
   );
 }
 
-function Pagination({ page, totalPages, totalElements, unit, onChange, pageSize, onSizeChange }) {
+function Pagination({ page, totalPages, totalElements, unit, onChange }) {
   // Luôn hiện thanh phân trang (kể cả khi chỉ có 1 trang) để thấy
-  // "Đang xem trang X / Y" và ô "Số dòng/trang" — giống trang Quản lý người dùng.
+  // "Đang xem trang X / Y" — giống trang Quản lý người dùng.
   if (!totalElements) return null;
   return (
     <PaginationBar
@@ -2584,8 +2633,6 @@ function Pagination({ page, totalPages, totalElements, unit, onChange, pageSize,
       totalElements={totalElements}
       unit={unit}
       onChange={onChange}
-      pageSize={pageSize}
-      onSizeChange={onSizeChange}
     />
   );
 }
@@ -2668,7 +2715,7 @@ function ModalShell({ title, onClose, children, footer, wide = false, xwide = fa
         aria-modal="true"
         className={`flex max-h-[calc(100dvh-2rem)] w-full ${
           xwide
-            ? "max-w-[1680px]"
+            ? "max-w-[1900px]"
             : wide
               ? "max-w-3xl"
               : "max-w-lg"

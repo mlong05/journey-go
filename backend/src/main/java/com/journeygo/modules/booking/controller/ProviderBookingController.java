@@ -40,8 +40,10 @@ public class ProviderBookingController {
     private final ProviderBookingService providerBookingService;
 
     @GetMapping
-    @Operation(summary = "Danh sách booking của các tour tôi tạo",
-            description = "Lọc tuỳ chọn theo tourId, ngày khởi hành (date) và trạng thái (status, nhiều giá trị).")
+    @Operation(summary = "Danh sách khách đã đặt tour của các tour tôi tạo",
+            description = "Lọc tuỳ chọn theo tourId, ngày khởi hành (date) và trạng thái (status, nhiều giá trị). "
+                    + "⚠️ Chỉ trả đơn ĐÃ THANH TOÁN (CONFIRMED/COMPLETED) và KHÔNG bị hoàn tiền — "
+                    + "đây là danh sách khách tham gia để đối tác quản lý chuyến đi.")
     public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> list(
             @RequestParam(required = false) Long tourId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
@@ -57,7 +59,8 @@ public class ProviderBookingController {
     @Operation(summary = "Lịch khởi hành (tour × ngày) kèm số khách đã đăng ký",
             description = "scope = UPCOMING (mặc định) | PAST | ALL; from/to ghi đè khoảng ngày. "
                     + "Mặc định chỉ trả ngày đã có đơn; includeEmpty=true trả cả slot chưa có ai đặt. "
-                    + "Khách đã đăng ký = đơn CONFIRMED/COMPLETED; đơn PENDING_PAYMENT tính riêng là đang giữ chỗ.")
+                    + "Khách đã đăng ký = đơn CONFIRMED/COMPLETED KHÔNG bị hoàn tiền; "
+                    + "đơn PENDING_PAYMENT tính riêng là đang giữ chỗ.")
     public ResponseEntity<ApiResponse<PageResponse<ProviderDepartureResponse>>> departures(
             @RequestParam(required = false) Long tourId,
             @RequestParam(required = false) ProviderBookingService.DepartureScope scope,

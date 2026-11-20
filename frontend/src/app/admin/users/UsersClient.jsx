@@ -19,10 +19,6 @@ import {
   AlertCircle,
   Inbox,
   Loader2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Mail,
   Calendar,
   RotateCcw,
@@ -37,8 +33,10 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { apiClient } from "@/services/apiClient";
+import PaginationBar from "@/components/ui/PaginationBar";
 import RoleManagerModal from "./RoleManagerModal";
 import { formatDateTimeVN } from "@/lib/money";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 // URL chỉ dùng để hiển thị trong banner cảnh báo khi fallback.
 // Việc gọi API thực sự dùng apiClient (đã cấu hình base URL đúng ở services/apiClient.js).
@@ -87,8 +85,6 @@ const SORT_OPTIONS = [
   { value: "fullName,ASC", label: "Tên A-Z" },
 ];
 
-const SIZE_OPTIONS = [10, 20, 50];
-
 /* =========================================================================
    HELPER FUNCTIONS
    ========================================================================= */
@@ -125,7 +121,7 @@ export default function AdminUsersClient() {
     content: [],
     totalElements: 0,
     totalPages: 0,
-    size: 20,
+    size: PAGE_SIZE,
     number: 0,
     first: true,
     last: true,
@@ -140,7 +136,6 @@ export default function AdminUsersClient() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [activeFilter, setActiveFilter] = useState("all");
   const [sortValue, setSortValue] = useState("id,ASC");
-  const [pageSize, setPageSize] = useState(20);
   const [pageNumber, setPageNumber] = useState(0);
   const [keywordInput, setKeywordInput] = useState("");
   const [keywordApplied, setKeywordApplied] = useState("");
@@ -208,7 +203,7 @@ export default function AdminUsersClient() {
     async (override = {}) => {
       const params = {
         page: override.page ?? pageNumber,
-        size: override.size ?? pageSize,
+        size: override.size ?? PAGE_SIZE,
         sort: override.sort ?? sortValue,
         keyword: override.keyword ?? keywordApplied,
         role: override.role ?? roleFilter,
@@ -225,8 +220,11 @@ export default function AdminUsersClient() {
 
       if (params.keyword) query.append("keyword", params.keyword);
       if (params.role && params.role !== "all") query.append("role", params.role);
-      if (params.active === true || params.active === false) {
-        query.append("active", String(params.active));
+      // `activeFilter` là STRING ("all" | "true" | "false") ⇒ phải so sánh theo
+      // chuỗi, nếu không điều kiện này luôn false ⇒ bộ lọc "Đã khóa" không bao giờ
+      // được gửi lên server (bug: chọn "Đã khóa" vẫn ra toàn bộ danh sách).
+      if (params.active === "true" || params.active === "false") {
+        query.append("active", params.active);
       }
       query.append("page", String(params.page));
       query.append("size", String(params.size));
@@ -250,7 +248,7 @@ export default function AdminUsersClient() {
         }
         // Trường hợp 2: trả về mảng thuần (không phân trang)
         else if (Array.isArray(payload)) {
-          const size = params.size || 20;
+          const size = params.size || PAGE_SIZE;
           setPageData({
             content: payload,
             totalElements: payload.length,
@@ -313,7 +311,7 @@ export default function AdminUsersClient() {
         setIsLoading(false);
       }
     },
-    [pageNumber, pageSize, sortValue, keywordApplied, roleFilter, activeFilter]
+    [pageNumber, sortValue, keywordApplied, roleFilter, activeFilter]
   );
 
   /* --------------------------- EFFECTS ----------------------------- */
@@ -370,11 +368,6 @@ export default function AdminUsersClient() {
 
   const handleSortChange = (value) => {
     setSortValue(value);
-    setPageNumber(0);
-  };
-
-  const handleSizeChange = (value) => {
-    setPageSize(Number(value));
     setPageNumber(0);
   };
 
@@ -460,133 +453,6 @@ export default function AdminUsersClient() {
     URL.revokeObjectURL(url);
     showToast(`Đã xuất ${rows.length} tài khoản ra Excel.`, "success");
   };
-
-  /* ----------------------------------------------------------------
-     MUTATION: cập nhật role của 1 user
-     PATCH /api/v1/users/{id}/role  body: { role }
-     ---------------------------------------------------------------- */
-  const handleChangeRole = useCallback(
-    async (user, nextRole) => {
-      if (!user || !nextRole || user.role === nextRole) return;
-      setMutatingId(user.id);
-      setMutatingAction((prev) => ({ ...prev, [user.id]: "role" }));
-      try {
-        const json = await apiClient.patch(
-          `/users/${user.id}/role`,
-          { role: nextRole }
-        );
-        const updated = json?.data || json;
-        // Cập nhật row trong state ngay để UX mượt, không cần refetch
-        setPageData((prev) => {
-          const list = Array.isArray(prev.content) ? prev.content : [];
-          return {
-            ...prev,
-            content: list.map((u) =>
-              u.id === user.id ? { ...u, ...updated } : u
-            ),
-          };
-        });
-        // Đồng bộ lại modal chi tiết / modal edit nếu đang mở
-        if (detailUser?.id === user.id) {
-          setDetailUser((prev) => ({ ...prev, ...updated }));
-        }
-        if (editUser?.id === user.id) {
-          setEditUser((prev) => ({ ...prev, ...updated }));
-        }
-        showToast(
-          `Đã chuyển ${user.fullName || user.email} sang vai trò ${
-            ROLE_LABELS[nextRole] || nextRole
-          }.`,
-          "success"
-        );
-      } catch (err) {
-        console.error("[Admin Users] Lỗi đổi role:", err);
-        showToast(
-          `Không thể đổi vai trò: ${
-            err?.message || "Lỗi không xác định"
-          }`,
-          "error"
-        );
-      } finally {
-        setMutatingId(null);
-        setMutatingAction((prev) => {
-          const next = { ...prev };
-          delete next[user.id];
-          return next;
-        });
-      }
-    },
-    [detailUser, editUser, showToast]
-  );
-
-  /* ----------------------------------------------------------------
-     MUTATION: cập nhật trạng thái active của 1 user
-     POST /api/v1/users/{id}/activate     (kích hoạt)
-     POST /api/v1/users/{id}/deactivate   (khóa)
-     ---------------------------------------------------------------- */
-  const handleToggleActive = useCallback(
-    async (user, nextActive) => {
-      if (!user || typeof nextActive !== "boolean") return;
-      if (user.active === nextActive) return;
-      setMutatingId(user.id);
-      setMutatingAction((prev) => ({ ...prev, [user.id]: "status" }));
-      try {
-        const endpoint = nextActive
-          ? `/users/${user.id}/activate`
-          : `/users/${user.id}/deactivate`;
-        const json = await apiClient.post(endpoint, {});
-        const updated = json?.data || json;
-        setPageData((prev) => {
-          const list = Array.isArray(prev.content) ? prev.content : [];
-          // Hợp nhất: nếu response trả về thiếu `active` thì tự set theo nextActive
-          return {
-            ...prev,
-            content: list.map((u) =>
-              u.id === user.id
-                ? { ...u, ...updated, active: nextActive }
-                : u
-            ),
-          };
-        });
-        if (detailUser?.id === user.id) {
-          setDetailUser((prev) => ({
-            ...prev,
-            ...updated,
-            active: nextActive,
-          }));
-        }
-        if (editUser?.id === user.id) {
-          setEditUser((prev) => ({
-            ...prev,
-            ...updated,
-            active: nextActive,
-          }));
-        }
-        showToast(
-          nextActive
-            ? `Đã mở khóa tài khoản ${user.fullName || user.email}.`
-            : `Đã khóa tài khoản ${user.fullName || user.email}.`,
-          nextActive ? "success" : "info"
-        );
-      } catch (err) {
-        console.error("[Admin Users] Lỗi đổi trạng thái:", err);
-        showToast(
-          `Không thể đổi trạng thái: ${
-            err?.message || "Lỗi không xác định"
-          }`,
-          "error"
-        );
-      } finally {
-        setMutatingId(null);
-        setMutatingAction((prev) => {
-          const next = { ...prev };
-          delete next[user.id];
-          return next;
-        });
-      }
-    },
-    [detailUser, editUser, showToast]
-  );
 
   /* ----------------------------------------------------------------
      MUTATION: cập nhật thông tin user (fullName, phone, role)
@@ -951,8 +817,8 @@ export default function AdminUsersClient() {
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
               >
                 <option value="all">Tất cả trạng thái</option>
-                <option value="true">● Đang hoạt động</option>
-                <option value="false">● Đã khóa / Ngưng</option>
+                <option value="true">Đang hoạt động</option>
+                <option value="false">Đã khóa / Ngưng</option>
               </select>
             </div>
 
@@ -1015,13 +881,8 @@ export default function AdminUsersClient() {
                     key={u.id}
                     user={u}
                     isMutating={mutatingId === u.id}
-                    mutatingAction={mutatingAction[u.id]}
                     onView={() => setDetailUser(u)}
                     onEdit={() => setEditUser({ ...u })}
-                    onChangeRole={(nextRole) => handleChangeRole(u, nextRole)}
-                    onToggleActive={(nextActive) =>
-                      handleToggleActive(u, nextActive)
-                    }
                   />
                 ))
               )}
@@ -1032,11 +893,11 @@ export default function AdminUsersClient() {
         {/* ---- THANH PHÂN TRANG (shrink-0, cố định ở đáy) ---- */}
         <div className="shrink-0 border-t border-slate-100 bg-white">
           <PaginationBar
-            pageData={pageData}
-            pageNumber={pageNumber}
-            pageSize={pageSize}
-            onPageChange={handlePageChange}
-            onSizeChange={handleSizeChange}
+            page={pageData.number ?? pageNumber}
+            totalPages={pageData.totalPages}
+            totalElements={pageData.totalElements}
+            unit="tài khoản"
+            onChange={handlePageChange}
           />
         </div>
       </div>
@@ -1052,12 +913,6 @@ export default function AdminUsersClient() {
             setEditUser({ ...detailUser });
             setDetailUser(null);
           }}
-          isMutating={mutatingId === detailUser.id}
-          mutatingAction={mutatingAction[detailUser.id]}
-          onChangeRole={(nextRole) => handleChangeRole(detailUser, nextRole)}
-          onToggleActive={(nextActive) =>
-            handleToggleActive(detailUser, nextActive)
-          }
         />
       )}
 
@@ -1171,10 +1026,7 @@ function UserRow({
   user,
   onView,
   onEdit,
-  onChangeRole,
-  onToggleActive,
   isMutating = false,
-  mutatingAction = null,
 }) {
   const [avatarError, setAvatarError] = useState(false);
   const avatarSrc = user.avatarUrl || user.avatar;
@@ -1405,156 +1257,19 @@ function EmptyState({ hasFilter, onReset, isFallback }) {
 }
 
 /* =========================================================================
-   SUB-COMPONENT: PaginationBar
-   ========================================================================= */
-
-function PaginationBar({
-  pageData,
-  pageNumber,
-  pageSize,
-  onPageChange,
-  onSizeChange,
-}) {
-  const totalPages = Math.max(pageData.totalPages || 0, 1);
-  const currentPage = (pageData.number ?? pageNumber) + 1;
-  const totalElements = pageData.totalElements || 0;
-
-  // Tính danh sách số trang hiển thị (tối đa 5 nút quanh trang hiện tại)
-  const visiblePageNumbers = useMemo(() => {
-    const total = totalPages;
-    const curr = currentPage;
-    if (total <= 5) {
-      return Array.from({ length: total }, (_, i) => i + 1);
-    }
-    const start = Math.max(1, curr - 2);
-    const end = Math.min(total, curr + 2);
-    const pages = [];
-    for (let p = start; p <= end; p += 1) pages.push(p);
-    if (start > 1) {
-      pages.unshift(1);
-      if (start > 2) pages.splice(1, 0, "...");
-    }
-    if (end < total) {
-      if (end < total - 1) pages.push("...");
-      pages.push(total);
-    }
-    return pages;
-  }, [totalPages, currentPage]);
-
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-3.5 bg-slate-50/60 border-t border-slate-100">
-      {/* Bên trái: Thông tin + chọn size */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-        <span className="text-xs text-slate-600 font-bold">
-          Đang xem trang{" "}
-          <strong className="text-slate-900">{currentPage}</strong> /{" "}
-          <strong className="text-slate-900">{totalPages}</strong>{" "}
-          <span className="text-slate-400">
-            (Tổng{" "}
-            <strong className="text-slate-700">
-              {totalElements.toLocaleString("vi-VN")}
-            </strong>{" "}
-            tài khoản)
-          </span>
-        </span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-slate-600 font-bold">
-            Số dòng/trang:
-          </span>
-          <select
-            value={pageSize}
-            onChange={(e) => onSizeChange(e.target.value)}
-            className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/20"
-          >
-            {SIZE_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Bên phải: Nút điều hướng */}
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onPageChange(0)}
-          disabled={pageData.first}
-          className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          title="Trang đầu"
-        >
-          <ChevronsLeft size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onPageChange(pageNumber - 1)}
-          disabled={pageData.first}
-          className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          title="Trang trước"
-        >
-          <ChevronLeft size={14} />
-        </button>
-        {visiblePageNumbers.map((p, idx) =>
-          p === "..." ? (
-            <span
-              key={`dots-${idx}`}
-              className="px-2 text-xs text-slate-400 font-bold select-none"
-            >
-              …
-            </span>
-          ) : (
-            <button
-              key={`page-${p}`}
-              type="button"
-              onClick={() => onPageChange(Number(p) - 1)}
-              className={`min-w-[32px] h-7 px-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
-                p === currentPage
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
-              }`}
-            >
-              {p}
-            </button>
-          )
-        )}
-        <button
-          type="button"
-          onClick={() => onPageChange(pageNumber + 1)}
-          disabled={pageData.last}
-          className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          title="Trang sau"
-        >
-          <ChevronRight size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onPageChange(totalPages - 1)}
-          disabled={pageData.last}
-          className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          title="Trang cuối"
-        >
-          <ChevronsRight size={14} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================================
    SUB-COMPONENT: DetailModal
    ========================================================================= */
 
+/**
+ * Modal CHI TIẾT — chỉ đọc (read-only).
+ * Không có bất kỳ control chỉnh sửa nào (select vai trò, nút khóa/mở khóa…).
+ * Muốn sửa thông tin / vai trò / trạng thái ⇒ dùng nút "Chỉnh sửa" (EditModal).
+ */
 function DetailModal({
   user,
   onClose,
   onEdit,
-  onChangeRole,
-  onToggleActive,
-  isMutating = false,
-  mutatingAction = null,
 }) {
-  const roleBusy = isMutating && mutatingAction === "role";
   const detailAvatarSrc = user.avatarUrl || user.avatar;
   const showDetailAvatar =
     Boolean(detailAvatarSrc) &&
@@ -1635,32 +1350,19 @@ function DetailModal({
             muted={!user.phone}
           />
 
-          {/* Vai trò — đổi nhanh (style đồng nhất, không tô màu) */}
-          <div
-            className={`p-3 rounded-xl border bg-white border-slate-200 ${
-              roleBusy ? "opacity-60" : ""
-            }`}
-          >
+          {/* Vai trò — CHỈ XEM (read-only). Muốn đổi vai trò hãy dùng nút "Chỉnh sửa". */}
+          <div className="p-3 rounded-xl border bg-white border-slate-200">
             <p className="text-[11px] font-bold text-slate-600 mb-1.5 inline-flex items-center gap-1">
               <ShieldAlert size={10} className="text-slate-400" />
               Vai trò
             </p>
             <div className="flex items-center gap-2">
-              <select
-                value={user.role}
-                disabled={isMutating}
-                onChange={(e) => onChangeRole?.(e.target.value)}
-                className="flex-1 appearance-none px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500/30 focus:border-slate-700 disabled:cursor-not-allowed"
-              >
-                {Object.values(ROLES).map((r) => (
-                  <option key={r} value={r}>
-                    {ROLE_LABELS[r] || r}
-                  </option>
-                ))}
-              </select>
-              {roleBusy && (
-                <Loader2 size={14} className="animate-spin text-slate-600" />
-              )}
+              <span className="flex-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800">
+                {ROLE_LABELS[user.role] || user.role}
+              </span>
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-1 rounded-lg">
+                Chỉ xem
+              </span>
             </div>
           </div>
 
@@ -1697,14 +1399,13 @@ function DetailModal({
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between gap-2.5">
           <p className="text-[11px] text-slate-600">
-            Mọi thay đổi sẽ được ghi nhật ký phía máy chủ.
+            Chế độ chỉ xem — mọi thay đổi được thực hiện qua nút “Chỉnh sửa”.
           </p>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onEdit}
-              disabled={isMutating}
-              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
             >
               <Pencil size={12} />
               Chỉnh sửa

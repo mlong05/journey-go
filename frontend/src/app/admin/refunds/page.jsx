@@ -59,9 +59,7 @@ import {
   REFUND_STATUS_LABELS,
 } from "@/lib/money";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-
-/** Số bản ghi mỗi trang. */
-const PAGE_SIZE = 10;
+import { PAGE_SIZE } from "@/lib/pagination";
 
 /**
  * Class DÙNG CHUNG cho mọi nút trong cột "Thao tác".
@@ -135,7 +133,6 @@ function isSwitchableToManual(refund) {
 export default function AdminRefundsPage() {
   const { confirm, confirmDialog } = useConfirm();
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [pageData, setPageData] = useState({
     content: [],
     totalElements: 0,
@@ -198,15 +195,15 @@ export default function AdminRefundsPage() {
         status: statusFilter || undefined,
         search: search || undefined,
         page,
-        size: pageSize,
+        size: PAGE_SIZE,
       });
-      setPageData(normalizePage(data, pageSize));
+      setPageData(normalizePage(data, PAGE_SIZE));
     } catch (err) {
       setError(err?.message || "Không thể tải danh sách yêu cầu hoàn tiền.");
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, search, page, pageSize]);
+  }, [statusFilter, search, page]);
 
   useEffect(() => {
     // `queueMicrotask` để không gọi setState đồng bộ trong thân effect
@@ -273,7 +270,7 @@ export default function AdminRefundsPage() {
   const filtered = pageData.content;
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-3">
+    <div className="flex-1 min-h-0 flex flex-col gap-3">
       <Panel
         fill
         icon={RotateCcw}
@@ -285,11 +282,6 @@ export default function AdminRefundsPage() {
             totalElements={pageData.totalElements}
             unit="yêu cầu hoàn tiền"
             onChange={setPage}
-            pageSize={pageSize}
-            onSizeChange={(size) => {
-              setPageSize(size);
-              setPage(0);
-            }}
           />
         }
         right={

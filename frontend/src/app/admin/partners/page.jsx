@@ -33,12 +33,11 @@ import {
   rejectApplication,
 } from "@/features/partnerapplication/services/partnerApplicationService";
 import { formatDateTimeVN } from "@/lib/money";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 /* =========================================================================
    HẰNG SỐ & HÀM TRỢ GIÚP
    ========================================================================= */
-
-const PAGE_SIZE = 10;
 
 /**
  * Tab trạng thái trên màn hình làm việc.
