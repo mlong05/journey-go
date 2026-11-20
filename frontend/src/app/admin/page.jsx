@@ -34,15 +34,16 @@ import {
 import { RecentSettlementsCard } from "./overview/RecentSettlements";
 import RecentActivities from "./overview/RecentActivities";
 import { GRID } from "./overview.tokens";
+import { KPI_HINTS } from "./overview/glossary";
 
 /**
  * Trang Tổng quan vận hành (Operations Overview) — JourneyGo Admin.
  *
- * Ba trụ cột: Business Performance · Operational Health · Action Center.
- *
  * Vai trò Admin là GIÁM SÁT: chỉ đọc số liệu của toàn sàn (du khách, đối tác,
  * tour, tài chính) và xử lý các việc thuộc quyền quản trị (duyệt đối tác,
  * quyết toán, hoàn tiền, cấu hình). Không nhúng bảng CRUD chi tiết.
+ *
+ * Mọi thuật ngữ nghiệp vụ đều có giải thích khi rê chuột (component `Hint`).
  */
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
@@ -125,8 +126,7 @@ export default function AdminDashboardPage() {
     {
       id: "revenue",
       label: "Tổng doanh thu nền tảng",
-      tooltip:
-        "Phần hoa hồng JourneyGo thu được từ các booking đã thanh toán thành công. KHÔNG phải toàn bộ tiền khách thanh toán.",
+      tooltip: KPI_HINTS.revenue,
       value: (kpis?.platformRevenue ?? 0).toLocaleString("vi-VN"),
       unit: "đ",
       change: percentChange(kpis?.platformRevenue, previousKpis?.platformRevenue),
@@ -137,8 +137,7 @@ export default function AdminDashboardPage() {
     {
       id: "gmv",
       label: "Tổng giá trị giao dịch (GMV)",
-      tooltip:
-        "Tổng tiền của các booking đã thanh toán thành công trong kỳ. Không tính booking đang chờ thanh toán.",
+      tooltip: KPI_HINTS.gmv,
       value: (kpis?.gmv ?? 0).toLocaleString("vi-VN"),
       unit: "đ",
       change: percentChange(kpis?.gmv, previousKpis?.gmv),
@@ -149,7 +148,7 @@ export default function AdminDashboardPage() {
     {
       id: "bookings",
       label: "Tổng lượt đặt tour",
-      tooltip: "Tổng số booking được tạo trong kỳ, bất kể trạng thái thanh toán.",
+      tooltip: KPI_HINTS.bookings,
       value: (kpis?.totalBookings ?? 0).toLocaleString("vi-VN"),
       unit: "lượt",
       change: percentChange(kpis?.totalBookings, previousKpis?.totalBookings),
@@ -160,7 +159,7 @@ export default function AdminDashboardPage() {
     {
       id: "success",
       label: "Booking thành công",
-      tooltip: "Booking đã thanh toán và được xác nhận (đã xác minh giao dịch thành công).",
+      tooltip: KPI_HINTS.success,
       value: (kpis?.successfulBookings ?? 0).toLocaleString("vi-VN"),
       unit: "lượt",
       change: percentChange(kpis?.successfulBookings, previousKpis?.successfulBookings),
@@ -171,7 +170,7 @@ export default function AdminDashboardPage() {
     {
       id: "tourists",
       label: "Khách hàng hoạt động",
-      tooltip: "Số khách du lịch có đặt tour trong kỳ (đếm theo khách duy nhất).",
+      tooltip: KPI_HINTS.tourists,
       value: (kpis?.activeTourists ?? 0).toLocaleString("vi-VN"),
       unit: "khách",
       change: percentChange(kpis?.activeTourists, previousKpis?.activeTourists),
@@ -182,7 +181,7 @@ export default function AdminDashboardPage() {
     {
       id: "providers",
       label: "Đối tác đang hoạt động",
-      tooltip: "Số đối tác có ít nhất một tour đang mở bán (xuất bản) trong kỳ.",
+      tooltip: KPI_HINTS.providers,
       value: (kpis?.activeProviders ?? 0).toLocaleString("vi-VN"),
       unit: "đối tác",
       change: percentChange(kpis?.activeProviders, previousKpis?.activeProviders),

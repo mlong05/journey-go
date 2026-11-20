@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ChevronRight, Handshake, Users } from "lucide-react";
 import { CardHeader, MetricTile } from "./KpiCard";
 import { CARD } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
+import { TOURIST_HINTS, PARTNER_HINTS } from "./glossary";
 
 /** Vòng cung Donut phân bổ trạng thái đối tác (vẽ bằng SVG, không cần thư viện chart). */
 function DonutChart({ segments, total }) {
@@ -102,21 +104,25 @@ export function TouristActivityCard({ tourists, isLoading }) {
           label="Tổng tài khoản Tourist"
           value={Number(stats.total || 0).toLocaleString("vi-VN")}
           tone="sky"
+          hint={TOURIST_HINTS.total}
         />
         <MetricTile
           label="Tourist mới trong kỳ"
           value={Number(stats.newInPeriod || 0).toLocaleString("vi-VN")}
           tone="indigo"
+          hint={TOURIST_HINTS.newInPeriod}
         />
         <MetricTile
           label="Tourist đang hoạt động"
           value={Number(stats.active || 0).toLocaleString("vi-VN")}
           tone="emerald"
+          hint={TOURIST_HINTS.active}
         />
         <MetricTile
           label="Hoàn thành ≥ 1 tour"
           value={Number(stats.completedAtLeastOne || 0).toLocaleString("vi-VN")}
           tone="amber"
+          hint={TOURIST_HINTS.completedAtLeastOne}
         />
       </div>
 
@@ -124,7 +130,7 @@ export function TouristActivityCard({ tourists, isLoading }) {
       <div className="px-4 pb-4">
         <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-sky-50 border border-indigo-100">
           <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-600/80">
-            Tỷ lệ khách quay lại đặt tour
+            <Hint text={TOURIST_HINTS.returningRate}>Tỷ lệ khách quay lại đặt tour</Hint>
           </p>
           <div className="mt-1 flex items-end gap-2.5">
             <span className="text-3xl font-bold tracking-tight text-slate-900 tabular-nums leading-none">
@@ -191,7 +197,9 @@ export function PartnerActivityCard({ partners, isLoading }) {
                 className="w-2.5 h-2.5 rounded-full shrink-0"
                 style={{ background: segment.color }}
               />
-              <span className="text-[11.5px] text-slate-600 truncate flex-1">{segment.label}</span>
+              <span className="text-[11.5px] text-slate-600 truncate flex-1">
+                <Hint text={PARTNER_HINTS[segment.key]}>{segment.label}</Hint>
+              </span>
               <span className="text-[12.5px] font-bold text-slate-900 tabular-nums shrink-0">
                 {isLoading ? "…" : segment.value.toLocaleString("vi-VN")}
               </span>
@@ -205,21 +213,25 @@ export function PartnerActivityCard({ partners, isLoading }) {
           label="Có tour đang mở bán"
           value={Number(stats.withPublishedTours || 0).toLocaleString("vi-VN")}
           tone="indigo"
+          hint={PARTNER_HINTS.withPublishedTours}
         />
         <MetricTile
           label="Đối tác mới tham gia"
           value={Number(stats.newInPeriod || 0).toLocaleString("vi-VN")}
           tone="sky"
+          hint={PARTNER_HINTS.newInPeriod}
         />
         <MetricTile
           label="Chờ xét duyệt"
           value={Number(stats.pendingApproval || 0).toLocaleString("vi-VN")}
           tone="amber"
+          hint={PARTNER_HINTS.pendingApproval}
         />
         <MetricTile
           label="Hồ sơ không hoạt động"
           value={Number(stats.inactive || 0).toLocaleString("vi-VN")}
           tone="rose"
+          hint={PARTNER_HINTS.inactive}
         />
       </div>
     </section>

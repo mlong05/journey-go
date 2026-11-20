@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { CardHeader } from "./KpiCard";
 import { CARD, PILL } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
+import { SEVERITY_HINTS } from "./glossary";
 
 /** Mức độ ưu tiên — màu ngữ nghĩa theo đặc tả. */
 export const SEVERITY = {
@@ -81,13 +83,14 @@ export default function ActionCenter({ actions, isLoading }) {
       {/* Chú thích 3 mức độ */}
       <div className="px-5 py-2.5 border-b border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1.5">
         {["URGENT", "SOON", "NORMAL"].map((severity) => (
-          <span
-            key={severity}
-            className={`${PILL.base} ${SEVERITY[severity].chip} px-1.5 py-0 text-[10px]`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${SEVERITY[severity].dot}`} />
-            {SEVERITY[severity].label}
-          </span>
+          <Hint key={severity} text={SEVERITY_HINTS[severity]}>
+            <span
+              className={`${PILL.base} ${SEVERITY[severity].chip} px-1.5 py-0 text-[10px]`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${SEVERITY[severity].dot}`} />
+              {SEVERITY[severity].label}
+            </span>
+          </Hint>
         ))}
       </div>
 
@@ -123,7 +126,9 @@ export default function ActionCenter({ actions, isLoading }) {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 min-w-0">
-                        <h3 className="text-[13px] font-bold text-slate-900 truncate">{action.title}</h3>
+                        <h3 className="text-[13px] font-bold text-slate-900 truncate">
+                          <Hint text={action.note}>{action.title}</Hint>
+                        </h3>
                         <span className={`${PILL.base} ${severity.chip} shrink-0 px-1.5 py-0 text-[10px]`}>
                           {action.count}
                         </span>

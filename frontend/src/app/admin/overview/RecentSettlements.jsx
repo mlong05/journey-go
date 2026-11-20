@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ChevronRight, HandCoins } from "lucide-react";
 import { CardHeader } from "./KpiCard";
 import { CARD, TABLE, PILL } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
+import { SETTLEMENT_HINTS } from "./glossary";
 
 const money = (v) => `${(Number(v) || 0).toLocaleString("vi-VN")} đ`;
 
@@ -96,7 +98,9 @@ export function RecentSettlementsCard({ settlements, isLoading }) {
                       {money(row.totalAmount)}
                     </td>
                     <td className={TABLE.td}>
-                      <span className={`${PILL.base} ${status.pill}`}>{status.label}</span>
+                      <span className={`${PILL.base} ${status.pill}`}>
+                        <Hint text={SETTLEMENT_HINTS[row.status]}>{status.label}</Hint>
+                      </span>
                     </td>
                   </tr>
                 );

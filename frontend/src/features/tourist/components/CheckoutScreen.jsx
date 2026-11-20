@@ -19,13 +19,15 @@ import { LimitedField } from "@/components/ui/LimitedField";
 import { useGuestTypes } from "@/lib/guestTypes";
 
 const GENDERS = [["MALE", "Nam"], ["FEMALE", "Nữ"], ["OTHER", "Khác"]];
+/** Giới tính mặc định khi tạo hành khách — luôn là "Nam" (MALE). */
+const DEFAULT_GENDER = "MALE";
 const input = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 aria-[invalid=true]:border-rose-400";
 
 function buildPassengers(params, user) {
   const list = [];
   GUEST_TYPES.forEach(({ type }) => {
     const n = Math.max(0, Math.min(20, Number(params.get(type.toLowerCase()) || 0)));
-    for (let i = 0; i < n; i++) list.push({ guestType: type, fullName: "", birthDate: "", gender: "", email: "" });
+    for (let i = 0; i < n; i++) list.push({ guestType: type, fullName: "", birthDate: "", gender: DEFAULT_GENDER, email: "" });
   });
   // Người đặt là người lớn đầu tiên, điền sẵn từ tài khoản.
   const booker = list.find((p) => p.guestType === "ADULT");
@@ -73,6 +75,8 @@ function CheckoutForm({ tourId }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pendingBooking, setPendingBooking] = useState(null);
+  /** Người dùng đã đọc & đồng ý với quy định mang theo giấy tờ tùy thân khi check-in. */
+  const [docsAcknowledged, setDocsAcknowledged] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -100,6 +104,12 @@ function CheckoutForm({ tourId }) {
     }
     if (hasErrors) {
       document.querySelector("[aria-invalid=true]")?.focus();
+      return;
+    }
+    // Phải xác nhận đã đọc quy định mang theo CCCD/Hộ chiếu/VNeID trước khi thanh toán.
+    if (!docsAcknowledged) {
+      setError("Vui lòng tick vào ô xác nhận đã đọc thông báo về giấy tờ tùy thân.");
+      document.getElementById("docs-ack")?.focus();
       return;
     }
     setBusy(true);
@@ -166,13 +176,26 @@ function CheckoutForm({ tourId }) {
 
   const typeIndex = {};
   return (
-    <form onSubmit={submit} noValidate className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-      <Breadcrumbs fallback={ROUTES.TOUR_DETAIL(tourId)} items={[{ label: "Khám phá", href: ROUTES.HOME }, { label: tour.title, href: ROUTES.TOUR_DETAIL(tourId) }, { label: "Thông tin hành khách" }]} />
-      <h1 className="mt-3 text-[26px] font-extrabold tracking-tight text-slate-900">Thông tin hành khách</h1>
-      <p className="mt-1 text-sm text-slate-500">Ngày sinh dùng để xác định loại vé theo ngày đi tour. Người lớn cần email để nhận vé và mở tour trong app.</p>
+    <form onSubmit={submit} noValidate className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:pt-0">
+      {/* Breadcrumb cách header ~10px (pt-1) để không bị dính sát mép trên. */}
+      <div className="pt-1">
+        <Breadcrumbs fallback={ROUTES.TOUR_DETAIL(tourId)} items={[{ label: "Khám phá", href: ROUTES.HOME }, { label: tour.title, href: ROUTES.TOUR_DETAIL(tourId) }, { label: "Thông tin hành khách" }]} />
+      </div>
 
-      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0 space-y-4">
+      {/* Bố cục 2 cột: cột trái = thông tin hành khách (dọc, dài tự nhiên),
+          cột phải = ô thông tin thanh toán (dính theo khung nhìn, rộng để chữ không chật chội).
+          `max-w-[1600px]` tận dụng khoảng trống hai bên trên màn hình rộng.
+          Ô thanh toán bắt đầu ngang với tiêu đề "Thông tin hành khách" (cùng đường cơ sở
+          của hàng grid) ⇒ hai khối thẳng hàng nhau.
+          `lg:self-start` trên ô thanh toán ⇒ grid không kéo giãn nó, nên ô dính giữ nguyên
+          vị trí và luôn hiển thị trọn vẹn khi cuộn từ đầu đến cuối trang. */}
+      <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(520px,42%)] xl:grid-cols-[minmax(0,1fr)_minmax(640px,44%)]">
+        <div className="min-w-0">
+          <h1 className="text-[26px] font-extrabold tracking-tight text-slate-900">Thông tin hành khách</h1>
+          <p className="mt-1 text-sm text-slate-500">Ngày sinh dùng để xác định loại vé theo ngày đi tour. Người lớn cần email để nhận vé và mở tour trong app.</p>
+          {/* Danh sách hành khách giữ nguyên thứ tự từ trên xuống dưới; khối này dài tự nhiên
+              theo số khách, không bị cắt — mỗi ô nhập luôn hiển thị trọn vẹn. */}
+          <div className="mt-4 space-y-4">
           {passengers.map((p, i) => {
             const meta = guestTypes.find((g) => g.type === p.guestType);
             typeIndex[p.guestType] = (typeIndex[p.guestType] || 0) + 1;
@@ -225,19 +248,36 @@ function CheckoutForm({ tourId }) {
             <LimitedField as="textarea" limit={1000} id="booking-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ví dụ: nhóm có người lớn tuổi, cần đi chậm"
               className={`${input} resize-none`} />
           </div>
+          </div>
         </div>
 
-        <aside className="lg:sticky lg:top-20">
-          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(16,32,29,0.08)]">
-            {tour.coverImageUrl && <img src={tour.coverImageUrl} alt="" className="aspect-[16/9] w-full object-cover" />}
-            <div className="p-5">
-              <h2 className="font-bold leading-snug text-slate-900">{tour.title}</h2>
-              <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-600"><CalendarDays size={14} />{longDate(date)} · {durationLabel(tour)}</p>
-              <ul className="mt-4 space-y-1.5 border-t border-dashed border-slate-200 pt-4 text-sm">
+        {/* Ô thông tin thanh toán: sticky ngay dưới header dính (lg:top-16 = 4rem),
+            chiều cao ôm sát nội dung (không kéo dài theo viewport) ⇒ không có khoảng
+            trống thừa trước nút "Xác nhận và thanh toán".
+            `lg:self-start` ⇒ grid không kéo giãn ô, nên nó dính đúng chỗ và hiển thị
+            trọn vẹn khi cuộn từ đầu đến cuối trang.
+            Khối nội dung cuộn nhỏ bên trong khi màn hình thấp (không cuộn cả trang). */}
+        <aside className="lg:sticky lg:top-16 lg:self-start">
+          <div className="flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(16,32,29,0.08)] lg:max-h-[calc(100vh-5rem)]">
+            <div className="flex min-h-0 flex-col p-4 sm:p-5 lg:p-6">
+              {/* Vùng nội dung cuộn riêng khi màn hình thấp (không cuộn trang). */}
+              <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
+              <div className="flex gap-4">
+                {tour.coverImageUrl && (
+                  // Ảnh nhỏ cạnh tiêu đề: gợi nhớ tour mà không chiếm nhiều chiều cao.
+                  <img src={tour.coverImageUrl} alt="" className="h-20 w-28 shrink-0 rounded-xl object-cover sm:h-24 sm:w-36" />
+                )}
+                <div className="min-w-0">
+                  <h2 className="font-bold leading-snug text-slate-900">{tour.title}</h2>
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-600"><CalendarDays size={14} />{longDate(date)} · {durationLabel(tour)}</p>
+                </div>
+              </div>
+              {/* Danh sách vé xếp 2 cột trên màn rộng ⇒ thông tin không bị chật chội, chiều cao ngắn lại. */}
+              <ul className="mt-4 grid gap-x-6 gap-y-2 border-t border-dashed border-slate-200 pt-4 text-sm sm:grid-cols-2">
                 {guestTypes.map(({ type, label }) => {
                   const n = passengers.filter((p) => p.guestType === type).length;
                   return n ? (
-                    <li key={type} className="flex justify-between text-slate-700"><span>{label} × {n}</span><span className="tabular-nums">{vnd(priceOf(type) * n)}</span></li>
+                    <li key={type} className="flex items-baseline justify-between gap-3 text-slate-700"><span className="shrink-0">{label} × {n}</span><span className="tabular-nums font-semibold text-slate-900">{vnd(priceOf(type) * n)}</span></li>
                   ) : null;
                 })}
               </ul>
@@ -253,13 +293,37 @@ function CheckoutForm({ tourId }) {
                   )}
                 </div>
               )}
-              <button type="submit" disabled={busy || (touched && hasErrors)}
+              {/* Thông báo mang theo giấy tờ tùy thân + checkbox xác nhận (bắt buộc tick mới thanh toán được). */}
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 p-3.5">
+                <p className="flex items-start gap-2 text-xs font-semibold leading-relaxed text-amber-900">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600" />
+                  <span>
+                    Vui lòng mang theo <b>CCCD/Hộ chiếu/VNeID</b> (hoặc ảnh chụp <b>Giấy khai sinh</b> đối với trẻ em) để đối chiếu khi check-in. Nếu độ tuổi thực tế không khớp với loại vé đã mua, hành khách cần thanh toán phần chênh lệch tại điểm tập trung.
+                  </span>
+                </p>
+                <label htmlFor="docs-ack"
+                  className="mt-2.5 flex cursor-pointer items-start gap-2.5 rounded-lg bg-white/70 p-2.5 text-xs font-semibold leading-relaxed text-amber-900 hover:bg-white">
+                  <input
+                    id="docs-ack"
+                    type="checkbox"
+                    checked={docsAcknowledged}
+                    onChange={(e) => setDocsAcknowledged(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-amber-600"
+                  />
+                  <span>Tôi đã đọc và đồng ý mang theo giấy tờ tùy thân theo thông báo trên.</span>
+                </label>
+              </div>
+              </div>
+              {/* Nút thanh toán + điều khoản: ghim cố định ở đáy thẻ (không cuộn theo nội dung). */}
+              <div className="lg:shrink-0">
+              <button type="submit" disabled={busy || !docsAcknowledged || (touched && hasErrors)}
                 className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] hover:bg-orange-700 disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none transition duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none cursor-pointer disabled:cursor-not-allowed">
                 {busy ? <Loader2 size={17} className="animate-spin" /> : <CreditCard size={17} />}
                 {pendingBooking ? "Thử thanh toán lại" : "Xác nhận và thanh toán"}
               </button>
-              <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-500"><Timer size={13} className="mt-px shrink-0 text-orange-600" />Sau khi xác nhận, chỗ được giữ trong 10 phút để bạn thanh toán.</p>
+              <p className="mt-2.5 flex items-start gap-1.5 text-xs text-slate-500"><Timer size={13} className="mt-px shrink-0 text-orange-600" />Sau khi xác nhận, chỗ được giữ trong 10 phút để bạn thanh toán.</p>
               <p className="mt-1.5 flex items-start gap-1.5 text-xs text-slate-500"><Lock size={13} className="mt-px shrink-0 text-teal-700" />Thanh toán an toàn qua cổng VNPay (thẻ ATM, QR ngân hàng, thẻ quốc tế).</p>
+              </div>
             </div>
           </div>
         </aside>
