@@ -17,15 +17,21 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  FileText,
 } from "lucide-react";
 import { PageHeader, StatCard, Panel, EmptyBlock } from "@/components/dashboard/DashboardUI";
 import { aiGuideService } from "../services/aiGuideService";
+import AdminAiDocumentsPanel from "./AdminAiDocumentsPanel";
+import AiMessageContent from "./AiMessageContent";
 
 const CONTENT_TYPE_OPTIONS = [
   { value: "", label: "Tất cả phân loại" },
   { value: "CULTURAL_STORY", label: "Câu chuyện văn hóa (CULTURAL_STORY)" },
   { value: "TOUR_INFO", label: "Thông tin địa điểm / Tour (TOUR_INFO)" },
   { value: "TASK_HINT", label: "Gợi ý nhiệm vụ (TASK_HINT)" },
+  { value: "PLATFORM_POLICY", label: "Chính sách nền tảng (PLATFORM_POLICY)" },
+  { value: "CULTURAL_SUPPLEMENT", label: "Bổ sung văn hóa (CULTURAL_SUPPLEMENT)" },
+  { value: "FAQ", label: "Câu hỏi thường gặp (FAQ)" },
   { value: "HISTORY", label: "Lịch sử (HISTORY)" },
   { value: "AUDIO", label: "Audio thuyết minh (AUDIO)" },
 ];
@@ -51,6 +57,7 @@ function formatDateTime(iso) {
 export default function AdminAiGuideScreen() {
   const [stats, setStats] = useState(null);
   const [destinations, setDestinations] = useState([]);
+  const [activeTab, setActiveTab] = useState("overview");
   const [syncDestId, setSyncDestId] = useState("");
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncingDest, setSyncingDest] = useState(false);
@@ -89,8 +96,10 @@ export default function AdminAiGuideScreen() {
     async (targetPage = page, dest = filterDestId, type = filterType) => {
       setLoadingChunks(true);
       try {
+        const isGlobal = dest === "__GLOBAL__";
         const res = await aiGuideService.getAdminChunks({
-          destinationId: dest || null,
+          destinationId: !isGlobal && dest ? dest : null,
+          globalOnly: isGlobal,
           contentType: type,
           page: targetPage,
           size: 15,
@@ -130,9 +139,11 @@ export default function AdminAiGuideScreen() {
 
   useEffect(() => {
     let active = true;
+    const isGlobal = filterDestId === "__GLOBAL__";
     aiGuideService
       .getAdminChunks({
-        destinationId: filterDestId || null,
+        destinationId: !isGlobal && filterDestId ? filterDestId : null,
+        globalOnly: isGlobal,
         contentType: filterType,
         page,
         size: 15,
@@ -275,8 +286,10 @@ export default function AdminAiGuideScreen() {
               Đồng bộ hoàn tất: đã tạo <b>{syncResult.totalChunksCreated ?? 0}</b> vector chunks
               {syncResult.processedContents != null && ` · Nội dung: ${syncResult.processedContents}`}
               {syncResult.processedDestinations != null && ` · Điểm đến: ${syncResult.processedDestinations}`}
+              {syncResult.processedTours != null && ` · Tour: ${syncResult.processedTours}`}
               {syncResult.processedTourStops != null && ` · Trạm tour: ${syncResult.processedTourStops}`}
               {syncResult.processedTasks != null && ` · Nhiệm vụ: ${syncResult.processedTasks}`}
+              {syncResult.processedAdminDocuments != null && ` · Tài liệu Admin: ${syncResult.processedAdminDocuments}`}
             </span>
           </div>
           <button
@@ -309,7 +322,7 @@ export default function AdminAiGuideScreen() {
           unit="phiên"
           icon={Bot}
           tone="emerald"
-          hint={`Tổng ${(stats?.totalMessages ?? 0).toLocaleString("vi-VN")} lượt trao đổi`}
+          hint={`Tổng ${(stats?.totalMessages ?? 0).toLocaleString("vi-VN")} lượt · ${stats?.activeAdminDocuments ?? 0} tài liệu (${stats?.activeAiRules ?? 0} rules)`}
         />
         <StatCard
           title="Chế độ Vector Store"
@@ -339,8 +352,56 @@ export default function AdminAiGuideScreen() {
         />
       </div>
 
-      {/* Đồng bộ theo điểm đến & Hộp thử nghiệm RAG */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* Chuyển tab Tổng quan / Tài liệu Context & Rule */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("overview")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
+            activeTab === "overview"
+              ? "bg-slate-900 text-white shadow-xs"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <Database size={14} />
+          Tổng quan, Đồng bộ & Vector Chunks
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("documents")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
+            activeTab === "documents"
+              ? "bg-indigo-600 text-white shadow-xs"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <FileText size={14} />
+          Tài liệu Context & Rule
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+              activeTab === "documents"
+                ? "bg-white/20 text-white"
+                : "bg-white text-slate-700"
+            }`}
+          >
+            {stats?.totalAdminDocuments ?? 0}
+          </span>
+        </button>
+      </div>
+
+      {activeTab === "documents" ? (
+        <AdminAiDocumentsPanel
+          destinations={destinations}
+          onDocumentsChanged={() => {
+            loadStatsAndDestinations();
+            loadChunks(0, filterDestId, filterType);
+          }}
+        />
+      ) : (
+        <>
+          {/* Đồng bộ theo điểm đến & Hộp thử nghiệm RAG */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Panel
           title="Đồng bộ Vector theo Điểm đến"
           description="Làm mới tức thời tri thức của một điểm đến cụ thể sau khi cập nhật nội dung."
@@ -460,9 +521,9 @@ export default function AdminAiGuideScreen() {
                     </span>
                   )}
                 </div>
-                <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-800">
-                  {sandboxReply.answer}
-                </p>
+                <div className="text-[13px] leading-relaxed text-slate-800">
+                  <AiMessageContent content={sandboxReply.answer} />
+                </div>
               </div>
             )}
           </form>
@@ -487,6 +548,7 @@ export default function AdminAiGuideScreen() {
               className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none"
             >
               <option value="">Tất cả điểm đến</option>
+              <option value="__GLOBAL__">Toàn nền tảng (Global)</option>
               {destinations.map((d) => (
                 <option key={d.id} value={String(d.id)}>
                   #{d.id} · {d.name}
@@ -541,8 +603,9 @@ export default function AdminAiGuideScreen() {
                   {chunkPage.content.map((c) => {
                     const destName =
                       c.metadata?.destination_name ||
-                      destMap.get(Number(c.destinationId)) ||
-                      `#${c.destinationId}`;
+                      (c.destinationId == null
+                        ? "Toàn nền tảng (Global)"
+                        : destMap.get(Number(c.destinationId)) || `#${c.destinationId}`);
                     return (
                       <tr key={c.id} className="hover:bg-slate-50/70">
                         <td className="px-4 py-3 font-mono text-[11px] font-semibold text-slate-700 whitespace-nowrap">
@@ -617,7 +680,9 @@ export default function AdminAiGuideScreen() {
             )}
           </>
         )}
-      </Panel>
+          </Panel>
+        </>
+      )}
 
       {/* Modal xem chi tiết Chunk */}
       {inspectChunk && (

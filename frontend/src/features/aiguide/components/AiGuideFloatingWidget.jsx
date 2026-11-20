@@ -203,6 +203,7 @@ export default function AiGuideFloatingWidget() {
               setDestinationId(val);
               handleNewSession(val);
             }}
+            onTourLinkClick={() => setOpen(false)}
             compact
           />
         </section>
