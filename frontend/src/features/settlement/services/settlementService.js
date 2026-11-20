@@ -135,3 +135,34 @@ export async function getSettlementsByProviderProfile(providerProfileId, { page 
   );
   return res?.data ?? res;
 }
+
+/**
+ * Kỳ tất toán ĐÃ CHỐT của một đối tác, kèm giao dịch tour của riêng họ.
+ *
+ * Backend chỉ trả các đợt đã được Admin duyệt (APPROVED) — tức là khi tiền đã cộng
+ * vào ví đối tác. Số tiền luôn tính theo riêng đối tác, kể cả đợt tất toán TỔNG (BATCH).
+ */
+export async function getFinalizedSettlementPeriods(
+  providerProfileId,
+  { page = 0, size = 10 } = {},
+) {
+  const res = await apiClient.get(
+    `${ENDPOINT}/provider-profile/${providerProfileId}/finalized?page=${page}&size=${size}`,
+  );
+  return res?.data ?? res;
+}
+
+/**
+ * Danh sách giao dịch tour đã được tất toán của một đối tác (mọi kỳ).
+ *
+ * Chỉ gồm giao dịch thuộc kỳ đã được Admin duyệt ⇒ tiền đã về ví đối tác.
+ */
+export async function getFinalizedSettlementTransactions(
+  providerProfileId,
+  { page = 0, size = 10 } = {},
+) {
+  const res = await apiClient.get(
+    `${ENDPOINT}/provider-profile/${providerProfileId}/finalized/transactions?page=${page}&size=${size}`,
+  );
+  return res?.data ?? res;
+}

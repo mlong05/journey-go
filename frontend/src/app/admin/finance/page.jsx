@@ -62,9 +62,7 @@ import {
   vnpayMessageForUser,
   vnpayResponseCodeForUser,
 } from "@/lib/money";
-
-/** Số bản ghi mỗi trang. */
-const PAGE_SIZE = 10;
+import { PAGE_SIZE } from "@/lib/pagination";
 
 /**
  * Giao dịch nào còn có thể "Truy vấn lại" từ VNPay?
@@ -114,7 +112,6 @@ export default function AdminFinancePage() {
 
 function PaymentsTab() {
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [pageData, setPageData] = useState({ content: [], totalElements: 0, totalPages: 0 });
   const [finance, setFinance] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -149,20 +146,20 @@ function PaymentsTab() {
           status: statusFilter || undefined,
           search: search || undefined,
           page,
-          size: pageSize,
+          size: PAGE_SIZE,
         }),
         // Tổng hợp 4 ô chỉ số (giao dịch thành công / tổng tiền giao dịch /
         // tổng tiền đã hoàn / thực thu nền tảng).
         getFinanceSummary().catch(() => null),
       ]);
-      setPageData(normalizePage(data, pageSize));
+      setPageData(normalizePage(data, PAGE_SIZE));
       if (fin) setFinance(fin);
     } catch (err) {
       setError(err?.message || "Không thể tải danh sách giao dịch.");
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, search, page, pageSize]);
+  }, [statusFilter, search, page]);
 
   useEffect(() => {
     // `queueMicrotask` để không gọi setState đồng bộ trong thân effect
@@ -230,11 +227,6 @@ function PaymentsTab() {
             totalElements={pageData.totalElements}
             unit="giao dịch"
             onChange={setPage}
-            pageSize={pageSize}
-            onSizeChange={(size) => {
-              setPageSize(size);
-              setPage(0);
-            }}
           />
         }
         right={
