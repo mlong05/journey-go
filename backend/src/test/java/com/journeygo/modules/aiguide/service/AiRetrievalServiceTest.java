@@ -42,19 +42,35 @@ class AiRetrievalServiceTest {
     }
 
     @Test
-    @DisplayName("Normal Guide Mode gọi tìm kiếm chung theo destinationId")
-    void normalGuideMode_searchesByDestination() {
+    @DisplayName("Normal Guide Mode gọi tìm kiếm gộp theo destinationId và tri thức GLOBAL")
+    void normalGuideMode_searchesByDestinationIncludingGlobal() {
         float[] vec = new float[]{1.0f, 0.0f};
         AiKnowledgeChunk c1 = AiKnowledgeChunk.builder().id(UUID.randomUUID()).sourceId("S1").build();
 
         when(embeddingService.embed("Chùa xây năm nào?")).thenReturn(vec);
         when(embeddingService.toVectorString(vec)).thenReturn("[1.0,0.0]");
-        when(chunkStore.searchSimilar(50L, null, vec, "[1.0,0.0]", 4)).thenReturn(List.of(c1));
+        when(chunkStore.searchSimilar(50L, true, null, vec, "[1.0,0.0]", 4)).thenReturn(List.of(c1));
 
         List<AiKnowledgeChunk> results = retrievalService.retrieveRelevantChunks("Chùa xây năm nào?", 50L, false);
 
         assertThat(results).containsExactly(c1);
-        verify(chunkStore).searchSimilar(50L, null, vec, "[1.0,0.0]", 4);
+        verify(chunkStore).searchSimilar(50L, true, null, vec, "[1.0,0.0]", 4);
+    }
+
+    @Test
+    @DisplayName("Normal Guide Mode với destinationId == null tìm toàn bộ kho tri thức (gồm GLOBAL)")
+    void normalGuideMode_nullDestination_searchesAll() {
+        float[] vec = new float[]{1.0f, 0.0f};
+        AiKnowledgeChunk policyChunk = AiKnowledgeChunk.builder().id(UUID.randomUUID()).sourceId("ADMIN_DOC:1").destinationId(null).build();
+
+        when(embeddingService.embed("Chính sách hoàn tiền?")).thenReturn(vec);
+        when(embeddingService.toVectorString(vec)).thenReturn("[1.0,0.0]");
+        when(chunkStore.searchSimilar(null, null, vec, "[1.0,0.0]", 4)).thenReturn(List.of(policyChunk));
+
+        List<AiKnowledgeChunk> results = retrievalService.retrieveRelevantChunks("Chính sách hoàn tiền?", null, false);
+
+        assertThat(results).containsExactly(policyChunk);
+        verify(chunkStore).searchSimilar(null, null, vec, "[1.0,0.0]", 4);
     }
 
     @Test

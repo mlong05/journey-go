@@ -8,9 +8,13 @@ import com.journeygo.modules.aiguide.dto.AiChatResponse;
 import com.journeygo.modules.aiguide.dto.AiChatSessionDto;
 import com.journeygo.modules.aiguide.entity.AiChatMessage;
 import com.journeygo.modules.aiguide.entity.AiChatSession;
+import com.journeygo.modules.aiguide.entity.AiDocumentScope;
+import com.journeygo.modules.aiguide.entity.AiDocumentType;
 import com.journeygo.modules.aiguide.entity.AiKnowledgeChunk;
+import com.journeygo.modules.aiguide.entity.AiKnowledgeDocument;
 import com.journeygo.modules.aiguide.repository.AiChatMessageRepository;
 import com.journeygo.modules.aiguide.repository.AiChatSessionRepository;
+import com.journeygo.modules.aiguide.repository.AiKnowledgeDocumentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,6 +59,9 @@ class VirtualGuideChatServiceTest {
 
     @Mock
     private AiRateLimiterService aiRateLimiterService;
+
+    @Mock
+    private AiKnowledgeDocumentRepository documentRepository;
 
     @InjectMocks
     private VirtualGuideChatService chatService;
@@ -266,5 +273,60 @@ class VirtualGuideChatServiceTest {
                 .isInstanceOf(AppException.class)
                 .extracting(ex -> ((AppException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.AI_RATE_LIMITED);
+    }
+
+    @Test
+    @DisplayName("Các AI_RULE đang bật từ Admin được tiêm vào System Prompt gửi cho Gemini")
+    void chat_appendsActiveAdminRulesToSystemPrompt() {
+        when(sessionRepository.findFirstByUserIdAndCurrentDestinationIdOrderByUpdatedAtDesc(100L, 50L))
+                .thenReturn(Optional.of(existingSession));
+        when(sessionRepository.save(any(AiChatSession.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(messageRepository.save(any(AiChatMessage.class))).thenAnswer(inv -> {
+            AiChatMessage msg = inv.getArgument(0);
+            msg.setId(UUID.randomUUID());
+            msg.setCreatedAt(Instant.now());
+            return msg;
+        });
+
+        AiKnowledgeDocument activeRule = AiKnowledgeDocument.builder()
+                .id(1L)
+                .title("Quy tắc ứng xử di tích")
+                .docType(AiDocumentType.AI_RULE)
+                .scope(AiDocumentScope.GLOBAL)
+                .rawText("Luôn nhắc du khách mặc trang phục lịch sự khi vào khu vực tâm linh.")
+                .active(true)
+                .build();
+        when(documentRepository.findActiveRulesForChat(50L)).thenReturn(List.of(activeRule));
+        when(aiRetrievalService.retrieveRelevantChunks(anyString(), eq(50L), eq(false))).thenReturn(List.of());
+        when(messageRepository.findRecentMessagesAsc(existingSessionId, 8)).thenReturn(List.of());
+        when(chatClient.generateReply(anyString(), anyList(), anyString(), anyDouble(), anyInt()))
+                .thenReturn("Vâng, bạn nhớ lưu ý trang phục lịch sự nhé.");
+
+        chatService.chat(100L, AiChatRequest.builder().destinationId(50L).question("Cần lưu ý gì không?").build());
+
+        ArgumentCaptor<String> systemCaptor = ArgumentCaptor.forClass(String.class);
+        verify(chatClient).generateReply(systemCaptor.capture(), anyList(), anyString(), anyDouble(), anyInt());
+        assertThat(systemCaptor.getValue())
+                .contains(VirtualGuidePromptTemplate.NORMAL_GUIDE_SYSTEM_PROMPT)
+                .contains("Quy tắc ứng xử di tích")
+                .contains("mặc trang phục lịch sự");
+    }
+
+    @Test
+    @DisplayName("sanitizeAnswerFormatting loại bỏ ** **, ### nhưng giữ nguyên link [Xem tour](/tours/{id})")
+    void sanitizeAnswerFormatting_removesBoldAsterisksAndPreservesTourLinks() {
+        String raw = """
+                ### Gợi ý điểm đến & tour
+                * **Hoàng Thành Huế**: Kinh thành cổ kính.
+                - Gợi ý trải nghiệm: [Xem tour: Đại Nội Huế](/tours/12)
+                """;
+
+        String cleaned = VirtualGuideChatService.sanitizeAnswerFormatting(raw);
+
+        assertThat(cleaned)
+                .doesNotContain("**")
+                .doesNotContain("###")
+                .contains("- Hoàng Thành Huế: Kinh thành cổ kính.")
+                .contains("[Xem tour: Đại Nội Huế](/tours/12)");
     }
 }

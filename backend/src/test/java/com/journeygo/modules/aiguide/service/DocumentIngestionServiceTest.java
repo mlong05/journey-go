@@ -118,4 +118,35 @@ class DocumentIngestionServiceTest {
         ingestionService.invalidateContent("CULTURAL_CONTENT:99");
         verify(chunkRepository).deleteBySourceId("CULTURAL_CONTENT:99");
     }
+
+    @Test
+    @DisplayName("ingestTourOverview lưu tri thức GLOBAL với tour_url /tours/{id}")
+    void ingestTourOverview_savesGlobalTourChunkWithUrl() {
+        when(embeddingService.embedAll(anyList())).thenReturn(List.of(new float[]{0.7f, 0.8f}));
+
+        int count = ingestionService.ingestTourOverview(
+                10L,
+                "Đại Nội Huế trọn một ngày",
+                "Miền Trung",
+                "Di sản",
+                "8 giờ",
+                "650.000 VNĐ",
+                "Khám phá kinh thành triều Nguyễn.",
+                List.of("Ngọ Môn", "Điện Thái Hòa"),
+                List.of("Ngọ Môn", "Chùa Thiên Mụ")
+        );
+
+        assertThat(count).isEqualTo(1);
+        verify(chunkRepository).deleteBySourceId("TOUR:10");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<AiKnowledgeChunk>> captor = ArgumentCaptor.forClass(List.class);
+        verify(chunkStore).saveChunks(captor.capture());
+        AiKnowledgeChunk saved = captor.getValue().get(0);
+        assertThat(saved.getSourceId()).isEqualTo("TOUR:10");
+        assertThat(saved.getDestinationId()).isNull();
+        assertThat(saved.getContentType()).isEqualTo("TOUR_INFO");
+        assertThat(saved.getChunkText()).contains("/tours/10").contains("650.000 VNĐ");
+        assertThat(saved.getMetadata()).containsEntry("tour_url", "/tours/10").containsEntry("scope", "GLOBAL");
+    }
 }

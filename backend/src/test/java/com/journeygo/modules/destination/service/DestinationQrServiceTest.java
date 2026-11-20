@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 
@@ -30,6 +31,7 @@ class DestinationQrServiceTest {
     @Mock private RegionRepository regionRepository;
     @Mock private ThemeRepository themeRepository;
     @Mock private DestinationModerationService moderationService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private DestinationService destinationService;
