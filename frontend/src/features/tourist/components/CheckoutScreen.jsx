@@ -19,13 +19,15 @@ import { LimitedField } from "@/components/ui/LimitedField";
 import { useGuestTypes } from "@/lib/guestTypes";
 
 const GENDERS = [["MALE", "Nam"], ["FEMALE", "Nữ"], ["OTHER", "Khác"]];
+/** Giới tính mặc định khi tạo hành khách — luôn là "Nam" (MALE). */
+const DEFAULT_GENDER = "MALE";
 const input = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 aria-[invalid=true]:border-rose-400";
 
 function buildPassengers(params, user) {
   const list = [];
   GUEST_TYPES.forEach(({ type }) => {
     const n = Math.max(0, Math.min(20, Number(params.get(type.toLowerCase()) || 0)));
-    for (let i = 0; i < n; i++) list.push({ guestType: type, fullName: "", birthDate: "", gender: "", email: "" });
+    for (let i = 0; i < n; i++) list.push({ guestType: type, fullName: "", birthDate: "", gender: DEFAULT_GENDER, email: "" });
   });
   // Người đặt là người lớn đầu tiên, điền sẵn từ tài khoản.
   const booker = list.find((p) => p.guestType === "ADULT");
@@ -73,6 +75,8 @@ function CheckoutForm({ tourId }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pendingBooking, setPendingBooking] = useState(null);
+  /** Người dùng đã đọc & đồng ý với quy định mang theo giấy tờ tùy thân khi check-in. */
+  const [docsAcknowledged, setDocsAcknowledged] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -100,6 +104,12 @@ function CheckoutForm({ tourId }) {
     }
     if (hasErrors) {
       document.querySelector("[aria-invalid=true]")?.focus();
+      return;
+    }
+    // Phải xác nhận đã đọc quy định mang theo CCCD/Hộ chiếu/VNeID trước khi thanh toán.
+    if (!docsAcknowledged) {
+      setError("Vui lòng tick vào ô xác nhận đã đọc thông báo về giấy tờ tùy thân.");
+      document.getElementById("docs-ack")?.focus();
       return;
     }
     setBusy(true);
@@ -283,10 +293,30 @@ function CheckoutForm({ tourId }) {
                   )}
                 </div>
               )}
+              {/* Thông báo mang theo giấy tờ tùy thân + checkbox xác nhận (bắt buộc tick mới thanh toán được). */}
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 p-3.5">
+                <p className="flex items-start gap-2 text-xs font-semibold leading-relaxed text-amber-900">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600" />
+                  <span>
+                    Vui lòng mang theo <b>CCCD/Hộ chiếu/VNeID</b> (hoặc ảnh chụp <b>Giấy khai sinh</b> đối với trẻ em) để đối chiếu khi check-in. Nếu độ tuổi thực tế không khớp với loại vé đã mua, hành khách cần thanh toán phần chênh lệch tại điểm tập trung.
+                  </span>
+                </p>
+                <label htmlFor="docs-ack"
+                  className="mt-2.5 flex cursor-pointer items-start gap-2.5 rounded-lg bg-white/70 p-2.5 text-xs font-semibold leading-relaxed text-amber-900 hover:bg-white">
+                  <input
+                    id="docs-ack"
+                    type="checkbox"
+                    checked={docsAcknowledged}
+                    onChange={(e) => setDocsAcknowledged(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-amber-600"
+                  />
+                  <span>Tôi đã đọc và đồng ý mang theo giấy tờ tùy thân theo thông báo trên.</span>
+                </label>
+              </div>
               </div>
               {/* Nút thanh toán + điều khoản: ghim cố định ở đáy thẻ (không cuộn theo nội dung). */}
               <div className="lg:shrink-0">
-              <button type="submit" disabled={busy || (touched && hasErrors)}
+              <button type="submit" disabled={busy || !docsAcknowledged || (touched && hasErrors)}
                 className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] hover:bg-orange-700 disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none transition duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none cursor-pointer disabled:cursor-not-allowed">
                 {busy ? <Loader2 size={17} className="animate-spin" /> : <CreditCard size={17} />}
                 {pendingBooking ? "Thử thanh toán lại" : "Xác nhận và thanh toán"}
