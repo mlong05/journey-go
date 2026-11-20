@@ -8,6 +8,8 @@ import com.journeygo.modules.settlement.dto.request.RejectSettlementRequest;
 import com.journeygo.modules.settlement.dto.response.BatchSettlementCandidatesResponse;
 import com.journeygo.modules.settlement.dto.response.FinanceSummaryResponse;
 import com.journeygo.modules.settlement.dto.response.PlatformRevenueSummaryResponse;
+import com.journeygo.modules.settlement.dto.response.ProviderSettlementPeriodResponse;
+import com.journeygo.modules.settlement.dto.response.ProviderSettlementTransactionResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementCandidatesResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementDetailResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementOverviewResponse;
@@ -228,5 +230,43 @@ public class SettlementController {
             @ParameterObject @PageableDefault(page = 0, size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách đợt tất toán thành công",
                 settlementService.getByProviderProfile(providerProfileId, pageable)));
+    }
+
+    /**
+     * Kỳ tất toán ĐÃ CHỐT của đối tác, kèm giao dịch tour của riêng họ.
+     *
+     * <p>Dùng cho tab "Tài chính & Doanh thu" của đối tác: chỉ hiển thị kết quả cuối cùng
+     * (kỳ đã được Admin duyệt ⇒ tiền đã về ví), không hiển thị trạng thái chờ tất toán.
+     */
+    @GetMapping("/provider-profile/{providerProfileId}/finalized")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Kỳ tất toán đã chốt của một đối tác kèm giao dịch tour",
+            description = "Chỉ trả các đợt đã được Admin duyệt (APPROVED) — tức là khi tiền đã "
+                    + "cộng vào ví đối tác. Số tiền và danh sách giao dịch luôn thuộc riêng đối tác, "
+                    + "kể cả khi đợt có phạm vi TỔNG (BATCH).")
+    public ResponseEntity<ApiResponse<PageResponse<ProviderSettlementPeriodResponse>>> getFinalizedPeriods(
+            @PathVariable Long providerProfileId,
+            @ParameterObject @PageableDefault(page = 0, size = 10, sort = "revenuePeriod", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy kỳ tất toán đã chốt thành công",
+                settlementService.getFinalizedPeriodsForProvider(providerProfileId, pageable)));
+    }
+
+    /**
+     * Danh sách giao dịch tour đã được tất toán của một đối tác (mọi kỳ).
+     *
+     * <p>Chỉ gồm giao dịch thuộc kỳ đã được Admin duyệt ⇒ tiền đã về ví đối tác.
+     */
+    @GetMapping("/provider-profile/{providerProfileId}/finalized/transactions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_PROVIDER')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Giao dịch tour đã tất toán của một đối tác",
+            description = "Chỉ trả giao dịch nằm trong kỳ tất toán đã duyệt (APPROVED). "
+                    + "Mỗi giao dịch kèm mã đơn, tên tour, ngày trải nghiệm và các khoản tiền.")
+    public ResponseEntity<ApiResponse<PageResponse<ProviderSettlementTransactionResponse>>> getFinalizedTransactions(
+            @PathVariable Long providerProfileId,
+            @ParameterObject @PageableDefault(page = 0, size = 10) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy giao dịch đã tất toán thành công",
+                settlementService.getFinalizedTransactionsForProvider(providerProfileId, pageable)));
     }
 }

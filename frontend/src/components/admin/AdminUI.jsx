@@ -85,7 +85,7 @@ export function Panel({ icon: Icon, title, right, children, fill = false, footer
 
 /**
  * Thanh phân trang — bọc component dùng chung `PaginationBar`
- * (số trang, nút nhảy đầu/cuối, "Đang xem trang X / Y" và ô "Số dòng/trang").
+ * (số trang, nút nhảy đầu/cuối, "Đang xem trang X / Y").
  * Luôn hiện kể cả khi chỉ có 1 trang.
  */
 export function Pagination({
@@ -94,8 +94,6 @@ export function Pagination({
   totalElements,
   unit = "bản ghi",
   onChange,
-  pageSize,
-  onSizeChange,
 }) {
   if (!totalElements) return null;
   return (
@@ -105,8 +103,6 @@ export function Pagination({
       totalElements={totalElements}
       unit={unit}
       onChange={onChange}
-      pageSize={pageSize}
-      onSizeChange={onSizeChange}
     />
   );
 }

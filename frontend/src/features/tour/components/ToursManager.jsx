@@ -19,14 +19,12 @@ import {
   Ban,
   BadgeCheck,
   RotateCcw,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Layers,
   ShieldCheck,
 } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
+import PaginationBar from "@/components/ui/PaginationBar";
+import { PAGE_SIZE } from "@/lib/pagination";
 import { tourService } from "../services/tourService";
 import {
   getTourTheme,
@@ -65,9 +63,6 @@ import { useQueueRefresh } from "@/context/NotificationContext";
  *     ^                 │
  *     └───update────────┴──reject──> REJECTED ──submit──> PENDING_REVIEW
  * ========================================================================= */
-
-/* Số dòng mỗi trang */
-const SIZE_OPTIONS = [6, 12, 24];
 
 /* Lưới dùng chung cho tiêu đề cột và từng dòng để thẳng hàng: STT và Thao tác cố định ở hai mép,
    cột Tour rộng nhất vì tên dài */
@@ -122,143 +117,6 @@ function Toast({ msg, tone }) {
 }
 
 
-/* ── Thanh phân trang ────────────────────────────────────────── */
-function PaginationBar({
-  totalElements,
-  pageNumber,
-  pageSize,
-  totalPages,
-  onPageChange,
-  onSizeChange,
-}) {
-  const currentPage = pageNumber + 1;
-  const safeTotalPages = Math.max(totalPages, 1);
-
-  const visiblePageNumbers = useMemo(() => {
-    const total = safeTotalPages;
-    const curr = currentPage;
-    if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
-    const start = Math.max(1, curr - 2);
-    const end = Math.min(total, curr + 2);
-    const pages = [];
-    for (let p = start; p <= end; p += 1) pages.push(p);
-    if (start > 1) {
-      pages.unshift(1);
-      if (start > 2) pages.splice(1, 0, "...");
-    }
-    if (end < total) {
-      if (end < total - 1) pages.push("...");
-      pages.push(total);
-    }
-    return pages;
-  }, [safeTotalPages, currentPage]);
-
-  const isFirst = pageNumber <= 0;
-  const isLast = pageNumber >= safeTotalPages - 1;
-  const navBtn =
-    "p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
-
-  return (
-    <div
-      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-4 sm:pl-5 ${HEADER_PAD} py-3 bg-slate-50/60 border-t border-slate-100`}
-    >
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-        <span className="text-xs text-slate-600 font-semibold">
-          Đang xem trang{" "}
-          <strong className="font-bold text-slate-900">{currentPage}</strong> /{" "}
-          <strong className="font-bold text-slate-900">{safeTotalPages}</strong>{" "}
-          <span className="text-slate-400">
-            ({totalElements.toLocaleString("vi-VN")} tour)
-          </span>
-        </span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-slate-600 font-bold">
-            Số dòng/trang:
-          </span>
-          <select
-            value={pageSize}
-            onChange={(e) => onSizeChange(Number(e.target.value))}
-            aria-label="Số dòng mỗi trang"
-            className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500/20 cursor-pointer"
-          >
-            {SIZE_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onPageChange(0)}
-          disabled={isFirst}
-          className={navBtn}
-          title="Trang đầu"
-          aria-label="Trang đầu"
-        >
-          <ChevronsLeft size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onPageChange(pageNumber - 1)}
-          disabled={isFirst}
-          className={navBtn}
-          title="Trang trước"
-          aria-label="Trang trước"
-        >
-          <ChevronLeft size={14} />
-        </button>
-
-        {visiblePageNumbers.map((p, idx) =>
-          p === "..." ? (
-            <span key={`dots-${idx}`} className="px-2 text-xs text-slate-400 font-bold select-none">
-              ...
-            </span>
-          ) : (
-            <button
-              key={`page-${p}`}
-              type="button"
-              onClick={() => onPageChange(Number(p) - 1)}
-              aria-current={p === currentPage ? "page" : undefined}
-              className={`min-w-[32px] h-7 px-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
-                p === currentPage
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
-              }`}
-            >
-              {p}
-            </button>
-          )
-        )}
-
-        <button
-          type="button"
-          onClick={() => onPageChange(pageNumber + 1)}
-          disabled={isLast}
-          className={navBtn}
-          title="Trang sau"
-          aria-label="Trang sau"
-        >
-          <ChevronRight size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onPageChange(safeTotalPages - 1)}
-          disabled={isLast}
-          className={navBtn}
-          title="Trang cuối"
-          aria-label="Trang cuối"
-        >
-          <ChevronsRight size={14} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
 /* =========================================================================
  *  COMPONENT CHÍNH
  * ========================================================================= */
@@ -304,7 +162,6 @@ export default function ToursManager({
   const [toastTone, setToastTone] = useState("success");
 
   const [pageNumber, setPageNumber] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
 
   /* ── Helpers ───────────────────────────────────────────────── */
   const showToast = useCallback((msg, tone = "success") => {
@@ -618,12 +475,12 @@ export default function ToursManager({
   }, [baseTours, searchQuery, statusTab, deletionFilter]);
 
   /* ── Phân trang ────────────────────────────────────────────── */
-  const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1);
+  const totalPages = Math.max(Math.ceil(filtered.length / PAGE_SIZE), 1);
   const safePageNumber = Math.min(pageNumber, totalPages - 1);
   const pagedItems = useMemo(() => {
-    const start = safePageNumber * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, safePageNumber, pageSize]);
+    const start = safePageNumber * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, safePageNumber]);
 
   const handleStatusChange = useCallback((tab) => {
     setStatusTab(tab);
@@ -632,11 +489,6 @@ export default function ToursManager({
 
   const handleSearchChange = useCallback((value) => {
     setSearchQuery(value);
-    setPageNumber(0);
-  }, []);
-
-  const handlePageSizeChange = useCallback((size) => {
-    setPageSize(size);
     setPageNumber(0);
   }, []);
 
@@ -1037,7 +889,7 @@ export default function ToursManager({
                   <div className={ROW_GRID}>
                     {/* Số thứ tự (tính theo trang) */}
                     <div className="hidden md:block md:col-span-1 text-center text-xs font-bold text-slate-500 tabular-nums">
-                      {safePageNumber * pageSize + idx + 1}
+                      {safePageNumber * PAGE_SIZE + idx + 1}
                     </div>
 
                     {/* Cột 1: Tour */}
@@ -1094,12 +946,12 @@ export default function ToursManager({
         {/* Phân trang */}
         <div className="shrink-0 border-t border-slate-100">
           <PaginationBar
-            totalElements={filtered.length}
-            pageNumber={safePageNumber}
-            pageSize={pageSize}
+            page={safePageNumber}
             totalPages={totalPages}
-            onPageChange={handlePageChange}
-            onSizeChange={handlePageSizeChange}
+            totalElements={filtered.length}
+            unit="tour"
+            onChange={handlePageChange}
+            className={HEADER_PAD}
           />
         </div>
       </section>

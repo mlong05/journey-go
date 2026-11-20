@@ -10,7 +10,10 @@
  *    và danh sách đơn của một lịch khởi hành khi mở rộng).
  *  - GET /provider/bookings/{bookingId}                            : chi tiết + danh sách hành khách
  *
- * "Khách đã đăng ký" = đơn CONFIRMED/COMPLETED; đơn PENDING_PAYMENT hiện riêng là "đang giữ chỗ".
+ * ⚠️ DANH SÁCH NÀY là danh sách khách THAM GIA chuyến đi — mục đích để đối tác biết
+ * ngày đó có bao nhiêu người đi để quản lý. Vì vậy chỉ gồm đơn ĐÃ THANH TOÁN
+ * (CONFIRMED / COMPLETED). Đơn chưa thanh toán (PENDING_PAYMENT), đơn quá hạn (EXPIRED),
+ * đơn đã hủy (CANCELLED) và đơn đã được Admin duyệt hoàn tiền đều KHÔNG xuất hiện.
  *
  * Trong màn này đối tác có thể:
  *  • Xem mỗi tour, mỗi ngày có bao nhiêu khách / còn bao nhiêu chỗ.
@@ -44,8 +47,9 @@ import {
   sendBookingMessage,
 } from "@/features/booking/services/passengerService";
 import { providerTourService } from "@/features/tourwizard/services/providerTourService";
-import Pager from "@/features/booking/components/Pager";
-
+import PaginationBar from "@/components/ui/PaginationBar";
+import SearchSelect from "@/components/ui/SearchSelect";
+import { PAGE_SIZE } from "@/lib/pagination";
 const GUEST_LABELS = {
   ADULT: "Người lớn",
   CHILD: "Trẻ em",
@@ -59,21 +63,19 @@ const SCOPE_OPTIONS = [
   { value: "ALL", label: "Tất cả" },
 ];
 
+/**
+ * Bộ lọc trạng thái — danh sách này CHỈ gồm đơn đã thanh toán (khách thực sự tham gia).
+ * Đơn chưa thanh toán / quá hạn / đã hủy / đã hoàn tiền không xuất hiện trong danh sách.
+ */
 const STATUS_FILTERS = [
   { value: "", label: "Mọi trạng thái" },
   { value: "CONFIRMED", label: BOOKING_STATUS_LABELS.CONFIRMED },
-  { value: "PENDING_PAYMENT", label: BOOKING_STATUS_LABELS.PENDING_PAYMENT },
   { value: "COMPLETED", label: BOOKING_STATUS_LABELS.COMPLETED },
-  { value: "CANCELLED", label: BOOKING_STATUS_LABELS.CANCELLED },
-  { value: "EXPIRED", label: BOOKING_STATUS_LABELS.EXPIRED },
 ];
 
 const STATUS_BADGE = {
-  PENDING_PAYMENT: "bg-amber-100 text-amber-700",
   CONFIRMED: "bg-emerald-100 text-emerald-700",
   COMPLETED: "bg-blue-100 text-blue-700",
-  EXPIRED: "bg-slate-200 text-slate-600",
-  CANCELLED: "bg-red-100 text-red-700",
 };
 
 const GUEST_ORDER = ["ADULT", "CHILD", "TODDLER", "INFANT"];
@@ -142,16 +144,25 @@ export default function ProviderBookingsPage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   // Danh sách tour của đối tác cho bộ lọc.
+  // Lấy NHIỀU TRANG để dropdown có đủ tour (đối tác lớn có hàng trăm tour).
   useEffect(() => {
     let cancelled = false;
-    providerTourService
-      .list({ page: 0, size: 100 })
-      .then((data) => {
-        if (!cancelled) setTours(pageContent(data));
-      })
-      .catch(() => {
-        if (!cancelled) setTours([]);
-      });
+    const fetchAll = async () => {
+      const collected = [];
+      let page = 0;
+      let totalPages = 1;
+      do {
+        const data = await providerTourService.list({ page, size: 100 });
+        if (cancelled) return;
+        collected.push(...pageContent(data));
+        totalPages = data?.totalPages ?? 1;
+        page += 1;
+      } while (page < totalPages && page < 20);
+      if (!cancelled) setTours(collected);
+    };
+    fetchAll().catch(() => {
+      if (!cancelled) setTours([]);
+    });
     return () => {
       cancelled = true;
     };
@@ -170,7 +181,7 @@ export default function ProviderBookingsPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-900">Khách hàng đã đặt tour</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Theo dõi số khách từng ngày khởi hành và danh sách hành khách của các tour bạn tạo.
+            Danh sách khách ĐÃ THANH TOÁN — dùng để quản lý số người tham gia từng chuyến đi.
           </p>
         </div>
         <button
@@ -191,18 +202,18 @@ export default function ProviderBookingsPage() {
             Theo đơn
           </button>
         </div>
-        <select
+        <SearchSelect
           value={tourId}
-          onChange={(e) => setTourId(e.target.value)}
-          className="max-w-xs rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-blue-500"
-        >
-          <option value="">Tất cả tour</option>
-          {tours.map((t) => (
-            <option key={t.tourId} value={t.tourId}>
-              {t.title || `Tour #${t.tourId}`}
-            </option>
-          ))}
-        </select>
+          onChange={setTourId}
+          allLabel="Tất cả tour"
+          placeholder="Chọn tour"
+          maxVisible={7}
+          className="w-full max-w-xs"
+          options={tours.map((t) => ({
+            value: String(t.tourId),
+            label: t.title || `Tour #${t.tourId}`,
+          }))}
+        />
       </div>
 
       {/* key = tourId ⇒ đổi tour thì về trang đầu. */}
@@ -226,7 +237,7 @@ function DeparturesView({ tourId, reloadKey, onChanged }) {
 
   const { loading, data: raw, error } = useRemote(
     JSON.stringify(["departures", tourId, scope, includeEmpty, page, reloadKey]),
-    () => getProviderDepartures({ tourId, scope, includeEmpty, page, size: 20 }).then(toPage),
+    () => getProviderDepartures({ tourId, scope, includeEmpty, page, size: PAGE_SIZE }).then(toPage),
     "Không thể tải lịch khởi hành.",
   );
   const data = raw ?? { items: [], totalPages: 0, totalElements: 0 };
@@ -283,7 +294,7 @@ function DeparturesView({ tourId, reloadKey, onChanged }) {
               return (
                 <li key={key}>
                   <DepartureRow departure={d} open={open} onToggle={() => setExpandedKey(open ? null : key)} />
-                  {open && <DepartureBookings departure={d} reloadKey={reloadKey} onChanged={onChanged} />}
+                  {open && <DepartureBookings departure={d} reloadKey={reloadKey} />}
                 </li>
               );
             })}
@@ -291,7 +302,17 @@ function DeparturesView({ tourId, reloadKey, onChanged }) {
         )}
       </div>
 
-      {data.totalPages > 1 && <Pager page={page} totalPages={data.totalPages} onChange={setPage} />}
+      {data.totalElements > 0 && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <PaginationBar
+            page={page}
+            totalPages={data.totalPages}
+            totalElements={data.totalElements}
+            unit="lịch khởi hành"
+            onChange={setPage}
+          />
+        </div>
+      )}
     </>
   );
 }
@@ -309,7 +330,7 @@ function DepartureRow({ departure: d, open, onToggle }) {
     <button
       type="button"
       onClick={onToggle}
-      className="grid w-full grid-cols-1 items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-slate-50 md:grid-cols-[minmax(0,1fr)_220px_auto]"
+      className="grid w-full grid-cols-1 items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-slate-50 md:grid-cols-[minmax(0,1fr)_220px_120px]"
     >
       <div className="flex min-w-0 items-start gap-2">
         {open ? (
@@ -329,13 +350,14 @@ function DepartureRow({ departure: d, open, onToggle }) {
         </div>
       </div>
 
-      <div className="pl-6 md:pl-0">
-        <div className="flex items-baseline justify-between text-xs">
+      {/* Cột sức chứa — cố định 220px để thanh tiến trình luôn dài bằng nhau. */}
+      <div className="w-full pl-6 md:w-[220px] md:pl-0">
+        <div className="flex items-baseline justify-between gap-2 text-xs">
           <span className="flex items-center gap-1 text-slate-500">
             <Users size={13} />
             <span className="text-sm font-bold text-slate-900">{d.confirmedGuests}</span> khách
           </span>
-          <span className="text-slate-500">
+          <span className="whitespace-nowrap text-slate-500">
             {capacity ? (
               <>
                 <b className="text-slate-800">{d.reservedSeats ?? d.confirmedSeats}</b>/{capacity} chỗ
@@ -345,12 +367,10 @@ function DepartureRow({ departure: d, open, onToggle }) {
             )}
           </span>
         </div>
-        {capacity > 0 && (
-          <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full bg-emerald-500" style={{ width: `${confirmedPct}%` }} />
-            <div className="h-full bg-amber-300" style={{ width: `${pendingPct}%` }} />
-          </div>
-        )}
+        <div className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full bg-emerald-500" style={{ width: `${confirmedPct}%` }} />
+          <div className="h-full bg-amber-300" style={{ width: `${pendingPct}%` }} />
+        </div>
         {d.pendingBookings > 0 && (
           <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-700">
             <Clock size={11} /> {d.pendingGuests} khách đang giữ chỗ ({d.pendingBookings} đơn chờ thanh toán)
@@ -359,15 +379,26 @@ function DepartureRow({ departure: d, open, onToggle }) {
       </div>
 
       <div className="flex items-center justify-between gap-3 pl-6 md:flex-col md:items-end md:pl-0">
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${state.cls}`}>{state.label}</span>
-        <span className="font-mono text-xs font-bold text-slate-900">{formatVND(d.revenue)}</span>
+        <span
+          className={`inline-flex min-w-[96px] justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${state.cls}`}
+        >
+          {state.label}
+        </span>
+        <span className="whitespace-nowrap font-mono text-xs font-bold text-slate-900">{formatVND(d.revenue)}</span>
       </div>
     </button>
   );
 }
 
-/** Các đơn của một lịch khởi hành (mở rộng từ dòng tour × ngày). */
-function DepartureBookings({ departure, reloadKey, onChanged }) {
+/**
+ * Các đơn + danh sách hành khách thực tế của một lịch khởi hành
+ * (mở rộng từ dòng tour × ngày).
+ *
+ * Yêu cầu nghiệp vụ: đối tác cần danh sách NGƯỜI THỰC TẾ đã đăng ký (những người được
+ * điền khi đặt tour), không phải tên tài khoản đặt tour. Vì vậy mỗi đơn hiển thị kèm
+ * danh sách hành khách ngay bên dưới, không cần bấm thêm vào đơn.
+ */
+function DepartureBookings({ departure, reloadKey }) {
   const { loading, data, error } = useRemote(
     JSON.stringify(["departure-bookings", departure.tourId, departure.date, reloadKey]),
     () =>
@@ -378,19 +409,90 @@ function DepartureBookings({ departure, reloadKey, onChanged }) {
   );
   const bookings = data ?? [];
 
+  const totalPassengers = bookings.reduce(
+    (sum, b) => sum + (b.passengers?.length ?? b.passengerCount ?? 0),
+    0,
+  );
+
   return (
-    <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3">
+    <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-4">
       {error && <ErrorBox message={error} />}
       {loading ? (
-        <LoadingRow text="Đang tải đơn..." />
+        <LoadingRow text="Đang tải danh sách khách..." />
       ) : bookings.length === 0 ? (
         <p className="py-4 text-center text-xs text-slate-500">Ngày này chưa có đơn nào.</p>
       ) : (
-        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
-          {bookings.map((b) => (
-            <BookingRow key={b.id} booking={b} showTour={false} onChanged={onChanged} />
-          ))}
-        </ul>
+        <>
+          <p className="mb-3 flex items-center gap-1.5 text-xs font-bold text-slate-700">
+            <Users size={13} />
+            Danh sách khách đã đăng ký ({totalPassengers} người · {bookings.length} đơn)
+          </p>
+          <div className="space-y-3">
+            {bookings.map((b) => (
+              <div
+                key={b.id}
+                className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+              >
+                {/* Header của nhóm: tài khoản đặt tour + trạng thái đơn */}
+                <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-2">
+                  <span className="text-xs font-bold text-slate-900">
+                    Đơn của tài khoản: {b.touristName}
+                  </span>
+                  <span
+                    className={`inline-flex min-w-[104px] justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      STATUS_BADGE[b.status] ?? "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {BOOKING_STATUS_LABELS[b.status] ?? b.status}
+                  </span>
+                  <span className="ml-auto whitespace-nowrap font-mono text-xs font-bold text-slate-900">
+                    {formatVND(b.totalAmount)}
+                  </span>
+                </div>
+
+                {/* Danh sách người thực tế đăng ký tour */}
+                <ul className="divide-y divide-slate-100">
+                  {(b.passengers ?? []).map((p) => (
+                    <li
+                      key={p.id}
+                      className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900">
+                          {p.fullName}
+                          {p.bookingCustomer && (
+                            <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                              Người đặt
+                            </span>
+                          )}
+                          {p.status === "REPLACED" && (
+                            <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                              Đã thay thế
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-slate-500">
+                          {p.guestTypeLabel ?? GUEST_LABELS[p.guestType] ?? p.guestType}
+                          {p.ageAtExperience != null ? ` · ${p.ageAtExperience} tuổi` : ""}
+                          {p.email ? ` · ${p.email}` : ""}
+                          {` · ${p.hasAccount ? "Đã có tài khoản" : "Chưa có tài khoản"}`}
+                        </p>
+                      </div>
+                      <span className="whitespace-nowrap font-mono text-xs font-bold text-slate-900">
+                        {formatVND(p.price)}
+                      </span>
+                    </li>
+                  ))}
+                  {(b.passengers ?? []).length === 0 && (
+                    <li className="px-4 py-3 text-center text-xs text-slate-500">
+                      Đơn này chưa có thông tin hành khách.
+                    </li>
+                  )}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -405,7 +507,7 @@ function BookingsView({ tourId, reloadKey, onChanged }) {
 
   const { loading, data: raw, error } = useRemote(
     JSON.stringify(["bookings", tourId, status, page, reloadKey]),
-    () => getProviderBookings({ tourId, statuses: status ? [status] : [], page, size: 20 }).then(toPage),
+    () => getProviderBookings({ tourId, statuses: status ? [status] : [], page, size: PAGE_SIZE }).then(toPage),
     "Không thể tải danh sách khách hàng.",
   );
   const data = raw ?? { items: [], totalPages: 0, totalElements: 0 };
@@ -446,7 +548,17 @@ function BookingsView({ tourId, reloadKey, onChanged }) {
         )}
       </div>
 
-      {data.totalPages > 1 && <Pager page={page} totalPages={data.totalPages} onChange={setPage} />}
+      {data.totalElements > 0 && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <PaginationBar
+            page={page}
+            totalPages={data.totalPages}
+            totalElements={data.totalElements}
+            unit="đơn đặt"
+            onChange={setPage}
+          />
+        </div>
+      )}
     </>
   );
 }
@@ -468,13 +580,15 @@ function BookingRow({ booking: b, showTour, onChanged }) {
           <p className={`${showTour ? "mt-0.5 text-xs text-slate-500" : "text-sm font-semibold text-slate-800"}`}>
             {showTour ? "Khách: " : ""}
             {b.touristName}
-            <span className="ml-2 font-mono text-[11px] font-normal text-slate-500">{b.bookingCode}</span>
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+          {/* Badge trạng thái: min-width cố định để các hàng thẳng hàng với nhau. */}
           <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_BADGE[b.status] ?? "bg-slate-100 text-slate-600"}`}
+            className={`inline-flex min-w-[104px] justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              STATUS_BADGE[b.status] ?? "bg-slate-100 text-slate-600"
+            }`}
           >
             {BOOKING_STATUS_LABELS[b.status] ?? b.status}
           </span>
@@ -486,7 +600,7 @@ function BookingRow({ booking: b, showTour, onChanged }) {
           <span className="flex items-center gap-1">
             <Users size={13} /> {b.passengerCount ?? 0} người
           </span>
-          <span className="font-mono font-bold text-slate-900">{formatVND(b.totalAmount)}</span>
+          <span className="whitespace-nowrap font-mono font-bold text-slate-900">{formatVND(b.totalAmount)}</span>
         </div>
       </button>
 

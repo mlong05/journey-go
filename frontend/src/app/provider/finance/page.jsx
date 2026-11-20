@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   BarChart3,
   ChevronRight,
-  Clock,
   FileCheck,
   Loader2,
   Percent,
@@ -14,63 +13,41 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useProviderProfileContext } from "@/features/providerprofile/hooks/useProviderProfileContext";
-import {
-  getProviderProfileWallet,
-  getProviderProfileWalletTransactions,
-  getRevenuesByProviderProfile,
-} from "@/features/settlement/services/providerRevenueService";
-import { getSettlementsByProviderProfile } from "@/features/settlement/services/settlementService";
+import { getProviderProfileWallet, getProviderProfileWalletTransactions } from "@/features/settlement/services/providerRevenueService";
+import { getFinalizedSettlementPeriods } from "@/features/settlement/services/settlementService";
 import {
   formatDateTimeVN,
   formatDateVN,
   formatPeriod,
   formatVND,
-  SETTLEMENT_STATUS_LABELS,
 } from "@/lib/money";
 import { ROUTES } from "@/constants/routes";
+import PaginationBar from "@/components/ui/PaginationBar";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 /**
  * Tổng quan tài chính của Đối tác — /provider/finance
  *
- * Bố cục khóa khung (màn xl+): tiêu đề → dải 4 ô số liệu → 2 cột
- *   [Doanh thu theo kỳ (7/12)] | [Giao dịch ví gần đây / Tất toán gần đây (5/12)]
- * Chỉ các danh sách bên trong thẻ tự cuộn. Màn nhỏ: các khối xếp dọc, vùng nội dung cuộn.
+ * ── Nguyên tắc hiển thị ──
+ * Đối tác CHỈ thấy KẾT QUẢ CUỐI CÙNG: các kỳ tất toán đã được Admin duyệt
+ * (tức là khi tiền đã cộng vào ví). Không hiển thị "chờ tất toán" / bản nháp /
+ * đợt bị từ chối — những trạng thái đó là thông tin nội bộ của Admin.
  *
- * Số liệu:
- *  • Số dư ví                 → `wallet.balance`
- *  • Chờ tất toán / Đã tất toán / Hoa hồng → cộng từ các khoản doanh thu (`ProviderRevenue`)
- *    (trước đây "Đã cộng/Đã trừ (gần nhất)" chỉ cộng 5 giao dịch cuối, "Số đợt tất toán"
- *    luôn ≤ 5 — không phản ánh đúng dữ liệu).
+ * Bố cục khóa khung (màn xl+): tiêu đề → dải 4 ô số liệu → 2 cột
+ *   [Kỳ tất toán (7/12)] | [Giao dịch ví gần đây (5/12)]
+ * Chỉ các danh sách bên trong thẻ tự cuộn.
  */
 
-/** Số khoản doanh thu tải về để tổng hợp (đủ cho nhiều năm hoạt động của một đối tác). */
-const REVENUE_FETCH_SIZE = 500;
 const LIST_FETCH_SIZE = 20;
-
-const OPEN_REVENUE_STATUSES = new Set(["PENDING", "ELIGIBLE", "IN_SETTLEMENT"]);
-
-const SETTLEMENT_TONE = {
-  DRAFT: "bg-amber-50 text-amber-700",
-  APPROVED: "bg-emerald-50 text-emerald-700",
-  REJECTED: "bg-rose-50 text-rose-700",
-  CANCELLED: "bg-slate-100 text-slate-600",
-};
 
 const TONE = {
   emerald: { chip: "bg-emerald-50 text-emerald-600", text: "text-emerald-600" },
-  amber: { chip: "bg-amber-50 text-amber-600", text: "text-amber-600" },
   sky: { chip: "bg-sky-50 text-sky-600", text: "text-sky-600" },
   indigo: { chip: "bg-indigo-50 text-indigo-600", text: "text-slate-900" },
 };
 
 const toArray = (data) => (Array.isArray(data) ? data : (data?.content ?? []));
 const num = (v) => Number(v ?? 0) || 0;
-
-function formatRate(rate) {
-  if (rate == null) return "—";
-  // Làm tròn để tránh lỗi số thực (0.15 * 100 = 15.000000000000002).
-  return `${Math.round(Number(rate) * 1000) / 10}%`;
-}
 
 export default function ProviderFinanceOverviewPage() {
   const {
@@ -82,8 +59,10 @@ export default function ProviderFinanceOverviewPage() {
 
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
-  const [settlements, setSettlements] = useState([]);
-  const [revenues, setRevenues] = useState([]);
+  const [periods, setPeriods] = useState([]);
+  const [periodPage, setPeriodPage] = useState(0);
+  const [periodTotalPages, setPeriodTotalPages] = useState(0);
+  const [periodTotalElements, setPeriodTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -96,18 +75,19 @@ export default function ProviderFinanceOverviewPage() {
       setError("");
 
       try {
-        const [walletData, txData, stData, revData] = await Promise.all([
+        const [walletData, txData, periodData] = await Promise.all([
           getProviderProfileWallet(providerProfileId),
           getProviderProfileWalletTransactions(providerProfileId, { size: LIST_FETCH_SIZE }),
-          getSettlementsByProviderProfile(providerProfileId, { size: LIST_FETCH_SIZE }),
-          getRevenuesByProviderProfile(providerProfileId, { size: REVENUE_FETCH_SIZE }).catch(
-            () => [],
-          ),
+          getFinalizedSettlementPeriods(providerProfileId, {
+            page: periodPage,
+            size: PAGE_SIZE,
+          }),
         ]);
         setWallet(walletData);
         setTransactions(toArray(txData));
-        setSettlements(toArray(stData));
-        setRevenues(toArray(revData));
+        setPeriods(toArray(periodData));
+        setPeriodTotalPages(periodData?.totalPages ?? 0);
+        setPeriodTotalElements(periodData?.totalElements ?? toArray(periodData).length);
       } catch (err) {
         setError(err?.message || "Không thể tải dữ liệu tài chính.");
       } finally {
@@ -115,7 +95,7 @@ export default function ProviderFinanceOverviewPage() {
         setRefreshing(false);
       }
     },
-    [providerProfileId],
+    [providerProfileId, periodPage],
   );
 
   useEffect(() => {
@@ -128,44 +108,22 @@ export default function ProviderFinanceOverviewPage() {
     };
   }, [load]);
 
-  /* ── Tổng hợp từ các khoản doanh thu ───────────────────────────────── */
+  /* ── Tổng hợp từ các kỳ tất toán đã chốt ───────────────────────────── */
   const summary = useMemo(() => {
-    let openAmount = 0;
-    let openCount = 0;
-    let eligibleCount = 0;
-    let settledAmount = 0;
-    let settledCount = 0;
+    let netAmount = 0;
     let commission = 0;
-    for (const r of revenues) {
-      commission += num(r?.commissionAmount);
-      if (r?.status === "SETTLED") {
-        settledAmount += num(r?.providerNetAmount);
-        settledCount += 1;
-      } else if (OPEN_REVENUE_STATUSES.has(r?.status)) {
-        openAmount += num(r?.providerNetAmount);
-        openCount += 1;
-        if (r?.status === "ELIGIBLE") eligibleCount += 1;
-      }
+    let gross = 0;
+    let refund = 0;
+    let transactionCount = 0;
+    for (const p of periods) {
+      netAmount += num(p?.settlementAmount);
+      commission += num(p?.commissionAmount);
+      gross += num(p?.grossAmount);
+      refund += num(p?.refundAmount);
+      transactionCount += num(p?.transactionCount);
     }
-    return { openAmount, openCount, eligibleCount, settledAmount, settledCount, commission };
-  }, [revenues]);
-
-  /** Gộp doanh thu theo kỳ (mới nhất lên đầu). */
-  const periods = useMemo(() => {
-    const map = new Map();
-    for (const r of revenues) {
-      const key = r?.revenuePeriod || "—";
-      const p = map.get(key) || { period: key, gross: 0, refund: 0, commission: 0, net: 0, count: 0, settled: 0 };
-      p.gross += num(r?.grossAmount);
-      p.refund += num(r?.refundAmount);
-      p.commission += num(r?.commissionAmount);
-      p.net += num(r?.providerNetAmount);
-      p.count += 1;
-      if (r?.status === "SETTLED") p.settled += 1;
-      map.set(key, p);
-    }
-    return [...map.values()].sort((a, b) => String(b.period).localeCompare(String(a.period)));
-  }, [revenues]);
+    return { netAmount, commission, gross, refund, transactionCount };
+  }, [periods]);
 
   if (loadingProfile || loading) {
     return (
@@ -185,23 +143,20 @@ export default function ProviderFinanceOverviewPage() {
       hint: wallet?.updatedAt ? `Cập nhật ${formatDateVN(wallet.updatedAt)}` : "Tiền đã tất toán vào ví",
     },
     {
-      id: "open",
-      label: "Chờ tất toán",
-      value: formatVND(summary.openAmount),
-      icon: Clock,
-      tone: "amber",
-      hint:
-        summary.openCount > 0
-          ? `${summary.openCount} khoản · ${summary.eligibleCount} đủ điều kiện`
-          : "Không có khoản đang chờ",
-    },
-    {
-      id: "settled",
+      id: "net",
       label: "Đã tất toán",
-      value: formatVND(summary.settledAmount),
+      value: formatVND(summary.netAmount),
       icon: CheckCircle2,
       tone: "sky",
-      hint: `${summary.settledCount} khoản doanh thu`,
+      hint: `${summary.transactionCount} giao dịch · ${periods.length} kỳ trên trang`,
+    },
+    {
+      id: "gross",
+      label: "Khách thanh toán",
+      value: formatVND(summary.gross),
+      icon: BarChart3,
+      tone: "indigo",
+      hint: summary.refund > 0 ? `Đã hoàn ${formatVND(summary.refund)}` : "Tổng giá trị đơn",
     },
     {
       id: "commission",
@@ -209,7 +164,7 @@ export default function ProviderFinanceOverviewPage() {
       value: formatVND(summary.commission),
       icon: Percent,
       tone: "indigo",
-      hint: `Tỷ lệ ${formatRate(providerProfile?.commissionRate)}`,
+      hint: "Phí nền tảng trừ trong các kỳ đã tất toán",
     },
   ];
 
@@ -218,9 +173,14 @@ export default function ProviderFinanceOverviewPage() {
     <div className="flex min-h-0 flex-col gap-4 xl:h-full">
       {/* Tiêu đề */}
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="min-w-0 truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-          Tổng quan tài chính
-        </h1>
+        <div className="min-w-0">
+          <h1 className="min-w-0 truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+            Tổng quan tài chính
+          </h1>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Kết quả cuối cùng của các kỳ tất toán đã được duyệt — tiền đã cộng vào ví của bạn.
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => load(true)}
@@ -268,69 +228,73 @@ export default function ProviderFinanceOverviewPage() {
 
       {/* Hai cột */}
       <section className="grid grid-cols-1 gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-12 xl:grid-rows-[minmax(0,1fr)]">
-        {/* Doanh thu theo kỳ */}
+        {/* Kỳ tất toán đã chốt */}
         <Card
           className="h-[420px] xl:col-span-7 xl:h-auto"
-          icon={BarChart3}
-          title="Doanh thu theo kỳ"
-          subtitle="Gộp các khoản doanh thu theo tháng hoàn thành trải nghiệm"
-          href={ROUTES.PROVIDER_FINANCE_REVENUES}
+          icon={FileCheck}
+          title="Kỳ tất toán đã chốt"
+          subtitle="Chỉ hiển thị kỳ đã được duyệt — tiền đã về ví"
+          href={ROUTES.PROVIDER_FINANCE_SETTLEMENTS}
           linkText="Xem chi tiết"
         >
           {periods.length === 0 ? (
-            <Empty text="Chưa có dữ liệu doanh thu." />
+            <Empty text="Chưa có kỳ tất toán nào được duyệt." />
           ) : (
-            <table className="w-full min-w-[560px] border-collapse text-left text-xs">
-              <thead className="sticky top-0 z-10">
-                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500">
-                  <th className="px-4 py-2.5">Kỳ</th>
-                  <th className="px-3 py-2.5 text-right">Khách thanh toán</th>
-                  <th className="px-3 py-2.5 text-right">Hoa hồng</th>
-                  <th className="px-3 py-2.5 text-right">Bạn nhận</th>
-                  <th className="px-4 py-2.5">Tình trạng</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {periods.map((p) => {
-                  const done = p.settled === p.count;
-                  return (
-                    <tr key={p.period} className="align-top hover:bg-slate-50/70">
+            <>
+              <table className="w-full min-w-[560px] border-collapse text-left text-xs">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500">
+                    <th className="px-4 py-2.5">Kỳ</th>
+                    <th className="px-3 py-2.5 text-right">Khách thanh toán</th>
+                    <th className="px-3 py-2.5 text-right">Hoa hồng</th>
+                    <th className="px-3 py-2.5 text-right">Bạn nhận</th>
+                    <th className="px-4 py-2.5">Số giao dịch</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {periods.map((p) => (
+                    <tr key={p.settlementId} className="align-top hover:bg-slate-50/70">
                       <td className="px-4 py-2.5">
                         <p className="whitespace-nowrap font-semibold text-slate-800">
-                          {formatPeriod(p.period)}
+                          {formatPeriod(p?.revenuePeriod)}
                         </p>
                         <p className="whitespace-nowrap text-[10.5px] text-slate-400">
-                          {p.count} khoản
-                          {p.refund > 0 ? ` · hoàn ${formatVND(p.refund)}` : ""}
+                          {p?.approvedAt ? `Duyệt ${formatDateVN(p.approvedAt)}` : "—"}
                         </p>
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-slate-600">
-                        {formatVND(p.gross)}
+                        {formatVND(p?.grossAmount)}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-slate-600">
-                        {formatVND(p.commission)}
+                        {formatVND(p?.commissionAmount)}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-bold text-emerald-700">
-                        {formatVND(p.net)}
+                        {formatVND(p?.settlementAmount)}
                       </td>
-                      <td className="px-4 py-2.5">
-                        <span
-                          className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
-                            done ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          {done ? "Đã tất toán" : `Đã tất toán ${p.settled}/${p.count}`}
-                        </span>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
+                        {p?.transactionCount ?? 0} tour
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+
+              {periodTotalElements > 0 && (
+                <div className="border-t border-slate-100">
+                  <PaginationBar
+                    page={periodPage}
+                    totalPages={periodTotalPages}
+                    totalElements={periodTotalElements}
+                    unit="kỳ tất toán"
+                    onChange={setPeriodPage}
+                  />
+                </div>
+              )}
+            </>
           )}
         </Card>
 
-        {/* Cột phải: 2 thẻ chia đôi chiều cao */}
+        {/* Cột phải: giao dịch ví gần đây */}
         <div className="flex min-w-0 flex-col gap-4 xl:col-span-5 xl:min-h-0">
           <Card
             className="h-[320px] xl:h-auto xl:min-h-0 xl:flex-1"
@@ -371,49 +335,6 @@ export default function ProviderFinanceOverviewPage() {
               </ul>
             )}
           </Card>
-
-          <Card
-            className="h-[320px] xl:h-auto xl:min-h-0 xl:flex-1"
-            icon={FileCheck}
-            title="Tất toán gần đây"
-            href={ROUTES.PROVIDER_FINANCE_SETTLEMENTS}
-            linkText="Xem tất cả"
-          >
-            {settlements.length === 0 ? (
-              <Empty text="Chưa có đợt tất toán nào." />
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {settlements.map((s) => {
-                  const code = s?.settlementCode ?? `#${s?.id}`;
-                  return (
-                    <li key={s.id} className="flex items-center gap-3 px-4 py-2.5">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-800">
-                          {formatPeriod(s?.revenuePeriod)}
-                        </p>
-                        <p className="truncate font-mono text-[11px] text-slate-500" title={code}>
-                          {code}
-                          {s?.detailCount != null ? ` · ${s.detailCount} khoản` : ""}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="whitespace-nowrap font-mono text-sm font-bold text-slate-900">
-                          {formatVND(s?.settlementAmount)}
-                        </p>
-                        <span
-                          className={`mt-0.5 inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
-                            SETTLEMENT_TONE[s?.status] || "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {SETTLEMENT_STATUS_LABELS[s?.status] ?? s?.status}
-                        </span>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
         </div>
       </section>
     </div>
@@ -436,13 +357,15 @@ function Card({ className = "", icon: Icon, title, subtitle, href, linkText, chi
             {subtitle && <p className="truncate text-[11px] text-slate-500">{subtitle}</p>}
           </div>
         </div>
-        <Link
-          href={href}
-          className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs font-semibold text-emerald-600 hover:text-emerald-700"
-        >
-          {linkText}
-          <ChevronRight size={14} />
-        </Link>
+        {href && (
+          <Link
+            href={href}
+            className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+          >
+            {linkText}
+            <ChevronRight size={14} />
+          </Link>
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
         {children}

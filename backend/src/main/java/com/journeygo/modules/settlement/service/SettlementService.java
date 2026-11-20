@@ -17,6 +17,8 @@ import com.journeygo.modules.providerrevenue.service.ProviderRevenueService;
 import com.journeygo.modules.settlement.dto.request.CreateSettlementRequest;
 import com.journeygo.modules.settlement.dto.request.RejectSettlementRequest;
 import com.journeygo.modules.settlement.dto.response.PlatformRevenueSummaryResponse;
+import com.journeygo.modules.settlement.dto.response.ProviderSettlementPeriodResponse;
+import com.journeygo.modules.settlement.dto.response.ProviderSettlementTransactionResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementCandidatesResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementDetailResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementOverviewResponse;
@@ -754,7 +756,16 @@ public class SettlementService {
                             .txnRef(r.getPayment() != null ? r.getPayment().getTxnRef() : null)
                             .revenuePeriod(d.getRevenuePeriod())
                             .grossAmount(d.getGrossAmount())
-                            .refundAmount(d.getRefundAmount())
+                            // ⚠️ Lấy số tiền hoàn TỪ KHOẢN DOANH THU (nguồn sống) chứ không
+                            // phải bản chụp trong settlement_details.
+                            // Lý do: khoản doanh thu được tính lại (refreshFinancials) mỗi khi
+                            // hoàn tiền hoàn tất ⇒ refundAmount trên ProviderRevenue luôn đúng.
+                            // Còn settlement_details lưu ẢNH CHỤP lúc tạo đợt ⇒ nếu hoàn tiền
+                            // hoàn tất sau đó, cột "Hoàn tiền" hiện 0 ⇒ Admin đối chiếu thấy
+                            // đợt tất toán không khớp với số tiền đã hoàn thực tế.
+                            .refundAmount(r.getRefundAmount() != null
+                                    ? r.getRefundAmount()
+                                    : d.getRefundAmount())
                             .commissionRate(r.getCommissionRate())
                             .commissionAmount(d.getCommissionAmount())
                             .voucherDiscount(r.getVoucherDiscount())
@@ -774,6 +785,120 @@ public class SettlementService {
         requireFinanceAccess(providerProfile);
         Page<Settlement> page = settlementRepository.findByProviderProfile_IdOrderByCreatedAtDesc(providerProfileId, pageable);
         return PageResponse.from(page, SettlementResponse::fromEntity);
+    }
+
+    /**
+     * Kỳ tất toán ĐÃ CHỐT của đối tác, kèm các giao dịch tour của riêng họ.
+     *
+     * <p>Nguyên tắc cho màn "Tài chính & Doanh thu" của đối tác:
+     * <ul>
+     *   <li>Chỉ hiển thị kỳ đã được Admin duyệt ({@code APPROVED}) — tức là khi tiền
+     *       đã cộng vào ví. Không có trạng thái "chờ tất toán".</li>
+     *   <li>Số tiền luôn tính theo RIÊNG đối tác, kể cả khi đợt có phạm vi TỔNG
+     *       (BATCH) gồm nhiều đối tác.</li>
+     * </ul>
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<ProviderSettlementPeriodResponse> getFinalizedPeriodsForProvider(
+            Long providerProfileId, Pageable pageable) {
+        ProviderProfile providerProfile = providerProfileRepository.findById(providerProfileId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_PROFILE_NOT_FOUND));
+        requireFinanceAccess(providerProfile);
+
+        Page<Settlement> page = settlementRepository.findApprovedByProviderProfile(providerProfileId, pageable);
+
+        return PageResponse.from(page, settlement -> toProviderPeriod(settlement, providerProfileId));
+    }
+
+    /**
+     * Danh sách giao dịch tour đã được tất toán của đối tác (mọi kỳ).
+     *
+     * <p>Chỉ gồm các khoản nằm trong đợt tất toán đã DUYỆT — không có trạng thái
+     * "đang chờ tất toán".
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<ProviderSettlementTransactionResponse> getFinalizedTransactionsForProvider(
+            Long providerProfileId, Pageable pageable) {
+        ProviderProfile providerProfile = providerProfileRepository.findById(providerProfileId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_PROFILE_NOT_FOUND));
+        requireFinanceAccess(providerProfile);
+
+        Page<SettlementDetail> page =
+                detailRepository.findTransactionsByProviderProfile(providerProfileId, pageable);
+        return PageResponse.from(page, this::toProviderTransaction);
+    }
+
+    /** Chuyển một Settlement thành "kỳ tất toán" góc nhìn đối tác. */    private ProviderSettlementPeriodResponse toProviderPeriod(Settlement settlement, Long providerProfileId) {
+        // Chỉ lấy các khoản của RIÊNG đối tác này (lọc theo settlement_details).
+        List<SettlementDetail> details = detailRepository
+                .findBySettlementIdAndProviderProfile(settlement.getId(), providerProfileId);
+
+        BigDecimal gross = BigDecimal.ZERO;
+        BigDecimal refund = BigDecimal.ZERO;
+        BigDecimal commission = BigDecimal.ZERO;
+        BigDecimal adjustment = BigDecimal.ZERO;
+        BigDecimal net = BigDecimal.ZERO;
+
+        for (SettlementDetail d : details) {
+            gross = gross.add(nz(d.getGrossAmount()));
+            refund = refund.add(nz(d.getRefundAmount()));
+            commission = commission.add(nz(d.getCommissionAmount()));
+            adjustment = adjustment.add(nz(d.getAdjustmentAmount()));
+            net = net.add(nz(d.getProviderNetAmount()));
+        }
+
+        List<ProviderSettlementTransactionResponse> transactions =
+                detailRepository.findBySettlementAndProviderProfile(settlement.getId(), providerProfileId)
+                        .stream()
+                        .map(this::toProviderTransaction)
+                        .toList();
+
+        return ProviderSettlementPeriodResponse.builder()
+                .settlementId(settlement.getId())
+                .settlementCode(settlement.getSettlementCode())
+                .scope(settlement.getScope() != null ? settlement.getScope().name() : null)
+                .revenuePeriod(settlement.getRevenuePeriod())
+                .periodStart(settlement.getPeriodStart())
+                .periodEnd(settlement.getPeriodEnd())
+                .approvedAt(settlement.getApprovedAt())
+                .grossAmount(gross)
+                .refundAmount(refund)
+                .commissionAmount(commission)
+                .adjustmentAmount(adjustment)
+                .settlementAmount(net)
+                .transactionCount(transactions.size())
+                .transactions(transactions)
+                .build();
+    }
+
+    /** Một khoản doanh thu (giao dịch tour) góc nhìn đối tác. */
+    private ProviderSettlementTransactionResponse toProviderTransaction(SettlementDetail d) {
+        ProviderRevenue r = d.getProviderRevenue();
+        var booking = r != null ? r.getBooking() : null;
+        var tour = booking != null ? booking.getTour() : null;
+        var payment = r != null ? r.getPayment() : null;
+
+        return ProviderSettlementTransactionResponse.builder()
+                .revenueId(r != null ? r.getId() : null)
+                .bookingId(booking != null ? booking.getId() : null)
+                .bookingCode(booking != null ? booking.getBookingCode() : null)
+                .txnRef(payment != null ? payment.getTxnRef() : null)
+                .tourTitle(tour != null ? tour.getTitle() : null)
+                .experienceDate(booking != null ? booking.getExperienceDate() : null)
+                .revenuePeriod(d.getRevenuePeriod())
+                .grossAmount(nz(d.getGrossAmount()))
+                // ⚠️ Voucher / hoàn tiền là TUỲ CHỌN THEO GIA DỊCH — chỉ hiện khi có.
+                .voucherDiscount(nz(r != null ? r.getVoucherDiscount() : null))
+                .voucherScope(r != null ? r.getVoucherScope() : null)
+                // Nguồn sống = khoản doanh thu (xem giải thích ở getDetails).
+                .refundAmount(nz(r != null && r.getRefundAmount() != null
+                        ? r.getRefundAmount()
+                        : d.getRefundAmount()))
+                .commissionAmount(nz(d.getCommissionAmount()))
+                .adjustmentAmount(nz(d.getAdjustmentAmount()))
+                .providerNetAmount(nz(d.getProviderNetAmount()))
+                .status(r != null ? r.getStatus() : null)
+                .build();
     }
 
     @Transactional(readOnly = true)

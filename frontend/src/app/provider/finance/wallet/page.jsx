@@ -9,6 +9,7 @@ import {
   getProviderProfileWalletTransactions,
 } from "@/features/settlement/services/providerRevenueService";
 import { formatDateTimeVN, formatVND } from "@/lib/money";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 export default function ProviderFinanceWalletPage() {
   const {
@@ -32,7 +33,7 @@ export default function ProviderFinanceWalletPage() {
     try {
       const [walletData, txData] = await Promise.all([
         getProviderProfileWallet(providerProfileId),
-        getProviderProfileWalletTransactions(providerProfileId, { page, size: 20 }),
+        getProviderProfileWalletTransactions(providerProfileId, { page, size: PAGE_SIZE }),
       ]);
       setWallet(walletData);
       setTransactions(Array.isArray(txData) ? txData : (txData?.content ?? []));
@@ -150,7 +151,7 @@ export default function ProviderFinanceWalletPage() {
           </div>
         )}
 
-        {totalPages > 1 && (
+        {totalElements > 0 && (
           <div className="mt-5">
             <PaginationBar
               page={page}
