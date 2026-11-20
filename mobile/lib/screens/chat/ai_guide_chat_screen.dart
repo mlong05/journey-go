@@ -4,6 +4,7 @@ import '../../core/models/ai_guide_model.dart';
 import '../../core/services/ai_guide_service.dart';
 import '../../core/services/api_client.dart';
 import '../common/ink.dart';
+import '../tours/tour_detail_opener.dart';
 
 /// Màn hình / Bottom Sheet trò chuyện cùng Hướng dẫn viên ảo AI (RAG).
 /// Hỗ trợ 2 chế độ:
@@ -496,6 +497,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
 
   Widget _buildMessageBubble(AiChatMessageModel msg) {
     final isUser = msg.isUser;
+    final parsed = isUser ? null : _parseAiMessage(msg.content);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -531,13 +533,70 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    msg.content,
+                    isUser ? msg.content : parsed!.displayText,
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.5,
                       color: isUser ? Colors.white : AppCultureColors.textDark,
                     ),
                   ),
+                  if (!isUser && parsed!.tourLinks.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: parsed.tourLinks
+                          .map(
+                            (ref) => Material(
+                              color: AppCultureColors.jadeLight.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(10),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(10),
+                                onTap: () => openTourDetailScreen(context, tourId: ref.tourId),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: AppCultureColors.heritageJade.withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.explore_rounded,
+                                        size: 14,
+                                        color: AppCultureColors.heritageJade,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Flexible(
+                                        child: Text(
+                                          ref.label,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppCultureColors.heritageJade,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        size: 11,
+                                        color: AppCultureColors.heritageJade,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ],
                   if (!isUser && msg.citations.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
@@ -818,4 +877,54 @@ class _SessionHistorySheetState extends State<_SessionHistorySheet> {
       ),
     );
   }
+}
+
+class _TourLinkRef {
+  final int tourId;
+  final String label;
+
+  const _TourLinkRef({required this.tourId, required this.label});
+}
+
+class _ParsedAiMessage {
+  final String displayText;
+  final List<_TourLinkRef> tourLinks;
+
+  const _ParsedAiMessage({required this.displayText, required this.tourLinks});
+}
+
+_ParsedAiMessage _parseAiMessage(String raw) {
+  var text = raw;
+  text = text.replaceAllMapped(RegExp(r'\*\*([\s\S]+?)\*\*'), (m) => m.group(1) ?? '');
+  text = text.replaceAllMapped(RegExp(r'__([\s\S]+?)__'), (m) => m.group(1) ?? '');
+  text = text.replaceAll(RegExp(r'^#{1,6}\s+', multiLine: true), '');
+  text = text.replaceAllMapped(RegExp(r'^(\s*)\*\s+', multiLine: true), (m) => '${m.group(1) ?? ''}- ');
+  text = text.replaceAll('**', '');
+
+  final linksById = <int, _TourLinkRef>{};
+
+  text = text.replaceAllMapped(RegExp(r'\[([^\]]+)\]\(/tours/(\d+)\)'), (m) {
+    final label = (m.group(1) ?? '').trim();
+    final tourId = int.tryParse(m.group(2) ?? '');
+    if (tourId != null) {
+      final cleanLabel = label.isEmpty ? 'Xem tour #$tourId' : label;
+      linksById.putIfAbsent(tourId, () => _TourLinkRef(tourId: tourId, label: cleanLabel));
+      return cleanLabel;
+    }
+    return label;
+  });
+
+  text = text.replaceAllMapped(RegExp(r'/tours/(\d+)'), (m) {
+    final tourId = int.tryParse(m.group(1) ?? '');
+    if (tourId != null) {
+      linksById.putIfAbsent(tourId, () => _TourLinkRef(tourId: tourId, label: 'Xem tour #$tourId'));
+      return 'Tour #$tourId';
+    }
+    return m.group(0) ?? '';
+  });
+
+  return _ParsedAiMessage(
+    displayText: text.trim(),
+    tourLinks: linksById.values.toList(),
+  );
 }
