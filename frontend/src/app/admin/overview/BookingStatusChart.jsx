@@ -13,6 +13,8 @@ import {
 import { CheckCircle2, Clock, XCircle, Ban } from "lucide-react";
 import { CardHeader, Skeleton } from "./KpiCard";
 import { CARD } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
+import { BOOKING_STATE_HINTS } from "./glossary";
 
 /** 4 ô trạng thái + màu tương ứng trên biểu đồ cột chồng. */
 export const BOOKING_STATES = [
@@ -66,7 +68,7 @@ export default function BookingStatusChart({ breakdown, trend, isLoading }) {
       >
         <div className="text-right">
           <p className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider leading-none">
-            Tỷ lệ thành công
+            <Hint text={BOOKING_STATE_HINTS.successRatio}>Tỷ lệ thành công</Hint>
           </p>
           <p className="text-2xl font-bold tracking-tight text-emerald-600 tabular-nums leading-tight mt-0.5">
             {isLoading ? "…" : `${successRate.toFixed(1)}%`}
@@ -96,7 +98,7 @@ export default function BookingStatusChart({ breakdown, trend, isLoading }) {
               </span>
               <div className="min-w-0">
                 <p className="text-[10.5px] font-semibold text-slate-500 truncate leading-tight">
-                  {state.label}
+                  <Hint text={BOOKING_STATE_HINTS[state.key]}>{state.label}</Hint>
                 </p>
                 <p className="text-[13px] font-bold text-slate-900 tabular-nums leading-tight">
                   {isLoading ? "…" : Number(value).toLocaleString("vi-VN")}
@@ -149,7 +151,9 @@ export default function BookingStatusChart({ breakdown, trend, isLoading }) {
 
       <div className={CARD.footer + " flex items-center justify-between"}>
         <span className="font-semibold">
-          Tổng {Number(breakdown?.total ?? 0).toLocaleString("vi-VN")} booking
+          <Hint text="Tổng số booking phát sinh trong kỳ đang chọn, bất kể trạng thái thanh toán.">
+            Tổng {Number(breakdown?.total ?? 0).toLocaleString("vi-VN")} booking
+          </Hint>
         </span>
         <span className="text-slate-400">Nguồn: hệ thống đặt tour</span>
       </div>

@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, RefreshCw, X } from "lucide-react";
 import { RANGE, PILL } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
+import { RANGE_HINTS } from "./glossary";
 
 /** Các khoảng thời gian có sẵn. `month` = 30 ngày qua (mặc định theo đặc tả). */
 export const RANGE_OPTIONS = [
@@ -70,7 +72,12 @@ export default function OverviewHeader({
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Tổng quan vận hành
+              <Hint
+                text="Trang giám sát toàn sàn của JourneyGo: doanh thu, tình trạng booking, việc cần xử lý và các chỉ số vận hành chính."
+                underline={false}
+              >
+                Tổng quan vận hành
+              </Hint>
             </h1>
             <span
               className={`${PILL.base} ${
@@ -106,37 +113,39 @@ export default function OverviewHeader({
             {RANGE_OPTIONS.map((option) => {
               const active = range === option.key;
               return (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => (option.key === "custom" ? openCustom() : onRangeChange(option.key))}
-                  aria-pressed={active}
-                  className={`${RANGE.item} ${active ? RANGE.itemActive : ""}`}
-                >
-                  {option.label}
-                </button>
+                <Hint key={option.key} text={RANGE_HINTS[option.key]}>
+                  <button
+                    type="button"
+                    onClick={() => (option.key === "custom" ? openCustom() : onRangeChange(option.key))}
+                    aria-pressed={active}
+                    className={`${RANGE.item} ${active ? RANGE.itemActive : ""}`}
+                  >
+                    {option.label}
+                  </button>
+                </Hint>
               );
             })}
           </div>
 
           {/* Mốc cập nhật + nút làm mới */}
           <div className="flex items-center gap-1.5">
-            <span
-              className="hidden md:inline text-[11px] font-semibold text-slate-500 tabular-nums"
-              title="Thời điểm cập nhật dữ liệu gần nhất"
-            >
-              Cập nhật {lastUpdated}
-            </span>
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              aria-label="Làm mới dữ liệu"
-              title="Làm mới dữ liệu"
-              className="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors disabled:opacity-60"
-            >
-              <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
-            </button>
+            <Hint text="Thời điểm cập nhật dữ liệu gần nhất. Bấm nút làm mới để lấy số liệu mới nhất từ hệ thống.">
+              <span className="hidden md:inline text-[11px] font-semibold text-slate-500 tabular-nums">
+                Cập nhật {lastUpdated}
+              </span>
+            </Hint>
+            <Hint text="Làm mới dữ liệu từ máy chủ.">
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                aria-label="Làm mới dữ liệu"
+                title="Làm mới dữ liệu"
+                className="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors disabled:opacity-60"
+              >
+                <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
+              </button>
+            </Hint>
           </div>
         </div>
       </div>
