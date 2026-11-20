@@ -79,6 +79,20 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, Lo
             @Param("statuses") List<RefundStatus> statuses);
 
     /**
+     * Các ID đơn (booking) của một đối tác đã có yêu cầu hoàn tiền được Admin duyệt
+     * (đang xử lý hoặc đã hoàn thành) — dùng để loại các đơn này khỏi danh sách
+     * "khách tham gia" của đối tác.
+     */
+    @Query("""
+            SELECT DISTINCT r.payment.booking.id
+            FROM RefundRequest r
+            WHERE r.status IN :statuses
+              AND r.payment.booking.tour.createdBy.id = :providerId
+            """)
+    List<Long> findRefundedBookingIds(@Param("providerId") Long providerId,
+                                      @Param("statuses") List<RefundStatus> statuses);
+
+    /**
      * TỔNG số tiền đã hoàn thành thành công trên TOÀN HỆ THỐNG.
      *
      * <p>Dùng cho ô chỉ số "Tổng tiền đã hoàn" ở tab Tài chính & Thanh toán —

@@ -10,6 +10,8 @@ import com.journeygo.modules.booking.entity.BookingPassenger;
 import com.journeygo.modules.booking.entity.enums.BookingStatus;
 import com.journeygo.modules.booking.repository.BookingPassengerRepository;
 import com.journeygo.modules.booking.repository.BookingRepository;
+import com.journeygo.modules.refund.entity.enums.RefundStatus;
+import com.journeygo.modules.refund.repository.RefundRequestRepository;
 import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourSlot;
@@ -59,6 +61,7 @@ public class ProviderBookingService {
     private final BookingPassengerRepository passengerRepository;
     private final TourRepository tourRepository;
     private final TourSlotRepository tourSlotRepository;
+    private final RefundRequestRepository refundRequestRepository;
 
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     /** Biên dưới / trên khi lọc "tất cả" hoặc "đã qua" (tránh tham số null với PostgreSQL). */
@@ -66,15 +69,47 @@ public class ProviderBookingService {
     private static final LocalDate MAX_DATE = LocalDate.of(2100, 12, 31);
 
     /**
+     * Trạng thái đơn ĐÃ THANH TOÁN ⇒ khách thực sự tham gia chuyến đi.
+     *
+     * <p>Danh sách "Khách hàng đã đặt tour" của đối tác dùng để đối tác biết chuyến đi
+     * có bao nhiêu người tham gia để quản lý ⇒ đơn chưa thanh toán (PENDING_PAYMENT),
+     * đơn quá hạn (EXPIRED) và đơn đã hủy (CANCELLED) KHÔNG được xuất hiện.
+     */
+    private static final List<BookingStatus> ATTENDING_STATUSES = List.of(
+            BookingStatus.CONFIRMED, BookingStatus.COMPLETED);
+
+    /**
+     * Trạng thái yêu cầu hoàn tiền ⇒ khách đã (đang) được hoàn tiền ⇒ không còn tham gia.
+     *
+     * <p>Gồm cả {@code APPROVED} (Admin đã duyệt nhưng tiền chưa về) và các trạng thái
+     * đang xử lý / hoàn thành. Yêu cầu chưa được duyệt ({@code PENDING_REVIEW}) vẫn giữ
+     * khách trong danh sách cho tới khi Admin quyết định.
+     */
+    private static final List<RefundStatus> REFUNDED_OUT_STATUSES = List.of(
+            RefundStatus.APPROVED,
+            RefundStatus.VNPAY_PROCESSING,
+            RefundStatus.MANUAL_TRANSFER_PENDING,
+            RefundStatus.REFUND_PROCESSING,
+            RefundStatus.REFUNDED);
+
+    /**
      * Danh sách booking của các tour mà đối tác sở hữu, lọc tuỳ chọn theo tour, ngày
      * khởi hành và trạng thái.
+     *
+     * <p>⚠️ Đây là danh sách "khách THAM GIA" cho đối tác quản lý chuyến đi ⇒ chỉ trả về
+     * đơn ĐÃ THANH TOÁN thành công ({@code CONFIRMED} / {@code COMPLETED}).
+     * Đơn chưa thanh toán ({@code PENDING_PAYMENT}), quá hạn ({@code EXPIRED}) hoặc đã hủy
+     * ({@code CANCELLED}) bị loại. Đơn đã được Admin duyệt hoàn tiền cũng bị loại.
      */
     @Transactional(readOnly = true)
     public PageResponse<BookingResponse> listProviderBookings(Long providerId, Long tourId, LocalDate date,
                                                               List<BookingStatus> statuses, Pageable pageable) {
+        Set<Long> refundedBookingIds = findRefundedBookingIds(providerId);
         Specification<Booking> spec = (root, query, cb) -> {
             List<Predicate> where = new ArrayList<>();
             where.add(cb.equal(root.get("tour").get("createdBy").get("id"), providerId));
+            // Chỉ đơn đã thanh toán ⇒ khách thực sự tham gia chuyến đi.
+            where.add(root.get("status").in(ATTENDING_STATUSES));
             if (tourId != null) {
                 where.add(cb.equal(root.get("tour").get("tourId"), tourId));
             }
@@ -84,10 +119,20 @@ public class ProviderBookingService {
             if (statuses != null && !statuses.isEmpty()) {
                 where.add(root.get("status").in(statuses));
             }
+            // Đơn đã được Admin duyệt hoàn tiền ⇒ khách không còn tham gia ⇒ loại.
+            if (!refundedBookingIds.isEmpty()) {
+                where.add(cb.not(root.get("id").in(refundedBookingIds)));
+            }
             return cb.and(where.toArray(Predicate[]::new));
         };
         Page<Booking> page = bookingRepository.findAll(spec, pageable);
         return PageResponse.from(page, BookingResponse::fromEntity);
+    }
+
+    /** ID các đơn của đối tác đã được Admin duyệt hoàn tiền. */
+    private Set<Long> findRefundedBookingIds(Long providerId) {
+        return new HashSet<>(refundRequestRepository
+                .findRefundedBookingIds(providerId, REFUNDED_OUT_STATUSES));
     }
 
     /** Phạm vi thời gian của màn "Theo lịch khởi hành". */
@@ -123,14 +168,29 @@ public class ProviderBookingService {
                 acc.reservedSeats = slot.getBookedCount();
                 acc.slotStatus = slot.getStatus();
             }
-            for (Object[] r : bookingRepository.aggregateProviderBookings(providerId, lower, upper)) {
+            // Chỗ bị chiếm bởi đơn đã hoàn tiền ⇒ trừ ra khỏi số chỗ đang giữ.
+            for (Object[] r : bookingRepository.aggregateProviderRefundedSlots(
+                    providerId, lower, upper, REFUNDED_OUT_STATUSES)) {
+                Long rowTourId = (Long) r[0];
+                if (tourId != null && !tourId.equals(rowTourId)) continue;
+                DepartureAccumulator acc = rows.get(new DepartureKey(rowTourId, (LocalDate) r[1]));
+                if (acc == null) continue;
+                acc.refundedSeats += ((Number) r[2]).intValue();
+            }
+            for (Object[] r : bookingRepository.aggregateProviderBookings(
+                    providerId, lower, upper, REFUNDED_OUT_STATUSES)) {
                 Long rowTourId = (Long) r[0];
                 if (tourId != null && !tourId.equals(rowTourId)) continue;
                 BookingStatus status = (BookingStatus) r[2];
+                int count = ((Number) r[3]).intValue();
+                // ⚠️ Đơn EXPIRED (quá hạn thanh toán) / CANCELLED (đã hủy) bị LOẠI hoàn toàn
+                // — đây là danh sách khách THAM GIA, chúng không phải khách của chuyến đi.
+                if (status == BookingStatus.EXPIRED || status == BookingStatus.CANCELLED) {
+                    continue;
+                }
                 DepartureAccumulator acc = rows.computeIfAbsent(
                         new DepartureKey(rowTourId, (LocalDate) r[1]), k -> new DepartureAccumulator());
                 acc.anyBooking = true;
-                int count = ((Number) r[3]).intValue();
                 if (isRegistered(status)) {
                     acc.confirmedBookings += count;
                     acc.revenue = acc.revenue.add(toBigDecimal(r[4]));
@@ -138,10 +198,17 @@ public class ProviderBookingService {
                     acc.pendingBookings += count;
                 }
             }
-            for (Object[] r : passengerRepository.aggregateProviderPassengers(providerId, lower, upper)) {
-                DepartureAccumulator acc = rows.get(new DepartureKey((Long) r[0], (LocalDate) r[1]));
+            for (Object[] r : passengerRepository.aggregateProviderPassengers(
+                    providerId, lower, upper, REFUNDED_OUT_STATUSES)) {
+                Long rowTourId = (Long) r[0];
+                if (tourId != null && !tourId.equals(rowTourId)) continue;
+                DepartureAccumulator acc = rows.get(new DepartureKey(rowTourId, (LocalDate) r[1]));
                 if (acc == null) continue;
                 BookingStatus status = (BookingStatus) r[2];
+                // ⚠️ Hành khách của đơn quá hạn / đã hủy KHÔNG tham gia chuyến đi.
+                if (status == BookingStatus.EXPIRED || status == BookingStatus.CANCELLED) {
+                    continue;
+                }
                 GuestType guestType = (GuestType) r[3];
                 int guests = ((Number) r[4]).intValue();
                 int seats = r[5] == null ? 0 : ((Number) r[5]).intValue();
@@ -162,9 +229,7 @@ public class ProviderBookingService {
         Map<Long, String> titles = new HashMap<>();
         tourRepository.findAllById(missingTitles).forEach(t -> titles.put(t.getTourId(), t.getTitle()));
 
-        Comparator<Map.Entry<DepartureKey, DepartureAccumulator>> byDate =
-                Comparator.comparing(e -> e.getKey().date());
-        if (effectiveScope == DepartureScope.PAST) byDate = byDate.reversed();
+        Comparator<Map.Entry<DepartureKey, DepartureAccumulator>> byDate = buildDateComparator(effectiveScope, today);
         List<ProviderDepartureResponse> all = rows.entrySet().stream()
                 .filter(e -> includeEmpty || e.getValue().anyBooking)
                 .sorted(byDate.thenComparing(e -> e.getKey().tourId()))
@@ -175,6 +240,36 @@ public class ProviderBookingService {
         int start = (int) Math.min(pageable.getOffset(), all.size());
         int end = Math.min(start + pageable.getPageSize(), all.size());
         return PageResponse.from(new PageImpl<>(all.subList(start, end), pageable, all.size()));
+    }
+
+    /**
+     * Sắp xếp departure theo ngày đi:
+     * <ul>
+     *   <li>{@code UPCOMING}: ngày tăng dần (gần nhất lên đầu).</li>
+     *   <li>{@code PAST}: ngày giảm dần (gần nhất vừa qua lên đầu).</li>
+     *   <li>{@code ALL}: các chuyến sắp diễn ra (ngày &gt;= hôm nay) tăng dần đứng trước,
+     *       sau đó tới các chuyến đã qua giảm dần.</li>
+     * </ul>
+     */
+    private static Comparator<Map.Entry<DepartureKey, DepartureAccumulator>> buildDateComparator(
+            DepartureScope scope, LocalDate today) {
+        Comparator<Map.Entry<DepartureKey, DepartureAccumulator>> asc =
+                Comparator.comparing(e -> e.getKey().date());
+        Comparator<Map.Entry<DepartureKey, DepartureAccumulator>> desc = asc.reversed();
+        if (scope == DepartureScope.PAST) return desc;
+        if (scope == DepartureScope.ALL) {
+            // Chuyến sắp diễn ra (>= hôm nay) đứng trước & tăng dần;
+            // sau đó là các chuyến đã qua, giảm dần.
+            return (a, b) -> {
+                boolean pastA = a.getKey().date().isBefore(today);
+                boolean pastB = b.getKey().date().isBefore(today);
+                if (pastA != pastB) return pastA ? 1 : -1;
+                return pastA
+                        ? b.getKey().date().compareTo(a.getKey().date())
+                        : a.getKey().date().compareTo(b.getKey().date());
+            };
+        }
+        return asc;
     }
 
     /** Booking được tính là "khách đã đăng ký". */
@@ -203,13 +298,17 @@ public class ProviderBookingService {
         int pendingBookings;
         int pendingGuests;
         int pendingSeats;
+        /** Số chỗ còn bị giữ bởi đơn đã được Admin duyệt hoàn tiền. */
+        int refundedSeats;
         BigDecimal revenue = BigDecimal.ZERO;
         final Map<GuestType, Integer> guestBreakdown = new EnumMap<>(GuestType.class);
 
         ProviderDepartureResponse toResponse(DepartureKey key, String fallbackTitle, LocalDate today) {
+            // Số chỗ đang chiếm thực tế = chỗ đã giữ trên slot − chỗ của đơn đã hoàn tiền.
+            Integer seatsHeld = reservedSeats == null ? null : Math.max(0, reservedSeats - refundedSeats);
             return new ProviderDepartureResponse(key.tourId(),
                     tourTitle != null ? tourTitle : fallbackTitle,
-                    key.date(), capacity, reservedSeats, slotStatus,
+                    key.date(), capacity, seatsHeld, slotStatus,
                     confirmedBookings, confirmedGuests, confirmedSeats,
                     pendingBookings, pendingGuests, pendingSeats,
                     guestBreakdown, revenue, key.date().isBefore(today));
