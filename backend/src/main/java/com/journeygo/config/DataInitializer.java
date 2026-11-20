@@ -554,8 +554,8 @@ public class DataInitializer {
     @org.springframework.core.annotation.Order(2)
     public CommandLineRunner initCatalogData() {
         return args -> {
-            if (tourRepository.count() > 0) {
-                log.info("Bước 2 — Bỏ qua seed catalog tour: DB đã có {} tour.", tourRepository.count());
+            if (tourRepository.countByTourFormatIsNotNull() > 0) {
+                log.info("Bước 2 — Bỏ qua seed catalog tour: DB đã có tour 5 bước.");
                 return;
             }
             try {
@@ -601,6 +601,9 @@ public class DataInitializer {
         int experiencePoints = rewardSettingService.pointsFor(RewardSettingCode.REAL_WORLD_EXPERIENCE);
 
         for (TourSeed seed : buildTourSeeds()) {
+            if (findTourByTitle(seed.title()) != null) {
+                continue;
+            }
             User owner = switch (seed.ownerKey()) {
                 case "p1" -> provider1;
                 case "p2" -> provider2;
