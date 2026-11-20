@@ -4,11 +4,14 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.modules.aiguide.config.GeminiAiProperties;
 import com.journeygo.modules.aiguide.dto.AiKnowledgeChunkAdminDto;
+import com.journeygo.modules.aiguide.entity.AiDocumentType;
 import com.journeygo.modules.aiguide.entity.AiKnowledgeChunk;
+import com.journeygo.modules.aiguide.entity.AiKnowledgeDocument;
 import com.journeygo.modules.aiguide.repository.AiChatMessageRepository;
 import com.journeygo.modules.aiguide.repository.AiChatSessionRepository;
 import com.journeygo.modules.aiguide.repository.AiKnowledgeChunkRepository;
 import com.journeygo.modules.aiguide.repository.AiKnowledgeChunkStore;
+import com.journeygo.modules.aiguide.repository.AiKnowledgeDocumentRepository;
 import com.journeygo.modules.aiguide.service.DocumentIngestionService;
 import com.journeygo.modules.content.entity.CulturalContent;
 import com.journeygo.modules.destination.entity.Destination;
@@ -21,11 +24,15 @@ import com.journeygo.modules.experience.entity.enums.TaskStatus;
 import com.journeygo.modules.experience.repository.TaskRepository;
 import com.journeygo.modules.moderation.entity.enums.ContentReviewStatus;
 import com.journeygo.modules.moderation.repository.ContentReviewRepository;
+import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.Tour;
+import com.journeygo.modules.tour.entity.TourDestination;
+import com.journeygo.modules.tour.entity.TourPrice;
 import com.journeygo.modules.tour.entity.TourStop;
 import com.journeygo.modules.tour.entity.TourStopArtifact;
 import com.journeygo.modules.tour.entity.TourStopExperience;
 import com.journeygo.modules.tour.repository.TourRepository;
+import java.text.NumberFormat;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -64,12 +71,13 @@ public class AdminAiSyncController {
     private final AiChatSessionRepository sessionRepository;
     private final AiChatMessageRepository messageRepository;
     private final AiKnowledgeChunkStore chunkStore;
+    private final AiKnowledgeDocumentRepository documentRepository;
     private final GeminiAiProperties properties;
 
-    @Operation(summary = "Đồng bộ toàn bộ dữ liệu tri thức vào Vector Store (nội dung văn hóa, điểm đến, trạm tour và gợi ý nhiệm vụ)")
+    @Operation(summary = "Đồng bộ toàn bộ dữ liệu tri thức vào Vector Store (nội dung văn hóa, điểm đến, trạm tour, nhiệm vụ và tài liệu Admin)")
     @PostMapping("/sync-all")
     @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_MODERATOR')")
-    @Transactional(readOnly = true)
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> syncAllApprovedContent() {
         log.info("Admin kích hoạt đồng bộ toàn bộ tri thức đã duyệt vào Vector Store");
 
@@ -112,10 +120,28 @@ public class AdminAiSyncController {
             }
         }
 
-        // 3. Điểm dừng trong các Tour đã xuất bản (truyện văn hóa, hiện vật, gợi ý trải nghiệm — không kèm đáp án)
+        // 3. Tour đã xuất bản (tổng quan kèm link /tours/{id}) + từng Điểm dừng trong Tour
+        int processedTours = 0;
         int processedTourStops = 0;
         List<Tour> approvedTours = tourRepository.findByApprovedTrue();
         for (Tour tour : approvedTours) {
+            try {
+                totalChunks += ingestionService.ingestTourOverview(
+                        tour.getTourId(),
+                        tour.getTitle(),
+                        tour.getRegion() != null ? tour.getRegion().getName() : null,
+                        tour.getTheme() != null ? tour.getTheme().getName() : null,
+                        formatTourDuration(tour),
+                        formatAdultPrice(tour),
+                        tour.getDescription(),
+                        tour.getHighlights(),
+                        extractStopNames(tour)
+                );
+                processedTours++;
+            } catch (Exception ex) {
+                log.error("Lỗi đồng bộ vector tổng quan tourId={}: {}", tour.getTourId(), ex.getMessage());
+            }
+
             List<TourStop> stops = tour.getStops();
             if (stops == null || stops.isEmpty()) {
                 continue;
@@ -178,11 +204,46 @@ public class AdminAiSyncController {
             }
         }
 
+        // 5. Tài liệu Context bổ sung do Admin nạp (trừ AI_RULE vì AI_RULE tiêm thẳng vào System Prompt)
+        int processedAdminDocuments = 0;
+        Map<Long, String> destNameCache = approvedDestinations.stream()
+                .collect(Collectors.toMap(Destination::getId, Destination::getName, (a, b) -> a));
+        List<AiKnowledgeDocument> activeRagDocs = documentRepository.findByActiveTrueAndDocTypeNot(AiDocumentType.AI_RULE);
+        for (AiKnowledgeDocument doc : activeRagDocs) {
+            try {
+                String destName = null;
+                if (doc.getDestinationId() != null) {
+                    destName = destNameCache.get(doc.getDestinationId());
+                    if (destName == null) {
+                        destName = destinationRepository.findByIdAndDeletedFalse(doc.getDestinationId())
+                                .map(Destination::getName)
+                                .orElse(null);
+                    }
+                }
+                int created = ingestionService.ingestAdminDocument(
+                        doc.getId(),
+                        doc.getDestinationId(),
+                        destName,
+                        doc.getDocType().name(),
+                        doc.getTitle(),
+                        doc.getRawText()
+                );
+                doc.setChunkCount(created);
+                documentRepository.save(doc);
+                totalChunks += created;
+                processedAdminDocuments++;
+            } catch (Exception ex) {
+                log.error("Lỗi đồng bộ vector cho tài liệu Admin id={}: {}", doc.getId(), ex.getMessage());
+            }
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("processedContents", approvedContents.size());
         result.put("processedDestinations", approvedDestinations.size());
+        result.put("processedTours", processedTours);
         result.put("processedTourStops", processedTourStops);
         result.put("processedTasks", processedTasks);
+        result.put("processedAdminDocuments", processedAdminDocuments);
         result.put("totalChunksCreated", totalChunks);
         result.put("message", "Đồng bộ Vector Store hoàn tất thành công");
 
@@ -258,6 +319,9 @@ public class AdminAiSyncController {
         stats.put("totalSessions", totalSessions);
         stats.put("totalMessages", totalMessages);
         stats.put("chunksByContentType", chunksByContentType);
+        stats.put("totalAdminDocuments", documentRepository.count());
+        stats.put("activeAdminDocuments", documentRepository.countByActiveTrue());
+        stats.put("activeAiRules", documentRepository.countByDocTypeAndActiveTrue(AiDocumentType.AI_RULE));
         stats.put("pgvectorEnabled", chunkStore.isPgVectorEnabled());
         stats.put("chatModel", properties.getChatModel());
         stats.put("embeddingModel", properties.getEmbeddingModel());
@@ -273,6 +337,7 @@ public class AdminAiSyncController {
     public ResponseEntity<ApiResponse<PageResponse<AiKnowledgeChunkAdminDto>>> getChunks(
             @RequestParam(required = false) Long destinationId,
             @RequestParam(required = false) String contentType,
+            @RequestParam(required = false) Boolean globalOnly,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         int safePage = Math.max(page, 0);
@@ -280,7 +345,11 @@ public class AdminAiSyncController {
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt"));
 
         Page<AiKnowledgeChunk> chunkPage;
-        if (destinationId != null && StringUtils.hasText(contentType)) {
+        if (Boolean.TRUE.equals(globalOnly)) {
+            chunkPage = StringUtils.hasText(contentType)
+                    ? chunkRepository.findByDestinationIdIsNullAndContentType(contentType.trim(), pageable)
+                    : chunkRepository.findByDestinationIdIsNull(pageable);
+        } else if (destinationId != null && StringUtils.hasText(contentType)) {
             chunkPage = chunkRepository.findByDestinationIdAndContentType(destinationId, contentType.trim(), pageable);
         } else if (destinationId != null) {
             chunkPage = chunkRepository.findByDestinationId(destinationId, pageable);
@@ -334,5 +403,53 @@ public class AdminAiSyncController {
             return "";
         }
         return "Hoạt động trải nghiệm tại điểm: " + exp.getActivityName().trim();
+    }
+
+    private String formatTourDuration(Tour tour) {
+        if (tour.getDurationMinutes() != null && tour.getDurationMinutes() > 0) {
+            int mins = tour.getDurationMinutes();
+            if (mins % 60 == 0) {
+                return (mins / 60) + " giờ";
+            }
+            return mins + " phút";
+        }
+        if (tour.getDurationDays() > 0) {
+            String base = tour.getDurationDays() + " ngày";
+            if (tour.getDurationNights() != null && tour.getDurationNights() > 0) {
+                base += " " + tour.getDurationNights() + " đêm";
+            }
+            return base;
+        }
+        return "";
+    }
+
+    private String formatAdultPrice(Tour tour) {
+        if (tour.getPrices() == null || tour.getPrices().isEmpty()) {
+            return "";
+        }
+        return tour.getPrices().stream()
+                .filter(p -> p != null && p.getGuestType() == GuestType.ADULT && p.getPrice() != null)
+                .findFirst()
+                .map(TourPrice::getPrice)
+                .map(price -> NumberFormat.getNumberInstance(Locale.forLanguageTag("vi-VN")).format(price) + " VNĐ")
+                .orElse("");
+    }
+
+    private List<String> extractStopNames(Tour tour) {
+        if (tour.getStops() != null && !tour.getStops().isEmpty()) {
+            return tour.getStops().stream()
+                    .map(TourStop::getName)
+                    .filter(StringUtils::hasText)
+                    .toList();
+        }
+        if (tour.getTourDestinations() != null && !tour.getTourDestinations().isEmpty()) {
+            return tour.getTourDestinations().stream()
+                    .map(TourDestination::getDestination)
+                    .filter(Objects::nonNull)
+                    .map(Destination::getName)
+                    .filter(StringUtils::hasText)
+                    .toList();
+        }
+        return List.of();
     }
 }
