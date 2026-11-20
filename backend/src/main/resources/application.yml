@@ -42,6 +42,11 @@ spring:
       port: ${SPRING_DATA_REDIS_PORT:6379}
       password: ${SPRING_DATA_REDIS_PASSWORD:}
       timeout: 3000ms
+    # ── Phân trang mặc định: 10 bản ghi/trang (đồng bộ với toàn bộ web) ──────
+    web:
+      pageable:
+        default-page-size: 10
+        max-page-size: 100
   # ── Flyway ────────────────────────────────────────────────────────────────
   # Migration cho các bảng nghiệp vụ mới (booking / payment / refund / wallet /
   # settlement / provider revenue). Các bảng cũ do Hibernate `ddl-auto: update` quản lý.
