@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
+import { dashboardService } from "@/features/dashboard";
+import { useQueueRefresh } from "@/context/NotificationContext";
 import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout";
 import { NotificationProvider } from "@/context/NotificationContext";
 import NotificationToaster from "@/components/notifications/NotificationToaster";
@@ -190,14 +192,59 @@ export default function AdminLayout({ children }) {
   const [isSidebarWide, setIsSidebarWide] = useState(true);
   const [topSearch, setTopSearch] = useState("");
 
+  // Badge số lượng việc đang chờ trên Sidebar (đối tác, quyết toán, hoàn tiền…)
+  const [navBadges, setNavBadges] = useState({});
+
+  const loadNavBadges = useCallback(async () => {
+    try {
+      const badges = await dashboardService.getAdminOperationBadges();
+      setNavBadges(badges || {});
+    } catch {
+      // Badge là thông tin phụ — lỗi không chặn hiển thị trang.
+    }
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => loadNavBadges());
+  }, [loadNavBadges]);
+
+  // Tự làm mới badge khi có yêu cầu mới trong hàng đợi thông báo.
+  useQueueRefresh(
+    ["refund-review", "adjustment-review", "settlements", "partner-review", "tour-review"],
+    () => loadNavBadges(),
+  );
+
+  // Gắn badge động vào các mục Sidebar có việc đang chờ.
+  const navItemsWithBadges = useMemo(
+    () =>
+      ADMIN_NAV_ITEMS.map((item) => {
+        const count = navBadges?.[item.id];
+        if (!count || count < 1) return item;
+        // Hoàn tiền là việc khẩn cấp ⇒ badge màu đỏ; còn lại dùng chip mặc định.
+        const isUrgent = item.id === "refunds";
+        return {
+          ...item,
+          badge: {
+            text: count > 99 ? "99+" : String(count),
+            color: isUrgent
+              ? "bg-rose-50 text-rose-700 ring-rose-200/80"
+              : "bg-amber-50 text-amber-700 ring-amber-200/80",
+          },
+        };
+      }),
+    [navBadges],
+  );
+
   // Các trang khóa khung 100vh: header, thẻ số liệu & bộ lọc đứng yên, chỉ danh sách trong thẻ tự cuộn
+  // ⚠️ "/admin" (Tổng quan vận hành) KHÔNG khóa — trang này dài, cần cuộn toàn trang.
   const isScrollLockedPage =
-    pathname === "/admin" ||
     pathname?.startsWith("/admin/users") ||
     pathname?.startsWith("/admin/regions") ||
     pathname?.startsWith("/admin/themes") ||
     pathname?.startsWith("/admin/commission-policies") ||
     pathname?.startsWith("/admin/finance") ||
+    pathname?.startsWith("/admin/vouchers") ||
+    pathname?.startsWith("/admin/refunds") ||
     pathname?.startsWith("/admin/settlements");
 
   // Xử lý tìm kiếm nhanh từ Topbar
@@ -221,7 +268,7 @@ export default function AdminLayout({ children }) {
       <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 text-slate-800 font-sans antialiased">
         <Sidebar
           role="admin"
-          navItems={ADMIN_NAV_ITEMS}
+          navItems={navItemsWithBadges}
           onLogout={performLogout}
           isOpenMobile={isSidebarOpen}
           onCloseMobile={() => setIsSidebarOpen(false)}
@@ -253,11 +300,12 @@ export default function AdminLayout({ children }) {
             }
           >
             <div
-              className={
+              key={pathname}
+              className={`jg-page-enter ${
                 isScrollLockedPage
                   ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
                   : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
-              }
+              }`}
             >
               {children}
             </div>
