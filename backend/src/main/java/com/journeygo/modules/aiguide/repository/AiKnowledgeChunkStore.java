@@ -6,11 +6,15 @@ import com.journeygo.modules.aiguide.entity.AiKnowledgeChunk;
 import com.pgvector.PGvector;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.*;
 
@@ -102,33 +106,37 @@ public class AiKnowledgeChunkStore {
                 + "VALUES (?, ?, ?, ?, ?, " + metadataExpr + ", " + embeddingExpr + ", ?, ?)";
 
         Instant now = Instant.now();
-        List<Object[]> batchArgs = new ArrayList<>(chunks.size());
+        jdbcTemplate.batchUpdate(sql, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                AiKnowledgeChunk chunk = chunks.get(i);
+                UUID id = chunk.getId() != null ? chunk.getId() : UUID.randomUUID();
+                chunk.setId(id);
+                Instant createdAt = chunk.getCreatedAt() != null ? chunk.getCreatedAt() : now;
+                Instant updatedAt = chunk.getUpdatedAt() != null ? chunk.getUpdatedAt() : now;
+                chunk.setCreatedAt(createdAt);
+                chunk.setUpdatedAt(updatedAt);
 
-        for (AiKnowledgeChunk chunk : chunks) {
-            UUID id = chunk.getId() != null ? chunk.getId() : UUID.randomUUID();
-            chunk.setId(id);
-            Instant createdAt = chunk.getCreatedAt() != null ? chunk.getCreatedAt() : now;
-            Instant updatedAt = chunk.getUpdatedAt() != null ? chunk.getUpdatedAt() : now;
-            chunk.setCreatedAt(createdAt);
-            chunk.setUpdatedAt(updatedAt);
+                ps.setObject(1, id);
+                ps.setString(2, chunk.getSourceId());
+                if (chunk.getDestinationId() != null) {
+                    ps.setLong(3, chunk.getDestinationId());
+                } else {
+                    ps.setNull(3, Types.BIGINT);
+                }
+                ps.setString(4, chunk.getContentType());
+                ps.setString(5, chunk.getChunkText());
+                ps.setString(6, serializeMetadata(chunk.getMetadata()));
+                ps.setString(7, toVectorString(chunk.getEmbedding()));
+                ps.setTimestamp(8, Timestamp.from(createdAt));
+                ps.setTimestamp(9, Timestamp.from(updatedAt));
+            }
 
-            String metadataJson = serializeMetadata(chunk.getMetadata());
-            String vectorStr = toVectorString(chunk.getEmbedding());
-
-            batchArgs.add(new Object[]{
-                    id,
-                    chunk.getSourceId(),
-                    chunk.getDestinationId(),
-                    chunk.getContentType(),
-                    chunk.getChunkText(),
-                    metadataJson,
-                    vectorStr,
-                    Timestamp.from(createdAt),
-                    Timestamp.from(updatedAt)
-            });
-        }
-
-        jdbcTemplate.batchUpdate(sql, batchArgs);
+            @Override
+            public int getBatchSize() {
+                return chunks.size();
+            }
+        });
     }
 
     /**
@@ -139,17 +147,31 @@ public class AiKnowledgeChunkStore {
                                               float[] queryVector,
                                               String queryVectorStr,
                                               int topK) {
+        return searchSimilar(destinationId, false, contentType, queryVector, queryVectorStr, topK);
+    }
+
+    /**
+     * Tìm Top-K chunks tương đồng nhất; khi {@code includeGlobal = true} và có {@code destinationId},
+     * truy vấn gộp cả tri thức riêng của địa điểm lẫn tri thức GLOBAL ({@code destination_id IS NULL}).
+     */
+    public List<AiKnowledgeChunk> searchSimilar(Long destinationId,
+                                              boolean includeGlobal,
+                                              String contentType,
+                                              float[] queryVector,
+                                              String queryVectorStr,
+                                              int topK) {
         if (topK <= 0) {
             return Collections.emptyList();
         }
 
         if (isPgVectorEnabled()) {
-            return searchViaPgVector(destinationId, contentType, queryVectorStr, topK);
+            return searchViaPgVector(destinationId, includeGlobal, contentType, queryVectorStr, topK);
         }
-        return searchInMemoryFallback(destinationId, contentType, queryVector, topK);
+        return searchInMemoryFallback(destinationId, includeGlobal, contentType, queryVector, topK);
     }
 
     private List<AiKnowledgeChunk> searchViaPgVector(Long destinationId,
+                                                     boolean includeGlobal,
                                                      String contentType,
                                                      String queryVectorStr,
                                                      int topK) {
@@ -163,7 +185,11 @@ public class AiKnowledgeChunkStore {
         List<Object> params = new ArrayList<>();
 
         if (destinationId != null) {
-            sql.append(" AND destination_id = ?");
+            if (includeGlobal) {
+                sql.append(" AND (destination_id = ? OR destination_id IS NULL)");
+            } else {
+                sql.append(" AND destination_id = ?");
+            }
             params.add(destinationId);
         }
         if (StringUtils.hasText(contentType)) {
@@ -175,25 +201,34 @@ public class AiKnowledgeChunkStore {
         params.add(queryVectorStr);
         params.add(topK);
 
-        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> AiKnowledgeChunk.builder()
-                .id(UUID.fromString(rs.getString("id")))
-                .sourceId(rs.getString("source_id"))
-                .destinationId(rs.getLong("destination_id"))
-                .contentType(rs.getString("content_type"))
-                .chunkText(rs.getString("chunk_text"))
-                .metadata(deserializeMetadata(rs.getString("metadata_json")))
-                .embedding(parseVectorString(rs.getString("embedding_str")))
-                .createdAt(toInstant(rs.getTimestamp("created_at")))
-                .updatedAt(toInstant(rs.getTimestamp("updated_at")))
-                .build(), params.toArray());
+        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
+            long rawDestId = rs.getLong("destination_id");
+            Long resolvedDestId = rs.wasNull() ? null : rawDestId;
+            return AiKnowledgeChunk.builder()
+                    .id(UUID.fromString(rs.getString("id")))
+                    .sourceId(rs.getString("source_id"))
+                    .destinationId(resolvedDestId)
+                    .contentType(rs.getString("content_type"))
+                    .chunkText(rs.getString("chunk_text"))
+                    .metadata(deserializeMetadata(rs.getString("metadata_json")))
+                    .embedding(parseVectorString(rs.getString("embedding_str")))
+                    .createdAt(toInstant(rs.getTimestamp("created_at")))
+                    .updatedAt(toInstant(rs.getTimestamp("updated_at")))
+                    .build();
+        }, params.toArray());
     }
 
     private List<AiKnowledgeChunk> searchInMemoryFallback(Long destinationId,
+                                                          boolean includeGlobal,
                                                           String contentType,
                                                           float[] queryVector,
                                                           int topK) {
         List<AiKnowledgeChunk> candidates;
-        if (destinationId != null && StringUtils.hasText(contentType)) {
+        if (destinationId != null && includeGlobal) {
+            candidates = StringUtils.hasText(contentType)
+                    ? chunkRepository.findByDestinationIdIncludingGlobalAndContentType(destinationId, contentType)
+                    : chunkRepository.findByDestinationIdIncludingGlobal(destinationId);
+        } else if (destinationId != null && StringUtils.hasText(contentType)) {
             candidates = chunkRepository.findByDestinationIdAndContentType(destinationId, contentType);
         } else if (destinationId != null) {
             candidates = chunkRepository.findByDestinationId(destinationId);

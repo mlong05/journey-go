@@ -39,9 +39,9 @@ public class AiKnowledgeChunk {
     private String sourceId;
 
     /**
-     * ID địa điểm (khớp với Destination.id).
+     * ID địa điểm (khớp với Destination.id; NULL nếu là tri thức GLOBAL toàn nền tảng).
      */
-    @Column(name = "destination_id", nullable = false)
+    @Column(name = "destination_id", nullable = true)
     private Long destinationId;
 
     /**

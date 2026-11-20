@@ -60,11 +60,24 @@ public interface AiKnowledgeChunkRepository extends JpaRepository<AiKnowledgeChu
 
     List<AiKnowledgeChunk> findByDestinationIdAndContentType(Long destinationId, String contentType);
 
+    @Query("SELECT c FROM AiKnowledgeChunk c WHERE (c.destinationId = :destinationId OR c.destinationId IS NULL)")
+    List<AiKnowledgeChunk> findByDestinationIdIncludingGlobal(@Param("destinationId") Long destinationId);
+
+    @Query("SELECT c FROM AiKnowledgeChunk c WHERE (c.destinationId = :destinationId OR c.destinationId IS NULL) AND c.contentType = :contentType")
+    List<AiKnowledgeChunk> findByDestinationIdIncludingGlobalAndContentType(
+            @Param("destinationId") Long destinationId,
+            @Param("contentType") String contentType
+    );
+
     Page<AiKnowledgeChunk> findByDestinationId(Long destinationId, Pageable pageable);
 
     Page<AiKnowledgeChunk> findByContentType(String contentType, Pageable pageable);
 
     Page<AiKnowledgeChunk> findByDestinationIdAndContentType(Long destinationId, String contentType, Pageable pageable);
+
+    Page<AiKnowledgeChunk> findByDestinationIdIsNull(Pageable pageable);
+
+    Page<AiKnowledgeChunk> findByDestinationIdIsNullAndContentType(String contentType, Pageable pageable);
 
     @Query("SELECT c.contentType, COUNT(c) FROM AiKnowledgeChunk c GROUP BY c.contentType")
     List<Object[]> countGroupedByContentType();
