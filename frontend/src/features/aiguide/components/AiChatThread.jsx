@@ -10,11 +10,13 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
+import AiMessageContent from "./AiMessageContent";
 
 const STARTER_PROMPTS = [
   "Lịch sử điểm đến nổi bật tại Việt Nam",
   "Lưu ý trang phục & ứng xử khi tham quan di tích",
   "Gợi ý điểm đến văn hóa giàu bản sắc",
+  "Gợi ý tour du lịch di sản nổi bật kèm link đặt tour",
 ];
 
 /**
@@ -46,6 +48,7 @@ export default function AiChatThread({
   destinations = [],
   destinationId = "",
   onDestinationChange,
+  onTourLinkClick = null,
   maxLength = 1000,
   compact = false,
 }) {
@@ -158,9 +161,11 @@ export default function AiChatThread({
                     </div>
                   )}
 
-                  <p className="whitespace-pre-wrap break-words text-[13.5px]">
-                    {msg.content}
-                  </p>
+                  <AiMessageContent
+                    content={msg.content}
+                    isUser={isUser}
+                    onTourLinkClick={onTourLinkClick}
+                  />
 
                   {!isUser && Array.isArray(msg.citations) && msg.citations.length > 0 && (
                     <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2">

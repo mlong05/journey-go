@@ -69,6 +69,7 @@ export const aiGuideService = {
   async getAdminChunks({
     destinationId = null,
     contentType = "",
+    globalOnly = false,
     page = 0,
     size = 20,
   } = {}) {
@@ -76,7 +77,11 @@ export const aiGuideService = {
       page: String(page),
       size: String(size),
     });
-    if (destinationId) query.set("destinationId", String(destinationId));
+    if (globalOnly) {
+      query.set("globalOnly", "true");
+    } else if (destinationId) {
+      query.set("destinationId", String(destinationId));
+    }
     if (contentType) query.set("contentType", contentType);
     return unwrap(await apiClient.get(`/admin/ai/chunks?${query}`));
   },
@@ -87,6 +92,75 @@ export const aiGuideService = {
         `/admin/ai/sources/${encodeURIComponent(sourceId)}`,
       ),
     );
+  },
+
+  async getAdminDocuments({
+    docType = "",
+    scope = "",
+    destinationId = null,
+    active = null,
+    page = 0,
+    size = 15,
+  } = {}) {
+    const query = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+    });
+    if (docType) query.set("docType", docType);
+    if (scope) query.set("scope", scope);
+    if (destinationId) query.set("destinationId", String(destinationId));
+    if (active !== null && active !== undefined && active !== "") {
+      query.set("active", String(active));
+    }
+    return unwrap(await apiClient.get(`/admin/ai/documents?${query}`));
+  },
+
+  async getAdminDocument(id) {
+    return unwrap(await apiClient.get(`/admin/ai/documents/${id}`));
+  },
+
+  async createAdminDocument({
+    title,
+    docType,
+    scope = "GLOBAL",
+    destinationId = null,
+    rawText = "",
+    file = null,
+    active = true,
+  }) {
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("docType", docType);
+    formData.append("scope", scope);
+    formData.append("active", String(Boolean(active)));
+    if (scope === "DESTINATION" && destinationId) {
+      formData.append("destinationId", String(destinationId));
+    }
+    if (rawText && rawText.trim()) {
+      formData.append("rawText", rawText.trim());
+    }
+    if (file) {
+      formData.append("file", file);
+    }
+    return unwrap(await apiClient.upload("/admin/ai/documents", formData));
+  },
+
+  async updateAdminDocument(id, payload) {
+    return unwrap(await apiClient.put(`/admin/ai/documents/${id}`, payload));
+  },
+
+  async toggleAdminDocumentStatus(id, active) {
+    return unwrap(
+      await apiClient.patch(`/admin/ai/documents/${id}/status?active=${Boolean(active)}`),
+    );
+  },
+
+  async reindexAdminDocument(id) {
+    return unwrap(await apiClient.post(`/admin/ai/documents/${id}/reindex`, {}));
+  },
+
+  async deleteAdminDocument(id) {
+    return unwrap(await apiClient.delete(`/admin/ai/documents/${id}`));
   },
 
   async getDestinations() {
