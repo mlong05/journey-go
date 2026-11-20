@@ -104,13 +104,11 @@ public record TourPublicDetailResponse(
                 .cancellationPolicy(d.cancellationPolicy())
                 .contactInfo(d.contactInfo())
                 .price(price)
-                // Chỉ hiện loại khách đã có giá, hoặc luôn miễn phí (em bé)
+                // Chỉ hiện loại khách đã có giá (0đ = miễn phí); tính chỗ theo khai báo của đối tác.
                 .prices(d.prices().stream()
-                        .filter(p -> p.price() != null || p.alwaysFree())
+                        .filter(p -> p.price() != null)
                         .map(p -> new Price(p.guestType(), p.label(), p.ageRange(),
-                                p.alwaysFree() ? BigDecimal.ZERO : p.price(), p.alwaysFree(),
-                                // Em bé luôn không chiếm chỗ; các loại khác theo cấu hình đối tác.
-                                p.alwaysFree() ? false : p.countsTowardSlot()))
+                                p.price(), p.alwaysFree(), p.countsTowardSlot()))
                         .toList())
                 .maxGuestsPerSlot(d.maxGuestsPerSlot())
                 .upcomingDepartureDates(d.departureDates().stream().filter(day -> !day.isBefore(today)).toList())

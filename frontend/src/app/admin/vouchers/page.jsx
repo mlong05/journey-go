@@ -6,8 +6,6 @@ import {
   BadgePercent,
   Building2,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   CircleSlash,
   Filter,
   Loader2,
@@ -26,6 +24,8 @@ import {
   updateVoucher,
 } from "@/features/finance/services/voucherService";
 import { getActiveProviderProfiles } from "@/features/providerprofile/services/providerProfileService";
+import PaginationBar from "@/components/ui/PaginationBar";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 /* =========================================================================
    HẰNG SỐ
@@ -162,19 +162,23 @@ function VoucherFormModal({ mode, initialData, onClose, onSaved, showToast }) {
 
   useEffect(() => {
     let mounted = true;
-    setLoadingPartners(true);
-    getActiveProviderProfiles()
-      .then((data) => {
-        if (mounted) {
-          setPartners(Array.isArray(data) ? data : []);
-        }
-      })
-      .catch((err) => {
-        console.warn("Không thể tải danh sách đối tác:", err);
-      })
-      .finally(() => {
-        if (mounted) setLoadingPartners(false);
-      });
+    // Gọi trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect
+    // (tránh cascading render — rule `react-hooks/set-state-in-effect`).
+    (async () => {
+      setLoadingPartners(true);
+      getActiveProviderProfiles()
+        .then((data) => {
+          if (mounted) {
+            setPartners(Array.isArray(data) ? data : []);
+          }
+        })
+        .catch((err) => {
+          console.warn("Không thể tải danh sách đối tác:", err);
+        })
+        .finally(() => {
+          if (mounted) setLoadingPartners(false);
+        });
+    })();
     return () => {
       mounted = false;
     };
@@ -606,7 +610,7 @@ export default function AdminVouchersPage() {
   const [vouchers, setVouchers] = useState([]);
   const [pagination, setPagination] = useState({
     page: 0,
-    size: 15,
+    size: PAGE_SIZE,
     totalPages: 0,
     totalElements: 0,
   });
@@ -659,7 +663,10 @@ export default function AdminVouchersPage() {
   );
 
   useEffect(() => {
-    load(0);
+    // Gọi trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
+    (async () => {
+      await load(0);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
@@ -692,7 +699,7 @@ export default function AdminVouchersPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
+    <div className="flex-1 min-h-0 flex flex-col gap-4">
       {/* ── Header ── */}
       <div className="shrink-0 bg-white rounded-2xl px-5 py-4 border border-slate-200/90 shadow-2xs">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1024,35 +1031,14 @@ export default function AdminVouchersPage() {
 
         {/* ── Phân trang ── */}
         {!loading && vouchers.length > 0 && (
-          <div className="shrink-0 flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs">
-            <span className="text-slate-500">
-              Tổng{" "}
-              <strong className="text-slate-700">
-                {pagination.totalElements}
-              </strong>{" "}
-              voucher
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={pagination.page === 0}
-                onClick={() => load(pagination.page - 1)}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-              >
-                <ChevronLeft size={15} />
-              </button>
-              <span className="font-semibold text-slate-700 px-2">
-                Trang {pagination.page + 1} / {Math.max(pagination.totalPages, 1)}
-              </span>
-              <button
-                type="button"
-                disabled={pagination.page >= pagination.totalPages - 1}
-                onClick={() => load(pagination.page + 1)}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-              >
-                <ChevronRight size={15} />
-              </button>
-            </div>
+          <div className="shrink-0">
+            <PaginationBar
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              totalElements={pagination.totalElements}
+              unit="voucher"
+              onChange={(p) => load(p)}
+            />
           </div>
         )}
       </div>

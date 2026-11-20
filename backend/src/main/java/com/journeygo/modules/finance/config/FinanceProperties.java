@@ -89,6 +89,28 @@ public class FinanceProperties {
     private long bookingExpiryScanIntervalSeconds = 60;
 
     /**
+     * Số giây giữa các lần quét hết hạn Payment (giây).
+     *
+     * <p>Xem {@code PaymentExpiryScheduler}. Mặc định 60 giây.
+     */
+    private long paymentExpiryScanIntervalSeconds = 60;
+
+    /**
+     * Số giây "lướt an toàn" sau khi hạn thanh toán đã qua, trước khi đóng giao dịch
+     * sang {@code EXPIRED} (giây). Mặc định 900 giây (15 phút).
+     *
+     * <p>── Vì sao cần khoảng lướt này? ──
+     * Có thể khách ĐÃ thanh toán thành công ở VNPay trước hạn, nhưng callback/IPN
+     * bị mất (tunnel chết, app bị kill…) ⇒ giao dịch treo ở PROCESSING dù tiền đã
+     * vào tài khoản. Trong khoảng lướt này, tác vụ đối soá (QueryDR) có cơ hội xác
+     * minh và chuyển giao dịch sang SUCCESS.
+     *
+     * <p>⚠️ Dù sao thì {@code EXPIRED} KHÔNG phải trạng thái cuối ⇒ callback đến
+     * muộn vẫn được áp dụng bình thường ⇒ KHÔNG mất tiền khách.
+     */
+    private long paymentExpiryGraceSeconds = 900;
+
+    /**
      * Số giây giữa các lần kiểm tra trạng thái Refund đang chờ kết quả từ VNPay (giây).
      */
     private long refundStatusCheckIntervalSeconds = 300;

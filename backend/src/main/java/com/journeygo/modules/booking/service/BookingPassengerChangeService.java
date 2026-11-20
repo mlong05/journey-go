@@ -99,9 +99,6 @@ public class BookingPassengerChangeService {
 
         TourBookingCatalogService.PriceTable table = catalogService.priceTable(booking.getTour());
         BigDecimal newPrice = table.sells(newGuestType) ? table.priceOf(newGuestType) : BigDecimal.ZERO;
-        if (newGuestType.isAlwaysFree()) {
-            newPrice = BigDecimal.ZERO;
-        }
         BigDecimal priceDelta = newPrice.subtract(passenger.getPrice() != null ? passenger.getPrice() : BigDecimal.ZERO);
 
         BookingPassengerChange change = BookingPassengerChange.builder()

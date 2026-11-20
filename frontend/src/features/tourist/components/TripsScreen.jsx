@@ -343,13 +343,19 @@ function Trips() {
       {next && <NextTrip booking={next} today={today} isGuest={guestIds.has(String(next.id))} />}
 
       <div>
-        <div ref={tablistRef} className="relative -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:thin] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" role="tablist" aria-label="Lọc chuyến đi">
-          {TRIP_TABS.map(([k, label]) => (
-            <button key={k} type="button" role="tab" aria-selected={active === k} onClick={() => pick(k)}
-              className={`shrink-0 cursor-pointer whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold transition-colors ${active === k ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}>
-              {label} <span className={active === k ? "text-white/70" : "text-slate-400"}>{groups[k]?.length || 0}</span>
-            </button>
-          ))}
+        {/* Một hàng duy nhất (không xuống dòng): máy tính vừa đủ 8 tab, màn hẹp thì vuốt ngang. */}
+        <div ref={tablistRef} className="relative flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Lọc chuyến đi">
+          {TRIP_TABS.map(([k, label]) => {
+            const n = groups[k]?.length || 0;
+            const on = active === k;
+            return (
+              <button key={k} type="button" role="tab" aria-selected={on} onClick={() => pick(k)}
+                className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-[13px] font-bold transition-colors ${on ? "bg-slate-900 text-white" : n ? "text-slate-700 hover:bg-slate-100" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"}`}>
+                {label}
+                <span className={`min-w-5 rounded-full px-1.5 text-center text-[11px] tabular-nums ${on ? "bg-white/20 text-white" : n ? "bg-slate-100 text-slate-600" : "text-slate-300"}`}>{n}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="mt-4" role="tabpanel">

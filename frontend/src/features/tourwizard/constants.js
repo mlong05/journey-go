@@ -28,12 +28,12 @@ export const CONTENT_EDITABLE = ["DRAFT", "CHANGES_REQUESTED"];
 /** Đối tác được sửa giá / lịch (bước 2, 4) ở các trạng thái này (BR-05). */
 export const PRICING_EDITABLE = ["DRAFT", "CHANGES_REQUESTED", "PUBLISHED"];
 
-/** Mã loại khách + giá trị mặc định. Tên / độ tuổi / miễn phí do Admin cấu hình — hiển thị dùng useGuestTypes(). */
+/** Mã loại khách + giá trị mặc định. Tên / độ tuổi do Admin cấu hình — hiển thị dùng useGuestTypes(). */
 export const GUEST_TYPES = [
   { key: "ADULT", label: "Người lớn", age: "12 tuổi trở lên" },
   { key: "CHILD", label: "Trẻ em", age: "5 – 11 tuổi" },
   { key: "TODDLER", label: "Trẻ nhỏ", age: "2 – 4 tuổi" },
-  { key: "INFANT", label: "Em bé", age: "Dưới 2 tuổi", alwaysFree: true },
+  { key: "INFANT", label: "Em bé", age: "Dưới 2 tuổi" },
 ];
 
 export const VIDEO_SOURCES = [
@@ -84,7 +84,7 @@ export const LIMITS = {
 
 export const BANNED_TITLE_WORDS = ["rẻ nhất", "độc quyền", "tốt nhất", "số 1", "số một"];
 
-/** 5 tiêu chí kiểm duyệt; cần đạt tối thiểu 3/5 để duyệt. */
+/** 5 tiêu chí kiểm duyệt; cần đạt đủ 5/5 để duyệt. */
 export const REVIEW_CRITERIA = [
   { key: "interactive", label: "Tính tương tác", hint: "Khách được thực hành, chạm, thử nghiệm — không chỉ đứng nhìn hay nghe thuyết minh." },
   { key: "localExpertise", label: "Tính bản địa", hint: "Người dẫn / người chia sẻ có chuyên môn hoặc là người địa phương am hiểu sâu sắc." },
@@ -92,7 +92,7 @@ export const REVIEW_CRITERIA = [
   { key: "culturalRatio", label: "Tỷ trọng văn hóa > 50%", hint: "Hoạt động văn hóa chiếm đa số, không lồng điểm mua sắm đại trà (trừ làng nghề)." },
   { key: "authenticMedia", label: "Hình ảnh / video trực quan", hint: "Tập trung vào con người, hoạt động trải nghiệm; không dùng ảnh mạng, phong cảnh chung chung." },
 ];
-export const CRITERIA_MIN_TO_APPROVE = 3;
+export const CRITERIA_MIN_TO_APPROVE = 5;
 
 /** Lý do từ chối dạng mã — khớp TourRejectionReason. */
 export const REJECTION_REASONS = [

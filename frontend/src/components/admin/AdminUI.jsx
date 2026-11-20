@@ -85,7 +85,7 @@ export function Panel({ icon: Icon, title, right, children, fill = false, footer
 
 /**
  * Thanh phân trang — bọc component dùng chung `PaginationBar`
- * (số trang, nút nhảy đầu/cuối, "Đang xem trang X / Y" và ô "Số dòng/trang").
+ * (số trang, nút nhảy đầu/cuối, "Đang xem trang X / Y").
  * Luôn hiện kể cả khi chỉ có 1 trang.
  */
 export function Pagination({
@@ -94,8 +94,6 @@ export function Pagination({
   totalElements,
   unit = "bản ghi",
   onChange,
-  pageSize,
-  onSizeChange,
 }) {
   if (!totalElements) return null;
   return (
@@ -105,8 +103,6 @@ export function Pagination({
       totalElements={totalElements}
       unit={unit}
       onChange={onChange}
-      pageSize={pageSize}
-      onSizeChange={onSizeChange}
     />
   );
 }
@@ -173,6 +169,7 @@ export function ModalShell({
   subtitle,
   onClose,
   children,
+  footer = null,
   wide = false,
   extraWide = false,
   fillHeight = false,
@@ -281,6 +278,16 @@ export function ModalShell({
             children
           )}
         </div>
+        {/*
+          ⚠️ CHÂN MODAL — nút hành động luôn NHÌN THẤY, không phải cuộn xuống
+            cuối mới thấy. Chân modal nằm NGOÀI thân cuộn (`overflow-y-auto`)
+            ⇒ ghim cố định ở đáy modal.
+        */}
+        {footer && (
+          <div className="mt-4 flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body,

@@ -19,6 +19,8 @@ import { useEffect, useRef, useState } from "react";
  */
 export function LimitedField({
   as = "input", limit, value = "", onChange, counter = "auto", wrapperClassName = "", className = "",
+  // quiet: chỉ giới hạn (cắt phần dán dư, xử lý bộ gõ) — không hiện bộ đếm / dòng thông báo (ô nhập nhỏ gọn).
+  quiet = false,
   onPaste, onCompositionStart, onCompositionEnd, ...props
 }) {
   const ref = useRef(null);
@@ -103,7 +105,7 @@ export function LimitedField({
         onChange={handleChange} onPaste={handlePaste} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd}
         aria-describedby={showCounter && props.id ? `${props.id}-count` : props["aria-describedby"]}
         className={`${className} ${over ? "!border-rose-300" : full ? "!border-amber-300" : ""}`} />
-      {(showCounter || notice) && (
+      {!quiet && (showCounter || notice) && (
         <div className="mt-1 flex items-start justify-between gap-2 text-[11px] font-semibold">
           <span className={over ? "text-rose-600" : full || notice ? "text-amber-700" : ""} aria-live="polite">{notice || status}</span>
           {showCounter && (

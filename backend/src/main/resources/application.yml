@@ -6,6 +6,12 @@ server:
 spring:
   application:
     name: journey-go-backend
+  # Profile mặc định khi không set biến môi trường.
+  #   dev  → chạy local (application-dev.yml)
+  #   prod → chạy trong Docker / máy chủ thật (application-prod.yml)
+  # Biến môi trường SPRING_PROFILES_ACTIVE sẽ ghi đè giá trị này.
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   servlet:
     multipart:
       # Ảnh tối đa 10MB, video cổ vật tối đa 100MB (kiểm tra chi tiết trong CloudinaryService)
@@ -36,6 +42,11 @@ spring:
       port: ${SPRING_DATA_REDIS_PORT:6379}
       password: ${SPRING_DATA_REDIS_PASSWORD:}
       timeout: 3000ms
+    # ── Phân trang mặc định: 10 bản ghi/trang (đồng bộ với toàn bộ web) ──────
+    web:
+      pageable:
+        default-page-size: 10
+        max-page-size: 100
   # ── Flyway ────────────────────────────────────────────────────────────────
   # Migration cho các bảng nghiệp vụ mới (booking / payment / refund / wallet /
   # settlement / provider revenue). Các bảng cũ do Hibernate `ddl-auto: update` quản lý.
@@ -125,6 +136,18 @@ app:
     from-name: ${MAIL_FROM_NAME:JourneyGo Platform}
     otp-expiration-minutes: ${MAIL_OTP_EXPIRATION_MINUTES:10}
 
+  # ── Seed Runner (dữ liệu DEMO) ──────────────────────────────────────────────
+  # Dữ liệu nền tảng cố định (Role, TaskType, PointRule, Region, Theme, chính sách
+  # hoa hồng) do DataInitializer tự đảm bảo khi Backend khởi động.
+  #
+  # Dữ liệu DEMO (tài khoản, tour, booking, doanh thu…) nằm ở src/main/resources/seed/*.sql
+  # và CHỈ chạy khi bật cờ dưới đây — tức là thủ công, có chủ đích:
+  #   • Local : SEED_ENABLED=true mvn spring-boot:run
+  #   • Docker: docker compose run --rm backend-seed
+  seed:
+    enabled: ${SEED_ENABLED:false}
+    location: classpath*:seed/*.sql
+
   # ── Partner Application (Đăng ký đối tác) ────────────────────────────────
   partner:
     # Thời hạn hiệu lực mã OTP xác minh email khi đăng ký đối tác (phút).
@@ -155,6 +178,10 @@ app:
     auto-open-slot-capacity: ${BOOKING_AUTO_OPEN_SLOT_CAPACITY:50}
     # Số giây giữa các lần quét Booking quá hạn thanh toán.
     booking-expiry-scan-interval-seconds: ${BOOKING_EXPIRY_SCAN_INTERVAL_SECONDS:60}
+    # Số giây giữa các lần quét Payment quá hạn thanh toán (chuyển sang EXPIRED).
+    payment-expiry-scan-interval-seconds: ${PAYMENT_EXPIRY_SCAN_INTERVAL_SECONDS:60}
+    # Số giây lướt an toàn sau hạn thanh toán trước khi đóng giao dịch sang EXPIRED.
+    payment-expiry-grace-seconds: ${PAYMENT_EXPIRY_GRACE_SECONDS:900}
     # Số giây giữa các lần kiểm tra trạng thái Refund đang chờ kết quả từ VNPay.
     refund-status-check-interval-seconds: ${REFUND_STATUS_CHECK_INTERVAL_SECONDS:300}
     # Số giây giữa các lần đối soát lại giao dịch thanh toán còn "kẹt" (PENDING/PROCESSING).

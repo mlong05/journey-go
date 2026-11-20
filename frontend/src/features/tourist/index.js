@@ -16,3 +16,4 @@ export { default as CommunityPostScreen } from "./components/CommunityPostScreen
 export { default as MyPostsScreen } from "./components/MyPostsScreen";
 export { default as InvitationsScreen } from "./components/InvitationsScreen";
 export { default as InvitationAcceptScreen } from "./components/InvitationAcceptScreen";
+export { default as AchievementsScreen } from "./components/AchievementsScreen";

@@ -28,6 +28,7 @@ export const ROUTES = {
   /** Nhắn tin với nhà tour: /account/messages?c={conversationId} */
   ACCOUNT_MESSAGES: "/account/messages",
   ACCOUNT_REWARDS: "/account/rewards",
+  ACCOUNT_ACHIEVEMENTS: "/account/achievements",
   /** Trung tâm thông báo (đầy đủ): /account/notifications */
   ACCOUNT_NOTIFICATIONS: "/account/notifications",
   /** Bài viết cộng đồng của tôi: /account/posts */

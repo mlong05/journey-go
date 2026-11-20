@@ -222,6 +222,21 @@ public class CulturalContentService {
         content.incrementPlayCount();
         CulturalContent saved = culturalContentRepository.save(content);
         log.info("Played cultural content id={} totalPlayCount={}", saved.getId(), saved.getPlayCount());
+
+        try {
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof com.journeygo.security.UserPrincipal principal) {
+                if (eventPublisher != null) {
+                    Long destId = saved.getDestination() != null ? saved.getDestination().getId() : null;
+                    eventPublisher.publishEvent(new com.journeygo.modules.achievement.event.CulturalContentExploredEvent(
+                            principal.getId(), saved.getId(), destId
+                    ));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not publish CulturalContentExploredEvent: {}", e.getMessage());
+        }
+
         return CulturalContentResponse.fromEntity(saved);
     }
 

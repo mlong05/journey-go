@@ -2,14 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileCheck, LayoutDashboard, Wallet } from "lucide-react";
+import { FileCheck, LayoutDashboard, Wallet } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 
+/**
+ * Các tab của khu vực Tài chính của đối tác.
+ *
+ * ⚠️ KHÔNG có tab "Giao dịch tour" — danh sách giao dịch tour đã được xếp vào
+ * tab "Kỳ tất toán" (bấm vào từng kỳ để xổ ra giao dịch của kỳ đó).
+ */
 const FINANCE_TABS = [
   { id: "overview", label: "Tổng quan", href: ROUTES.PROVIDER_FINANCE, icon: LayoutDashboard },
-  { id: "wallet", label: "Ví & Doanh thu", href: ROUTES.PROVIDER_FINANCE_WALLET, icon: Wallet },
-  { id: "settlements", label: "Lịch sử tất toán", href: ROUTES.PROVIDER_FINANCE_SETTLEMENTS, icon: FileCheck },
-  { id: "revenues", label: "Doanh thu theo kỳ", href: ROUTES.PROVIDER_FINANCE_REVENUES, icon: BarChart3 },
+  { id: "wallet", label: "Ví nội bộ", href: ROUTES.PROVIDER_FINANCE_WALLET, icon: Wallet },
+  { id: "settlements", label: "Kỳ tất toán", href: ROUTES.PROVIDER_FINANCE_SETTLEMENTS, icon: FileCheck },
 ];
 
 /**

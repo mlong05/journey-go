@@ -17,7 +17,8 @@ const fromTour = (tour) => {
       const p = (tour.prices || []).find((x) => x.guestType === g.key);
       return {
         guestType: g.key,
-        price: p?.price ?? (g.alwaysFree ? 0 : null),
+        // Lần đầu: gợi ý Em bé 0đ (đối tác đổi được).
+        price: p?.price ?? (!configured && g.key === "INFANT" ? 0 : null),
         // Lần đầu (chưa nhập giá nào): Người lớn + Trẻ em mặc định tính slot.
         countsTowardSlot: configured ? !!p?.countsTowardSlot : DEFAULT_COUNTS_SLOT[g.key],
       };
@@ -57,7 +58,10 @@ export default function PricingStep({ tour, issues, readOnly, isLive, onSave }) 
 
       <section className="space-y-3">
         <h3 className="text-sm font-bold text-slate-900">Bảng giá theo đối tượng (VNĐ)</h3>
-        <p className="text-[11px] text-slate-500">Loại khách và độ tuổi do nền tảng quy định. Tích &ldquo;Tính slot&rdquo; nếu loại khách đó chiếm 1 chỗ.</p>
+        <p className="text-[11px] text-slate-500">
+          Loại khách và độ tuổi do nền tảng quy định. Nhập 0đ nếu loại khách đó được miễn phí; tích
+          &ldquo;Tính slot&rdquo; nếu loại khách đó chiếm 1 chỗ.
+        </p>
         <div className="rounded-xl border border-slate-200 overflow-hidden">
           <div className="grid grid-cols-12 bg-slate-50 px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
             <span className="col-span-3">Loại khách</span>
@@ -73,11 +77,17 @@ export default function PricingStep({ tour, issues, readOnly, isLive, onSave }) 
                 <span className="col-span-3 text-sm font-bold text-slate-800">{g.label}</span>
                 <span className="col-span-3 text-xs text-slate-500">{g.age}</span>
                 <div className="col-span-4">
-                  {g.alwaysFree ? (
-                    <span className="inline-block px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold">Miễn phí (cố định)</span>
+                  <MoneyInput value={p.price} suffix="đ" disabled={readOnly} placeholder="0"
+                    error={e} onChange={(v) => setPrice(g.key, { price: v })} />
+                  {p.price != null && Number(p.price) === 0 ? (
+                    <p className="text-[11px] font-bold text-emerald-700 mt-1">Miễn phí</p>
                   ) : (
-                    <MoneyInput value={p.price} suffix="đ" disabled={readOnly} placeholder="0"
-                      error={e} onChange={(v) => setPrice(g.key, { price: v })} />
+                    !readOnly && (
+                      <button type="button" onClick={() => setPrice(g.key, { price: 0 })}
+                        className="text-[11px] font-semibold text-slate-500 hover:text-emerald-700 hover:underline mt-1 cursor-pointer">
+                        Đặt miễn phí
+                      </button>
+                    )
                   )}
                   {e && <p className="text-[11px] font-bold text-rose-600 mt-1">{e}</p>}
                 </div>

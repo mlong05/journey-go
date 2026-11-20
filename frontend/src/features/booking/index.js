@@ -8,11 +8,11 @@
  *
  *  • `bookingService`      — đọc dữ liệu đơn đặt cho admin/provider.
  *  • `passengerService`   — duyệt yêu cầu thay đổi hành khách, chat (provider).
- *  • `Pager`              — phân trang dùng chung.
  *  • `PassengerListPanel` — danh sách hành khách của một booking.
  *  • `BookingChatPanel`   — khung chat hỗ trợ gắn với booking.
+ *
+ * Phân trang dùng chung: `@/components/ui/PaginationBar` (10 dòng/trang).
  */
 export { default as bookingService, toPage } from "./services/bookingService";
-export { default as Pager } from "./components/Pager";
 export { default as PassengerListPanel } from "./components/PassengerListPanel";
 export { default as BookingChatPanel } from "./components/BookingChatPanel";

@@ -469,6 +469,18 @@ public class ProviderRevenueService {
         if (booking.getTour() == null) {
             return result;
         }
+        // Tour tạo theo wizard 5 bước không có TourDestination/Experience riêng:
+        // toàn bộ doanh thu thuộc về đối tác đã tạo tour (chủ tour).
+        if (booking.getTour().isWizardTour()) {
+            User owner = booking.getTour().getCreatedBy();
+            if (owner == null) {
+                return result;
+            }
+            providerProfileRepository.findByUser_Id(owner.getId()).ifPresent(profile ->
+                    result.put(profile.getId(),
+                            booking.getTotalAmount() != null ? booking.getTotalAmount() : BigDecimal.ZERO));
+            return result;
+        }
         List<Long> destinationIds = booking.getTour().getTourDestinations() == null
                 ? List.of()
                 : booking.getTour().getTourDestinations().stream()

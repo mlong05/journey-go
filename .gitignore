@@ -36,7 +36,16 @@ mobile/android/build/
 
 # Database backups
 *.dump
+backups/
+!backups/.gitkeep
 .worktrees/
+
+# GitHub Actions self-hosted runner (chứa token đăng ký — KHÔNG commit)
+.runner/
+_work/
+
+# Secrets dùng cho self-hosted deploy (KHÔNG commit — file .env để deploy)
+.secrets/
 
 # Next.js build output (frontend/.next) — không commit
 frontend/.next/

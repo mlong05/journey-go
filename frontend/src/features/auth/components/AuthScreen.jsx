@@ -15,7 +15,7 @@ import AuthHeroCarousel from "./AuthHeroCarousel";
 import AuthFeedbackModal from "./AuthFeedbackModal";
 import AuthToast from "./AuthToast";
 import LoginForm from "./LoginForm";
-import RegisterForm from "./RegisterForm";
+import RegisterForm, { validateRegister } from "./RegisterForm";
 import ForgotPasswordFlow from "./ForgotPasswordFlow";
 import SocialLoginButtons from "./SocialLoginButtons";
 import HeritageLandmarksArt from "./HeritageLandmarksArt";
@@ -219,24 +219,10 @@ export default function AuthScreen({ initialTab = "login" }) {
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
 
-    if (!registerForm.fullName.trim()) {
-      showToast("error", "Vui lòng điền Họ và tên người đại diện.");
-      return;
-    }
-    if (!registerForm.phone.trim()) {
-      showToast("error", "Vui lòng cung cấp Số điện thoại liên hệ.");
-      return;
-    }
-    if (!registerForm.email.trim()) {
-      showToast("error", "Vui lòng nhập Email hợp lệ.");
-      return;
-    }
-    if (registerForm.password.length < 6) {
-      showToast("error", "Mật khẩu cần tối thiểu 6 ký tự.");
-      return;
-    }
-    if (registerForm.password !== registerForm.confirmPassword) {
-      showToast("error", "Mật khẩu xác nhận không trùng khớp.");
+    // Cùng bộ kiểm tra với RegisterForm (lỗi chi tiết đã hiện dưới từng ô) — báo lỗi đầu tiên.
+    const firstError = Object.values(validateRegister(registerForm))[0];
+    if (firstError) {
+      showToast("error", `${firstError}.`);
       return;
     }
     if (!registerForm.agreeTerms) {
@@ -250,80 +236,23 @@ export default function AuthScreen({ initialTab = "login" }) {
       const targetRoleEnum = "TOURIST";
 
       const result = await authService.register({
-        fullName: registerForm.fullName.trim(),
+        fullName: registerForm.fullName.trim().replace(/\s+/g, " "),
         phone: registerForm.phone.trim(),
         email: registerForm.email.trim(),
         password: registerForm.password,
         role: targetRoleEnum,
       });
 
-      const payload = result?.data || result;
-      const user = payload?.user;
-      const accessToken = payload?.accessToken || payload?.token;
-      const refreshToken = payload?.refreshToken;
-
-      const roleStr = String(user?.role || targetRoleEnum).toUpperCase();
-      let targetPath = ROUTES.HOME || "/";
-      let roleTitle = "Du khách khám phá";
-
-      if (roleStr === "ADMIN") {
-        targetPath = ROUTES.ADMIN || "/admin";
-        roleTitle = "Quản trị viên";
-      } else if (roleStr === "CONTENT_MODERATOR") {
-        targetPath = ROUTES.MODERATOR || "/moderator";
-        roleTitle = "Kiểm duyệt viên";
-      } else if (roleStr === "CONTENT_PROVIDER") {
-        targetPath = ROUTES.PROVIDER || "/provider";
-        roleTitle = "Đối tác cung cấp nội dung";
-      } else {
-        targetPath = touristCallback(ROUTES.HOME || "/");
-        roleTitle = "Du khách khám phá";
+      if (result?.success === false) {
+        throw new Error(result?.message || "Đăng ký không thành công. Vui lòng thử lại.");
       }
 
-      const authSession = {
-        user: {
-          id: user?.id,
-          name: registerForm.fullName,
-          fullName: registerForm.fullName,
-          email: registerForm.email,
-          phone: registerForm.phone,
-          role: roleStr.toLowerCase(),
-          roleRaw: roleStr,
-          roleTitle,
-          roleScope: "Khám phá di sản",
-        },
-        token: accessToken,
-        accessToken,
-        refreshToken,
-        role: roleStr.toLowerCase(),
-        rolePath: targetPath,
-        loginAt: new Date().toISOString(),
-      };
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("journey_go_auth", JSON.stringify(authSession));
-        if (accessToken) localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN || "jg_access_token", accessToken);
-        if (refreshToken) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN || "jg_refresh_token", refreshToken);
-        if (user) localStorage.setItem(STORAGE_KEYS.USER_INFO || "jg_user_info", JSON.stringify(user));
-        window.dispatchEvent(new Event("storage"));
-      }
-
+      // Đăng ký xong KHÔNG tự đăng nhập/chuyển trang: ở lại trang xác thực, chuyển sang tab
+      // Đăng nhập với email vừa tạo để người dùng tự đăng nhập.
       setLoading(false);
-
-      setFeedbackModal({
-        isOpen: true,
-        type: "register",
-        title: "Chào mừng thành viên mới!",
-        subtitle: "Đang tự động đăng nhập và đưa bạn tới cổng khám phá...",
-        roleBadge: roleTitle,
-        targetLabel: targetPath === "/" ? "Cổng khám phá (Tourist)" : targetPath,
-        redirectPath: targetPath,
-      });
-
-      setTimeout(() => {
-        setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
-        router.push(targetPath);
-      }, 1250);
+      setLoginForm((prev) => ({ ...prev, identifier: registerForm.email.trim(), password: "" }));
+      setActiveTab("login");
+      showToast("success", "Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.");
     } catch (err) {
       console.error("[Register Error]", err);
       showToast("error", err?.message || "Đăng ký không thành công. Vui lòng thử lại.");
@@ -514,7 +443,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       <AuthHeroCarousel />
 
       {/* Cột phải: logo + form, nội dung căn giữa */}
-      <div className="relative isolate lg:col-span-6 xl:col-span-7 col-span-12 h-screen overflow-y-auto overflow-x-hidden flex flex-col bg-white">
+      <div className="relative isolate lg:col-span-6 xl:col-span-7 col-span-12 h-screen overflow-hidden flex flex-col bg-white">
         {/* Trống đồng Đông Sơn mờ ở góc dưới phải: nằm dưới mọi nội dung (-z-10), không bắt sự kiện chuột */}
         <BronzeDrumMotif className="pointer-events-none absolute -z-10 -right-44 -bottom-44 w-[520px] h-[520px] text-amber-800/[0.07] motion-safe:animate-[spin_180s_linear_infinite]" />
 
@@ -554,7 +483,7 @@ export default function AuthScreen({ initialTab = "login" }) {
 
 
         {/* Logo thương hiệu (giống thanh bên trang quản trị) */}
-        <header className="relative z-10 shrink-0 px-6 sm:px-10 xl:px-14 pt-6 sm:pt-8 flex items-center justify-between gap-4">
+        <header className="relative z-10 shrink-0 px-6 sm:px-10 xl:px-14 pt-5 [@media(max-height:760px)]:pt-3 flex items-center justify-between gap-4">
           <Link href={ROUTES.HOME} className="flex items-center gap-1.5 min-w-0" title="Về trang chủ JourneyGo">
             <Image
               src="/image/logo-emblem.png"
@@ -584,8 +513,10 @@ export default function AuthScreen({ initialTab = "login" }) {
           </Link>
         </header>
 
-        <main className="relative z-10 flex-1 flex items-center justify-center px-6 sm:px-10 xl:px-14 py-8">
-          <div className="w-full max-w-[440px] space-y-5">
+        {/* Vùng form chiếm phần còn lại của màn hình, căn giữa; không hiện thanh cuộn
+            (chỉ cuộn ngầm khi màn hình quá thấp để không mất nội dung) */}
+        <main className="relative z-10 flex-1 min-h-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex flex-col px-6 sm:px-10 xl:px-14 py-4">
+          <div className="m-auto w-full max-w-[440px] space-y-5 [@media(max-height:760px)]:space-y-3.5">
             {/* Chế độ Quên mật khẩu & Khôi phục bằng OTP */}
             {activeTab === "forgot_password" ? (
               <ForgotPasswordFlow
@@ -668,12 +599,14 @@ export default function AuthScreen({ initialTab = "login" }) {
           </div>
         </main>
 
-        {/* Chân trang: bản quyền + hình bóng di sản Việt (nằm trong luồng, không đè lên form) */}
-        <footer className="relative shrink-0 h-28 md:h-32">
-          <p className="relative z-10 text-center text-[11px] text-slate-400 leading-normal">
+        {/* Hình bóng di sản Việt: trang trí mờ phía sau, sát đáy cột, không chiếm chỗ của form */}
+        <HeritageLandmarksArt />
+
+        {/* Chân trang: dòng bản quyền gọn, nằm trong luồng */}
+        <footer className="relative z-10 shrink-0 pb-4 pt-1">
+          <p className="text-center text-[11px] text-slate-400 leading-normal">
             Bảo hộ bởi JourneyGo Identity Service • Phiên bản 2.5
           </p>
-          <HeritageLandmarksArt />
         </footer>
       </div>
 

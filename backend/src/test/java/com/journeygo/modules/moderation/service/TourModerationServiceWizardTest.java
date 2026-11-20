@@ -79,9 +79,9 @@ class TourModerationServiceWizardTest {
     }
 
     @Test
-    @DisplayName("Duyệt: đạt dưới 3/5 tiêu chí thì bị chặn")
-    void approveRequiresThreeCriteria() {
-        var request = new TourReviewDecisionRequest(null, null, null, criteria(2), null);
+    @DisplayName("Duyệt: đạt dưới 5/5 tiêu chí thì bị chặn")
+    void approveRequiresAllCriteria() {
+        var request = new TourReviewDecisionRequest(null, null, null, criteria(4), null);
         AppException ex = assertThrows(AppException.class, () -> service.approve(1L, 99L, request));
         assertEquals(ErrorCode.TOUR_REVIEW_CRITERIA_NOT_MET, ex.getErrorCode());
         assertEquals(TourStatus.PENDING_REVIEW, tour.getStatus());
@@ -95,15 +95,15 @@ class TourModerationServiceWizardTest {
     }
 
     @Test
-    @DisplayName("Duyệt: đạt 3/5 tiêu chí thì PUBLISHED, sinh slot, gửi email")
+    @DisplayName("Duyệt: đạt 5/5 tiêu chí thì PUBLISHED, sinh slot, gửi email")
     void approvePublishesTour() {
-        var request = new TourReviewDecisionRequest("OK", null, null, criteria(3), null);
+        var request = new TourReviewDecisionRequest("OK", null, null, criteria(5), null);
         service.approve(1L, 99L, request);
         assertEquals(TourStatus.PUBLISHED, tour.getStatus());
         assertTrue(tour.isApproved());
         assertNotNull(tour.getPublishedAt());
         assertEquals(TourReviewStatus.APPROVED, review.getStatus());
-        assertEquals(3, review.criteriaPassedCount());
+        assertEquals(5, review.criteriaPassedCount());
         verify(slotService).syncSlots(tour);
         verify(mailer).sendApproved(tour);
     }

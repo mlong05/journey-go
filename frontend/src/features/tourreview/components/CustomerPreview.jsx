@@ -68,7 +68,7 @@ function appDuration(tour) {
 }
 
 const money = (v) => `${Math.round(Number(v)).toLocaleString("vi-VN")} đ`;
-const priceText = (p) => (p.alwaysFree || !(Number(p.price) > 0) ? "Miễn phí" : money(p.price));
+const priceText = (p) => (Number(p.price) > 0 ? money(p.price) : "Miễn phí");
 
 /** Ảnh hiển thị trên app: ảnh bìa đứng đầu, sau đó album (giống TourPublicDetailResponse). */
 function appImages(tour) {
@@ -256,7 +256,7 @@ export default function CustomerPreview({ tour }) {
   const ThemeIcon = themeIcon(tour.theme?.name);
   const taskCount = stops.reduce((n, s) => n + (s.quiz?.length || 0) + (s.experiences?.length || 0), 0);
   const totalPoints = stops.reduce((n, s) => n + (s.maxPoints || 0), 0);
-  const prices = (tour.prices || []).filter((p) => p.price != null || p.alwaysFree);
+  const prices = (tour.prices || []).filter((p) => p.price != null);
   const adult = prices.find((p) => p.guestType === "ADULT");
   const today = new Date().toISOString().slice(0, 10);
   const dates = (tour.departureDates || []).filter((d) => d >= today).sort();

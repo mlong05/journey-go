@@ -32,7 +32,7 @@ public record TourReviewDecisionRequest(
         @Valid @Size(max = 100) List<NoteItem> notes
 ) {
 
-    @Schema(description = "5 tiêu chí; tour cần đạt tối thiểu 3/5 để được duyệt")
+    @Schema(description = "5 tiêu chí; tour cần đạt đủ 5/5 để được duyệt")
     public record ReviewCriteria(
             @Schema(description = "Tính tương tác: khách được thực hành, chạm, thử nghiệm")
             @NotNull(message = "Vui lòng đánh giá tiêu chí Tính tương tác") Boolean interactive,

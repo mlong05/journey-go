@@ -90,7 +90,7 @@ public class TourModerationController {
     @PatchMapping("/{tourId}/approve")
     @PreAuthorize("hasRole('CONTENT_MODERATOR')")
     @Operation(summary = "Đồng ý duyệt tour",
-            description = "Tour 5 bước: bắt buộc tick 5 tiêu chí, đạt tối thiểu 3/5 và không có ghi chú lỗi. "
+            description = "Tour 5 bước: bắt buộc tick 5 tiêu chí, đạt đủ 5/5 và không có ghi chú lỗi. "
                     + "Backend kiểm tra lại toàn bộ dữ liệu, chốt điểm thưởng, sinh slot, chuyển PUBLISHED và gửi email.")
     public ResponseEntity<ApiResponse<TourReviewResponse>> approve(@PathVariable Long tourId,
             @AuthenticationPrincipal UserPrincipal principal,

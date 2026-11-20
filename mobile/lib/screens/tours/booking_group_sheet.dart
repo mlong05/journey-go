@@ -124,7 +124,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                 ageRange: p.ageRange,
                 price: p.price,
                 alwaysFree: p.alwaysFree,
-                // Em bé đi kèm KHÔNG tính slot; các loại khác theo cấu hình đối tác.
+                // Tính slot theo khai báo của đối tác cho từng loại khách.
                 countsTowardSlot: p.countsTowardSlot,
               ))
           .toList()
@@ -308,7 +308,8 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
           fullName: p.fullName.trim(),
           birthDate: p.birthDate,
           gender: p.gender,
-          email: p.email.trim().isEmpty ? null : p.email.trim(),
+          // Chỉ người lớn cần email; trẻ em/trẻ nhỏ/em bé không gửi email.
+          email: type.key != 'ADULT' || p.email.trim().isEmpty ? null : p.email.trim(),
           guestType: type.key,
         ));
       }
@@ -631,7 +632,9 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
           subtitle: Text(
             complete
                 ? 'Đã điền đủ thông tin'
-                : 'Bấm để nhập họ tên, ngày sinh, giới tính, email',
+                : isAdult
+                    ? 'Bấm để nhập họ tên, ngày sinh, giới tính, email'
+                    : 'Bấm để nhập họ tên, ngày sinh, giới tính',
             style: TextStyle(
               fontSize: 11.5,
               color: complete ? AppCultureColors.jadeDark : AppCultureColors.textMuted,
@@ -748,19 +751,19 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _controller(passenger, 'email'),
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.done,
-            scrollPadding: const EdgeInsets.only(bottom: 120, left: 20, right: 20),
-            style: const TextStyle(fontSize: 14, color: AppCultureColors.textDark),
-            decoration: _inputDecoration(
-              label: isAdult ? 'Email *' : 'Email (không bắt buộc)',
-              icon: Icons.alternate_email_rounded,
+          if (isAdult) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller(passenger, 'email'),
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
+              scrollPadding: const EdgeInsets.only(bottom: 120, left: 20, right: 20),
+              style: const TextStyle(fontSize: 14, color: AppCultureColors.textDark),
+              decoration: _inputDecoration(
+                label: 'Email *',
+                icon: Icons.alternate_email_rounded,
+              ),
             ),
-          ),
-          if (isAdult)
             const Padding(
               padding: EdgeInsets.only(top: 6, left: 2),
               child: Text(
@@ -768,6 +771,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                 style: TextStyle(fontSize: 11, color: AppCultureColors.textMuted, height: 1.35),
               ),
             ),
+          ],
           if (mismatch)
             Padding(
               padding: const EdgeInsets.only(top: 8, left: 2),

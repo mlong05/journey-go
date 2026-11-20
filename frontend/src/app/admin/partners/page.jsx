@@ -33,12 +33,11 @@ import {
   rejectApplication,
 } from "@/features/partnerapplication/services/partnerApplicationService";
 import { formatDateTimeVN } from "@/lib/money";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 /* =========================================================================
    HẰNG SỐ & HÀM TRỢ GIÚP
    ========================================================================= */
-
-const PAGE_SIZE = 10;
 
 /**
  * Tab trạng thái trên màn hình làm việc.
@@ -392,16 +391,15 @@ export default function AdminPartnersPage() {
               Không có đơn đăng ký nào ở trạng thái này.
             </div>
           ) : (
-            <table className="w-full min-w-[980px] text-sm">
+            <table className="w-full min-w-[900px] text-sm">
               <thead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold">Doanh nghiệp / Cơ sở</th>
                   <th className="px-4 py-3 text-left font-semibold">Người đại diện</th>
                   <th className="px-4 py-3 text-left font-semibold">Loại hình</th>
-                  <th className="px-4 py-3 text-left font-semibold">Ngân hàng</th>
-                  <th className="px-4 py-3 text-left font-semibold">Ngày gửi</th>
-                  <th className="px-4 py-3 text-left font-semibold">Trạng thái</th>
-                  <th className="px-4 py-3 text-right font-semibold">Thao tác</th>
+                  <th className="px-4 py-3 text-left font-semibold whitespace-nowrap">Ngày gửi</th>
+                  <th className="px-4 py-3 text-left font-semibold whitespace-nowrap">Trạng thái</th>
+                  <th className="w-[270px] px-4 py-3 text-right font-semibold">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -409,46 +407,37 @@ export default function AdminPartnersPage() {
                   <tr key={a.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="px-4 py-3">
                       <Tooltip content={a.businessName || "—"}>
-                        <span className="block max-w-[220px] truncate font-semibold text-slate-900">
+                        <span className="block max-w-[260px] truncate font-semibold text-slate-900">
                           {a.businessName || "—"}
                         </span>
                       </Tooltip>
-                      <div className="text-xs text-slate-500 flex items-center gap-1">
-                        <Mail size={12} /> {a.email}
+                      <div className="mt-0.5 flex max-w-[260px] items-center gap-1 text-xs text-slate-500">
+                        <Mail size={12} className="shrink-0" />
+                        <span className="truncate">{a.email}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-slate-800">{a.representativeName || "—"}</div>
-                      <div className="text-xs text-slate-500">
+                      <div className="whitespace-nowrap text-slate-800">{a.representativeName || "—"}</div>
+                      <div className="mt-0.5 whitespace-nowrap text-xs text-slate-500">
                         {POSITION_LABEL[a.representativePosition] || a.representativePosition || "—"}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-700">
-                      {PARTNER_TYPE_LABEL[a.partnerType] || a.partnerType || "—"}
+                      <div className="whitespace-nowrap">
+                        {PARTNER_TYPE_LABEL[a.partnerType] || a.partnerType || "—"}
+                      </div>
                       {a.travelScope && (
-                        <div className="text-xs text-slate-500">
+                        <div className="mt-0.5 whitespace-nowrap text-xs text-slate-500">
                           {TRAVEL_SCOPE_LABEL[a.travelScope] || a.travelScope}
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      <div className="text-xs">
-                        <Tooltip content={a.bankName || "—"}>
-                          <span className="block max-w-[180px] truncate">
-                            {a.bankName || "—"}
-                          </span>
-                        </Tooltip>
-                      </div>
-                      <div className="text-xs text-slate-500 font-mono">
-                        {a.bankAccountNumber || ""}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500">
                       {formatDateTime(a.submittedAt)}
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
+                        className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
                           STATUS_BADGE[a.status] || STATUS_BADGE.DRAFT
                         }`}
                       >
@@ -456,13 +445,13 @@ export default function AdminPartnersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => openDetail(a.id)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                          className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
                         >
-                          <FileText size={13} />
+                          <FileText size={14} />
                           Chi tiết
                         </button>
                         {a.status === "PENDING" && (
@@ -471,18 +460,18 @@ export default function AdminPartnersPage() {
                               type="button"
                               onClick={() => handleApprove(a)}
                               disabled={actionBusy}
-                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer disabled:opacity-50"
+                              className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer disabled:opacity-50"
                             >
-                              <CheckCircle2 size={13} />
+                              <CheckCircle2 size={14} />
                               Duyệt
                             </button>
                             <button
                               type="button"
                               onClick={() => handleReject(a)}
                               disabled={actionBusy}
-                              className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 transition-colors cursor-pointer disabled:opacity-50"
+                              className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer disabled:opacity-50"
                             >
-                              <XCircle size={13} />
+                              <XCircle size={14} />
                               Từ chối
                             </button>
                           </>

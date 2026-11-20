@@ -1,5 +1,5 @@
 -- =====================================================================================
---  SEED — 20 TOUR ĐÃ XUẤT BẢN (PUBLISHED), CHƯA CÓ BOOKING / PAYMENT
+--  SEED 02 — 20 TOUR ĐÃ XUẤT BẢN (PUBLISHED), CHƯA CÓ BOOKING / PAYMENT
 --
 --  Mục đích: nạp dữ liệu tour "đẹp" vào PostgreSQL để test giao diện tìm kiếm /
 --  chi tiết tour / đặt tour mà không phải tạo tay.
@@ -12,10 +12,13 @@
 --     + tour_review_history (SUBMITTED → APPROVED) + điểm thưởng đã chốt.
 --   • KHÔNG tạo booking / payment / refund / revenue — dữ liệu sạch để test từ đầu.
 --
+--  ⚠️ YÊU CẦU: chạy `01_demo_accounts.sql` TRƯỚC (cần tài khoản CONTENT_PROVIDER +
+--     CONTENT_MODERATOR + khu vực/chủ đề do DataInitializer tạo sẵn).
+--
 --  IDEMPOTENT: chạy lại nhiều lần vẫn an toàn — tour đã tồn tại (theo title) sẽ bị bỏ qua.
 --
 --  Cách chạy:
---     psql -h localhost -U postgres -d journeygo_db -f seed_published_tours.sql
+--     psql -h localhost -U postgres -d journeygo_db -f 02_demo_tours.sql
 --
 --  Lưu ý: ảnh dùng placeholder https://picsum.photos/... (URL thật, ảnh thật) —
 --  thay bằng URL Cloudinary thật khi cần dùng cho demo chính thức.
@@ -72,7 +75,7 @@ BEGIN
   {
     "title": "Hoa Lư cố đô – Tam Cốc huyền thoại",
     "type": "ECOTOURISM", "format": "MULTI_DAY",
-    "region": 1, "theme": 2, "days": 2, "nights": 1, "minutes": null,
+    "region": "mien-bac", "theme": "truyen-thong", "days": 2, "nights": 1, "minutes": null,
     "capacity": 20, "adult": 1200000, "child": 600000, "toddler": 150000,
     "desc": "Hai ngày quay về kinh đô đầu tiên của nhà Trần, nơi thung lũng sông Ninh Bình mở ra những dòng sông xanh biếc và những vách núi khoét sâu nghìn năm.",
     "highlights": [
@@ -89,7 +92,7 @@ BEGIN
   {
     "title": "Phố cổ Hà Nội và Văn Miếu Quốc Tử Giám",
     "type": "HISTORICAL", "format": "DAY_TRIP",
-    "region": 1, "theme": 1, "days": 1, "nights": 0, "minutes": 300,
+    "region": "mien-bac", "theme": "lich-su", "days": 1, "nights": 0, "minutes": 300,
     "capacity": 25, "adult": 450000, "child": 250000, "toddler": 80000,
     "desc": "Một ngày đi qua hai mốc lịch sử lớn của Hà Nội: những con phố cổ và trường đại học đầu tiên của đất nước.",
     "highlights": [
@@ -106,7 +109,7 @@ BEGIN
   {
     "title": "Sa Pa – mảnh đất trên mây",
     "type": "MOUNTAIN", "format": "MULTI_DAY",
-    "region": 1, "theme": 2, "days": 3, "nights": 2, "minutes": null,
+    "region": "mien-bac", "theme": "truyen-thong", "days": 3, "nights": 2, "minutes": null,
     "capacity": 15, "adult": 2100000, "child": 1050000, "toddler": 250000,
     "desc": "Ba ngày trên vùng đất cao nguyên phía tây Bắc Bộ, nơi ruộng bậc thang tựa sóng và đồng trẩ Tày vẫn giữ nếp nhà sàn truyền thống.",
     "highlights": [
@@ -123,7 +126,7 @@ BEGIN
   {
     "title": "Hạ Long – vịnh biển trong lòng đá",
     "type": "ECOTOURISM", "format": "DAY_TRIP",
-    "region": 1, "theme": 3, "days": 1, "nights": 0, "minutes": 420,
+    "region": "mien-bac", "theme": "dan-gian", "days": 1, "nights": 0, "minutes": 420,
     "capacity": 30, "adult": 950000, "child": 500000, "toddler": 120000,
     "desc": "Một ngày trên vịnh Hạ Long – Di sản Thiên nhiên Thế giới – nơi hàng nghìn đảo đá vươn lên từ làng biển trong sương.",
     "highlights": [
@@ -140,7 +143,7 @@ BEGIN
   {
     "title": "Đồng Văn – cao nguyên đá và tranh Bazan",
     "type": "GASTRONOMY", "format": "MULTI_DAY",
-    "region": 1, "theme": 3, "days": 2, "nights": 1, "minutes": null,
+    "region": "mien-bac", "theme": "dan-gian", "days": 2, "nights": 1, "minutes": null,
     "capacity": 16, "adult": 1350000, "child": 700000, "toddler": 180000,
     "desc": "Hai ngày trên Cao nguyên Đồng Văn – Cần Thơ, nơi đá xám địa tầng và tranh Bazan kể một câu chuyện về văn hóa Tày vùng cao.",
     "highlights": [
@@ -157,7 +160,7 @@ BEGIN
   {
     "title": "Ninh Bình – thủy triều và lò gốm Bát Tràng",
     "type": "CULTURAL", "format": "DAY_TRIP",
-    "region": 1, "theme": 2, "days": 1, "nights": 0, "minutes": 360,
+    "region": "mien-bac", "theme": "truyen-thong", "days": 1, "nights": 0, "minutes": 360,
     "capacity": 24, "adult": 780000, "child": 400000, "toddler": 100000,
     "desc": "Một ngày nối ba câu chuyện: núi chúa Yên Tử, vùng đồng bằng ngập nước và làng gốm hơn nghìn năm tuổi.",
     "highlights": [
@@ -174,7 +177,7 @@ BEGIN
   {
     "title": "Huế – cố đô của nhà Nguyễn",
     "type": "HISTORICAL", "format": "MULTI_DAY",
-    "region": 2, "theme": 1, "days": 3, "nights": 2, "minutes": null,
+    "region": "mien-trung", "theme": "lich-su", "days": 3, "nights": 2, "minutes": null,
     "capacity": 18, "adult": 2400000, "child": 1200000, "toddler": 300000,
     "desc": "Ba ngày đi qua ba thế kỷ của cố đô Huế, nơi kiến trúc phong thuỷ Đông hòa với dòng sông Hương và nhã nhạc cung đình.",
     "highlights": [
@@ -191,7 +194,7 @@ BEGIN
   {
     "title": "Hội An – phố cổ và nghề dệt nước",
     "type": "CULTURAL", "format": "DAY_TRIP",
-    "region": 2, "theme": 2, "days": 1, "nights": 0, "minutes": 300,
+    "region": "mien-trung", "theme": "truyen-thong", "days": 1, "nights": 0, "minutes": 300,
     "capacity": 22, "adult": 620000, "child": 320000, "toddler": 90000,
     "desc": "Một ngày chậm rãi bên dòng sông Hoài, nơi những mái ngói cong và đèn lồng cổ tự bắt đầu thắp lên lúc hoàng hôn.",
     "highlights": [
@@ -208,7 +211,7 @@ BEGIN
   {
     "title": "Phong Nha – hang động và rừng quốc gia",
     "type": "ADVENTURE", "format": "MULTI_DAY",
-    "region": 2, "theme": 2, "days": 2, "nights": 1, "minutes": null,
+    "region": "mien-trung", "theme": "truyen-thong", "days": 2, "nights": 1, "minutes": null,
     "capacity": 18, "adult": 1450000, "child": 750000, "toddler": 190000,
     "desc": "Hai ngày giữa vùng đất karst, nơi những hang động kỳ vĩ nằm dưới lớp đá vôi dày và rừng phòng chống Ke Bàng vẫn còn nguyên.",
     "highlights": [
@@ -225,7 +228,7 @@ BEGIN
   {
     "title": "Đà Nẵng – cầu vàng và bán đảo Sơn Trà",
     "type": "BEACH", "format": "DAY_TRIP",
-    "region": 2, "theme": 2, "days": 1, "nights": 0, "minutes": 300,
+    "region": "mien-trung", "theme": "truyen-thong", "days": 1, "nights": 0, "minutes": 300,
     "capacity": 25, "adult": 650000, "child": 350000, "toddler": 100000,
     "desc": "Một ngày nắng của Đà Nẵng: cầu Rồng thở phun lửa, bãi biển Mỹ Khê và đường mây trên đỉnh Sơn Trà.",
     "highlights": [
@@ -242,7 +245,7 @@ BEGIN
   {
     "title": "Mỹ Sơn – dòng chảy kiến trúc Champa",
     "type": "HISTORICAL", "format": "DAY_TRIP",
-    "region": 2, "theme": 1, "days": 1, "nights": 0, "minutes": 300,
+    "region": "mien-trung", "theme": "lich-su", "days": 1, "nights": 0, "minutes": 300,
     "capacity": 20, "adult": 520000, "child": 280000, "toddler": 80000,
     "desc": "Một ngày giữa thung lũng Bờ Yêu, nơi những tháp gạch Cham vẫn đứng vững sau hơn mười thế kỷ và là Di sản Thế giới.",
     "highlights": [
@@ -259,7 +262,7 @@ BEGIN
   {
     "title": "Mì Quảng, bún bò Huế và cao lầu Hội An",
     "type": "GASTRONOMY", "format": "DAY_TRIP",
-    "region": 2, "theme": 3, "days": 1, "nights": 0, "minutes": 300,
+    "region": "mien-trung", "theme": "dan-gian", "days": 1, "nights": 0, "minutes": 300,
     "capacity": 16, "adult": 480000, "child": 250000, "toddler": 70000,
     "desc": "Một ngày ăn đi ba vùng miền, từ mì Quảng nước dập của Quảng Nam đến bún bò Huế và chiếc cao lầu Hội An.",
     "highlights": [
@@ -276,7 +279,7 @@ BEGIN
   {
     "title": "Nha Trang – vinh biển và tháp Chàm",
     "type": "ECOTOURISM", "format": "MULTI_DAY",
-    "region": 2, "theme": 2, "days": 2, "nights": 1, "minutes": null,
+    "region": "mien-trung", "theme": "truyen-thong", "days": 2, "nights": 1, "minutes": null,
     "capacity": 20, "adult": 1250000, "child": 650000, "toddler": 160000,
     "desc": "Hai ngày ở vịnh biển Nha Trang, nơi tháp Ponagar của người Cham đứng cạnh bãi biển và những đảo ngoài khơi.",
     "highlights": [
@@ -293,7 +296,7 @@ BEGIN
   {
     "title": "Sài Gòn – chốn ăn ngon phố thị",
     "type": "CULTURAL", "format": "MULTI_DAY",
-    "region": 3, "theme": 3, "days": 3, "nights": 2, "minutes": null,
+    "region": "mien-nam", "theme": "dan-gian", "days": 3, "nights": 2, "minutes": null,
     "capacity": 22, "adult": 1650000, "child": 850000, "toddler": 200000,
     "desc": "Ba ngày trong thành phố không ngừng chuyển động, từ chợ Bến Thành đến những căn xe đẩy bán bánh mì nước ốt lúc rạng sáng.",
     "highlights": [
@@ -310,7 +313,7 @@ BEGIN
   {
     "title": "Cần Thơ – miền Tây sông nước",
     "type": "GASTRONOMY", "format": "DAY_TRIP",
-    "region": 3, "theme": 3, "days": 1, "nights": 0, "minutes": 300,
+    "region": "mien-nam", "theme": "dan-gian", "days": 1, "nights": 0, "minutes": 300,
     "capacity": 18, "adult": 720000, "child": 380000, "toddler": 100000,
     "desc": "Một ngày trên sông Cù Lao Giêng, nơi chợ nổi Cái Răng, lò gốm Thanh Hà và những món bánh nước miền Tây tụ họp.",
     "highlights": [
@@ -327,7 +330,7 @@ BEGIN
   {
     "title": "Đà Lạt – thành phố ngàn hoa",
     "type": "ECOTOURISM", "format": "MULTI_DAY",
-    "region": 3, "theme": 2, "days": 3, "nights": 2, "minutes": null,
+    "region": "mien-nam", "theme": "truyen-thong", "days": 3, "nights": 2, "minutes": null,
     "capacity": 20, "adult": 1500000, "child": 780000, "toddler": 190000,
     "desc": "Ba ngày trong cao nguyên Lâm Viên, nơi sương mù quấn lấy đồi chè và những biệt thự cổ kiểu Pháp.",
     "highlights": [
@@ -344,7 +347,7 @@ BEGIN
   {
     "title": "Côn Đảo – bí mật vùng biển xanh",
     "type": "ADVENTURE", "format": "MULTI_DAY",
-    "region": 3, "theme": 2, "days": 2, "nights": 1, "minutes": null,
+    "region": "mien-nam", "theme": "truyen-thong", "days": 2, "nights": 1, "minutes": null,
     "capacity": 12, "adult": 1900000, "child": 950000, "toddler": 240000,
     "desc": "Hai ngày trên đảo Côn Sơn, nơi nhà tù Pháp, rừng quốc gia Côn Đảo và những bãi biển hoang sơ cùng tồn tại.",
     "highlights": [
@@ -361,7 +364,7 @@ BEGIN
   {
     "title": "Phú Quốc – hoàng hôn và làng chài",
     "type": "BEACH", "format": "MULTI_DAY",
-    "region": 3, "theme": 2, "days": 3, "nights": 2, "minutes": null,
+    "region": "mien-nam", "theme": "truyen-thong", "days": 3, "nights": 2, "minutes": null,
     "capacity": 22, "adult": 1850000, "child": 950000, "toddler": 240000,
     "desc": "Ba ngày ở hòn đảo ngọc, nơi bãi Sao cát trắng và những làng chài ven biển vẫn giữ nếp sống nguyên bản.",
     "highlights": [
@@ -378,7 +381,7 @@ BEGIN
   {
     "title": "Rừng tràm Trà Sư – xứ sen",
     "type": "ECOTOURISM", "format": "MULTI_DAY",
-    "region": 3, "theme": 2, "days": 2, "nights": 1, "minutes": null,
+    "region": "mien-nam", "theme": "truyen-thong", "days": 2, "nights": 1, "minutes": null,
     "capacity": 16, "adult": 980000, "child": 520000, "toddler": 130000,
     "desc": "Hai ngày giữa vùng đồng bằng An Giang, nơi rừng tràm Trà Sư chanh sương và đầm Thị Tường mở ra trước mắt.",
     "highlights": [
@@ -395,7 +398,7 @@ BEGIN
   {
     "title": "Bến Tre – xứ dừa xứ mè",
     "type": "CULTURAL", "format": "DAY_TRIP",
-    "region": 3, "theme": 3, "days": 1, "nights": 0, "minutes": 300,
+    "region": "mien-nam", "theme": "dan-gian", "days": 1, "nights": 0, "minutes": 300,
     "capacity": 20, "adult": 560000, "child": 300000, "toddler": 85000,
     "desc": "Một ngày ở xứ dừa Bến Tre, nơi kẹo dừa, nước mắm và những chiếc ghe ba lá nằm nghiêng bên kênh rừng dừa.",
     "highlights": [
@@ -455,8 +458,8 @@ $json$;
             v_tour ->> 'format',
             (v_tour ->> 'minutes')::int,
             (v_tour ->> 'nights')::int,
-            (v_tour ->> 'region')::int,
-            (v_tour ->> 'theme')::int,
+            (SELECT id FROM regions WHERE slug = v_tour ->> 'region' LIMIT 1),
+            (SELECT id FROM themes WHERE slug = v_tour ->> 'theme' LIMIT 1),
             v_tour ->> 'desc',
             'Vé tham quan, hướng dẫn viên chuyên nghiệp, nước uống trong suốt hành trình, vé thuyền/xe đưa đón nội thành theo lịch trình.',
             'Chi phí ăn uống ngoài lịch trình, quà lưu niệm, phí tham quan bổ sung, tiền tip cho hướng dẫn viên.',

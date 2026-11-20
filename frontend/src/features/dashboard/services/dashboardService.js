@@ -10,6 +10,8 @@ import { apiClient } from "@/services/apiClient";
 
 const ENDPOINTS = {
   ADMIN: "/dashboard/admin",
+  ADMIN_OPERATIONS: "/dashboard/admin/operations",
+  ADMIN_OPERATION_BADGES: "/dashboard/admin/operations/badges",
   PROVIDER: "/dashboard/provider",
   MODERATOR: "/dashboard/moderator",
 };
@@ -22,8 +24,32 @@ export async function getAdminDashboard() {
   return unwrap(await apiClient.get(ENDPOINTS.ADMIN));
 }
 
-export async function getProviderDashboard(range = "month") {
-  return unwrap(await apiClient.get(`${ENDPOINTS.PROVIDER}?range=${encodeURIComponent(range)}`));
+/**
+ * Trang Tổng quan vận hành — dữ liệu đầy đủ theo kỳ thời gian.
+ *
+ * @param {string} range  today | week | month | prevMonth | custom
+ * @param {{from?: string, to?: string}} [custom] ngày YYYY-MM-DD (chỉ dùng khi range = "custom")
+ */
+export async function getAdminOperations(range = "month", custom = {}) {
+  const params = new URLSearchParams({ range });
+  if (range === "custom") {
+    if (custom.from) params.set("from", custom.from);
+    if (custom.to) params.set("to", custom.to);
+  }
+  return unwrap(await apiClient.get(`${ENDPOINTS.ADMIN_OPERATIONS}?${params.toString()}`));
+}
+
+/**
+ * Số lượng việc đang chờ theo mô-đun — dùng cho badge trên Sidebar Admin.
+ *
+ * @returns {Promise<Record<string, number>>} map moduleId -> số lượng đang chờ
+ */
+export async function getAdminOperationBadges() {
+  const result = unwrap(await apiClient.get(ENDPOINTS.ADMIN_OPERATION_BADGES));
+  return result || {};
+}
+
+export async function getProviderDashboard(range = "month") {  return unwrap(await apiClient.get(`${ENDPOINTS.PROVIDER}?range=${encodeURIComponent(range)}`));
 }
 
 export async function getModeratorDashboard() {
@@ -40,6 +66,8 @@ export function percentChange(current, previous) {
 
 const dashboardService = {
   getAdmin: getAdminDashboard,
+  getAdminOperations,
+  getAdminOperationBadges,
   getProvider: getProviderDashboard,
   getModerator: getModeratorDashboard,
 };
