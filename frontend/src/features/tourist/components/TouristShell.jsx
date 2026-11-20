@@ -124,9 +124,14 @@ export function TouristHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur" style={{ viewTransitionName: "site-header" }}>
       <LogoutModal {...logoutModal} />
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
-        <BrandLogo compact />
-        <nav className="hidden items-center gap-1 lg:flex" aria-label="Điều hướng chính">
+      {/* Bố cục: logo bám góc trái ngoài cùng · điều hướng căn giữa theo trục viewport ·
+          đăng nhập / đăng ký bám góc phải ngoài cùng.
+          `relative` + `absolute` cho nav ⇒ menu luôn nằm chính giữa màn hình, không lệch theo độ rộng logo/nút. */}
+      <div className="relative flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center">
+          <BrandLogo compact />
+        </div>
+        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 lg:flex" aria-label="Điều hướng chính">
           {links.map((n) => (
             <Link key={n.href} href={n.href}
               className={`rounded-xl px-3 py-2 text-sm font-semibold transition active:scale-[0.97] ${n.match(pathname) ? "bg-teal-50 text-teal-800" : "text-slate-600 hover:bg-slate-50 hover:text-teal-800"}`}>
@@ -134,7 +139,7 @@ export function TouristHeader() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex min-w-0 items-center gap-2">
           {!ready ? null : isTourist ? (
             <>
               <TouristNotificationBell />
