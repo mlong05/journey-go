@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight, CreditCard, Layers } from "lucide-react";
 import { CardHeader, MetricTile } from "./KpiCard";
 import { CARD } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
 
 const money = (v) => `${(Number(v) || 0).toLocaleString("vi-VN")} đ`;
 const pct = (part, whole) => (whole > 0 ? ((part / whole) * 100).toFixed(1) : "0.0");
@@ -83,7 +84,9 @@ export default function FinanceSnapshot({ finance, isLoading }) {
         <div className="flex items-center gap-2 mb-2.5">
           <Layers size={13} className="text-indigo-500 shrink-0" />
           <p className="text-[11.5px] font-bold text-slate-700">
-            1. Dòng tiền khách hàng
+            <Hint text="Toàn bộ tiền khách thực trả trong kỳ đang xem: gồm tiền trả, voucher đã giảm và tiền đã hoàn. Khớp với tab Tài chính & Thanh toán.">
+              1. Dòng tiền khách hàng
+            </Hint>
           </p>
           <span className="text-[10.5px] font-medium text-slate-400">
             theo kỳ đang xem
@@ -170,7 +173,9 @@ export default function FinanceSnapshot({ finance, isLoading }) {
         <div className="flex items-center gap-2 mb-2.5">
           <Layers size={13} className="text-emerald-500 shrink-0" />
           <p className="text-[11.5px] font-bold text-slate-700">
-            2. Quyết toán doanh thu cho đối tác
+            <Hint text="Tiền đã được chia cho đối tác theo từng đợt tất toán (batch). Khác với dòng tiền khách ở trên về thời điểm ghi nhận.">
+              2. Quyết toán doanh thu cho đối tác
+            </Hint>
           </p>
           <span className="text-[10.5px] font-medium text-slate-400">theo đợt tất toán</span>
         </div>
@@ -224,7 +229,9 @@ export default function FinanceSnapshot({ finance, isLoading }) {
         <div className="flex items-center gap-2 mb-2.5">
           <Layers size={13} className="text-slate-400 shrink-0" />
           <p className="text-[11.5px] font-bold text-slate-700">
-            3. Doanh thu ghi nhận theo booking
+            <Hint text="Hoa hồng JourneyGo và tiền đối tác ghi nhận từ các tour đã gán đối tác. Chỉ gồm tour có đối tác được gán nên nhỏ hơn GMV — đây là bản chất dữ liệu.">
+              3. Doanh thu ghi nhận theo booking
+            </Hint>
           </p>
           <span className="text-[10.5px] font-medium text-slate-400">từ khoản doanh thu đối tác</span>
         </div>

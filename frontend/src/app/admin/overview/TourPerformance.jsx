@@ -4,6 +4,8 @@ import React from "react";
 import { MapPin, Sparkles, Trophy } from "lucide-react";
 import { CardHeader, ProgressRow } from "./KpiCard";
 import { CARD, TABLE } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
+import { TOP_TOUR_HINTS, EXPERIENCE_HINTS, DESTINATION_HINTS } from "./glossary";
 
 const money = (v) => `${(Number(v) || 0).toLocaleString("vi-VN")} đ`;
 
@@ -26,9 +28,15 @@ export function TopToursCard({ tours, isLoading }) {
             <tr>
               <th className={TABLE.th + " w-10"}>#</th>
               <th className={TABLE.th}>Tour &amp; Đối tác</th>
-              <th className={TABLE.th + " text-right"}>Lượt đặt</th>
-              <th className={TABLE.th + " text-right"}>Doanh thu</th>
-              <th className={TABLE.th + " w-32"}>Tỷ lệ hoàn thành</th>
+              <th className={TABLE.th + " text-right"}>
+                <Hint text={TOP_TOUR_HINTS.bookings}>Lượt đặt</Hint>
+              </th>
+              <th className={TABLE.th + " text-right"}>
+                <Hint text={TOP_TOUR_HINTS.revenue}>Doanh thu</Hint>
+              </th>
+              <th className={TABLE.th + " w-32"}>
+                <Hint text={TOP_TOUR_HINTS.completionRate}>Tỷ lệ hoàn thành</Hint>
+              </th>
             </tr>
           </thead>
           <tbody className={TABLE.tbody}>
@@ -117,16 +125,23 @@ export function ExperienceStatsCard({ experience, isLoading }) {
 
       <div className="p-4 grid grid-cols-2 gap-2.5">
         {[
-          { label: "Lượt mở khóa", value: stats.unlocks, tone: "indigo" },
-          { label: "Lượt check-in", value: stats.checkIns, tone: "sky" },
-          { label: "Hoàn thành Experience", value: stats.completed, tone: "emerald" },
-          { label: "Tỷ lệ hoàn thành", value: `${(stats.completionRate ?? 0).toFixed(1)}%`, tone: "amber" },
+          { label: "Lượt mở khóa", value: stats.unlocks, tone: "indigo", hint: EXPERIENCE_HINTS.unlocks },
+          { label: "Lượt check-in", value: stats.checkIns, tone: "sky", hint: EXPERIENCE_HINTS.checkIns },
+          { label: "Hoàn thành Experience", value: stats.completed, tone: "emerald", hint: EXPERIENCE_HINTS.completed },
+          {
+            label: "Tỷ lệ hoàn thành",
+            value: `${(stats.completionRate ?? 0).toFixed(1)}%`,
+            tone: "amber",
+            hint: EXPERIENCE_HINTS.completionRate,
+          },
         ].map((item) => (
           <div
             key={item.label}
             className="p-2.5 rounded-xl bg-slate-50/70 border border-slate-100"
           >
-            <p className="text-[10.5px] font-semibold text-slate-500 truncate">{item.label}</p>
+            <p className="text-[10.5px] font-semibold text-slate-500 truncate">
+              <Hint text={item.hint}>{item.label}</Hint>
+            </p>
             <p className="mt-0.5 text-[15px] font-bold tracking-tight text-slate-900 tabular-nums">
               {isLoading
                 ? "…"
@@ -171,6 +186,7 @@ export function TopDestinationsCard({ destinations, isLoading }) {
                 ).toFixed(0)}%`}
                 percent={row.completionRate || 0}
                 tone="rose"
+                hint={DESTINATION_HINTS.checkIns}
               />
             </div>
           ))

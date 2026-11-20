@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { HelpCircle } from "lucide-react";
 import { CARD } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
 
 /**
  * Thẻ KPI của Trang Tổng quan vận hành.
@@ -57,10 +57,9 @@ export function KpiCard({
             </span>
           )}
           <div className="min-w-0">
-            <p className={KPI_LABEL} title={label}>
-              {label}
+            <p className={KPI_LABEL}>
+              <Hint text={tooltip}>{label}</Hint>
             </p>
-            {tooltip && <InfoHint text={tooltip} />}
           </div>
         </div>
 
@@ -98,25 +97,6 @@ const KPI_CARD = "bg-white border border-slate-200/80 rounded-2xl shadow-sm p-4 
 const KPI_LABEL = "text-[11.5px] font-semibold text-slate-500 leading-snug";
 const KPI_VALUE = "text-[22px] font-bold tracking-tight text-slate-900 tabular-nums leading-none";
 const KPI_UNIT = "text-[11px] font-semibold text-slate-400 ml-1";
-
-/** Icon "i" kèm tooltip giải thích định nghĩa nghiệp vụ. */
-export function InfoHint({ text }) {
-  return (
-    <span className="group relative inline-flex align-middle">
-      <HelpCircle
-        size={12}
-        className="text-slate-300 hover:text-slate-500 transition-colors cursor-help"
-        aria-label="Giải thích"
-      />
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute left-0 top-5 z-30 w-60 hidden group-hover:block p-2.5 rounded-xl bg-slate-900 text-white text-[11px] font-medium leading-relaxed shadow-xl"
-      >
-        {text}
-      </span>
-    </span>
-  );
-}
 
 /**
  * Sparkline mini — vẽ bằng SVG thuần (không phụ thuộc thư viện chart).
@@ -195,7 +175,9 @@ export function CardHeader({ icon: Icon, title, subtitle, tone = "slate", action
           </span>
         )}
         <div className="min-w-0">
-          <h2 className={CARD.title}>{title}</h2>
+          <h2 className={CARD.title}>
+            <Hint text={subtitle}>{title}</Hint>
+          </h2>
           {subtitle && <p className={CARD.subtitle}>{subtitle}</p>}
         </div>
       </div>
@@ -219,10 +201,12 @@ export function MetricTile({ label, value, unit, tone = "slate", hint }) {
   }[tone];
 
   return (
-    <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100" title={hint}>
+    <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100">
       <div className="flex items-center gap-1.5">
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
-        <p className="text-[11px] font-semibold text-slate-500 truncate">{label}</p>
+        <p className="text-[11px] font-semibold text-slate-500 truncate">
+          <Hint text={hint}>{label}</Hint>
+        </p>
       </div>
       <p className="mt-1 text-[15px] font-bold tracking-tight text-slate-900 tabular-nums leading-tight">
         {value}
@@ -233,7 +217,7 @@ export function MetricTile({ label, value, unit, tone = "slate", hint }) {
 }
 
 /** Thanh tiến trọng số có nhãn phần trăm. */
-export function ProgressRow({ label, value, percent, tone = "indigo" }) {
+export function ProgressRow({ label, value, percent, tone = "indigo", hint }) {
   const bar = {
     indigo: "bg-indigo-500",
     emerald: "bg-emerald-500",
@@ -247,7 +231,9 @@ export function ProgressRow({ label, value, percent, tone = "indigo" }) {
   return (
     <div>
       <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-[11.5px] font-semibold text-slate-600 truncate">{label}</span>
+        <span className="text-[11.5px] font-semibold text-slate-600 truncate">
+          <Hint text={hint}>{label}</Hint>
+        </span>
         <span className="text-[11px] font-bold text-slate-900 tabular-nums shrink-0">{value}</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">

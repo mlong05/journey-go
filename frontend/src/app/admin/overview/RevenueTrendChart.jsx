@@ -13,6 +13,8 @@ import {
 } from "recharts";
 import { CardHeader, Skeleton } from "./KpiCard";
 import { CARD, PILL } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
+import { TREND_HINTS } from "./glossary";
 
 /** Định dạng tiền VND rút gọn cho trục Y (1.2tr, 850tr…). */
 function compactVnd(value) {
@@ -93,22 +95,23 @@ export default function RevenueTrendChart({
       >
         <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-slate-100/80 border border-slate-200/80">
           {[
-            { key: "revenue", label: "Doanh thu" },
-            { key: "gmv", label: "GMV" },
+            { key: "revenue", label: "Doanh thu", hint: TREND_HINTS.revenue },
+            { key: "gmv", label: "GMV", hint: TREND_HINTS.gmv },
           ].map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => onMetricChange(option.key)}
-              aria-pressed={metric === option.key}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
-                metric === option.key
-                  ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/70"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {option.label}
-            </button>
+            <Hint key={option.key} text={option.hint}>
+              <button
+                type="button"
+                onClick={() => onMetricChange(option.key)}
+                aria-pressed={metric === option.key}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                  metric === option.key
+                    ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/70"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {option.label}
+              </button>
+            </Hint>
           ))}
         </div>
       </CardHeader>
@@ -117,15 +120,19 @@ export default function RevenueTrendChart({
       <div className="px-5 py-3 border-b border-slate-100 flex flex-wrap items-center gap-x-6 gap-y-2">
         <div>
           <p className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider">
-            Tổng kỳ hiện tại
+            <Hint text={TREND_HINTS.current}>Tổng kỳ hiện tại</Hint>
           </p>
           <p className="text-lg font-bold tracking-tight text-slate-900 tabular-nums leading-tight">
-            {isLoading ? <Skeleton className="h-5 w-28 rounded-md bg-slate-100" /> : `${totals.current.toLocaleString("vi-VN")} đ`}
+            {isLoading ? (
+              <span className="block h-5 w-28 rounded-md bg-slate-100 animate-pulse" />
+            ) : (
+              `${totals.current.toLocaleString("vi-VN")} đ`
+            )}
           </p>
         </div>
         <div>
           <p className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider">
-            Kỳ trước
+            <Hint text={TREND_HINTS.previous}>Kỳ trước</Hint>
           </p>
           <p className="text-sm font-bold text-slate-600 tabular-nums leading-tight mt-0.5">
             {totals.previous.toLocaleString("vi-VN")} đ
@@ -133,7 +140,9 @@ export default function RevenueTrendChart({
         </div>
         {delta !== null && (
           <span className={`${PILL.base} ${delta >= 0 ? PILL.emerald : PILL.rose}`}>
-            {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}% so với kỳ trước
+            <Hint text={TREND_HINTS.delta}>
+              {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}% so với kỳ trước
+            </Hint>
           </span>
         )}
       </div>
@@ -204,7 +213,7 @@ export default function RevenueTrendChart({
       <div className={CARD.footer + " flex flex-wrap items-center gap-x-5 gap-y-1.5"}>
         <span className="inline-flex items-center gap-1.5 font-semibold">
           <span className="w-4 h-0.5 rounded-full" style={{ background: color }} />
-          {metricLabel} — kỳ hiện tại
+          <Hint text={metricLabel}>{metricLabel}</Hint> — kỳ hiện tại
         </span>
         <span className="inline-flex items-center gap-1.5 font-semibold">
           <span

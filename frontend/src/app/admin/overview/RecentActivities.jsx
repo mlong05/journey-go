@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { CardHeader } from "./KpiCard";
 import { CARD } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
+import { ACTIVITY_HINTS } from "./glossary";
 
 /** Cấu hình chấm màu + icon theo loại sự kiện. */
 const EVENT_TYPES = {
@@ -102,7 +104,7 @@ export default function RecentActivities({ activities, isLoading }) {
                       <span className="font-semibold text-slate-800">{row.target || ""}</span>
                     </p>
                     <p className="mt-0.5 text-[10.5px] font-semibold text-slate-400">
-                      {config.label} · {relativeTime(row.timestamp)}
+                      <Hint text={ACTIVITY_HINTS[row.type]}>{config.label}</Hint> · {relativeTime(row.timestamp)}
                     </p>
                   </div>
                 </li>

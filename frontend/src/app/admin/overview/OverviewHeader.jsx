@@ -2,15 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  Activity,
-  CalendarRange,
-  ChevronDown,
-  RefreshCw,
-  TrendingUp,
-  X,
-} from "lucide-react";
-import { CARD, RANGE, PILL } from "@/app/admin/overview.tokens";
+import { ChevronDown, RefreshCw, X } from "lucide-react";
+import { RANGE, PILL } from "@/app/admin/overview.tokens";
+import Hint from "./Hint";
+import { RANGE_HINTS } from "./glossary";
 
 /** Các khoảng thời gian có sẵn. `month` = 30 ngày qua (mặc định theo đặc tả). */
 export const RANGE_OPTIONS = [
@@ -22,33 +17,16 @@ export const RANGE_OPTIONS = [
   { key: "custom", label: "Tùy chỉnh" },
 ];
 
-const PILLARS = [
-  {
-    icon: TrendingUp,
-    title: "Business Performance",
-    desc: "Doanh thu, GMV và lượt đặt tour",
-    tone: "indigo",
-  },
-  {
-    icon: Activity,
-    title: "Operational Health",
-    desc: "Tình trạng booking, tài chính & trải nghiệm",
-    tone: "emerald",
-  },
-  {
-    icon: CalendarRange,
-    title: "Action Center",
-    desc: "Việc Admin cần xử lý ngay",
-    tone: "rose",
-  },
-];
-
 /**
  * Header dính của Trang Tổng quan vận hành.
  *
  * Trái: tiêu đề + badge trạng thái hệ thống (chấm xanh nhấp nháy) + mô tả.
  * Phải: bộ lọc thời gian dạng segmented pill + "Cập nhật gần nhất" + nút Refresh.
- * Dưới: thanh ghi chú 3 trụ cột + dòng lưu ý nghiệp vụ GMV/Refund.
+ *
+ * ⚠️ Vị trí dính: header nằm trong `main` có padding trên (`lg:p-5` = 20px). Ta dùng
+ * `-mt-*` (bằng đúng lượng padding) + `pt-*` tương ứng ⇒ hộp header bắt đầu ngay
+ * mép trên của vùng cuộn (dưới topbar), nên `sticky top-0` ghim nó sát đỉnh, không
+ * bị hở 20px và không đè lên nội dung bên dưới quá nhiều.
  */
 export default function OverviewHeader({
   range,
@@ -84,20 +62,22 @@ export default function OverviewHeader({
     setIsCustomOpen(false);
   };
 
-  const activeLabel =
-    RANGE_OPTIONS.find((o) => o.key === range)?.label ||
-    (range === "custom" ? "Tùy chỉnh" : "30 ngày qua");
-
   const isStable = !health?.degraded;
+  const criticalCount = health?.criticalActions ?? 0;
 
   return (
-    <header className="sticky top-0 z-30 -mx-3 sm:-mx-4 lg:-mx-5 px-3 sm:px-4 lg:px-5 pt-3 sm:pt-4 pb-3 bg-slate-50/85 backdrop-blur-md border-b border-slate-200/70">
+    <header className="sticky top-[-12px] sm:top-[-16px] lg:top-[-20px] z-30 -mx-3 sm:-mx-4 lg:-mx-5 -mt-3 sm:-mt-4 lg:-mt-5 px-3 sm:px-4 lg:px-5 pt-3 sm:pt-4 lg:pt-5 pb-3 bg-slate-50/90 backdrop-blur-md border-b border-slate-200/70">
       {/* ── Hàng chính: tiêu đề + bộ lọc ── */}
       <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Tổng quan vận hành
+              <Hint
+                text="Trang giám sát toàn sàn của JourneyGo: doanh thu, tình trạng booking, việc cần xử lý và các chỉ số vận hành chính."
+                underline={false}
+              >
+                Tổng quan vận hành
+              </Hint>
             </h1>
             <span
               className={`${PILL.base} ${
@@ -106,7 +86,7 @@ export default function OverviewHeader({
               title={
                 isStable
                   ? "Không có việc khẩn cấp đang chờ xử lý"
-                  : `${health?.criticalActions ?? 0} việc khẩn cấp đang chờ xử lý`
+                  : `${criticalCount} việc khẩn cấp đang chờ xử lý`
               }
             >
               <span className="relative flex h-1.5 w-1.5">
@@ -133,79 +113,41 @@ export default function OverviewHeader({
             {RANGE_OPTIONS.map((option) => {
               const active = range === option.key;
               return (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => (option.key === "custom" ? openCustom() : onRangeChange(option.key))}
-                  aria-pressed={active}
-                  className={`${RANGE.item} ${active ? RANGE.itemActive : ""}`}
-                >
-                  {option.label}
-                </button>
+                <Hint key={option.key} text={RANGE_HINTS[option.key]}>
+                  <button
+                    type="button"
+                    onClick={() => (option.key === "custom" ? openCustom() : onRangeChange(option.key))}
+                    aria-pressed={active}
+                    className={`${RANGE.item} ${active ? RANGE.itemActive : ""}`}
+                  >
+                    {option.label}
+                  </button>
+                </Hint>
               );
             })}
           </div>
 
           {/* Mốc cập nhật + nút làm mới */}
           <div className="flex items-center gap-1.5">
-            <span
-              className="hidden md:inline text-[11px] font-semibold text-slate-500 tabular-nums"
-              title="Thời điểm cập nhật dữ liệu gần nhất"
-            >
-              Cập nhật {lastUpdated}
-            </span>
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              aria-label="Làm mới dữ liệu"
-              title="Làm mới dữ liệu"
-              className="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors disabled:opacity-60"
-            >
-              <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
-            </button>
+            <Hint text="Thời điểm cập nhật dữ liệu gần nhất. Bấm nút làm mới để lấy số liệu mới nhất từ hệ thống.">
+              <span className="hidden md:inline text-[11px] font-semibold text-slate-500 tabular-nums">
+                Cập nhật {lastUpdated}
+              </span>
+            </Hint>
+            <Hint text="Làm mới dữ liệu từ máy chủ.">
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                aria-label="Làm mới dữ liệu"
+                title="Làm mới dữ liệu"
+                className="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors disabled:opacity-60"
+              >
+                <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
+              </button>
+            </Hint>
           </div>
         </div>
-      </div>
-
-      {/* ── Thanh ghi chú: 3 trụ cột + quy tắc nghiệp vụ ── */}
-      <div className="mt-3 flex flex-col lg:flex-row lg:items-center gap-2.5">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 min-w-0">
-          {PILLARS.map((pillar) => {
-            const Icon = pillar.icon;
-            const chip = {
-              indigo: "bg-indigo-50 text-indigo-600",
-              emerald: "bg-emerald-50 text-emerald-600",
-              rose: "bg-rose-50 text-rose-600",
-            }[pillar.tone];
-            return (
-              <div
-                key={pillar.title}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200/70 min-w-0"
-              >
-                <span className={`w-6 h-6 shrink-0 rounded-lg flex items-center justify-center ${chip}`}>
-                  <Icon size={13} strokeWidth={2} />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold text-slate-800 truncate leading-tight">
-                    {pillar.title}
-                  </p>
-                  <p className="text-[10.5px] text-slate-500 truncate leading-tight">{pillar.desc}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <p className="text-[10.5px] text-slate-500 leading-relaxed lg:max-w-sm lg:text-right shrink-0">
-          <span className="font-semibold text-slate-600">GMV</span> = tổng giá trị booking đã
-          thanh toán thành công (không tính chờ thanh toán).{" "}
-          <span className="font-semibold text-slate-600">Doanh thu nền tảng</span> = hoa hồng
-          JourneyGo thu được. Hoàn tiền hiển thị riêng, không tính trùng.{" "}
-          <span className="font-semibold text-slate-600">Lưu ý</span> = kỳ lọc áp dụng cho
-          dòng tiền khách &amp; doanh thu ghi nhận; tiền quyết toán tính theo kỳ doanh thu
-          (yyyy-MM) của đợt tất toán.
-        </p>
       </div>
 
       {/* ── Modal chọn khoảng thời gian tùy chỉnh ──
