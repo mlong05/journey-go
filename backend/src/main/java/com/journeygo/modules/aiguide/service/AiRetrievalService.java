@@ -50,7 +50,11 @@ public class AiRetrievalService {
                 return mergeUniqueUpToLimit(hints, supplement, topK);
             }
 
-            return chunkStore.searchSimilar(destinationId, null, queryVector, queryVectorStr, topK);
+            if (destinationId != null) {
+                return chunkStore.searchSimilar(destinationId, true, null, queryVector, queryVectorStr, topK);
+            }
+
+            return chunkStore.searchSimilar(null, null, queryVector, queryVectorStr, topK);
         } catch (Exception e) {
             log.warn("RAG Retrieval thất bại (không có chunks): {}. Chat vẫn tiếp tục không có ngữ cảnh.", e.getMessage());
             return Collections.emptyList();

@@ -132,6 +132,9 @@ public class DocumentIngestionService {
         if (StringUtils.hasText(tourName)) {
             storyBuilder.append("Hành trình: ").append(tourName.trim()).append(".\n");
         }
+        if (tourId != null) {
+            storyBuilder.append("Đường dẫn chi tiết tour: /tours/").append(tourId).append(".\n");
+        }
         if (StringUtils.hasText(shortDescription)) {
             storyBuilder.append("Giới thiệu: ").append(shortDescription.trim()).append("\n\n");
         }
@@ -154,6 +157,9 @@ public class DocumentIngestionService {
         storyMeta.put("source_type", "TOUR_STOP");
         storyMeta.put("source_id", stopId);
         storyMeta.put("tour_id", tourId);
+        if (tourId != null) {
+            storyMeta.put("tour_url", "/tours/" + tourId);
+        }
         storyMeta.put("title", effectiveName + (StringUtils.hasText(tourName) ? (" (" + tourName + ")") : ""));
         storyMeta.put("destination_name", effectiveName);
 
@@ -195,16 +201,125 @@ public class DocumentIngestionService {
         return totalChunks;
     }
 
+    /**
+     * Nạp tổng quan một Tour đã duyệt kèm đường dẫn chi tiết {@code /tours/{tourId}} làm tri thức GLOBAL
+     * để AI gợi ý tour chính xác và luôn gắn link trực tiếp.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int ingestTourOverview(Long tourId,
+                                  String tourTitle,
+                                  String regionName,
+                                  String themeName,
+                                  String durationLabel,
+                                  String adultPriceLabel,
+                                  String description,
+                                  List<String> highlights,
+                                  List<String> stopNames) {
+        if (tourId == null) {
+            return 0;
+        }
+        String sourceId = "TOUR:" + tourId;
+        String tourUrl = "/tours/" + tourId;
+        String safeTitle = StringUtils.hasText(tourTitle) ? tourTitle.trim() : ("Tour #" + tourId);
+
+        StringBuilder body = new StringBuilder();
+        body.append("Tour du lịch: ").append(safeTitle).append(".\n");
+        body.append("Đường dẫn chi tiết tour: ").append(tourUrl).append(".\n");
+        if (StringUtils.hasText(regionName)) {
+            body.append("Khu vực: ").append(regionName.trim()).append(".\n");
+        }
+        if (StringUtils.hasText(themeName)) {
+            body.append("Chủ đề: ").append(themeName.trim()).append(".\n");
+        }
+        if (StringUtils.hasText(durationLabel)) {
+            body.append("Thời lượng: ").append(durationLabel.trim()).append(".\n");
+        }
+        if (StringUtils.hasText(adultPriceLabel)) {
+            body.append("Giá tham khảo (người lớn): ").append(adultPriceLabel.trim()).append(".\n");
+        }
+        if (StringUtils.hasText(description)) {
+            body.append("Mô tả: ").append(description.trim()).append("\n");
+        }
+        if (highlights != null && !highlights.isEmpty()) {
+            List<String> cleanHighlights = highlights.stream().filter(StringUtils::hasText).map(String::trim).toList();
+            if (!cleanHighlights.isEmpty()) {
+                body.append("Điểm nổi bật:\n");
+                for (String hl : cleanHighlights) {
+                    body.append("- ").append(hl).append("\n");
+                }
+            }
+        }
+        if (stopNames != null && !stopNames.isEmpty()) {
+            String joinedStops = stopNames.stream().filter(StringUtils::hasText).map(String::trim)
+                    .reduce((a, b) -> a + ", " + b).orElse("");
+            if (StringUtils.hasText(joinedStops)) {
+                body.append("Các điểm dừng trong hành trình: ").append(joinedStops).append(".\n");
+            }
+        }
+
+        String contextLabel = StringUtils.hasText(regionName)
+                ? ("Tour " + regionName.trim())
+                : "Tour JourneyGo";
+
+        Map<String, Object> baseMeta = new HashMap<>();
+        baseMeta.put("source_type", "TOUR");
+        baseMeta.put("source_id", tourId);
+        baseMeta.put("tour_id", tourId);
+        baseMeta.put("tour_url", tourUrl);
+        baseMeta.put("scope", "GLOBAL");
+        baseMeta.put("title", safeTitle);
+        baseMeta.put("destination_name", contextLabel);
+
+        return ingestDocument(sourceId, null, contextLabel, "TOUR_INFO", body.toString(), baseMeta, true);
+    }
+
+    /**
+     * Nạp tài liệu context do Admin quản lý vào Vector Store (hỗ trợ cả phạm vi GLOBAL với destinationId = null).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int ingestAdminDocument(Long documentId,
+                                   Long destinationId,
+                                   String destinationName,
+                                   String docType,
+                                   String title,
+                                   String rawContentText) {
+        String sourceId = "ADMIN_DOC:" + documentId;
+        String effectiveDestName = destinationId == null
+                ? "Toàn nền tảng JourneyGo"
+                : (StringUtils.hasText(destinationName) ? destinationName.trim() : ("Điểm đến #" + destinationId));
+
+        Map<String, Object> baseMeta = new HashMap<>();
+        baseMeta.put("source_type", "ADMIN_DOC");
+        baseMeta.put("source_id", documentId);
+        baseMeta.put("doc_type", docType != null ? docType : "PLATFORM_POLICY");
+        baseMeta.put("scope", destinationId == null ? "GLOBAL" : "DESTINATION");
+        baseMeta.put("title", StringUtils.hasText(title) ? title.trim() : ("Tài liệu #" + documentId));
+        baseMeta.put("destination_name", effectiveDestName);
+
+        String effectiveContentType = StringUtils.hasText(docType) ? docType : "PLATFORM_POLICY";
+        return ingestDocument(sourceId, destinationId, effectiveDestName, effectiveContentType, rawContentText, baseMeta, true);
+    }
+
     private int ingestDocument(String sourceId,
                                Long destinationId,
                                String destinationName,
                                String contentType,
                                String rawContentText,
                                Map<String, Object> baseMeta) {
+        return ingestDocument(sourceId, destinationId, destinationName, contentType, rawContentText, baseMeta, false);
+    }
+
+    private int ingestDocument(String sourceId,
+                               Long destinationId,
+                               String destinationName,
+                               String contentType,
+                               String rawContentText,
+                               Map<String, Object> baseMeta,
+                               boolean allowNullDestination) {
         // 1. Xóa các chunks cũ của nguồn này trước (tránh trùng lặp / dữ liệu cũ)
         chunkRepository.deleteBySourceId(sourceId);
 
-        if (destinationId == null || !StringUtils.hasText(rawContentText)) {
+        if ((!allowNullDestination && destinationId == null) || !StringUtils.hasText(rawContentText)) {
             log.debug("Bỏ qua nạp vector cho sourceId={} do destinationId null hoặc nội dung rỗng.", sourceId);
             return 0;
         }

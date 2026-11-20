@@ -148,6 +148,7 @@ public enum ErrorCode {
     AI_EMBEDDING_FAILED("Không thể tính toán vector nhúng từ mô hình AI", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_CHAT_FAILED("Xử lý hội thoại AI thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_SESSION_NOT_FOUND("Phiên hội thoại AI không tồn tại", HttpStatus.NOT_FOUND),
+    AI_DOCUMENT_NOT_FOUND("Tài liệu tri thức AI không tồn tại", HttpStatus.NOT_FOUND),
     AI_RATE_LIMITED("Bạn đang gửi quá nhiều câu hỏi cho AI. Vui lòng thử lại sau giây lát.", HttpStatus.TOO_MANY_REQUESTS),
 
     // ── Booking nhóm (Đặt - Thanh toán tour) ────────────────────────────────
