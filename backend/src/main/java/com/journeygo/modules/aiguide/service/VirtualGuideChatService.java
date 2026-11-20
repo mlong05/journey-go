@@ -10,8 +10,10 @@ import com.journeygo.modules.aiguide.dto.AiChatSessionDto;
 import com.journeygo.modules.aiguide.entity.AiChatMessage;
 import com.journeygo.modules.aiguide.entity.AiChatSession;
 import com.journeygo.modules.aiguide.entity.AiKnowledgeChunk;
+import com.journeygo.modules.aiguide.entity.AiKnowledgeDocument;
 import com.journeygo.modules.aiguide.repository.AiChatMessageRepository;
 import com.journeygo.modules.aiguide.repository.AiChatSessionRepository;
+import com.journeygo.modules.aiguide.repository.AiKnowledgeDocumentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -24,6 +26,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -35,6 +38,11 @@ import java.util.stream.Collectors;
 @Slf4j
 public class VirtualGuideChatService {
 
+    private static final Pattern BOLD_MARKDOWN_PATTERN = Pattern.compile("\\*\\*(.+?)\\*\\*", Pattern.DOTALL);
+    private static final Pattern UNDERLINE_BOLD_PATTERN = Pattern.compile("__(.+?)__", Pattern.DOTALL);
+    private static final Pattern HEADING_MARKDOWN_PATTERN = Pattern.compile("(?m)^#{1,6}\\s+");
+    private static final Pattern STAR_BULLET_PATTERN = Pattern.compile("(?m)^(\\s*)\\*\\s+");
+
     private final AiChatSessionRepository sessionRepository;
     private final AiChatMessageRepository messageRepository;
     private final GeminiChatClient chatClient;
@@ -42,6 +50,7 @@ public class VirtualGuideChatService {
     private final GeminiAiProperties properties;
     private final AiRetrievalService aiRetrievalService;
     private final AiRateLimiterService aiRateLimiterService;
+    private final AiKnowledgeDocumentRepository documentRepository;
 
     /**
      * Khởi tạo hoặc lấy lại một phiên hội thoại cho du khách (tương thích chữ ký cũ).
@@ -158,10 +167,10 @@ public class VirtualGuideChatService {
                 .build();
         messageRepository.save(userMessage);
 
-        // 3. Phân biệt chế độ: Normal Guide vs Task Hint
+        // 3. Phân biệt chế độ: Normal Guide vs Task Hint & Nạp thêm AI_RULE từ Admin
         boolean isTaskHintMode = (request.getTaskId() != null);
         String activeMode = isTaskHintMode ? "TASK_HINT" : "NORMAL_GUIDE";
-        String systemInstruction = isTaskHintMode
+        String baseSystemPrompt = isTaskHintMode
                 ? VirtualGuidePromptTemplate.TASK_HINT_SYSTEM_PROMPT
                 : VirtualGuidePromptTemplate.NORMAL_GUIDE_SYSTEM_PROMPT;
 
@@ -169,6 +178,17 @@ public class VirtualGuideChatService {
         Long targetDestinationId = request.getDestinationId() != null
                 ? request.getDestinationId()
                 : session.getCurrentDestinationId();
+
+        List<AiKnowledgeDocument> activeRules = List.of();
+        try {
+            List<AiKnowledgeDocument> foundRules = documentRepository.findActiveRulesForChat(targetDestinationId);
+            if (foundRules != null) {
+                activeRules = foundRules;
+            }
+        } catch (Exception ex) {
+            log.warn("Không tải được AI_RULE bổ sung cho destinationId={}: {}", targetDestinationId, ex.getMessage());
+        }
+        String systemInstruction = promptTemplate.appendAdminRules(baseSystemPrompt, activeRules);
 
         List<AiKnowledgeChunk> relevantChunks = aiRetrievalService.retrieveRelevantChunks(
                 trimmedQuestion,
@@ -231,6 +251,8 @@ public class VirtualGuideChatService {
 
         if (!StringUtils.hasText(aiAnswer)) {
             aiAnswer = "Rất tiếc, tôi chưa có thông tin chính xác về câu hỏi này tại điểm đến của bạn.";
+        } else {
+            aiAnswer = sanitizeAnswerFormatting(aiAnswer);
         }
 
         // 8. Lưu câu trả lời của AI vào DB
@@ -249,6 +271,21 @@ public class VirtualGuideChatService {
                 .citations(citations.stream().distinct().toList())
                 .createdAt(savedAiMessage.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Loại bỏ các ký hiệu Markdown thừa (** **, __, ###, bullet *) nhưng giữ nguyên link [label](/tours/id).
+     */
+    static String sanitizeAnswerFormatting(String rawAnswer) {
+        if (!StringUtils.hasText(rawAnswer)) {
+            return rawAnswer;
+        }
+        String cleaned = BOLD_MARKDOWN_PATTERN.matcher(rawAnswer).replaceAll("$1");
+        cleaned = UNDERLINE_BOLD_PATTERN.matcher(cleaned).replaceAll("$1");
+        cleaned = HEADING_MARKDOWN_PATTERN.matcher(cleaned).replaceAll("");
+        cleaned = STAR_BULLET_PATTERN.matcher(cleaned).replaceAll("$1- ");
+        cleaned = cleaned.replace("**", "");
+        return cleaned.trim();
     }
 
     private AiChatSession findSessionOwnedByUser(UUID sessionId, Long userId) {
