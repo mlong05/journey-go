@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  ArrowLeft, CalendarDays, Loader2, AlertTriangle, Lock, UserRound, Timer, CreditCard, CheckCircle2,
+  ArrowLeft, CalendarDays, Loader2, AlertTriangle, Lock, UserRound, Timer, CreditCard, CheckCircle2, Ticket, Check, X,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
@@ -74,6 +74,13 @@ function CheckoutForm({ tourId }) {
   const [error, setError] = useState("");
   const [pendingBooking, setPendingBooking] = useState(null);
 
+  // ── Voucher state ────────────────────────────────────────────────────────
+  const [voucherInput, setVoucherInput] = useState("");
+  const [validatingVoucher, setValidatingVoucher] = useState(false);
+  const [voucherResult, setVoucherResult] = useState(null);
+  const [voucherError, setVoucherError] = useState("");
+  const [myVouchersList, setMyVouchersList] = useState([]);
+
   useEffect(() => {
     let alive = true;
     touristService.tourDetail(tourId).then((t) => alive && setTour(t))
@@ -81,11 +88,74 @@ function CheckoutForm({ tourId }) {
     return () => { alive = false; };
   }, [tourId]);
 
+  // Tải danh sách voucher khả dụng trong ví của du khách để gợi ý
+  useEffect(() => {
+    let alive = true;
+    touristService.myVouchers()
+      .then((list) => {
+        if (!alive) return;
+        const available = (list || []).filter((v) => v.status === "AVAILABLE");
+        setMyVouchersList(available);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   const priceOf = (type) => {
     const p = tour?.prices?.find((x) => x.guestType === type);
     return Number(p?.price || 0);
   };
   const total = passengers.reduce((s, p) => s + priceOf(p.guestType), 0);
+
+  // Nếu tổng tiền thay đổi so với lúc validate voucher, voucher không còn hiệu lực
+  const isVoucherPriceMatched = !voucherResult?.originalPrice || Number(voucherResult.originalPrice) === total;
+  const activeVoucher = isVoucherPriceMatched ? voucherResult : null;
+
+  const discountAmount = activeVoucher?.valid && Number(activeVoucher?.discountAmount || 0) > 0
+    ? Number(activeVoucher.discountAmount)
+    : 0;
+  const finalTotal = Math.max(0, total - discountAmount);
+
+  const handleValidateVoucher = async (codeToValidate) => {
+    const code = (codeToValidate || voucherInput).trim();
+    if (!code) {
+      setVoucherError("Vui lòng nhập mã voucher.");
+      setVoucherResult(null);
+      return;
+    }
+    if (total <= 0) {
+      setVoucherError("Vui lòng chọn ít nhất một hành khách để kiểm tra voucher.");
+      return;
+    }
+    setValidatingVoucher(true);
+    setVoucherError("");
+    try {
+      const res = await touristService.validateVoucher({
+        userVoucherCode: code,
+        tourPrice: total,
+        partnerId: tour?.providerId,
+      });
+      if (res?.valid) {
+        setVoucherResult(res);
+        setVoucherError("");
+        setVoucherInput(res.voucherCode || code);
+      } else {
+        setVoucherResult(null);
+        setVoucherError(res?.errorMessage || "Mã voucher không hợp lệ hoặc không đủ điều kiện áp dụng.");
+      }
+    } catch (err) {
+      setVoucherResult(null);
+      setVoucherError(err?.message || "Không thể kiểm tra mã voucher. Vui lòng thử lại.");
+    } finally {
+      setValidatingVoucher(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setVoucherResult(null);
+    setVoucherError("");
+    setVoucherInput("");
+  };
   const errors = useMemo(() => validate(passengers, date, guestTypes), [passengers, date, guestTypes]);
   const hasErrors = errors.some((e) => Object.keys(e).length);
   const set = (i, patch) => setPassengers((list) => list.map((p, j) => (j === i ? { ...p, ...patch } : p)));
@@ -108,6 +178,7 @@ function CheckoutForm({ tourId }) {
         tourId: Number(tourId),
         experienceDate: date,
         note: note.trim() || null,
+        voucherCode: activeVoucher?.valid ? (activeVoucher.voucherCode || voucherInput.trim()) : null,
         passengers: passengers.map((p) => ({
           fullName: p.fullName.trim(), birthDate: p.birthDate, gender: p.gender,
           email: p.guestType === "ADULT" ? p.email.trim() || null : null, guestType: p.guestType,
@@ -241,9 +312,124 @@ function CheckoutForm({ tourId }) {
                   ) : null;
                 })}
               </ul>
+
+              {/* ── Khối mã giảm giá / Voucher ── */}
+              <div className="mt-4 border-t border-dashed border-slate-200 pt-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="voucher-code-input" className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                    <Ticket size={14} className="text-teal-700" />
+                    Mã ưu đãi / Voucher
+                  </label>
+                  {myVouchersList.length > 0 && !voucherResult && (
+                    <span className="text-[11px] font-medium text-teal-700">
+                      Có {myVouchersList.length} voucher khả dụng
+                    </span>
+                  )}
+                </div>
+
+                {!activeVoucher ? (
+                  <div>
+                    <div className="flex gap-2">
+                      <input
+                        id="voucher-code-input"
+                        type="text"
+                        placeholder="Nhập mã voucher"
+                        value={voucherInput}
+                        onChange={(e) => {
+                          setVoucherInput(e.target.value.toUpperCase());
+                          if (voucherError) setVoucherError("");
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleValidateVoucher();
+                          }
+                        }}
+                        className="flex-1 uppercase font-mono tracking-wider rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleValidateVoucher()}
+                        disabled={validatingVoucher || !voucherInput.trim()}
+                        className="inline-flex items-center justify-center rounded-xl bg-teal-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      >
+                        {validatingVoucher ? <Loader2 size={13} className="animate-spin" /> : "Áp dụng"}
+                      </button>
+                    </div>
+
+                    {/* Gợi ý voucher trong ví */}
+                    {myVouchersList.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-[11px] text-slate-500">Hoặc chọn từ ví của bạn:</p>
+                        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                          {myVouchersList.map((v) => (
+                            <button
+                              key={v.userVoucherCode}
+                              type="button"
+                              onClick={() => {
+                                setVoucherInput(v.userVoucherCode);
+                                handleValidateVoucher(v.userVoucherCode);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50/70 px-2 py-1 text-[11px] font-medium text-teal-800 hover:bg-teal-100 transition"
+                            >
+                              <span className="font-mono font-bold">{v.userVoucherCode}</span>
+                              <span className="text-teal-600 truncate max-w-[120px]">({v.voucherTitle})</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {voucherError && (
+                      <p className="mt-2 text-xs font-semibold text-rose-600 flex items-start gap-1">
+                        <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                        {voucherError}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                        <Check size={14} className="text-emerald-600" />
+                        <span>Đã áp dụng: <span className="font-mono">{activeVoucher.voucherCode || voucherInput}</span></span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveVoucher}
+                        className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        title="Bỏ chọn voucher"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {activeVoucher.title && (
+                      <p className="mt-0.5 text-xs text-emerald-700">{activeVoucher.title}</p>
+                    )}
+                    <p className="mt-1 text-xs font-semibold text-emerald-700">
+                      Giảm: -{vnd(discountAmount)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {discountAmount > 0 && (
+                <div className="mt-3 flex items-center justify-between text-sm text-emerald-700 font-semibold border-t border-slate-100 pt-2">
+                  <span>Giảm giá voucher</span>
+                  <span className="tabular-nums">-{vnd(discountAmount)}</span>
+                </div>
+              )}
+
               <div className="mt-3 flex items-end justify-between border-t border-slate-200 pt-3">
                 <span className="text-sm font-bold text-slate-800">Tổng thanh toán</span>
-                <span className="text-xl font-extrabold tabular-nums text-slate-900">{vnd(total)}</span>
+                <div className="text-right">
+                  {discountAmount > 0 && (
+                    <div className="text-xs text-slate-400 line-through tabular-nums">
+                      {vnd(total)}
+                    </div>
+                  )}
+                  <span className="text-xl font-extrabold tabular-nums text-slate-900">{vnd(finalTotal)}</span>
+                </div>
               </div>
               {error && (
                 <div role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700">
