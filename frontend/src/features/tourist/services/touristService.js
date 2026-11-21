@@ -55,9 +55,17 @@ export const touristService = {
     return list(data(await apiClient.get("/themes")));
   },
 
-  /** body: { tourId, experienceDate: "yyyy-MM-dd", passengers: [{fullName, birthDate, gender, email, guestType}], note } */
+  /** body: { tourId, experienceDate: "yyyy-MM-dd", passengers: [{fullName, birthDate, gender, email, guestType}], note, voucherCode } */
   async createBooking(body) {
     return data(await apiClient.post("/bookings", body));
+  },
+  /** Thẩm định và tính toán giảm giá khi người dùng áp dụng mã voucher cho tour */
+  async validateVoucher({ userVoucherCode, tourPrice, partnerId }) {
+    return data(await apiClient.post("/vouchers/validate-user-voucher", {
+      userVoucherCode,
+      tourPrice,
+      partnerId: partnerId ? Number(partnerId) : null,
+    }));
   },
   async myBookings({ page = 0, size = 50 } = {}) {
     return list(data(await apiClient.get(`/bookings/my?page=${page}&size=${size}`)));
