@@ -101,6 +101,11 @@ function TripDetail({ bookingId }) {
   // Người đặt tour (chủ đơn) vs hành khách được mời — quyền khác nhau.
   const isOwner = Boolean(user?.id) && String(user.id) === String(booking.touristId);
 
+  const discount = Number(booking.discountAmount || 0);
+  const finalTotal = Number(booking.totalAmount || 0);
+  const passengerSum = (booking.passengers || []).reduce((sum, p) => sum + Number(p.price || 0), 0);
+  const originalTotal = passengerSum > 0 ? passengerSum : (discount > 0 ? finalTotal + discount : finalTotal);
+
   return (
     <div className="min-w-0">
       {confirmDialog}
@@ -176,11 +181,46 @@ function TripDetail({ bookingId }) {
         <PassengerGroupPanel booking={booking} isOwner={isOwner} />
         <section className="rounded-3xl border border-slate-200 bg-white p-5 text-sm">
           <h2 className="mb-3 font-extrabold text-slate-900">Thanh toán</h2>
-          <dl className="space-y-2">
-            <div className="flex justify-between"><dt className="text-slate-500">Tổng tiền</dt><dd className="font-extrabold tabular-nums text-slate-900">{vnd(booking.totalAmount)}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Đặt lúc</dt><dd>{dateTime(booking.createdAt)}</dd></div>
-            {booking.paidAt && <div className="flex justify-between"><dt className="text-slate-500">Thanh toán lúc</dt><dd>{dateTime(booking.paidAt)}</dd></div>}
-            {booking.cancellationReason && <div><dt className="text-slate-500">Lý do hủy</dt><dd className="mt-0.5">{booking.cancellationReason}</dd></div>}
+          <dl className="space-y-2.5">
+            <div className="flex justify-between">
+              <dt className="text-slate-500">Tiền ban đầu</dt>
+              <dd className="tabular-nums font-medium text-slate-800">{vnd(originalTotal)}</dd>
+            </div>
+            <div className="flex justify-between items-center">
+              <dt className="text-slate-500">Voucher áp dụng</dt>
+              <dd className="tabular-nums">
+                {booking.appliedVoucherCode ? (
+                  <span
+                    className="font-medium text-emerald-600"
+                    title={booking.appliedVoucherDescription || ''}
+                  >
+                    {booking.appliedVoucherCode}
+                  </span>
+                ) : (
+                  <span className="text-slate-400">Không có</span>
+                )}
+              </dd>
+            </div>
+            <div className="flex justify-between border-t border-slate-100 pt-2">
+              <dt className="font-bold text-slate-800">Số tiền cần thanh toán</dt>
+              <dd className="font-extrabold tabular-nums text-slate-900">{vnd(booking.totalAmount)}</dd>
+            </div>
+            <div className="flex justify-between border-t border-dashed border-slate-200 pt-2 text-xs">
+              <dt className="text-slate-500">Đặt lúc</dt>
+              <dd className="text-slate-700">{dateTime(booking.createdAt)}</dd>
+            </div>
+            {booking.paidAt && (
+              <div className="flex justify-between text-xs">
+                <dt className="text-slate-500">Thanh toán lúc</dt>
+                <dd className="text-slate-700">{dateTime(booking.paidAt)}</dd>
+              </div>
+            )}
+            {booking.cancellationReason && (
+              <div className="text-xs">
+                <dt className="text-slate-500">Lý do hủy</dt>
+                <dd className="mt-0.5 text-slate-700">{booking.cancellationReason}</dd>
+              </div>
+            )}
           </dl>
         </section>
       </div>
