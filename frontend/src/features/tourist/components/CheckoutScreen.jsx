@@ -14,6 +14,7 @@ import RequireTourist from "./RequireTourist";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { usePurchasedBooking } from "../hooks/usePurchasedBooking";
+import { PaymentCountdown, usePendingBooking } from "./PendingBooking";
 import { GUEST_TYPES, ageAt, durationLabel, longDate, vnd } from "../utils";
 import { LimitedField } from "@/components/ui/LimitedField";
 import { useGuestTypes } from "@/lib/guestTypes";
@@ -84,6 +85,41 @@ function CheckoutForm({ tourId }) {
   const [voucherResult, setVoucherResult] = useState(null);
   const [voucherError, setVoucherError] = useState("");
   const [myVouchersList, setMyVouchersList] = useState([]);
+
+  // Đơn giữ chỗ từ lần đặt trước (đã thoát / quay lại từ VNPay chưa trả tiền): backend không cho tạo
+  // đơn thứ hai cho cùng tour ⇒ mời tiếp tục đơn đó hoặc hủy để đặt lại theo thông tin mới.
+  const { pending: heldBooking, reload: reloadHeld, clear: clearHeld } = usePendingBooking(tourId);
+  const held = heldBooking && heldBooking.id !== pendingBooking?.id ? heldBooking : null;
+  const [heldBusy, setHeldBusy] = useState("");
+
+  const resumeHeld = async () => {
+    if (!held) return;
+    setHeldBusy("resume");
+    setError("");
+    try {
+      const payment = await touristService.initPayment(held.id);
+      if (!payment?.paymentUrl) throw new Error("Không nhận được đường dẫn thanh toán từ VNPay.");
+      window.location.href = payment.paymentUrl;
+    } catch (err) {
+      setError(err?.message || "Không mở được trang thanh toán. Vui lòng thử lại.");
+      setHeldBusy("");
+    }
+  };
+
+  const cancelHeld = async () => {
+    if (!held) return;
+    setHeldBusy("cancel");
+    setError("");
+    try {
+      await touristService.cancelBooking(held.id, "Khách hủy để đặt lại");
+      clearHeld();
+    } catch (err) {
+      setError(err?.message || "Không hủy được đơn cũ. Vui lòng thử lại.");
+      reloadHeld();
+    } finally {
+      setHeldBusy("");
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -172,6 +208,10 @@ function CheckoutForm({ tourId }) {
       setError("Bạn đã mua tour này rồi — không thể đặt lại.");
       return;
     }
+    if (held) {
+      document.getElementById("held-booking")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if (hasErrors) {
       document.querySelector("[aria-invalid=true]")?.focus();
       return;
@@ -199,8 +239,13 @@ function CheckoutForm({ tourId }) {
       if (!payment?.paymentUrl) throw new Error("Không nhận được đường dẫn thanh toán từ VNPay.");
       window.location.href = payment.paymentUrl;
     } catch (err) {
-      setError(err?.message || "Không đặt được tour. Vui lòng thử lại.");
       setBusy(false);
+      // 409 có thể là "đang có đơn giữ chỗ cho tour này" (đặt ở tab / thiết bị khác) ⇒ hiện khung đơn đó.
+      if (err?.status === 409 && !pendingBooking && (await reloadHeld())) {
+        document.getElementById("held-booking")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      setError(err?.message || "Không đặt được tour. Vui lòng thử lại.");
     }
   };
 
@@ -252,6 +297,28 @@ function CheckoutForm({ tourId }) {
       <div className="pt-1">
         <Breadcrumbs fallback={ROUTES.TOUR_DETAIL(tourId)} items={[{ label: "Khám phá", href: ROUTES.HOME }, { label: tour.title, href: ROUTES.TOUR_DETAIL(tourId) }, { label: "Thông tin hành khách" }]} />
       </div>
+
+      {held && (
+        <section id="held-booking" role="alert" className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-5">
+          <p className="flex items-center gap-2 font-extrabold text-amber-900">
+            <Timer size={18} />Bạn đang có đơn giữ chỗ · còn <PaymentCountdown deadline={held.paymentDeadline} onExpire={clearHeld} />
+          </p>
+          <p className="mt-1.5 text-sm text-amber-900/80">
+            Đơn <b className="font-mono">{held.bookingCode}</b> cho ngày <b>{longDate(held.experienceDate)}</b> ({vnd(held.totalAmount)}) đang giữ chỗ.
+            Mỗi tour chỉ giữ được một đơn chưa thanh toán — hãy tiếp tục đơn này, hoặc hủy để đặt lại theo thông tin bên dưới.
+          </p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <button type="button" onClick={resumeHeld} disabled={Boolean(heldBusy)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-60 cursor-pointer disabled:cursor-wait">
+              {heldBusy === "resume" ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}Tiếp tục thanh toán đơn này
+            </button>
+            <button type="button" onClick={cancelHeld} disabled={Boolean(heldBusy)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-5 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-60 cursor-pointer disabled:cursor-wait">
+              {heldBusy === "cancel" && <Loader2 size={16} className="animate-spin" />}Hủy đơn cũ và đặt lại
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Bố cục 2 cột: cột trái = thông tin hành khách (dọc, dài tự nhiên),
           cột phải = ô thông tin thanh toán (dính theo khung nhìn, rộng để chữ không chật chội).
@@ -502,7 +569,7 @@ function CheckoutForm({ tourId }) {
               </div>
               {/* Nút thanh toán + điều khoản: ghim cố định ở đáy thẻ (không cuộn theo nội dung). */}
               <div className="lg:shrink-0">
-              <button type="submit" disabled={busy || !docsAcknowledged || (touched && hasErrors)}
+              <button type="submit" disabled={busy || Boolean(held) || !docsAcknowledged || (touched && hasErrors)}
                 className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] hover:bg-orange-700 disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none transition duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none cursor-pointer disabled:cursor-not-allowed">
                 {busy ? <Loader2 size={17} className="animate-spin" /> : <CreditCard size={17} />}
                 {pendingBooking ? "Thử thanh toán lại" : "Xác nhận và thanh toán"}

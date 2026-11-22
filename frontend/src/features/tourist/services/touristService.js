@@ -80,6 +80,11 @@ export const touristService = {
   async booking(bookingId) {
     return data(await apiClient.get(`/bookings/${bookingId}`));
   },
+  /** Đơn đang giữ chỗ (chờ thanh toán, còn hạn), mới nhất trước; có tourId thì chỉ của tour đó. */
+  async myPendingBookings(tourId) {
+    const query = tourId ? `?tourId=${tourId}` : "";
+    return list(data(await apiClient.get(`/bookings/my/pending${query}`)));
+  },
   async cancelBooking(bookingId, reason) {
     return data(await apiClient.post(`/bookings/${bookingId}/cancel`, reason ? { reason } : {}));
   },

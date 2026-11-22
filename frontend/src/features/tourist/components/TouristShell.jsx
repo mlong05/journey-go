@@ -14,6 +14,7 @@ import { PAGE_EVENT, rememberPage } from "../navigation";
 import "../tourist-motion.css";
 import TouristNotificationBell from "./TouristNotificationBell";
 import TouristNotificationProvider from "./TouristNotificationProvider";
+import { PendingBookingBar } from "./PendingBooking";
 
 const NAV = [
   { href: ROUTES.HOME, label: "Khám phá", match: (p) => p === "/" },
@@ -236,6 +237,8 @@ export default function TouristShell({ children, desktopFixed = false }) {
     <div className="font-jakarta flex min-h-screen w-full min-w-0 flex-col overflow-x-clip bg-[#f4f7f6] text-slate-900 antialiased">
       <TouristNotificationProvider>
         <TouristHeader />
+        {/* Đơn đang giữ chỗ chưa thanh toán: nhắc ở mọi trang (kể cả Trang chủ) để khách quay lại đúng đơn */}
+        <PendingBookingBar />
         {/* Vùng nội dung có tên riêng ⇒ trượt khi chuyển trang, header & footer đứng yên */}
         <main className="flex-1" style={{ viewTransitionName: "jg-page" }}>{children}</main>
         {desktopFixed ? <div className="lg:hidden"><TouristFooter /></div> : <TouristFooter />}
