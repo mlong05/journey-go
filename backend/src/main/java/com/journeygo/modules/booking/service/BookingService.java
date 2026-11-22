@@ -140,6 +140,12 @@ public class BookingService {
         // đặt lại tour đó dưới bất kỳ hình thức nào (cùng ngày hay ngày khác).
         validateTourNotAlreadyPurchased(tour.getTourId(), touristId);
 
+        // ── Chống giữ chỗ trùng ───────────────────────────────────────────────
+        // Mỗi du khách chỉ có tối đa 1 đơn đang giữ chỗ cho một tour: thoát màn thanh toán rồi
+        // bấm "Đặt tour" lại không được tạo đơn thứ hai (giữ chỗ gấp đôi, đồng hồ "reset").
+        // App bắt mã này rồi mời tiếp tục đơn cũ hoặc hủy đơn cũ để đặt lại.
+        validateNoActivePendingBooking(tour.getTourId(), touristId);
+
         // ── Chuẩn bị danh sách hành khách + chốt giá ─────────────────────────
         PriceSnapshot price = buildPriceSnapshot(tour, request);
 
@@ -902,6 +908,35 @@ public class BookingService {
             throw new AppException(ErrorCode.BOOKING_TOUR_ALREADY_PURCHASED,
                     "Bạn đã mua tour này rồi — không thể đặt lại.");
         }
+    }
+
+    /**
+     * Chặn tạo đơn mới khi du khách còn đơn {@code PENDING_PAYMENT} chưa hết hạn cho cùng tour.
+     *
+     * @throws AppException {@link ErrorCode#BOOKING_PENDING_EXISTS} — app tra đơn đó qua
+     *                      {@code GET /bookings/my/pending?tourId=} để mời tiếp tục thanh toán
+     */
+    private void validateNoActivePendingBooking(Long tourId, Long touristId) {
+        List<Booking> pending = bookingRepository.findActivePendingByTouristAndTour(touristId, tourId, Instant.now());
+        if (!pending.isEmpty()) {
+            Booking existing = pending.get(0);
+            throw new AppException(ErrorCode.BOOKING_PENDING_EXISTS,
+                    "Bạn đang có đơn " + existing.getBookingCode() + " giữ chỗ cho tour này — hãy tiếp tục thanh toán "
+                            + "hoặc hủy đơn đó trước khi đặt lại.");
+        }
+    }
+
+    /**
+     * Đơn đang giữ chỗ (chờ thanh toán, còn hạn) của du khách; {@code tourId} khác null thì chỉ của tour đó.
+     * Dùng cho thanh nhắc "Bạn có đơn chờ thanh toán" ở Trang chủ / trang tour.
+     */
+    @Transactional(readOnly = true)
+    public List<BookingResponse> getMyActivePendingBookings(Long touristId, Long tourId) {
+        Instant now = Instant.now();
+        List<Booking> pending = tourId == null
+                ? bookingRepository.findActivePendingByTourist(touristId, now)
+                : bookingRepository.findActivePendingByTouristAndTour(touristId, tourId, now);
+        return pending.stream().map(b -> buildResponse(b, touristId, false)).toList();
     }
 
     private void validateExperienceDate(Tour tour, LocalDate experienceDate) {
