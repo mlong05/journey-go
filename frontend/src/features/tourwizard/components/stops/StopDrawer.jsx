@@ -3,12 +3,15 @@
 import React, { useRef, useState } from "react";
 import {
   X, Plus, Trash2, Info, BookOpen, Gamepad2, Save, Loader2, CheckCircle2, AlertCircle,
-  ChevronRight, ArrowLeft, ArrowRight,
+  ChevronRight, ArrowLeft, ArrowRight, MapPin,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { Field, TextInput, TextArea, SingleImage, ImageStrip, VideoField } from "../FormKit";
+import GoongMapPickerModal from "@/features/destination/components/GoongMapPickerModal";
+import { Field, TextInput, TextArea, SingleImage, ImageStrip, VideoField, NumberInput } from "../FormKit";
 import { LIMITS } from "../../constants";
 import StopActivitiesEditor from "./StopActivitiesEditor";
+import CheckpointMap from "./CheckpointMap";
+import ExperienceQr from "./ExperienceQr";
 import StepNumber from "../StepNumber";
 
 let keySeq = 0;
@@ -18,7 +21,7 @@ export const emptyArtifact = () => ({ _key: newKey(), name: "", imageUrl: "", sh
 
 /** Ba bước thiết lập điểm đến, làm lần lượt: Thông tin → Nội dung văn hóa → Trải nghiệm. */
 const TABS = [
-  { key: "info", label: "Thông tin", Icon: Info, fields: ["name", "shortDescription", "guestNote", "imageUrl"] },
+  { key: "info", label: "Thông tin", Icon: Info, fields: ["name", "location", "checkInRadiusMeters", "shortDescription", "guestNote", "imageUrl"] },
   { key: "culture", label: "Nội dung văn hóa", Icon: BookOpen, fields: ["videoUrl", "videoSource", "culturalContent", "culturalImages", "artifacts"] },
   { key: "experience", label: "Trải nghiệm", Icon: Gamepad2, fields: ["quiz", "experiences"] },
 ];
@@ -43,6 +46,7 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
   const [stepNotice, setStepNotice] = useState("");
   // Còn form câu hỏi / trải nghiệm đang soạn (chưa bấm "Lưu câu hỏi" / "Lưu trải nghiệm").
   const [activityFormOpen, setActivityFormOpen] = useState(false);
+  const [pickLocation, setPickLocation] = useState(false);
   // Các ô đã sửa từ lần lưu gần nhất: ẩn lỗi cũ của máy chủ cho tới khi lưu và kiểm tra lại.
   const [touched, setTouched] = useState(() => new Set());
   const bodyRef = useRef(null);
@@ -170,6 +174,30 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
               <TextInput value={stop.name} disabled={readOnly} limit={LIMITS.TEXT.STOP_NAME}
                 placeholder="Ví dụ: Xưởng mộc làng Kim Bồng" onChange={(e) => set({ name: e.target.value })} error={stopErr("name")} />
             </Field>
+            <Field label="Vị trí check-in" required error={stopErr("location")}
+              hint="Đặt ghim tại cổng hoặc lối vào chính. Khách phải đứng trong vòng tròn bán kính mới check-in được và mở khóa trải nghiệm.">
+              <CheckpointMap latitude={stop.latitude} longitude={stop.longitude} radius={stop.checkInRadiusMeters}
+                emptyLabel="Chưa chọn vị trí check-in" />
+              {!readOnly && (
+                <button type="button" onClick={() => setPickLocation(true)}
+                  className="mt-2 px-3 py-1.5 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer hover:bg-emerald-50">
+                  <MapPin size={13} /> {stop.latitude != null ? "Đổi vị trí trên bản đồ" : "Chọn vị trí trên bản đồ"}
+                </button>
+              )}
+            </Field>
+            <Field label="Bán kính check-in" required error={stopErr("checkInRadiusMeters")}>
+              <div className="max-w-[200px]">
+                <NumberInput value={stop.checkInRadiusMeters} min={LIMITS.STOP_RADIUS_MIN} max={LIMITS.STOP_RADIUS_MAX}
+                  suffix="mét" disabled={readOnly} error={stopErr("checkInRadiusMeters")}
+                  onChange={(checkInRadiusMeters) => set({ checkInRadiusMeters })} />
+              </div>
+            </Field>
+            <Field label="Mã QR check-in tại điểm">
+              <ExperienceQr token={stop.qrToken} label={`check-in ${stop.name || "diem-den"}`}
+                title="Mã QR check-in trạm"
+                description="In và dán mã này tại cổng / lối vào. Khách check-in bằng GPS (trong bán kính) hoặc quét mã này khi GPS yếu. Mã được giữ nguyên khi bạn sửa điểm đến."
+                emptyText="Mã QR sẽ được tạo khi bạn lưu điểm đến." />
+            </Field>
             <Field label="Mô tả ngắn" required error={stopErr("shortDescription")}>
               <TextArea rows={3} value={stop.shortDescription} limit={LIMITS.TEXT.STOP_SHORT} disabled={readOnly}
                 onChange={(e) => set({ shortDescription: e.target.value })} error={stopErr("shortDescription")} />
@@ -294,6 +322,21 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
       </footer>
 
     </aside>
+
+    {pickLocation && (
+      <GoongMapPickerModal
+        isOpen
+        onClose={() => setPickLocation(false)}
+        placeName={stop.name}
+        initialLatitude={stop.latitude}
+        initialLongitude={stop.longitude}
+        onSelect={({ latitude, longitude }) => {
+          // Toạ độ là một trường "location" với backend: sửa thì ẩn lỗi cũ của cả cặp.
+          set({ latitude: Number(latitude), longitude: Number(longitude) }, ["location", "latitude", "longitude"]);
+          setPickLocation(false);
+        }}
+      />
+    )}
     </>
   );
 }
