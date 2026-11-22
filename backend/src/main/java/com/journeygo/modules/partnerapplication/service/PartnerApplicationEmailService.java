@@ -211,7 +211,9 @@ public class PartnerApplicationEmailService {
             log.info("[Email] Đã gửi '{}' tới {}", subject, toEmail);
         } catch (Exception ex) {
             log.error("Không thể gửi email '{}' tới {}: {}", subject, toEmail, ex.getMessage(), ex);
-            throw new AppException(ErrorCode.MAIL_SEND_FAILED, "Không thể gửi email: " + ex.getMessage());
+            // Chi tiết kỹ thuật (SMTP/TLS) chỉ ghi log, không trả về cho người dùng.
+            throw new AppException(ErrorCode.MAIL_SEND_FAILED,
+                    "Hiện không gửi được email. Vui lòng thử lại sau ít phút.");
         }
     }
 
