@@ -222,16 +222,20 @@ class _TourListScreenState extends State<TourListScreen> {
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(108),
-          child: Column(
-            children: [
-              _buildSearchRow(),
-              _buildQuickChips(),
-            ],
-          ),
+          preferredSize: const Size.fromHeight(62),
+          child: _buildSearchRow(),
         ),
       ),
-      body: _buildBody(),
+      // Chip lọc nằm trong thân trang (không bị ép trong thanh tiêu đề cao cố định) nên xuống hàng thoải mái
+      body: Column(
+        children: [
+          ColoredBox(
+            color: AppCultureColors.surface,
+            child: SizedBox(width: double.infinity, child: _buildQuickChips()),
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
     );
   }
 
@@ -298,11 +302,11 @@ class _TourListScreenState extends State<TourListScreen> {
     final region = nameOf(_regions, _filter.regionId);
     final theme = nameOf(_themes, _filter.themeId);
 
-    return SizedBox(
-      height: 44,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+    // Chip lọc tự xuống hàng (không cuộn ngang) — mọi chip hiện trọn
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+      child: Wrap(
+        runSpacing: 6,
         children: [
           for (final (value, label) in const [(null, 'Tất cả'), ('DAY_TRIP', 'Trong ngày'), ('MULTI_DAY', 'Nhiều ngày')])
             Padding(

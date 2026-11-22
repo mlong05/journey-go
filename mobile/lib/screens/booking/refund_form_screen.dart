@@ -617,7 +617,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
       case _PolicyTone.success:
         return AppCultureColors.heritageJade;
       case _PolicyTone.danger:
-        return const Color(0xFFB91C1C);
+        return AppCultureColors.lacquer600;
       case _PolicyTone.muted:
         return AppCultureColors.textMuted;
     }
@@ -799,7 +799,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               style: TextStyle(
                 fontSize: 10.5,
                 color: _summaryController.text.length >= _summaryMax * 0.9
-                    ? const Color(0xFFC98A1B)
+                    ? AppCultureColors.brass500
                     : AppCultureColors.textLight,
               ),
             ),
@@ -850,7 +850,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               style: TextStyle(
                 fontSize: 10.5,
                 color: _detailController.text.length >= _detailMax * 0.9
-                    ? const Color(0xFFC98A1B)
+                    ? AppCultureColors.brass500
                     : AppCultureColors.textLight,
               ),
             ),
@@ -868,7 +868,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        border: Border.all(color: AppCultureColors.lacquer200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -920,9 +920,9 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
+              color: AppCultureColors.lacquer50,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFECACA)),
+              border: Border.all(color: AppCultureColors.lacquer200),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -930,7 +930,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                 const Icon(
                   Icons.receipt_long_rounded,
                   size: 18,
-                  color: Color(0xFF991B1B),
+                  color: AppCultureColors.lacquer700,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -942,7 +942,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF991B1B),
+                          color: AppCultureColors.lacquer700,
                         ),
                       ),
                       const SizedBox(height: 3),
@@ -952,7 +952,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                         style: TextStyle(
                           fontSize: 11,
                           height: 1.4,
-                          color: Color(0xFF991B1B),
+                          color: AppCultureColors.lacquer700,
                         ),
                       ),
                     ],
@@ -1008,7 +1008,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: file.failed
-                  ? const Color(0xFFFECACA)
+                  ? AppCultureColors.lacquer200
                   : AppCultureColors.border,
             ),
           ),
@@ -1056,7 +1056,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFDC2626),
+                color: AppCultureColors.lacquer500,
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(11),
                 ),
@@ -1081,7 +1081,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               width: 22,
               height: 22,
               decoration: const BoxDecoration(
-                color: Color(0xFFDC2626),
+                color: AppCultureColors.lacquer500,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -1324,9 +1324,9 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
+        color: AppCultureColors.lacquer50,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        border: Border.all(color: AppCultureColors.lacquer200),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1342,7 +1342,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               _error,
               style: const TextStyle(
                 fontSize: 12.5,
-                color: Color(0xFF991B1B),
+                color: AppCultureColors.lacquer700,
                 height: 1.35,
               ),
             ),

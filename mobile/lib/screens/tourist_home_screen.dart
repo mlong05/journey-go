@@ -168,45 +168,39 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
     );
   }
 
+  /// Nút Check-in nổi giữa thanh dưới: tròn xanh ngọc, viền trắng tách khỏi nội dung, chỉ icon
+  /// (nhãn "Check-in" nằm trong thanh dưới ngay bên dưới để chữ đủ lớn, dễ đọc).
   Widget _buildCheckInFab() {
-    return Container(
-      margin: const EdgeInsets.only(top: 14),
-      width: 64,
-      height: 64,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [Color(0xFF00A86B), Color(0xFF00C853)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF00A86B).withValues(alpha: 0.35),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return Semantics(
+      button: true,
+      label: 'Check-in tại điểm đến',
+      child: Container(
+        margin: const EdgeInsets.only(top: 22),
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          // Màu đặc tươi (không gradient đậm) cho cảm giác sáng, nổi trên thanh trắng
+          gradient: const LinearGradient(
+            colors: [AppCultureColors.jade400, AppCultureColors.heritageJade],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _openCheckIn,
-          customBorder: const CircleBorder(),
-          child: const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 26),
-              Text(
-                'CHECK-IN',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
+          border: Border.all(color: AppCultureColors.surface, width: 4),
+          boxShadow: [
+            BoxShadow(
+              color: AppCultureColors.heritageJade.withValues(alpha: 0.30),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _openCheckIn,
+            customBorder: const CircleBorder(),
+            child: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 26),
           ),
         ),
       ),
@@ -216,21 +210,20 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: const Border(top: BorderSide(color: AppCultureColors.border, width: 0.8)),
+        color: AppCultureColors.surface,
+        border: const Border(top: BorderSide(color: AppCultureColors.borderLight)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
       child: SafeArea(
         child: SizedBox(
-          height: 62,
+          height: 66,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(
                 index: 0,
@@ -244,8 +237,27 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
                 unselectedIcon: Icons.confirmation_number_outlined,
                 label: 'Chuyến đi',
               ),
-              // Empty space for the center floating Check-In button
-              const SizedBox(width: 56),
+              // Chỗ cho nút Check-in nổi; nhãn nằm dưới nút
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _openCheckIn,
+                  child: const Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 9),
+                      child: Text(
+                        'Check-in',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppCultureColors.heritageJade,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               _buildNavItem(
                 index: 2,
                 icon: Icons.forum_rounded,
@@ -265,6 +277,7 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
     );
   }
 
+  /// Mục điều hướng: đang chọn thì icon nằm trong viên thuốc xanh ngọc nhạt, chữ đậm màu chính.
   Widget _buildNavItem({
     required int index,
     required IconData icon,
@@ -272,29 +285,39 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
     required String label,
   }) {
     final isSelected = _currentIndex == index;
-    final color = isSelected ? AppCultureColors.oceanBlue : AppCultureColors.textMuted;
+    final color = isSelected ? AppCultureColors.heritageJade : AppCultureColors.textMuted;
 
     return Expanded(
-      child: InkWell(
-        onTap: () => _selectTab(index),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isSelected ? icon : unselectedIcon,
-              color: color,
-              size: 22,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                color: color,
+      child: Semantics(
+        selected: isSelected,
+        button: true,
+        child: InkWell(
+          onTap: () => _selectTab(index),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.symmetric(horizontal: isSelected ? 18 : 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppCultureColors.jadeLight : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Icon(isSelected ? icon : unselectedIcon, color: color, size: 22),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

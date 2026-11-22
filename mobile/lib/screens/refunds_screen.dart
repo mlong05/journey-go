@@ -174,7 +174,7 @@ class _RefundsScreenState extends State<RefundsScreen> {
       return (bg: AppCultureColors.rewardBg, fg: AppCultureColors.rewardText);
     }
     if (r.status == 'REJECTED' || r.status == 'FAILED') {
-      return (bg: const Color(0xFFFEE2E2), fg: AppCultureColors.error);
+      return (bg: AppCultureColors.lacquer100, fg: AppCultureColors.error);
     }
     return (bg: AppCultureColors.surfaceSubtle, fg: AppCultureColors.textMuted);
   }

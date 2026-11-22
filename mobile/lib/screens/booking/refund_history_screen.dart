@@ -165,9 +165,9 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
+            // Bộ lọc dạng chip tự xuống hàng — không chip nào bị cắt ở mép màn hình
+            child: Wrap(
+                runSpacing: 8,
                 children: _filters.map((f) {
                   final isSelected = _filter == f;
                   final count = f == 'ALL'
@@ -202,7 +202,6 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                     ),
                   );
                 }).toList(),
-              ),
             ),
           ),
           Expanded(
@@ -405,7 +404,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                               refund.displayAmount! > 0 &&
                               refund.refundRatePercent > 0
                           ? AppCultureColors.textMuted
-                          : const Color(0xFFB91C1C),
+                          : AppCultureColors.lacquer600,
                     ),
                   ),
                 ],
@@ -480,7 +479,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                     style: const TextStyle(
                       fontSize: 11.5,
                       height: 1.35,
-                      color: Color(0xFF991B1B),
+                      color: AppCultureColors.lacquer700,
                     ),
                   ),
                 ),
@@ -607,7 +606,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
         return (bg: AppCultureColors.jadeLight, fg: AppCultureColors.jadeDark);
       case 'REJECTED':
       case 'FAILED':
-        return (bg: const Color(0xFFFEF2F2), fg: const Color(0xFF991B1B));
+        return (bg: AppCultureColors.lacquer50, fg: AppCultureColors.lacquer700);
       case 'PENDING_REVIEW':
         return (bg: AppCultureColors.rewardBg, fg: AppCultureColors.rewardText);
       default:

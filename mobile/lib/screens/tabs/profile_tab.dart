@@ -21,6 +21,7 @@ import '../../core/services/realtime_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../tourist_auth_screen.dart' show TouristAuthScreen;
 import '../account/password_screens.dart';
+import '../common/bright.dart';
 import '../common/heritage_motion.dart';
 import '../common/tab_refresh.dart';
 import '../forum/forum_widgets.dart' show ForumAvatar;
@@ -329,205 +330,156 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
     final next = nextRankFor(earned);
     final joinedAt = DateTime.tryParse(_user.createdAt ?? '')?.toLocal();
 
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppCultureColors.jadeDark, AppCultureColors.oceanBlue],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: AppCultureColors.heritageJade.withValues(alpha: 0.28),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Stack(
+    // Thẻ hồ sơ sáng: nền trắng → ngọc nhạt, chữ màu mực, ba ô thống kê theo nhóm màu
+    return BrightHeroCard(
+      tone: AppTone.jade,
+      radius: 26,
+      padding: const EdgeInsets.fromLTRB(18, 14, 14, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            right: -70,
-            top: -70,
-            child: SlowSpin(
-              child: DrumMotif(
-                size: 230,
-                color: Colors.white.withValues(alpha: 0.1),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Hồ sơ du khách',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppCultureColors.textMuted),
+                ),
+              ),
+              _lightIconButton(
+                icon: Icons.notifications_none_rounded,
+                iconWidget: const NotificationBellIcon(size: 19, color: AppCultureColors.textDark),
+                tooltip: 'Thông báo',
+                onTap: _openNotificationDialog,
+              ),
+              const SizedBox(width: 8),
+              _lightIconButton(icon: Icons.edit_outlined, tooltip: 'Sửa hồ sơ', onTap: _openEditProfileModal),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [AppCultureColors.goldBright, AppCultureColors.jade400],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: AppCultureColors.surface),
+                  child: ForumAvatar(name: _user.fullName, url: _user.avatarUrl, size: 62),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _user.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppCultureColors.textDark,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _toneChip(Icons.workspace_premium_rounded, rank, AppTone.brass),
+                        if (joinedAt != null)
+                          _toneChip(Icons.calendar_today_rounded, 'Từ ${formatDate(joinedAt)}', AppTone.jade),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          // Tiến độ lên hạng
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  next == null
+                      ? 'Bạn đã đạt hạng cao nhất'
+                      : 'Còn ${formatThousands(next.remaining)} điểm lên ${next.name}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppCultureColors.textMuted),
+                ),
+              ),
+              const Icon(Icons.auto_awesome_rounded, size: 15, color: AppCultureColors.gold),
+            ],
+          ),
+          const SizedBox(height: 7),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: rankProgressFor(earned)),
+              duration: const Duration(milliseconds: 900),
+              curve: Curves.easeOutCubic,
+              builder: (_, v, _) => LinearProgressIndicator(
+                value: v,
+                minHeight: 7,
+                backgroundColor: AppTone.brass.soft.withValues(alpha: 0.6),
+                valueColor: const AlwaysStoppedAnimation(AppCultureColors.brass500),
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 14, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Hồ sơ du khách',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withValues(alpha: 0.85),
-                        ),
-                      ),
-                    ),
-                    _glassIconButton(
-                      icon: Icons.notifications_none_rounded,
-                      iconWidget: const NotificationBellIcon(size: 19),
-                      tooltip: 'Thông báo',
-                      onTap: _openNotificationDialog,
-                    ),
-                    const SizedBox(width: 8),
-                    _glassIconButton(
-                      icon: Icons.edit_outlined,
-                      tooltip: 'Sửa hồ sơ',
-                      onTap: _openEditProfileModal,
-                    ),
-                  ],
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: StatTile(
+                  icon: Icons.star_rounded,
+                  tone: AppTone.brass,
+                  value: _points.currentBalance,
+                  label: 'Điểm khả dụng',
+                  compact: true,
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [AppCultureColors.gold, Colors.white],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                      child: ForumAvatar(
-                        name: _user.fullName,
-                        url: _user.avatarUrl,
-                        size: 64,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _user.fullName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              _glassChip(Icons.workspace_premium_rounded, rank),
-                              if (joinedAt != null)
-                                _glassChip(
-                                  Icons.calendar_today_rounded,
-                                  'Từ ${formatDate(joinedAt)}',
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: StatTile(
+                  icon: Icons.military_tech_rounded,
+                  tone: AppTone.coral,
+                  value: _badges.length,
+                  label: 'Huy hiệu',
+                  compact: true,
                 ),
-                const SizedBox(height: 18),
-                // Tiến độ lên hạng
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        next == null
-                            ? 'Bạn đã đạt hạng cao nhất'
-                            : 'Còn ${formatThousands(next.remaining)} điểm lên ${next.name}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: Colors.white.withValues(alpha: 0.9),
-                        ),
-                      ),
-                    ),
-                    const Icon(
-                      Icons.auto_awesome_rounded,
-                      size: 14,
-                      color: Colors.amberAccent,
-                    ),
-                  ],
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: StatTile(
+                  icon: Icons.place_rounded,
+                  tone: AppTone.jade,
+                  value: _timeline.length,
+                  label: 'Điểm đã đến',
+                  compact: true,
                 ),
-                const SizedBox(height: 7),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: rankProgressFor(earned)),
-                    duration: const Duration(milliseconds: 900),
-                    curve: Curves.easeOutCubic,
-                    builder: (_, v, _) => LinearProgressIndicator(
-                      value: v,
-                      minHeight: 7,
-                      backgroundColor: Colors.white.withValues(alpha: 0.22),
-                      valueColor: const AlwaysStoppedAnimation(
-                        Colors.amberAccent,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      _heroStat(
-                        icon: Icons.star_rounded,
-                        iconColor: Colors.amberAccent,
-                        value: _points.currentBalance,
-                        label: 'Điểm khả dụng',
-                      ),
-                      _heroDivider(),
-                      _heroStat(
-                        icon: Icons.military_tech_rounded,
-                        iconColor: Colors.white,
-                        value: _badges.length,
-                        label: 'Huy hiệu',
-                      ),
-                      _heroDivider(),
-                      _heroStat(
-                        icon: Icons.place_rounded,
-                        iconColor: Colors.white,
-                        value: _timeline.length,
-                        label: 'Điểm đã đến',
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _glassIconButton({
+  Widget _lightIconButton({
     required IconData icon,
     required String tooltip,
     required VoidCallback onTap,
@@ -536,85 +488,38 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: Colors.white.withValues(alpha: 0.18),
-        shape: const CircleBorder(),
+        color: AppCultureColors.surface,
+        shape: const CircleBorder(side: BorderSide(color: AppCultureColors.borderLight)),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: iconWidget ?? Icon(icon, size: 19, color: Colors.white),
+            child: iconWidget ?? Icon(icon, size: 19, color: AppCultureColors.textDark),
           ),
         ),
       ),
     );
   }
 
-  Widget _glassChip(IconData icon, String text) {
+  Widget _toneChip(IconData icon, String text, AppTone tone) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
+        color: tone.tint,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: tone.soft),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: Colors.white),
+          Icon(icon, size: 13, color: tone.strong),
           const SizedBox(width: 4),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
-            ),
-          ),
+          Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: tone.strong)),
         ],
       ),
     );
   }
-
-  Widget _heroStat({
-    required IconData icon,
-    required Color iconColor,
-    required int value,
-    required String label,
-  }) {
-    return Expanded(
-      child: Column(
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: iconColor, size: 16),
-              const SizedBox(width: 4),
-              CountUpText(
-                value: value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _heroDivider() => Container(width: 1, height: 30, color: Colors.white24);
 
   // ─────────────────────── Hành trình di sản ───────────────────────
 
@@ -629,45 +534,56 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
         const SizedBox(height: 12),
         Pressable(
           onTap: _openAchievements,
+          // Thẻ sáng nhóm vàng (thưởng); có thưởng chờ nhận thì nhấn san hô
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF093B37), Color(0xFF0F524C)],
+              gradient: LinearGradient(
+                colors: [AppCultureColors.surface, AppTone.brass.tint],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: unclaimed > 0
-                    ? const Color(0xFFFBBF24)
-                    : AppCultureColors.heritageJade,
+                color: unclaimed > 0 ? AppTone.coral.soft : AppTone.brass.soft,
+                width: unclaimed > 0 ? 1.5 : 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF093B37).withValues(alpha: 0.2),
+                  color: AppCultureColors.brass500.withValues(alpha: 0.12),
                   blurRadius: 14,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
+            // Tiêu đề hiện đủ (không bị cắt bởi chip); số thưởng chờ nhận nằm ở dòng phụ màu san hô
+            // + chấm số trên icon. Ẩn "+0 JP" khi chưa nhận điểm nào.
             child: Row(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFBBF24).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFFFCD34D).withValues(alpha: 0.5),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.emoji_events_rounded,
-                    color: Color(0xFFFCD34D),
-                    size: 24,
-                  ),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const IconTile(icon: Icons.emoji_events_rounded, tone: AppTone.brass, size: 46),
+                    if (unclaimed > 0)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          constraints: const BoxConstraints(minWidth: 20),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppCultureColors.coral,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppCultureColors.surface, width: 1.5),
+                          ),
+                          child: Text(
+                            '$unclaimed',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -676,72 +592,33 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                     children: [
                       const Text(
                         'Thành tựu & Nhận thưởng',
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+                        style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${_achievementSummary.totalAchieved} đã đạt • +${formatThousands(_achievementSummary.totalPointsEarned)} JP',
+                      const SizedBox(height: 3),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: '${_achievementSummary.totalAchieved} đã đạt'),
+                            if (_achievementSummary.totalPointsEarned > 0)
+                              TextSpan(text: ' · +${formatThousands(_achievementSummary.totalPointsEarned)} JP'),
+                            if (unclaimed > 0)
+                              TextSpan(
+                                text: ' · $unclaimed chờ nhận',
+                                style: const TextStyle(color: AppCultureColors.coralDark, fontWeight: FontWeight.w700),
+                              ),
+                          ],
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withValues(alpha: 0.82),
-                        ),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppCultureColors.brass800),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (unclaimed > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE11D48),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '$unclaimed chờ nhận',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Xem',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFFDE68A),
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.white.withValues(alpha: 0.85),
-                  size: 20,
-                ),
+                const Icon(Icons.chevron_right_rounded, color: AppCultureColors.textMuted, size: 22),
               ],
             ),
           ),
@@ -808,8 +685,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             Expanded(
               child: _HeritageTile(
                 icon: Icons.confirmation_number_outlined,
-                color: const Color(0xFFDB2777),
-                background: const Color(0xFFFCE7F3),
+                color: AppCultureColors.lacquer500,
+                background: AppCultureColors.lacquer50,
                 title: 'Voucher',
                 value: '${formatThousands(_points.currentBalance)} điểm khả dụng',
                 onTap: _openWallet,
@@ -1171,8 +1048,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
           _tileDivider(),
           _buildSettingTile(
             icon: Icons.support_agent_rounded,
-            iconColor: const Color(0xFFE11D48),
-            iconBg: const Color(0xFFFFF1F2),
+            iconColor: AppCultureColors.lacquer500,
+            iconBg: AppCultureColors.lacquer50,
             title: 'Hỗ trợ & khiếu nại',
             subtitle: 'Hoàn tiền và xử lý sự cố vé',
             trailing: refundsInProgress > 0
@@ -1269,7 +1146,7 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
           _buildSettingTile(
             icon: Icons.logout_rounded,
             iconColor: AppCultureColors.error,
-            iconBg: const Color(0xFFFEE2E2),
+            iconBg: AppCultureColors.lacquer100,
             title: 'Đăng xuất',
             subtitle: 'Thoát tài khoản khỏi thiết bị',
             titleColor: AppCultureColors.error,
@@ -1386,8 +1263,9 @@ class _HeritageTile extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       child: Container(
-        height: 132,
-        padding: const EdgeInsets.all(14),
+        // Gọn hơn (132 → 108): bớt khoảng trống lớn giữa icon và chữ
+        height: 108,
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -1406,12 +1284,12 @@ class _HeritageTile extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(9),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: background,
-                    borderRadius: BorderRadius.circular(13),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: color, size: 21),
+                  child: Icon(icon, color: color, size: 20),
                 ),
                 const Spacer(),
                 if (preview != null) Flexible(child: preview!),
@@ -1424,17 +1302,17 @@ class _HeritageTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
                 color: AppCultureColors.textDark,
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             Text(
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 12.5, color: color, fontWeight: FontWeight.w600),
             ),
           ],
         ),

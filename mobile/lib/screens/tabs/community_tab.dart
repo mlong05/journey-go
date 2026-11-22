@@ -6,6 +6,7 @@ import '../../core/models/forum_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/forum_service.dart';
 import '../../core/services/tour_service.dart';
+import '../common/bright.dart';
 import '../common/heritage_motion.dart';
 import '../common/tab_refresh.dart';
 import '../forum/compose_post_screen.dart';
@@ -196,79 +197,39 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
     );
   }
 
-  /// Băng đầu trang kiểu di sản: nền ngọc, hoa văn trống đồng xoay chậm, nút "Bài của tôi".
+  /// Băng đầu trang sáng (nhóm xanh trời = cộng đồng): tiêu đề màu mực, nút "Bài của tôi".
   Widget _buildHeader() {
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [AppCultureColors.jadeDark, AppCultureColors.oceanBlue],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppCultureColors.heritageJade.withValues(alpha: 0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -50,
-            top: -60,
-            child: SlowSpin(child: DrumMotif(size: 180, color: Colors.white.withValues(alpha: 0.12))),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Diễn đàn di sản',
-                        style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700, color: Colors.white),
-                      ),
-                      SizedBox(height: 3),
-                      Text(
-                        'Chia sẻ trải nghiệm văn hoá cùng cộng đồng',
-                        style: TextStyle(fontSize: 12.5, color: Colors.white70, height: 1.35),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Material(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.3))),
-                  child: InkWell(
-                    customBorder: const StadiumBorder(),
-                    onTap: _openMyPosts,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.article_outlined, size: 16, color: Colors.white),
-                          SizedBox(width: 5),
-                          Text(
-                            'Bài của tôi',
-                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
-                          ),
-                        ],
-                      ),
+    return BrightHeroCard(
+      tone: AppTone.sky,
+      padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+      child: HeroTitle(
+        title: 'Diễn đàn di sản',
+        subtitle: 'Chia sẻ trải nghiệm văn hoá cùng cộng đồng',
+        trailing: Padding(
+          padding: const EdgeInsets.only(left: 10),
+          child: Material(
+            color: AppCultureColors.surface,
+            shape: StadiumBorder(side: BorderSide(color: AppTone.sky.soft)),
+            child: InkWell(
+              customBorder: const StadiumBorder(),
+              onTap: _openMyPosts,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.article_outlined, size: 16, color: AppCultureColors.skyDark),
+                    SizedBox(width: 5),
+                    Text(
+                      'Bài của tôi',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppCultureColors.skyDark),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -474,7 +435,7 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: on ? AppCultureColors.textDark : Colors.transparent,
+            color: on ? AppCultureColors.heritageJade : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(

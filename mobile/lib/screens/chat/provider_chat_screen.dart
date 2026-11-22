@@ -364,7 +364,7 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
               m.timeLabel,
               style: TextStyle(
                 fontSize: 10.5,
-                color: mine ? Colors.white70 : AppCultureColors.textLight,
+                color: mine ? AppCultureColors.onDarkMuted : AppCultureColors.textLight,
               ),
             ),
           ],

@@ -106,11 +106,8 @@ class _StopMarker extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: LinearGradient(
           colors: isLast
-              ? const [Color(0xFFF59E0B), Color(0xFFD97706)]
-              : const [
-                  AppCultureColors.jadeGradientStart,
-                  AppCultureColors.jadeGradientEnd,
-                ],
+              ? const [AppCultureColors.coral, AppCultureColors.coralDark]
+              : const [AppCultureColors.jade400, AppCultureColors.heritageJade],
         ),
         border: Border.all(color: Colors.white, width: 3),
         boxShadow: const [

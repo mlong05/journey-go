@@ -7,6 +7,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/forum_service.dart';
 import '../../core/services/notification_service.dart';
 import '../common/heritage_motion.dart';
+import '../common/no_clip.dart';
 import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeletonList;
 import 'compose_post_screen.dart';
 import 'forum_widgets.dart';
@@ -166,29 +167,6 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
               color: AppCultureColors.textDark,
             ),
           ),
-          bottom: TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-            labelPadding: const EdgeInsets.symmetric(horizontal: 14),
-            dividerColor: Colors.transparent,
-            labelColor: Colors.white,
-            unselectedLabelColor: AppCultureColors.textMuted,
-            indicatorSize: TabBarIndicatorSize.tab,
-            indicator: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: const LinearGradient(
-                colors: [AppCultureColors.jadeGradientStart, AppCultureColors.jadeGradientEnd],
-              ),
-            ),
-            splashBorderRadius: BorderRadius.circular(20),
-            labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
-            tabs: [
-              for (final t in _tabs)
-                Tab(height: 34, text: _loading ? t.label : '${t.label} (${_posts.where(t.match).length})'),
-            ],
-          ),
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _compose,
@@ -197,18 +175,31 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
           icon: const Icon(Icons.edit_rounded),
           label: const Text('Viết bài', style: TextStyle(fontWeight: FontWeight.w600)),
         ),
-        body: _loading
-            ? const RewardsSkeletonList(count: 3, itemHeight: 170)
-            : _error != null
-                ? RewardsMessageView(
-                    icon: Icons.cloud_off_rounded,
-                    title: 'Không tải được bài viết',
-                    message: _error,
-                    onRetry: _load,
-                  )
-                : TabBarView(
-                    children: [for (final t in _tabs) _buildList(_posts.where(t.match).toList(), t.label)],
-                  ),
+        body: Column(
+          children: [
+            // Nhóm bài dạng chip tự xuống hàng — thay thanh tab cuộn ngang bị cắt ở mép
+            TabChipWrap(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+              labels: [
+                for (final t in _tabs) _loading ? t.label : '${t.label} (${_posts.where(t.match).length})',
+              ],
+            ),
+            Expanded(
+              child: _loading
+                  ? const RewardsSkeletonList(count: 3, itemHeight: 170)
+                  : _error != null
+                      ? RewardsMessageView(
+                          icon: Icons.cloud_off_rounded,
+                          title: 'Không tải được bài viết',
+                          message: _error,
+                          onRetry: _load,
+                        )
+                      : TabBarView(
+                          children: [for (final t in _tabs) _buildList(_posts.where(t.match).toList(), t.label)],
+                        ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -284,7 +284,7 @@ class NavigationBanner extends StatelessWidget {
                       width: 58,
                       height: 58,
                       decoration: BoxDecoration(
-                        color: arrived ? AppCultureColors.heritageJade : AppCultureColors.jadeDark,
+                        color: arrived ? AppCultureColors.coral : AppCultureColors.heritageJade,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Icon(icon, color: Colors.white, size: 38),
@@ -363,19 +363,21 @@ class NavigationMilestone extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: AppCultureColors.textDark,
+          // Thông báo nổi sáng: nền trắng, viền ngọc nhạt, chữ màu mực
+          color: AppCultureColors.surface,
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppTone.jade.soft),
           boxShadow: const [BoxShadow(color: Color(0x331E1A14), blurRadius: 12, offset: Offset(0, 4))],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: const Color(0xFFF1DFB4)),
+            Icon(icon, size: 18, color: AppCultureColors.heritageJade),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
                 text,
-                style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
+                style: const TextStyle(color: AppCultureColors.textDark, fontSize: 13.5, fontWeight: FontWeight.w700),
               ),
             ),
           ],
@@ -720,30 +722,35 @@ class NavigationPanel extends StatelessWidget {
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
+        // Thẻ sáng: nền ngọc nhạt, chữ màu mực, nút xanh ngọc đặc
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [AppCultureColors.jadeGradientStart, AppCultureColors.jadeGradientEnd],
+            colors: [AppCultureColors.surface, AppCultureColors.jadeTint],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppTone.jade.soft),
+          boxShadow: [
+            BoxShadow(color: AppCultureColors.heritageJade.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 6)),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(
               children: [
-                Icon(Icons.flag_rounded, color: Color(0xFFF1DFB4), size: 20),
+                Icon(Icons.flag_rounded, color: AppCultureColors.coral, size: 20),
                 SizedBox(width: 8),
-                Text('Bạn đã đến nơi', style: TextStyle(color: Color(0xFFF1DFB4), fontWeight: FontWeight.w700)),
+                Text('Bạn đã đến nơi', style: TextStyle(color: AppCultureColors.coralDark, fontWeight: FontWeight.w700)),
               ],
             ),
             const SizedBox(height: 6),
-            Text(destinationName, style: AppType.display(size: 21, color: Colors.white)),
+            Text(destinationName, style: AppType.display(size: 21)),
             const SizedBox(height: 4),
             const Text(
               'Check-in để mở khóa Nội dung văn hóa và Trải nghiệm tại trạm này.',
-              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+              style: TextStyle(color: AppCultureColors.textMuted, fontSize: 13, height: 1.4),
             ),
             const SizedBox(height: 14),
             SizedBox(
@@ -752,8 +759,8 @@ class NavigationPanel extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: onCheckIn,
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppCultureColors.jadeDark,
+                  backgroundColor: AppCultureColors.heritageJade,
+                  foregroundColor: Colors.white,
                   shape: const StadiumBorder(),
                 ),
                 icon: const Icon(Icons.verified_outlined),

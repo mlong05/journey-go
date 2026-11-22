@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'gamification_model.dart' show formatDate;
+import '../constants/app_colors.dart';
 
 DateTime? _parseDate(dynamic value) {
   if (value == null) return null;
@@ -53,20 +54,20 @@ class ForumStatus {
   const ForumStatus(this.label, this.color);
 
   static ForumStatus of(String status, {bool hidden = false}) {
-    if (hidden) return const ForumStatus('Đang được xem xét', Color(0xFF64748B));
+    if (hidden) return const ForumStatus('Đang được xem xét', AppCultureColors.ink500);
     switch (status) {
       case 'DRAFT':
-        return const ForumStatus('Bản nháp', Color(0xFF64748B));
+        return const ForumStatus('Bản nháp', AppCultureColors.ink500);
       case 'PENDING_REVIEW':
-        return const ForumStatus('Chờ duyệt', Color(0xFFF59E0B));
+        return const ForumStatus('Chờ duyệt', AppCultureColors.brass500);
       case 'PUBLISHED':
-        return const ForumStatus('Đã đăng', Color(0xFF10B981));
+        return const ForumStatus('Đã đăng', AppCultureColors.jade400);
       case 'NEEDS_REVISION':
-        return const ForumStatus('Cần chỉnh sửa', Color(0xFF0288D1));
+        return const ForumStatus('Cần chỉnh sửa', AppCultureColors.indigo500);
       case 'REJECTED':
-        return const ForumStatus('Bị từ chối', Color(0xFFEF4444));
+        return const ForumStatus('Bị từ chối', AppCultureColors.lacquer400);
       default:
-        return ForumStatus(status, const Color(0xFF64748B));
+        return ForumStatus(status, AppCultureColors.ink500);
     }
   }
 }

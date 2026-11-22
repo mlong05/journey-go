@@ -59,6 +59,8 @@
                     android:pathPrefix="/invitations/accept"/>
             </intent-filter>
         </activity>
+        <!-- flutter_local_notifications: hiện thông báo đã hẹn giờ (hết giờ đếm ngược hoạt động thực địa) -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

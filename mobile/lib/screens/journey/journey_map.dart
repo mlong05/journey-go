@@ -274,7 +274,7 @@ class JourneyMapState extends State<JourneyMap> {
                   color: switch (s.state) {
                     StopState.done => AppCultureColors.heritageJade,
                     StopState.current => AppCultureColors.oceanBlue,
-                    StopState.locked => const Color(0xFF94A3B8),
+                    StopState.locked => AppCultureColors.ink300,
                   },
                   emphasized: s.state == StopState.current,
                   label: s.name,

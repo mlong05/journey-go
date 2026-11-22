@@ -1,10 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart' show Position;
+import 'package:latlong2/latlong.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/tour_detail_model.dart';
 import '../../core/models/tour_journey_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/journey_service.dart';
+import '../../core/services/location_service.dart';
 import '../common/ink.dart';
+import 'map_kit.dart' show distanceMeters, formatDistance;
+import 'stop_checkpoints_map.dart';
 import 'task_screen.dart';
 
 /// Phần "Trải nghiệm" của một trạm, mở sau khi check-in: các thử thách (câu đố, hoạt động thực địa) tại điểm.
@@ -27,6 +33,66 @@ class StopExperienceScreen extends StatefulWidget {
 class _StopExperienceScreenState extends State<StopExperienceScreen> {
   late JourneyDestination _dest = widget.destination;
   bool _changed = false;
+
+  /// Bản đồ checkpoint của trạm (null khi chưa tải xong / lỗi — tab vẫn dùng được bình thường).
+  StopCheckpoints? _checkpoints;
+  LatLng? _user;
+  StreamSubscription<Position>? _positionSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCheckpoints();
+    _startLocation();
+  }
+
+  @override
+  void dispose() {
+    _positionSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadCheckpoints() async {
+    try {
+      final data = await JourneyService().getCheckpoints(
+        journeyId: widget.journeyId,
+        destinationId: _dest.destinationId,
+      );
+      if (mounted) setState(() => _checkpoints = data);
+    } catch (_) {
+      // Không có bản đồ thì vẫn hiện danh sách thử thách như trước.
+    }
+  }
+
+  /// Chỉ theo dõi vị trí khi du khách đã cấp quyền (không hỏi quyền ở màn này).
+  Future<void> _startLocation() async {
+    final first = await LocationService.positionIfPermitted();
+    if (!mounted || first == null) return;
+    setState(() => _user = LatLng(first.latitude, first.longitude));
+    _positionSub = LocationService.positionStream().listen(
+      (p) {
+        if (mounted) setState(() => _user = LatLng(p.latitude, p.longitude));
+      },
+      onError: (_) {},
+    );
+  }
+
+  StopCheckpoint? _checkpointOf(JourneyTask task) =>
+      _checkpoints?.checkpoints.where((c) => c.taskId == task.taskId).firstOrNull;
+
+  /// "Bạn đang ở trong vùng" / "cách 120 m" cho hoạt động có checkpoint (cần vị trí du khách).
+  String? _distanceLabel(JourneyTask task) {
+    final c = _checkpointOf(task);
+    final user = _user;
+    if (c == null || user == null) return null;
+    final d = distanceMeters(user, LatLng(c.latitude, c.longitude));
+    return d <= c.radiusMeters ? 'bạn đang ở trong vùng' : 'cách ${formatDistance(d)}';
+  }
+
+  void _openCheckpoint(StopCheckpoint c) {
+    final task = _dest.tasks.where((t) => t.taskId == c.taskId).firstOrNull;
+    if (task != null) _open(task);
+  }
 
   Future<void> _refresh() async {
     try {
@@ -111,6 +177,21 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
               Text('Tự tay khám phá di sản', style: AppType.display(size: 24)),
               const SizedBox(height: 16),
               _summary(done, tasks.length, points),
+              if ((_checkpoints?.checkpoints.isNotEmpty ?? false)) ...[
+                const SizedBox(height: 16),
+                StopCheckpointsMap(
+                  data: _checkpoints!,
+                  user: _user,
+                  heading: null,
+                  doneTaskIds: {for (final t in tasks) if (!t.isOpen) t.taskId},
+                  onTapCheckpoint: _openCheckpoint,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Bấm vào số trên bản đồ để mở hoạt động. Vào trong vòng tròn của hoạt động mới bắt đầu được.',
+                  style: TextStyle(fontSize: 11.5, color: AppInk.muted, height: 1.4),
+                ),
+              ],
               const SizedBox(height: 24),
               if (tasks.isEmpty)
                 const Text('Trạm này không có thử thách.', style: TextStyle(color: AppInk.muted))
@@ -212,6 +293,7 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
       if (quiz && (widget.stop?.quizCount ?? 0) > 0) '${widget.stop!.quizCount} câu hỏi',
       if (activity?.formattedDuration != null) activity!.formattedDuration!,
       if (field) 'quét QR tại điểm',
+      if (task.isOpen) ?_distanceLabel(task),
     ];
 
     return Padding(
