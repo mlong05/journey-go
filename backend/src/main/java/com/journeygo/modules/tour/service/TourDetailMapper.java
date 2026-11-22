@@ -129,7 +129,8 @@ public class TourDetailMapper {
                         .map(a -> new TourDetailResponse.Artifact(a.getId(), a.getName(), a.getImageUrl(),
                                 a.getShortDescription(), a.getVideoUrl(), a.getVideoSource()))
                         .toList(),
-                quiz, experiences, maxPoints);
+                quiz, experiences, maxPoints,
+                stop.getLatitude(), stop.getLongitude(), stop.getCheckInRadiusMeters(), stop.getQrToken());
     }
 
     private TourDetailResponse.Question toQuestion(TourStopQuestion q, Integer points) {
