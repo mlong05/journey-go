@@ -3,7 +3,7 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'core/constants/app_colors.dart';
+import 'core/constants/app_theme.dart';
 import 'core/models/auth_models.dart';
 import 'core/services/goong_map_style.dart';
 import 'core/services/google_auth_service.dart';
@@ -12,6 +12,7 @@ import 'core/services/payment_result_service.dart';
 import 'core/services/server_finder.dart';
 import 'core/services/token_storage.dart';
 import 'screens/booking/invitation_deep_link_host.dart';
+import 'core/services/app_route_observer.dart';
 import 'screens/booking/pending_payment_host.dart';
 import 'screens/tourist_home_screen.dart';
 import 'tourist_auth_screen.dart';
@@ -118,62 +119,8 @@ class _JourneyGoTouristAppState extends State<JourneyGoTouristApp> {
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigatorKey,
       scaffoldMessengerKey: _scaffoldMessengerKey,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: AppCultureColors.background,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppCultureColors.heritageJade,
-          primary: AppCultureColors.heritageJade,
-          secondary: AppCultureColors.oceanBlue,
-          tertiary: AppCultureColors.lacquer,
-          error: AppCultureColors.error,
-          surface: AppCultureColors.background,
-          onSurface: AppCultureColors.textDark,
-        ),
-        // Tiêu đề lớn dùng font có chân; thân bài giữ font hệ thống cho dễ đọc
-        textTheme: const TextTheme(
-          displayLarge: TextStyle(fontFamily: AppType.serif),
-          displayMedium: TextStyle(fontFamily: AppType.serif),
-          displaySmall: TextStyle(fontFamily: AppType.serif),
-          headlineLarge: TextStyle(fontFamily: AppType.serif, fontWeight: FontWeight.w700),
-          headlineMedium: TextStyle(fontFamily: AppType.serif, fontWeight: FontWeight.w700),
-          headlineSmall: TextStyle(fontFamily: AppType.serif, fontWeight: FontWeight.w700),
-          titleLarge: TextStyle(fontFamily: AppType.serif, fontWeight: FontWeight.w700),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: AppCultureColors.background,
-          foregroundColor: AppCultureColors.textDark,
-          surfaceTintColor: Colors.transparent,
-          titleTextStyle: TextStyle(
-            fontFamily: AppType.serif,
-            fontSize: 19,
-            fontWeight: FontWeight.w700,
-            color: AppCultureColors.textDark,
-          ),
-        ),
-        dividerTheme: const DividerThemeData(color: AppCultureColors.border, thickness: 1),
-        bottomSheetTheme: const BottomSheetThemeData(
-          backgroundColor: AppCultureColors.surface,
-          surfaceTintColor: Colors.transparent,
-        ),
-        dialogTheme: const DialogThemeData(
-          backgroundColor: AppCultureColors.surface,
-          surfaceTintColor: Colors.transparent,
-        ),
-        cardTheme: const CardThemeData(color: AppCultureColors.surface, surfaceTintColor: Colors.transparent),
-        snackBarTheme: const SnackBarThemeData(backgroundColor: AppCultureColors.textDark),
-        navigationBarTheme: const NavigationBarThemeData(
-          backgroundColor: AppCultureColors.surface,
-          indicatorColor: AppCultureColors.jadeLight,
-          surfaceTintColor: Colors.transparent,
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: AppCultureColors.heritageJade,
-            foregroundColor: Colors.white,
-          ),
-        ),
-      ),
+      navigatorObservers: [appRouteObserver],
+      theme: AppTheme.light(),
       // ⚠️ `InvitationDeepLinkHost` đặt trong `builder` (NGOÀI Navigator) vì deep
       // link lời mời có thể mở app khi khách CHƯA đăng nhập; nếu bọc trong `home`
       // thì route gốc bị `pushReplacement` khi đăng nhập ⇒ mất listener.

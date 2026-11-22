@@ -5,7 +5,7 @@ import '../common/heritage_motion.dart';
 import '../common/live_time.dart';
 
 /// Màu trái tim khi đã thả tim.
-const Color _heartColor = Color(0xFFE11D48);
+const Color _heartColor = AppCultureColors.lacquer500;
 
 /// Ảnh đại diện tròn; không có ảnh thì hiện chữ cái đầu của tên.
 class ForumAvatar extends StatelessWidget {
@@ -18,20 +18,22 @@ class ForumAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final initial = name.trim().isEmpty ? '?' : name.trim().characters.first.toUpperCase();
+    // Ảnh đại diện chữ cái: mỗi người một nhóm màu pastel (theo tên) cho danh sách sinh động
+    const tones = [AppTone.jade, AppTone.sky, AppTone.coral, AppTone.brass];
+    final tone = tones[name.codeUnits.fold(0, (a, c) => a + c) % tones.length];
     final fallback = Container(
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppCultureColors.jadeGradientStart, AppCultureColors.jadeGradientEnd],
-        ),
+      decoration: BoxDecoration(
+        color: tone.tint,
         shape: BoxShape.circle,
+        border: Border.all(color: tone.soft),
       ),
       child: Text(
         initial,
         style: TextStyle(
-          color: Colors.white,
+          color: tone.strong,
           fontSize: size * 0.42,
           fontWeight: FontWeight.w700,
         ),
@@ -220,7 +222,7 @@ class _ForumPostCardState extends State<ForumPostCard> {
   static const _contentStyle = TextStyle(
     fontSize: 14,
     height: 1.55,
-    color: Color(0xFF334155),
+    color: AppCultureColors.ink700,
   );
 
   bool _expanded = false;
@@ -255,7 +257,7 @@ class _ForumPostCardState extends State<ForumPostCard> {
           border: Border.all(color: AppCultureColors.border),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+              color: AppCultureColors.ink900.withValues(alpha: 0.04),
               blurRadius: 14,
               offset: const Offset(0, 6),
             ),
@@ -292,16 +294,16 @@ class _ForumPostCardState extends State<ForumPostCard> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFECFDF5),
+                              color: AppCultureColors.jade50,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.verified_rounded, size: 12, color: Color(0xFF047857)),
+                                Icon(Icons.verified_rounded, size: 12, color: AppCultureColors.jade600),
                                 SizedBox(width: 3),
                                 Text('Đã tham gia tour',
-                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF047857))),
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppCultureColors.jade600)),
                               ],
                             ),
                           ),
@@ -468,7 +470,7 @@ class _AvatarRing extends StatelessWidget {
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
-          colors: [AppCultureColors.jadeGradientStart, AppCultureColors.gold],
+          colors: [AppCultureColors.jadeGradientStart, AppCultureColors.goldBright],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

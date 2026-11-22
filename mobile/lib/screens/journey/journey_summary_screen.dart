@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/tour_journey_model.dart';
-import '../common/ink.dart';
 import '../common/photo.dart';
+import 'heritage_passport.dart';
 import 'journey_map.dart';
+import 'journey_share_card.dart';
 import 'journey_widgets.dart';
 import 'map_kit.dart' show MapAttributionText;
 import 'navigation.dart' show formatDuration;
@@ -43,24 +44,24 @@ class JourneySummaryScreen extends StatelessWidget {
     );
   }
 
-  ({String title, String subtitle, IconData icon, Color accent}) get _rank => switch (journey.completionRank) {
+  ({String title, String subtitle, IconData icon, AppTone tone}) get _rank => switch (journey.completionRank) {
     CompletionRank.perfect => (
       title: 'Hoàn thành trọn vẹn',
       subtitle: 'Bạn đã chinh phục mọi điểm đến và trả lời đúng mọi thử thách.',
       icon: Icons.emoji_events_rounded,
-      accent: AppCultureColors.gold,
+      tone: AppTone.brass,
     ),
     CompletionRank.partial => (
       title: 'Đã đi hết hành trình',
       subtitle: 'Bạn đã bỏ qua ${journey.skippedCount} điểm đến. Lần sau hãy thử đi đủ để nhận thưởng hoàn thành.',
       icon: Icons.flag_rounded,
-      accent: Colors.white,
+      tone: AppTone.coral,
     ),
     _ => (
       title: 'Hoàn thành hành trình',
       subtitle: 'Bạn đã đi đủ mọi điểm đến. Vài thử thách còn chưa trọn điểm, thử lại ở chuyến sau nhé!',
       icon: Icons.workspace_premium_rounded,
-      accent: AppCultureColors.rewardBorder,
+      tone: AppTone.jade,
     ),
   };
 
@@ -76,9 +77,11 @@ class JourneySummaryScreen extends StatelessWidget {
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: 330,
-            backgroundColor: AppInk.ink,
-            foregroundColor: Colors.white,
+            expandedHeight: 420,
+            backgroundColor: AppCultureColors.background,
+            foregroundColor: AppCultureColors.textDark,
+            surfaceTintColor: Colors.transparent,
+            scrolledUnderElevation: 0.5,
             title: const Text('Tổng kết hành trình', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
             flexibleSpace: FlexibleSpaceBar(
               collapseMode: CollapseMode.pin,
@@ -157,6 +160,13 @@ class JourneySummaryScreen extends StatelessWidget {
               child: Padding(padding: EdgeInsets.only(top: 6), child: MapAttributionText(satellite: false)),
             ),
           ],
+          _sectionTitle('Dấu ấn di sản'),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: HeritagePassport(journey: journey, stampSize: 88),
+            ),
+          ),
           _sectionTitle('Từng điểm đến'),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -171,10 +181,29 @@ class JourneySummaryScreen extends StatelessWidget {
               top: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                child: PrimaryButton(
-                  label: 'Xem lại hành trình',
-                  icon: Icons.map_rounded,
-                  onPressed: () => Navigator.of(context).pop(),
+                child: Column(
+                  children: [
+                    PrimaryButton(
+                      label: 'Chia sẻ thành tích',
+                      icon: Icons.ios_share_rounded,
+                      onPressed: () => showJourneyShareSheet(context, journey: journey, coverImage: coverImage),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.map_rounded, size: 19),
+                        label: const Text('Xem lại hành trình', style: TextStyle(fontWeight: FontWeight.w700)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppCultureColors.textDark,
+                          side: const BorderSide(color: AppCultureColors.border, width: 1.2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -230,9 +259,10 @@ class JourneySummaryScreen extends StatelessWidget {
   );
 }
 
+/// Hero sáng: ảnh tour bo góc phía trên, cúp "bật" ra đè mép ảnh, hạng + tên tour trên nền pastel theo hạng.
 class _Hero extends StatelessWidget {
   final TourJourney journey;
-  final ({String title, String subtitle, IconData icon, Color accent}) rank;
+  final ({String title, String subtitle, IconData icon, AppTone tone}) rank;
   final String? coverImage;
 
   const _Hero({required this.journey, required this.rank, this.coverImage});
@@ -240,66 +270,109 @@ class _Hero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final done = journey.completedAt;
-    // Nền là ảnh chụp thật của tour phủ lớp tối phẳng (không gradient, không hình trang trí)
-    return ColoredBox(
-      color: AppInk.ink,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (coverImage != null) ...[Photo(url: coverImage, width: 420), const ColoredBox(color: Color(0xA6000000))],
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  // Cúp "bật" ra khi mở màn hình
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.4, end: 1),
-                    duration: const Duration(milliseconds: 700),
-                    curve: Curves.elasticOut,
-                    builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
-                    child: Container(
-                      width: 92,
-                      height: 92,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withValues(alpha: 0.16),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
-                        boxShadow: [BoxShadow(color: rank.accent.withValues(alpha: 0.45), blurRadius: 28)],
+    final tone = rank.tone;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [tone.tint, AppCultureColors.background],
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, kToolbarHeight + 4, 16, 16),
+          child: Column(
+            children: [
+              // Ảnh tour + cúp đè mép dưới ảnh
+              SizedBox(
+                height: 176,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(
+                      bottom: 36,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(color: tone.strong.withValues(alpha: 0.12), blurRadius: 18, offset: const Offset(0, 8)),
+                          ],
+                        ),
+                        child: Photo(url: coverImage, width: 420, borderRadius: BorderRadius.circular(22)),
                       ),
-                      child: Icon(rank.icon, size: 50, color: rank.accent),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    rank.title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    journey.tourName,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    rank.subtitle,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5, height: 1.4),
-                  ),
-                  if (done != null) ...[
-                    const SizedBox(height: 10),
-                    InfoChip.onGradient(icon: Icons.event_available_rounded, text: _formatDate(done)),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.4, end: 1),
+                        duration: const Duration(milliseconds: 700),
+                        curve: Curves.elasticOut,
+                        builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppCultureColors.surface,
+                            border: Border.all(color: tone.soft, width: 3),
+                            boxShadow: [BoxShadow(color: tone.strong.withValues(alpha: 0.25), blurRadius: 22, offset: const Offset(0, 6))],
+                          ),
+                          child: Icon(rank.icon, size: 42, color: tone.strong),
+                        ),
+                      ),
+                    ),
                   ],
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+              Text(
+                rank.title,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: tone.strong, fontSize: 23, fontWeight: FontWeight.w800, letterSpacing: -0.3),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                journey.tourName,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.editorial(size: 17, height: 1.3),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                rank.subtitle,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppCultureColors.textMuted, fontSize: 13, height: 1.45),
+              ),
+              if (done != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppCultureColors.surface,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: tone.soft),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.event_available_rounded, size: 14, color: tone.strong),
+                      const SizedBox(width: 5),
+                      Text(
+                        _formatDate(done),
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

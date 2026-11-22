@@ -69,6 +69,16 @@ class JourneyService {
     await ApiClient.request('PATCH', '/journeys/$journeyId/destinations/$destinationId/skip');
   }
 
+  /// GET /journeys/{id}/destinations/{stopId}/checkpoints: vùng check-in của trạm và vị trí các hoạt động
+  /// thực địa (không kèm mã QR / đáp án). Backend chỉ trả khi đã check-in trạm.
+  Future<StopCheckpoints> getCheckpoints({required int journeyId, required int destinationId}) async {
+    final data = await ApiClient.request('GET', '/journeys/$journeyId/destinations/$destinationId/checkpoints');
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Máy chủ trả về bản đồ checkpoint không hợp lệ.');
+    }
+    return StopCheckpoints.fromJson(data);
+  }
+
   /// GET /journeys/{id}/destinations/{stopId}/culture: nội dung văn hoá, backend chỉ trả khi đã check-in.
   Future<StopCulture> getCulture({required int journeyId, required int destinationId}) async {
     final data = await ApiClient.request('GET', '/journeys/$journeyId/destinations/$destinationId/culture');

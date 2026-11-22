@@ -192,6 +192,9 @@ class TourStopModel {
   final double? longitude;
   final int maxPoints;
 
+  /// Bán kính check-in trạm (mét) do đối tác nhập; null = chưa có vị trí.
+  final int? checkInRadiusMeters;
+
   /// API công khai không trả nội dung văn hoá (chỉ mở sau check-in), chỉ báo trước số lượng.
   final bool hasCulturalStory;
   final int culturalImageCount;
@@ -213,6 +216,7 @@ class TourStopModel {
     this.latitude,
     this.longitude,
     this.maxPoints = 0,
+    this.checkInRadiusMeters,
     this.hasCulturalStory = false,
     this.culturalImageCount = 0,
     this.artifactCount = 0,
@@ -234,6 +238,7 @@ class TourStopModel {
         latitude: _asDoubleOrNull(json['latitude']),
         longitude: _asDoubleOrNull(json['longitude']),
         maxPoints: _asInt(json['maxPoints']),
+        checkInRadiusMeters: _asIntOrNull(json['checkInRadiusMeters']),
         hasCulturalStory: json['hasCulturalStory'] == true || _text(json['culturalContent']) != null,
         culturalImageCount: _asInt(json['culturalImageCount']),
         artifactCount: _asInt(json['artifactCount']),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../common/inline_video.dart';
+import '../common/no_clip.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/cultural_content_model.dart';
 import '../../core/services/api_client.dart';
@@ -13,12 +14,12 @@ import '../../core/services/cultural_content_service.dart';
       'AUDIO' => (
         label: 'Thuyết minh',
         icon: Icons.headphones_rounded,
-        color: const Color(0xFF4F46E5),
+        color: AppCultureColors.indigo500,
       ),
       'VIDEO' => (
         label: 'Video tư liệu',
         icon: Icons.smart_display_rounded,
-        color: const Color(0xFFE11D48),
+        color: AppCultureColors.lacquer500,
       ),
       'STORY' => (
         label: 'Truyền thuyết',
@@ -33,7 +34,7 @@ import '../../core/services/cultural_content_service.dart';
       '3D_VR' => (
         label: 'Mô hình 3D / VR',
         icon: Icons.view_in_ar_rounded,
-        color: const Color(0xFF7C3AED),
+        color: AppCultureColors.indigo500,
       ),
       _ => (
         label: 'Bài viết di sản',
@@ -203,7 +204,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFFBEB),
+            color: AppCultureColors.brass50,
             borderRadius: BorderRadius.circular(16),
             border: const Border(
               left: BorderSide(color: AppCultureColors.amberDark, width: 3),
@@ -257,7 +258,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF4F46E5),
+                          backgroundColor: AppCultureColors.indigo500,
                           minimumSize: const Size(0, 40),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -270,7 +271,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEEF2FF),
+                          color: AppCultureColors.indigo50,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Row(
@@ -279,7 +280,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                             Icon(
                               Icons.headphones_rounded,
                               size: 15,
-                              color: Color(0xFF4F46E5),
+                              color: AppCultureColors.indigo500,
                             ),
                             SizedBox(width: 6),
                             Text(
@@ -287,14 +288,14 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF4F46E5),
+                                color: AppCultureColors.indigo500,
                               ),
                             ),
                             SizedBox(width: 6),
                             Icon(
                               Icons.lock_rounded,
                               size: 13,
-                              color: Color(0xFF818CF8),
+                              color: AppCultureColors.indigo300,
                             ),
                           ],
                         ),
@@ -744,39 +745,13 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
                     'Hình ảnh (${gallery.length})',
                   ),
                   const SizedBox(height: 8),
-                  SizedBox(
-                    height: 170,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: gallery.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 10),
-                      itemBuilder: (context, i) => GestureDetector(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            fullscreenDialog: true,
-                            builder: (_) => _ImageViewerScreen(
-                              images: gallery,
-                              initialIndex: i,
-                            ),
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: AspectRatio(
-                            aspectRatio: 4 / 3,
-                            child: Image.network(
-                              gallery[i],
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Container(
-                                color: AppCultureColors.border,
-                                child: const Icon(
-                                  Icons.broken_image_rounded,
-                                  color: AppCultureColors.textLight,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                  // Lưới ảnh 3 cột vừa khít (thay dải vuốt ngang bị cắt ở mép); còn ảnh thì ô cuối "+N"
+                  PhotoGridPreview(
+                    images: gallery,
+                    onOpen: (i) => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        fullscreenDialog: true,
+                        builder: (_) => _ImageViewerScreen(images: gallery, initialIndex: i),
                       ),
                     ),
                   ),

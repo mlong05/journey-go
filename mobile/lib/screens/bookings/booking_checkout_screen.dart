@@ -398,8 +398,78 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
     return '${two(s ~/ 60)}:${two(s % 60)}';
   }
 
+  /// Đơn còn đang giữ chỗ (chưa thanh toán, còn hạn) ⇒ thoát cần hỏi lại.
+  bool get _holdingSlot {
+    final b = _booking;
+    return b != null && b.isPendingPayment && b.isPaymentWindowOpen;
+  }
+
+  /// Bấm quay lại khi đang giữ chỗ: thoát KHÔNG hủy đơn — nói rõ chỗ được giữ đến khi nào
+  /// và quay lại thanh toán ở đâu, kèm lựa chọn hủy đơn ngay.
+  Future<void> _confirmLeave() async {
+    final deadline = _booking?.paymentDeadline?.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    final until = deadline == null ? 'hết thời gian giữ chỗ' : '${two(deadline.hour)}:${two(deadline.minute)}';
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rời màn thanh toán?'),
+        content: Text(
+          'Chỗ của bạn vẫn được giữ đến $until (còn $_countdownLabel). '
+          'Bạn có thể quay lại thanh toán ở trang tour, Trang chủ hoặc mục Đơn đặt tour.',
+          style: const TextStyle(height: 1.45),
+        ),
+        actionsOverflowDirection: VerticalDirection.up,
+        actionsOverflowButtonSpacing: 4,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            style: TextButton.styleFrom(foregroundColor: AppCultureColors.lacquer),
+            child: const Text('Hủy đơn'),
+          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, 'leave'), child: const Text('Thoát, vẫn giữ chỗ')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'stay'),
+            style: FilledButton.styleFrom(backgroundColor: AppCultureColors.heritageJade),
+            child: const Text('Ở lại'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null || choice == 'stay') return;
+    if (choice == 'cancel') {
+      setState(() {
+        _busy = true;
+        _error = null;
+      });
+      try {
+        await _bookings.cancel(widget.bookingId, reason: 'Khách chủ động hủy trước khi thanh toán');
+      } on ApiException catch (e) {
+        if (mounted) {
+          setState(() {
+            _busy = false;
+            _error = e.message;
+          });
+        }
+        return;
+      }
+      _stopWaiting();
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !_holdingSlot,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmLeave();
+      },
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: AppCultureColors.background,
       appBar: buildRewardsAppBar(context, 'Thanh toán'),
@@ -546,7 +616,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
       if (booking.status == BookingStatus.cancelled)
         _message('Đơn đã được hủy.', AppCultureColors.surfaceSubtle, AppCultureColors.textMuted),
       if (_notice != null) _message(_notice!, AppCultureColors.oceanLight, AppCultureColors.oceanDark),
-      if (_error != null) _message(_error!, const Color(0xFFFEE2E2), AppCultureColors.error),
+      if (_error != null) _message(_error!, AppCultureColors.lacquer100, AppCultureColors.error),
       if (canPay) ...[
         _card(_buildMethods()),
         if (_latestOpenAttempt != null && !_awaiting)

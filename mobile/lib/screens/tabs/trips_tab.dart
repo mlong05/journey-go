@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
-import '../../core/constants/app_colors.dart';
 import '../common/tab_refresh.dart';
 import '../tours/my_tours_view.dart';
 import '../tours/tour_list_screen.dart';
@@ -36,24 +35,29 @@ class _TripsTabState extends State<TripsTab> with RefreshOnTabReturn {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppCultureColors.background,
+      backgroundColor: TripsPalette.background,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Padding(
-              padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
+              padding: EdgeInsets.fromLTRB(18, 16, 18, 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Chuyến đi của tôi',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                      color: TripsPalette.ink,
+                    ),
                   ),
                   SizedBox(height: 2),
                   Text(
                     'Vé đã mua, hành trình đang đi và đã hoàn thành',
-                    style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
+                    style: TextStyle(fontSize: 13, color: TripsPalette.muted),
                   ),
                 ],
               ),

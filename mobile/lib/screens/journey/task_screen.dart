@@ -11,13 +11,16 @@ import '../../core/models/tour_journey_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
+import '../../core/services/notification_alerts.dart';
 import '../../core/services/route_service.dart';
+import 'activity_timer_store.dart';
 import 'journey_widgets.dart';
 import 'qr_scan_screen.dart';
 import 'map_kit.dart' show MapRoundButton, MapAttributionText, formatDistance;
 import 'navigation.dart' show formatDuration;
 import 'reward_effects.dart';
 import 'station_map.dart';
+import 'hot_cold.dart';
 
 /// `activity`: hoạt động thực địa của tour 5 bước — đếm ngược rồi quét QR tại điểm để mở câu hỏi.
 enum _Phase { loading, intro, locked, activity, quiz, result, error }
@@ -55,7 +58,7 @@ class TaskScreen extends StatefulWidget {
   State<TaskScreen> createState() => _TaskScreenState();
 }
 
-class _TaskScreenState extends State<TaskScreen> {
+class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
   final JourneyService _service = JourneyService();
 
   _Phase _phase = _Phase.loading;
@@ -85,6 +88,9 @@ class _TaskScreenState extends State<TaskScreen> {
   bool _walkRouteLoading = false;
   DateTime? _lastAutoCheck;
   bool _arrivedNotified = false;
+
+  /// Mức "nóng – lạnh" lần đo gần nhất (rung khi lên mức nóng hơn).
+  Warmth _warmth = Warmth.cold;
   final GlobalKey<StationMapState> _mapKey = GlobalKey<StationMapState>();
   bool _satellite = false;
 
@@ -93,8 +99,16 @@ class _TaskScreenState extends State<TaskScreen> {
   final Map<int, TextEditingController> _texts = {};
 
   // Hoạt động thực địa: đếm ngược trước khi được quét QR.
+  // Tính theo mốc kết thúc (không trừ dần từng giây) để ẩn app / thoát ra vào lại vẫn đúng giờ.
   Timer? _activityTimer;
-  int _secondsLeft = 0;
+  DateTime? _activityEndsAt;
+
+  int get _secondsLeft {
+    final end = _activityEndsAt;
+    if (end == null) return 0;
+    final ms = end.difference(DateTime.now()).inMilliseconds;
+    return ms <= 0 ? 0 : (ms / 1000).ceil();
+  }
 
   /// Đã đếm ngược xong (hoặc hoạt động không đếm giờ): được quét QR. Giữ nguyên khi làm lại câu hỏi.
   bool _activityDone = false;
@@ -106,11 +120,21 @@ class _TaskScreenState extends State<TaskScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // App ở nền thì timer có thể bị tạm dừng (iOS) hoặc chạy chậm (Android): quay lại thì tính lại ngay.
+    if (state == AppLifecycleState.resumed && _phase == _Phase.activity && !_activityDone) {
+      _tickActivity();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _activityTimer?.cancel();
     _positionSub?.cancel();
     _compassSub?.cancel();
@@ -227,10 +251,15 @@ class _TaskScreenState extends State<TaskScreen> {
     // Vào trong bán kính: tự hỏi backend để mở câu hỏi (backend vẫn là nơi xác nhận).
     final distance = _liveDistance;
     final radius = _content?.station?.radiusMeters ?? 50;
-    // Rung nhẹ một lần khi vừa tới trạm; ra xa hẳn (chừa sai số GPS) thì lần tới lại rung.
+    // Nóng – lạnh: lên mức nóng hơn thì rung mạnh dần (tới nơi rung 3 nhịp). Đi xa ra thì chỉ đổi màu,
+    // không rung; ra xa hẳn (chừa sai số GPS) thì lần tới lại rung khi tới trạm.
+    final warmth = warmthFor(distance, radius);
+    if (warmth.index > _warmth.index && (warmth != Warmth.arrived || !_arrivedNotified)) {
+      warmth.buzz();
+    }
+    _warmth = warmth;
     if (distance != null && distance <= radius && !_arrivedNotified) {
       _arrivedNotified = true;
-      HapticFeedback.mediumImpact();
     } else if (distance != null && distance > radius + 20) {
       _arrivedNotified = false;
     }
@@ -270,13 +299,29 @@ class _TaskScreenState extends State<TaskScreen> {
         journeyId: widget.journeyId,
         taskId: widget.taskId,
       );
+      final resumeAt = await _restoreActivity(content);
       if (!mounted) return;
       setState(() {
         _content = content;
-        _phase = _Phase.intro;
         _error = null;
+        if (resumeAt != null) {
+          // Đang đếm dở (hoặc đã hết giờ nhưng chưa quét QR) ở trạm này: vào thẳng bước hoạt động,
+          // không bắt check-in và đếm lại từ đầu.
+          _phase = _Phase.activity;
+          _checkedIn = true;
+          _activityEndsAt = resumeAt;
+          _activityDone = _secondsLeft == 0;
+          // Đếm dở: hẹn lại thông báo (phòng khi lịch cũ đã bị huỷ lúc hệ thống dọn app).
+          if (!_activityDone) _scheduleTimeUpReminder(resumeAt);
+        } else {
+          _phase = _Phase.intro;
+        }
       });
-      _refreshIntroDistance();
+      if (resumeAt != null) {
+        _runActivityTimer();
+      } else {
+        _refreshIntroDistance();
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -307,6 +352,7 @@ class _TaskScreenState extends State<TaskScreen> {
         qrValue: qr,
       );
       if (!mounted) return;
+      if (content.isFinished) _clearActivity();
       _qr = (qr != null && content.unlocked) ? qr : null;
       if (qr != null && !content.unlocked && !content.isFinished) {
         _snack(content.qrRequired
@@ -406,33 +452,108 @@ class _TaskScreenState extends State<TaskScreen> {
   void _startActivity() {
     final seconds = _task.durationSeconds ?? 0;
     _activityTimer?.cancel();
+    final endsAt = seconds > 0 ? DateTime.now().add(Duration(seconds: seconds)) : null;
     setState(() {
       _phase = _Phase.activity;
-      _secondsLeft = seconds;
-      _activityDone = seconds <= 0;
+      _activityEndsAt = endsAt;
+      _activityDone = endsAt == null;
     });
     _syncTracking();
-    if (seconds <= 0) return;
-    _activityTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return t.cancel();
-      setState(() {
-        _secondsLeft = (_secondsLeft - 1).clamp(0, seconds);
-        if (_secondsLeft == 0) {
-          _activityDone = true;
-          t.cancel();
-        }
-      });
-      if (_secondsLeft == 0) showPointsBurst(context, text: 'Hết giờ!', icon: Icons.alarm_on_rounded);
+    if (endsAt == null) return;
+    ActivityTimerStore.save(
+      journeyId: widget.journeyId,
+      taskId: widget.taskId,
+      questionIndex: _task.questionIndex,
+      endsAt: endsAt,
+    );
+    _scheduleTimeUpReminder(endsAt);
+    _runActivityTimer();
+  }
+
+  /// Id thông báo hẹn giờ của hoạt động này (cố định theo hành trình + nhiệm vụ để hẹn lại / huỷ đúng cái).
+  int get _reminderId => Object.hash('activity-timer', widget.journeyId, widget.taskId) & 0x7fffffff;
+
+  /// Hẹn thông báo hệ thống lúc hết giờ: du khách cất điện thoại đi tham quan vẫn được nhắc quay lại quét QR.
+  void _scheduleTimeUpReminder(DateTime endsAt) {
+    final task = _content;
+    NotificationAlerts.instance.scheduleReminder(
+      id: _reminderId,
+      at: endsAt,
+      title: 'Hết giờ: ${task?.name ?? widget.fallbackName}',
+      body: 'Quét mã QR tại ${task?.station?.name ?? widget.destinationName} để trả lời câu hỏi và nhận điểm.',
+    );
+  }
+
+  /// Timer chỉ để vẽ lại màn hình; số giây còn lại luôn tính từ [_activityEndsAt].
+  void _runActivityTimer() {
+    _activityTimer?.cancel();
+    _activityTimer = null;
+    if (_activityDone || _activityEndsAt == null) return;
+    _activityTimer = Timer.periodic(const Duration(milliseconds: 500), (_) => _tickActivity());
+  }
+
+  void _tickActivity() {
+    if (!mounted) {
+      _activityTimer?.cancel();
+      return;
+    }
+    if (_activityDone) return;
+    final finished = _secondsLeft == 0;
+    setState(() {
+      if (finished) _activityDone = true;
     });
+    if (finished) {
+      _activityTimer?.cancel();
+      _activityTimer = null;
+      // Đang mở app lúc hết giờ ⇒ hiệu ứng trên màn là đủ, bỏ thông báo hệ thống đã hẹn.
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        NotificationAlerts.instance.cancelReminder(_reminderId);
+      }
+      HapticFeedback.heavyImpact();
+      showPointsBurst(context, text: 'Hết giờ!', icon: Icons.alarm_on_rounded);
+    }
+  }
+
+  /// Mốc kết thúc đã lưu của trạm hiện tại (nếu có) để tiếp tục đếm sau khi thoát ra vào lại.
+  Future<DateTime?> _restoreActivity(TaskContent content) async {
+    if (content.isFinished) {
+      _clearActivity();
+      return null;
+    }
+    if (!content.qrRequired || content.unlocked || (content.durationSeconds ?? 0) <= 0) return null;
+    return ActivityTimerStore.load(
+      journeyId: widget.journeyId,
+      taskId: widget.taskId,
+      questionIndex: content.questionIndex,
+    );
+  }
+
+  /// Bỏ trạng thái hoạt động (xong trạm / xong nhiệm vụ / sang trạm mới).
+  void _clearActivity() {
+    _activityTimer?.cancel();
+    _activityTimer = null;
+    NotificationAlerts.instance.cancelReminder(_reminderId);
+    _activityEndsAt = null;
+    _activityDone = false;
+    ActivityTimerStore.clear(journeyId: widget.journeyId, taskId: widget.taskId);
   }
 
   /// CHỈ BẢN DEBUG: bỏ qua đếm ngược để thử nhanh.
   void _skipCountdown() {
     _activityTimer?.cancel();
+    _activityTimer = null;
+    NotificationAlerts.instance.cancelReminder(_reminderId);
+    final now = DateTime.now();
     setState(() {
-      _secondsLeft = 0;
+      _activityEndsAt = now;
       _activityDone = true;
     });
+    ActivityTimerStore.save(
+      journeyId: widget.journeyId,
+      taskId: widget.taskId,
+      questionIndex: _task.questionIndex,
+      endsAt: now,
+    );
   }
 
   void _start() {
@@ -485,9 +606,12 @@ class _TaskScreenState extends State<TaskScreen> {
       );
       if (!mounted) return;
       _changed = true;
+      // Xong trạm này (đúng) hoặc hết lượt: mốc đếm ngược không còn dùng nữa.
+      final stationDone = result.completed || result.lastAnswerCorrect == true || result.exhausted;
       setState(() {
         _result = result;
         _phase = _Phase.result;
+        if (stationDone) _clearActivity();
       });
       _syncTracking();
       if (result.completed) {
@@ -759,20 +883,16 @@ class _TaskScreenState extends State<TaskScreen> {
               Container(
                 width: 52,
                 height: 52,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      AppCultureColors.jadeGradientStart,
-                      AppCultureColors.jadeGradientEnd,
-                    ],
-                  ),
+                  color: task.requiresLocation ? AppCultureColors.jadeTint : AppCultureColors.brassTint,
+                  border: Border.all(color: task.requiresLocation ? AppTone.jade.soft : AppTone.brass.soft),
                 ),
                 child: Icon(
                   task.requiresLocation
                       ? Icons.explore_rounded
                       : Icons.quiz_rounded,
-                  color: Colors.white,
+                  color: task.requiresLocation ? AppCultureColors.heritageJade : AppCultureColors.brass700,
                   size: 26,
                 ),
               ),
@@ -786,7 +906,7 @@ class _TaskScreenState extends State<TaskScreen> {
                           ? 'Nhiệm vụ thực địa'
                           : 'Đố vui di sản',
                       style: const TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 12,
                         letterSpacing: 0.2,
                         fontWeight: FontWeight.w700,
                         color: AppCultureColors.heritageJade,
@@ -893,7 +1013,7 @@ class _TaskScreenState extends State<TaskScreen> {
           _banner(
             Icons.block_rounded,
             'Bạn đã hết lượt làm nhiệm vụ này.',
-            const Color(0xFFFEE2E2),
+            AppCultureColors.lacquer100,
             AppCultureColors.error,
           )
         else
@@ -1242,6 +1362,8 @@ class _TaskScreenState extends State<TaskScreen> {
             satellite: _satellite,
             route: distance != null && distance > _compassRangeMeters ? _walkRoute?.points : null,
             inside: arrived,
+            // Nóng – lạnh: vòng bán kính đổi màu theo khoảng cách (xanh dương → cam → đỏ → xanh ngọc khi tới).
+            ringColor: warmthFor(distance, radius).color,
             fitPadding: EdgeInsets.fromLTRB(64, topInset + 120, 64, 360),
           ),
         ),
@@ -1563,13 +1685,20 @@ class _TaskScreenState extends State<TaskScreen> {
                 ],
               ),
               const SizedBox(height: 8),
+              Align(alignment: Alignment.centerLeft, child: WarmthChip(warmth: warmthFor(distance, radius))),
+              const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: closeness,
-                  minHeight: 8,
-                  backgroundColor: AppCultureColors.surfaceSubtle,
-                  color: AppCultureColors.heritageJade,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: closeness),
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeOutCubic,
+                  builder: (_, v, _) => LinearProgressIndicator(
+                    value: v,
+                    minHeight: 8,
+                    backgroundColor: AppCultureColors.surfaceSubtle,
+                    color: warmthFor(distance, radius).color,
+                  ),
                 ),
               ),
               if (_locationMessage != null) ...[
@@ -1577,7 +1706,7 @@ class _TaskScreenState extends State<TaskScreen> {
                 _banner(
                   Icons.location_off_rounded,
                   _locationMessage!,
-                  const Color(0xFFFEF3C7),
+                  AppCultureColors.brass100,
                   AppCultureColors.rewardText,
                 ),
                 if (_locationNeedsSettings)

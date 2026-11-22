@@ -1,3 +1,4 @@
+import '../models/departure_model.dart';
 import '../models/experience_model.dart';
 import '../models/tour_detail_model.dart';
 import '../models/tour_model.dart';
@@ -91,6 +92,25 @@ class TourService {
     );
     final meta = ApiClient.asPageMeta(data);
     return TourPage(ApiClient.asList(data).map(TourModel.fromJson).toList(), meta['last'] == true);
+  }
+
+  /// GET /tours/departures — lịch khởi hành của các tour đã xuất bản, gom theo ngày (chỉ ngày có tour).
+  /// Backend kẹp khoảng: [from] mặc định hôm nay, [to] tối đa from + 92 ngày.
+  Future<List<DepartureDay>> getDepartures({DateTime? from, DateTime? to}) async {
+    String day(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final params = [if (from != null) 'from=${day(from)}', if (to != null) 'to=${day(to)}'];
+    final data = await ApiClient.request(
+      'GET',
+      '/tours/departures${params.isEmpty ? '' : '?${params.join('&')}'}',
+      auth: false,
+    );
+    final days = data is Map ? data['days'] : data;
+    return [
+      if (days is List)
+        for (final d in days)
+          if (d is Map<String, dynamic>) ?DepartureDay.fromJson(d),
+    ];
   }
 
   /// GET /tours/{id}

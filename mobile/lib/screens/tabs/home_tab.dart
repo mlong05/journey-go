@@ -1,12 +1,15 @@
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_icons.dart';
 import '../../core/models/auth_models.dart';
+import '../../core/models/booking_model.dart';
 import '../../core/models/destination_model.dart';
 import '../../core/models/gamification_model.dart' show formatThousands;
 import '../../core/models/tour_journey_model.dart';
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
+import '../../core/services/app_route_observer.dart';
 import '../../core/services/area_service.dart';
 import '../../core/services/booking_service.dart';
 import '../../core/services/catalog_service.dart';
@@ -20,6 +23,8 @@ import '../modals/notification_dialog.dart';
 import '../common/heritage_motion.dart';
 import '../common/ink.dart';
 import '../common/tab_refresh.dart';
+import '../bookings/pending_booking_prompt.dart';
+import '../tours/tour_calendar_screen.dart';
 import '../tours/tour_list_screen.dart';
 import 'home/home_sections.dart';
 
@@ -36,7 +41,45 @@ class HomeTab extends StatefulWidget {
   State<HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
+class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, WidgetsBindingObserver {
+  /// Đơn đang giữ chỗ (chờ thanh toán, còn hạn) — hiện thanh nhắc trên cùng để khách quay lại thanh toán.
+  BookingModel? _pendingBooking;
+  ModalRoute<void>? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null && route != _route) {
+      if (_route != null) appRouteObserver.unsubscribe(this);
+      _route = route;
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  /// Quay về Trang chủ từ màn phía trên (trang tour, màn thanh toán…) ⇒ kiểm tra lại đơn giữ chỗ.
+  @override
+  void didPopNext() => _loadPending();
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadPending();
+  }
+
+  Future<void> _loadPending() async {
+    try {
+      final list = await _bookingService.getMyPending();
+      if (mounted) setState(() => _pendingBooking = list.firstOrNull);
+    } catch (_) {
+      // Lỗi / chưa đăng nhập ⇒ không hiện thanh nhắc.
+    }
+  }
+
+  Future<void> _openPending(BookingModel booking) async {
+    await openPendingBooking(context, booking);
+    _loadPending();
+  }
+
   @override
   ValueListenable<int>? get selectedTab => widget.selectedTab;
 
@@ -83,7 +126,15 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadAllData();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    appRouteObserver.unsubscribe(this);
+    super.dispose();
   }
 
   Future<void> _loadAllData() async {
@@ -135,6 +186,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
     _updateNextDistance();
     _loadJourneyImage();
     _loadArea();
+    _loadPending();
   }
 
   /// Id các tour du khách đã mua (đã thanh toán) ⇒ loại khỏi danh sách hiển thị.
@@ -268,12 +320,13 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
 
   @override
   Widget build(BuildContext context) {
+    // Cùng màu nền giấy với đầu trang — không còn dải trắng/kem lệch nhau dưới ô tìm kiếm
     return ColoredBox(
-      color: Colors.white,
+      color: AppInk.paper,
       child: RefreshIndicator(
         onRefresh: _loadAllData,
         color: AppInk.accent,
-        edgeOffset: 144 + MediaQuery.paddingOf(context).top,
+        edgeOffset: 124 + MediaQuery.paddingOf(context).top,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
@@ -300,30 +353,50 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
 
     final journey = _journey;
 
+    final pending = _pendingBooking;
     return [
+      // Đơn đang giữ chỗ chưa thanh toán: nhắc trên cùng, bấm để tiếp tục đúng đơn đó.
+      if (pending != null)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+            child: PendingBookingBanner(
+              key: ValueKey('home-pending-${pending.id}'),
+              booking: pending,
+              showTourTitle: true,
+              onTap: () => _openPending(pending),
+              onExpired: () {
+                if (mounted) setState(() => _pendingBooking = null);
+              },
+            ),
+          ),
+        ),
+      // 4 nút danh mục chia đều — nhãn ngắn, luôn 1 dòng, không cuộn ngang
       block(
-        HomeQuickTabs(
-          tabs: [
+        HomeCategoryRow(
+          items: [
+            (icon: AppIcons.compass, label: 'Tất cả', tone: AppTone.jade, selected: true, onTap: null),
             (
+              icon: AppIcons.sunHorizon,
               label: 'Trong ngày',
-              onTap: () => _openList(
-                filter: const TourFilter(format: 'DAY_TRIP'),
-                title: 'Tour trong ngày',
-              ),
+              tone: AppTone.brass,
+              selected: false,
+              onTap: () => _openList(filter: const TourFilter(format: 'DAY_TRIP'), title: 'Tour trong ngày'),
             ),
             (
+              icon: AppIcons.suitcaseRolling,
               label: 'Nhiều ngày',
-              onTap: () => _openList(
-                filter: const TourFilter(format: 'MULTI_DAY'),
-                title: 'Tour nhiều ngày',
-              ),
+              tone: AppTone.sky,
+              selected: false,
+              onTap: () => _openList(filter: const TourFilter(format: 'MULTI_DAY'), title: 'Tour nhiều ngày'),
             ),
             (
-              label: 'Sắp khởi hành',
-              onTap: () => _openList(
-                filter: const TourFilter(order: TourOrder.departure),
-                title: 'Khởi hành sắp tới',
-              ),
+              // Mở lịch: chọn ngày → xem các tour khởi hành ngày đó
+              icon: AppIcons.calendarDots,
+              label: 'Theo ngày',
+              tone: AppTone.coral,
+              selected: false,
+              onTap: () => openTourCalendar(context),
             ),
           ],
         ),
@@ -331,7 +404,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
       if (journey != null)
         block(
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: HomeJourneyCard(
               journey: journey,
               imageUrl: _journeyImage,
@@ -350,6 +423,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
       else if (_availableTours.isEmpty)
         block(_buildAllOwned())
       else ...[
+        // 2 tour gần nhất, thẻ ngang toàn bề rộng — hiện trọn, phần còn lại qua "Xem tất cả"
         if (upcoming.isNotEmpty)
           block(
             _section(
@@ -358,20 +432,26 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
                 filter: const TourFilter(order: TourOrder.departure),
                 title: 'Khởi hành sắp tới',
               ),
-              child: TourPhotoStrip(tours: upcoming, onOpen: _openTour),
+              child: TourRowList(tours: upcoming.take(2).toList(), showDate: true, onOpen: _openTour),
             ),
           ),
+        // Chip co theo tên, vừa đúng 2 hàng; chủ đề dư gom vào chip "+N chủ đề"
         if (_themes.isNotEmpty)
           block(
             _section(
               title: 'Khám phá theo chủ đề',
-              child: ThemePhotoGrid(
-                themes: _themes,
-                photoOf: (t) => _catalogPhoto(t, (tour) => tour.themeId == t.id),
-                onOpen: (t) => _openList(
-                  filter: TourFilter(themeId: t.id),
-                  title: t.name,
-                ),
+              child: CatalogChipWrap(
+                sheetTitle: 'Tất cả chủ đề',
+                moreLabel: 'chủ đề',
+                items: [
+                  for (final t in _themes)
+                    (
+                      label: t.name,
+                      trailing: null,
+                      photo: _catalogPhoto(t, (tour) => tour.themeId == t.id),
+                      onTap: () => _openList(filter: TourFilter(themeId: t.id), title: t.name),
+                    ),
+                ],
               ),
             ),
           ),
@@ -379,14 +459,18 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
           block(
             _section(
               title: 'Điểm đến theo vùng miền',
-              child: RegionPhotoStrip(
-                regions: regions,
-                tourCounts: _regionCounts,
-                photoOf: (r) => _catalogPhoto(r, (tour) => tour.regionId == r.id),
-                onOpen: (r) => _openList(
-                  filter: TourFilter(regionId: r.id),
-                  title: r.name,
-                ),
+              child: CatalogChipWrap(
+                sheetTitle: 'Tất cả vùng miền',
+                moreLabel: 'vùng',
+                items: [
+                  for (final r in regions)
+                    (
+                      label: r.name,
+                      trailing: _regionCounts[r.id] == null ? null : '${_regionCounts[r.id]} tour',
+                      photo: _catalogPhoto(r, (tour) => tour.regionId == r.id),
+                      onTap: () => _openList(filter: TourFilter(regionId: r.id), title: r.name),
+                    ),
+                ],
               ),
             ),
           ),
@@ -398,19 +482,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
                 filter: const TourFilter(format: 'DAY_TRIP'),
                 title: 'Tour trong ngày',
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < dayTrips.length && i < 4; i++)
-                      TourRow(
-                        tour: dayTrips[i],
-                        onTap: () => _openTour(dayTrips[i]),
-                        divider: i < dayTrips.length - 1 && i < 3,
-                      ),
-                  ],
-                ),
-              ),
+              child: TourRowList(tours: dayTrips.take(3).toList(), onOpen: _openTour),
             ),
           ),
         if (multiDays.isNotEmpty)
@@ -421,7 +493,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
                 filter: const TourFilter(format: 'MULTI_DAY'),
                 title: 'Tour nhiều ngày',
               ),
-              child: TourPhotoStrip(tours: multiDays, onOpen: _openTour),
+              child: TourRowList(tours: multiDays.take(3).toList(), onOpen: _openTour),
             ),
           ),
         block(
@@ -450,7 +522,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
 
   Widget _section({required String title, VoidCallback? onAll, required Widget child}) {
     return Padding(
-      padding: const EdgeInsets.only(top: 30),
+      padding: const EdgeInsets.only(top: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -503,7 +575,11 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
         ),
         child: Column(
           children: [
-            Icon(icon, size: 40, color: AppCultureColors.textLight),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: const BoxDecoration(color: AppCultureColors.surfaceSubtle, shape: BoxShape.circle),
+              child: Icon(icon, size: 30, color: AppCultureColors.textMuted),
+            ),
             const SizedBox(height: 10),
             Text(
               title,
@@ -537,11 +613,11 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
     return SliverAppBar(
       pinned: true,
       automaticallyImplyLeading: false,
-      backgroundColor: Colors.white,
+      backgroundColor: AppInk.paper,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      toolbarHeight: 68,
+      toolbarHeight: 62,
       titleSpacing: 16,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -557,7 +633,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
             _area ?? 'Hôm nay bạn muốn đi đâu?',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppInk.ink, fontSize: 17, fontWeight: FontWeight.w700),
+            style: const TextStyle(color: AppInk.ink, fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.2),
           ),
         ],
       ),
@@ -567,28 +643,28 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
         Padding(padding: const EdgeInsets.only(right: 12), child: _buildBell()),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(76),
+        preferredSize: const Size.fromHeight(62),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
           child: Semantics(
             button: true,
             label: 'Tìm tour, điểm đến, chủ đề',
             child: Pressable(
               onTap: () => _openList(focusSearch: true),
               child: Container(
-                height: 60,
-                padding: const EdgeInsets.only(left: 18, right: 8),
+                height: 52,
+                padding: const EdgeInsets.only(left: 16, right: 6),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: AppInk.border),
+                  border: Border.all(color: AppInk.line),
                   boxShadow: [
-                    BoxShadow(color: AppInk.ink.withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, 6)),
+                    BoxShadow(color: AppInk.ink.withValues(alpha: 0.07), blurRadius: 22, offset: const Offset(0, 8)),
                   ],
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.search_rounded, color: AppInk.ink),
+                    const Icon(Icons.search_rounded, color: AppInk.accent, size: 24),
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Column(
@@ -604,13 +680,10 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
                       ),
                     ),
                     Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppInk.border),
-                      ),
-                      child: const Icon(Icons.tune_rounded, size: 19, color: AppInk.ink),
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(shape: BoxShape.circle, color: AppInk.accentSoft),
+                      child: const Icon(Icons.tune_rounded, size: 19, color: AppInk.accent),
                     ),
                   ],
                 ),
@@ -629,12 +702,20 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
+          color: AppCultureColors.rewardBg,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppInk.border),
+          border: Border.all(color: AppCultureColors.rewardBorder),
         ),
-        child: Text(
-          '${formatThousands(_userPoints)} điểm',
-          style: const TextStyle(color: AppInk.ink, fontSize: 13, fontWeight: FontWeight.w600),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.stars_rounded, size: 17, color: AppCultureColors.gold),
+            const SizedBox(width: 5),
+            Text(
+              '${formatThousands(_userPoints)} điểm',
+              style: const TextStyle(color: AppCultureColors.rewardText, fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+          ],
         ),
       ),
     );
@@ -652,7 +733,8 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: AppInk.border),
+            color: AppInk.surface,
+            border: Border.all(color: AppInk.line),
           ),
           child: const NotificationBellIcon(size: 20, color: AppInk.ink),
         ),

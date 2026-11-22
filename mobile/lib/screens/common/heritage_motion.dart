@@ -380,7 +380,7 @@ class ShimmerText extends StatefulWidget {
   final TextStyle style;
   final Color shine;
 
-  const ShimmerText(this.text, {super.key, required this.style, this.shine = const Color(0xFFFDE68A)});
+  const ShimmerText(this.text, {super.key, required this.style, this.shine = AppCultureColors.brass200});
 
   @override
   State<ShimmerText> createState() => _ShimmerTextState();

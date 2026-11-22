@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'photo.dart';
+import '../../core/constants/app_colors.dart';
 
 /// Mã video YouTube (11 ký tự) từ link watch?v=, youtu.be/, shorts/, embed/, live/.
 String? youTubeIdOf(String url) => RegExp(
@@ -180,14 +181,14 @@ class _InlineVideoState extends State<InlineVideo> {
 
   Widget _failure() {
     return ColoredBox(
-      color: const Color(0xFF1F2328),
+      color: AppCultureColors.ink900,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
               'Không phát được video này trong ứng dụng',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+              style: TextStyle(color: AppCultureColors.onDarkMuted, fontSize: 13),
             ),
             TextButton(
               onPressed: () => launchUrl(Uri.parse(widget.url), mode: LaunchMode.externalApplication),
