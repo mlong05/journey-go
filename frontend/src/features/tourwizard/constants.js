@@ -56,6 +56,13 @@ export const LIMITS = {
   RADIUS_MIN: 10,
   RADIUS_MAX: 500,
   RADIUS_DEFAULT: 50,
+  /** Bán kính check-in trạm (đối tác tự nhập) — khớp STOP_RADIUS_* ở backend. */
+  STOP_RADIUS_MIN: 50,
+  STOP_RADIUS_MAX: 500,
+  STOP_RADIUS_DEFAULT: 300,
+  /** Checkpoint hoạt động cách vị trí điểm đến: trên 1 km cảnh báo, trên 3 km backend chặn gửi duyệt. */
+  CHECKPOINT_WARN_METERS: 1000,
+  CHECKPOINT_MAX_METERS: 3000,
   IMAGE_MAX_BYTES: 10 * 1024 * 1024,
   VIDEO_MAX_BYTES: 100 * 1024 * 1024,
   /** Số ký tự tối đa của từng ô chữ (giao diện). Backend cho phép dài hơn để tour cũ vẫn lưu được. */
@@ -123,3 +130,34 @@ export const NOTICE_SECTIONS = [
   { key: "refundPolicy", label: "Chính sách hỗ trợ hoàn tiền", max: 1000 },
   { key: "contactInfo", label: "Liên hệ", max: 300 },
 ];
+
+/** Khoảng cách (mét) giữa hai toạ độ — công thức haversine, cùng cách tính với GeoUtils ở backend. */
+export function distanceMeters(lat1, lng1, lat2, lng2) {
+  const values = [lat1, lng1, lat2, lng2].map(Number);
+  if ([lat1, lng1, lat2, lng2].some((v) => v === null || v === undefined || v === "") || values.some((v) => !Number.isFinite(v))) {
+    return null;
+  }
+  const [aLat, aLng, bLat, bLng] = values;
+  const rad = (d) => (d * Math.PI) / 180;
+  const dLat = rad(bLat - aLat);
+  const dLng = rad(bLng - aLng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Mức độ xa của checkpoint so với vị trí điểm đến:
+ * null = chưa đủ toạ độ để so · "ok" ≤ 1 km · "warn" 1–3 km · "block" > 3 km (backend chặn gửi duyệt).
+ */
+export function checkpointDistanceLevel(stop, experience) {
+  const d = distanceMeters(stop?.latitude, stop?.longitude, experience?.checkpointLatitude, experience?.checkpointLongitude);
+  if (d === null) return null;
+  const level = d > LIMITS.CHECKPOINT_MAX_METERS ? "block" : d > LIMITS.CHECKPOINT_WARN_METERS ? "warn" : "ok";
+  return { meters: d, level };
+}
+
+/** "350 m" / "2,4 km". */
+export function formatDistance(meters) {
+  if (meters == null) return "";
+  return meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1).replace(".", ",")} km`;
+}

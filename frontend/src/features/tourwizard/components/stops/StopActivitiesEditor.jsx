@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, MapPin, Timer, HelpCircle, Footprints, CheckCircle2, QrCode } from "lucide-react";
+import { Plus, Pencil, Trash2, MapPin, Timer, HelpCircle, Footprints, CheckCircle2, QrCode, AlertTriangle } from "lucide-react";
 import GoongMapPickerModal from "@/features/destination/components/GoongMapPickerModal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Field, TextInput, NumberInput, PointsBadge } from "../FormKit";
 import QuestionEditor, { emptyQuestion } from "./QuestionEditor";
 import CheckpointMap from "./CheckpointMap";
 import ExperienceQr, { newExperienceQrToken } from "./ExperienceQr";
-import { LIMITS } from "../../constants";
+import { LIMITS, checkpointDistanceLevel, formatDistance } from "../../constants";
 
 let keySeq = 0;
 const newKey = () => `a${Date.now().toString(36)}${(keySeq++).toString(36)}`;
@@ -109,6 +109,25 @@ function AddButton({ onClick, children }) {
   );
 }
 
+/**
+ * Cảnh báo checkpoint xa vị trí check-in của điểm đến: 1–3 km cảnh báo (vẫn gửi duyệt được),
+ * trên 3 km báo đỏ (backend chặn gửi duyệt). Gần thì không hiện gì.
+ */
+export function CheckpointDistanceNotice({ stop, experience, compact = false }) {
+  const result = checkpointDistanceLevel(stop, experience);
+  if (!result || result.level === "ok") return null;
+  const blocked = result.level === "block";
+  const text = blocked
+    ? `Checkpoint cách vị trí điểm đến ${formatDistance(result.meters)} — quá ${LIMITS.CHECKPOINT_MAX_METERS / 1000} km, tour sẽ không gửi duyệt được. Hãy kiểm tra lại ghim.`
+    : `Checkpoint cách vị trí điểm đến ${formatDistance(result.meters)} (trên ${LIMITS.CHECKPOINT_WARN_METERS / 1000} km). Vẫn gửi duyệt được nhưng Moderator sẽ kiểm tra lại.`;
+  return (
+    <p className={`flex items-start gap-1.5 rounded-lg border font-semibold ${compact ? "px-2 py-1 text-[10px]" : "px-2.5 py-1.5 text-[11px]"} ${blocked ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+      <AlertTriangle size={compact ? 11 : 13} className="mt-px shrink-0" />
+      {text}
+    </p>
+  );
+}
+
 /* ── Editor ──────────────────────────────────────────────────────────────── */
 
 /**
@@ -206,11 +225,13 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
         </Field>
         <Field label="Checkpoint" required
           hint="Khách đi theo bản đồ trên app; vào trong bán kính sẽ hiện nút Bắt đầu trải nghiệm.">
-          <CheckpointMap latitude={d.checkpointLatitude} longitude={d.checkpointLongitude} radius={d.radiusMeters} />
+          <CheckpointMap latitude={d.checkpointLatitude} longitude={d.checkpointLongitude} radius={d.radiusMeters}
+            reference={{ latitude: stop.latitude, longitude: stop.longitude, radius: stop.checkInRadiusMeters }} />
           <button type="button" onClick={() => setPickMap(true)}
             className="mt-2 px-3 py-1.5 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer hover:bg-emerald-50">
             <MapPin size={13} /> {d.checkpointLatitude ? "Đổi vị trí trên bản đồ" : "Chọn vị trí trên bản đồ"}
           </button>
+          <div className="mt-2"><CheckpointDistanceNotice stop={stop} experience={d} /></div>
         </Field>
         {/* Gợi ý hai ô dài ngắn khác nhau: đẩy ô nhập xuống đáy để hai hàng input luôn thẳng nhau */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 [&>div]:flex [&>div]:flex-col [&>div>*:nth-child(3)]:mt-auto">
@@ -299,6 +320,7 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
                     {e.qrToken && readOnly && (
                       <span className="basis-full pt-1.5"><ExperienceQr token={e.qrToken} label={e.activityName} compact /></span>
                     )}
+                    <span className="basis-full empty:hidden"><CheckpointDistanceNotice stop={stop} experience={e} compact /></span>
                   </span>
                 }
                 points={experiencePoints} pointsLabel="điểm" error={stopErr(`experiences[${i}]`)}
@@ -318,8 +340,15 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
           isOpen
           onClose={() => setPickMap(false)}
           placeName={draft.activityName || stop.name}
-          initialLatitude={draft.checkpointLatitude}
-          initialLongitude={draft.checkpointLongitude}
+          // Checkpoint mới: mở bản đồ quanh vị trí check-in của điểm đến thay vì vị trí của người đang soạn.
+          initialLatitude={draft.checkpointLatitude ?? stop.latitude}
+          initialLongitude={draft.checkpointLongitude ?? stop.longitude}
+          // Hiện vùng check-in của điểm đến (cam) để đặt checkpoint trong / gần đó.
+          reference={stop.latitude != null && stop.longitude != null ? {
+            latitude: stop.latitude, longitude: stop.longitude, radius: stop.checkInRadiusMeters,
+            label: `Vị trí check-in: ${stop.name || "điểm đến"}`,
+            warnMeters: LIMITS.CHECKPOINT_WARN_METERS, maxMeters: LIMITS.CHECKPOINT_MAX_METERS,
+          } : null}
           onSelect={({ latitude, longitude }) =>
             setDraft({ checkpointLatitude: Number(latitude), checkpointLongitude: Number(longitude) })}
         />
