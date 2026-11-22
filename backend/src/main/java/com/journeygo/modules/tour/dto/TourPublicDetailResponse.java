@@ -66,9 +66,13 @@ public record TourPublicDetailResponse(
                        @Schema(description = "Số hiện vật") int artifactCount,
                        @Schema(description = "Số câu quiz tại điểm dừng") int quizCount,
                        List<Activity> activities,
-                       @Schema(description = "Toạ độ checkpoint đầu tiên có toạ độ (để vẽ bản đồ)") BigDecimal latitude,
+                       @Schema(description = "Vị trí check-in trạm (tour cũ: checkpoint đầu tiên có toạ độ) — để vẽ bản đồ") BigDecimal latitude,
                        BigDecimal longitude,
-                       int maxPoints) {}
+                       int maxPoints,
+                       @Schema(description = "Bán kính check-in trạm (mét); tour cũ chưa có vị trí riêng: 300") Integer checkInRadiusMeters) {}
+
+    /** Bán kính check-in khi điểm dừng chưa có vị trí riêng — khớp RealTourInfoProvider.STOP_CHECK_IN_RADIUS_METERS. */
+    private static final int LEGACY_STOP_RADIUS_METERS = 300;
 
     /** Lọc dữ liệu của luồng 5 bước xuống phần công khai. */
     public static TourPublicDetailResponse fromWizard(TourDetailResponse d, BigDecimal price, LocalDate today) {
@@ -119,7 +123,9 @@ public record TourPublicDetailResponse(
     }
 
     private static Stop toStop(TourDetailResponse.Stop s) {
-        TourDetailResponse.Experience located = s.experiences().stream()
+        // Ưu tiên vị trí check-in trạm; tour cũ chưa có thì lấy checkpoint đầu tiên có toạ độ.
+        boolean stopLocated = s.latitude() != null && s.longitude() != null;
+        TourDetailResponse.Experience located = stopLocated ? null : s.experiences().stream()
                 .filter(e -> e.checkpointLatitude() != null && e.checkpointLongitude() != null)
                 .findFirst().orElse(null);
         return new Stop(s.id(), s.sequenceOrder(), s.name(), s.shortDescription(), s.guestNote(),
@@ -131,9 +137,11 @@ public record TourPublicDetailResponse(
                 s.experiences().stream()
                         .map(e -> new Activity(e.activityName(), e.durationSeconds(), e.points()))
                         .toList(),
-                located == null ? null : located.checkpointLatitude(),
-                located == null ? null : located.checkpointLongitude(),
-                s.maxPoints());
+                stopLocated ? s.latitude() : located == null ? null : located.checkpointLatitude(),
+                stopLocated ? s.longitude() : located == null ? null : located.checkpointLongitude(),
+                s.maxPoints(),
+                stopLocated && s.checkInRadiusMeters() != null ? s.checkInRadiusMeters()
+                        : located == null ? null : LEGACY_STOP_RADIUS_METERS);
     }
 
     /** Tour luồng cũ: chỉ có thông tin chung, điểm đến xem qua {@code GET /tours/{id}}. */

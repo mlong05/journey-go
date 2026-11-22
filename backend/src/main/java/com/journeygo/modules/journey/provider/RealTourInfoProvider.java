@@ -95,7 +95,7 @@ public class RealTourInfoProvider implements TourInfoProvider {
 
     // ── Tour 5 bước: hành trình dựng từ điểm dừng riêng của tour ────────────────
 
-    /** Bán kính check-in quanh checkpoint đầu tiên của điểm dừng (điểm dừng không có toạ độ riêng). */
+    /** Bán kính check-in khi điểm dừng chưa có vị trí riêng (tour cũ): quanh checkpoint đầu tiên. */
     static final int STOP_CHECK_IN_RADIUS_METERS = 300;
 
     /** Số lần làm lại một hoạt động thực địa (câu hỏi sau trải nghiệm trả lời sai). */
@@ -155,15 +155,18 @@ public class RealTourInfoProvider implements TourInfoProvider {
                         true, questions, e.getDurationSeconds(), true, false));
             }
 
+            // Vị trí check-in trạm do đối tác chọn; tour cũ chưa có thì mượn checkpoint đầu tiên (bán kính 300 m).
+            boolean stopLocated = stop.getLatitude() != null && stop.getLongitude() != null;
             stops.add(new TourInfo.TourDestinationInfo(
                     stop.getId(),
                     stop.getName(),
                     order++,
                     null,
-                    located == null ? null : located.getCheckpointLatitude(),
-                    located == null ? null : located.getCheckpointLongitude(),
-                    STOP_CHECK_IN_RADIUS_METERS,
-                    null,
+                    stopLocated ? stop.getLatitude() : located == null ? null : located.getCheckpointLatitude(),
+                    stopLocated ? stop.getLongitude() : located == null ? null : located.getCheckpointLongitude(),
+                    stopLocated && stop.getCheckInRadiusMeters() != null
+                            ? stop.getCheckInRadiusMeters() : STOP_CHECK_IN_RADIUS_METERS,
+                    stop.getQrToken(), // check-in trạm: GPS trong bán kính HOẶC quét mã QR tại cổng
                     tasks));
         }
         return new TourInfo(tour.getTourId(), tour.getTitle(), stops, true);

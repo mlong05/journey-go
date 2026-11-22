@@ -72,6 +72,18 @@ public class JourneyController {
         return ResponseEntity.ok(ApiResponse.success(result.message(), result));
     }
 
+    @GetMapping("/{id}/destinations/{destinationId}/checkpoints")
+    @Operation(summary = "Bản đồ checkpoint của trạm",
+            description = "Vùng check-in của trạm và vị trí các hoạt động thực địa (không kèm mã QR / đáp án). Chỉ mở sau khi check-in trạm")
+    public ResponseEntity<ApiResponse<StopCheckpointsResponse>> getStopCheckpoints(
+            @PathVariable Long id,
+            @PathVariable Long destinationId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        StopCheckpointsResponse response = journeyService.getStopCheckpoints(id, destinationId, userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.success("Lấy bản đồ checkpoint thành công", response));
+    }
+
     @GetMapping("/{id}/tasks/{taskId}/puzzle-clue")
     @Operation(summary = "Xem manh mối giải đố GPS Puzzle", description = "Lấy gợi ý và tọa độ vị trí thực địa để du khách đến giải mật mã tại di tích")
     public ResponseEntity<ApiResponse<PuzzleClueResponse>> getPuzzleClue(

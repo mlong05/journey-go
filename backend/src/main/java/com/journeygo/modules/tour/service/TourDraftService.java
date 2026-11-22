@@ -215,6 +215,14 @@ public class TourDraftService {
 
     private void applyStop(TourStop stop, TourWizardRequests.StopItem item) {
         stop.setName(trimToNull(item.name()));
+        // Toạ độ đi theo cặp: thiếu một trong hai thì coi như chưa chọn vị trí.
+        boolean hasLocation = item.latitude() != null && item.longitude() != null;
+        stop.setLatitude(hasLocation ? item.latitude() : null);
+        stop.setLongitude(hasLocation ? item.longitude() : null);
+        stop.setCheckInRadiusMeters(item.checkInRadiusMeters());
+        // Ưu tiên mã đang lưu (QR đã in); client gửi mã hợp lệ thì giữ; còn lại sinh mã mới.
+        stop.setQrToken(TourStop.keepOrNewQrToken(
+                stop.getQrToken() != null ? stop.getQrToken() : item.qrToken()));
         stop.setShortDescription(trimToNull(item.shortDescription()));
         stop.setGuestNote(trimToNull(item.guestNote()));
         stop.setImageUrl(trimToNull(item.imageUrl()));
@@ -485,7 +493,9 @@ public class TourDraftService {
                         e.getCheckpointLatitude(), e.getCheckpointLongitude(), e.getRadiusMeters(),
                         e.getDurationSeconds(), null, // tour nhân bản: mã QR mới, không dùng chung QR với tour gốc
                         e.getQuestion() == null ? null : toQuestionItem(e.getQuestion())))
-                        .toList());
+                        .toList(),
+                s.getLatitude(), s.getLongitude(), s.getCheckInRadiusMeters(),
+                null); // tour nhân bản: mã QR trạm mới, không dùng chung với tour gốc
     }
 
     /**

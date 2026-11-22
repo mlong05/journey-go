@@ -20,6 +20,11 @@ class TourPublicDetailResponseTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 9);
 
     private TourDetailResponse wizardDetail() {
+        return wizardDetail(null, null);
+    }
+
+    /** stopLatitude / stopLongitude = vị trí check-in trạm (null = tour cũ chưa có vị trí riêng). */
+    private TourDetailResponse wizardDetail(BigDecimal stopLatitude, BigDecimal stopLongitude) {
         var quiz = new TourDetailResponse.Question(1L, StopQuestionKind.QUIZ, QuestionType.MULTIPLE_CHOICE,
                 "Văn Miếu xây năm nào?", 10,
                 List.of(new TourDetailResponse.Answer(11L, "1070", true),
@@ -33,7 +38,8 @@ class TourPublicDetailResponseTest {
         var stop = new TourDetailResponse.Stop(7L, 1, "Văn Miếu", "Trường đại học đầu tiên", null,
                 "https://img/stop.jpg", null, null, "SECRET-CULTURE-STORY", List.of("https://img/culture-1.jpg"),
                 List.of(new TourDetailResponse.Artifact(3L, "Bia tiến sĩ", "https://img/artifact.jpg", "Bia đá", null, null)),
-                List.of(quiz), List.of(experience), 30);
+                List.of(quiz), List.of(experience), 30, stopLatitude, stopLongitude,
+                stopLatitude == null ? null : 150, "JGS-SECRETSTOPQR00");
         return TourDetailResponse.builder()
                 .tourId(99L)
                 .title("Hà Nội ngàn năm")
@@ -64,6 +70,7 @@ class TourPublicDetailResponseTest {
         String json = new ObjectMapper().registerModule(new JavaTimeModule()).writeValueAsString(result);
         assertThat(json)
                 .doesNotContain("JGE-0123456789ABCDEF")
+                .doesNotContain("JGS-SECRETSTOPQR00")
                 .doesNotContain("SECRET-ANSWER")
                 .doesNotContain("\"correct\"")
                 .doesNotContain("ghi chú nội bộ");
@@ -102,6 +109,24 @@ class TourPublicDetailResponseTest {
         assertThat(stop.latitude()).isEqualByComparingTo("21.0293");
         assertThat(result.taskCount()).isEqualTo(2);
         assertThat(result.totalPoints()).isEqualTo(30);
+    }
+
+    @Test
+    void fromWizard_prefersStopCheckInLocationOverCheckpoint() {
+        var result = TourPublicDetailResponse.fromWizard(
+                wizardDetail(new BigDecimal("21.0277"), new BigDecimal("105.8355")), new BigDecimal("450000"), TODAY);
+
+        var stop = result.stops().get(0);
+        assertThat(stop.latitude()).isEqualByComparingTo("21.0277");
+        assertThat(stop.longitude()).isEqualByComparingTo("105.8355");
+        assertThat(stop.checkInRadiusMeters()).isEqualTo(150);
+    }
+
+    @Test
+    void fromWizard_legacyStopFallsBackToCheckpointWith300mRadius() {
+        var stop = TourPublicDetailResponse.fromWizard(wizardDetail(), new BigDecimal("450000"), TODAY).stops().get(0);
+        assertThat(stop.latitude()).isEqualByComparingTo("21.0293");
+        assertThat(stop.checkInRadiusMeters()).isEqualTo(300);
     }
 
     @Test

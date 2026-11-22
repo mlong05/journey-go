@@ -1,5 +1,6 @@
 package com.journeygo.modules.tour.service;
 
+import com.journeygo.modules.experience.util.GeoUtils;
 import com.journeygo.modules.providerprofile.entity.ProviderProfile;
 import com.journeygo.modules.providerprofile.repository.ProviderProfileRepository;
 import com.journeygo.modules.reward.entity.RewardSettingCode;
@@ -39,6 +40,15 @@ public class TourSubmissionValidator {
     public static final int EXPERIENCES_MAX = 5;
     public static final int RADIUS_MIN = 10;
     public static final int RADIUS_MAX = 500;
+    /** Bán kính check-in trạm (đối tác tự nhập). */
+    public static final int STOP_RADIUS_MIN = 50;
+    public static final int STOP_RADIUS_MAX = 500;
+    /**
+     * Checkpoint hoạt động xa vị trí điểm đến quá mức này ⇒ chặn gửi duyệt (gần như chắc chắn đặt nhầm ghim).
+     * Từ {@code CHECKPOINT_WARN_METERS} (1 km) đến mức này chỉ cảnh báo — hiển thị ở frontend cho đối tác / Moderator.
+     */
+    public static final int CHECKPOINT_MAX_DISTANCE_METERS = 3000;
+    public static final int CHECKPOINT_WARN_METERS = 1000;
 
     /** Từ ngữ quảng cáo không được dùng trong tên tour. */
     static final List<String> BANNED_TITLE_WORDS = List.of("rẻ nhất", "độc quyền", "tốt nhất", "số 1", "số một");
@@ -179,6 +189,16 @@ public class TourSubmissionValidator {
         for (int i = 0; i < stops.size(); i++) {
             TourStop stop = stops.get(i);
             if (isBlank(stop.getName())) issues.add(TourValidationIssue.stop(i, "name", "Vui lòng nhập tên điểm đến"));
+            boolean stopLocated = isValidCoordinate(stop.getLatitude(), stop.getLongitude());
+            if (!stopLocated) {
+                issues.add(TourValidationIssue.stop(i, "location",
+                        "Vui lòng chọn vị trí check-in của điểm đến trên bản đồ (nên đặt tại cổng / lối vào chính)"));
+            }
+            Integer stopRadius = stop.getCheckInRadiusMeters();
+            if (stopRadius == null || stopRadius < STOP_RADIUS_MIN || stopRadius > STOP_RADIUS_MAX) {
+                issues.add(TourValidationIssue.stop(i, "checkInRadiusMeters",
+                        "Bán kính check-in phải từ " + STOP_RADIUS_MIN + " đến " + STOP_RADIUS_MAX + " mét"));
+            }
             if (isBlank(stop.getShortDescription())) {
                 issues.add(TourValidationIssue.stop(i, "shortDescription", "Vui lòng nhập mô tả ngắn"));
             }
@@ -220,19 +240,37 @@ public class TourSubmissionValidator {
                         "Cần từ " + EXPERIENCES_MIN + " đến " + EXPERIENCES_MAX + " trải nghiệm thực tế"));
             }
             for (int e = 0; e < experienceCount; e++) {
-                validateExperience(stop.getExperiences().get(e), i, "experiences[" + e + "]", issues);
+                validateExperience(stop, stopLocated, stop.getExperiences().get(e), i, "experiences[" + e + "]", issues);
             }
         }
     }
 
-    private void validateExperience(TourStopExperience exp, int stopIndex, String path, List<TourValidationIssue> issues) {
+    private static boolean isValidCoordinate(BigDecimal latitude, BigDecimal longitude) {
+        return latitude != null && longitude != null
+                && latitude.abs().compareTo(BigDecimal.valueOf(90)) <= 0
+                && longitude.abs().compareTo(BigDecimal.valueOf(180)) <= 0;
+    }
+
+    /** Khoảng cách (mét, làm tròn) từ vị trí điểm đến tới checkpoint của hoạt động. */
+    public static int distanceFromStopMeters(TourStop stop, TourStopExperience exp) {
+        return GeoUtils.haversineMeters(stop.getLatitude(), stop.getLongitude(),
+                exp.getCheckpointLatitude(), exp.getCheckpointLongitude()).intValue();
+    }
+
+    private void validateExperience(TourStop stop, boolean stopLocated, TourStopExperience exp, int stopIndex,
+                                    String path, List<TourValidationIssue> issues) {
         if (isBlank(exp.getActivityName())) {
             issues.add(TourValidationIssue.stop(stopIndex, path + ".activityName", "Vui lòng nhập tên hoạt động"));
         }
-        if (exp.getCheckpointLatitude() == null || exp.getCheckpointLongitude() == null
-                || exp.getCheckpointLatitude().abs().compareTo(BigDecimal.valueOf(90)) > 0
-                || exp.getCheckpointLongitude().abs().compareTo(BigDecimal.valueOf(180)) > 0) {
+        if (!isValidCoordinate(exp.getCheckpointLatitude(), exp.getCheckpointLongitude())) {
             issues.add(TourValidationIssue.stop(stopIndex, path + ".checkpoint", "Vui lòng chọn checkpoint hợp lệ trên bản đồ"));
+        } else if (stopLocated) {
+            int distance = distanceFromStopMeters(stop, exp);
+            if (distance > CHECKPOINT_MAX_DISTANCE_METERS) {
+                issues.add(TourValidationIssue.stop(stopIndex, path + ".checkpoint", String.format(Locale.ROOT,
+                        "Checkpoint cách vị trí điểm đến %.1f km (tối đa %d km) — hãy kiểm tra lại vị trí trên bản đồ",
+                        distance / 1000.0, CHECKPOINT_MAX_DISTANCE_METERS / 1000)));
+            }
         }
         if (exp.getRadiusMeters() == null || exp.getRadiusMeters() < RADIUS_MIN || exp.getRadiusMeters() > RADIUS_MAX) {
             issues.add(TourValidationIssue.stop(stopIndex, path + ".radiusMeters",

@@ -94,7 +94,11 @@ public record TourDetailResponse(
                        String imageUrl, String videoUrl, VideoSource videoSource,
                        String culturalContent, List<String> culturalImages,
                        List<Artifact> artifacts, List<Question> quiz, List<Experience> experiences,
-                       @Schema(description = "Tổng điểm tối đa của điểm đến") int maxPoints) {}
+                       @Schema(description = "Tổng điểm tối đa của điểm đến") int maxPoints,
+                       @Schema(description = "Vĩ độ vị trí check-in trạm") BigDecimal latitude,
+                       @Schema(description = "Kinh độ vị trí check-in trạm") BigDecimal longitude,
+                       @Schema(description = "Bán kính check-in trạm (mét)") Integer checkInRadiusMeters,
+                       @Schema(description = "Mã QR check-in trạm (chỉ đối tác / Moderator thấy)") String qrToken) {}
 
     /**
      * @param snapshot true = điểm đã chốt lúc duyệt; false = đang hiển thị theo cấu hình Admin hiện hành
