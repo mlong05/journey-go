@@ -4,6 +4,7 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.modules.tour.dto.TourRequest;
 import com.journeygo.modules.tour.dto.TourPublicDetailResponse;
+import com.journeygo.modules.tour.dto.TourDeparturesResponse;
 import com.journeygo.modules.tour.dto.TourResponse;
 import com.journeygo.modules.tour.dto.TourSearchFilter;
 import com.journeygo.modules.tour.dto.TourSlotAvailabilityResponse;
@@ -21,11 +22,14 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/v1/tours")
@@ -62,6 +66,18 @@ public class TourController {
     public ResponseEntity<ApiResponse<TourPublicDetailResponse>> getPublicDetail(@PathVariable Long tourId) {
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tour thành công",
                 tourService.getPublicDetail(tourId)));
+    }
+
+    @GetMapping("/departures")
+    @Operation(summary = "Lịch khởi hành theo ngày của các tour đã xuất bản (công khai)",
+            description = "Gom theo từng ngày: các tour khởi hành ngày đó kèm số chỗ còn. "
+                    + "from mặc định hôm nay (ngày quá khứ kẹp về hôm nay), to mặc định from + 60 ngày, tối đa from + 92 ngày. "
+                    + "Chỉ trả những ngày có tour. Dùng cho màn 'Xem tour theo ngày' của du khách.")
+    public ResponseEntity<ApiResponse<TourDeparturesResponse>> getDepartures(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy lịch khởi hành thành công",
+                tourService.departures(from, to)));
     }
 
     @GetMapping("/{tourId}/availability")

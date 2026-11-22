@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +70,44 @@ public class TourAvailabilityService {
     }
 
     /**
+     * Số chỗ còn theo ngày của NHIỀU tour trong khoảng [{@code from}, {@code to}] — dùng cho lịch khởi hành.
+     *
+     * <p>Tour luồng 5 bước: một truy vấn duy nhất lấy slot của mọi tour trong khoảng (không N+1).
+     * Tour luồng cũ (ít): tính từng tour bằng đúng logic của {@link #getAvailability}.
+     * Cách tính số chỗ còn giống hệt {@link #getAvailability} để lịch và màn đặt tour luôn khớp nhau.
+     *
+     * @return tourId → các ngày trong khoảng (đã sắp tăng dần); tour không có ngày nào thì không có khóa
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, List<TourSlotAvailabilityResponse.DateAvailability>> availabilityBetween(
+            Collection<Tour> tours, LocalDate from, LocalDate to) {
+        Map<Long, List<TourSlotAvailabilityResponse.DateAvailability>> result = new HashMap<>();
+        if (tours.isEmpty() || to.isBefore(from)) {
+            return result;
+        }
+
+        List<Long> wizardIds = tours.stream().filter(Tour::isWizardTour).map(Tour::getTourId).toList();
+        if (!wizardIds.isEmpty()) {
+            for (TourSlot slot : tourSlotRepository.findByTourIdsBetween(wizardIds, from, to)) {
+                result.computeIfAbsent(slot.getTour().getTourId(), id -> new ArrayList<>()).add(toAvailability(slot));
+            }
+        }
+
+        for (Tour tour : tours) {
+            if (tour.isWizardTour()) {
+                continue;
+            }
+            List<TourSlotAvailabilityResponse.DateAvailability> dates = legacyAvailability(tour, from).stream()
+                    .filter(d -> !d.date().isAfter(to))
+                    .toList();
+            if (!dates.isEmpty()) {
+                result.put(tour.getTourId(), dates);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Tour luồng 5 bước — số chỗ còn lấy thẳng từ {@link TourSlot} của từng ngày.
      */
     private List<TourSlotAvailabilityResponse.DateAvailability> wizardAvailability(Tour tour, LocalDate today) {
@@ -77,19 +117,24 @@ public class TourAvailabilityService {
             if (slot.getSlotDate().isBefore(today)) {
                 continue;
             }
-            int capacity = slot.getCapacity() == null ? 0 : slot.getCapacity();
-            int booked = slot.getBookedCount() == null ? 0 : slot.getBookedCount();
-            int remaining = Math.max(0, capacity - booked);
-            boolean available = slot.getStatus() == TourSlotStatus.OPEN && remaining > 0;
-            result.add(TourSlotAvailabilityResponse.DateAvailability.builder()
-                    .date(slot.getSlotDate())
-                    .capacity(capacity)
-                    .bookedCount(booked)
-                    .remaining(remaining)
-                    .available(available)
-                    .build());
+            result.add(toAvailability(slot));
         }
         return result;
+    }
+
+    /** Số chỗ còn của một {@link TourSlot}: capacity - bookedCount; đặt được khi slot mở và còn chỗ. */
+    private static TourSlotAvailabilityResponse.DateAvailability toAvailability(TourSlot slot) {
+        int capacity = slot.getCapacity() == null ? 0 : slot.getCapacity();
+        int booked = slot.getBookedCount() == null ? 0 : slot.getBookedCount();
+        int remaining = Math.max(0, capacity - booked);
+        boolean available = slot.getStatus() == TourSlotStatus.OPEN && remaining > 0;
+        return TourSlotAvailabilityResponse.DateAvailability.builder()
+                .date(slot.getSlotDate())
+                .capacity(capacity)
+                .bookedCount(booked)
+                .remaining(remaining)
+                .available(available)
+                .build();
     }
 
     /**
