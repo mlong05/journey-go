@@ -63,6 +63,7 @@ public enum ErrorCode {
     BOOKING_CANNOT_CANCEL_PAID("Booking đã thanh toán — không thể hủy trực tiếp", HttpStatus.CONFLICT),
     BOOKING_INVALID_STATUS_FOR_CANCEL("Trạng thái Booking không cho phép hủy", HttpStatus.CONFLICT),
     BOOKING_TOUR_ALREADY_PURCHASED("Bạn đã mua tour này rồi — không thể đặt lại", HttpStatus.CONFLICT),
+    BOOKING_PENDING_EXISTS("Bạn đang có đơn giữ chỗ chưa thanh toán cho tour này", HttpStatus.CONFLICT),
 
     // ── Payment ───────────────────────────────────────────────────────────────
     PAYMENT_NOT_FOUND("Giao dịch thanh toán không tồn tại", HttpStatus.NOT_FOUND),

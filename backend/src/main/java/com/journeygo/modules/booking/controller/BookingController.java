@@ -59,6 +59,18 @@ public class BookingController {
                 bookingService.getMyBookings(userPrincipal.getId(), pageable)));
     }
 
+    @GetMapping("/my/pending")
+    @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Đơn đang giữ chỗ của tôi",
+            description = "Các booking PENDING_PAYMENT còn hạn thanh toán, mới nhất trước. Truyền tourId để chỉ lấy đơn của tour đó.")
+    public ResponseEntity<ApiResponse<List<BookingResponse>>> getMyPendingBookings(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam(required = false) Long tourId) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy đơn đang giữ chỗ thành công",
+                bookingService.getMyActivePendingBookings(userPrincipal.getId(), tourId)));
+    }
+
     @GetMapping("/accessible")
     @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
