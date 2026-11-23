@@ -6,6 +6,7 @@ import {
   BarChart3,
   ChevronRight,
   FileCheck,
+  Info,
   Loader2,
   Percent,
   RefreshCw,
@@ -15,6 +16,7 @@ import {
 import { useProviderProfileContext } from "@/features/providerprofile/hooks/useProviderProfileContext";
 import { getProviderProfileWallet, getProviderProfileWalletTransactions } from "@/features/settlement/services/providerRevenueService";
 import { getFinalizedSettlementPeriods } from "@/features/settlement/services/settlementService";
+import { getCurrentRate } from "@/features/finance/services/commissionPolicyService";
 import {
   formatDateTimeVN,
   formatDateVN,
@@ -49,6 +51,19 @@ const TONE = {
 const toArray = (data) => (Array.isArray(data) ? data : (data?.content ?? []));
 const num = (v) => Number(v ?? 0) || 0;
 
+/**
+ * Định dạng tỷ lệ (0.20 → "20%") — bỏ các số 0 thừa ở cuối.
+ *
+ * ⚠️ Giống hệt logic của trang Admin "Quản lý chính sách hoa hồng" để cùng cách
+ * hiển thị ở 2 nơi.
+ */
+function formatRate(rate) {
+  if (rate === null || rate === undefined) return "—";
+  const n = Number(rate);
+  if (Number.isNaN(n)) return "—";
+  return `${(n * 100).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1")}%`;
+}
+
 export default function ProviderFinanceOverviewPage() {
   const {
     providerProfile,
@@ -66,6 +81,29 @@ export default function ProviderFinanceOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  // Tỷ lệ chia lợi nhuận hiện hành (xem-only) — tách khỏi `load` bên dưới vì
+  // KHÔNG phụ thuộc providerProfileId ⇒ tải song song, lỗi riêng không chặn trang.
+  const [rate, setRate] = useState(null);
+
+  // ── Tỷ lệ chia lợi nhuận hiện hành (read-only) ─────────────────────────
+  // ⚠️ Đối tác XEM được tỷ lệ đang áp dụng nhưng KHÔNG sửa được.
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      getCurrentRate()
+        .then((data) => {
+          if (!cancelled) setRate(data ?? null);
+        })
+        .catch(() => {
+          // ⚠️ Lỗi tải tỷ lệ KHÔNG được làm hỏng cả trang ⇒ chỉ ẩn thẻ này.
+          if (!cancelled) setRate(null);
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const load = useCallback(
     async (silent = false) => {
@@ -196,6 +234,64 @@ export default function ProviderFinanceOverviewPage() {
         <div className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
           {profileError || error}
         </div>
+      )}
+
+      {/* ══════════ TỶ LỆ CHIA LỢI NHUẬN HIỆN HÀNH (XEM-ONLY) ══════════
+          Đối tác cần biết TỶ LỆ đang áp dụng để tự tính trước doanh thu mới.
+          ⚠️ CHỈ XEM — không có nút sửa (chính sách do Admin quản lý).
+          ⚠️ Ẩn hoàn toàn nếu chưa có chính sách hiệu lực (rate = null). */}
+      {rate && (
+        <section className="shrink-0 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                <Percent size={17} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-emerald-900">
+                  Tỷ lệ chia lợi nhuận hiện hành
+                </p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-emerald-700/80">
+                  {rate?.policyName
+                    ? `${rate.policyName} · Hiệu lực từ ${formatDateVN(rate?.effectiveFrom)}`
+                    : `Hiệu lực từ ${formatDateVN(rate?.effectiveFrom)}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/70">
+                  Nền tảng thu
+                </p>
+                <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-emerald-900">
+                  {formatRate(rate?.platformRate)}
+                </p>
+              </div>
+              <div className="h-8 w-px bg-emerald-200" aria-hidden="true" />
+              <div className="text-right">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/70">
+                  Bạn nhận
+                </p>
+                <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-emerald-700">
+                  {formatRate(rate?.providerRate)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/*
+            ⚠️ BR-05 — KHÔNG áp dụng hồi tố: khoản đã tất toán dùng tỷ lệ CHỐT tại
+            thời điểm duyệt ⇒ tỷ lệ ở đây chỉ mang tính tham khảo cho doanh thu mới.
+          */}
+          <p className="mt-2.5 flex items-start gap-1.5 text-[11px] leading-relaxed text-emerald-800/75">
+            <Info size={12} className="mt-0.5 shrink-0" />
+            <span>
+              Tỷ lệ này áp dụng cho doanh thu mới. Các kỳ đã tất toán giữ nguyên
+              tỷ lệ đã chốt tại thời điểm duyệt.
+            </span>
+          </p>
+        </section>
       )}
 
       {/* Dải số liệu: 1 thẻ chia 4 ô (2×2 trên màn nhỏ) */}

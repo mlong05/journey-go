@@ -17,7 +17,9 @@ public record RefundReasonGroupResponse(
         @Schema(description = "Mã nhóm (PERSONAL | PLATFORM_FAULT | PROVIDER_FAULT | FORCE_MAJEURE)")
         String code,
         @Schema(description = "Tên hiển thị tiếng Việt") String name,
-        @Schema(description = "Tỷ lệ hoàn tiền của nhóm (0.50 = 50%)") BigDecimal refundRate,
+        @Schema(description = "Tỷ lệ hoàn tiền của nhóm (0.80 = 80%). Với nhóm PERSONAL, tỷ lệ "
+                + "thực tế tính theo 3 bậc theo thời điểm hủy — xem `refundTiers`.")
+        BigDecimal refundRate,
         @Schema(description = "Mô tả điều kiện áp dụng") String description,
         @Schema(description = "true = nhóm bất khả kháng (không hoàn tiền)") boolean forceMajeure,
         @Schema(description = "Số giờ trước ngày trải nghiệm mà tỷ lệ hoàn bị đưa xuống "
@@ -33,6 +35,10 @@ public record RefundReasonGroupResponse(
         @Schema(description = "Tên admin tạo / sửa") String createdByName,
         @Schema(description = "Thời điểm tạo") Instant createdAt,
         @Schema(description = "Thời điểm sửa") Instant updatedAt,
+        @Schema(description = "Các bậc tỷ lệ hoàn theo thời điểm hủy (chỉ nhóm PERSONAL có 3 bậc: "
+                + "80% / 50% / 0%). Danh sách rỗng = nhóm chỉ có 1 tỷ lệ (`refundRate`). "
+                + "Web/mobile dùng để hiển thị bảng chính sách cho khách.")
+        List<RefundTierResponse> refundTiers,
         @Schema(description = "Danh sách mã lý do chi tiết") List<RefundReasonCodeResponse> reasonCodes
 ) {
     public static RefundReasonGroupResponse fromEntity(RefundReasonGroup g,
@@ -51,6 +57,23 @@ public record RefundReasonGroupResponse(
                                                         List<RefundReasonCode> codes,
                                                         Integer noShowWindowHours,
                                                         BigDecimal noShowRefundRate) {
+        return fromEntity(g, codes, noShowWindowHours, noShowRefundRate, List.of());
+    }
+
+    /**
+     * Bản đầy đủ — có thêm thông tin "mức hoàn 0%" và các BẬC theo thời điểm hủy.
+     *
+     * @param noShowWindowHours số giờ trước ngày trải nghiệm mà nhóm này bị đưa
+     *                          xuống mức hoàn 0%; null = nhóm không có mức 0% riêng
+     * @param noShowRefundRate  tỷ lệ hoàn trong cửa sổ đó (thường 0)
+     * @param refundTiers       các bậc tỷ lệ hoàn theo thời điểm hủy (rỗng = nhóm
+     *                          chỉ có 1 tỷ lệ)
+     */
+    public static RefundReasonGroupResponse fromEntity(RefundReasonGroup g,
+                                                        List<RefundReasonCode> codes,
+                                                        Integer noShowWindowHours,
+                                                        BigDecimal noShowRefundRate,
+                                                        List<RefundTierResponse> refundTiers) {
         if (g == null) return null;
         return RefundReasonGroupResponse.builder()
                 .id(g.getId())
@@ -67,8 +90,28 @@ public record RefundReasonGroupResponse(
                 .createdByName(g.getCreatedBy() != null ? g.getCreatedBy().getFullName() : null)
                 .createdAt(g.getCreatedAt())
                 .updatedAt(g.getUpdatedAt())
+                .refundTiers(refundTiers == null ? List.of() : refundTiers)
                 .reasonCodes(codes.stream().map(RefundReasonCodeResponse::fromEntity).toList())
                 .build();
+    }
+
+    /**
+     * Một bậc tỷ lệ hoàn theo thời điểm hủy (chỉ nhóm PERSONAL có nhiều bậc).
+     *
+     * @param code           mã bậc (EARLY | MID | LATE) — dùng để web/mobile map nhanh
+     * @param conditionLabel điều kiện hiển thị cho khách (tiếng Việt)
+     * @param refundRate     tỷ lệ hoàn của bậc (0.80 = 80%)
+     * @param minDays        số ngày tối thiểu trước khởi hành để thuộc bậc này
+     */
+    @Builder
+    @Schema(description = "Bậc tỷ lệ hoàn theo thời điểm hủy")
+    public record RefundTierResponse(
+            @Schema(description = "Mã bậc (EARLY | MID | LATE)") String code,
+            @Schema(description = "Điều kiện hiển thị cho khách") String conditionLabel,
+            @Schema(description = "Tỷ lệ hoàn của bậc (0.80 = 80%)") BigDecimal refundRate,
+            @Schema(description = "Số ngày tối thiểu trước khởi hành để thuộc bậc này")
+            int minDays
+    ) {
     }
 
     /** Mã lý do chi tiết. */

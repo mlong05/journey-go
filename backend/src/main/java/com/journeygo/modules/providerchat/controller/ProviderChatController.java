@@ -4,6 +4,7 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.providerchat.dto.request.SendProviderMessageRequest;
 import com.journeygo.modules.providerchat.dto.request.StartProviderConversationRequest;
 import com.journeygo.modules.providerchat.dto.response.ProviderConversationResponse;
+import com.journeygo.modules.providerchat.dto.response.ProviderMessagePageResponse;
 import com.journeygo.modules.providerchat.dto.response.ProviderMessageResponse;
 import com.journeygo.modules.providerchat.service.ProviderChatService;
 import com.journeygo.security.UserPrincipal;
@@ -73,6 +74,29 @@ public class ProviderChatController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tin nhắn thành công",
                 chatService.listMessages(conversationId, userPrincipal.getId())));
+    }
+
+    /**
+     * Trang tin nhắn MỚI NHẤT — phân trang kiểu "cuộn lên để load thêm".
+     *
+     * <p>⚠️ Mặc định chỉ trả về 10 tin MỚI NHẤT ⇒ mở khung chat không phải tải
+     * cả lịch sử. Muốn xem tin cũ hơn thì gọi lại với {@code beforeId} =
+     * {@code nextCursor} của lần trước.
+     *
+     * @param limit     số tin mỗi trang (mặc định 10, tối đa 100)
+     * @param beforeId  id tin cũ nhất đã tải — lấy tin có id nhỏ hơn (null = mới nhất)
+     */
+    @GetMapping("/conversations/{conversationId}/messages/page")
+    @Operation(summary = "Trang tin nhắn mới nhất của cuộc trò chuyện (cuộn lên để load thêm)",
+            description = "Mặc định 10 tin mới nhất. Dùng nextCursor làm tham số 'beforeId' "
+                    + "để tải tiếp lịch sử cũ.")
+    public ResponseEntity<ApiResponse<ProviderMessagePageResponse>> listMessagesPage(
+            @PathVariable Long conversationId,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) Long beforeId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy trang tin nhắn thành công",
+                chatService.listMessagesPage(conversationId, userPrincipal.getId(), limit, beforeId)));
     }
 
     @PostMapping("/conversations/{conversationId}/messages")

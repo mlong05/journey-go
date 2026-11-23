@@ -1,4 +1,4 @@
-﻿# Tài liệu Triển khai — Booking · Payment · Refund · Provider Revenue · Wallet & Settlement
+# Tài liệu Triển khai — Booking · Payment · Refund · Provider Revenue · Wallet & Settlement
 
 > **Nguồn yêu cầu:** `Booking - Payment - Refund - Wallet & Settlement.pdf`
 > **Backend:** `backend/` — Java 21 · Spring Boot 3.3.5 · PostgreSQL · Flyway · Spring Security (JWT + Method Security)
@@ -258,8 +258,10 @@ TransactionDate|CreateBy|CreateDate|IpAddr|OrderInfo
 | Quy tắc | Chi tiết |
 |---|---|
 | **Cửa sổ 24 giờ** | Chỉ gửi yêu cầu trong vòng **24h kể từ `paidAt`** (thời điểm thanh toán thành công đã xác minh). Cấu hình: `app.finance.refund-window-hours` |
-| **Tourist không tự nhập số tiền** | Hệ thống tự tính theo nguyên nhân. Tourist gửi `reason` (`TOURIST_FAULT` / `PLATFORM_FAULT`), không có trường amount |
-| **Tỷ lệ hoàn** | `TOURIST_FAULT` → **50%**, `PLATFORM_FAULT` → **100%**. Cấu hình: `app.finance.tourist-fault-refund-rate` / `platform-fault-refund-rate` |
+| **Tourist không tự nhập số tiền** | Hệ thống tự tính theo nguyên nhân. Tourist gửi `reason` (`PERSONAL` / `PLATFORM_FAULT` / `PROVIDER_FAULT` / `FORCE_MAJEURE`), không có trường amount |
+| **Tỷ lệ hoàn — nhóm cá nhân** | `PERSONAL` → **3 bậc theo thời điểm hủy**: từ **7 ngày** trở lên → **80%**; từ **72 giờ – 6 ngày** → **50%**; dưới **72 giờ** (3 ngày) → **0%**. Xem `PersonalRefundPolicy` (Java) |
+| **Tỷ lệ hoàn — nhóm khác** | `PLATFORM_FAULT` / `PROVIDER_FAULT` → **100%**, `FORCE_MAJEURE` → **0%**. Cấu hình: `app.finance.platform-fault-refund-rate` |
+| **Mốc thời gian của bậc** | Tính từ **00:00 giờ Việt Nam của ngày trải nghiệm**, dựa trên **thời điểm khách gửi yêu cầu** (không phải lúc Admin duyệt) |
 | **Chống refund trùng** | 1 Payment chỉ có 1 yêu cầu refund ở trạng thái chưa kết thúc |
 | **Chống hoàn vượt** | Tổng số tiền đã hoàn + đang xử lý **không được vượt** số tiền thanh toán (`REFUND_EXCEEDS_PAYMENT_AMOUNT`) |
 | **Admin không đổi tỷ lệ** | Nếu Admin gửi `amount` khác số tiền hệ thống tính → `REFUND_AMOUNT_MISMATCH` |
@@ -503,7 +505,7 @@ Dùng cho **trường hợp phát sinh sau khi đã tất toán** (refund đến
 |---|---|---|
 | `refund-window-hours` | `24` | Cửa sổ gửi yêu cầu refund từ `paidAt` |
 | `default-commission-rate` | `0.2000` | Tỷ lệ hoa hồng mặc định (20%) |
-| `tourist-fault-refund-rate` | `0.50` | Hoàn 50% khi lỗi tourist |
+| `tourist-fault-refund-rate` | `0.50` | ⚠️ Không còn dùng — nhóm cá nhân tính theo 3 bậc (`PersonalRefundPolicy`) |
 | `platform-fault-refund-rate` | `1.00` | Hoàn 100% khi lỗi hệ thống |
 | `settlement-grace-minutes` | `0` | Số phút chờ sau khi kỳ kết thúc |
 | `allow-open-period-settlement` | `false` | Cho tạo settlement cho kỳ chưa kết thúc |

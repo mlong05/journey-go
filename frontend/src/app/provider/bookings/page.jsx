@@ -37,9 +37,11 @@ import {
 } from "lucide-react";
 import { BOOKING_STATUS_LABELS, formatLocalDate, formatVND } from "@/lib/money";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
+import { useChatHistory, CHAT_PAGE_SIZE } from "@/hooks/useChatHistory";
+import { useAuthSession } from "@/hooks/useAuthSession";
 import {
   approvePassengerChange,
-  getBookingMessages,
+  getBookingMessagesPage,
   getPassengerChanges,
   getProviderBookings,
   getProviderDepartures,
@@ -48,6 +50,7 @@ import {
 } from "@/features/booking/services/passengerService";
 import { providerTourService } from "@/features/tourwizard/services/providerTourService";
 import PaginationBar from "@/components/ui/PaginationBar";
+import ChatBubble from "@/components/ui/ChatBubble";
 import SearchSelect from "@/components/ui/SearchSelect";
 import { PAGE_SIZE } from "@/lib/pagination";
 const GUEST_LABELS = {
@@ -180,9 +183,6 @@ export default function ProviderBookingsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Khách hàng đã đặt tour</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Danh sách khách ĐÃ THANH TOÁN — dùng để quản lý số người tham gia từng chuyến đi.
-          </p>
         </div>
         <button
           type="button"
@@ -378,13 +378,20 @@ function DepartureRow({ departure: d, open, onToggle }) {
         )}
       </div>
 
+      {/*
+        ⚠️ Cột trạng thái + doanh thu: badge dùng W CỐ ĐỊNH (không min-w) ⇒
+        badge "Đã diễn ra" / "Sắp đầy" / "Còn chỗ" (độ dài khác nhau) vẫn chiếm
+        đúng một ô ⇒ số tiền luôn nằm thẳng hàng giữa các dòng.
+      */}
       <div className="flex items-center justify-between gap-3 pl-6 md:flex-col md:items-end md:pl-0">
         <span
-          className={`inline-flex min-w-[96px] justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${state.cls}`}
+          className={`inline-flex w-[96px] shrink-0 justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${state.cls}`}
         >
           {state.label}
         </span>
-        <span className="whitespace-nowrap font-mono text-xs font-bold text-slate-900">{formatVND(d.revenue)}</span>
+        <span className="w-[120px] shrink-0 whitespace-nowrap text-right font-mono text-xs font-bold text-slate-900">
+          {formatVND(d.revenue)}
+        </span>
       </div>
     </button>
   );
@@ -434,18 +441,23 @@ function DepartureBookings({ departure, reloadKey }) {
                 className="overflow-hidden rounded-xl border border-slate-200 bg-white"
               >
                 {/* Header của nhóm: tài khoản đặt tour + trạng thái đơn */}
-                <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-2">
-                  <span className="text-xs font-bold text-slate-900">
+                <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-2">
+                  <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-900">
                     Đơn của tài khoản: {b.touristName}
                   </span>
+                  {/*
+                    ⚠️ Badge dùng `w-[104px]` (KHÔNG `min-w`) ⇒ độ rộng CỐ ĐỊNH ⇒
+                    các nhóm có badge dài/ngắn vẫn cùng vị trí. Cùng logic với
+                    `BookingRow` ở tab "Theo đơn".
+                  */}
                   <span
-                    className={`inline-flex min-w-[104px] justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    className={`inline-flex w-[104px] shrink-0 justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
                       STATUS_BADGE[b.status] ?? "bg-slate-100 text-slate-600"
                     }`}
                   >
                     {BOOKING_STATUS_LABELS[b.status] ?? b.status}
                   </span>
-                  <span className="ml-auto whitespace-nowrap font-mono text-xs font-bold text-slate-900">
+                  <span className="w-[120px] shrink-0 whitespace-nowrap text-right font-mono text-xs font-bold text-slate-900">
                     {formatVND(b.totalAmount)}
                   </span>
                 </div>
@@ -455,9 +467,9 @@ function DepartureBookings({ departure, reloadKey }) {
                   {(b.passengers ?? []).map((p) => (
                     <li
                       key={p.id}
-                      className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5"
+                      className="flex items-center justify-between gap-3 px-4 py-2.5"
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-slate-900">
                           {p.fullName}
                           {p.bookingCustomer && (
@@ -478,7 +490,7 @@ function DepartureBookings({ departure, reloadKey }) {
                           {` · ${p.hasAccount ? "Đã có tài khoản" : "Chưa có tài khoản"}`}
                         </p>
                       </div>
-                      <span className="whitespace-nowrap font-mono text-xs font-bold text-slate-900">
+                      <span className="w-[120px] shrink-0 whitespace-nowrap text-right font-mono text-xs font-bold text-slate-900">
                         {formatVND(p.price)}
                       </span>
                     </li>
@@ -571,8 +583,16 @@ function BookingRow({ booking: b, showTour, onChanged }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full flex-wrap items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-slate-50"
+        className="flex w-full items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-slate-50"
       >
+        {/*
+          ⚠️ CỐ ĐỊNH bề rộng từng cột (w-[...]) ⇒ các dòng "Đã xác nhận / Ngày /
+          Số người / Tiền" luôn THẲNG HÀNG với nhau, độc lập độ dài nội dung
+          (tên tour / tên khách / độ dài badge).
+
+          ⚠️ TRƯỚC đây dùng `flex-wrap` + `min-w` ⇒ mỗi dòng tự đóng gói theo độ
+          dài nội dung ⇒ cột bị lệch nhau giữa các dòng (đúng lỗi user báo).
+        */}
         <div className="min-w-0 flex-1">
           {showTour && (
             <p className="truncate text-sm font-bold text-slate-900">{b.tourTitle ?? `Tour #${b.tourId}`}</p>
@@ -583,24 +603,27 @@ function BookingRow({ booking: b, showTour, onChanged }) {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-          {/* Badge trạng thái: min-width cố định để các hàng thẳng hàng với nhau. */}
+        <div className="flex shrink-0 items-center gap-4 text-xs text-slate-500">
+          {/* Badge trạng thái: W CỐ ĐỊNH (không min-w) ⇒ badge dài/ngắn vẫn
+              chiếm đúng một ô ⇒ cột sau luôn thẳng hàng. */}
           <span
-            className={`inline-flex min-w-[104px] justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+            className={`inline-flex w-[104px] shrink-0 justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
               STATUS_BADGE[b.status] ?? "bg-slate-100 text-slate-600"
             }`}
           >
             {BOOKING_STATUS_LABELS[b.status] ?? b.status}
           </span>
           {showTour && (
-            <span className="flex items-center gap-1">
+            <span className="flex w-[92px] shrink-0 items-center gap-1">
               <CalendarDays size={13} /> {formatLocalDate(b.experienceDate)}
             </span>
           )}
-          <span className="flex items-center gap-1">
+          <span className="flex w-[84px] shrink-0 items-center gap-1">
             <Users size={13} /> {b.passengerCount ?? 0} người
           </span>
-          <span className="whitespace-nowrap font-mono font-bold text-slate-900">{formatVND(b.totalAmount)}</span>
+          <span className="w-[120px] shrink-0 whitespace-nowrap text-right font-mono font-bold text-slate-900">
+            {formatVND(b.totalAmount)}
+          </span>
         </div>
       </button>
 
@@ -630,14 +653,41 @@ function LoadingRow({ text }) {
  */
 function ProviderBookingDetail({ booking, onChanged }) {
   const [changes, setChanges] = useState([]);
-  const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  // ID người đang đăng nhập ⇒ phân biệt tin "của mình" (bên phải) và tin của khách
+  // (bên trái) trong khung chat.
+  const { user } = useAuthSession();
+  const currentUserId = user?.id ?? null;
+
   const bookingId = booking?.id ?? null;
   const [reloadKey, setReloadKey] = useState(0);
+
+  // ⚠️ PHÂN TRANG KIỂU "CUỘN LÊN ĐỂ LOAD THÊM":
+  //  • Mở khung ⇒ chỉ tải 10 tin MỚI NHẤT, tự cuộn xuống cuối (thấy ngay tin mới).
+  //  • Cuộn lên gần đầu ⇒ tự nối thêm tin CŨ hơn.
+  const fetchMessagePage = useCallback(
+    (cursor) => getBookingMessagesPage(bookingId, CHAT_PAGE_SIZE, cursor),
+    [bookingId],
+  );
+
+  const {
+    messages,
+    loading: loadingMessages,
+    loadingMore,
+    hasMore,
+    error: messageError,
+    containerRef: messageListRef,
+    handleScroll: handleMessageScroll,
+    appendMessage,
+    loadMore: loadMoreMessages,
+  } = useChatHistory(fetchMessagePage, {
+    enabled: Boolean(bookingId),
+    resetKey: String(bookingId),
+  });
 
   // Tin nhắn mới trong booking này ⇒ hiện ngay, không cần tải lại danh sách.
   //
@@ -650,12 +700,9 @@ function ProviderBookingDetail({ booking, onChanged }) {
         if (scope === "BOOKING_CHAT" && Number(payload.bookingId) !== Number(bookingId)) return;
         if (scope === "PROVIDER_CHAT" && payload.bookingId != null
           && Number(payload.bookingId) !== Number(bookingId)) return;
-        setMessages((prev) => {
-          if (prev.some((m) => Number(m.id) === Number(payload.message?.id))) return prev;
-          return payload.message ? [...prev, payload.message] : prev;
-        });
+        appendMessage(payload.message);
       },
-      [bookingId],
+      [bookingId, appendMessage],
     ),
   );
 
@@ -664,17 +711,11 @@ function ProviderBookingDetail({ booking, onChanged }) {
     let cancelled = false;
     (async () => {
       try {
-        const [c, m] = await Promise.all([
-          getPassengerChanges(bookingId),
-          getBookingMessages(bookingId),
-        ]);
+        const c = await getPassengerChanges(bookingId);
         if (cancelled) return;
         setChanges(Array.isArray(c) ? c : (c?.content ?? []));
-        setMessages(Array.isArray(m) ? m : (m?.content ?? []));
       } catch {
-        if (cancelled) return;
-        setChanges([]);
-        setMessages([]);
+        if (!cancelled) setChanges([]);
       }
     })();
     return () => {
@@ -718,10 +759,7 @@ function ProviderBookingDetail({ booking, onChanged }) {
     if (!body) return;
     try {
       const created = await sendBookingMessage(booking.id, body);
-      setMessages((prev) => {
-        if (prev.some((m) => Number(m.id) === Number(created.id))) return prev;
-        return [...prev, created];
-      });
+      appendMessage(created);
       setText("");
     } catch (err) {
       setError(err?.message || "Không gửi được tin nhắn.");
@@ -753,9 +791,9 @@ function ProviderBookingDetail({ booking, onChanged }) {
           {passengers.map((p) => (
             <li
               key={p.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-slate-900">
                   {p.fullName}
                   {p.bookingCustomer && (
@@ -776,7 +814,9 @@ function ProviderBookingDetail({ booking, onChanged }) {
                   {p.hasAccount ? " · Đã có tài khoản" : " · Chưa có tài khoản"}
                 </p>
               </div>
-              <span className="font-mono text-xs font-bold text-slate-900">{formatVND(p.price)}</span>
+              <span className="w-[120px] shrink-0 whitespace-nowrap text-right font-mono text-xs font-bold text-slate-900">
+                {formatVND(p.price)}
+              </span>
             </li>
           ))}
           {passengers.length === 0 && (
@@ -866,23 +906,82 @@ function ProviderBookingDetail({ booking, onChanged }) {
         )}
       </div>
 
-      {/* ── Chat hỗ trợ ── */}
+      {/* ── Chat hỗ trợ ──
+          ⚠️ PHÂN BIỆT BÊN PHẢI (của mình) / BÊN TRÁI (của khách) + phân trang
+          "cuộn lên để load thêm" (chỉ 10 tin mới nhất mỗi lần tải). */}
       <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-          <Ticket size={15} /> Trao đổi với khách
-        </h3>
-        <div className="mt-3 max-h-56 space-y-2 overflow-y-auto rounded-lg bg-slate-50 p-3">
-          {messages.length === 0 ? (
+        <div className="flex items-center gap-2">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+            <Ticket size={15} /> Trao đổi với khách
+          </h3>
+        </div>
+
+        <div
+          ref={messageListRef}
+          onScroll={handleMessageScroll}
+          className="mt-3 max-h-72 space-y-2 overflow-y-auto overscroll-contain rounded-lg bg-slate-50 p-3 [scrollbar-width:thin]"
+        >
+          {loadingMessages ? (
+            <p className="flex items-center justify-center gap-2 py-6 text-xs text-slate-500">
+              <Loader2 size={14} className="animate-spin" /> Đang tải tin nhắn…
+            </p>
+          ) : messages.length === 0 ? (
             <p className="py-4 text-center text-xs text-slate-500">Chưa có tin nhắn.</p>
           ) : (
-            messages.map((m) => (
-              <div key={m.id} className="rounded-lg bg-white px-3 py-2 text-xs shadow-sm">
-                <p className="font-semibold text-slate-700">{m.senderName ?? "Người dùng"}</p>
-                <p className="mt-0.5 text-slate-600">{m.body}</p>
-              </div>
-            ))
+            <>
+              {/* Đầu danh sách: nút load thêm lịch sử cũ / dòng "đã xem hết". */}
+              {hasMore ? (
+                <div className="flex justify-center pb-1">
+                  <button
+                    type="button"
+                    onClick={loadMoreMessages}
+                    disabled={loadingMore}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 size={11} className="animate-spin" /> Đang tải lịch sử…
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown size={11} /> Xem tin nhắn cũ hơn
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <p className="pb-1 text-center text-[11px] text-slate-400">
+                  Bạn đã xem hết lịch sử tin nhắn
+                </p>
+              )}
+
+              <ul className="space-y-2">
+                {messages.map((m) => (
+                  <ChatBubble
+                    key={m.id}
+                    mine={currentUserId != null && Number(m.senderId) === Number(currentUserId)}
+                    body={m.body}
+                    createdAt={m.createdAt}
+                    author={m.senderName ?? "Khách hàng"}
+                  />
+                ))}
+              </ul>
+
+              {loadingMore && (
+                <p className="flex items-center justify-center gap-2 py-2 text-[11px] text-slate-400">
+                  <Loader2 size={11} className="animate-spin" /> Đang tải tin nhắn cũ…
+                </p>
+              )}
+            </>
           )}
         </div>
+
+        {messageError && (
+          <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+            {messageError}
+          </p>
+        )}
+
         <div className="mt-3 flex gap-2">
           <input
             type="text"

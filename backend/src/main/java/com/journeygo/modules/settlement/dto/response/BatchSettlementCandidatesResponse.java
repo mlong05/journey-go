@@ -24,7 +24,9 @@ import java.util.List;
 @Schema(description = "Ứng viên tất toán tổng cho toàn bộ đối tác theo kỳ")
 public record BatchSettlementCandidatesResponse(
 
-        @Schema(description = "Kỳ doanh thu (yyyy-MM)") String revenuePeriod,
+        @Schema(description = "Kỳ doanh thu — chu kỳ 10 ngày (yyyy-MM-D), VD: 2026-10-1 = 01/10 → 10/10/2026")
+        String revenuePeriod,
+        @Schema(description = "Nhãn kỳ tất toán đầy đủ, VD: '01/10 – 10/10/2026'") String periodLabel,
         @Schema(description = "Các khoản đủ điều kiện của toàn bộ đối tác") List<ProviderRevenueResponse> eligible,
         @Schema(description = "Các khoản bị giữ lại kèm lý do") List<HeldItem> held,
         @Schema(description = "Tổng số tiền của các khoản đủ điều kiện") Totals totals,
@@ -52,6 +54,10 @@ public record BatchSettlementCandidatesResponse(
 
     /**
      * Khoản bị giữ lại — kèm đối tác sở hữu để Admin biết vì sao bị loại.
+     *
+     * @param carriedOver {@code true} ⇒ khoản thuộc KỲ TRƯỚC, đã được đẩy sang kỳ này
+     *                    để xét lại nhưng VẪN chưa đủ điều kiện ⇒ tiếp tục chờ.
+     *                    {@code false} ⇒ khoản thuộc đúng kỳ đang xem.
      */
     @Builder
     @Schema(description = "Khoản doanh thu bị giữ lại")
@@ -63,7 +69,9 @@ public record BatchSettlementCandidatesResponse(
             @Schema(description = "Mã đơn đặt tour") String bookingCode,
             @Schema(description = "Kỳ doanh thu gốc") String revenuePeriod,
             @Schema(description = "Số tiền ProviderProfile được nhận") BigDecimal providerNetAmount,
-            @Schema(description = "Lý do bị giữ lại") DeferredReason deferredReason
+            @Schema(description = "Lý do bị giữ lại") DeferredReason deferredReason,
+            @Schema(description = "Khoản được đẩy từ kỳ trước sang kỳ này và vẫn chưa đủ điều kiện")
+            Boolean carriedOver
     ) {
     }
 

@@ -13,7 +13,7 @@ import java.math.BigDecimal;
  */
 public interface ApprovedSettlementAggregate {
 
-    /** Kỳ doanh thu (yyyy-MM). */
+    /** Kỳ doanh thu (chu kỳ 10 ngày, yyyy-MM-D). */
     String getRevenuePeriod();
 
     /** Tổng tiền khách đã thanh toán. */
