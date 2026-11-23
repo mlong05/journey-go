@@ -16,6 +16,8 @@ import { touristService, getTourPreview } from "../services/touristService";
 import {
   BOOKING_STATUS, REFUND_STATUS, REFUND_PENDING_STATUSES, longDate, todayIso, vnd,
 } from "../utils";
+import PaginationBar from "@/components/ui/PaginationBar";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 /**
  * Phân loại đơn — MỖI ĐƠN CHỈ THUỘC ĐÚNG MỘT NHÓM.
@@ -156,14 +158,27 @@ function NextTrip({ booking, today, isGuest }) {
   );
 }
 
-function TripCard({ b, refundByBooking, isGuest }) {
-  const st = BOOKING_STATUS[b.status] || BOOKING_STATUS.CANCELLED;
+function TripCard({ b, refundByBooking, isGuest, group }) {
+  // ⚠️ Nhãn trạng thái phải KHỚP với NHÓM đang hiển thị, không dùng thẳng
+  // `b.status`:
+  //  • Nhóm "Đã hoàn thành" gồm cả đơn CONFIRMED có ngày đi đã qua (backend
+  //    chưa kịp đánh dấu COMPLETED) ⇒ hiện "Đã xác nhận" ở tab "Đã hoàn thành"
+  //    là SAI ⇒ gán lại "Đã hoàn thành".
+  const effectiveStatus = group === "completed" ? "COMPLETED" : b.status;
+  const st = BOOKING_STATUS[effectiveStatus] || BOOKING_STATUS.CANCELLED;
   const refund = refundBadgeFor(b.id, refundByBooking);
   const refundState = refundStateOf(latestRefundOf(b.id, refundByBooking));
   const closed = b.status === "CANCELLED" || b.status === "EXPIRED";
-  // ⚠️ "Đặt lại tour" chỉ hiện khi đơn ĐÃ xử lý xong hoàn tiền (tránh mua trùng lúc tiền hoàn
-  // còn bay) hoặc đơn đã hủy/hết hạn. Hành khách được mời không đặt lại được (đơn không thuộc họ).
-  const canRebook = !isGuest && (refundState === "resolved" || (closed && refundState === "none"));
+  // ⚠️ "Đặt lại tour" hiện khi:
+  //  • đơn ĐÃ xử lý xong hoàn tiền (tránh mua trùng lúc tiền hoàn còn bay),
+  //  • đơn đã hủy/hết hạn, HOẶC
+  //  • đơn ĐÃ HOÀN THÀNH (tour đã đi xong) ⇒ người dùng muốn thì đặt lại
+  //    tour cho lần sau. Hành khách được mời không đặt lại được (đơn không thuộc họ).
+  const canRebook = !isGuest && b.tourId && (
+    group === "completed"
+    || refundState === "resolved"
+    || (closed && refundState === "none")
+  );
   return (
     <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-teal-300">
       <TransitionLink href={ROUTES.TRIP_DETAIL(b.id)} type="forward" className="flex items-center gap-3 p-3 sm:gap-4">
@@ -205,7 +220,7 @@ function TripCard({ b, refundByBooking, isGuest }) {
         <div className="border-t border-slate-100 px-3 py-2.5">
           <TransitionLink href={ROUTES.TOUR_DETAIL(b.tourId)}
             className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-teal-200 bg-white px-4 py-2 text-xs font-bold text-teal-800 transition-colors hover:bg-teal-50">
-            <RotateCcw size={14} />Đặt lại tour
+            <RotateCcw size={14} />{group === "completed" ? "Đặt lại tour này" : "Đặt lại tour"}
           </TransitionLink>
         </div>
       )}
@@ -235,8 +250,10 @@ function Trips() {
     let alive = true;
     // ⚠️ `/bookings/accessible` = đơn tôi đặt + đơn tôi được MỜI tham gia. `/bookings/my` chỉ có đơn tôi đặt
     // ⇒ du khách được mời sẽ không thấy chuyến đi của mình. Tải song song danh sách tour công khai để có ảnh bìa.
+    // ⚠️ Phân trang chạy phía client (mỗi tab một danh sách riêng) ⇒ phải tải ĐỦ đơn,
+    //    nếu không sẽ thiếu chuyến ở các trang sau. `all: true` ⇒ gọi hết các trang.
     Promise.all([
-      touristService.myBookings(),
+      touristService.myBookings({ all: true }),
       touristService.accessibleBookings().catch(() => []),
       touristService.publishedTours().catch(() => null),
     ]).then(([mine, accessible]) => {
@@ -301,7 +318,35 @@ function Trips() {
   // Tab nằm trên URL (?tab=) ⇒ link từ nơi khác mở đúng tab, F5 vẫn giữ tab.
   const requested = TAB_ALIASES[params.get("tab")] || params.get("tab");
   const active = TRIP_TABS.some(([k]) => k === requested) ? requested : "all";
-  const pick = (k) => router.replace(k === "all" ? pathname : `${pathname}?tab=${k}`, { scroll: false });
+
+  /**
+   * Trang hiện tại nằm trên URL (?page=) ⇒ link chia sẻ được, F5 vẫn giữ trang.
+   *
+   * ⚠️ Đổi tab ⇒ quay về trang 1 (vì mỗi tab có danh sách riêng).
+   */
+  const pageParam = Number.parseInt(params.get("page") || "1", 10);
+  const [page, setPage] = useState(Number.isFinite(pageParam) && pageParam > 0 ? pageParam - 1 : 0);
+  const activeRef = useRef(active);
+  useEffect(() => {
+    if (activeRef.current === active) return;
+    activeRef.current = active;
+    setPage(0);
+  }, [active]);
+
+  /** Ghi trang mới lên URL (giữ nguyên tham số tab) + cập nhật state. */
+  const pickPage = (p) => {
+    setPage(p);
+    const next = new URLSearchParams(params.toString());
+    if (p > 0) next.set("page", String(p + 1));
+    else next.delete("page");
+    router.replace(`${pathname}${next.toString() ? `?${next}` : ""}`, { scroll: false });
+  };
+
+  /** Đổi tab ⇒ về trang 1 (mỗi tab có danh sách riêng). */
+  const pick = (k) => {
+    setPage(0);
+    router.replace(k === "all" ? pathname : `${pathname}?tab=${k}`, { scroll: false });
+  };
 
   // Điện thoại: hàng tab cuộn ngang ⇒ đưa tab đang chọn vào giữa (vd. mở thẳng ?tab=experiencing).
   const tablistRef = useRef(null);
@@ -314,12 +359,23 @@ function Trips() {
 
   // Nhóm "chưa đi" thì ngày tăng dần (sắp đi trước), nhóm đã đóng thì giảm dần.
   const ascending = active === "all" || active === "purchased" || active === "pending" || active === "experiencing";
-  let list = [...(groups[active] || [])].sort((a, b) =>
+  const sorted = [...(groups[active] || [])].sort((a, b) =>
     ascending
       ? String(a.experienceDate || "").localeCompare(String(b.experienceDate || ""))
       : String(b.experienceDate || "").localeCompare(String(a.experienceDate || "")));
   // Chuyến gần nhất đã hiện ở thẻ lớn phía trên.
-  if (next && (active === "all" || active === "purchased")) list = list.filter((b) => b.id !== next.id);
+  const fullList = next && (active === "all" || active === "purchased")
+    ? sorted.filter((b) => b.id !== next.id)
+    : sorted;
+
+  // ── Phân trang: mỗi trang 10 ô (PAGE_SIZE) ──────────────────────────────────
+  // ⚠️ Tính trên TOÀN BỘ danh sách của tab (đã bỏ thẻ "chuyến sắp tới") ⇒
+  // số trang / tổng bản ghi khớp với đúng những gì người dùng thấy.
+  const totalElements = fullList.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / PAGE_SIZE));
+  // Trang vượt quá số trang (vd. mở link cũ / danh sách vừa rút ngắn) ⇒ về trang cuối.
+  const safePage = Math.min(page, totalPages - 1);
+  const list = fullList.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   if (state.loading) {
     return <div className="space-y-3" aria-busy="true"><div className="jg-shimmer h-52 rounded-3xl" />{[0, 1].map((i) => <div key={i} className="jg-shimmer h-[112px] rounded-2xl" />)}</div>;
@@ -362,12 +418,33 @@ function Trips() {
           {(active === "refunding" || active === "refunded") && <RefundGuide />}
           {list.length ? (
             <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
-              {list.map((b) => <TripCard key={b.id} b={b} refundByBooking={refundByBooking} isGuest={guestIds.has(String(b.id))} />)}
+              {list.map((b) => (
+                <TripCard
+                  key={b.id}
+                  b={b}
+                  refundByBooking={refundByBooking}
+                  isGuest={guestIds.has(String(b.id))}
+                  group={groupOf.get(String(b.id))}
+                />
+              ))}
             </div>
           ) : (
             <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
               {next && (active === "all" || active === "purchased") ? "Không còn chuyến nào khác." : EMPTY[active]}
             </p>
+          )}
+
+          {/* Phân trang — mỗi trang 10 ô, giữ nguyên bố cục 1 hàng 2 ô */}
+          {totalPages > 1 && (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <PaginationBar
+                page={safePage}
+                totalPages={totalPages}
+                totalElements={totalElements}
+                unit="chuyến đi"
+                onChange={pickPage}
+              />
+            </div>
           )}
         </div>
       </div>

@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "./useTouristSession";
-import { PURCHASED_BOOKING_STATUSES } from "./usePurchasedBooking";
+import { blocksRebook } from "./usePurchasedBooking";
 
 /** Set rỗng dùng chung ⇒ không tạo Set mới mỗi lần render (giữ referential stability). */
 const EMPTY = new Set();
 
 /**
- * Tập ID các tour du khách ĐÃ MUA (booking `CONFIRMED` / `COMPLETED`).
+ * Tập ID các tour du khách ĐÃ MUA và CÒN HIỆU LỰC (booking `CONFIRMED`).
  *
  * <p>Dùng để ẨN tour đã mua khỏi danh sách du khách có thể đặt:
  * <ul>
@@ -18,7 +18,8 @@ const EMPTY = new Set();
  *   <li>ô tìm kiếm.</li>
  * </ul>
  *
- * ⚠️ `COMPLETED` cũng tính là "đã mua" — mỗi tour chỉ được đặt một lần
+ * ⚠️ CHỈ `CONFIRMED` mới bị ẩn. Booking `COMPLETED` (tour đã đi xong) KHÔNG bị
+ * ẩn ⇒ du khách thấy lại tour đó trong danh sách và có thể đặt tiếp cho lần sau
  * (xem `BookingService.validateTourNotAlreadyPurchased` ở backend).
  *
  * ⚠️ Về hydration: `ready` của `useTouristSession` là `false` ở cả bản SSR lẫn
@@ -41,7 +42,10 @@ export function usePurchasedTourIds() {
         if (!alive) return;
         const ids = new Set(
           (list || [])
-            .filter((b) => PURCHASED_BOOKING_STATUSES.has(b.status) && b.tourId != null)
+            // ⚠️ Chỉ tour còn CÒN CHẶN đặt lại mới bị ẩn khỏi danh sách.
+            // Tour đã đi xong (đơn `COMPLETED` hoặc `CONFIRMED` ngày đã qua)
+            // ⇒ hiện lại để người dùng đặt tiếp nếu muốn.
+            .filter((b) => b.tourId != null && blocksRebook(b))
             .map((b) => Number(b.tourId)),
         );
         setState({ ids, loaded: true });
