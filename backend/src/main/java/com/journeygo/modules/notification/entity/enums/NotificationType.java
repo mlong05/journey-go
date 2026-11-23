@@ -21,6 +21,7 @@ public enum NotificationType {
     PARTNER_PROFILE_UPDATE_PENDING(Category.REVIEW),
 
     // ── Provider ─────────────────────────────────────────────────────────────
+    TOUR_REQUEST_NEW(Category.BOOKING),
     DESTINATION_APPROVED(Category.APPROVED),
     DESTINATION_REJECTED(Category.REJECTED),
     TOUR_APPROVED(Category.APPROVED),
@@ -38,6 +39,9 @@ public enum NotificationType {
     PARTNER_PROFILE_UPDATE_REJECTED(Category.REJECTED),
 
     // ── Du khách ─────────────────────────────────────────────────────────────
+    TOUR_REQUEST_ACCEPTED(Category.BOOKING),
+    CUSTOM_TOUR_CREATED(Category.BOOKING),
+    CUSTOM_TOUR_READY(Category.BOOKING),
     PAYMENT_SUCCESS(Category.BOOKING),
     TOUR_REMINDER(Category.BOOKING),
     PASSENGER_CHANGE_REQUESTED(Category.BOOKING),

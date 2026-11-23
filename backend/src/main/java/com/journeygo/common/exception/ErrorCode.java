@@ -176,7 +176,17 @@ public enum ErrorCode {
     VOUCHER_INVALID("Voucher không hợp lệ cho đơn hàng này", HttpStatus.BAD_REQUEST),
     ACHIEVEMENT_NOT_FOUND("Thành tựu không tồn tại", HttpStatus.NOT_FOUND),
     ACHIEVEMENT_NOT_CLAIMABLE("Thành tựu chưa đủ điều kiện hoặc đã được nhận thưởng", HttpStatus.BAD_REQUEST),
-    ACHIEVEMENT_CODE_EXISTED("Mã thành tựu này đã tồn tại trong hệ thống", HttpStatus.CONFLICT);
+    ACHIEVEMENT_CODE_EXISTED("Mã thành tựu này đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
+
+    // ── Tour Request (Tour theo nhu cầu) ────────────────────────────────────
+    TOUR_REQUEST_NOT_FOUND("Yêu cầu tạo tour không tồn tại", HttpStatus.NOT_FOUND),
+    TOUR_REQUEST_ALREADY_ACCEPTED("Yêu cầu này đã được đối tác khác nhận", HttpStatus.CONFLICT),
+    TOUR_REQUEST_INVALID_STATUS("Trạng thái yêu cầu tour không hợp lệ cho thao tác này", HttpStatus.BAD_REQUEST),
+    TOUR_REQUEST_NOT_OWNER("Bạn không có quyền chỉnh sửa hoặc hủy yêu cầu này", HttpStatus.FORBIDDEN),
+    TOUR_REQUEST_NOT_ACCEPTED_BY_YOU("Chỉ đối tác đã nhận yêu cầu mới có thể thao tác", HttpStatus.FORBIDDEN),
+    TOUR_SPECIFIC_USER_NOT_FOUND("Không tìm thấy người dùng với email được chỉ định", HttpStatus.BAD_REQUEST),
+    TOUR_SPECIFIC_USER_EMAIL_REQUIRED("Tour riêng bắt buộc phải có email người nhận hợp lệ", HttpStatus.BAD_REQUEST),
+    TOUR_ACCESS_DENIED("Tour này là tour riêng, bạn không có quyền xem hoặc đặt mua", HttpStatus.FORBIDDEN);
 
     private final String message;
     private final HttpStatus httpStatus;
