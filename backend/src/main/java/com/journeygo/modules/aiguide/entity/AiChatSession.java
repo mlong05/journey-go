@@ -12,7 +12,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "ai_chat_sessions", indexes = {
         @Index(name = "idx_ai_chat_sessions_user", columnList = "user_id"),
-        @Index(name = "idx_ai_chat_sessions_destination", columnList = "current_destination_id")
+        @Index(name = "idx_ai_chat_sessions_destination", columnList = "current_destination_id"),
+        @Index(name = "idx_ai_chat_sessions_handoff", columnList = "handoff_status, updated_at")
 })
 @Getter
 @Setter
@@ -37,6 +38,29 @@ public class AiChatSession {
     @Column(name = "current_destination_id")
     private Long currentDestinationId;
 
+    /**
+     * Trạng thái điều phối giữa AI và nhân sự thật (Admin / Moderator).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "handoff_status", nullable = false, length = 20)
+    @Builder.Default
+    private AiChatHandoffStatus handoffStatus = AiChatHandoffStatus.AI_ACTIVE;
+
+    @Column(name = "handoff_requested_at")
+    private Instant handoffRequestedAt;
+
+    @Column(name = "handoff_reason", length = 500)
+    private String handoffReason;
+
+    @Column(name = "assigned_staff_id")
+    private Long assignedStaffId;
+
+    @Column(name = "assigned_staff_name", length = 150)
+    private String assignedStaffName;
+
+    @Column(name = "assigned_staff_role", length = 30)
+    private String assignedStaffRole;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -46,6 +70,9 @@ public class AiChatSession {
     @PrePersist
     public void prePersist() {
         Instant now = Instant.now();
+        if (this.handoffStatus == null) {
+            this.handoffStatus = AiChatHandoffStatus.AI_ACTIVE;
+        }
         if (this.createdAt == null) {
             this.createdAt = now;
         }

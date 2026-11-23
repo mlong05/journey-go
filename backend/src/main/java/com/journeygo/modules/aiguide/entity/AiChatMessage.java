@@ -28,13 +28,22 @@ public class AiChatMessage {
     private UUID sessionId;
 
     /**
-     * Vai trò của tin nhắn: 'USER' hoặc 'ASSISTANT' (hoặc 'SYSTEM').
+     * Vai trò của tin nhắn: 'USER', 'ASSISTANT', 'HUMAN_AGENT' hoặc 'SYSTEM'.
      */
     @Column(name = "role", nullable = false, length = 20)
     private String role;
 
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
+
+    @Column(name = "sender_id")
+    private Long senderId;
+
+    @Column(name = "sender_name", length = 150)
+    private String senderName;
+
+    @Column(name = "sender_role", length = 30)
+    private String senderRole;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

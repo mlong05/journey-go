@@ -42,14 +42,66 @@ export const aiGuideService = {
     return unwrap(await apiClient.get(`/ai-guide/sessions?${query}`));
   },
 
+  async getSession(sessionId) {
+    return unwrap(await apiClient.get(`/ai-guide/sessions/${sessionId}`));
+  },
+
   async getSessionMessages(sessionId) {
     return toList(
       unwrap(await apiClient.get(`/ai-guide/sessions/${sessionId}/messages`)),
     );
   },
 
+  async requestHumanSupport(sessionId, reason = "") {
+    const payload = reason && reason.trim() ? { reason: reason.trim() } : {};
+    return unwrap(
+      await apiClient.post(`/ai-guide/sessions/${sessionId}/request-human`, payload),
+    );
+  },
+
+  async returnToAi(sessionId) {
+    return unwrap(
+      await apiClient.post(`/ai-guide/sessions/${sessionId}/return-ai`, {}),
+    );
+  },
+
   async deleteSession(sessionId) {
     return unwrap(await apiClient.delete(`/ai-guide/sessions/${sessionId}`));
+  },
+
+  async getAdminHandoffSessions({ status = "WAITING_HUMAN", page = 0, size = 20 } = {}) {
+    const query = new URLSearchParams({
+      status,
+      page: String(page),
+      size: String(size),
+    });
+    return unwrap(await apiClient.get(`/admin/ai/handoff/sessions?${query}`));
+  },
+
+  async getAdminHandoffMessages(sessionId) {
+    return toList(
+      unwrap(await apiClient.get(`/admin/ai/handoff/sessions/${sessionId}/messages`)),
+    );
+  },
+
+  async claimHandoffSession(sessionId) {
+    return unwrap(
+      await apiClient.post(`/admin/ai/handoff/sessions/${sessionId}/claim`, {}),
+    );
+  },
+
+  async replyHandoffSession(sessionId, content) {
+    return unwrap(
+      await apiClient.post(`/admin/ai/handoff/sessions/${sessionId}/reply`, {
+        content,
+      }),
+    );
+  },
+
+  async resolveHandoffSession(sessionId) {
+    return unwrap(
+      await apiClient.post(`/admin/ai/handoff/sessions/${sessionId}/resolve`, {}),
+    );
   },
 
   async getAdminStats() {

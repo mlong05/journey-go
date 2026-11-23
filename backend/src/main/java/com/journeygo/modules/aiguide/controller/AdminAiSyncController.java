@@ -4,6 +4,7 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.modules.aiguide.config.GeminiAiProperties;
 import com.journeygo.modules.aiguide.dto.AiKnowledgeChunkAdminDto;
+import com.journeygo.modules.aiguide.entity.AiChatHandoffStatus;
 import com.journeygo.modules.aiguide.entity.AiDocumentType;
 import com.journeygo.modules.aiguide.entity.AiKnowledgeChunk;
 import com.journeygo.modules.aiguide.entity.AiKnowledgeDocument;
@@ -306,6 +307,8 @@ public class AdminAiSyncController {
         long totalChunks = chunkRepository.count();
         long totalSessions = sessionRepository.count();
         long totalMessages = messageRepository.count();
+        long pendingHandoffSessions = sessionRepository.countByHandoffStatus(AiChatHandoffStatus.WAITING_HUMAN);
+        long activeHandoffSessions = sessionRepository.countByHandoffStatus(AiChatHandoffStatus.HUMAN_ACTIVE);
 
         Map<String, Long> chunksByContentType = new LinkedHashMap<>();
         for (Object[] row : chunkRepository.countGroupedByContentType()) {
@@ -318,6 +321,8 @@ public class AdminAiSyncController {
         stats.put("totalKnowledgeChunks", totalChunks);
         stats.put("totalSessions", totalSessions);
         stats.put("totalMessages", totalMessages);
+        stats.put("pendingHandoffSessions", pendingHandoffSessions);
+        stats.put("activeHandoffSessions", activeHandoffSessions);
         stats.put("chunksByContentType", chunksByContentType);
         stats.put("totalAdminDocuments", documentRepository.count());
         stats.put("activeAdminDocuments", documentRepository.countByActiveTrue());

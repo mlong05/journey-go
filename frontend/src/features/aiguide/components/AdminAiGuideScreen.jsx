@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  Bot,
   Database,
   RefreshCw,
   MessageSquare,
@@ -18,10 +17,12 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  Headset,
 } from "lucide-react";
 import { PageHeader, StatCard, Panel, EmptyBlock } from "@/components/dashboard/DashboardUI";
 import { aiGuideService } from "../services/aiGuideService";
 import AdminAiDocumentsPanel from "./AdminAiDocumentsPanel";
+import AdminAiHandoffPanel from "./AdminAiHandoffPanel";
 import AiMessageContent from "./AiMessageContent";
 
 const CONTENT_TYPE_OPTIONS = [
@@ -316,14 +317,26 @@ export default function AdminAiGuideScreen() {
               : "Chưa có dữ liệu vector"
           }
         />
-        <StatCard
-          title="Phiên hội thoại Du khách"
-          value={(stats?.totalSessions ?? 0).toLocaleString("vi-VN")}
-          unit="phiên"
-          icon={Bot}
-          tone="emerald"
-          hint={`Tổng ${(stats?.totalMessages ?? 0).toLocaleString("vi-VN")} lượt · ${stats?.activeAdminDocuments ?? 0} tài liệu (${stats?.activeAiRules ?? 0} rules)`}
-        />
+        <button
+          type="button"
+          onClick={() => setActiveTab("handoff")}
+          className="text-left rounded-xl transition hover:ring-2 hover:ring-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+          title="Nhấn để mở danh sách phiên chat đang chờ xử lý"
+        >
+          <StatCard
+            title="Các phiên chat đang chờ xử lý"
+            value={(stats?.pendingHandoffSessions ?? 0).toLocaleString("vi-VN")}
+            unit="chờ xử lý"
+            icon={Headset}
+            tone={(stats?.pendingHandoffSessions ?? 0) > 0 ? "amber" : "emerald"}
+            badge={
+              (stats?.pendingHandoffSessions ?? 0) > 0
+                ? { text: "Cần tiếp nhận", positive: false }
+                : { text: "Đã xử lý hết", positive: true }
+            }
+            hint={`Đang hỗ trợ: ${stats?.activeHandoffSessions ?? 0} · Tổng ${stats?.totalSessions ?? 0} phiên`}
+          />
+        </button>
         <StatCard
           title="Chế độ Vector Store"
           value={stats?.pgvectorEnabled ? "pgvector HNSW" : "TEXT Cosine"}
@@ -388,9 +401,35 @@ export default function AdminAiGuideScreen() {
             {stats?.totalAdminDocuments ?? 0}
           </span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("handoff")}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
+            activeTab === "handoff"
+              ? "bg-amber-600 text-white shadow-xs"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <Headset size={14} />
+          Phiên chat chờ xử lý
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+              activeTab === "handoff"
+                ? "bg-white/20 text-white"
+                : (stats?.pendingHandoffSessions ?? 0) > 0
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-white text-slate-700"
+            }`}
+          >
+            {stats?.pendingHandoffSessions ?? 0}
+          </span>
+        </button>
       </div>
 
-      {activeTab === "documents" ? (
+      {activeTab === "handoff" ? (
+        <AdminAiHandoffPanel onStatsChanged={loadStatsAndDestinations} />
+      ) : activeTab === "documents" ? (
         <AdminAiDocumentsPanel
           destinations={destinations}
           onDocumentsChanged={() => {

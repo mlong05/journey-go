@@ -6,6 +6,7 @@ import com.journeygo.modules.aiguide.dto.AiChatMessageDto;
 import com.journeygo.modules.aiguide.dto.AiChatRequest;
 import com.journeygo.modules.aiguide.dto.AiChatResponse;
 import com.journeygo.modules.aiguide.dto.AiChatSessionDto;
+import com.journeygo.modules.aiguide.dto.AiHandoffRequest;
 import com.journeygo.modules.aiguide.service.VirtualGuideChatService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -84,6 +85,38 @@ public class AiGuideChatController {
             @Parameter(description = "ID phiên trò chuyện") @PathVariable UUID sessionId) {
         List<AiChatMessageDto> messages = virtualGuideChatService.getSessionMessages(sessionId, currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử tin nhắn thành công", messages));
+    }
+
+    @Operation(summary = "Lấy thông tin chi tiết một phiên trò chuyện",
+            description = "Bao gồm trạng thái chuyển tiếp hỗ trợ người thật và nhân sự tiếp nhận.")
+    @GetMapping("/sessions/{sessionId}")
+    public ResponseEntity<ApiResponse<AiChatSessionDto>> getSession(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "ID phiên trò chuyện") @PathVariable UUID sessionId) {
+        AiChatSessionDto session = virtualGuideChatService.getSession(sessionId, currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin phiên trò chuyện thành công", session));
+    }
+
+    @Operation(summary = "Yêu cầu kết nối trò chuyện trực tiếp với Admin / Moderator",
+            description = "Đưa phiên hội thoại vào danh sách chờ xử lý và tạm dừng phản hồi tự động từ AI.")
+    @PostMapping("/sessions/{sessionId}/request-human")
+    public ResponseEntity<ApiResponse<AiChatSessionDto>> requestHumanSupport(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "ID phiên trò chuyện") @PathVariable UUID sessionId,
+            @Valid @RequestBody(required = false) AiHandoffRequest request) {
+        String reason = request != null ? request.getReason() : null;
+        AiChatSessionDto session = virtualGuideChatService.requestHumanSupport(sessionId, currentUser.getId(), reason);
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi yêu cầu trò chuyện với Admin / Moderator", session));
+    }
+
+    @Operation(summary = "Quay lại trò chuyện với AI Hướng dẫn viên",
+            description = "Kết thúc chế độ chờ hoặc chat trực tiếp với nhân sự và kích hoạt lại AI.")
+    @PostMapping("/sessions/{sessionId}/return-ai")
+    public ResponseEntity<ApiResponse<AiChatSessionDto>> returnToAi(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "ID phiên trò chuyện") @PathVariable UUID sessionId) {
+        AiChatSessionDto session = virtualGuideChatService.returnToAi(sessionId, currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success("Đã chuyển phiên trò chuyện về AI Hướng dẫn viên", session));
     }
 
     @Operation(summary = "Xóa phiên trò chuyện",

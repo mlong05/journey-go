@@ -4,6 +4,7 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.modules.aiguide.config.GeminiAiProperties;
 import com.journeygo.modules.aiguide.dto.AiKnowledgeChunkAdminDto;
+import com.journeygo.modules.aiguide.entity.AiChatHandoffStatus;
 import com.journeygo.modules.aiguide.entity.AiDocumentScope;
 import com.journeygo.modules.aiguide.entity.AiDocumentType;
 import com.journeygo.modules.aiguide.entity.AiKnowledgeChunk;
@@ -173,6 +174,8 @@ class AdminAiSyncControllerTest {
         when(chunkRepository.count()).thenReturn(15L);
         when(sessionRepository.count()).thenReturn(4L);
         when(messageRepository.count()).thenReturn(18L);
+        when(sessionRepository.countByHandoffStatus(AiChatHandoffStatus.WAITING_HUMAN)).thenReturn(2L);
+        when(sessionRepository.countByHandoffStatus(AiChatHandoffStatus.HUMAN_ACTIVE)).thenReturn(1L);
         when(chunkRepository.countGroupedByContentType()).thenReturn(List.of(
                 new Object[]{"CULTURAL_STORY", 10L},
                 new Object[]{"TASK_HINT", 5L}
@@ -188,6 +191,8 @@ class AdminAiSyncControllerTest {
         assertThat(stats).containsEntry("totalKnowledgeChunks", 15L);
         assertThat(stats).containsEntry("totalSessions", 4L);
         assertThat(stats).containsEntry("totalMessages", 18L);
+        assertThat(stats).containsEntry("pendingHandoffSessions", 2L);
+        assertThat(stats).containsEntry("activeHandoffSessions", 1L);
         assertThat(stats).containsEntry("totalAdminDocuments", 5L);
         assertThat(stats).containsEntry("activeAdminDocuments", 4L);
         assertThat(stats).containsEntry("activeAiRules", 2L);
