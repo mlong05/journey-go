@@ -378,13 +378,15 @@ public class FlywayConfig {
      * version tạm (V41 = settlement batch scope, V42 = payment expiry index). Sau khi merge vào
      * {@code main}, số version bị đánh lại cho khớp với các migration đã có trên main:
      * <pre>
-     *   DB cũ (đã chạy)          →  Mã nguồn hiện tại (main)
-     *   V41 settlement batch scope → V43 settlement batch scope
-     *   V42 payment expiry index   → V44 payment expiry index
-     *   V41 achievement system     → V41 achievement system   (mới)
-     *   V42 guest type pricing     → V42 guest type pricing   (mới)
+     *   DB cũ (đã chạy)              →  Mã nguồn hiện tại (main)
+     *   V41 settlement batch scope   → V43 settlement batch scope
+     *   V42 payment expiry index     → V44 payment expiry index
+     *   V43 ai knowledge documents   → V47 ai knowledge documents
+     *   V44 ai chat human handoff    → V48 ai chat human handoff
+     *   V41 achievement system       → V41 achievement system   (mới)
+     *   V42 guest type pricing       → V42 guest type pricing   (mới)
      * </pre>
-     * ⇒ Flyway validate fail: "Migration checksum mismatch for migration version 41 / 42"
+     * ⇒ Flyway validate fail: "Migration checksum mismatch for migration version 41 / 42 / 43 / 44"
      * ⇒ {@code flywayInitializer} chết ⇒ {@code entityManagerFactory} không tạo được ⇒
      * ứng dụng không khởi động được ("Unable to start embedded Tomcat").
      *
@@ -404,11 +406,14 @@ public class FlywayConfig {
                     DELETE FROM flyway_schema_history
                     WHERE (version = '41' AND description = 'settlement batch scope')
                        OR (version = '42' AND description = 'payment expiry index')
+                       OR (version = '43' AND description = 'ai knowledge documents')
+                       OR (version = '44' AND description = 'ai chat human handoff')
                     """)) {
                 int removed = ps.executeUpdate();
                 if (removed > 0) {
                     log.warn("[Flyway] Đã xóa {} dòng lịch sử của migration đã đổi số phiên bản "
-                            + "(V41 settlement batch scope → V43, V42 payment expiry index → V44); "
+                            + "(V41 settlement batch scope → V43, V42 payment expiry index → V44, "
+                            + "V43 ai knowledge documents → V47, V44 ai chat human handoff → V48); "
                             + "chúng sẽ được chạy lại với số mới.", removed);
                 }
             }

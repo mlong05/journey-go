@@ -210,6 +210,21 @@ public class CulturalContentService {
 
         content.setDeleted(false);
         CulturalContent saved = culturalContentRepository.save(content);
+        try {
+            contentModerationService.requireApproved(saved.getId());
+            if (saved.getDestination() != null) {
+                eventPublisher.publishEvent(new com.journeygo.modules.aiguide.event.ContentApprovedEvent(
+                        saved.getId(),
+                        saved.getDestination().getId(),
+                        saved.getDestination().getName(),
+                        saved.getContentType(),
+                        saved.getTitle(),
+                        saved.getContentText()
+                ));
+            }
+        } catch (AppException ignored) {
+            // Nội dung đang PENDING hoặc REJECTED thì không nạp lại vector
+        }
         log.info("Restored cultural content id={}", saved.getId());
         return CulturalContentResponse.fromEntity(saved);
     }

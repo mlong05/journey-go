@@ -7,6 +7,7 @@ import '../../core/services/journey_service.dart';
 import '../common/inline_video.dart';
 import '../common/ink.dart';
 import '../common/photo.dart';
+import '../chat/ai_guide_chat_screen.dart';
 import '../culture/cultural_stories.dart';
 
 /// Đánh dấu du khách đã đọc phần văn hoá của một trạm (lưu trên máy, chỉ để hiện nhãn "Mới").
@@ -115,6 +116,23 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
           'TRẠM ${widget.order.toString().padLeft(2, '0')}  ·  NỘI DUNG VĂN HÓA',
           style: AppType.eyebrow(),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextButton.icon(
+              onPressed: () => AiGuideChatScreen.showSheet(
+                context,
+                destinationId: widget.destinationId,
+                destinationName: widget.name,
+              ),
+              icon: const Icon(Icons.auto_awesome_rounded, size: 17, color: AppCultureColors.heritageJade),
+              label: const Text(
+                'Hỏi AI',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppCultureColors.heritageJade),
+              ),
+            ),
+          ),
+        ],
       ),
       body: ListView(
         padding: EdgeInsets.zero,

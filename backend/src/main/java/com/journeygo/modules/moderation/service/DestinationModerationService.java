@@ -3,8 +3,11 @@ package com.journeygo.modules.moderation.service;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
+import com.journeygo.modules.aiguide.event.DestinationInvalidatedEvent;
+import com.journeygo.modules.aiguide.event.DestinationSyncedEvent;
 import com.journeygo.modules.destination.dto.DestinationResponse;
 import com.journeygo.modules.destination.entity.Destination;
+import com.journeygo.modules.destination.entity.Theme;
 import com.journeygo.modules.destination.entity.enums.DestinationStatus;
 import com.journeygo.modules.destination.repository.DestinationRepository;
 import com.journeygo.modules.experience.entity.Experience;
@@ -28,11 +31,16 @@ import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -45,6 +53,7 @@ public class DestinationModerationService {
     private final ExperienceRepository experienceRepository;
     private final TaskRepository taskRepository;
     private final NotificationPublisher notifications;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public DestinationReviewResponse submit(Long id, Long callerId, Role callerRole) {
@@ -79,6 +88,9 @@ public class DestinationModerationService {
         DestinationReview saved = reviewRepository.save(review);
         addHistory(saved, DestinationReviewAction.SUBMITTED, callerId, null, null, null);
         destinationRepository.save(destination);
+        if (edited) {
+            eventPublisher.publishEvent(new DestinationInvalidatedEvent(id, "DESTINATION_EDITED", false));
+        }
 
         String sender = destination.getCreatedBy() == null ? "đối tác" : destination.getCreatedBy().getFullName();
         notifications.send(NotificationType.DESTINATION_PENDING)
@@ -128,6 +140,13 @@ public class DestinationModerationService {
         addHistory(review, DestinationReviewAction.APPROVED, reviewerId, note, null, null);
         log.info("Approved destination id={}", id);
 
+        eventPublisher.publishEvent(new DestinationSyncedEvent(
+                destination.getId(),
+                destination.getName(),
+                buildDestinationDescription(destination),
+                destination.getAddress()
+        ));
+
         notifications.send(NotificationType.DESTINATION_APPROVED)
                 .to(NotificationPublisher.idOf(destination.getCreatedBy()))
                 .except(reviewerId)
@@ -169,6 +188,12 @@ public class DestinationModerationService {
         destinationRepository.save(destination);
         addHistory(review, DestinationReviewAction.REJECTED, reviewerId, review.getDecisionNote(), review.getReason(), review.getOtherReason());
         log.info(revoking ? "Revoked approval of destination id={}" : "Rejected destination id={}", id);
+
+        eventPublisher.publishEvent(new DestinationInvalidatedEvent(
+                id,
+                revoking ? "DESTINATION_APPROVAL_REVOKED" : "DESTINATION_REJECTED",
+                false
+        ));
 
         notifications.send(NotificationType.DESTINATION_REJECTED)
                 .to(NotificationPublisher.idOf(destination.getCreatedBy()))
@@ -319,5 +344,23 @@ public class DestinationModerationService {
                 throw new AppException(ErrorCode.UNAUTHORIZED);
             }
         }
+    }
+
+    private String buildDestinationDescription(Destination dest) {
+        List<String> parts = new ArrayList<>();
+        if (dest.getRegion() != null && StringUtils.hasText(dest.getRegion().getName())) {
+            parts.add("Khu vực: " + dest.getRegion().getName().trim());
+        }
+        if (dest.getThemes() != null && !dest.getThemes().isEmpty()) {
+            String themeNames = dest.getThemes().stream()
+                    .map(Theme::getName)
+                    .filter(StringUtils::hasText)
+                    .sorted()
+                    .collect(Collectors.joining(", "));
+            if (StringUtils.hasText(themeNames)) {
+                parts.add("Chủ đề: " + themeNames);
+            }
+        }
+        return String.join(". ", parts);
     }
 }
