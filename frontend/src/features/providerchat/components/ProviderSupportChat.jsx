@@ -14,16 +14,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  ChevronDown,
   Loader2,
   MessageSquare,
   RefreshCw,
   Send,
   User,
 } from "lucide-react";
-import { formatDateTimeVN } from "@/lib/money";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
+import { useChatHistory, CHAT_PAGE_SIZE } from "@/hooks/useChatHistory";
 import { providerChatService } from "../services/providerChatService";
 import { LimitedField } from "@/components/ui/LimitedField";
+import ChatBubble from "@/components/ui/ChatBubble";
 
 /** Nhãn thời gian rút gọn cho danh sách hội thoại: "10:30", "Hôm qua", "12/11". */
 function timeLabel(iso) {
@@ -263,12 +265,27 @@ export default function ProviderSupportChat({ currentUserId }) {
  * Một cuộc trò chuyện: danh sách tin nhắn + ô soạn và trả lời.
  */
 function ConversationThread({ conversation, currentUserId, onSent }) {
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const listRef = useRef(null);
+  const [sendError, setSendError] = useState("");
+
+  // Tải trang tin nhắn — mỗi lần gọi lấy 10 tin mới nhất hoặc 10 tin cũ hơn mốc.
+  const fetchPage = useCallback(
+    (cursor) => providerChatService.listMessagesPage(conversation.id, CHAT_PAGE_SIZE, cursor),
+    [conversation.id],
+  );
+
+  const {
+    messages,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    containerRef,
+    handleScroll,
+    appendMessage,
+    loadMore,
+  } = useChatHistory(fetchPage, { enabled: true, resetKey: String(conversation.id) });
 
   // Tin nhắn mới trong hội thoại này ⇒ thêm vào danh sách ngay (không cần tải lại).
   useRealtimeMessages(
@@ -276,56 +293,25 @@ function ConversationThread({ conversation, currentUserId, onSent }) {
       (payload) => {
         if (payload?.scope !== "PROVIDER_CHAT") return;
         if (Number(payload.conversationId) !== Number(conversation.id)) return;
-        setMessages((prev) => {
-          if (prev.some((m) => Number(m.id) === Number(payload.message?.id))) return prev;
-          return payload.message ? [...prev, payload.message] : prev;
-        });
+        appendMessage(payload.message);
       },
-      [conversation.id],
+      [conversation.id, appendMessage],
     ),
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const list = await providerChatService.listMessages(conversation.id);
-        if (cancelled) return;
-        setMessages(list);
-        setError("");
-      } catch (err) {
-        if (cancelled) return;
-        setError(err?.message || "Không tải được nội dung hội thoại.");
-        setMessages([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [conversation.id]);
-
-  // Luôn cuộn xuống cuối khi có tin mới.
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-    }
-  }, [messages.length]);
 
   const handleSend = async (e) => {
     e?.preventDefault?.();
     const body = text.trim();
     if (!body || sending) return;
     setSending(true);
-    setError("");
+    setSendError("");
     try {
       const created = await providerChatService.sendMessage(conversation.id, body);
-      setMessages((prev) => [...prev, created]);
+      appendMessage(created);
       setText("");
       onSent?.();
     } catch (err) {
-      setError(err?.message || "Không gửi được tin nhắn.");
+      setSendError(err?.message || "Không gửi được tin nhắn.");
     } finally {
       setSending(false);
     }
@@ -349,7 +335,11 @@ function ConversationThread({ conversation, currentUserId, onSent }) {
       </div>
 
       {/* Danh sách tin nhắn */}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 px-5 py-4 [scrollbar-width:thin]">
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 px-5 py-4 [scrollbar-width:thin]"
+      >
         {loading ? (
           <p className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500">
             <Loader2 size={16} className="animate-spin" /> Đang tải tin nhắn…
@@ -359,39 +349,59 @@ function ConversationThread({ conversation, currentUserId, onSent }) {
             Chưa có tin nhắn nào trong hội thoại này.
           </p>
         ) : (
-          <ul className="space-y-2.5">
-            {messages.map((m) => {
-              const mine = currentUserId != null && Number(m.senderId) === Number(currentUserId);
-              return (
-                <li
-                  key={m.id}
-                  className={`flex flex-col ${mine ? "items-end" : "items-start"}`}
+          <>
+            {/* Đầu danh sách: nút load thêm lịch sử cũ / dòng "đã xem hết". */}
+            {hasMore ? (
+              <div className="mb-3 flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
                 >
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed ${
-                      mine
-                        ? "rounded-br-sm bg-emerald-600 text-white"
-                        : "rounded-bl-sm border border-slate-200 bg-white text-slate-800"
-                    }`}
-                  >
-                    {m.body}
-                  </div>
-                  <p className="mt-0.5 px-1 text-[10px] text-slate-400">
-                    {mine ? "Bạn" : conversation.touristName || "Khách hàng"} ·{" "}
-                    {formatDateTimeVN(m.createdAt)}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
+                  {loadingMore ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" /> Đang tải lịch sử…
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={12} /> Xem tin nhắn cũ hơn
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <p className="mb-3 text-center text-[11px] text-slate-400">
+                Bạn đã xem hết lịch sử tin nhắn
+              </p>
+            )}
+
+            <ul className="space-y-2.5">
+              {messages.map((m) => (
+                <ChatBubble
+                  key={m.id}
+                  mine={currentUserId != null && Number(m.senderId) === Number(currentUserId)}
+                  body={m.body}
+                  createdAt={m.createdAt}
+                  author={conversation.touristName || "Khách hàng"}
+                />
+              ))}
+            </ul>
+
+            {loadingMore && (
+              <p className="flex items-center justify-center gap-2 py-3 text-[11px] text-slate-400">
+                <Loader2 size={12} className="animate-spin" /> Đang tải tin nhắn cũ…
+              </p>
+            )}
+          </>
         )}
       </div>
 
       {/* Ô soạn tin nhắn */}
       <div className="shrink-0 border-t border-slate-100 bg-white px-5 py-3">
-        {error && (
+        {(error || sendError) && (
           <p className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-            {error}
+            {error || sendError}
           </p>
         )}
         <form onSubmit={handleSend} className="flex gap-2">
