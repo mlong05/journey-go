@@ -42,6 +42,14 @@ class AiGuideService {
     return const [];
   }
 
+  Future<AiChatSessionModel> getSession(String sessionId) async {
+    final data = await ApiClient.request(
+      'GET',
+      '${ApiConstants.aiGuideEndpoint}/sessions/$sessionId',
+    );
+    return AiChatSessionModel.fromJson(Map<String, dynamic>.from(data as Map));
+  }
+
   Future<List<AiChatMessageModel>> getMessages(String sessionId) async {
     final data = await ApiClient.request(
       'GET',
@@ -54,6 +62,27 @@ class AiGuideService {
           .toList();
     }
     return const [];
+  }
+
+  Future<AiChatSessionModel> requestHumanSupport(String sessionId, {String? reason}) async {
+    final body = <String, dynamic>{
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+    };
+    final data = await ApiClient.request(
+      'POST',
+      '${ApiConstants.aiGuideEndpoint}/sessions/$sessionId/request-human',
+      body: body,
+    );
+    return AiChatSessionModel.fromJson(Map<String, dynamic>.from(data as Map));
+  }
+
+  Future<AiChatSessionModel> returnToAi(String sessionId) async {
+    final data = await ApiClient.request(
+      'POST',
+      '${ApiConstants.aiGuideEndpoint}/sessions/$sessionId/return-ai',
+      body: const {},
+    );
+    return AiChatSessionModel.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
   Future<void> deleteSession(String sessionId) async {
