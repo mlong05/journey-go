@@ -3,6 +3,7 @@ package com.journeygo.modules.tour.dto.wizard;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourFormat;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
+import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
@@ -12,6 +13,8 @@ public record TourSummaryResponse(
         Long tourId,
         String title,
         TourStatus status,
+        TourVisibility visibility,
+        String specificUserEmail,
         TourFormat tourFormat,
         String coverImageUrl,
         String regionName,
@@ -23,7 +26,9 @@ public record TourSummaryResponse(
         Instant publishedAt
 ) {
     public static TourSummaryResponse fromEntity(Tour t) {
-        return new TourSummaryResponse(t.getTourId(), t.getTitle(), t.getStatus(), t.getTourFormat(),
+        return new TourSummaryResponse(t.getTourId(), t.getTitle(), t.getStatus(),
+                t.getVisibility(), t.getSpecificUserEmail(),
+                t.getTourFormat(),
                 t.getCoverImageUrl(),
                 t.getRegion() != null ? t.getRegion().getName() : null,
                 t.getTheme() != null ? t.getTheme().getName() : null,

@@ -7,6 +7,7 @@ import com.journeygo.modules.tour.entity.TourFormat;
 import com.journeygo.modules.tour.entity.TourSlotStatus;
 import com.journeygo.modules.tour.entity.VideoSource;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
+import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
@@ -34,6 +35,9 @@ public record TourDetailResponse(
 
         // Bước 1
         String title,
+        TourVisibility visibility,
+        String specificUserEmail,
+        Long tourRequestId,
         TourFormat tourFormat,
         Integer durationMinutes,
         Integer durationDays,

@@ -8,6 +8,7 @@ import com.journeygo.modules.destination.repository.DestinationRepository;
 import com.journeygo.modules.tour.dto.*;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourDestination;
+import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.moderation.service.TourModerationService;
 import com.journeygo.modules.user.entity.Role;
@@ -62,7 +63,12 @@ public class TourService {
     /** All published / approved tours (public API, paginated). */
     @Transactional(readOnly = true)
     public PageResponse<TourResponse> getPublished(Pageable pageable) {
-        return searchPublished(TourSearchFilter.none(), pageable);
+        return searchPublished(TourSearchFilter.none(), null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<TourResponse> getPublished(String currentUserEmail, Pageable pageable) {
+        return searchPublished(TourSearchFilter.none(), currentUserEmail, pageable);
     }
 
     /**
@@ -72,8 +78,13 @@ public class TourService {
      */
     @Transactional(readOnly = true)
     public PageResponse<TourResponse> searchPublished(TourSearchFilter filter, Pageable pageable) {
+        return searchPublished(filter, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<TourResponse> searchPublished(TourSearchFilter filter, String currentUserEmail, Pageable pageable) {
         Pageable paging = sanitizePageable(pageable);
-        Specification<Tour> spec = publishedSpec(filter);
+        Specification<Tour> spec = publishedSpec(filter, currentUserEmail);
         if (filter.databaseOnly()) {
             return toPageResponse(tourRepository.findAll(spec, paging));
         }
@@ -102,8 +113,14 @@ public class TourService {
     /** Chi tiết tour công khai cho du khách (chỉ tour đã duyệt). */
     @Transactional(readOnly = true)
     public TourPublicDetailResponse getPublicDetail(Long tourId) {
+        return getPublicDetail(tourId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public TourPublicDetailResponse getPublicDetail(Long tourId, String currentUserEmail) {
         moderationService.requireApproved(tourId);
         Tour tour = findOrThrow(tourId);
+        checkVisibility(tour, currentUserEmail);
         TourResponse summary = pricingService.toResponse(tour);
         if (!tour.isWizardTour()) {
             return TourPublicDetailResponse.fromLegacy(summary);
@@ -128,10 +145,29 @@ public class TourService {
                 .orElseThrow(() -> new AppException(ErrorCode.TOUR_NOT_FOUND));
     }
 
-    private static Specification<Tour> publishedSpec(TourSearchFilter filter) {
+    private static Specification<Tour> publishedSpec(TourSearchFilter filter, String currentUserEmail) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.isTrue(root.get("approved")));
+
+            // Lọc theo visibility:
+            // - Tour công khai (visibility = ALL hoặc null)
+            // - Hoặc tour riêng (visibility = SPECIFIC_USER) chỉ hiển thị nếu email người xem khớp
+            Predicate publicTour = cb.or(
+                    cb.isNull(root.get("visibility")),
+                    cb.equal(root.get("visibility"), TourVisibility.ALL)
+            );
+            if (currentUserEmail != null && !currentUserEmail.isBlank()) {
+                String normalizedEmail = currentUserEmail.trim().toLowerCase();
+                Predicate specificForMe = cb.and(
+                        cb.equal(root.get("visibility"), TourVisibility.SPECIFIC_USER),
+                        cb.equal(cb.lower(root.get("specificUserEmail")), normalizedEmail)
+                );
+                predicates.add(cb.or(publicTour, specificForMe));
+            } else {
+                predicates.add(publicTour);
+            }
+
             if (filter.regionId() != null) predicates.add(cb.equal(root.get("region").get("id"), filter.regionId()));
             if (filter.themeId() != null) predicates.add(cb.equal(root.get("theme").get("id"), filter.themeId()));
             if (filter.format() != null) predicates.add(cb.equal(root.get("tourFormat"), filter.format()));
@@ -161,9 +197,25 @@ public class TourService {
     /** Single tour by ID. */
     @Transactional(readOnly = true)
     public TourResponse getById(Long tourId) {
+        return getById(tourId, null);
+    }
+
+    /** Single tour by ID with visibility check. */
+    @Transactional(readOnly = true)
+    public TourResponse getById(Long tourId, String currentUserEmail) {
         moderationService.requireApproved(tourId);
         Tour tour = findOrThrow(tourId);
+        checkVisibility(tour, currentUserEmail);
         return pricingService.toResponse(tour);
+    }
+
+    private void checkVisibility(Tour tour, String currentUserEmail) {
+        if (tour.getVisibility() == TourVisibility.SPECIFIC_USER) {
+            if (currentUserEmail == null || !currentUserEmail.trim().equalsIgnoreCase(tour.getSpecificUserEmail())) {
+                throw new AppException(ErrorCode.TOUR_ACCESS_DENIED,
+                        "Tour này là tour thiết kế riêng, bạn không có quyền xem hoặc đặt mua");
+            }
+        }
     }
 
     /** Soft-deleted tours (admin / moderator). */

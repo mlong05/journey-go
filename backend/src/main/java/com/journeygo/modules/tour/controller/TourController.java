@@ -42,26 +42,33 @@ public class TourController {
     @Operation(summary = "Lấy danh sách tour đã xuất bản (công khai)",
             description = "Trả về danh sách tour đã được phê duyệt và xuất bản, hỗ trợ phân trang. "
                     + "Lọc tùy chọn: q (tên / vùng miền / chủ đề, không phân biệt dấu), regionId, themeId, "
-                    + "format (DAY_TRIP, MULTI_DAY); order: NEWEST (mặc định), PRICE_ASC, PRICE_DESC, DEPARTURE")
+                    + "format (DAY_TRIP, MULTI_DAY); order: NEWEST (mặc định), PRICE_ASC, PRICE_DESC, DEPARTURE. "
+                    + "Nếu đăng nhập, tự động hiển thị kèm tour riêng dành cho tài khoản này.")
     public ResponseEntity<ApiResponse<PageResponse<TourResponse>>> getPublished(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Long regionId,
             @RequestParam(required = false) Long themeId,
             @RequestParam(required = false) TourFormat format,
             @RequestParam(required = false) TourSearchFilter.Order order,
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        String email = userPrincipal != null ? userPrincipal.getEmail() : null;
         TourSearchFilter filter = new TourSearchFilter(q, regionId, themeId, format, order);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tour đã xuất bản thành công",
-                tourService.searchPublished(filter, pageable)));
+                tourService.searchPublished(filter, email, pageable)));
     }
 
     @GetMapping("/{tourId}/public-detail")
     @Operation(summary = "Chi tiết tour cho du khách (công khai)",
             description = "Mô tả, điểm nổi bật, ảnh, lịch trình, bảng giá, chính sách và các điểm dừng. "
-                    + "Không trả đáp án quiz, mã QR hay ghi chú kiểm duyệt. Chỉ tour đã duyệt.")
-    public ResponseEntity<ApiResponse<TourPublicDetailResponse>> getPublicDetail(@PathVariable Long tourId) {
+                    + "Không trả đáp án quiz, mã QR hay ghi chú kiểm duyệt. Chỉ tour đã duyệt. "
+                    + "Nếu là tour riêng, chỉ tài khoản được chỉ định mới xem được.")
+    public ResponseEntity<ApiResponse<TourPublicDetailResponse>> getPublicDetail(
+            @PathVariable Long tourId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        String email = userPrincipal != null ? userPrincipal.getEmail() : null;
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tour thành công",
-                tourService.getPublicDetail(tourId)));
+                tourService.getPublicDetail(tourId, email)));
     }
 
     @GetMapping("/{tourId}/availability")
@@ -77,9 +84,12 @@ public class TourController {
 
     @GetMapping("/{tourId}")
     @Operation(summary = "Lấy thông tin tour theo ID")
-    public ResponseEntity<ApiResponse<TourResponse>> getById(@PathVariable Long tourId) {
+    public ResponseEntity<ApiResponse<TourResponse>> getById(
+            @PathVariable Long tourId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        String email = userPrincipal != null ? userPrincipal.getEmail() : null;
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin tour thành công",
-                tourService.getById(tourId)));
+                tourService.getById(tourId, email)));
     }
 
     // ── CONTENT_MODERATOR ─────────────────────────────────────────────────────
