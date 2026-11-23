@@ -58,9 +58,7 @@ jobs:
 
       - name: Backend — compile & unit test
         working-directory: backend
-        run: |
-          chmod +x mvnw
-          ./mvnw -B -ntp clean test
+        run: mvn -B -ntp clean test
 
       # ── Frontend ──
       - name: Set up Node.js
