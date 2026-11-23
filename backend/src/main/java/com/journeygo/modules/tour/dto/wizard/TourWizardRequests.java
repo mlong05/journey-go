@@ -40,7 +40,11 @@ public final class TourWizardRequests {
 
             @Schema(description = "ID yêu cầu tạo tour của khách (nếu tour này được tạo theo yêu cầu)")
             Long tourRequestId
-    ) {}
+    ) {
+        public CreateDraft(String title) {
+            this(title, TourVisibility.ALL, null, null);
+        }
+    }
 
     @Schema(description = "Bước 1 — Thông tin cơ bản")
     public record BasicInfo(
@@ -76,7 +80,17 @@ public final class TourWizardRequests {
             @Size(max = 5000) String refundPolicy,
             @Schema(description = "Những thông tin cần lưu ý — Liên hệ")
             @Size(max = 2000) String contactInfo
-    ) {}
+    ) {
+        public BasicInfo(String title, TourFormat tourFormat, Integer durationMinutes, Integer durationDays,
+                         Integer durationNights, Long regionId, Long themeId, String description,
+                         List<String> highlights, List<String> images, String coverImageUrl,
+                         List<ItineraryDayItem> itinerary, String priceIncludes, String priceExcludes,
+                         String forceMajeure, String refundPolicy, String contactInfo) {
+            this(title, TourVisibility.ALL, null, null, tourFormat, durationMinutes, durationDays,
+                    durationNights, regionId, themeId, description, highlights, images, coverImageUrl,
+                    itinerary, priceIncludes, priceExcludes, forceMajeure, refundPolicy, contactInfo);
+        }
+    }
 
     @Schema(description = "Một ngày trong lịch trình (dạng chữ)")
     public record ItineraryDayItem(
