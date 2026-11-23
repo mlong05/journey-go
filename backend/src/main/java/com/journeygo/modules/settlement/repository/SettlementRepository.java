@@ -57,16 +57,15 @@ public interface SettlementRepository extends JpaRepository<Settlement, Long> {
     List<Settlement> findByProviderProfileAndPeriod(@Param("providerProfileId") Long providerProfileId, @Param("period") String period);
 
     /**
-     * Đợt tất toán TỔNG của một kỳ (scope = BATCH) — nhiều nhất có 1 bản ghi.
-     *
-     * <p>Ràng buộc "mỗi kỳ chỉ 1 đợt tổng" được đảm bảo ở tầng DB bằng unique index
-     * `uk_settlement_batch_period` (xem migration V41).
-     */
-    Optional<Settlement> findFirstByScopeAndRevenuePeriod(SettlementScope scope, String revenuePeriod);
-
-    /**
      * Tất cả đợt tất toán TỔNG của một kỳ — dùng khi cần xem lịch sử (đợt đã bị từ chối
      * vẫn giữ để tra cứu).
+     *
+     * <p>⚠️ Một kỳ có THỂ có nhiều đợt: đợt cũ đã TỪ CHỐI / HỦY + đợt mới đang DRAFT
+     * (Admin từ chối rồi tạo lại thủ công). Vì vậy phải lọc theo trạng thái, không
+     * được dùng "findFirst" (có thể trả về nhầm đợt cũ).
+     *
+     * <p>Ràng buộc "mỗi kỳ chỉ 1 đợt tổng còn sống" được đảm bảo ở tầng DB bằng partial
+     * unique index `uk_settlement_batch_period` (xem migration V50).
      */
     List<Settlement> findByScopeAndRevenuePeriod(SettlementScope scope, String revenuePeriod);
 

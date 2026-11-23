@@ -26,7 +26,9 @@ import java.util.List;
 public record SettlementCandidatesResponse(
 
         @Schema(description = "ID đối tác") Long providerProfileId,
-        @Schema(description = "Kỳ doanh thu (yyyy-MM)") String revenuePeriod,
+        @Schema(description = "Kỳ doanh thu — chu kỳ 10 ngày (yyyy-MM-D), VD: 2026-10-1 = 01/10 → 10/10/2026")
+        String revenuePeriod,
+        @Schema(description = "Nhãn kỳ tất toán đầy đủ, VD: '01/10 – 10/10/2026'") String periodLabel,
         @Schema(description = "Các khoản đủ điều kiện") List<ProviderRevenueResponse> eligible,
         @Schema(description = "Các khoản bị giữ lại kèm lý do") List<HeldItem> held,
         @Schema(description = "Tổng số tiền của các khoản đủ điều kiện") Totals totals,

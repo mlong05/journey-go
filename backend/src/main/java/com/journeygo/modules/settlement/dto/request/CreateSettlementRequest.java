@@ -11,7 +11,9 @@ public record CreateSettlementRequest(
         @NotNull(message = "Đối tác không được để trống")
         Long providerProfileId,
 
-        @Schema(description = "Kỳ doanh thu (yyyy-MM) — phải là kỳ đã kết thúc", example = "2026-09")
+        @Schema(description = "Kỳ doanh thu — chu kỳ 10 ngày (yyyy-MM-D), phải là kỳ đã kết thúc. "
+                + "VD: 2026-10-1 = 01/10 → 10/10/2026, 2026-10-2 = 11/10 → 20/10/2026, "
+                + "2026-10-3 = 21/10 → 31/10/2026", example = "2026-10-1")
         @NotNull(message = "Kỳ doanh thu không được để trống")
         String revenuePeriod,
 
