@@ -45,7 +45,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -68,7 +67,8 @@ import java.util.UUID;
  *       xác minh</b> ({@code paidAt}), không dùng thời điểm tạo Booking/Payment.</li>
  *   <li><b>Quy tắc 3</b> — mỗi Payment chỉ có tối đa một yêu cầu Refund đang xử lý hoặc đã hoàn
  *       tất.</li>
- *   <li><b>Quy tắc 5</b> — số tiền do hệ thống tính: 50% (lỗi Tourist) / 100% (lỗi nền tảng);
+ *   <li><b>Quy tắc 5</b> — số tiền do hệ thống tính: nhóm cá nhân theo 3 bậc thời gian
+ *       (80% / 50% / 0%, xem {@link PersonalRefundPolicy}), nhóm nền tảng / đối tác 100%;
  *       Tourist KHÔNG tự nhập số tiền.</li>
  *   <li><b>Quy tắc 7</b> — KHÔNG ghi nhận REFUNDED chỉ vì yêu cầu đã được gửi đi; chỉ khi có
  *       bằng chứng xác minh (VNPay xác nhận, hoặc Admin nhập mã tham chiếu + bằng chứng
@@ -226,7 +226,7 @@ public class RefundService {
         }
 
         // 7. Tính số tiền đề xuất — hệ thống tự tính, Tourist không tự nhập.
-        //    Mốc so sánh cửa sổ no-show là THỜI ĐIỂM KHÁCH GỬI YÊU CẦU (now).
+        //    Mốc so sánh các bậc chính sách là THỜI ĐIỂM KHÁCH GỬI YÊU CẦU (now).
         //
         //    ⚠️ Khách KHÔNG chọn nhóm lý do ⇒ chưa biết tỷ lệ hoàn ⇒ số tiền đề
         //    xuất = 0 và ADMIN quyết định sau (xem `reviewRefund`).
@@ -376,15 +376,16 @@ public class RefundService {
      *
      * <p>Chính sách hoàn tiền:
      * <ul>
-     *   <li>Nhóm cá nhân: hủy trước 3 ngày khởi hành → 50%; hủy trong vòng 48 giờ
-     *       hoặc không xuất hiện → 0%.</li>
-     *   <li>Nhóm nền tảng / đối tác → 100%.</li>
-     *   <li>Nhóm bất khả kháng → 0%.</li>
+     *   <li>Nhóm cá nhân ({@link PersonalRefundPolicy}): 3 bậc theo số giờ còn lại
+     *       tới ngày trải nghiệm — từ 7 ngày trở lên → 80%; từ 72 giờ – 6 ngày →
+     *       50%; dưới 72 giờ hoặc không xuất hiện → 0%.</li>
+     *   <li>Nhóm nền tảng / đối tác → 100% (đọc từ cấu hình của Admin).</li>
+     *   <li>Nhóm bất khả kháng → 0% (đọc từ cấu hình của Admin).</li>
      * </ul>
      *
-     * <p>Tỷ lệ theo nhóm đọc từ cấu hình của Admin
-     * ({@code refund_reason_groups}); tỷ lệ 0% của cá nhân khi hủy quá muộn là
-     * ngoại lệ do chính sách quy định, không phụ thuộc cấu hình.
+     * <p>⚠️ Mốc so sánh là THỜI ĐIỂM KHÁCH GỞI YÊU CẦU ({@code requestTime}), KHÔNG phải
+     * thời điểm Admin duyệt — nếu dùng "now" thì một yêu cầu hợp lệ gửi từ 7 ngày
+     * trước sẽ bị tính thành 0% chỉ vì Admin duyệt chậm.
      */
     public BigDecimal calculateRefundAmount(BigDecimal paymentAmount,
                                             RefundReason group,
@@ -400,12 +401,11 @@ public class RefundService {
         BigDecimal rate;
 
         if (group == RefundReason.PERSONAL) {
-            // Lỗi cá nhân: hủy quá muộn (trong vòng 48 giờ) hoặc no-show → không hoàn.
-            if (isWithinNoShowWindow(experienceDate, requestTime)) {
-                rate = BigDecimal.ZERO;
-            } else {
-                rate = reasonConfig.refundRateOf(group);
-            }
+            // Lỗi cá nhân: 3 bậc theo thời điểm hủy (80% / 50% / 0%).
+            // Mốc "không hoàn" đọc từ cấu hình (mặc định 72 giờ) để khớp với
+            // bảng chính sách hiển thị cho khách.
+            rate = PersonalRefundPolicy.rateOf(experienceDate, requestTime,
+                    financeProperties.effectiveRefundNoShowWindowHours());
         } else {
             rate = reasonConfig.refundRateOf(group);
         }
@@ -417,7 +417,7 @@ public class RefundService {
      * Tính số tiền hoàn từ nguyên nhân đã lưu — dùng khi Admin duyệt lại.
      *
      * <p>⚠️ Không dùng overload này cho nhóm PERSONAL: hàm không biết thời điểm khách
-     * gửi yêu cầu nên không áp dụng được cửa sổ no-show 48h. Dùng overload có
+     * gửi yêu cầu nên không áp dụng được các bậc thời gian. Dùng overload có
      * {@code experienceDate} + {@code requestTime}.
      */
     public BigDecimal calculateRefundAmount(BigDecimal paymentAmount, RefundReason group) {
@@ -426,26 +426,6 @@ public class RefundService {
         }
         BigDecimal rate = reasonConfig.refundRateOf(group);
         return paymentAmount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /**
-     * Yêu cầu có nằm trong cửa sổ no-show không (hủy quá muộn / không xuất hiện).
-     *
-     * <p>Cửa sổ tính từ thời điểm bắt đầu ngày trải nghiệm lùi {@code noShowWindowHours}.
-     *
-     * <p>⚠️ Mốc so sánh là THỜI ĐIỂM KHÁCH GỬI YÊU CẦU ({@code requestTime}), KHÔNG phải
-     * thời điểm Admin duyệt. Nếu dùng "now" thì một yêu cầu hợp lệ gửi từ 3 ngày trước
-     * sẽ bị tính thành 0% chỉ vì Admin duyệt chậm 2 ngày.
-     */
-    private boolean isWithinNoShowWindow(LocalDate experienceDate, Instant requestTime) {
-        if (experienceDate == null) {
-            return false;
-        }
-        Instant when = requestTime != null ? requestTime : Instant.now();
-        int windowHours = financeProperties.effectiveRefundNoShowWindowHours();
-        Instant startOfExperience = experienceDate.atStartOfDay(VIETNAM_ZONE).toInstant();
-        Instant noShowDeadline = startOfExperience.minus(Duration.ofHours(windowHours));
-        return when.isAfter(noShowDeadline);
     }
 
     // ── Review (Admin) ────────────────────────────────────────────────────────
@@ -551,8 +531,9 @@ public class RefundService {
         // trong phạm vi chính sách (tức là bằng số tiền hệ thống tính cho nhóm đó).
         //
         // Lưu ý: với nhóm PERSONAL phải tính CẢ thời điểm khách gửi yêu cầu
-        // (cửa sổ no-show 48h) — nếu dùng "lúc Admin duyệt" thì một yêu cầu hợp lệ
-        // gửi từ 3 ngày trước sẽ bị tính thành 0% chỉ vì Admin duyệt chậm.
+        // (3 bậc theo thời điểm hủy: 80% / 50% / 0%) — nếu dùng "lúc Admin duyệt"
+        // thì một yêu cầu hợp lệ gửi từ 7 ngày trước sẽ bị tính thành 0% chỉ vì
+        // Admin duyệt chậm.
         LocalDate experienceDate = refund.getPayment().getBooking() != null
                 ? refund.getPayment().getBooking().getExperienceDate()
                 : null;

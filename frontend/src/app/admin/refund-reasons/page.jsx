@@ -531,13 +531,13 @@ export default function AdminRefundReasonConfigPage() {
                       Hoàn {formatRate(activeGroup.refundRate)}
                     </span>
                     {/*
-                      Nhóm cá nhân có MỨC HOÀN 0% riêng: hủy quá muộn hoặc
-                      không xuất hiện (no-show) ⇒ không hoàn. Hiển thị thêm mức
-                      0% để người đọc không bỏ sót nhánh này.
+                      Nhóm cá nhân có MỨC HOÀN 0% riêng: hủy quá muộn (dưới 72 giờ
+                      trước ngày trải nghiệm) ⇒ không hoàn. Hiển thị thêm mức 0%
+                      để người đọc không bỏ sót nhánh này.
                     */}
                     {activeGroup.noShowWindowHours != null && (
                       <span
-                        title={`Hủy trong vòng ${activeGroup.noShowWindowHours} giờ trước ngày trải nghiệm hoặc không xuất hiện ⇒ không hoàn`}
+                        title={`Hủy trong vòng ${activeGroup.noShowWindowHours} giờ trước ngày trải nghiệm ⇒ không hoàn`}
                         className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700"
                       >
                         Hoàn {formatRate(activeGroup.noShowRefundRate)} nếu hủy muộn
