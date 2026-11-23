@@ -8,6 +8,8 @@ import com.journeygo.modules.destination.entity.Theme;
 import com.journeygo.modules.destination.repository.RegionRepository;
 import com.journeygo.modules.destination.repository.ThemeRepository;
 import com.journeygo.modules.moderation.service.TourModerationService;
+import com.journeygo.modules.notification.entity.enums.NotificationType;
+import com.journeygo.modules.notification.service.NotificationPublisher;
 import com.journeygo.modules.providerprofile.service.ProviderProfileService;
 import com.journeygo.modules.tour.dto.wizard.TourDetailResponse;
 import com.journeygo.modules.tour.dto.wizard.TourSummaryResponse;
@@ -15,8 +17,12 @@ import com.journeygo.modules.tour.dto.wizard.TourValidationIssue;
 import com.journeygo.modules.tour.dto.wizard.TourWizardRequests;
 import com.journeygo.modules.tour.entity.*;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
+import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import com.journeygo.modules.tour.exception.TourValidationException;
 import com.journeygo.modules.tour.repository.TourRepository;
+import com.journeygo.modules.tourrequest.entity.TourRequest;
+import com.journeygo.modules.tourrequest.entity.enums.TourRequestStatus;
+import com.journeygo.modules.tourrequest.repository.TourRequestRepository;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
@@ -49,6 +55,8 @@ public class TourDraftService {
     private final TourDetailMapper mapper;
     private final TourSlotService slotService;
     private final TourModerationService moderationService;
+    private final TourRequestRepository tourRequestRepository;
+    private final NotificationPublisher notifications;
 
     // ── Tạo / đọc ────────────────────────────────────────────────────────────
 
@@ -59,12 +67,46 @@ public class TourDraftService {
         String title = request == null || request.title() == null ? "" : request.title().trim();
         if (!title.isEmpty()) requireValidTitle(title);
         User creator = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        TourVisibility visibility = request != null && request.visibility() != null
+                ? request.visibility()
+                : TourVisibility.ALL;
+        String specificUserEmail = null;
+        Long tourRequestId = request != null ? request.tourRequestId() : null;
+
+        if (tourRequestId != null) {
+            TourRequest tr = tourRequestRepository.findById(tourRequestId)
+                    .orElseThrow(() -> new AppException(ErrorCode.TOUR_REQUEST_NOT_FOUND));
+            if (tr.getAcceptedBy() == null || !tr.getAcceptedBy().getId().equals(userId)) {
+                throw new AppException(ErrorCode.TOUR_REQUEST_NOT_ACCEPTED_BY_YOU);
+            }
+            visibility = TourVisibility.SPECIFIC_USER;
+            specificUserEmail = tr.getRequester() != null ? tr.getRequester().getEmail() : null;
+        }
+
+        if (visibility == TourVisibility.SPECIFIC_USER) {
+            if (specificUserEmail == null && request != null && request.specificUserEmail() != null) {
+                specificUserEmail = request.specificUserEmail().trim().toLowerCase();
+            }
+            if (specificUserEmail == null || specificUserEmail.isBlank()) {
+                throw new AppException(ErrorCode.TOUR_SPECIFIC_USER_EMAIL_REQUIRED);
+            }
+            if (!userRepository.existsByEmail(specificUserEmail)) {
+                throw new AppException(ErrorCode.TOUR_SPECIFIC_USER_NOT_FOUND);
+            }
+        } else {
+            specificUserEmail = null;
+        }
+
         Tour tour = Tour.builder()
                 .title(title)
                 .tourType(TourType.OTHER)
                 .tourFormat(TourFormat.DAY_TRIP)
                 .durationDays(1)
                 .status(TourStatus.DRAFT)
+                .visibility(visibility)
+                .specificUserEmail(specificUserEmail)
+                .tourRequestId(tourRequestId)
                 .approved(false)
                 .deleted(false)
                 .createdBy(creator)
@@ -99,6 +141,41 @@ public class TourDraftService {
         if (request.title() != null) {
             requireValidTitle(request.title());
             tour.setTitle(request.title().trim());
+        }
+        if (request.tourRequestId() != null) {
+            TourRequest tr = tourRequestRepository.findById(request.tourRequestId())
+                    .orElseThrow(() -> new AppException(ErrorCode.TOUR_REQUEST_NOT_FOUND));
+            if (tr.getAcceptedBy() == null || !tr.getAcceptedBy().getId().equals(userId)) {
+                throw new AppException(ErrorCode.TOUR_REQUEST_NOT_ACCEPTED_BY_YOU);
+            }
+            tour.setTourRequestId(request.tourRequestId());
+            if (tour.getVisibility() != TourVisibility.SPECIFIC_USER) {
+                tour.setVisibility(TourVisibility.SPECIFIC_USER);
+            }
+            if (tour.getSpecificUserEmail() == null && tr.getRequester() != null) {
+                tour.setSpecificUserEmail(tr.getRequester().getEmail());
+            }
+        }
+        if (request.visibility() != null) {
+            tour.setVisibility(request.visibility());
+            if (request.visibility() == TourVisibility.SPECIFIC_USER) {
+                String email = request.specificUserEmail() != null ? request.specificUserEmail().trim().toLowerCase() : tour.getSpecificUserEmail();
+                if (email == null || email.isBlank()) {
+                    throw new AppException(ErrorCode.TOUR_SPECIFIC_USER_EMAIL_REQUIRED);
+                }
+                if (!userRepository.existsByEmail(email)) {
+                    throw new AppException(ErrorCode.TOUR_SPECIFIC_USER_NOT_FOUND);
+                }
+                tour.setSpecificUserEmail(email);
+            } else {
+                tour.setSpecificUserEmail(null);
+            }
+        } else if (request.specificUserEmail() != null && tour.getVisibility() == TourVisibility.SPECIFIC_USER) {
+            String email = request.specificUserEmail().trim().toLowerCase();
+            if (!userRepository.existsByEmail(email)) {
+                throw new AppException(ErrorCode.TOUR_SPECIFIC_USER_NOT_FOUND);
+            }
+            tour.setSpecificUserEmail(email);
         }
         TourFormat format = request.tourFormat() != null ? request.tourFormat() : tour.getTourFormat();
         tour.setTourFormat(format);
@@ -339,6 +416,31 @@ public class TourDraftService {
         if (!issues.isEmpty()) throw new TourValidationException(issues);
 
         moderationService.submitWizardTour(tour, userId);
+
+        // Nếu là tour riêng: cập nhật trạng thái yêu cầu và gửi thông báo cho du khách
+        if (tour.getVisibility() == TourVisibility.SPECIFIC_USER) {
+            if (tour.getTourRequestId() != null) {
+                tourRequestRepository.findById(tour.getTourRequestId()).ifPresent(tr -> {
+                    tr.setFulfilledTour(tour);
+                    tr.setStatus(TourRequestStatus.FULFILLED);
+                    tourRequestRepository.save(tr);
+                });
+            }
+            if (tour.getSpecificUserEmail() != null) {
+                userRepository.findByEmail(tour.getSpecificUserEmail()).ifPresent(u -> {
+                    notifications.send(NotificationType.CUSTOM_TOUR_CREATED)
+                            .to(u.getId())
+                            .title("Tour thiết kế riêng của bạn đang được kiểm duyệt")
+                            .body("Đối tác " + (tour.getCreatedBy() != null ? tour.getCreatedBy().getFullName() : "nhà tour")
+                                    + " đã tạo tour " + NotificationPublisher.quote(tour.getTitle())
+                                    + " theo yêu cầu của bạn và đã gửi cho ban kiểm duyệt. Bạn sẽ nhận được thông báo ngay khi tour được duyệt để đặt chỗ!")
+                            .link("/tour-requests")
+                            .ref("TOUR", tour.getTourId())
+                            .publish();
+                });
+            }
+        }
+
         return mapper.toResponse(tour);
     }
 
@@ -367,6 +469,9 @@ public class TourDraftService {
                 .coverImageUrl(source.getCoverImageUrl())
                 .cancellationPolicy(source.getCancellationPolicy())
                 .maxGuestsPerSlot(source.getMaxGuestsPerSlot())
+                .visibility(source.getVisibility())
+                .specificUserEmail(source.getSpecificUserEmail())
+                .tourRequestId(source.getTourRequestId())
                 .status(TourStatus.DRAFT)
                 .approved(false)
                 .deleted(false)
