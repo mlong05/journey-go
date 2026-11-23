@@ -28,6 +28,8 @@ public interface TourRepository extends JpaRepository<Tour, Long>,
 
     List<Tour> findByApprovedTrue();
 
+    long countByTourFormatIsNotNull();
+
     Page<Tour> findByCreatedBy_Id(Long creatorId, Pageable pageable);
 
     /** Tour của đối tác tạo theo luồng 5 bước. */

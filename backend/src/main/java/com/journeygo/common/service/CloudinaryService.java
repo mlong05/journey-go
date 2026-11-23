@@ -121,6 +121,61 @@ public class CloudinaryService {
     }
 
     /**
+     * Kết quả tải file gốc lên Cloudinary (resource_type=raw).
+     */
+    public record RawUploadResult(String url, String publicId) {
+    }
+
+    /**
+     * Upload file tài liệu gốc lên Cloudinary dưới dạng raw để lưu trữ và tải lại sau.
+     * Nếu Cloudinary chưa cấu hình hoặc tải thất bại ở môi trường dev, trả về null để luồng chính không gián đoạn.
+     */
+    public RawUploadResult uploadRawFile(MultipartFile file, String folder) {
+        if (file == null || file.isEmpty()) {
+            return null;
+        }
+        if (!isConfigured()) {
+            log.warn("Cloudinary chưa được cấu hình key. Bỏ qua bước sao lưu file gốc lên cloud.");
+            return null;
+        }
+        try {
+            String targetFolder = StringUtils.hasText(folder) ? folder : "journeygo/ai-documents";
+            @SuppressWarnings("unchecked")
+            Map<String, Object> uploadResult = cloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap(
+                            "folder", targetFolder,
+                            "resource_type", "raw",
+                            "use_filename", true,
+                            "unique_filename", true
+                    )
+            );
+            String secureUrl = (String) uploadResult.get("secure_url");
+            String publicId = (String) uploadResult.get("public_id");
+            log.info("Uploaded raw file to Cloudinary successfully: publicId={}", publicId);
+            return new RawUploadResult(secureUrl, publicId);
+        } catch (Exception e) {
+            log.warn("Không thể tải file gốc lên Cloudinary (vẫn giữ nội dung văn bản trong DB): {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Xóa file gốc (resource_type=raw) trên Cloudinary theo publicId.
+     */
+    public void deleteRawFile(String publicId) {
+        if (!isConfigured() || !StringUtils.hasText(publicId)) {
+            return;
+        }
+        try {
+            cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("resource_type", "raw"));
+            log.info("Deleted raw file from Cloudinary: publicId={}", publicId);
+        } catch (Exception e) {
+            log.warn("Could not delete raw file from Cloudinary: publicId={}, error={}", publicId, e.getMessage());
+        }
+    }
+
+    /**
      * Xóa ảnh trên Cloudinary theo publicId
      */
     public void deleteImage(String publicId) {
