@@ -66,6 +66,16 @@ public record RefundResponse(
         @Schema(description = "Số tài khoản nhận tiền") String bankAccountNumber,
         @Schema(description = "Tên chủ tài khoản") String bankAccountName,
         @Schema(description = "Ngân hàng") String bankName,
+        @Schema(description = "Ngân hàng / ví KHÁCH DÙNG khi thanh toán (vnp_BankCode của giao dịch gốc) "
+                + "— để Admin đối chiếu với ngân hàng khách khai báo lúc gửi yêu cầu hoàn")
+        String paymentBankCode,
+        @Schema(description = "Loại thẻ / phương thức khách dùng khi thanh toán (vnp_CardType: "
+                + "ATM = thẻ nội địa & tài khoản ngân hàng, QRCODE = ứng dụng ngân hàng & ví)")
+        String paymentCardType,
+        @Schema(description = "Mã giao dịch tại ngân hàng của lần thanh toán gốc (vnp_BankTranNo) "
+                + "— đối chiếu với biên lai khi hoàn thủ công")
+        String paymentBankTranNo,
+        @Schema(description = "Thời điểm thanh toán thành công (đã xác minh)") Instant paymentPaidAt,
         @Schema(description = "Số điện thoại liên hệ do Tourist cung cấp")
         String contactPhone,
         @Schema(description = "Email dự phòng do Tourist cung cấp")
@@ -122,6 +132,15 @@ public record RefundResponse(
                 .bankAccountNumber(r.getBankAccountNumber())
                 .bankAccountName(r.getBankAccountName())
                 .bankName(r.getBankName())
+                /*
+                  ⚠️ Thông tin ngân hàng/phương thức của lần THANH TOÁN GỐC — để Admin
+                  đối chiếu với tài khoản khách khai báo lúc gửi yêu cầu hoàn (thường
+                  phải TRÙNG tên chủ TK ⇒ dấu hiệu giao dịch không chính chủ).
+                */
+                .paymentBankCode(r.getPayment() != null ? r.getPayment().getBankCode() : null)
+                .paymentCardType(r.getPayment() != null ? r.getPayment().getCardType() : null)
+                .paymentBankTranNo(r.getPayment() != null ? r.getPayment().getVnpBankTranNo() : null)
+                .paymentPaidAt(r.getPayment() != null ? r.getPayment().getPaidAt() : null)
                 .contactPhone(r.getContactPhone())
                 .contactEmail(r.getContactEmail())
                 .transferReference(r.getTransferReference())
