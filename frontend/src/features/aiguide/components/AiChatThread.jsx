@@ -105,22 +105,22 @@ export default function AiChatThread({
   compact = false,
 }) {
   const bottomRef = useRef(null);
-  const [showCancelWaitModal, setShowCancelWaitModal] = useState(false);
+  const [showReturnAiModal, setShowReturnAiModal] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, sending, handoffStatus]);
 
   useEffect(() => {
-    if (!showCancelWaitModal) return undefined;
+    if (!showReturnAiModal) return undefined;
     const handleEsc = (e) => {
       if (e.key === "Escape" && !handoffLoading) {
-        setShowCancelWaitModal(false);
+        setShowReturnAiModal(false);
       }
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
-  }, [showCancelWaitModal, handoffLoading]);
+  }, [showReturnAiModal, handoffLoading]);
 
   const normalizedHandoff = String(handoffStatus || "AI_ACTIVE").toUpperCase();
   const isWaitingHuman = normalizedHandoff === "WAITING_HUMAN";
@@ -130,19 +130,34 @@ export default function AiChatThread({
     ? "Admin"
     : "Moderator";
 
+  const returnModalCopy = isHumanActive
+    ? {
+        title: "Kết thúc hỗ trợ trực tiếp?",
+        description:
+          "Bạn có chắc muốn kết thúc cuộc trò chuyện với nhân viên hỗ trợ và quay lại chat với AI không?",
+        primaryLabel: "Tiếp tục chat",
+        confirmLabel: "Kết thúc & quay lại AI",
+        iconClass: "bg-indigo-100 text-indigo-700",
+      }
+    : {
+        title: "Hủy yêu cầu hỗ trợ?",
+        description:
+          "Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?",
+        primaryLabel: "Tiếp tục chờ",
+        confirmLabel: "Hủy & quay lại AI",
+        iconClass: "bg-amber-100 text-amber-700",
+      };
+
   const handleReturnToAiClick = () => {
-    if (isWaitingHuman) {
-      setShowCancelWaitModal(true);
-      return;
-    }
-    onReturnToAi?.();
+    if (!isLiveQueue) return;
+    setShowReturnAiModal(true);
   };
 
   const handleConfirmReturnToAi = async () => {
     try {
       await onReturnToAi?.();
     } finally {
-      setShowCancelWaitModal(false);
+      setShowReturnAiModal(false);
     }
   };
 
@@ -463,15 +478,15 @@ export default function AiChatThread({
         )}
       </form>
 
-      {/* Hộp thoại xác nhận khi hủy hàng chờ gặp nhân viên */}
-      {showCancelWaitModal && (
+      {/* Hộp thoại xác nhận khi hủy hàng chờ hoặc kết thúc chat với nhân viên */}
+      {showReturnAiModal && isLiveQueue && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-labelledby="cancel-wait-modal-title"
+          aria-labelledby="return-ai-modal-title"
           className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs"
           onClick={() => {
-            if (!handoffLoading) setShowCancelWaitModal(false);
+            if (!handoffLoading) setShowReturnAiModal(false);
           }}
         >
           <div
@@ -479,18 +494,20 @@ export default function AiChatThread({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700">
-                <Clock size={18} />
+              <span
+                className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${returnModalCopy.iconClass}`}
+              >
+                {isHumanActive ? <Headset size={18} /> : <Clock size={18} />}
               </span>
               <div className="min-w-0">
                 <h3
-                  id="cancel-wait-modal-title"
+                  id="return-ai-modal-title"
                   className="text-sm font-bold text-slate-900"
                 >
-                  Xác nhận quay lại AI
+                  {returnModalCopy.title}
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-                  Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?
+                  {returnModalCopy.description}
                 </p>
               </div>
             </div>
@@ -503,15 +520,15 @@ export default function AiChatThread({
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50 cursor-pointer"
               >
                 {handoffLoading && <Loader2 size={13} className="animate-spin" />}
-                Hủy &amp; quay lại AI
+                {returnModalCopy.confirmLabel}
               </button>
               <button
                 type="button"
                 disabled={handoffLoading}
-                onClick={() => setShowCancelWaitModal(false)}
+                onClick={() => setShowReturnAiModal(false)}
                 className="inline-flex items-center justify-center rounded-xl bg-teal-700 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-teal-800 disabled:opacity-50 cursor-pointer"
               >
-                Tiếp tục chờ
+                {returnModalCopy.primaryLabel}
               </button>
             </div>
           </div>
