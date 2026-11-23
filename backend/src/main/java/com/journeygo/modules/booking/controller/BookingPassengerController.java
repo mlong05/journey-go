@@ -5,6 +5,7 @@ import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.modules.booking.dto.request.ChangePassengerRequest;
 import com.journeygo.modules.booking.dto.request.SendMessageRequest;
+import com.journeygo.modules.booking.dto.response.BookingMessagePageResponse;
 import com.journeygo.modules.booking.dto.response.BookingMessageResponse;
 import com.journeygo.modules.booking.dto.response.BookingPassengerResponse;
 import com.journeygo.modules.booking.dto.response.BookingResponse;
@@ -234,6 +235,32 @@ public class BookingPassengerController {
         requireAccess(booking, userPrincipal.getId());
         BookingMessageResponse response = chatService.send(booking, userPrincipal.getId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Đã gửi tin nhắn", response));
+    }
+
+    /**
+     * Trang tin nhắn MỚI NHẤT của booking — phân trang kiểu "cuộn lên để load thêm".
+     *
+     * <p>⚠️ Mặc định chỉ trả về 10 tin MỚI NHẤT ⇒ mở khung chat không phải tải cả
+     * lịch sử. Muốn xem tin cũ hơn thì gọi lại với {@code beforeId} =
+     * {@code nextCursor} của lần trước.
+     *
+     * @param limit     số tin mỗi trang (mặc định 10, tối đa 100)
+     * @param beforeId  id tin cũ nhất đã tải — lấy tin có id nhỏ hơn (null = mới nhất)
+     */
+    @GetMapping("/{bookingId}/messages/page")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Trang tin nhắn mới nhất của booking (cuộn lên để load thêm)",
+            description = "Mặc định 10 tin mới nhất. Dùng nextCursor làm tham số 'beforeId' "
+                    + "để tải tiếp lịch sử cũ.")
+    public ResponseEntity<ApiResponse<BookingMessagePageResponse>> listMessagesPage(
+            @PathVariable Long bookingId,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) Long beforeId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Booking booking = bookingService.findOrThrow(bookingId);
+        requireAccess(booking, userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.success("Lấy trang tin nhắn thành công",
+                chatService.listPage(booking, userPrincipal.getId(), limit, beforeId)));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

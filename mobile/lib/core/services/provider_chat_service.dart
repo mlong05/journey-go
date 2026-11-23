@@ -4,6 +4,8 @@
 ///  • POST /provider-chat/conversations  body: { tourId?, providerId? } → ProviderConversationModel
 ///  • GET  /provider-chat/conversations                    → ProviderConversationModel[]
 ///  • GET  /provider-chat/conversations/{id}/messages       → ProviderMessageModel[]
+///  • GET  /provider-chat/conversations/{id}/messages/page
+///         ?limit=10[&beforeId=<id>]                       → ChatMessagePage
 ///  • POST /provider-chat/conversations/{id}/messages body: { body } → ProviderMessageModel
 ///
 /// ── Vì sao tách khỏi chat trong booking? ──
@@ -61,6 +63,49 @@ class ProviderChatService {
         .toList();
   }
 
+  /// Trang tin nhắn MỚI NHẤT của một cuộc trò chuyện — phân trang kiểu
+  /// "cuộn lên để load thêm".
+  ///
+  /// ⚠️ Luôn trả về `limit` tin MỚI NHẤT. Muốn xem lịch sử cũ hơn thì gọi lại
+  /// với `beforeId` = `nextCursor` của lần trước.
+  ///
+  /// Trả về `(items, hasMore, nextCursor, totalCount)`:
+  ///  • `items` — theo thứ tự thời gian TĂNG dần (tin cũ ở trên, tin mới ở dưới).
+  ///  • `hasMore` — còn tin cũ hơn nữa không.
+  ///  • `nextCursor` — id tin cũ nhất trong trang (null = hết dữ liệu).
+  ///  • `totalCount` — tổng số tin nhắn của cuộc trò chuyện.
+  Future<ChatMessagePage> getMessagesPage(
+    int conversationId, {
+    int limit = 10,
+    int? beforeId,
+  }) async {
+    final query = <String, String>{
+      'limit': '$limit',
+      if (beforeId != null) 'beforeId': '$beforeId',
+    };
+    final qs = query.entries
+        .map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}')
+        .join('&');
+    final data = await ApiClient.request(
+      'GET',
+      '$_endpoint/conversations/$conversationId/messages/page?$qs',
+    );
+    final map = data is Map<String, dynamic> ? data : <String, dynamic>{};
+    final rawItems = map['items'];
+    final items = rawItems is List
+        ? rawItems
+            .whereType<Map>()
+            .map((e) => ProviderMessageModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
+        : <ProviderMessageModel>[];
+    return ChatMessagePage(
+      items: items,
+      hasMore: map['hasMore'] == true,
+      nextCursor: map['nextCursor'] is num ? (map['nextCursor'] as num).toInt() : null,
+      totalCount: map['totalCount'] is num ? (map['totalCount'] as num).toInt() : items.length,
+    );
+  }
+
   /// Gửi tin nhắn.
   Future<ProviderMessageModel> sendMessage(int conversationId, String body) async {
     final data = await ApiClient.request(
@@ -70,4 +115,19 @@ class ProviderChatService {
     );
     return ProviderMessageModel.fromJson(data as Map<String, dynamic>);
   }
+}
+
+/// Một trang tin nhắn (dùng cho phân trang "cuộn lên để load thêm").
+class ChatMessagePage {
+  const ChatMessagePage({
+    required this.items,
+    required this.hasMore,
+    required this.nextCursor,
+    required this.totalCount,
+  });
+
+  final List<ProviderMessageModel> items;
+  final bool hasMore;
+  final int? nextCursor;
+  final int totalCount;
 }

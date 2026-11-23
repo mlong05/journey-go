@@ -3,12 +3,14 @@ package com.journeygo.modules.booking.service;
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.modules.booking.dto.request.SendMessageRequest;
+import com.journeygo.modules.booking.dto.response.BookingMessagePageResponse;
 import com.journeygo.modules.booking.dto.response.BookingMessageResponse;
 import com.journeygo.modules.booking.entity.Booking;
 import com.journeygo.modules.booking.entity.BookingPassenger;
 import com.journeygo.modules.booking.repository.BookingPassengerRepository;
 import com.journeygo.modules.providerchat.dto.request.SendProviderMessageRequest;
 import com.journeygo.modules.providerchat.dto.response.ProviderConversationResponse;
+import com.journeygo.modules.providerchat.dto.response.ProviderMessagePageResponse;
 import com.journeygo.modules.providerchat.dto.response.ProviderMessageResponse;
 import com.journeygo.modules.providerchat.service.ProviderChatService;
 import com.journeygo.modules.tour.entity.Tour;
@@ -106,11 +108,41 @@ public class BookingChatService {
     }
 
     /**
+     * Trang tin nhắn MỚI NHẤT của Booking — phân trang kiểu "cuộn lên để load thêm".
+     *
+     * <p>⚠️ Luôn trả về {@code limit} tin MỚI NHẤT (mặc định 10). Muốn xem lịch sử
+     * cũ hơn thì gọi lại với {@code beforeId} = {@code nextCursor} của lần trước.
+     *
+     * <p>⚠️ Tin nhắn được trả về theo thứ tự thời gian TĂNG dần (tin cũ ở trên,
+     * tin mới ở dưới) ⇒ frontend render thẳng, không cần đảo mảng.
+     *
+     * @param booking   Booking
+     * @param readerId  người đang đọc (đánh dấu đã đọc đúng phía)
+     * @param limit     số tin tối đa mỗi trang (mặc định 10)
+     * @param beforeId  chỉ lấy tin có id nhỏ hơn mốc này (null = lấy mới nhất)
+     */
+    @Transactional
+    public BookingMessagePageResponse listPage(Booking booking, Long readerId,
+                                               int limit, Long beforeId) {
+        Long viewerId = readerId != null ? readerId : resolveViewerId(booking);
+        ProviderConversationResponse conversation =
+                providerChatService.startForBooking(booking.getId(), viewerId);
+
+        ProviderMessagePageResponse page =
+                providerChatService.listMessagesPage(conversation.id(), viewerId, limit, beforeId);
+
+        List<BookingMessageResponse> items = page.items().stream()
+                .map(m -> toBookingResponse(m, m.senderName() != null ? m.senderName() : senderNameOf(m.senderId())))
+                .toList();
+
+        return new BookingMessagePageResponse(items, page.hasMore(), page.nextCursor(), page.totalCount());
+    }
+
+    /**
      * Đánh dấu đã đọc các tin nhắn gửi cho người đang đăng nhập.
      */
     @Transactional
-    public int markRead(Booking booking, Long readerId) {
-        try {
+    public int markRead(Booking booking, Long readerId) {        try {
             ProviderConversationResponse conversation =
                     providerChatService.startForBooking(booking.getId(), readerId);
             providerChatService.listMessages(conversation.id(), readerId);
