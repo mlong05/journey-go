@@ -25,6 +25,7 @@ import com.journeygo.modules.settlement.dto.response.SettlementOverviewResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementResponse;
 import com.journeygo.modules.settlement.entity.Settlement;
 import com.journeygo.modules.settlement.entity.SettlementDetail;
+import com.journeygo.modules.settlement.entity.SettlementPeriod;
 import com.journeygo.modules.settlement.entity.enums.SettlementScope;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
 import com.journeygo.modules.settlement.repository.ApprovedSettlementAggregate;
@@ -47,7 +48,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -94,8 +94,8 @@ public class SettlementService {
      * <p>Đánh giá lại điều kiện TẠI THỜI ĐIỂM GỌI — không tin hoàn toàn vào trạng thái tính từ trước.
      * Khoản chưa đủ điều kiện được giữ lại kèm lý do rõ ràng và được xét lại ở lần sau.
      *
-     * <p>Chú ý (Mục 7.1): khoản đủ điều kiện từ kỳ trước cũng được đưa vào đợt tất toán kỳ này
-     * (doanh thu chuyển tiếp) — nhưng vẫn giữ {@code revenuePeriod} gốc.
+     * <p>Chú ý: khoản của kỳ KHÁC không được kéo vào — mỗi đợt chỉ gom giao dịch thuộc
+     * đúng chu kỳ 10 ngày mà Admin chọn.
      */
     @Transactional
     public SettlementCandidatesResponse getCandidates(Long providerProfileId, String revenuePeriod) {
@@ -103,7 +103,7 @@ public class SettlementService {
                 .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_PROFILE_NOT_FOUND));
         requireFinanceAccess(providerProfile);
 
-        YearMonth period = parsePeriod(revenuePeriod);
+        SettlementPeriod period = parsePeriod(revenuePeriod);
 
         List<ProviderRevenue> eligible = new ArrayList<>();
         List<SettlementCandidatesResponse.HeldItem> held = new ArrayList<>();
@@ -114,26 +114,13 @@ public class SettlementService {
         BigDecimal adjustment = BigDecimal.ZERO;
         BigDecimal net = BigDecimal.ZERO;
 
-        // Lấy TẤT CẢ khoản doanh thu của ProviderProfile thuộc kỳ (bất kể trạng thái) — bao gồm cả
-        // các khoản chưa đủ điều kiện được giữ lại từ kỳ trước (doanh thu chuyển tiếp).
-        List<ProviderRevenue> all = revenueRepository.findByProviderProfileAndPeriod(providerProfileId, revenuePeriod);
-
-        // Ngoài ra: các khoản CHƯA được tất toán từ KỲ TRƯỚC — doanh thu chuyển tiếp.
+        // Lấy TẤT CẢ khoản doanh thu của ProviderProfile thuộc ĐÚNG kỳ (bất kể trạng thái).
         //
-        // CHỈ lấy khoản có kỳ doanh thu TRƯỚC kỳ đang lập đợt. Khoản thuộc kỳ TƯƠNG LAI
-        // (kỳ chưa kết thúc) không phải "doanh thu chuyển tiếp" mà là doanh thu chưa tới hạn —
-        // không được trả tiền trước khi kỳ đó kết thúc.
-        //
-        // Dùng `findUnsettledByProviderProfile` (không chỉ ELIGIBLE) vì khoản bị giữ ở trạng thái
-        // PENDING vì lý do "kỳ doanh thu chưa kết thúc" sẽ tự đủ điều kiện khi kỳ đóng lại
-        // — nếu chỉ lấy ELIGIBLE thì khoản đó bị bỏ sót vĩnh viễn.
-        List<ProviderRevenue> carried = revenueRepository.findUnsettledByProviderProfile(providerProfileId).stream()
-                .filter(r -> !revenuePeriod.equals(r.getRevenuePeriod()))
-                .filter(r -> isPeriodBefore(r.getRevenuePeriod(), revenuePeriod))
-                .toList();
-
-        List<ProviderRevenue> combined = new ArrayList<>(all);
-        combined.addAll(carried);
+        // ⚠️ KHÔNG gom khoản của kỳ khác ("doanh thu chuyển tiếp") — mỗi kỳ có đợt riêng,
+        // kéo chéo làm sai lệch số tiền của từng đợt so với khoảng thời gian mà Admin
+        // chọn (VD chọn Kỳ 2 = 11–20/08/2026 mà lại thấy đơn của cả tháng 8).
+        List<ProviderRevenue> combined =
+                new ArrayList<>(revenueRepository.findByProviderProfileAndPeriod(providerProfileId, revenuePeriod));
 
         for (ProviderRevenue revenue : combined) {
             if (revenue.getStatus() == ProviderRevenueStatus.SETTLED
@@ -190,6 +177,7 @@ public class SettlementService {
         return SettlementCandidatesResponse.builder()
                 .providerProfileId(providerProfileId)
                 .revenuePeriod(revenuePeriod)
+                .periodLabel(period.toDisplayLabel())
                 .eligible(eligible.stream().map(ProviderRevenueResponse::fromEntity).toList())
                 .held(held)
                 .totals(SettlementCandidatesResponse.Totals.builder()
@@ -255,6 +243,7 @@ public class SettlementService {
 
             periods.add(PlatformRevenueSummaryResponse.PeriodRevenue.builder()
                     .revenuePeriod(period)
+                    .periodLabel(periodLabelOf(period))
                     .grossAmount(gross)
                     .refundAmount(refund)
                     .commissionAmount(commission)
@@ -334,7 +323,7 @@ public class SettlementService {
         ProviderProfile providerProfile = providerProfileRepository.findById(request.providerProfileId())
                 .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_PROFILE_NOT_FOUND));
 
-        YearMonth period = parsePeriod(request.revenuePeriod());
+        SettlementPeriod period = parsePeriod(request.revenuePeriod());
         validatePeriodClosed(period);
 
         // Mỗi ProviderProfile tối đa một Settlement đã duyệt cho mỗi kỳ (ràng buộc 9.4).
@@ -365,9 +354,9 @@ public class SettlementService {
         Settlement settlement = Settlement.builder()
                 .settlementCode(generateSettlementCode())
                 .providerProfile(providerProfile)
-                .revenuePeriod(request.revenuePeriod())
-                .periodStart(period.atDay(1))
-                .periodEnd(period.atEndOfMonth())
+                .revenuePeriod(period.toPeriodString())
+                .periodStart(period.getStart())
+                .periodEnd(period.getEnd())
                 .status(SettlementStatus.DRAFT)
                 .createdBy(admin)
                 .note(request.note())
@@ -858,6 +847,7 @@ public class SettlementService {
                 .settlementCode(settlement.getSettlementCode())
                 .scope(settlement.getScope() != null ? settlement.getScope().name() : null)
                 .revenuePeriod(settlement.getRevenuePeriod())
+                .periodLabel(periodLabelOf(settlement))
                 .periodStart(settlement.getPeriodStart())
                 .periodEnd(settlement.getPeriodEnd())
                 .approvedAt(settlement.getApprovedAt())
@@ -935,57 +925,57 @@ public class SettlementService {
     }
 
     /**
-     * Kiểm tra kỳ doanh thu đã kết thúc (Mục 7.1).
+     * Kiểm tra kỳ doanh thu đã kết thúc.
+     *
+     * <p>Kỳ tất toán chia tháng thành các CHU KỲ 10 NGÀY (1-10, 11-20, 21-cuối tháng).
+     * Chỉ tạo được đợt cho kỳ đã qua NGÀY CUỐI của kỳ.
      */
-    private void validatePeriodClosed(YearMonth period) {
-        YearMonth current = YearMonth.now();
-        if (!period.isBefore(current) && !financeProperties.isAllowOpenPeriodSettlement()) {
+    private void validatePeriodClosed(SettlementPeriod period) {
+        LocalDate today = LocalDate.now();
+        if (!period.isClosed(today) && !financeProperties.isAllowOpenPeriodSettlement()) {
             throw new AppException(ErrorCode.SETTLEMENT_PERIOD_NOT_CLOSED,
-                    "Chỉ cho phép tạo đợt tất toán cho kỳ doanh thu đã kết thúc. Kỳ " + period
-                            + " chưa kết thúc.");
+                    "Chỉ cho phép tạo đợt tất toán cho kỳ doanh thu đã kết thúc. Kỳ "
+                            + period.toDisplayLabel() + " chưa kết thúc.");
         }
         // Khoảng trễ (grace) — nếu cấu hình, chỉ cho tạo sau khi kỳ kết thúc + grace.
         if (financeProperties.getSettlementGraceMinutes() > 0) {
-            java.time.LocalDateTime earliest = period.plusMonths(1).atDay(1).atStartOfDay()
+            java.time.LocalDateTime earliest = period.getEnd().plusDays(1).atStartOfDay()
                     .plusMinutes(financeProperties.getSettlementGraceMinutes());
             if (java.time.LocalDateTime.now().isBefore(earliest)) {
                 throw new AppException(ErrorCode.SETTLEMENT_PERIOD_NOT_CLOSED,
-                        "Chưa đến thời điểm cho phép tạo đợt tất toán cho kỳ " + period);
+                        "Chưa đến thời điểm cho phép tạo đợt tất toán cho kỳ " + period.toDisplayLabel());
             }
         }
     }
 
-    private YearMonth parsePeriod(String period) {
-        if (period == null || period.isBlank()) {
-            throw new AppException(ErrorCode.VALIDATION_ERROR, "Kỳ doanh thu không được để trống");
-        }
-        try {
-            return YearMonth.parse(period.trim());
-        } catch (Exception e) {
-            throw new AppException(ErrorCode.VALIDATION_ERROR,
-                    "Kỳ doanh thu không hợp lệ (kỳ vòng dương lịch yyyy-MM): " + period);
-        }
+    private SettlementPeriod parsePeriod(String period) {
+        return SettlementPeriod.parse(period);
     }
 
     /**
-     * Kỳ doanh thu {@code candidate} có nằm TRƯỚC kỳ {@code reference} hay không.
+     * Nhãn kỳ tất toán cho UI — "01/10 – 10/10/2026".
      *
-     * <p>Dùng cho cơ chế "doanh thu chuyển tiếp": chỉ những khoản thuộc kỳ quá khứ mới
-     * được mang sang đợt tất toán của kỳ hiện tại. Khoản thuộc kỳ tương lai bị loại.
-     *
-     * @return {@code true} nếu {@code candidate} < {@code reference}; {@code false} nếu
-     *         bằng, lớn hơn, hoặc không đọc được chuỗi kỳ.
+     * <p>Đọc được cả kỳ mới ({@code yyyy-MM-D}) lẫn kỳ cũ theo tháng ({@code yyyy-MM}).
      */
-    private boolean isPeriodBefore(String candidate, String reference) {
-        if (candidate == null || candidate.isBlank() || reference == null || reference.isBlank()) {
-            return false;
+    private String periodLabelOf(String revenuePeriod) {
+        SettlementPeriod period = SettlementPeriod.parseOrNull(revenuePeriod);
+        return period != null ? period.toDisplayLabel() : revenuePeriod;
+    }
+
+    /**
+     * Nhãn kỳ tất toán của một đợt — ưu tiên {@code periodStart}/{@code periodEnd}
+     * (nguồn chuẩn của đợt, kể cả khi đợt gom khoản doanh thu chuyển tiếp).
+     */
+    private String periodLabelOf(Settlement settlement) {
+        if (settlement.getPeriodStart() != null && settlement.getPeriodEnd() != null) {
+            return String.format("%02d/%02d – %02d/%02d/%04d",
+                    settlement.getPeriodStart().getDayOfMonth(),
+                    settlement.getPeriodStart().getMonthValue(),
+                    settlement.getPeriodEnd().getDayOfMonth(),
+                    settlement.getPeriodEnd().getMonthValue(),
+                    settlement.getPeriodEnd().getYear());
         }
-        try {
-            return YearMonth.parse(candidate.trim()).isBefore(YearMonth.parse(reference.trim()));
-        } catch (Exception e) {
-            log.warn("[Settlement] Không đọc được kỳ doanh thu '{}' / '{}' — bỏ qua", candidate, reference);
-            return false;
-        }
+        return periodLabelOf(settlement.getRevenuePeriod());
     }
 
     private static BigDecimal nz(BigDecimal value) {

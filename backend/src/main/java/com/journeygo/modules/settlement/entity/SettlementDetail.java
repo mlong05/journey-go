@@ -54,8 +54,11 @@ public class SettlementDetail {
     @JoinColumn(name = "provider_profile_id", nullable = false)
     private ProviderProfile providerProfile;
 
-    /** Kỳ doanh thu gốc của khoản doanh thu (yyyy-MM) — có thể khác kỳ của Settlement (chuyển tiếp). */
-    @Column(name = "revenue_period", nullable = false, length = 7)
+    /**
+     * Kỳ doanh thu gốc của khoản doanh thu (chu kỳ 10 ngày, {@code yyyy-MM-D}) —
+     * có thể khác kỳ của Settlement (khoản doanh thu chuyển tiếp).
+     */
+    @Column(name = "revenue_period", nullable = false, length = 10)
     private String revenuePeriod;
 
     @Column(name = "gross_amount", nullable = false, precision = 14, scale = 2)

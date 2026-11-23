@@ -12,6 +12,7 @@ import com.journeygo.modules.settlement.dto.response.ProviderSettlementPeriodRes
 import com.journeygo.modules.settlement.dto.response.ProviderSettlementTransactionResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementCandidatesResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementDetailResponse;
+import com.journeygo.modules.settlement.dto.response.SettlementHeldResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementOverviewResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementResponse;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
@@ -68,13 +69,36 @@ public class SettlementController {
     @PreAuthorize("hasRole('ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Xem ứng viên tất toán TỔNG của kỳ (toàn bộ đối tác)",
-            description = "Gom khoản doanh thu đủ điều kiện của TẤT CẢ đối tác trong kỳ "
-                    + "(kèm doanh thu chuyển tiếp từ kỳ trước). Khoản chưa đủ điều kiện được "
-                    + "giữ lại kèm lý do và KHÔNG vào đợt — sẽ được xét lại ở kỳ sau.")
+            description = "Gom khoản doanh thu đủ điều kiện của TẤT CẢ đối tác thuộc ĐÚNG kỳ "
+                    + "đã chọn (chu kỳ 10 ngày) — KHÔNG gom doanh thu của kỳ khác. "
+                    + "Khoản chưa đủ điều kiện được giữ lại kèm lý do và KHÔNG vào đợt "
+                    + "— sẽ được xét lại ở kỳ của chính nó.")
     public ResponseEntity<ApiResponse<BatchSettlementCandidatesResponse>> getBatchCandidates(
             @RequestParam String revenuePeriod) {
         return ResponseEntity.ok(ApiResponse.success("Lấy ứng viên tất toán tổng thành công",
                 batchSettlementService.getBatchCandidates(revenuePeriod)));
+    }
+
+    /**
+     * Khoản doanh thu BỊ GIỮ LẠI của một kỳ — chưa đủ điều kiện nên không vào đợt.
+     *
+     * <p>Bổ sung cho màn "Chi tiết đợt tất toán": khi đợt được hệ thống TỰ ĐỘNG tạo,
+     * Admin cần thấy được những khoản của chính kỳ đó đang bị đọng, kèm lý do cụ thể.
+     *
+     * <p>⚠️ Các khoản này KHÔNG bị mất: khi kỳ kế tiếp đóng, hệ thống xét lại chúng —
+     * đủ điều kiện thì vào đợt kỳ sau (và được trả tiền), chưa đủ thì giữ lại tiếp.
+     */
+    @GetMapping("/batch/held")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Xem khoản bị giữ lại (chưa đủ điều kiện) của một kỳ",
+            description = "Trả về các khoản doanh thu thuộc đúng kỳ đã chọn nhưng CHƯA đủ điều kiện "
+                    + "tất toán, kèm lý do giữ lại và các điều kiện chưa đạt. "
+                    + "Các khoản này sẽ được xét lại ở kỳ kế tiếp.")
+    public ResponseEntity<ApiResponse<SettlementHeldResponse>> getBatchHeldItems(
+            @RequestParam String revenuePeriod) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy khoản bị giữ lại thành công",
+                batchSettlementService.getHeldItems(revenuePeriod)));
     }
 
     @PostMapping("/batch")

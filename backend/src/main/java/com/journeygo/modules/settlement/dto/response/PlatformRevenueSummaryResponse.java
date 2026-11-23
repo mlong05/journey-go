@@ -51,7 +51,9 @@ public record PlatformRevenueSummaryResponse(
     @Builder
     @Schema(description = "Doanh thu nền tảng theo kỳ")
     public record PeriodRevenue(
-            @Schema(description = "Kỳ doanh thu (yyyy-MM)") String revenuePeriod,
+            @Schema(description = "Kỳ doanh thu — chu kỳ 10 ngày (yyyy-MM-D), VD: 2026-10-1 = 01/10 → 10/10/2026")
+            String revenuePeriod,
+            @Schema(description = "Nhãn kỳ tất toán đầy đủ, VD: '01/10 – 10/10/2026'") String periodLabel,
             @Schema(description = "Tổng tiền khách thanh toán") BigDecimal grossAmount,
             @Schema(description = "Tổng hoàn tiền") BigDecimal refundAmount,
             @Schema(description = "Tổng hoa hồng") BigDecimal commissionAmount,
