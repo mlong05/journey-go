@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/ai_guide_model.dart';
@@ -90,12 +91,19 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
   final ScrollController _scrollCtrl = ScrollController();
 
   String? _sessionId;
+  AiChatSessionModel? _session;
   List<AiChatMessageModel> _messages = [];
   bool _loading = true;
   bool _sending = false;
+  bool _handoffLoading = false;
   String? _error;
+  Timer? _pollTimer;
 
   bool get _isTaskHintMode => widget.taskId != null;
+  String get _handoffStatus => _session?.handoffStatus ?? 'AI_ACTIVE';
+  bool get _isWaitingHuman => _handoffStatus.toUpperCase() == 'WAITING_HUMAN';
+  bool get _isHumanActive => _handoffStatus.toUpperCase() == 'HUMAN_ACTIVE';
+  bool get _isLiveQueue => _isWaitingHuman || _isHumanActive;
 
   List<String> get _suggestions => _isTaskHintMode
       ? const [
@@ -120,34 +128,78 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _inputCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
 
+  void _syncPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    final sid = _sessionId;
+    if (!mounted || !_isLiveQueue || sid == null || sid.isEmpty) return;
+
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      _pollLiveSession();
+    });
+  }
+
+  Future<void> _pollLiveSession() async {
+    final sid = _sessionId;
+    if (!mounted || sid == null || sid.isEmpty || _handoffLoading) return;
+    try {
+      final results = await Future.wait<dynamic>([
+        _service.getSession(sid),
+        _service.getMessages(sid),
+      ]);
+      if (!mounted) return;
+      final updatedSession = results[0] as AiChatSessionModel;
+      final updatedMessages = results[1] as List<AiChatMessageModel>;
+      final grew = updatedMessages.length > _messages.length;
+
+      setState(() {
+        _session = updatedSession;
+        _messages = updatedMessages;
+      });
+      if (grew) _scrollToBottom();
+      if (!updatedSession.isLiveQueue) {
+        _pollTimer?.cancel();
+        _pollTimer = null;
+      }
+    } catch (_) {
+      // Giữ trạng thái hiện tại nếu lỗi mạng tạm thời khi polling
+    }
+  }
+
   Future<void> _initSession({bool forceNew = false, String? targetSessionId}) async {
+    _pollTimer?.cancel();
+    _pollTimer = null;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      String sid;
+      final AiChatSessionModel session;
       if (targetSessionId != null && targetSessionId.isNotEmpty) {
-        sid = targetSessionId;
+        session = await _service.getSession(targetSessionId);
       } else {
-        final session = await _service.getOrCreateSession(
+        session = await _service.getOrCreateSession(
           destinationId: widget.destinationId,
           forceNew: forceNew,
         );
-        sid = session.id;
       }
-      final history = forceNew ? const <AiChatMessageModel>[] : await _service.getMessages(sid);
+      final history = forceNew
+          ? const <AiChatMessageModel>[]
+          : await _service.getMessages(session.id);
       if (!mounted) return;
       setState(() {
-        _sessionId = sid;
+        _session = session;
+        _sessionId = session.id;
         _messages = history;
         _loading = false;
       });
+      _syncPolling();
       _scrollToBottom();
     } on ApiException catch (e) {
       if (mounted) {
@@ -161,6 +213,86 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
         setState(() {
           _error = 'Không thể khởi tạo phiên trò chuyện AI.';
           _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _requestHumanSupport() async {
+    if (_handoffLoading || _loading) return;
+    setState(() {
+      _handoffLoading = true;
+      _error = null;
+    });
+    try {
+      var sid = _sessionId;
+      if (sid == null || sid.isEmpty) {
+        final created = await _service.getOrCreateSession(
+          destinationId: widget.destinationId,
+          forceNew: false,
+        );
+        sid = created.id;
+        _session = created;
+        _sessionId = sid;
+      }
+
+      final updated = await _service.requestHumanSupport(sid);
+      final list = await _service.getMessages(sid);
+      if (!mounted) return;
+      setState(() {
+        _session = updated;
+        _messages = list;
+        _handoffLoading = false;
+      });
+      _syncPolling();
+      _scrollToBottom();
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _handoffLoading = false;
+          _error = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _handoffLoading = false;
+          _error = 'Không thể gửi yêu cầu trò chuyện với Admin / Moderator.';
+        });
+      }
+    }
+  }
+
+  Future<void> _returnToAi() async {
+    final sid = _sessionId;
+    if (sid == null || sid.isEmpty || _handoffLoading) return;
+    setState(() {
+      _handoffLoading = true;
+      _error = null;
+    });
+    try {
+      final updated = await _service.returnToAi(sid);
+      final list = await _service.getMessages(sid);
+      if (!mounted) return;
+      setState(() {
+        _session = updated;
+        _messages = list;
+        _handoffLoading = false;
+      });
+      _syncPolling();
+      _scrollToBottom();
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _handoffLoading = false;
+          _error = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _handoffLoading = false;
+          _error = 'Không thể chuyển lại về AI Hướng dẫn viên.';
         });
       }
     }
@@ -210,21 +342,38 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
       );
       if (!mounted) return;
 
-      final aiMsg = AiChatMessageModel(
-        id: reply.messageId,
-        sessionId: reply.sessionId,
-        role: 'ASSISTANT',
-        content: reply.answer,
-        createdAt: reply.createdAt ?? DateTime.now(),
-        citations: reply.citations,
-        mode: reply.mode,
-      );
+      final nextSession = (_session ??
+              AiChatSessionModel(
+                id: reply.sessionId,
+                userId: 0,
+                currentDestinationId: widget.destinationId,
+              ))
+          .copyWith(id: reply.sessionId, handoffStatus: reply.handoffStatus);
+
+      final hasAiAnswer = reply.answer.trim().isNotEmpty;
+      final aiMsg = hasAiAnswer
+          ? AiChatMessageModel(
+              id: reply.messageId,
+              sessionId: reply.sessionId,
+              role: 'ASSISTANT',
+              content: reply.answer,
+              senderName: 'AI Hướng dẫn viên',
+              senderRole: 'AI',
+              createdAt: reply.createdAt ?? DateTime.now(),
+              citations: reply.citations,
+              mode: reply.mode,
+            )
+          : null;
 
       setState(() {
+        _session = nextSession;
         _sessionId = reply.sessionId;
-        _messages = [..._messages, aiMsg];
+        if (aiMsg != null) {
+          _messages = [..._messages, aiMsg];
+        }
         _sending = false;
       });
+      _syncPolling();
       _scrollToBottom();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -383,20 +532,48 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
   }
 
   Widget _buildContextBanner() {
-    final bg = _isTaskHintMode ? AppCultureColors.rewardBg : AppCultureColors.jadeLight;
-    final fg = _isTaskHintMode ? AppCultureColors.rewardText : AppCultureColors.heritageJade;
-    final border = _isTaskHintMode ? AppCultureColors.rewardBorder : AppCultureColors.heritageJade.withValues(alpha: 0.25);
+    final Color bg;
+    final Color fg;
+    final Color border;
+    final IconData leadingIcon;
+    final String title;
+    final String subtitle;
 
-    final title = _isTaskHintMode
-        ? (widget.taskName ?? 'Nhiệm vụ trải nghiệm')
-        : (widget.destinationName ?? 'Hỏi đáp di sản toàn hành trình');
-    final subtitle = _isTaskHintMode
-        ? 'Chế độ gợi ý thông minh · Không tiết lộ đáp án'
-        : 'Thuyết minh viên ảo dựa trên dữ liệu đã kiểm duyệt';
+    if (_isHumanActive) {
+      final isAdmin = (_session?.assignedStaffRole ?? '').toUpperCase() == 'ADMIN';
+      final roleLabel = isAdmin ? 'Admin' : 'Moderator';
+      final staffName = (_session?.assignedStaffName ?? '').trim();
+      bg = AppCultureColors.oceanLight;
+      fg = AppCultureColors.oceanBlue;
+      border = AppCultureColors.oceanBlue.withValues(alpha: 0.25);
+      leadingIcon = Icons.support_agent_rounded;
+      title = staffName.isNotEmpty ? 'Đang chat với $roleLabel: $staffName' : 'Đang chat với $roleLabel';
+      subtitle = 'Nhân sự thật đang hỗ trợ trực tiếp';
+    } else if (_isWaitingHuman) {
+      bg = AppCultureColors.warningLight;
+      fg = AppCultureColors.warning;
+      border = AppCultureColors.rewardBorder;
+      leadingIcon = Icons.hourglass_top_rounded;
+      title = 'Đang chờ Admin / Moderator tiếp nhận';
+      subtitle = 'Bạn vẫn có thể nhắn tin trong lúc chờ hỗ trợ';
+    } else {
+      bg = _isTaskHintMode ? AppCultureColors.rewardBg : AppCultureColors.jadeLight;
+      fg = _isTaskHintMode ? AppCultureColors.rewardText : AppCultureColors.heritageJade;
+      border = _isTaskHintMode
+          ? AppCultureColors.rewardBorder
+          : AppCultureColors.heritageJade.withValues(alpha: 0.25);
+      leadingIcon = _isTaskHintMode ? Icons.lightbulb_rounded : Icons.location_on_rounded;
+      title = _isTaskHintMode
+          ? (widget.taskName ?? 'Nhiệm vụ trải nghiệm')
+          : (widget.destinationName ?? 'Hỏi đáp di sản & hỗ trợ');
+      subtitle = _isTaskHintMode
+          ? 'Chế độ gợi ý thông minh · Không tiết lộ đáp án'
+          : 'Thuyết minh viên ảo dựa trên dữ liệu đã kiểm duyệt';
+    }
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       decoration: BoxDecoration(
         color: bg,
         border: Border(
@@ -406,12 +583,8 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
       ),
       child: Row(
         children: [
-          Icon(
-            _isTaskHintMode ? Icons.lightbulb_rounded : Icons.location_on_rounded,
-            size: 18,
-            color: fg,
-          ),
-          const SizedBox(width: 10),
+          Icon(leadingIcon, size: 18, color: fg),
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,17 +593,60 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg),
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: fg),
                 ),
                 Text(
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11, color: fg.withValues(alpha: 0.85)),
+                  style: TextStyle(fontSize: 10.5, color: fg.withValues(alpha: 0.85)),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          if (_isLiveQueue)
+            OutlinedButton.icon(
+              onPressed: _handoffLoading ? null : _returnToAi,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppCultureColors.textDark,
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: AppCultureColors.border),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: _handoffLoading
+                  ? const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.restart_alt_rounded, size: 15),
+              label: const Text('Quay lại AI', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: (_handoffLoading || _loading) ? null : _requestHumanSupport,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppCultureColors.oceanBlue,
+                backgroundColor: AppCultureColors.oceanLight,
+                side: BorderSide(color: AppCultureColors.oceanBlue.withValues(alpha: 0.3)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: _handoffLoading
+                  ? const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.support_agent_rounded, size: 15),
+              label: const Text('Chat Mod/Admin', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+            ),
         ],
       ),
     );
@@ -472,32 +688,92 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
           style: const TextStyle(fontSize: 13, height: 1.5, color: AppCultureColors.textMuted),
         ),
         const SizedBox(height: 20),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.center,
-          children: _suggestions
-              .map(
-                (q) => ActionChip(
-                  backgroundColor: AppCultureColors.surface,
-                  side: const BorderSide(color: AppCultureColors.border),
-                  label: Text(
-                    q,
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
+        if (!_isLiveQueue)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: _suggestions
+                .map(
+                  (q) => ActionChip(
+                    backgroundColor: AppCultureColors.surface,
+                    side: const BorderSide(color: AppCultureColors.border),
+                    label: Text(
+                      q,
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
+                    ),
+                    avatar: const Icon(Icons.auto_awesome_rounded, size: 15, color: AppCultureColors.heritageJade),
+                    onPressed: () => _send(q),
                   ),
-                  avatar: const Icon(Icons.auto_awesome_rounded, size: 15, color: AppCultureColors.heritageJade),
-                  onPressed: () => _send(q),
-                ),
-              )
-              .toList(),
-        ),
+                )
+                .toList(),
+          ),
       ],
     );
   }
 
   Widget _buildMessageBubble(AiChatMessageModel msg) {
+    if (msg.isSystem) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppCultureColors.surfaceSubtle,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppCultureColors.border),
+            ),
+            child: Text(
+              msg.content,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: AppCultureColors.textMuted,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final isUser = msg.isUser;
+    final isHuman = !isUser && msg.isHumanAgent;
+    final isAdmin = isHuman && msg.isAdminSender;
     final parsed = isUser ? null : _parseAiMessage(msg.content);
+
+    final Color avatarBg = isAdmin
+        ? AppCultureColors.lacquerLight
+        : isHuman
+            ? AppCultureColors.oceanLight
+            : AppCultureColors.jadeLight;
+    final Color avatarFg = isAdmin
+        ? AppCultureColors.lacquer
+        : isHuman
+            ? AppCultureColors.oceanBlue
+            : AppCultureColors.heritageJade;
+    final IconData avatarIcon = isAdmin
+        ? Icons.verified_user_rounded
+        : isHuman
+            ? Icons.support_agent_rounded
+            : Icons.auto_awesome_rounded;
+
+    final Color incomingBubbleBg = isAdmin
+        ? const Color(0xFFFFF5F6)
+        : isHuman
+            ? const Color(0xFFF6F7FE)
+            : AppCultureColors.surface;
+    final Color incomingBorderColor = isAdmin
+        ? AppCultureColors.lacquer.withValues(alpha: 0.25)
+        : isHuman
+            ? AppCultureColors.oceanBlue.withValues(alpha: 0.25)
+            : AppCultureColors.border;
+
+    final String senderLabel = isHuman
+        ? '${isAdmin ? 'Admin' : 'Moderator'}${msg.senderName?.trim().isNotEmpty == true ? ' · ${msg.senderName!.trim()}' : ''}'
+        : (msg.senderName?.trim().isNotEmpty == true ? msg.senderName!.trim() : 'AI Hướng dẫn viên');
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -510,28 +786,78 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
               height: 28,
               margin: const EdgeInsets.only(top: 2, right: 8),
               decoration: BoxDecoration(
-                color: AppCultureColors.jadeLight,
+                color: avatarBg,
                 borderRadius: BorderRadius.circular(9),
               ),
-              child: const Icon(Icons.auto_awesome_rounded, size: 15, color: AppCultureColors.heritageJade),
+              child: Icon(avatarIcon, size: 15, color: avatarFg),
             ),
           ],
           Flexible(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               decoration: BoxDecoration(
-                color: isUser ? AppCultureColors.heritageJade : AppCultureColors.surface,
+                color: isUser ? AppCultureColors.heritageJade : incomingBubbleBg,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
                   bottomLeft: Radius.circular(isUser ? 16 : 4),
                   bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
-                border: isUser ? null : Border.all(color: AppCultureColors.border),
+                border: isUser ? null : Border.all(color: incomingBorderColor),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (!isUser) ...[
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: avatarBg,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(avatarIcon, size: 11, color: avatarFg),
+                              const SizedBox(width: 4),
+                              Text(
+                                senderLabel,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: avatarFg,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isHuman)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: incomingBorderColor),
+                            ),
+                            child: Text(
+                              'NGƯỜI THẬT',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
+                                color: avatarFg,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                  ],
                   Text(
                     isUser ? msg.content : parsed!.displayText,
                     style: TextStyle(
@@ -597,7 +923,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                           .toList(),
                     ),
                   ],
-                  if (!isUser && msg.citations.isNotEmpty) ...[
+                  if (!isUser && !isHuman && msg.citations.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
@@ -665,10 +991,10 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppCultureColors.border),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
+                const SizedBox(
                   width: 14,
                   height: 14,
                   child: CircularProgressIndicator(
@@ -676,10 +1002,10 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                     color: AppCultureColors.heritageJade,
                   ),
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
-                  'AI đang suy nghĩ...',
-                  style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted, fontWeight: FontWeight.w600),
+                  _isLiveQueue ? 'Đang gửi tin nhắn...' : 'AI đang suy nghĩ...',
+                  style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted, fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -711,9 +1037,11 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                 onSubmitted: (_) => _send(),
                 decoration: InputDecoration(
                   counterText: '',
-                  hintText: _isTaskHintMode
-                      ? 'Hỏi gợi ý cho nhiệm vụ...'
-                      : 'Hỏi về lịch sử, kiến trúc điểm đến...',
+                  hintText: _isLiveQueue
+                      ? 'Nhắn tin trực tiếp tới Admin / Moderator...'
+                      : _isTaskHintMode
+                          ? 'Hỏi gợi ý cho nhiệm vụ...'
+                          : 'Hỏi về lịch sử, kiến trúc điểm đến...',
                   hintStyle: const TextStyle(fontSize: 13.5, color: AppCultureColors.textLight),
                   filled: true,
                   fillColor: AppCultureColors.background,
@@ -860,7 +1188,7 @@ class _SessionHistorySheetState extends State<_SessionHistorySheet> {
                         style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        '${s.messageCount} tin nhắn',
+                        '${s.isWaitingHuman ? 'Đang chờ Mod/Admin' : s.isHumanActive ? 'Chat trực tiếp' : 'AI Guide'} · ${s.messageCount} tin nhắn',
                         style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
                       ),
                       trailing: IconButton(
