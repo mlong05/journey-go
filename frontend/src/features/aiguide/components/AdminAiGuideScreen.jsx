@@ -80,6 +80,17 @@ export default function AdminAiGuideScreen() {
   const [sandboxReply, setSandboxReply] = useState(null);
   const [sandboxLoading, setSandboxLoading] = useState(false);
 
+  const refreshStatsOnly = useCallback(async () => {
+    try {
+      const statsRes = await aiGuideService.getAdminStats();
+      if (statsRes) {
+        setStats(statsRes);
+      }
+    } catch {
+      // Giữ số liệu hiện tại nếu lỗi mạng tạm thời
+    }
+  }, []);
+
   const loadStatsAndDestinations = useCallback(async () => {
     try {
       const [statsRes, destList] = await Promise.all([
@@ -137,6 +148,29 @@ export default function AdminAiGuideScreen() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        refreshStatsOnly();
+      }
+    };
+
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "hidden") {
+        refreshStatsOnly();
+      }
+    }, 4000);
+
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+    };
+  }, [refreshStatsOnly]);
 
   useEffect(() => {
     let active = true;
@@ -428,7 +462,7 @@ export default function AdminAiGuideScreen() {
       </div>
 
       {activeTab === "handoff" ? (
-        <AdminAiHandoffPanel onStatsChanged={loadStatsAndDestinations} />
+        <AdminAiHandoffPanel onStatsChanged={refreshStatsOnly} />
       ) : activeTab === "documents" ? (
         <AdminAiDocumentsPanel
           destinations={destinations}
