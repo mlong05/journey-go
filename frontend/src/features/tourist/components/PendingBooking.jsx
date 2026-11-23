@@ -18,6 +18,23 @@ import { longDate, vnd } from "../utils";
 
 const msLeft = (deadline) => Math.max(0, new Date(deadline).getTime() - Date.now());
 
+/**
+ * Sự kiện "đơn vừa được thanh toán" — bắn ra khi trang kết quả xác nhận thành công.
+ *
+ * ⚠️ VÌ SAO CẦN?
+ * Thanh nhắc "Bạn có đơn chờ thanh toán" lấy danh sách đơn `PENDING_PAYMENT` từ
+ * server và chỉ tự tải lại khi người dùng FOCUS lại tab. Sau khi thanh toán xong
+ * (quay lại từ VNPay) trang vẫn hiện thanh nhắc cũ ⇒ khách tưởng chưa trả tiền.
+ * ⇒ Bắn sự kiện này để thanh nhắc tải lại ngay và tự ẩn đi.
+ */
+export const PAYMENT_COMPLETED_EVENT = "jg:payment-completed";
+
+/** Báo "đơn vừa được thanh toán" ⇒ các thành phần đang giữ đơn chờ sẽ tải lại. */
+export function notifyPaymentCompleted() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(PAYMENT_COMPLETED_EVENT));
+}
+
 /** Đồng hồ mm:ss tới hạn thanh toán; gọi onExpire một lần khi hết giờ. */
 export function PaymentCountdown({ deadline, onExpire, className = "font-extrabold tabular-nums" }) {
   const [left, setLeft] = useState(() => msLeft(deadline));
@@ -66,12 +83,16 @@ export function usePendingBooking(tourId) {
     // Tải sau khi gắn xong (không gọi setState đồng bộ trong effect).
     const t = setTimeout(reload, 0);
     const onFocus = () => { if (document.visibilityState === "visible") reload(); };
+    // Đơn vừa được thanh toán ⇒ tải lại ngay để thanh nhắc "đơn chờ thanh toán" biến mất.
+    const onPaid = () => reload();
     document.addEventListener("visibilitychange", onFocus);
     window.addEventListener("focus", onFocus);
+    window.addEventListener(PAYMENT_COMPLETED_EVENT, onPaid);
     return () => {
       clearTimeout(t);
       document.removeEventListener("visibilitychange", onFocus);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener(PAYMENT_COMPLETED_EVENT, onPaid);
     };
   }, [reload]);
 

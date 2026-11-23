@@ -190,12 +190,15 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
     _loadPending();
   }
 
-  /// Id các tour du khách đã mua (đã thanh toán) ⇒ loại khỏi danh sách hiển thị.
+  /// Id các tour du khách đã mua và CÒN CHẶN đặt lại ⇒ loại khỏi danh sách hiển thị.
+  ///
+  /// ⚠️ Chỉ đơn `CONFIRMED` còn hiệu lực mới chặn. Đơn `COMPLETED` (đã đi xong) hoặc
+  /// `CONFIRMED` có ngày đi đã qua ⇒ tour hiện lại, du khách đặt tiếp được.
   ///
   /// ⚠️ `size: 200` để không bỏ sót tour đã mua khi du khách có nhiều đơn.
   Future<Set<int>> _loadOwnedTourIds() async {
     final bookings = await _bookingService.getMine(size: 200);
-    return {for (final b in bookings) if (b.isPaid) b.tourId};
+    return {for (final b in bookings) if (b.blocksRebook) b.tourId};
   }
 
   /// Ảnh cho thẻ hành trình: ảnh điểm dừng đang mở (tour 5 bước) → ảnh bìa tour.

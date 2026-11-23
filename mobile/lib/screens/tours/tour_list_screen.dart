@@ -97,15 +97,18 @@ class _TourListScreenState extends State<TourListScreen> {
     }
   }
 
-  /// Tour du khách ĐÃ MUA (đã thanh toán) ⇒ không hiển thị lại trong danh sách.
+  /// Tour du khách ĐÃ MUA và CÒN CHẶN đặt lại ⇒ không hiển thị lại trong danh sách.
   ///
-  /// ⚠️ Lấy từ `getMine()` + `isPaid` (không dùng `getTickets()` vì hàm đó chỉ
-  /// trả về vé đang dùng) — tour đã mua rồi thì KHÔNG được đặt tiếp.
+  /// ⚠️ Chỉ đơn `CONFIRMED` còn hiệu lực mới chặn. Đơn `COMPLETED` (đã đi xong) hoặc
+  /// `CONFIRMED` có ngày đi đã qua ⇒ tour hiện lại, du khách đặt tiếp được.
+  ///
+  /// ⚠️ Lấy từ `getMine()` + `blocksRebook` (không dùng `getTickets()` vì hàm đó chỉ
+  /// trả về vé đang dùng).
   /// ⚠️ `size: 200` để không bỏ sót tour đã mua khi du khách có nhiều đơn.
   Future<void> _loadOwned() async {
     try {
       final bookings = await BookingService().getMine(size: 200);
-      final ids = {for (final b in bookings) if (b.isPaid) b.tourId};
+      final ids = {for (final b in bookings) if (b.blocksRebook) b.tourId};
       if (mounted) setState(() => _owned = ids);
     } catch (_) {}
   }
