@@ -1,6 +1,6 @@
 /** Nhãn tiếng Việt cho phương thức xác minh nhiệm vụ (enum VerificationMethod ở backend). */
 export const VERIFICATION_METHOD_LABELS = {
-  ANSWER_MATCH: "So khớp đáp án (trắc nghiệm)",
+  ANSWER_MATCH: "So khớp đáp án",
   GPS_PRESENCE: "Định vị tại chỗ",
   QR_SCAN: "Quét mã QR hiện vật",
   PHOTO_SUBMISSION: "Nộp ảnh thực địa",

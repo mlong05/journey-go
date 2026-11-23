@@ -1,34 +1,47 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  X,
-  Plus,
-  Layers,
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  RefreshCw,
-  Pencil,
-  Search,
-  Eye,
-  MapPin,
-  HelpCircle,
-  QrCode,
+  AlertTriangle,
   Camera,
   Check,
+  CheckCircle2,
+  HelpCircle,
+  Layers,
+  Loader2,
+  MapPin,
+  Pencil,
+  Plus,
+  QrCode,
+  RefreshCw,
   Save,
+  Search,
 } from "lucide-react";
 import { taskTypeService } from "../services/taskTypeService";
 import { VERIFICATION_METHOD_LABELS, verificationMethodLabel } from "../constants";
 import { LimitedField } from "@/components/ui/LimitedField";
+import { ModalShell } from "@/components/admin/AdminUI";
 
-const VERIFICATION_METHODS = [
-  { value: "ANSWER_MATCH", icon: HelpCircle },
-  { value: "GPS_PRESENCE", icon: MapPin },
-  { value: "QR_SCAN", icon: QrCode },
-  { value: "PHOTO_SUBMISSION", icon: Camera },
-].map((m) => ({ ...m, label: VERIFICATION_METHOD_LABELS[m.value] }));
+/**
+ * Icon + màu cho từng phương thức xác minh — khớp `VERIFICATION_METHOD_LABELS`.
+ */
+const METHOD_META = {
+  ANSWER_MATCH: { icon: HelpCircle, chip: "bg-violet-50 text-violet-700 border-violet-200" },
+  GPS_PRESENCE: { icon: MapPin, chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  QR_SCAN: { icon: QrCode, chip: "bg-sky-50 text-sky-700 border-sky-200" },
+  PHOTO_SUBMISSION: { icon: Camera, chip: "bg-amber-50 text-amber-700 border-amber-200" },
+};
+
+const METHOD_FALLBACK = {
+  icon: HelpCircle,
+  chip: "bg-slate-100 text-slate-600 border-slate-200",
+};
+
+const methodMeta = (value) => METHOD_META[value] ?? METHOD_FALLBACK;
+
+const VERIFICATION_METHODS = Object.entries(VERIFICATION_METHOD_LABELS).map(
+  ([value, label]) => ({ value, label, ...methodMeta(value) }),
+);
 
 /**
  * Sinh mã định danh nội bộ từ tên hiển thị (bỏ dấu, viết hoa, nối bằng "_"),
@@ -52,7 +65,7 @@ const INITIAL_FORM = {
 };
 
 /**
- * Modal Quản Lý Danh Mục TaskType (Master Data)
+ * Modal Quản lý Danh mục TaskType (Master Data)
  * Dành cho ADMIN:
  *  - GET   /api/v1/task-types
  *  - GET   /api/v1/task-types/{id}
@@ -65,7 +78,8 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [query, setQuery] = useState("");
 
   const [editingType, setEditingType] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -92,7 +106,7 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
   }, []);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) return undefined;
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) loadList();
@@ -102,16 +116,23 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
     };
   }, [isOpen, loadList]);
 
-  // Tìm kiếm theo tên hoặc phương thức xác minh
+  /** Tìm kiếm có trì hoãn — tránh lọc lại trên mỗi ký tự gõ. */
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(searchInput.trim()), 250);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  // Tìm kiếm theo tên, mã hoặc phương thức xác minh
   const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = query.toLowerCase();
     if (!q) return types;
     return types.filter(
       (t) =>
         t.name?.toLowerCase().includes(q) ||
-        verificationMethodLabel(t.verificationMethod).toLowerCase().includes(q)
+        t.code?.toLowerCase().includes(q) ||
+        verificationMethodLabel(t.verificationMethod).toLowerCase().includes(q),
     );
-  }, [types, searchQuery]);
+  }, [types, query]);
 
   // Xem chi tiết qua GET /api/v1/task-types/{id}
   const handleViewDetail = async (id) => {
@@ -130,75 +151,20 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[70] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-4xl max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
-      >
-        {/* HEADER */}
-        <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="p-2.5 rounded-2xl bg-violet-50 text-violet-700 border border-violet-200 shrink-0">
-              <Layers size={22} />
-            </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                Quản lý loại nhiệm vụ
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                Chuẩn hóa các loại nhiệm vụ, cơ chế chấm điểm và yêu cầu vị trí cho toàn sàn.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Đóng"
-            className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {toast && (
-          <div className="mx-6 mt-3 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3.5 py-2.5 rounded-xl border border-emerald-200 flex items-center gap-2">
-            <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-            <span>{toast}</span>
-          </div>
-        )}
-
-        {/* TOOLBAR */}
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <div className="relative flex-1">
-              <Search
-                size={15}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm kiếm theo tên loại nhiệm vụ..."
-                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
+    <>
+      <ModalShell
+        title="Quản lý loại nhiệm vụ"
+        subtitle="Chuẩn hoá các loại nhiệm vụ, cơ chế chấm điểm và yêu cầu vị trí cho toàn sàn."
+        onClose={onClose}
+        extraWide
+        footer={
+          <>
             <button
               type="button"
-              onClick={loadList}
-              disabled={loading}
-              className="h-8 px-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              onClick={onClose}
+              className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
             >
-              <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-              Tải lại
+              Đóng
             </button>
             <button
               type="button"
@@ -206,111 +172,167 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
                 setEditingType(null);
                 setIsCreating(true);
               }}
-              className="h-8 px-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700"
             >
-              <Plus size={13} />
+              <Plus size={14} />
               Thêm loại mới
+            </button>
+          </>
+        }
+      >
+        {/* ── Thông báo ── */}
+        {toast && (
+          <p className="mb-3 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold leading-relaxed text-emerald-700">
+            <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+            {toast}
+          </p>
+        )}
+
+        {/* ── Toolbar ── */}
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative flex-1 sm:max-w-sm">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Tìm theo tên, mã, phương thức xác minh..."
+              aria-label="Tìm loại nhiệm vụ"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-4 focus:ring-violet-500/15"
+            />
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600">
+              {filtered.length} / {types.length} loại
+            </span>
+            <button
+              type="button"
+              onClick={loadList}
+              disabled={loading}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+              Tải lại
             </button>
           </div>
         </div>
 
-        {/* NỘI DUNG DANH SÁCH */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
-          {error && (
-            <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-semibold">
-              <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
+        {/* ── Danh sách ── */}
+        {error && (
+          <p className="mb-3 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-semibold leading-relaxed text-rose-700">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            {error}
+          </p>
+        )}
 
-          {loading && types.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
-              <Loader2 size={24} className="animate-spin text-violet-600" />
-              <span className="text-xs font-semibold">Đang tải danh mục loại nhiệm vụ...</span>
+        {loading && types.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-16 text-slate-500">
+            <Loader2 size={22} className="animate-spin text-violet-600" />
+            <span className="text-xs font-semibold">
+              Đang tải danh mục loại nhiệm vụ...
+            </span>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <Layers size={22} />
             </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-16 text-slate-400">
-              <Layers size={36} className="mx-auto mb-2 opacity-50" />
-              <p className="text-sm font-semibold">Không tìm thấy loại nhiệm vụ nào</p>
+            <div>
+              <p className="text-sm font-bold text-slate-700">
+                Không tìm thấy loại nhiệm vụ nào
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                {types.length === 0
+                  ? "Bấm “Thêm loại mới” để tạo loại đầu tiên."
+                  : "Thử đổi từ khoá tìm kiếm."}
+              </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {filtered.map((item) => {
-                const methodMeta = VERIFICATION_METHODS.find(
-                  (m) => m.value === item.verificationMethod
-                );
-                const MethodIcon = methodMeta?.icon || HelpCircle;
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {filtered.map((item) => {
+              const meta = methodMeta(item.verificationMethod);
+              const MethodIcon = meta.icon;
 
-                return (
-                  <div
-                    key={item.id}
-                    className="p-4 rounded-2xl border border-slate-200/90 bg-white hover:border-violet-300 hover:shadow-xs transition-all space-y-3 flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-sm font-bold text-slate-900">
+              return (
+                <div
+                  key={item.id}
+                  className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-4 transition-all hover:border-violet-300 hover:shadow-2xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${meta.chip}`}
+                      >
+                        <MethodIcon size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="truncate text-sm font-bold text-slate-900">
                           {item.name}
                         </h4>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleViewDetail(item.id)}
-                            title="Xem chi tiết"
-                            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-                          >
-                            <Eye size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsCreating(false);
-                              setEditingType(item);
-                            }}
-                            title="Chỉnh sửa"
-                            className="p-1 rounded-lg text-slate-400 hover:text-violet-700 hover:bg-violet-50 cursor-pointer"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                        </div>
+                        {/*
+                          ⚠️ KHÔNG hiển thị MÃ (VD "QUIZ",
+                          "REAL_WORLD_INTERACTIVE") — enum nội bộ backend, Admin
+                          không cần thấy.
+                        */}
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-600">
-                      <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md text-slate-700">
-                        <MethodIcon size={12} className="text-violet-600" />
-                        {verificationMethodLabel(item.verificationMethod)}
-                      </span>
-                      {item.hasQuestions && (
-                        <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">
-                          <Check size={11} /> Có câu hỏi
-                        </span>
-                      )}
-                      {item.requiresLocation && (
-                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded">
-                          <MapPin size={11} /> Cần vị trí
-                        </span>
-                      )}
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleViewDetail(item.id)}
+                        title="Xem chi tiết"
+                        aria-label={`Xem chi tiết ${item.name}`}
+                        className="cursor-pointer rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                      >
+                        <HelpCircle size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCreating(false);
+                          setEditingType(item);
+                        }}
+                        title="Chỉnh sửa"
+                        aria-label={`Sửa ${item.name}`}
+                        className="cursor-pointer rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-violet-50 hover:text-violet-700"
+                      >
+                        <Pencil size={14} />
+                      </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* FOOTER */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
-          >
-            Đóng
-          </button>
-        </div>
-      </div>
+                  <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-semibold ${meta.chip}`}
+                    >
+                      <MethodIcon size={11} />
+                      {verificationMethodLabel(item.verificationMethod)}
+                    </span>
+                    {item.hasQuestions && (
+                      <span className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
+                        <Check size={11} /> Có câu hỏi
+                      </span>
+                    )}
+                    {item.requiresLocation && (
+                      <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        <MapPin size={11} /> Cần vị trí
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </ModalShell>
 
-      {/* FORM DIALOG: TẠO MỚI HOẶC SỬA TASKTYPE */}
+      {/* ── FORM: tạo mới hoặc sửa ── */}
       {(isCreating || editingType) && (
         <TaskTypeFormDialog
           taskType={editingType}
@@ -321,7 +343,7 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
           onSaved={(saved, isEdit) => {
             if (isEdit) {
               setTypes((prev) =>
-                prev.map((t) => (t.id === saved.id ? { ...t, ...saved } : t))
+                prev.map((t) => (t.id === saved.id ? { ...t, ...saved } : t)),
               );
               showToast(`Đã cập nhật loại nhiệm vụ "${saved.name}".`);
             } else {
@@ -334,7 +356,7 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
         />
       )}
 
-      {/* MODAL CHI TIẾT */}
+      {/* ── MODAL CHI TIẾT ── */}
       {detailTarget && (
         <TaskTypeDetailDialog
           taskType={detailTarget}
@@ -342,13 +364,13 @@ export default function TaskTypeManagerModal({ isOpen, onClose }) {
           onClose={() => setDetailTarget(null)}
         />
       )}
-    </div>
+    </>
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// DIALOG FORM TẠO (POST) HOẶC SỬA (PATCH) TASKTYPE
-// ─────────────────────────────────────────────────────────────
+/* =========================================================================
+   FORM TẠO (POST) HOẶC SỬA (PATCH) TASKTYPE
+   ========================================================================= */
 function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
   const isEdit = Boolean(taskType);
   const [form, setForm] = useState(
@@ -359,7 +381,7 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
           requiresLocation: Boolean(taskType.requiresLocation),
           verificationMethod: taskType.verificationMethod || "ANSWER_MATCH",
         }
-      : INITIAL_FORM
+      : INITIAL_FORM,
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -407,192 +429,204 @@ function TaskTypeFormDialog({ taskType, onClose, onSaved }) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[80] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4"
-      >
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-base font-bold text-slate-900">
-            {isEdit ? "Cập nhật loại nhiệm vụ" : "Tạo loại nhiệm vụ mới"}
-          </h3>
+    <ModalShell
+      title={isEdit ? "Cập nhật loại nhiệm vụ" : "Tạo loại nhiệm vụ mới"}
+      subtitle={
+        isEdit
+          ? `Sửa cấu hình của "${taskType.name}".`
+          : "Mã định danh được hệ thống tự sinh từ tên hiển thị."
+      }
+      onClose={onClose}
+      footer={
+        <>
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+            disabled={loading}
+            className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
           >
-            <X size={14} />
+            Huỷ
           </button>
-        </div>
-
+          <button
+            type="submit"
+            form="task-type-form"
+            disabled={loading}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Save size={14} />
+            )}
+            {isEdit ? "Lưu thay đổi" : "Tạo loại mới"}
+          </button>
+        </>
+      }
+    >
+      <form id="task-type-form" onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-semibold">
+          <p className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-semibold leading-relaxed text-rose-700">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
             {error}
-          </div>
+          </p>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3.5">
-          {/* Tên hiển thị */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700">
-              Tên hiển thị <span className="text-rose-500">*</span>
-            </label>
-            <LimitedField
-              as="input"
-              limit={100}
-              type="text"
-              disabled={loading}
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Vd: Giải mã âm thanh thực địa"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none"
-            />
-          </div>
+        {/* ── Tên hiển thị ── */}
+        <div>
+          <label
+            htmlFor="task-type-name"
+            className="mb-1.5 block text-xs font-bold text-slate-700"
+          >
+            Tên hiển thị <span className="text-rose-500">*</span>
+          </label>
+          <LimitedField
+            as="input"
+            id="task-type-name"
+            limit={100}
+            type="text"
+            disabled={loading}
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="Vd: Giải mã âm thanh thực địa"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/15"
+          />
+          {/*
+            ⚠️ KHÔNG hiển thị "Mã định danh" (VD "GIAI_MA_AM_THANH") — mã được
+            SINH TỰ ĐỘNG từ tên hiển thị, Admin không cần thấy hay nhập ⇒ chỉ là
+            thông tin kỹ thuật của backend, gây nhiễu form.
+          */}
+        </div>
 
-          {/* Phương thức xác minh */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700">
-              Phương thức xác minh
-            </label>
-            <select
-              disabled={loading}
-              value={form.verificationMethod}
+        {/* ── Phương thức xác minh ── */}
+        <div>
+          <label
+            htmlFor="task-type-method"
+            className="mb-1.5 block text-xs font-bold text-slate-700"
+          >
+            Phương thức xác minh
+          </label>
+          <select
+            id="task-type-method"
+            disabled={loading}
+            value={form.verificationMethod}
+            onChange={(e) =>
+              setForm({ ...form, verificationMethod: e.target.value })
+            }
+            className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/15"
+          >
+            {VERIFICATION_METHODS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* ── Cờ đặc tính ── */}
+        <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={form.hasQuestions}
               onChange={(e) =>
-                setForm({ ...form, verificationMethod: e.target.value })
+                setForm({ ...form, hasQuestions: e.target.checked })
               }
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none"
-            >
-              {VERIFICATION_METHODS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
+              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+            />
+            <span className="text-xs font-semibold leading-relaxed text-slate-700">
+              Loại này có kèm bộ câu hỏi / trắc nghiệm
+              <span className="mt-0.5 block text-[11px] font-normal text-slate-500">
+                Khách phải trả lời đúng để được cộng điểm.
+              </span>
+            </span>
+          </label>
 
-          {/* Có câu hỏi & yêu cầu vị trí */}
-          <div className="pt-1 space-y-2">
-            <label className="flex items-center gap-2.5 text-xs font-bold text-slate-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.hasQuestions}
-                onChange={(e) =>
-                  setForm({ ...form, hasQuestions: e.target.checked })
-                }
-                className="w-4 h-4 rounded text-violet-600 focus:ring-violet-500"
-              />
-              <span>Loại này có kèm bộ câu hỏi / trắc nghiệm</span>
-            </label>
-
-            <label className="flex items-center gap-2.5 text-xs font-bold text-slate-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.requiresLocation}
-                onChange={(e) =>
-                  setForm({ ...form, requiresLocation: e.target.checked })
-                }
-                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
-              />
-              <span>Bắt buộc có vị trí khi tạo nhiệm vụ</span>
-            </label>
-          </div>
-
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 cursor-pointer"
-            >
-              Huỷ
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-            >
-              {loading ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <Save size={13} />
-              )}
-              <span>{isEdit ? "Lưu thay đổi" : "Tạo loại mới"}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={form.requiresLocation}
+              onChange={(e) =>
+                setForm({ ...form, requiresLocation: e.target.checked })
+              }
+              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+            />
+            <span className="text-xs font-semibold leading-relaxed text-slate-700">
+              Bắt buộc có vị trí khi tạo nhiệm vụ
+              <span className="mt-0.5 block text-[11px] font-normal text-slate-500">
+                Nhiệm vụ chỉ được hoàn thành khi khách có mặt tại địa điểm thực tế.
+              </span>
+            </span>
+          </label>
+        </div>
+      </form>
+    </ModalShell>
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// DIALOG CHI TIẾT TASKTYPE (GET /api/v1/task-types/{id})
-// ─────────────────────────────────────────────────────────────
+/* =========================================================================
+   MODAL CHI TIẾT TASKTYPE (GET /api/v1/task-types/{id})
+   ========================================================================= */
 function TaskTypeDetailDialog({ taskType, loading, onClose }) {
+  const meta = methodMeta(taskType?.verificationMethod);
+  const MethodIcon = meta.icon;
+
   return (
-    <div
-      className="fixed inset-0 z-[80] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-      onClick={onClose}
+    <ModalShell
+      title="Chi tiết loại nhiệm vụ"
+      onClose={onClose}
+      footer={
+        <button
+          type="button"
+          onClick={onClose}
+          className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+        >
+          Đóng
+        </button>
+      }
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4"
-      >
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-base font-bold text-slate-900">Chi tiết loại nhiệm vụ</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
-          >
-            <X size={14} />
-          </button>
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <Loader2 size={20} className="animate-spin text-violet-600" />
         </div>
-
-        {loading ? (
-          <div className="flex justify-center py-6">
-            <Loader2 size={20} className="animate-spin text-violet-600" />
-          </div>
-        ) : (
-          <div className="space-y-3 text-xs">
-            <h4 className="text-sm font-bold text-slate-900">
-              {taskType.name}
-            </h4>
-
-            <div className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200 font-semibold text-slate-700">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Xác minh:</span>
-                <span>{verificationMethodLabel(taskType.verificationMethod)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Có câu hỏi:</span>
-                <span>{taskType.hasQuestions ? "Có" : "Không"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Yêu cầu vị trí:</span>
-                <span>{taskType.requiresLocation ? "Có (Bắt buộc)" : "Không"}</span>
-              </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${meta.chip}`}
+            >
+              <MethodIcon size={18} />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-sm font-bold text-slate-900">{taskType?.name}</h4>
+              {/*
+                ⚠️ KHÔNG hiển thị MÃ (VD "QUIZ", "REAL_WORLD_INTERACTIVE") —
+                enum nội bộ backend, Admin không cần thấy.
+              */}
             </div>
           </div>
-        )}
 
-        <div className="pt-2 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 cursor-pointer"
-          >
-            Đóng
-          </button>
+          <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="text-slate-500">Xác minh:</span>
+              <span className="text-right font-semibold text-slate-800">
+                {verificationMethodLabel(taskType?.verificationMethod)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="text-slate-500">Có câu hỏi:</span>
+              <span className="font-semibold text-slate-800">
+                {taskType?.hasQuestions ? "Có" : "Không"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="text-slate-500">Yêu cầu vị trí:</span>
+              <span className="font-semibold text-slate-800">
+                {taskType?.requiresLocation ? "Có (bắt buộc)" : "Không"}
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </ModalShell>
   );
 }

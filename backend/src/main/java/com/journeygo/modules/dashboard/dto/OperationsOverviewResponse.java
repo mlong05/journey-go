@@ -11,7 +11,7 @@ import java.util.List;
  * (xem {@code OperationsOverviewService#buildFinance}):
  * <ol>
  *   <li><b>Dòng tiền khách hàng</b> — theo kỳ đang xem ({@code Booking.paidAt}).</li>
- *   <li><b>Quyết toán</b> — theo đợt tất toán ({@code Settlement.revenuePeriod} yyyy-MM).</li>
+ *   <li><b>Quyết toán</b> — theo đợt tất toán ({@code Settlement.revenuePeriod} yyyy-MM-D).</li>
  *   <li><b>Doanh thu ghi nhận</b> — từ {@code ProviderRevenue}.</li>
  * </ol>
  * Trộn 3 lớp này khiến Admin hiểu nhầm (VD: tưởng "tiền đã quyết toán" là tiền của
