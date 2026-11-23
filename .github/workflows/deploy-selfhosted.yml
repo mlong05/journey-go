@@ -43,6 +43,44 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
+    # AiProdConfigBindingTest la test @SpringBootTest duy nhat trong bo test: no
+    # FULL application context voi @ActiveProfiles("prod"), nen Spring se khoi
+    # dong datasource + Flyway + JPA. CI bat buoc can PostgreSQL that.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: journeygo_db
+          POSTGRES_USER: journeygo
+          POSTGRES_PASSWORD: journeygo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U journeygo -d journeygo_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Point the prod profile at the CI service containers instead of the
+      # Docker hostnames ("postgres" / "redis") that only exist inside a
+      # compose network.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/journeygo_db
+      SPRING_DATASOURCE_USERNAME: journeygo
+      SPRING_DATASOURCE_PASSWORD: journeygo
+      SPRING_DATA_REDIS_HOST: localhost
+      SPRING_DATA_REDIS_PORT: 6379
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
