@@ -4,6 +4,7 @@ import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.modules.finance.dto.request.CreateCommissionPolicyRequest;
 import com.journeygo.modules.finance.dto.response.CommissionPolicyResponse;
+import com.journeygo.modules.finance.dto.response.CurrentCommissionRateResponse;
 import com.journeygo.modules.finance.entity.CommissionPolicy;
 import com.journeygo.modules.finance.repository.CommissionPolicyRepository;
 import com.journeygo.modules.user.entity.User;
@@ -57,6 +58,22 @@ public class CommissionPolicyService {
         return commissionPolicyRepository.findEffectiveAt(Instant.now()).stream()
                 .findFirst()
                 .map(CommissionPolicyResponse::fromEntity)
+                .orElse(null);
+    }
+
+    /**
+     * Tỷ lệ chia lợi nhuận hiện hành — bản XEM-ONLY dành cho ĐỐI TÁC.
+     *
+     * <p>⚠️ Chỉ trả về tỷ lệ + tên + khoảng hiệu lực ⇒ KHÔNG lộ chi tiết nội bộ
+     * của Admin (người tạo, lý do đổi, cờ cancelled/future).
+     *
+     * <p>Trả về {@code null} nếu chưa có chính sách nào hiệu lực.
+     */
+    @Transactional(readOnly = true)
+    public CurrentCommissionRateResponse getCurrentRateForProvider() {
+        return commissionPolicyRepository.findEffectiveAt(Instant.now()).stream()
+                .findFirst()
+                .map(CurrentCommissionRateResponse::fromEntity)
                 .orElse(null);
     }
 

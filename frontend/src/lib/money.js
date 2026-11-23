@@ -113,14 +113,83 @@ export function formatLocalDate(value) {
 }
 
 /**
- * Định dạng kỳ doanh thu `YYYY-MM` → "Tháng 09/2026".
+ * ── KỲ TẤT TOÁN 10 NGÀY ────────────────────────────────────────────────────
+ *
+ * Kỳ tất toán chia mỗi tháng thành 3 chu kỳ:
+ *   • Kỳ 1 — ngày 01 → 10
+ *   • Kỳ 2 — ngày 11 → 20
+ *   • Kỳ 3 — ngày 21 → ngày cuối tháng (8/9/10/11 ngày tuỳ tháng)
+ *
+ * Định dạng `revenuePeriod` của backend: `yyyy-MM-D` (D = 1|2|3).
+ * Chuỗi cũ theo tháng (`yyyy-MM`) vẫn được đọc được để tương thích dữ liệu cũ.
+ */
+
+/**
+ * Tách `revenuePeriod` thành thông tin kỳ.
+ *
+ * @returns {{year: number, month: number, cycle: number, start: number, end: number,
+ *   isTenDay: boolean} | null} null nếu chuỗi không đọc được.
+ */
+export function parseSettlementPeriod(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+
+  // Định dạng mới: yyyy-MM-D
+  const tenDay = /^(\d{4})-(\d{2})-(\d)$/.exec(raw);
+  if (tenDay) {
+    const [, y, m, d] = tenDay;
+    const month = Number(m);
+    const cycle = Number(d);
+    const daysInMonth = daysInVietnamMonth(Number(y), month);
+    const start = cycle === 1 ? 1 : cycle === 2 ? 11 : 21;
+    const end = cycle === 1 ? 10 : cycle === 2 ? 20 : daysInMonth;
+    return {
+      year: Number(y),
+      month,
+      cycle,
+      start,
+      end,
+      isTenDay: true,
+    };
+  }
+
+  // Định dạng cũ: yyyy-MM ⇒ coi như kỳ cuối của tháng (kỳ 3).
+  const monthly = /^(\d{4})-(\d{2})$/.exec(raw);
+  if (monthly) {
+    const [, y, m] = monthly;
+    const month = Number(m);
+    return {
+      year: Number(y),
+      month,
+      cycle: 3,
+      start: 21,
+      end: daysInVietnamMonth(Number(y), month),
+      isTenDay: false,
+    };
+  }
+
+  return null;
+}
+
+/** Số ngày của tháng (có xử lý năm nhuận). */
+export function daysInVietnamMonth(year, month) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
+ * Định dạng kỳ doanh thu → nhãn đầy đủ.
+ *
+ * • Kỳ 10 ngày (`yyyy-MM-D`) → "01/10 – 10/10/2026"
+ * • Kỳ tháng cũ (`yyyy-MM`)    → "Tháng 10/2026"
  */
 export function formatPeriod(value) {
-  if (!value) return "";
-  const match = /^(\d{4})-(\d{2})$/.exec(String(value).slice(0, 7));
-  if (!match) return String(value);
-  const [, y, m] = match;
-  return `Tháng ${m}/${y}`;
+  const period = parseSettlementPeriod(value);
+  if (!period) return value ? String(value) : "";
+  if (!period.isTenDay) {
+    return `Tháng ${String(period.month).padStart(2, "0")}/${period.year}`;
+  }
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(period.start)}/${pad(period.month)} – ${pad(period.end)}/${pad(period.month)}/${period.year}`;
 }
 
 /** Tên tháng tiếng Việt (1 → "Tháng 1", 9 → "Tháng 9"). */
@@ -140,49 +209,99 @@ export const MONTH_NAMES_VI = [
 ];
 
 /**
- * Định dạng kỳ doanh thu `YYYY-MM` → nhãn tiếng Việt dễ đọc: "Tháng 1/2026".
+ * Định dạng kỳ doanh thu → nhãn tiếng Việt dễ đọc.
  *
- * Khác `formatPeriod` ("Tháng 01/2026") ở chỗ không giữ số 0 ở đầu tháng.
+ * • Kỳ 10 ngày → "Kỳ 1 · 01–10/10/2026"
+ * • Kỳ tháng cũ → "Tháng 10/2026"
  */
 export function formatPeriodVN(value) {
-  if (!value) return "";
-  const match = /^(\d{4})-(\d{2})$/.exec(String(value).slice(0, 7));
-  if (!match) return String(value);
-  const [, y, m] = match;
-  return `Tháng ${Number(m)}/${y}`;
+  const period = parseSettlementPeriod(value);
+  if (!period) return value ? String(value) : "";
+  if (!period.isTenDay) {
+    return `Tháng ${period.month}/${period.year}`;
+  }
+  const pad = (n) => String(n).padStart(2, "0");
+  return `Kỳ ${period.cycle} · ${pad(period.start)}–${pad(period.end)}/${pad(period.month)}/${period.year}`;
 }
 
 /**
- * Định dạng kỳ doanh thu `YYYY-MM` → nhãn ngắn cho biểu đồ: "T09/26".
+ * Định dạng kỳ doanh thu → nhãn ngắn cho biểu đồ.
+ *
+ * • Kỳ 10 ngày → "K1 10/26"  (K1/K2/K3 = kỳ 1/2/3)
+ * • Kỳ tháng cũ → "T10/26"
  *
  * Dùng khi nhãn dài sẽ chồng lên nhau trên trục X (nhiều cột).
  */
 export function formatShortPeriod(value) {
-  if (!value) return "";
-  const match = /^(\d{4})-(\d{2})$/.exec(String(value).slice(0, 7));
-  if (!match) return String(value);
-  const [, y, m] = match;
-  return `T${m}/${y.slice(2)}`;
+  const period = parseSettlementPeriod(value);
+  if (!period) return value ? String(value) : "";
+  if (!period.isTenDay) {
+    return `T${String(period.month).padStart(2, "0")}/${String(period.year).slice(2)}`;
+  }
+  return `K${period.cycle} ${String(period.month).padStart(2, "0")}/${String(period.year).slice(2)}`;
 }
 
 /**
- * Kỳ doanh thu của tháng trước, định dạng `YYYY-MM`.
- *
- * Kỳ tất toán chỉ được tạo cho tháng ĐÃ ĐÓNG ⇒ mặc định chọn tháng trước
- * (tháng hiện tại thường chưa kết thúc nên chưa thể tất toán).
+ * Ngày hiện tại ở múi giờ Việt Nam — dùng múi giờ cố định để server (UTC) và
+ * client cho cùng kết quả ⇒ tránh lỗi hydration trên ô "Kỳ doanh thu".
  */
-export function previousMonth() {
-  // Dùng múi giờ VN cố định để server (UTC) và client cho cùng kết quả
-  // ⇒ tránh lỗi hydration trên ô "Kỳ doanh thu".
+function todayInVietnam() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: VN_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-  const [y, m] = parts.split("-").map(Number);
-  const prevMonth = m === 1 ? 12 : m - 1;
-  const prevYear = m === 1 ? y - 1 : y;
+  const [y, m, d] = parts.split("-").map(Number);
+  return { year: y, month: m, day: d };
+}
+
+/**
+ * Chu kỳ tất toán 10 ngày chứa ngày hiện tại — định dạng `yyyy-MM-D`.
+ *
+ * @param offset số kỳ lùi (0 = kỳ hiện tại, 1 = kỳ trước, …)
+ */
+export function settlementPeriodByOffset(offset = 0) {
+  const { year, month, day } = todayInVietnam();
+  const cycle = day <= 10 ? 1 : day <= 20 ? 2 : 3;
+  // Lùi N kỳ: mỗi tháng có 3 kỳ ⇒ lùi 3 kỳ = lùi 1 tháng.
+  let index = (year * 12 + (month - 1)) * 3 + (cycle - 1) - offset;
+  const targetYear = Math.floor(index / 36);
+  const rest = index - targetYear * 36;
+  const targetMonth = Math.floor(rest / 3) + 1;
+  const targetCycle = (rest % 3) + 1;
+  return `${targetYear}-${String(targetMonth).padStart(2, "0")}-${targetCycle}`;
+}
+
+/**
+ * Kỳ tất toán 10 ngày ĐÃ KẾT THÚC gần nhất — định dạng `yyyy-MM-D`.
+ *
+ * Kỳ tất toán chỉ tạo được cho kỳ ĐÃ ĐÓNG ⇒ mặc định chọn kỳ vừa kết thúc
+ * (kỳ hiện tại thường chưa kết thúc nên chưa thể tất toán).
+ */
+export function previousSettlementPeriod() {
+  const { year, month, day } = todayInVietnam();
+  const cycle = day <= 10 ? 1 : day <= 20 ? 2 : 3;
+  // Nếu hôm nay đã qua ngày cuối của kỳ hiện tại (tức ngày 10/20/cuối tháng)
+  // thì kỳ hiện tại ĐÃ ĐÓNG ⇒ dùng luôn kỳ hiện tại.
+  const daysInMonth = daysInVietnamMonth(year, month);
+  const cycleEnd = cycle === 1 ? 10 : cycle === 2 ? 20 : daysInMonth;
+  if (day >= cycleEnd) {
+    return `${year}-${String(month).padStart(2, "0")}-${cycle}`;
+  }
+  return settlementPeriodByOffset(1);
+}
+
+/**
+ * Kỳ doanh thu của tháng trước, định dạng `YYYY-MM`.
+ *
+ * ⚠️ GIỮ LẠI để tương thích — luồng tất toán mới dùng
+ * {@link previousSettlementPeriod} (kỳ 10 ngày).
+ */
+export function previousMonth() {
+  const { year, month } = todayInVietnam();
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
   return `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
 }
 
@@ -638,11 +757,64 @@ export const REFUND_REASON_LABELS = {
  * Nguồn thật là cấu hình của Admin trong tab "Cấu hình lý do hoàn tiền".
  */
 export const REFUND_RATE_BY_REASON = {
-  PERSONAL: 0.5,
+  PERSONAL: 0.8,
   PLATFORM_FAULT: 1,
   PROVIDER_FAULT: 1,
   FORCE_MAJEURE: 0,
 };
+
+/**
+ * Mốc bậc cao nhất: từ 7 ngày trở lên trước khởi hành → hoàn 80%.
+ * Khớp backend `PersonalRefundPolicy.EARLY_CANCEL_DAYS`.
+ */
+export const REFUND_EARLY_CANCEL_DAYS = 7;
+
+/**
+ * Mốc bậc thấp nhất: dưới 72 giờ (3 ngày) trước khởi hành → hoàn 0%.
+ * Khớp backend `PersonalRefundPolicy.LATE_CANCEL_HOURS`.
+ */
+export const REFUND_LATE_CANCEL_HOURS = 72;
+
+/**
+ * Tỷ lệ hoàn của nhóm cá nhân theo 3 bậc thời gian.
+ *
+ * ⚠️ Khớp backend `PersonalRefundPolicy` (Java) — Admin dùng bảng này để
+ *    hiển thị số tiền đề xuất đúng với cách backend tính.
+ */
+export const REFUND_PERSONAL_TIERS = Object.freeze([
+  { id: "EARLY", rate: 0.8, condition: "Từ 7 ngày trở lên" },
+  { id: "MID", rate: 0.5, condition: "Từ 3 đến 6 ngày (72 giờ – 6 ngày)" },
+  { id: "LATE", rate: 0, condition: "Dưới 72 giờ (3 ngày)" },
+]);
+
+/**
+ * Số giờ còn lại từ thời điểm gửi yêu cầu tới đầu ngày trải nghiệm.
+ *
+ * @param {string} [experienceDate] ngày trải nghiệm (YYYY-MM-DD)
+ * @param {string} [requestedAt] thời điểm gửi yêu cầu (ISO) — mặc định "bây giờ"
+ * @returns {number} số giờ (âm nếu đã qua ngày trải nghiệm)
+ */
+function hoursUntilExperience(experienceDate, requestedAt) {
+  const start = parseLocalDateStart(experienceDate);
+  if (!start) return Number.POSITIVE_INFINITY;
+  const when = requestedAt ? new Date(requestedAt) : new Date();
+  if (Number.isNaN(when.getTime())) return Number.POSITIVE_INFINITY;
+  return (start - when.getTime()) / 3600000;
+}
+
+/**
+ * Bậc chính sách của nhóm cá nhân tại thời điểm gửi yêu cầu.
+ *
+ * @param {string} [experienceDate] ngày trải nghiệm (YYYY-MM-DD)
+ * @param {string} [requestedAt] thời điểm gửi yêu cầu (ISO)
+ * @returns {{ id: string, rate: number, condition: string }}
+ */
+export function personalRefundTier(experienceDate, requestedAt) {
+  const hoursLeft = hoursUntilExperience(experienceDate, requestedAt);
+  if (hoursLeft < REFUND_LATE_CANCEL_HOURS) return REFUND_PERSONAL_TIERS[2];
+  if (hoursLeft < REFUND_EARLY_CANCEL_DAYS * 24) return REFUND_PERSONAL_TIERS[1];
+  return REFUND_PERSONAL_TIERS[0];
+}
 
 /**
  * Tính số tiền hoàn theo nhóm lý do từ số tiền gốc của đơn.
@@ -654,11 +826,11 @@ export const REFUND_RATE_BY_REASON = {
  */
 export function refundAmountForReason(paymentAmount, reason, rateOverrides) {
   // ⚠️ Chưa chọn nhóm lý do (Admin chưa phân loại) ⇒ KHÔNG có tỷ lệ ⇒ 0.
-  //    Không dùng fallback 50% vì sẽ hiển thị sai số tiền cho Admin.
+  //    Không dùng fallback 80% vì sẽ hiển thị sai số tiền cho Admin.
   if (!reason) return 0;
   const base = toAmount(paymentAmount);
   const rate =
-    rateOverrides?.[reason] ?? REFUND_RATE_BY_REASON[reason] ?? 0.5;
+    rateOverrides?.[reason] ?? REFUND_RATE_BY_REASON[reason] ?? 0.8;
   return Math.round(base * rate);
 }
 
@@ -667,15 +839,14 @@ export function refundAmountForReason(paymentAmount, reason, rateOverrides) {
  * nghiệm) thì nhóm PERSONAL hoàn 0%. Khớp với
  * `finance.refund-no-show-window-hours` của backend.
  */
-export const REFUND_NO_SHOW_WINDOW_HOURS = 48;
+export const REFUND_NO_SHOW_WINDOW_HOURS = 72;
 
 /**
  * Tính số tiền hoàn theo chính sách đầy đủ (khớp với `RefundService`).
  *
  * ── Quy tắc ──
- *  • Nhóm có mức hoàn 0% riêng (mặc định là PERSONAL): hủy trong vòng N giờ
- *    trước ngày trải nghiệm (hoặc no-show) → 0%; ngoài cửa sổ → tỷ lệ của nhóm
- *    (mặc định 50%).
+ *  • Nhóm cá nhân (PERSONAL): 3 bậc theo thời điểm hủy — từ 7 ngày trở lên →
+ *    80%; từ 72 giờ – 6 ngày → 50%; dưới 72 giờ (hoặc no-show) → 0%.
  *  • PLATFORM_FAULT / PROVIDER_FAULT → 100%.
  *  • FORCE_MAJEURE → 0%.
  *
@@ -684,9 +855,7 @@ export const REFUND_NO_SHOW_WINDOW_HOURS = 48;
  * @param {Record<string, number>} [rateOverrides] tỷ lệ thật từ cấu hình Admin
  * @param {string} [experienceDate] ngày trải nghiệm (YYYY-MM-DD)
  * @param {string} [requestedAt] thời điểm khách gửi yêu cầu (ISO) — mốc so sánh
- *   cửa sổ no-show. Mặc định lấy "bây giờ" (dùng khi xem trước).
- * @param {number} [noShowWindowHours] số giờ cửa sổ no-show do backend cấu hình
- *   (mặc định {@link REFUND_NO_SHOW_WINDOW_HOURS}).
+ *   các bậc chính sách. Mặc định lấy "bây giờ" (dùng khi xem trước).
  */
 export function refundAmountForReasonAt(
   paymentAmount,
@@ -694,19 +863,22 @@ export function refundAmountForReasonAt(
   rateOverrides,
   experienceDate,
   requestedAt,
-  noShowWindowHours = REFUND_NO_SHOW_WINDOW_HOURS,
 ) {
-  if (
-    reason === "PERSONAL" &&
-    isWithinNoShowWindow(experienceDate, requestedAt, noShowWindowHours)
-  ) {
-    return 0;
+  // ⚠️ Nhóm cá nhân dùng 3 BẬC theo thời điểm hủy — KHÔNG dùng tỷ lệ cấu hình
+  //    của Admin (vì bậc 80%/50% là quy tắc nghiệp vụ cố định).
+  if (reason === "PERSONAL") {
+    const tier = personalRefundTier(experienceDate, requestedAt);
+    return Math.round(toAmount(paymentAmount) * tier.rate);
   }
   return refundAmountForReason(paymentAmount, reason, rateOverrides);
 }
 
 /**
- * Yêu cầu có nằm trong cửa sổ no-show không (hủy quá muộn / không xuất hiện).
+ * Yêu cầu có rơi vào bậc "không hoàn" không (hủy quá muộn — dưới 72 giờ).
+ *
+ * ⚠️ Tương đương với việc bậc áp dụng là {@code LATE} (0%) — xem
+ *    {@link personalRefundTier}. Giữ hàm này cho các nơi chỉ cần trả lời
+ *    "có/không" mà không cần biết tỷ lệ cụ thể.
  *
  * @param {string} [experienceDate] ngày trải nghiệm (YYYY-MM-DD)
  * @param {string} [requestedAt] thời điểm gửi yêu cầu (ISO) — mặc định "bây giờ"

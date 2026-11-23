@@ -13,7 +13,7 @@
  */
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, Loader2, XCircle } from "lucide-react";
+import { AlertTriangle, Check, Copy, Loader2, XCircle } from "lucide-react";
 import PaginationBar from "@/components/ui/PaginationBar";
 
 /**
@@ -306,6 +306,71 @@ export function InfoRow({ label, value, mono = false, pill = false, status }) {
           <span className="text-slate-400">—</span>
         ) : (
           <span className={mono ? "font-mono" : ""}>{value}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Hàng thông tin CÓ NÚT SAO CHÉP — dùng cho dữ liệu Admin phải copy để đối
+ * chiếu / chuyển khoản (STK, mã tham chiếu, mã đơn…).
+ *
+ * ⚠️ Vì sao cần? Khi chuyển khoản thủ công, Admin phải gõ lại số tài khoản
+ *    (số dài, dễ sai 1 chữ số) ⇒ nút copy giúp lấy đúng nguyên văn.
+ *
+ * @param {string} label    nhãn hiển thị
+ * @param {string} value    giá trị (null/rỗng ⇒ hiện "—", ẩn nút copy)
+ * @param {boolean} mono    dùng font đẳng khoảng (cho mã / số tài khoản)
+ * @param {string} [hint]   tooltip trên nút copy (mặc định "Sao chép")
+ */
+export function CopyableRow({ label, value, mono = false, hint = "Sao chép" }) {
+  const [copied, setCopied] = useState(false);
+  const hasValue =
+    value !== null && value !== undefined && String(value).trim() !== "";
+
+  // Tự tắt trạng thái "đã sao chép" sau 1.5s.
+  useEffect(() => {
+    if (!copied) return undefined;
+    const t = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  const handleCopy = async () => {
+    if (!hasValue) return;
+    try {
+      await navigator.clipboard.writeText(String(value).trim());
+      setCopied(true);
+    } catch {
+      // Trình duyệt chặn clipboard (VD: http) ⇒ im lặng, Admin vẫn copy tay được.
+    }
+  };
+
+  return (
+    <div className="rounded-xl bg-slate-50 px-3.5 py-2.5">
+      <p className="text-[10px] font-medium text-slate-500">{label}</p>
+      <div className="mt-1 flex items-start justify-between gap-2">
+        <div className="min-w-0 text-xs font-semibold text-slate-800">
+          {hasValue ? (
+            <span className={`break-all ${mono ? "font-mono" : ""}`}>{value}</span>
+          ) : (
+            <span className="text-slate-400">—</span>
+          )}
+        </div>
+        {hasValue && (
+          <button
+            type="button"
+            onClick={handleCopy}
+            title={copied ? "Đã sao chép" : hint}
+            aria-label={`${hint}: ${label}`}
+            className="shrink-0 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800"
+          >
+            {copied ? (
+              <Check size={12} className="text-emerald-600" />
+            ) : (
+              <Copy size={12} />
+            )}
+          </button>
         )}
       </div>
     </div>
