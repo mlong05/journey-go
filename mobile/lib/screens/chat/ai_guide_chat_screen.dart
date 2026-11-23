@@ -298,6 +298,95 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
     }
   }
 
+  void _handleReturnToAiPressed() {
+    if (_handoffLoading) return;
+    if (_isWaitingHuman) {
+      _showCancelWaitDialog();
+      return;
+    }
+    _returnToAi();
+  }
+
+  Future<void> _showCancelWaitDialog() async {
+    var submitting = false;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => PopScope(
+          canPop: !submitting,
+          child: AlertDialog(
+            backgroundColor: AppCultureColors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            title: const Row(
+              children: [
+                Icon(Icons.hourglass_top_rounded, color: AppCultureColors.warning, size: 22),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Xác nhận quay lại AI',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            content: const Text(
+              'Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?',
+              style: TextStyle(fontSize: 13.5, height: 1.5, color: AppCultureColors.textMuted),
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            actions: [
+              TextButton(
+                onPressed: submitting
+                    ? null
+                    : () async {
+                        setDialogState(() => submitting = true);
+                        await _returnToAi();
+                        if (ctx.mounted) {
+                          Navigator.of(ctx).pop();
+                        }
+                      },
+                style: TextButton.styleFrom(foregroundColor: AppCultureColors.lacquer),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (submitting) ...[
+                      const SizedBox(
+                        width: 13,
+                        height: 13,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppCultureColors.lacquer,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    const Text(
+                      'Hủy & quay lại AI',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton(
+                onPressed: submitting ? null : () => Navigator.of(ctx).pop(),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppCultureColors.heritageJade,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text(
+                  'Tiếp tục chờ',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) {
@@ -607,7 +696,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
           const SizedBox(width: 8),
           if (_isLiveQueue)
             OutlinedButton.icon(
-              onPressed: _handoffLoading ? null : _returnToAi,
+              onPressed: _handoffLoading ? null : _handleReturnToAiPressed,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppCultureColors.textDark,
                 backgroundColor: Colors.white,

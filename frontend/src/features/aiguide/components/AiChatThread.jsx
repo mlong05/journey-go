@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Sparkles,
   Send,
@@ -105,10 +105,22 @@ export default function AiChatThread({
   compact = false,
 }) {
   const bottomRef = useRef(null);
+  const [showCancelWaitModal, setShowCancelWaitModal] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, sending, handoffStatus]);
+
+  useEffect(() => {
+    if (!showCancelWaitModal) return undefined;
+    const handleEsc = (e) => {
+      if (e.key === "Escape" && !handoffLoading) {
+        setShowCancelWaitModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [showCancelWaitModal, handoffLoading]);
 
   const normalizedHandoff = String(handoffStatus || "AI_ACTIVE").toUpperCase();
   const isWaitingHuman = normalizedHandoff === "WAITING_HUMAN";
@@ -117,6 +129,22 @@ export default function AiChatThread({
   const staffRoleLabel = String(assignedStaffRole || "").toUpperCase() === "ADMIN"
     ? "Admin"
     : "Moderator";
+
+  const handleReturnToAiClick = () => {
+    if (isWaitingHuman) {
+      setShowCancelWaitModal(true);
+      return;
+    }
+    onReturnToAi?.();
+  };
+
+  const handleConfirmReturnToAi = async () => {
+    try {
+      await onReturnToAi?.();
+    } finally {
+      setShowCancelWaitModal(false);
+    }
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -185,7 +213,7 @@ export default function AiChatThread({
           ? onReturnToAi && (
               <button
                 type="button"
-                onClick={onReturnToAi}
+                onClick={handleReturnToAiClick}
                 disabled={handoffLoading}
                 className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
               >
@@ -434,6 +462,61 @@ export default function AiChatThread({
           </p>
         )}
       </form>
+
+      {/* Hộp thoại xác nhận khi hủy hàng chờ gặp nhân viên */}
+      {showCancelWaitModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-wait-modal-title"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs"
+          onClick={() => {
+            if (!handoffLoading) setShowCancelWaitModal(false);
+          }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700">
+                <Clock size={18} />
+              </span>
+              <div className="min-w-0">
+                <h3
+                  id="cancel-wait-modal-title"
+                  className="text-sm font-bold text-slate-900"
+                >
+                  Xác nhận quay lại AI
+                </h3>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+                  Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={handoffLoading}
+                onClick={handleConfirmReturnToAi}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50 cursor-pointer"
+              >
+                {handoffLoading && <Loader2 size={13} className="animate-spin" />}
+                Hủy &amp; quay lại AI
+              </button>
+              <button
+                type="button"
+                disabled={handoffLoading}
+                onClick={() => setShowCancelWaitModal(false)}
+                className="inline-flex items-center justify-center rounded-xl bg-teal-700 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-teal-800 disabled:opacity-50 cursor-pointer"
+              >
+                Tiếp tục chờ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
