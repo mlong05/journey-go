@@ -7,6 +7,7 @@ import com.journeygo.modules.aiguide.dto.AiChatMessageDto;
 import com.journeygo.modules.aiguide.dto.AiChatRequest;
 import com.journeygo.modules.aiguide.dto.AiChatResponse;
 import com.journeygo.modules.aiguide.dto.AiChatSessionDto;
+import com.journeygo.modules.aiguide.entity.AiChatHandoffStatus;
 import com.journeygo.modules.aiguide.entity.AiChatMessage;
 import com.journeygo.modules.aiguide.entity.AiChatSession;
 import com.journeygo.modules.aiguide.entity.AiKnowledgeChunk;
@@ -14,6 +15,9 @@ import com.journeygo.modules.aiguide.entity.AiKnowledgeDocument;
 import com.journeygo.modules.aiguide.repository.AiChatMessageRepository;
 import com.journeygo.modules.aiguide.repository.AiChatSessionRepository;
 import com.journeygo.modules.aiguide.repository.AiKnowledgeDocumentRepository;
+import com.journeygo.modules.user.entity.Role;
+import com.journeygo.modules.user.entity.User;
+import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -24,7 +28,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -51,6 +58,7 @@ public class VirtualGuideChatService {
     private final AiRetrievalService aiRetrievalService;
     private final AiRateLimiterService aiRateLimiterService;
     private final AiKnowledgeDocumentRepository documentRepository;
+    private final UserRepository userRepository;
 
     /**
      * Khởi tạo hoặc lấy lại một phiên hội thoại cho du khách (tương thích chữ ký cũ).
@@ -115,12 +123,177 @@ public class VirtualGuideChatService {
     }
 
     /**
+     * Lấy chi tiết một phiên trò chuyện thuộc quyền sở hữu của du khách.
+     */
+    @Transactional(readOnly = true)
+    public AiChatSessionDto getSession(UUID sessionId, Long userId) {
+        return toSessionDto(findSessionOwnedByUser(sessionId, userId));
+    }
+
+    /**
+     * Du khách yêu cầu chuyển phiên chat sang trò chuyện trực tiếp với Admin / Content Moderator.
+     */
+    @Transactional
+    public AiChatSessionDto requestHumanSupport(UUID sessionId, Long userId, String reason) {
+        AiChatSession session = findSessionOwnedByUser(sessionId, userId);
+        AiChatHandoffStatus current = effectiveHandoffStatus(session);
+        String cleanReason = StringUtils.hasText(reason) ? reason.trim() : null;
+
+        if (current == AiChatHandoffStatus.AI_ACTIVE) {
+            session.setHandoffStatus(AiChatHandoffStatus.WAITING_HUMAN);
+            session.setHandoffRequestedAt(Instant.now());
+            session.setHandoffReason(cleanReason);
+            session.setAssignedStaffId(null);
+            session.setAssignedStaffName(null);
+            session.setAssignedStaffRole(null);
+            session.setUpdatedAt(Instant.now());
+            session = sessionRepository.save(session);
+
+            saveSystemMessage(
+                    session.getId(),
+                    "Bạn đã gửi yêu cầu trò chuyện trực tiếp với Admin / Moderator. Phiên hội thoại đã được đưa vào hàng đợi chờ xử lý."
+            );
+            log.info("Du khách userId={} yêu cầu gặp Admin/Moderator tại sessionId={}", userId, sessionId);
+        } else if (cleanReason != null && !StringUtils.hasText(session.getHandoffReason())) {
+            session.setHandoffReason(cleanReason);
+            session.setUpdatedAt(Instant.now());
+            session = sessionRepository.save(session);
+        }
+
+        return toSessionDto(session);
+    }
+
+    /**
+     * Du khách kết thúc chế độ chờ / chat với nhân viên và quay lại trò chuyện với AI.
+     */
+    @Transactional
+    public AiChatSessionDto returnToAi(UUID sessionId, Long userId) {
+        AiChatSession session = findSessionOwnedByUser(sessionId, userId);
+        if (effectiveHandoffStatus(session) != AiChatHandoffStatus.AI_ACTIVE) {
+            clearHandoffAssignment(session);
+            session = sessionRepository.save(session);
+            saveSystemMessage(session.getId(), "Bạn đã quay lại trò chuyện với AI Hướng dẫn viên.");
+            log.info("Du khách userId={} chuyển phiên sessionId={} về AI Hướng dẫn viên", userId, sessionId);
+        }
+        return toSessionDto(session);
+    }
+
+    /**
+     * Admin / Moderator lấy danh sách các phiên chat cần hỗ trợ hoặc toàn bộ phiên theo trạng thái.
+     */
+    @Transactional(readOnly = true)
+    public Page<AiChatSessionDto> getAdminHandoffSessions(String statusFilter, Pageable pageable) {
+        Page<AiChatSession> pageData;
+        String normalized = StringUtils.hasText(statusFilter) ? statusFilter.trim().toUpperCase() : "WAITING_HUMAN";
+        switch (normalized) {
+            case "ALL" -> pageData = sessionRepository.findAllByOrderByUpdatedAtDesc(pageable);
+            case "PENDING" -> pageData = sessionRepository.findByHandoffStatusInOrderByUpdatedAtDesc(
+                    List.of(AiChatHandoffStatus.WAITING_HUMAN, AiChatHandoffStatus.HUMAN_ACTIVE), pageable);
+            case "HUMAN_ACTIVE" -> pageData = sessionRepository.findByHandoffStatusOrderByUpdatedAtDesc(
+                    AiChatHandoffStatus.HUMAN_ACTIVE, pageable);
+            case "AI_ACTIVE" -> pageData = sessionRepository.findByHandoffStatusOrderByUpdatedAtDesc(
+                    AiChatHandoffStatus.AI_ACTIVE, pageable);
+            default -> pageData = sessionRepository.findByHandoffStatusOrderByUpdatedAtDesc(
+                    AiChatHandoffStatus.WAITING_HUMAN, pageable);
+        }
+
+        Set<Long> userIds = pageData.getContent().stream()
+                .map(AiChatSession::getUserId)
+                .collect(Collectors.toSet());
+        Map<Long, User> userMap = loadUserMap(userIds);
+
+        return pageData.map(session -> toSessionDto(session, userMap.get(session.getUserId())));
+    }
+
+    /**
+     * Admin / Moderator xem toàn bộ lịch sử tin nhắn của một phiên bất kỳ.
+     */
+    @Transactional(readOnly = true)
+    public List<AiChatMessageDto> getAdminSessionMessages(UUID sessionId) {
+        AiChatSession session = findSessionById(sessionId);
+        return messageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId())
+                .stream()
+                .map(this::toMessageDto)
+                .toList();
+    }
+
+    /**
+     * Admin / Moderator nhận xử lý một phiên đang chờ hỗ trợ.
+     */
+    @Transactional
+    public AiChatSessionDto claimHandoffSession(UUID sessionId, Long staffId, String staffName, String staffRole) {
+        AiChatSession session = findSessionById(sessionId);
+        session = applyClaim(session, staffId, staffName, staffRole);
+        return toSessionDto(session, findUserQuietly(session.getUserId()));
+    }
+
+    /**
+     * Admin / Moderator gửi tin nhắn trực tiếp tới du khách (tự động claim nếu phiên chưa HUMAN_ACTIVE).
+     */
+    @Transactional
+    public AiChatMessageDto sendStaffReply(UUID sessionId,
+                                           Long staffId,
+                                           String staffName,
+                                           String staffRole,
+                                           String content) {
+        String trimmed = content != null ? content.trim() : "";
+        if (!StringUtils.hasText(trimmed) || trimmed.length() > 2000) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                    "Nội dung phản hồi phải từ 1 đến 2000 ký tự");
+        }
+
+        AiChatSession session = findSessionById(sessionId);
+        String normalizedRole = normalizeStaffRole(staffRole);
+        String displayName = resolveStaffDisplayName(staffName, normalizedRole);
+
+        if (effectiveHandoffStatus(session) != AiChatHandoffStatus.HUMAN_ACTIVE) {
+            session = applyClaim(session, staffId, displayName, normalizedRole);
+        } else {
+            session.setUpdatedAt(Instant.now());
+            sessionRepository.save(session);
+        }
+
+        AiChatMessage staffMessage = AiChatMessage.builder()
+                .sessionId(session.getId())
+                .role("HUMAN_AGENT")
+                .senderId(staffId)
+                .senderName(displayName)
+                .senderRole(normalizedRole)
+                .content(trimmed)
+                .build();
+        AiChatMessage saved = messageRepository.save(staffMessage);
+        log.info("{} staffId={} đã phản hồi trực tiếp trong sessionId={}", normalizedRole, staffId, sessionId);
+        return toMessageDto(saved);
+    }
+
+    /**
+     * Admin / Moderator hoàn tất hỗ trợ và trả phiên hội thoại về lại cho AI.
+     */
+    @Transactional
+    public AiChatSessionDto resolveHandoffSession(UUID sessionId, Long staffId, String staffName, String staffRole) {
+        AiChatSession session = findSessionById(sessionId);
+        if (effectiveHandoffStatus(session) != AiChatHandoffStatus.AI_ACTIVE) {
+            String normalizedRole = normalizeStaffRole(staffRole);
+            String displayName = resolveStaffDisplayName(staffName, normalizedRole);
+            clearHandoffAssignment(session);
+            session = sessionRepository.save(session);
+            saveSystemMessage(
+                    session.getId(),
+                    String.format("%s %s đã kết thúc hỗ trợ trực tiếp. Phiên chat đã quay lại chế độ AI Hướng dẫn viên.",
+                            buildStaffRoleLabel(normalizedRole), displayName)
+            );
+            log.info("{} staffId={} đã kết thúc hỗ trợ sessionId={}", normalizedRole, staffId, sessionId);
+        }
+        return toSessionDto(session, findUserQuietly(session.getUserId()));
+    }
+
+    /**
      * Xử lý luồng Chat RAG chính:
      * 1. Kiểm tra Rate Limit và độ dài câu hỏi.
      * 2. Xác thực hoặc tìm/tạo phiên chat.
      * 3. Lưu tin nhắn của User vào DB.
-     * 4. Truy xuất ngữ cảnh Vector (cô lập REQUIRES_NEW).
-     * 5. Lấy lịch sử tin nhắn làm Memory.
+     * 4. Nếu phiên đang ở chế độ chờ/chat người thật, giữ tin nhắn và không gọi AI.
+     * 5. Truy xuất ngữ cảnh Vector (cô lập REQUIRES_NEW) & Memory.
      * 6. Lắp ráp Prompt và gọi Gemini LLM.
      * 7. Lưu câu trả lời của AI vào DB và trả về cho du khách.
      */
@@ -163,9 +336,26 @@ public class VirtualGuideChatService {
         AiChatMessage userMessage = AiChatMessage.builder()
                 .sessionId(session.getId())
                 .role("USER")
+                .senderId(userId)
+                .senderRole(Role.TOURIST)
                 .content(trimmedQuestion)
                 .build();
-        messageRepository.save(userMessage);
+        AiChatMessage savedUserMessage = messageRepository.save(userMessage);
+
+        // 2b. Nếu đang chờ Admin/Moderator hoặc đang chat người thật thì không để AI trả lời đè
+        AiChatHandoffStatus handoffStatus = effectiveHandoffStatus(session);
+        if (handoffStatus == AiChatHandoffStatus.WAITING_HUMAN
+                || handoffStatus == AiChatHandoffStatus.HUMAN_ACTIVE) {
+            return AiChatResponse.builder()
+                    .sessionId(session.getId())
+                    .messageId(savedUserMessage.getId())
+                    .answer(null)
+                    .mode(handoffStatus.name())
+                    .handoffStatus(handoffStatus.name())
+                    .citations(List.of())
+                    .createdAt(savedUserMessage.getCreatedAt())
+                    .build();
+        }
 
         // 3. Phân biệt chế độ: Normal Guide vs Task Hint & Nạp thêm AI_RULE từ Admin
         boolean isTaskHintMode = (request.getTaskId() != null);
@@ -224,9 +414,14 @@ public class VirtualGuideChatService {
         List<AiChatMessage> recentMessages = messageRepository.findRecentMessagesAsc(session.getId(), 8);
         List<GeminiChatClient.ChatTurn> historyTurns = new ArrayList<>();
         for (AiChatMessage msg : recentMessages) {
-            if (!msg.getId().equals(userMessage.getId())) {
-                historyTurns.add(new GeminiChatClient.ChatTurn(msg.getRole(), msg.getContent()));
+            if (msg.getId() != null && msg.getId().equals(savedUserMessage.getId())) {
+                continue;
             }
+            if ("SYSTEM".equalsIgnoreCase(msg.getRole())) {
+                continue;
+            }
+            String turnRole = "HUMAN_AGENT".equalsIgnoreCase(msg.getRole()) ? "ASSISTANT" : msg.getRole();
+            historyTurns.add(new GeminiChatClient.ChatTurn(turnRole, msg.getContent()));
         }
 
         // 6. Ghép Prompt hoàn chỉnh
@@ -259,6 +454,8 @@ public class VirtualGuideChatService {
         AiChatMessage aiMessage = AiChatMessage.builder()
                 .sessionId(session.getId())
                 .role("ASSISTANT")
+                .senderName("AI Hướng dẫn viên")
+                .senderRole("AI")
                 .content(aiAnswer)
                 .build();
         AiChatMessage savedAiMessage = messageRepository.save(aiMessage);
@@ -268,6 +465,7 @@ public class VirtualGuideChatService {
                 .messageId(savedAiMessage.getId())
                 .answer(aiAnswer)
                 .mode(activeMode)
+                .handoffStatus(AiChatHandoffStatus.AI_ACTIVE.name())
                 .citations(citations.stream().distinct().toList())
                 .createdAt(savedAiMessage.getCreatedAt())
                 .build();
@@ -294,7 +492,100 @@ public class VirtualGuideChatService {
                         "Không tìm thấy phiên trò chuyện hoặc bạn không có quyền truy cập"));
     }
 
+    private AiChatSession findSessionById(UUID sessionId) {
+        return sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new AppException(ErrorCode.AI_SESSION_NOT_FOUND,
+                        "Không tìm thấy phiên trò chuyện"));
+    }
+
+    private AiChatHandoffStatus effectiveHandoffStatus(AiChatSession session) {
+        return session.getHandoffStatus() != null
+                ? session.getHandoffStatus()
+                : AiChatHandoffStatus.AI_ACTIVE;
+    }
+
+    private AiChatSession applyClaim(AiChatSession session, Long staffId, String staffName, String staffRole) {
+        String normalizedRole = normalizeStaffRole(staffRole);
+        String displayName = resolveStaffDisplayName(staffName, normalizedRole);
+        boolean wasDifferentHandler = effectiveHandoffStatus(session) != AiChatHandoffStatus.HUMAN_ACTIVE
+                || (staffId != null && !staffId.equals(session.getAssignedStaffId()));
+
+        session.setHandoffStatus(AiChatHandoffStatus.HUMAN_ACTIVE);
+        session.setAssignedStaffId(staffId);
+        session.setAssignedStaffName(displayName);
+        session.setAssignedStaffRole(normalizedRole);
+        session.setUpdatedAt(Instant.now());
+        AiChatSession saved = sessionRepository.save(session);
+
+        if (wasDifferentHandler) {
+            saveSystemMessage(
+                    saved.getId(),
+                    String.format("%s %s đã tiếp nhận và tham gia hỗ trợ trực tiếp phiên trò chuyện này.",
+                            buildStaffRoleLabel(normalizedRole), displayName)
+            );
+            log.info("{} staffId={} đã tiếp nhận hỗ trợ sessionId={}", normalizedRole, staffId, saved.getId());
+        }
+        return saved;
+    }
+
+    private void clearHandoffAssignment(AiChatSession session) {
+        session.setHandoffStatus(AiChatHandoffStatus.AI_ACTIVE);
+        session.setAssignedStaffId(null);
+        session.setAssignedStaffName(null);
+        session.setAssignedStaffRole(null);
+        session.setHandoffRequestedAt(null);
+        session.setHandoffReason(null);
+        session.setUpdatedAt(Instant.now());
+    }
+
+    private void saveSystemMessage(UUID sessionId, String content) {
+        messageRepository.save(AiChatMessage.builder()
+                .sessionId(sessionId)
+                .role("SYSTEM")
+                .senderName("Hệ thống")
+                .senderRole("SYSTEM")
+                .content(content)
+                .build());
+    }
+
+    private String normalizeStaffRole(String staffRole) {
+        if (Role.ADMIN.equalsIgnoreCase(staffRole)) {
+            return Role.ADMIN;
+        }
+        return Role.CONTENT_MODERATOR;
+    }
+
+    private String resolveStaffDisplayName(String staffName, String normalizedRole) {
+        if (StringUtils.hasText(staffName)) {
+            return staffName.trim();
+        }
+        return Role.ADMIN.equals(normalizedRole) ? "Quản trị viên" : "Kiểm duyệt viên";
+    }
+
+    private String buildStaffRoleLabel(String normalizedRole) {
+        return Role.ADMIN.equals(normalizedRole) ? "Admin" : "Moderator";
+    }
+
+    private Map<Long, User> loadUserMap(Collection<Long> userIds) {
+        if (userRepository == null || userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
+    }
+
+    private User findUserQuietly(Long userId) {
+        if (userRepository == null || userId == null) {
+            return null;
+        }
+        return userRepository.findById(userId).orElse(null);
+    }
+
     private AiChatSessionDto toSessionDto(AiChatSession session) {
+        return toSessionDto(session, null);
+    }
+
+    private AiChatSessionDto toSessionDto(AiChatSession session, User owner) {
         String preview = messageRepository.findFirstBySessionIdOrderByCreatedAtDesc(session.getId())
                 .map(AiChatMessage::getContent)
                 .map(c -> c != null && c.length() > 80 ? c.substring(0, 77) + "..." : c)
@@ -307,17 +598,35 @@ public class VirtualGuideChatService {
                 .currentDestinationId(session.getCurrentDestinationId())
                 .lastMessagePreview(preview)
                 .messageCount(msgCount)
+                .handoffStatus(effectiveHandoffStatus(session).name())
+                .handoffRequestedAt(session.getHandoffRequestedAt())
+                .handoffReason(session.getHandoffReason())
+                .assignedStaffId(session.getAssignedStaffId())
+                .assignedStaffName(session.getAssignedStaffName())
+                .assignedStaffRole(session.getAssignedStaffRole())
+                .userFullName(owner != null ? owner.getFullName() : null)
+                .userEmail(owner != null ? owner.getEmail() : null)
                 .createdAt(session.getCreatedAt())
                 .updatedAt(session.getUpdatedAt())
                 .build();
     }
 
     private AiChatMessageDto toMessageDto(AiChatMessage message) {
+        String resolvedSenderRole = StringUtils.hasText(message.getSenderRole())
+                ? message.getSenderRole()
+                : ("ASSISTANT".equalsIgnoreCase(message.getRole()) ? "AI" : message.getRole());
+        String resolvedSenderName = StringUtils.hasText(message.getSenderName())
+                ? message.getSenderName()
+                : ("ASSISTANT".equalsIgnoreCase(message.getRole()) ? "AI Hướng dẫn viên" : null);
+
         return AiChatMessageDto.builder()
                 .id(message.getId())
                 .sessionId(message.getSessionId())
                 .role(message.getRole())
                 .content(message.getContent())
+                .senderId(message.getSenderId())
+                .senderName(resolvedSenderName)
+                .senderRole(resolvedSenderRole)
                 .createdAt(message.getCreatedAt())
                 .build();
     }

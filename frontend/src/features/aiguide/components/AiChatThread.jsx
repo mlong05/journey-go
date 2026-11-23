@@ -6,9 +6,13 @@ import {
   Send,
   BookOpen,
   Compass,
-  MapPin,
   Loader2,
   AlertCircle,
+  Headset,
+  ShieldCheck,
+  Bot,
+  Clock,
+  RotateCcw,
 } from "lucide-react";
 import AiMessageContent from "./AiMessageContent";
 
@@ -22,7 +26,7 @@ const STARTER_PROMPTS = [
 /**
  * Định dạng thời gian ngắn HH:mm theo locale tiếng Việt.
  */
-function formatTime(iso) {
+export function formatMessageTime(iso) {
   if (!iso) return "";
   try {
     return new Date(iso).toLocaleTimeString("vi-VN", {
@@ -35,7 +39,52 @@ function formatTime(iso) {
 }
 
 /**
+ * Phân biệt rõ nguồn tin nhắn: AI Hướng dẫn viên vs Nhân sự thật (Admin / Moderator).
+ */
+export function resolveSenderMeta(msg) {
+  const role = String(msg?.role || "").toUpperCase();
+  const senderRole = String(msg?.senderRole || "").toUpperCase();
+
+  if (role === "HUMAN_AGENT" || senderRole === "ADMIN" || senderRole === "CONTENT_MODERATOR") {
+    const isAdmin = senderRole === "ADMIN";
+    const roleLabel = isAdmin ? "Admin" : "Moderator";
+    const displayName = msg?.senderName
+      ? `${roleLabel} · ${msg.senderName}`
+      : roleLabel;
+
+    return {
+      isHuman: true,
+      isAdmin,
+      roleLabel,
+      displayName,
+      humanBadgeText: "Người thật",
+      bubbleClass: isAdmin
+        ? "border border-rose-200 bg-rose-50/75 text-slate-800"
+        : "border border-indigo-200 bg-indigo-50/80 text-slate-800",
+      badgeClass: isAdmin
+        ? "bg-rose-100 text-rose-800 ring-1 ring-rose-200"
+        : "bg-indigo-100 text-indigo-800 ring-1 ring-indigo-200",
+      humanTagClass: isAdmin
+        ? "bg-white text-rose-700 ring-1 ring-rose-200"
+        : "bg-white text-indigo-700 ring-1 ring-indigo-200",
+    };
+  }
+
+  return {
+    isHuman: false,
+    isAdmin: false,
+    roleLabel: "AI",
+    displayName: msg?.senderName || "AI Hướng dẫn viên",
+    humanBadgeText: null,
+    bubbleClass: "border border-slate-200 bg-white text-slate-800",
+    badgeClass: "bg-teal-50 text-teal-800 ring-1 ring-teal-200",
+    humanTagClass: "",
+  };
+}
+
+/**
  * Luồng hội thoại dùng chung cho cả Widget nổi và trang toàn màn hình AI Virtual Guide.
+ * Hỗ trợ chuyển đổi liền mạch giữa AI Hướng dẫn viên và trò chuyện trực tiếp với Admin / Moderator.
  */
 export default function AiChatThread({
   messages = [],
@@ -45,10 +94,13 @@ export default function AiChatThread({
   question = "",
   onQuestionChange,
   onSend,
-  destinations = [],
-  destinationId = "",
-  onDestinationChange,
   onTourLinkClick = null,
+  handoffStatus = "AI_ACTIVE",
+  assignedStaffName = "",
+  assignedStaffRole = "",
+  handoffLoading = false,
+  onRequestHumanSupport = null,
+  onReturnToAi = null,
   maxLength = 1000,
   compact = false,
 }) {
@@ -56,7 +108,15 @@ export default function AiChatThread({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, sending]);
+  }, [messages.length, sending, handoffStatus]);
+
+  const normalizedHandoff = String(handoffStatus || "AI_ACTIVE").toUpperCase();
+  const isWaitingHuman = normalizedHandoff === "WAITING_HUMAN";
+  const isHumanActive = normalizedHandoff === "HUMAN_ACTIVE";
+  const isLiveQueue = isWaitingHuman || isHumanActive;
+  const staffRoleLabel = String(assignedStaffRole || "").toUpperCase() === "ADMIN"
+    ? "Admin"
+    : "Moderator";
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -69,29 +129,89 @@ export default function AiChatThread({
 
   return (
     <div className="flex flex-1 min-h-0 flex-col bg-slate-50/60">
-      {/* Thanh chọn ngữ cảnh điểm đến */}
+      {/* Thanh trạng thái hỗ trợ AI / Chuyển tiếp Admin & Moderator */}
       <div
-        className={`flex items-center gap-2 border-b border-slate-200 bg-white ${
-          compact ? "px-3 py-2" : "px-4 py-2.5"
-        }`}
+        className={`flex flex-wrap items-center justify-between gap-2 border-b ${
+          isHumanActive
+            ? "border-indigo-200 bg-indigo-50/90"
+            : isWaitingHuman
+              ? "border-amber-200 bg-amber-50/90"
+              : "border-slate-200 bg-white"
+        } ${compact ? "px-3 py-2" : "px-4 py-2.5"}`}
       >
-        <MapPin size={15} className="shrink-0 text-teal-700" />
-        <label htmlFor={compact ? "ai-widget-dest" : "ai-page-dest"} className="sr-only">
-          Chọn điểm đến ngữ cảnh
-        </label>
-        <select
-          id={compact ? "ai-widget-dest" : "ai-page-dest"}
-          value={destinationId}
-          onChange={(e) => onDestinationChange(e.target.value)}
-          className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-teal-600 focus:bg-white"
-        >
-          <option value="">Hỏi đáp chung (toàn bộ điểm đến)</option>
-          {destinations.map((d) => (
-            <option key={d.id} value={String(d.id)}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+          {isHumanActive ? (
+            <>
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-indigo-600 text-white">
+                <Headset size={13} />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-bold text-indigo-950">
+                  Đang chat với {staffRoleLabel}
+                  {assignedStaffName ? `: ${assignedStaffName}` : ""}
+                </p>
+                <p className="truncate text-[10.5px] font-medium text-indigo-700">
+                  Nhân sự thật đang phản hồi trực tiếp
+                </p>
+              </div>
+            </>
+          ) : isWaitingHuman ? (
+            <>
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-amber-500 text-white">
+                <Clock size={13} />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-bold text-amber-950">
+                  Đang chờ Admin / Moderator tiếp nhận
+                </p>
+                <p className="truncate text-[10.5px] font-medium text-amber-700">
+                  Bạn vẫn có thể gửi thêm lời nhắn trong lúc chờ
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-teal-50 text-teal-700 ring-1 ring-teal-200/80">
+                <Bot size={13} />
+              </span>
+              <span className="truncate text-slate-600">
+                Trợ lý AI đang hoạt động
+              </span>
+            </>
+          )}
+        </div>
+
+        {isLiveQueue
+          ? onReturnToAi && (
+              <button
+                type="button"
+                onClick={onReturnToAi}
+                disabled={handoffLoading}
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+              >
+                {handoffLoading ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <RotateCcw size={12} />
+                )}
+                Quay lại AI
+              </button>
+            )
+          : onRequestHumanSupport && (
+              <button
+                type="button"
+                onClick={() => onRequestHumanSupport("")}
+                disabled={handoffLoading}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50 cursor-pointer"
+              >
+                {handoffLoading ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Headset size={12} />
+                )}
+                Chat với Moderator/Admin
+              </button>
+            )}
       </div>
 
       {/* Khu vực tin nhắn */}
@@ -114,50 +234,93 @@ export default function AiChatThread({
               Xin chào! Tôi là Hướng dẫn viên ảo JourneyGo
             </p>
             <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-500">
-              Hãy hỏi tôi về lịch sử, kiến trúc, văn hóa hoặc chọn một điểm đến phía trên để được giải đáp sát ngữ cảnh thực tế.
+              Hãy hỏi tôi về điểm đến, lịch sử, văn hóa, gợi ý tour hoặc nhấn Chat với Moderator/Admin ở phía trên nếu cần hỗ trợ trực tiếp.
             </p>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {STARTER_PROMPTS.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => onSend(prompt)}
-                  disabled={sending}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3 py-1.5 text-xs font-semibold text-teal-800 shadow-2xs transition hover:border-teal-400 hover:bg-teal-50 disabled:opacity-50 cursor-pointer"
-                >
-                  <Compass size={12} className="shrink-0 text-teal-600" />
-                  <span className="text-left">{prompt}</span>
-                </button>
-              ))}
-            </div>
+            {!isLiveQueue && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {STARTER_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => onSend(prompt)}
+                    disabled={sending}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3 py-1.5 text-xs font-semibold text-teal-800 shadow-2xs transition hover:border-teal-400 hover:bg-teal-50 disabled:opacity-50 cursor-pointer"
+                  >
+                    <Compass size={12} className="shrink-0 text-teal-600" />
+                    <span className="text-left">{prompt}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           messages.map((msg, idx) => {
-            const isUser = String(msg.role || "").toUpperCase() === "USER";
+            const role = String(msg.role || "").toUpperCase();
+            if (role === "SYSTEM") {
+              return (
+                <div
+                  key={msg.id || `${idx}-system`}
+                  className="flex justify-center py-0.5"
+                >
+                  <span className="max-w-[92%] rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-center text-[11px] font-semibold text-slate-600">
+                    {msg.content}
+                  </span>
+                </div>
+              );
+            }
+
+            const isUser = role === "USER";
+            const identity = isUser ? null : resolveSenderMeta(msg);
+
             return (
               <div
-                key={msg.id || `${idx}-${msg.role}`}
+                key={msg.id || `${idx}-${role}`}
                 className={`flex ${isUser ? "justify-end" : "justify-start"}`}
               >
                 <div
                   className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-2xs ${
                     isUser
                       ? "rounded-br-md bg-teal-700 text-white"
-                      : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
+                      : `rounded-bl-md ${identity.bubbleClass}`
                   }`}
                 >
-                  {!isUser && msg.mode && (
-                    <div className="mb-1.5 flex items-center gap-1.5">
+                  {!isUser && (
+                    <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          msg.mode === "TASK_HINT"
-                            ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200"
-                            : "bg-teal-50 text-teal-800 ring-1 ring-teal-200"
-                        }`}
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${identity.badgeClass}`}
                       >
-                        <Sparkles size={10} />
-                        {msg.mode === "TASK_HINT" ? "Gợi ý nhiệm vụ" : "Thuyết minh"}
+                        {identity.isHuman ? (
+                          identity.isAdmin ? (
+                            <ShieldCheck size={11} />
+                          ) : (
+                            <Headset size={11} />
+                          )
+                        ) : (
+                          <Bot size={11} />
+                        )}
+                        {identity.displayName}
                       </span>
+
+                      {identity.humanBadgeText && (
+                        <span
+                          className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide ${identity.humanTagClass}`}
+                        >
+                          {identity.humanBadgeText}
+                        </span>
+                      )}
+
+                      {!identity.isHuman && msg.mode && (
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            msg.mode === "TASK_HINT"
+                              ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          <Sparkles size={10} />
+                          {msg.mode === "TASK_HINT" ? "Gợi ý nhiệm vụ" : "Thuyết minh"}
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -167,22 +330,25 @@ export default function AiChatThread({
                     onTourLinkClick={onTourLinkClick}
                   />
 
-                  {!isUser && Array.isArray(msg.citations) && msg.citations.length > 0 && (
-                    <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2">
-                      <BookOpen size={11} className="shrink-0 text-slate-400" />
-                      <span className="text-[10.5px] font-semibold text-slate-400">
-                        Nguồn:
-                      </span>
-                      {msg.citations.map((cite) => (
-                        <span
-                          key={cite}
-                          className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-slate-600"
-                        >
-                          {cite}
+                  {!isUser &&
+                    !identity.isHuman &&
+                    Array.isArray(msg.citations) &&
+                    msg.citations.length > 0 && (
+                      <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2">
+                        <BookOpen size={11} className="shrink-0 text-slate-400" />
+                        <span className="text-[10.5px] font-semibold text-slate-400">
+                          Nguồn:
                         </span>
-                      ))}
-                    </div>
-                  )}
+                        {msg.citations.map((cite) => (
+                          <span
+                            key={cite}
+                            className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-slate-600"
+                          >
+                            {cite}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                   {msg.createdAt && (
                     <p
@@ -190,7 +356,7 @@ export default function AiChatThread({
                         isUser ? "text-teal-100" : "text-slate-400"
                       }`}
                     >
-                      {formatTime(msg.createdAt)}
+                      {formatMessageTime(msg.createdAt)}
                     </p>
                   )}
                 </div>
@@ -203,7 +369,11 @@ export default function AiChatThread({
           <div className="flex justify-start">
             <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-600 shadow-2xs">
               <Loader2 size={14} className="animate-spin text-teal-700" />
-              <span>AI đang tra cứu tri thức di sản...</span>
+              <span>
+                {isLiveQueue
+                  ? "Đang gửi tin nhắn tới nhân viên hỗ trợ..."
+                  : "AI đang tra cứu tri thức di sản..."}
+              </span>
             </div>
           </div>
         )}
@@ -238,13 +408,17 @@ export default function AiChatThread({
             value={question}
             onChange={(e) => onQuestionChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Nhập câu hỏi về địa điểm, lịch sử, văn hóa..."
+            placeholder={
+              isLiveQueue
+                ? "Nhập lời nhắn gửi trực tiếp tới Admin / Moderator..."
+                : "Nhập câu hỏi về địa điểm, lịch sử, văn hóa..."
+            }
             className="max-h-28 min-h-[38px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-teal-600 focus:bg-white"
           />
           <button
             type="submit"
             disabled={sending || !question.trim()}
-            aria-label="Gửi câu hỏi"
+            aria-label="Gửi tin nhắn"
             className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300 cursor-pointer"
           >
             {sending ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Sparkles, X, Plus, Maximize2, MessageSquareText } from "lucide-react";
@@ -18,30 +18,47 @@ export default function AiGuideFloatingWidget() {
   const { isTourist } = useTouristSession();
 
   const [open, setOpen] = useState(false);
-  const [destinations, setDestinations] = useState([]);
-  const [destinationId, setDestinationId] = useState("");
   const [sessionId, setSessionId] = useState(null);
+  const [sessionInfo, setSessionInfo] = useState(null);
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const [handoffLoading, setHandoffLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const handoffStatus = sessionInfo?.handoffStatus || "AI_ACTIVE";
+
+  const refreshActiveSession = useCallback(async (sid) => {
+    if (!sid) return;
+    try {
+      const [sessionRes, msgRes] = await Promise.all([
+        aiGuideService.getSession(sid),
+        aiGuideService.getSessionMessages(sid),
+      ]);
+      if (sessionRes) setSessionInfo(sessionRes);
+      if (Array.isArray(msgRes)) setMessages(msgRes);
+    } catch {
+      // Giữ trạng thái hiện tại nếu lỗi mạng tạm thời
+    }
+  }, []);
+
   useEffect(() => {
-    if (!open || !isTourist) return undefined;
-    let active = true;
+    if (
+      !open ||
+      !isTourist ||
+      !sessionId ||
+      (handoffStatus !== "WAITING_HUMAN" && handoffStatus !== "HUMAN_ACTIVE")
+    ) {
+      return undefined;
+    }
 
-    aiGuideService
-      .getDestinations()
-      .then((list) => {
-        if (active) setDestinations(list);
-      })
-      .catch(() => {});
+    const timer = setInterval(() => {
+      refreshActiveSession(sessionId);
+    }, 3500);
 
-    return () => {
-      active = false;
-    };
-  }, [open, isTourist]);
+    return () => clearInterval(timer);
+  }, [open, isTourist, sessionId, handoffStatus, refreshActiveSession]);
 
   if (!isTourist || pathname.startsWith(ROUTES.ACCOUNT_AI_GUIDE)) {
     return null;
@@ -50,17 +67,20 @@ export default function AiGuideFloatingWidget() {
   const handleToggleOpen = async () => {
     const nextOpen = !open;
     setOpen(nextOpen);
-    if (!nextOpen || sessionId) return;
+    if (!nextOpen) return;
+
+    if (sessionId) {
+      await refreshActiveSession(sessionId);
+      return;
+    }
 
     setLoadingMessages(true);
     setError("");
     try {
-      const session = await aiGuideService.createSession(
-        destinationId ? Number(destinationId) : null,
-        false,
-      );
+      const session = await aiGuideService.createSession(null, false);
       if (session?.id) {
         setSessionId(session.id);
+        setSessionInfo(session);
         const list = await aiGuideService.getSessionMessages(session.id);
         setMessages(list);
       }
@@ -71,20 +91,61 @@ export default function AiGuideFloatingWidget() {
     }
   };
 
-  const handleNewSession = async (nextDestId = destinationId) => {
+  const handleNewSession = async () => {
     setError("");
     setLoadingMessages(true);
     try {
-      const created = await aiGuideService.createSession(
-        nextDestId ? Number(nextDestId) : null,
-        true,
-      );
+      const created = await aiGuideService.createSession(null, true);
       setSessionId(created?.id || null);
+      setSessionInfo(created || null);
       setMessages([]);
     } catch (err) {
       setError(err?.message || "Không thể tạo phiên mới.");
     } finally {
       setLoadingMessages(false);
+    }
+  };
+
+  const handleRequestHumanSupport = async (reason = "") => {
+    if (handoffLoading) return;
+    setError("");
+    setHandoffLoading(true);
+    try {
+      let targetSessionId = sessionId;
+      if (!targetSessionId) {
+        const created = await aiGuideService.createSession(null, false);
+        targetSessionId = created?.id || null;
+        if (targetSessionId) {
+          setSessionId(targetSessionId);
+          setSessionInfo(created);
+        }
+      }
+      if (!targetSessionId) return;
+
+      const updated = await aiGuideService.requestHumanSupport(targetSessionId, reason);
+      setSessionInfo(updated);
+      const list = await aiGuideService.getSessionMessages(targetSessionId);
+      setMessages(list);
+    } catch (err) {
+      setError(err?.message || "Không thể gửi yêu cầu gặp Admin / Moderator.");
+    } finally {
+      setHandoffLoading(false);
+    }
+  };
+
+  const handleReturnToAi = async () => {
+    if (!sessionId || handoffLoading) return;
+    setError("");
+    setHandoffLoading(true);
+    try {
+      const updated = await aiGuideService.returnToAi(sessionId);
+      setSessionInfo(updated);
+      const list = await aiGuideService.getSessionMessages(sessionId);
+      setMessages(list);
+    } catch (err) {
+      setError(err?.message || "Không thể chuyển về AI Hướng dẫn viên.");
+    } finally {
+      setHandoffLoading(false);
     }
   };
 
@@ -110,27 +171,39 @@ export default function AiGuideFloatingWidget() {
     try {
       const reply = await aiGuideService.chat({
         sessionId,
-        destinationId: destinationId ? Number(destinationId) : null,
         question: text,
       });
 
+      const resolvedSid = reply?.sessionId || sessionId;
       if (reply?.sessionId) {
         setSessionId(reply.sessionId);
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: reply?.messageId || `ai-${Date.now()}`,
-          role: "ASSISTANT",
-          content: reply?.answer || "",
-          mode: reply?.mode,
-          citations: reply?.citations || [],
-          createdAt: reply?.createdAt || new Date().toISOString(),
-        },
-      ]);
+      if (reply?.handoffStatus) {
+        setSessionInfo((prev) =>
+          prev
+            ? { ...prev, handoffStatus: reply.handoffStatus }
+            : { id: resolvedSid, handoffStatus: reply.handoffStatus },
+        );
+      }
+
+      if (reply?.answer) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: reply?.messageId || `ai-${Date.now()}`,
+            role: "ASSISTANT",
+            senderName: "AI Hướng dẫn viên",
+            senderRole: "AI",
+            content: reply.answer,
+            mode: reply?.mode,
+            citations: reply?.citations || [],
+            createdAt: reply?.createdAt || new Date().toISOString(),
+          },
+        ]);
+      }
     } catch (err) {
-      setError(err?.message || "Không thể nhận phản hồi từ AI.");
+      setError(err?.message || "Không thể gửi tin nhắn.");
     } finally {
       setSending(false);
     }
@@ -154,14 +227,14 @@ export default function AiGuideFloatingWidget() {
                   Hướng dẫn viên ảo AI
                 </p>
                 <p className="truncate text-[11px] text-teal-100">
-                  Giải đáp văn hóa & di sản JourneyGo
+                  Giải đáp văn hóa & hỗ trợ trực tiếp
                 </p>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
-                onClick={() => handleNewSession(destinationId)}
+                onClick={handleNewSession}
                 title="Phiên trò chuyện mới"
                 aria-label="Phiên trò chuyện mới"
                 className="rounded-lg p-1.5 text-teal-50 transition hover:bg-white/15 cursor-pointer"
@@ -197,12 +270,12 @@ export default function AiGuideFloatingWidget() {
             question={question}
             onQuestionChange={setQuestion}
             onSend={handleSend}
-            destinations={destinations}
-            destinationId={destinationId}
-            onDestinationChange={(val) => {
-              setDestinationId(val);
-              handleNewSession(val);
-            }}
+            handoffStatus={sessionInfo?.handoffStatus || "AI_ACTIVE"}
+            assignedStaffName={sessionInfo?.assignedStaffName || ""}
+            assignedStaffRole={sessionInfo?.assignedStaffRole || ""}
+            handoffLoading={handoffLoading}
+            onRequestHumanSupport={handleRequestHumanSupport}
+            onReturnToAi={handleReturnToAi}
             onTourLinkClick={() => setOpen(false)}
             compact
           />

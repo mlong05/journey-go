@@ -3,9 +3,11 @@ package com.journeygo.modules.aiguide.service;
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
 import com.journeygo.modules.aiguide.config.GeminiAiProperties;
+import com.journeygo.modules.aiguide.dto.AiChatMessageDto;
 import com.journeygo.modules.aiguide.dto.AiChatRequest;
 import com.journeygo.modules.aiguide.dto.AiChatResponse;
 import com.journeygo.modules.aiguide.dto.AiChatSessionDto;
+import com.journeygo.modules.aiguide.entity.AiChatHandoffStatus;
 import com.journeygo.modules.aiguide.entity.AiChatMessage;
 import com.journeygo.modules.aiguide.entity.AiChatSession;
 import com.journeygo.modules.aiguide.entity.AiDocumentScope;
@@ -15,6 +17,9 @@ import com.journeygo.modules.aiguide.entity.AiKnowledgeDocument;
 import com.journeygo.modules.aiguide.repository.AiChatMessageRepository;
 import com.journeygo.modules.aiguide.repository.AiChatSessionRepository;
 import com.journeygo.modules.aiguide.repository.AiKnowledgeDocumentRepository;
+import com.journeygo.modules.user.entity.Role;
+import com.journeygo.modules.user.entity.User;
+import com.journeygo.modules.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -62,6 +67,9 @@ class VirtualGuideChatServiceTest {
 
     @Mock
     private AiKnowledgeDocumentRepository documentRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private VirtualGuideChatService chatService;
@@ -328,5 +336,107 @@ class VirtualGuideChatServiceTest {
                 .doesNotContain("###")
                 .contains("- Hoàng Thành Huế: Kinh thành cổ kính.")
                 .contains("[Xem tour: Đại Nội Huế](/tours/12)");
+    }
+
+    @Test
+    @DisplayName("requestHumanSupport chuyển phiên sang WAITING_HUMAN và lưu tin nhắn SYSTEM")
+    void requestHumanSupport_transitionsToWaitingHuman() {
+        when(sessionRepository.findByIdAndUserId(existingSessionId, 100L)).thenReturn(Optional.of(existingSession));
+        when(sessionRepository.save(any(AiChatSession.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(messageRepository.save(any(AiChatMessage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AiChatSessionDto dto = chatService.requestHumanSupport(existingSessionId, 100L, "Cần hỏi vé đoàn");
+
+        assertThat(dto.getHandoffStatus()).isEqualTo("WAITING_HUMAN");
+        assertThat(dto.getHandoffReason()).isEqualTo("Cần hỏi vé đoàn");
+        assertThat(dto.getHandoffRequestedAt()).isNotNull();
+
+        ArgumentCaptor<AiChatMessage> msgCaptor = ArgumentCaptor.forClass(AiChatMessage.class);
+        verify(messageRepository).save(msgCaptor.capture());
+        assertThat(msgCaptor.getValue().getRole()).isEqualTo("SYSTEM");
+        assertThat(msgCaptor.getValue().getSenderRole()).isEqualTo("SYSTEM");
+    }
+
+    @Test
+    @DisplayName("Khi phiên đang WAITING_HUMAN hoặc HUMAN_ACTIVE, chat() chỉ lưu tin User và không gọi AI trả lời")
+    void chat_whileWaitingOrHumanActive_skipsGeminiAndSavesUserMessage() {
+        existingSession.setHandoffStatus(AiChatHandoffStatus.WAITING_HUMAN);
+        UUID userMsgId = UUID.randomUUID();
+        when(sessionRepository.findByIdAndUserId(existingSessionId, 100L)).thenReturn(Optional.of(existingSession));
+        when(sessionRepository.save(any(AiChatSession.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(messageRepository.save(any(AiChatMessage.class))).thenAnswer(inv -> {
+            AiChatMessage m = inv.getArgument(0);
+            m.setId(userMsgId);
+            m.setCreatedAt(Instant.now());
+            return m;
+        });
+
+        AiChatRequest req = AiChatRequest.builder()
+                .sessionId(existingSessionId)
+                .question("Cho mình hỏi lịch khởi hành riêng")
+                .build();
+
+        AiChatResponse res = chatService.chat(100L, req);
+
+        assertThat(res.getAnswer()).isNull();
+        assertThat(res.getHandoffStatus()).isEqualTo("WAITING_HUMAN");
+        assertThat(res.getMode()).isEqualTo("WAITING_HUMAN");
+        verify(chatClient, never()).generateReply(anyString(), anyList(), anyString(), anyDouble(), anyInt());
+        verify(aiRetrievalService, never()).retrieveRelevantChunks(anyString(), any(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("sendStaffReply tự động claim phiên và lưu tin HUMAN_AGENT với senderRole phân biệt ADMIN/MODERATOR")
+    void sendStaffReply_autoClaimsAndStoresHumanIdentity() {
+        existingSession.setHandoffStatus(AiChatHandoffStatus.WAITING_HUMAN);
+        when(sessionRepository.findById(existingSessionId)).thenReturn(Optional.of(existingSession));
+        when(sessionRepository.save(any(AiChatSession.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(messageRepository.save(any(AiChatMessage.class))).thenAnswer(inv -> {
+            AiChatMessage m = inv.getArgument(0);
+            m.setId(UUID.randomUUID());
+            m.setCreatedAt(Instant.now());
+            return m;
+        });
+
+        AiChatMessageDto reply = chatService.sendStaffReply(
+                existingSessionId,
+                5L,
+                "Nguyễn Văn Admin",
+                Role.ADMIN,
+                "Chào bạn, Admin đã hỗ trợ đặt vé đoàn cho bạn ạ."
+        );
+
+        assertThat(existingSession.getHandoffStatus()).isEqualTo(AiChatHandoffStatus.HUMAN_ACTIVE);
+        assertThat(existingSession.getAssignedStaffId()).isEqualTo(5L);
+        assertThat(existingSession.getAssignedStaffRole()).isEqualTo(Role.ADMIN);
+        assertThat(reply.getRole()).isEqualTo("HUMAN_AGENT");
+        assertThat(reply.getSenderRole()).isEqualTo(Role.ADMIN);
+        assertThat(reply.getSenderName()).isEqualTo("Nguyễn Văn Admin");
+    }
+
+    @Test
+    @DisplayName("resolveHandoffSession đưa phiên về AI_ACTIVE và xóa phân công nhân sự")
+    void resolveHandoffSession_returnsSessionToAiActive() {
+        existingSession.setHandoffStatus(AiChatHandoffStatus.HUMAN_ACTIVE);
+        existingSession.setAssignedStaffId(7L);
+        existingSession.setAssignedStaffName("Mod Lan");
+        existingSession.setAssignedStaffRole(Role.CONTENT_MODERATOR);
+        when(sessionRepository.findById(existingSessionId)).thenReturn(Optional.of(existingSession));
+        when(sessionRepository.save(any(AiChatSession.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.findById(100L)).thenReturn(Optional.of(
+                User.builder().id(100L).fullName("Khách A").email("khach@journeygo.com").build()
+        ));
+
+        AiChatSessionDto dto = chatService.resolveHandoffSession(
+                existingSessionId,
+                7L,
+                "Mod Lan",
+                Role.CONTENT_MODERATOR
+        );
+
+        assertThat(dto.getHandoffStatus()).isEqualTo("AI_ACTIVE");
+        assertThat(dto.getAssignedStaffId()).isNull();
+        assertThat(dto.getAssignedStaffName()).isNull();
+        assertThat(dto.getUserFullName()).isEqualTo("Khách A");
     }
 }
