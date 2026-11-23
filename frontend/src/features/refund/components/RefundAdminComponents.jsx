@@ -12,8 +12,14 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { AlertTriangle, FileText, ImagePlus, Loader2 } from "lucide-react";
-import { DetailBlock, Field, InfoRow, ModalShell } from "@/components/admin/AdminUI";
+import { AlertTriangle, FileText, ImagePlus, Landmark, Loader2 } from "lucide-react";
+import {
+  CopyableRow,
+  DetailBlock,
+  Field,
+  InfoRow,
+  ModalShell,
+} from "@/components/admin/AdminUI";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { apiClient } from "@/services/apiClient";
 import {
@@ -26,6 +32,9 @@ import {
   formatDateTimeVN,
   formatLocalDate,
   formatVND,
+  PAYMENT_BANK_CODE_LABELS,
+  PAYMENT_CARD_TYPE_LABELS,
+  REFUND_PERSONAL_TIERS,
   refundAmountForReasonAt,
   refundStatusLabel,
   sanitizeAuditDetail,
@@ -43,6 +52,20 @@ function parseLocalDateStart(value) {
   if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
   const [y, m, d] = parts;
   return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+}
+
+/**
+ * Tiêu đề nhóm thông tin trong modal (ví dụ "Thông tin giao dịch",
+ * "Thông tin khách gửi kèm") — dùng chung style với tiêu đề cột bên trái
+ * của modal xử lý (sticky, in đậm, icon xám).
+ */
+function SectionHeading({ icon, children }) {
+  return (
+    <h3 className="sticky top-0 z-10 mb-3 flex items-center gap-1.5 bg-white pt-0.5 text-xs font-bold text-slate-700">
+      {icon}
+      {children}
+    </h3>
+  );
 }
 
 /* =========================================================================
@@ -63,9 +86,11 @@ export const FALLBACK_GROUPS = [
   {
     code: "PERSONAL",
     name: "Lỗi khách hàng",
-    refundRate: 0.5,
-    // Nhóm cá nhân có mức hoàn 0% riêng: hủy quá muộn / không xuất hiện.
-    noShowWindowHours: 48,
+    // ⚠️ Tỷ lệ CAO NHẤT của chính sách 3 bậc — tỷ lệ thực tế được tính theo
+    //    thời điểm hủy (xem `refundAmountForReasonAt`), không phải cột này.
+    refundRate: 0.8,
+    // Nhóm cá nhân có mức hoàn 0% riêng: hủy quá muộn (dưới 72 giờ).
+    noShowWindowHours: 72,
     noShowRefundRate: 0,
     reasonCodes: [],
   },
@@ -179,6 +204,88 @@ export function auditDotClass(action) {
 }
 
 /**
+ * Nội dung timeline "Nhật ký xử lý" — tách riêng thành hàm để dùng được ở
+ * 2 nơi: (1) cuối nhóm "Thông tin giao dịch" khi bật tiêu đề chia nhóm,
+ * (2) cuối `RefundDetailBody` khi không bật tiêu đề (hành vi cũ).
+ */
+function AuditLogTimeline({ logs }) {
+  if (!logs || logs.length === 0) {
+    return (
+      <p className="text-xs text-slate-500">
+        Chưa có nhật ký xử lý cho yêu cầu này.
+      </p>
+    );
+  }
+  return (
+    <ol className="relative space-y-3 pl-6">
+      {/* Vạch dọc nối các mốc thời gian */}
+      <span
+        aria-hidden="true"
+        className="absolute left-[7px] top-2 bottom-2 w-px bg-slate-200"
+      />
+      {logs.map((log, idx) => (
+        <li key={log?.id ?? idx} className="relative">
+          {/* Chấm mốc */}
+          <span
+            aria-hidden="true"
+            className={`absolute -left-6 top-1.5 h-3.5 w-3.5 rounded-full border-2 border-white ring-1 ${auditDotClass(
+              log?.action,
+            )}`}
+          />
+          <div className="rounded-xl bg-slate-50 px-3.5 py-2.5 border border-slate-100">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-xs font-semibold text-slate-800">
+                {auditActionLabel(log?.action)}
+              </span>
+              {log?.fromStatus && log?.fromStatus !== log?.toStatus && (
+                <span className="text-[11px] text-slate-500">
+                  {refundStatusLabel(log.fromStatus)} →{" "}
+                  <span className="font-semibold text-slate-700">
+                    {refundStatusLabel(log?.toStatus)}
+                  </span>
+                </span>
+              )}
+              {!log?.fromStatus && log?.toStatus && (
+                <span className="text-[11px] text-slate-500">
+                  Trạng thái:{" "}
+                  <span className="font-semibold text-slate-700">
+                    {refundStatusLabel(log?.toStatus)}
+                  </span>
+                </span>
+              )}
+              {log?.amount > 0 && (
+                <span className="font-mono text-[11px] font-semibold text-emerald-700">
+                  {formatVND(log.amount)}
+                </span>
+              )}
+              <span className="ml-auto text-[11px] text-slate-400 font-medium">
+                {formatDateTimeVN(log?.createdAt)}
+              </span>
+            </div>
+            {(() => {
+              // Làm sạch TRƯỚC khi render: nếu sau khi lọc không còn nội dung
+              // đáng hiển thị thì bỏ hẳn dòng mô tả (tránh dòng trống vô nghĩa).
+              const cleanDetail = sanitizeAuditDetail(log?.detail);
+              return cleanDetail ? (
+                <p className="mt-1 text-[11px] text-slate-600 leading-relaxed">
+                  {cleanDetail}
+                </p>
+              ) : null;
+            })()}
+            {log?.reference && (
+              <p className="mt-1 text-[11px] text-slate-400">
+                Mã tham chiếu:{" "}
+                <span className="font-mono text-slate-500">{log.reference}</span>
+              </p>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
  * Thân nội dung chi tiết yêu cầu hoàn tiền — TÁI SỬ DỤNG cho cả modal
  * "Chi tiết" và modal "Xử lý" (cột bên trái) để 2 nơi hiển thị CÙNG một bộ
  * thông tin: mã đơn, số tiền, lý do khách khai báo, bằng chứng, thông tin
@@ -188,8 +295,17 @@ export function auditDotClass(action) {
  * @param {object} props.refund    dữ liệu yêu cầu hoàn tiền (đã tải đầy đủ)
  * @param {boolean} [props.compact] bỏ nhật ký kiểm toán (đơn chờ xét duyệt
  *   chưa có nhật ký xử lý ⇒ không cần hiện)
+ * @param {boolean} [props.withSectionTitles] tự render 2 tiêu đề chia nhóm:
+ *   "Thông tin giao dịch" (mã đơn / số tiền / mốc thời gian / kết quả VNPay…)
+ *   và "Thông tin khách gửi kèm" (từ "Lý do ngắn gọn (khách khai báo)" trở
+ *   đi: lý do, chi tiết, bằng chứng, tài khoản ngân hàng, liên hệ…). Khi
+ *   `false` (mặc định) ⇒ không có tiêu đề, giữ hành vi cũ.
  */
-export function RefundDetailBody({ refund, compact = false }) {
+export function RefundDetailBody({
+  refund,
+  compact = false,
+  withSectionTitles = false,
+}) {
   // Nhật ký đã rút gọn — tính 1 lần thay vì gọi lại ở mỗi lần render.
   const auditLogs = useMemo(
     () => dedupeAuditLogs(refund?.auditLogs),
@@ -200,6 +316,24 @@ export function RefundDetailBody({ refund, compact = false }) {
 
   return (
     <div className="space-y-5">
+      {/*
+        ⚠️ CHIA 2 NHÓM khi `withSectionTitles`:
+        ① "Thông tin giao dịch"   — mã yêu cầu, mã đơn, mã giao dịch, trạng
+           thái, ngày trải nghiệm, số tiền, mốc thời gian + PHƯƠNG THỨC THANH
+           TOÁN GỐC (vnp_BankCode / vnp_CardType) + kết quả VNPay + nhật ký.
+        ② "Thông tin khách gửi kèm" — TỪ "Lý do ngắn gọn (khách khai báo)"
+           trở đi: lý do, chi tiết, bằng chứng, tài khoản ngân hàng, đối chiếu
+           lúc thanh toán, thông tin liên hệ, ghi chú.
+
+        ⇒ Các khối dữ liệu HỆ THỐNG ("Phương thức thanh toán gốc", "Kết quả từ
+        VNPay", "Nhật ký xử lý") thuộc NHÓM ① ⇒ render ở cuối nhóm ①.
+      */}
+      {withSectionTitles && (
+        <SectionHeading icon={<Landmark size={13} className="text-slate-400" />}>
+          Thông tin giao dịch
+        </SectionHeading>
+      )}
+
       {/* Tóm tắt */}
       <div className="grid grid-cols-2 gap-3">
         <InfoRow label="Mã yêu cầu" value={refund?.refundCode} mono />
@@ -241,6 +375,110 @@ export function RefundDetailBody({ refund, compact = false }) {
           value={formatDateTimeVN(refund?.reviewedAt)}
         />
       </div>
+
+      {/*
+        ⚠️ PHƯƠNG THỨC THANH TOÁN GỐC (vnp_BankCode + vnp_CardType) — dữ liệu
+        của lần THANH TOÁN, KHÔNG phải dữ liệu khách khai báo ⇒ nằm ở NHÓM ①
+        "Thông tin giao dịch".
+
+        ⚠️ Tại sao quan trọng? — VNPay KHÔNG trả về số tài khoản / tên chủ tài
+        khoản lúc thanh toán ⇒ Admin chỉ có thể đối chiếu tới mức "khách đã
+        thanh toán qua ngân hàng X, bằng thẻ loại Y". Nếu `vnp_BankCode` KHÁC
+        ngân hàng khách khai báo trong yêu cầu hoàn ⇒ cần hỏi lại khách.
+
+        ⚠️ Nhãn tiếng Việt lấy từ `PAYMENT_BANK_CODE_LABELS` /
+        `PAYMENT_CARD_TYPE_LABELS` (money.js) — có fallback về mã gốc nếu gặp
+        mã lạ, KHÔNG để trống.
+      */}
+      {(refund?.paymentBankCode || refund?.paymentCardType) && (
+        <DetailBlock title="Phương thức thanh toán gốc">
+          <div className="grid grid-cols-2 gap-3">
+            <InfoRow
+              label="Ngân hàng / Ví"
+              value={
+                refund?.paymentBankCode
+                  ? (PAYMENT_BANK_CODE_LABELS[refund.paymentBankCode] ??
+                    refund.paymentBankCode)
+                  : null
+              }
+              mono
+            />
+            <InfoRow
+              label="Loại thẻ"
+              value={
+                refund?.paymentCardType
+                  ? (PAYMENT_CARD_TYPE_LABELS[refund.paymentCardType] ??
+                    refund.paymentCardType)
+                  : null
+              }
+              mono
+            />
+          </div>
+        </DetailBlock>
+      )}
+
+      {/*
+        ⚠️ "Kết quả từ VNPay" là dữ liệu HỆ THỐNG (mã GD, mã phản hồi, trạng
+        thái giao dịch) ⇒ nằm ở NHÓM ① "Thông tin giao dịch", không phải nhóm
+        "khách gửi kèm".
+
+        ⚠️ Thông điệp lỗi kỹ thuật (mã 99 / "Unexpected error") KHÔNG BAO GIỜ
+        hiển thị cho người dùng ⇒ đã lọc qua `vnpayMessageForUser`.
+      */}
+      {(refund?.vnpResponseCode || refund?.vnpTransactionNo) && (
+        <DetailBlock title="Kết quả từ VNPay">
+          <div className="grid grid-cols-2 gap-3">
+            <InfoRow
+              label="Mã yêu cầu VNPay"
+              value={refund?.vnpRequestId}
+              mono
+            />
+            <InfoRow
+              label="Mã giao dịch VNPay"
+              value={refund?.vnpTransactionNo}
+              mono
+            />
+            <InfoRow
+              label="Mã phản hồi"
+              value={vnpayResponseCodeForUser(refund?.vnpResponseCode)}
+              mono
+            />
+            <InfoRow
+              label="Trạng thái giao dịch"
+              value={refund?.vnpTransactionStatus}
+              mono
+            />
+            <InfoRow
+              label="Thông điệp VNPay"
+              value={vnpayMessageForUser(
+                refund?.vnpResponseCode,
+                refund?.vnpMessage,
+              )}
+            />
+            <InfoRow
+              label="Thời điểm xác minh"
+              value={formatDateTimeVN(refund?.vnpResolvedAt)}
+            />
+          </div>
+        </DetailBlock>
+      )}
+
+      {/*
+        ⚠️ "Nhật ký xử lý" thuộc NHÓM ① "Thông tin giao dịch" (dữ liệu hệ
+        thống) — chỉ hiện khi bật tiêu đề chia nhóm. Khi KHÔNG bật thì nó
+        nằm ở cuối body (hành vi cũ).
+      */}
+      {withSectionTitles && !compact && (
+        <DetailBlock title="Nhật ký xử lý">
+          <AuditLogTimeline logs={auditLogs} />
+        </DetailBlock>
+      )}
+
+      {withSectionTitles && (
+        <SectionHeading icon={<FileText size={13} className="text-slate-400" />}>
+          Thông tin khách gửi kèm
+        </SectionHeading>
+      )}
 
       {/* Lý do */}
       {refund?.reasonSummary && (
@@ -351,26 +589,79 @@ export function RefundDetailBody({ refund, compact = false }) {
         </DetailBlock>
       )}
 
-      {/* Thông tin ngân hàng nhận tiền */}
-      {(refund?.bankAccountNumber || refund?.transferReference) && (
-        <DetailBlock title="Thông tin nhận tiền">
+      {/*
+        ⚠️ Thông tin tài khoản KHÁCH KHAI BÁO lúc gửi yêu cầu — dùng để chuyển
+        khoản thủ công. Luôn hiện nếu có bất kỳ trường nào (kể cả khi thiếu STK
+        ⇒ Admin biết phải liên hệ khách, không phải tự điền).
+
+        ⚠️ Có nút SAO CHÉP cho STK / mã tham chiếu: số tài khoản dài, Admin gõ
+        tay rất dễ sai 1 chữ số ⇒ copy để đối chiếu chính xác.
+      */}
+      {(refund?.bankAccountNumber ||
+        refund?.bankAccountName ||
+        refund?.bankName ||
+        refund?.transferReference) && (
+        <DetailBlock title="Tài khoản khách khai báo lúc gửi yêu cầu">
           <div className="grid grid-cols-2 gap-3">
-            <InfoRow
-              label="Số tài khoản"
+            <CopyableRow
+              label="Số tài khoản (STK)"
               value={refund?.bankAccountNumber}
               mono
+              hint="Sao chép số tài khoản"
             />
-            <InfoRow
-              label="Chủ tài khoản"
+            <CopyableRow
+              label="Tên chủ tài khoản"
               value={refund?.bankAccountName}
+              hint="Sao chép tên chủ tài khoản"
             />
-            <InfoRow label="Ngân hàng" value={refund?.bankName} />
-            <InfoRow
-              label="Mã tham chiếu"
+            <CopyableRow label="Ngân hàng" value={refund?.bankName} />
+            <CopyableRow
+              label="Mã tham chiếu (Admin đã nhập)"
               value={refund?.transferReference}
               mono
+              hint="Sao chép mã tham chiếu"
             />
           </div>
+        </DetailBlock>
+      )}
+
+      {/*
+        ⚠️ Thông tin lần THANH TOÁN GỐC — để Admin đối chiếu với tài khoản khách
+        khai báo (cùng ngân hàng / cùng tên chủ TK ⇒ bình thường; KHÁC tên hoặc
+        KHÁC ngân hàng ⇒ cần xác minh thêm trước khi chuyển).
+
+        ⚠️ VNPay KHÔNG trả về STK/tên chủ TK lúc thanh toán (chỉ trả mã ngân
+        hàng, loại thẻ và mã giao dịch tại ngân hàng) ⇒ đây là mức đối chiếu
+        TỐI ĐA mà hệ thống có thể cung cấp.
+
+        ⚠️ `vnp_BankCode` + `vnp_CardType` ĐÃ chuyển sang nhóm ① "Thông tin giao
+        dịch" (khối "Phương thức thanh toán gốc") ⇒ ở đây chỉ giữ mã giao
+        dịch ngân hàng + thời điểm thanh toán (2 thông tin này giúp Admin đối
+        chiếu với biên lai ngân hàng).
+      */}
+      {(refund?.paymentBankTranNo || refund?.paymentPaidAt) && (
+        <DetailBlock title="Đối chiếu lúc thanh toán">
+          <div className="grid grid-cols-2 gap-3">
+            <CopyableRow
+              label="Mã giao dịch ngân hàng"
+              value={refund?.paymentBankTranNo}
+              mono
+              hint="Sao chép mã giao dịch ngân hàng"
+            />
+            <InfoRow
+              label="Thời điểm thanh toán"
+              value={
+                refund?.paymentPaidAt
+                  ? formatDateTimeVN(refund.paymentPaidAt)
+                  : null
+              }
+            />
+          </div>
+          <p className="mt-2 text-[10.5px] leading-relaxed text-slate-500">
+            VNPay không trả số tài khoản / tên chủ tài khoản lúc thanh toán — hãy
+            đối chiếu tài khoản khách khai báo với biên lai ngân hàng trước khi
+            chuyển.
+          </p>
         </DetailBlock>
       )}
 
@@ -388,124 +679,14 @@ export function RefundDetailBody({ refund, compact = false }) {
         </DetailBlock>
       )}
 
-      {/* Kết quả VNPay — thông điệp lỗi kỹ thuật (mã 99 / "Unexpected error")
-          KHÔNG BAO GIỜ hiển thị cho người dùng. */}
-      {(refund?.vnpResponseCode || refund?.vnpTransactionNo) && (
-        <DetailBlock title="Kết quả từ VNPay">
-          <div className="grid grid-cols-2 gap-3">
-            <InfoRow
-              label="Mã yêu cầu VNPay"
-              value={refund?.vnpRequestId}
-              mono
-            />
-            <InfoRow
-              label="Mã giao dịch VNPay"
-              value={refund?.vnpTransactionNo}
-              mono
-            />
-            <InfoRow
-              label="Mã phản hồi"
-              value={vnpayResponseCodeForUser(refund?.vnpResponseCode)}
-              mono
-            />
-            <InfoRow
-              label="Trạng thái giao dịch"
-              value={refund?.vnpTransactionStatus}
-              mono
-            />
-            <InfoRow
-              label="Thông điệp VNPay"
-              value={vnpayMessageForUser(
-                refund?.vnpResponseCode,
-                refund?.vnpMessage,
-              )}
-            />
-            <InfoRow
-              label="Thời điểm xác minh"
-              value={formatDateTimeVN(refund?.vnpResolvedAt)}
-            />
-          </div>
-        </DetailBlock>
-      )}
-
-      {/* Nhật ký kiểm toán — dùng timeline tiếng Việt, ẩn hoàn toàn
-          thuật ngữ kỹ thuật (mã hành động, mã trạng thái, payload thô).
-          Các dòng trùng lặp do bấm "Kiểm tra" nhiều lần đã được gộp lại. */}
-      {!compact && (
+      {/*
+        ⚠️ "Nhật ký xử lý" là dữ liệu HỆ THỐNG ⇒ nằm ở NHÓM ① "Thông tin giao
+        dịch" (render ngay sau "Kết quả từ VNPay"), KHÔNG phải nhóm khách gửi
+        kèm. Ở đây chỉ render khi KHÔNG bật tiêu đề chia nhóm.
+      */}
+      {!withSectionTitles && !compact && (
         <DetailBlock title="Nhật ký xử lý">
-          {auditLogs.length > 0 ? (
-            <ol className="relative space-y-3 pl-6">
-              {/* Vạch dọc nối các mốc thời gian */}
-              <span
-                aria-hidden="true"
-                className="absolute left-[7px] top-2 bottom-2 w-px bg-slate-200"
-              />
-              {auditLogs.map((log, idx) => (
-                <li key={log?.id ?? idx} className="relative">
-                  {/* Chấm mốc */}
-                  <span
-                    aria-hidden="true"
-                    className={`absolute -left-6 top-1.5 h-3.5 w-3.5 rounded-full border-2 border-white ring-1 ${auditDotClass(
-                      log?.action,
-                    )}`}
-                  />
-                  <div className="rounded-xl bg-slate-50 px-3.5 py-2.5 border border-slate-100">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-xs font-semibold text-slate-800">
-                        {auditActionLabel(log?.action)}
-                      </span>
-                      {log?.fromStatus && log?.fromStatus !== log?.toStatus && (
-                        <span className="text-[11px] text-slate-500">
-                          {refundStatusLabel(log.fromStatus)} →{" "}
-                          <span className="font-semibold text-slate-700">
-                            {refundStatusLabel(log?.toStatus)}
-                          </span>
-                        </span>
-                      )}
-                      {!log?.fromStatus && log?.toStatus && (
-                        <span className="text-[11px] text-slate-500">
-                          Trạng thái:{" "}
-                          <span className="font-semibold text-slate-700">
-                            {refundStatusLabel(log?.toStatus)}
-                          </span>
-                        </span>
-                      )}
-                      {log?.amount > 0 && (
-                        <span className="font-mono text-[11px] font-semibold text-emerald-700">
-                          {formatVND(log.amount)}
-                        </span>
-                      )}
-                      <span className="ml-auto text-[11px] text-slate-400 font-medium">
-                        {formatDateTimeVN(log?.createdAt)}
-                      </span>
-                    </div>
-                    {(() => {
-                      // Làm sạch TRƯỚC khi render: nếu sau khi lọc không còn nội dung
-                      // đáng hiển thị thì bỏ hẳn dòng mô tả (tránh dòng trống vô nghĩa).
-                      const cleanDetail = sanitizeAuditDetail(log?.detail);
-                      return cleanDetail ? (
-                        <p className="mt-1 text-[11px] text-slate-600 leading-relaxed">
-                          {cleanDetail}
-                        </p>
-                      ) : null;
-                    })()}
-                    {log?.reference && (
-                      <p className="mt-1 text-[11px] text-slate-400">
-                        Mã tham chiếu:{" "}
-                        <span className="font-mono text-slate-500">
-                          {log.reference}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="text-xs text-slate-500">
-              Chưa có nhật ký xử lý cho yêu cầu này.
-            </p>
-          )}
+          <AuditLogTimeline logs={auditLogs} />
         </DetailBlock>
       )}
     </div>
@@ -550,7 +731,7 @@ export function RefundDetailModal({ refundId, onClose }) {
           <span>{error}</span>
         </div>
       ) : (
-        <RefundDetailBody refund={refund} />
+        <RefundDetailBody refund={refund} withSectionTitles />
       )}
     </ModalShell>
   );
@@ -626,7 +807,7 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
   const requestedAt = refund?.createdAt ?? null;
 
   // Số ngày từ lúc khách gửi yêu cầu tới ngày trải nghiệm.
-  // Dùng để Admin đối chiếu chính sách "hủy trước 3 ngày ⇒ hoàn 50%".
+  // Dùng để Admin đối chiếu chính sách 3 bậc (80% / 50% / 0%).
   const daysBeforeStart = useMemo(() => {
     if (!experienceDate || !requestedAt) return null;
     const start = parseLocalDateStart(experienceDate);
@@ -685,7 +866,8 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
     requestedAt,
   );
 
-  // Nhóm PERSONAL bị áp cửa sổ no-show ⇒ tỷ lệ thực tế là 0% dù cấu hình là 50%.
+  // Nhóm PERSONAL bị áp bậc 0% (hủy trong vòng 72 giờ / no-show) ⇒ tỷ lệ thực tế
+  // là 0% dù cấu hình nhóm là 80%.
   const noShowApplies = reason === "PERSONAL" && amount === 0 && groupRate > 0;
   const effectiveRate =
     paymentAmount > 0 ? amount / paymentAmount : groupRate;
@@ -839,6 +1021,31 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
       onClose={onClose}
       extraWide
       fillHeight
+      footer={
+        /*
+          ⚠️ Nút "Hủy" / "Xác nhận" nằm ở CHÂN MODAL (ngoài vùng cuộn) ⇒ LUÔN
+          nhìn thấy, không phải cuộn tới cuối mới thấy. Nút "Xác nhận" dùng
+          `form="refund-review-form"` để kích hoạt submit của form trong thân.
+        */
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            form="refund-review-form"
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            {busy && <Loader2 size={12} className="animate-spin" />}
+            Xác nhận
+          </button>
+        </>
+      }
     >
       {/*
         ⚠️ `grid-rows-[minmax(0,1fr)]` là BẮT BUỘC: mặc định `grid-template-rows`
@@ -849,16 +1056,25 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
       */}
       <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] gap-5 lg:grid-cols-[1.05fr_1fr]">        {/* ── CỘT TRÁI: chi tiết đơn khách gửi lên ── */}
         <div className="min-h-0 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-          <h3 className="sticky top-0 z-10 mb-3 flex items-center gap-1.5 bg-white pt-0.5 text-xs font-bold text-slate-700">
-            <FileText size={13} className="text-slate-400" />
-            Thông tin khách gửi kèm
-          </h3>
-          <RefundDetailBody refund={detailRefund} compact />
+          {/*
+            ⚠️ KHÔNG đặt tiêu đề "Thông tin khách gửi kèm" ở đây nữa — nội
+            dung đã được `RefundDetailBody` tự chia thành 2 nhóm có tiêu đề:
+            "Thông tin giao dịch" và "Thông tin khách gửi kèm".
+          */}
+          <RefundDetailBody
+            refund={detailRefund}
+            compact
+            withSectionTitles
+          />
         </div>
 
         {/* ── CỘT PHẢI: quyết định của quản trị viên ── */}
         <div className="min-h-0 overflow-y-auto overscroll-contain border-t border-slate-100 pt-4 pr-1 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form
+            id="refund-review-form"
+            onSubmit={handleSubmit}
+            className="space-y-4"
+          >
             {/* Số tiền gốc của đơn — luôn hiển thị để quản trị viên đối chiếu */}
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
               <div className="flex items-center justify-between gap-3">
@@ -931,15 +1147,25 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
                     <option value="">— Chọn nhóm lý do —</option>
                     {(groups.length > 0 ? groups : FALLBACK_GROUPS).map((g) => {
                       const rate = Number(g.refundRate ?? 0);
-                      const preview = refundAmountForReasonAt(
-                        paymentAmount,
-                        g.code,
-                        rateOverrides,
-                        experienceDate,
-                        requestedAt,
-                        g.noShowWindowHours ?? undefined,
-                      );
-                      // Nhóm cá nhân có MỨC HOÀN 0% riêng (hủy quá muộn / no-show).
+                      /*
+                        ⚠️ Chỉ hiện MỨC HOÀN, KHÔNG kèm số tiền — Admin xem số
+                        tiền ở khối "Số tiền đề xuất" ngay bên dưới.
+
+                        Nhóm "Lỗi khách hàng" có 3 BẬC theo thời điểm hủy
+                        (80% / 50% / 0%) ⇒ phải hiện ĐỦ cả 3 mức, nếu không
+                        Admin không thấy nhánh 50%.
+                      */
+                      if (g.code === "PERSONAL") {
+                        const tiers = REFUND_PERSONAL_TIERS.map(
+                          (t) => `${Math.round(t.rate * 100)}%`,
+                        ).join("/ ");
+                        return (
+                          <option key={g.code} value={g.code}>
+                            {g.name} - Hoàn {tiers}
+                          </option>
+                        );
+                      }
+                      // Nhóm cá nhân có MỨC HOÀN 0% riêng (hủy quá muộn).
                       const rateText =
                         rate === 0
                           ? "0%"
@@ -949,7 +1175,7 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
                               : "");
                       return (
                         <option key={g.code} value={g.code}>
-                          {g.name} — hoàn {rateText} ({formatVND(preview)})
+                          {g.name} - Hoàn {rateText}
                         </option>
                       );
                     })}
@@ -981,9 +1207,10 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
                 {/*
                   ── Nhóm "Lỗi khách hàng" ──
                   Chính sách phụ thuộc THỜI ĐIỂM khách gửi yêu cầu so với ngày
-                  trải nghiệm:
-                    • Hủy trước 3 ngày khởi hành  → Hoàn 50%
-                    • Hủy trong vòng 48 giờ / không xuất hiện → Hoàn 0%
+                  trải nghiệm (3 bậc):
+                    • Từ 7 ngày trở lên                  → Hoàn 80%
+                    • Từ 3 đến 6 ngày (72 giờ – 6 ngày) → Hoàn 50%
+                    • Dưới 72 giờ                        → Hoàn 0%
                   ⇒ Hiển thị 2 mốc ngày để Admin tự đối chiếu.
                 */}
                 {reason === "PERSONAL" && (
@@ -1020,24 +1247,38 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
                         </>
                       )}
                     </p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                      Quy tắc: <b>Hoàn 50%</b> nếu hủy trước 3 ngày khởi hành;{" "}
-                      <b>Hoàn 0%</b> nếu hủy trong vòng 48 giờ hoặc không xuất hiện.
-                    </p>
+                    {/*
+                      ⚠️ Mỗi quy tắc 1 DÒNG riêng ⇒ Admin đọc nhanh, không phải
+                      dòng text dài gộp 3 nhánh vào một dòng.
+                    */}
+                    <div className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                      <p className="font-semibold text-slate-600">Quy tắc:</p>
+                      <p className="mt-0.5">
+                        Hoàn <b className="text-slate-700">80%</b> nếu hủy từ 7 ngày
+                        trở lên.
+                      </p>
+                      <p className="mt-0.5">
+                        Hoàn <b className="text-slate-700">50%</b> nếu hủy từ 3 đến 6
+                        ngày (72 giờ – 6 ngày).
+                      </p>
+                      <p className="mt-0.5">
+                        Hoàn <b className="text-slate-700">0%</b> nếu hủy trong vòng
+                        72 giờ.
+                      </p>
+                    </div>
                     <p className="mt-1.5 text-[11px] font-semibold leading-relaxed">
                       {noShowApplies ? (
                         <span className="text-amber-700">
-                          ⇒ Áp dụng Hoàn 0% (khách gửi trong vòng 48 giờ trước
+                          ⇒ Áp dụng Hoàn 0% (khách gửi trong vòng 72 giờ trước
                           ngày trải nghiệm).
                         </span>
-                      ) : daysBeforeStart != null && daysBeforeStart < 3 ? (
+                      ) : daysBeforeStart != null && daysBeforeStart < 7 ? (
                         <span className="text-amber-700">
-                          ⇒ Áp dụng Hoàn 50% (chưa vào cửa sổ 48 giờ, nhưng hủy
-                          muộn hơn 3 ngày — Admin nên cân nhắc).
+                          ⇒ Áp dụng Hoàn 50% (hủy trong khoảng 72 giờ – 6 ngày).
                         </span>
                       ) : (
                         <span className="text-emerald-700">
-                          ⇒ Áp dụng Hoàn 50% (hủy trước 3 ngày khởi hành).
+                          ⇒ Áp dụng Hoàn 80% (hủy từ 7 ngày trở lên).
                         </span>
                       )}
                     </p>
@@ -1059,7 +1300,7 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
                   <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
                     <AlertTriangle size={14} className="mt-0.5 shrink-0" />
                     <span>
-                      Khách gửi yêu cầu <b>trong vòng 48 giờ</b> trước ngày trải
+                      Khách gửi yêu cầu <b>trong vòng 72 giờ</b> trước ngày trải
                       nghiệm ({experienceDate ? formatLocalDate(experienceDate) : "—"}
                       ) — theo chính sách nhóm{" "}
                       <b>Lỗi khách hàng</b> chỉ hoàn <b>0%</b>. Số tiền được hệ
@@ -1173,24 +1414,6 @@ export function ReviewRefundModal({ refund, busy, onClose, onSubmit }) {
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:bg-white focus:outline-none"
               />
             </Field>
-
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
-              >
-                {busy && <Loader2 size={12} className="animate-spin" />}
-                Xác nhận
-              </button>
-            </div>
           </form>
         </div>
       </div>
@@ -1349,6 +1572,31 @@ export function ManualTransferModal({ refund, busy, onClose, onSubmit }) {
       onClose={onClose}
       extraWide
       fillHeight
+      footer={
+        /*
+          ⚠️ Nút hành động nằm ở CHÂN MODAL (ngoài vùng cuộn) ⇒ LUÔN nhìn thấy.
+          Nút "Xác nhận đã chuyển" dùng `form="refund-manual-transfer-form"` để
+          kích hoạt submit của form trong thân.
+        */
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            form="refund-manual-transfer-form"
+            disabled={busy || uploading}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {busy && <Loader2 size={12} className="animate-spin" />}
+            Xác nhận đã chuyển
+          </button>
+        </>
+      }
     >
       {/*
         ⚠️ `grid-rows-[minmax(0,1fr)]` là BẮT BUỘC: mặc định `grid-template-rows`
@@ -1359,16 +1607,25 @@ export function ManualTransferModal({ refund, busy, onClose, onSubmit }) {
       <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] gap-5 lg:grid-cols-[1.05fr_1fr]">
         {/* ── CỘT TRÁI: chi tiết yêu cầu hoàn tiền ── */}
         <div className="min-h-0 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-          <h3 className="sticky top-0 z-10 mb-3 flex items-center gap-1.5 bg-white pt-0.5 text-xs font-bold text-slate-700">
-            <FileText size={13} className="text-slate-400" />
-            Chi tiết yêu cầu hoàn tiền
-          </h3>
-          <RefundDetailBody refund={detailRefund} compact />
+          {/*
+            ⚠️ Tiêu đề "Chi tiết yêu cầu hoàn tiền" bị thay bằng 2 tiêu đề do
+            `RefundDetailBody` tự sinh: "Thông tin giao dịch" + "Thông tin khách
+            gửi kèm" ⇒ rõ ràng hơn cho Admin khi đang đối chiếu tài khoản.
+          */}
+          <RefundDetailBody
+            refund={detailRefund}
+            compact
+            withSectionTitles
+          />
         </div>
 
         {/* ── CỘT PHẢI: form ghi nhận chuyển khoản ── */}
         <div className="min-h-0 overflow-y-auto overscroll-contain border-t border-slate-100 pt-4 pr-1 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form
+            id="refund-manual-transfer-form"
+            onSubmit={handleSubmit}
+            className="space-y-4"
+          >
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
               <p className="text-[10px] font-semibold text-slate-500">
                 Số tiền cần chuyển
@@ -1376,6 +1633,56 @@ export function ManualTransferModal({ refund, busy, onClose, onSubmit }) {
               <p className="mt-1 font-mono text-lg font-semibold text-slate-900">
                 {formatVND(amountToTransfer)}
               </p>
+            </div>
+
+            {/*
+              ⚠️ KHỐI "CHUYỂN ĐẾN" — đặt NGAY TRÊN form vì đây là thứ Admin cần
+              dùng để chuyển khoản: STK, tên chủ TK, ngân hàng. Có nút sao chép
+              để không phải gõ tay số tài khoản dài.
+
+              ⚠️ Khi khách KHÔNG khai báo tài khoản ⇒ hiện cảnh báo rõ ràng thay
+              vì im lặng (trước đây khối này bị ẩn hoàn toàn ⇒ Admin không biết
+              mình đang thiếu dữ liệu).
+            */}
+            <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50/60 px-4 py-3">
+              <p className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800">
+                <Landmark size={13} />
+                Chuyển đến tài khoản khách
+              </p>
+              {detailRefund?.bankAccountNumber ||
+              detailRefund?.bankAccountName ||
+              detailRefund?.bankName ? (
+                <div className="mt-2 space-y-2">
+                  <div className="grid grid-cols-1 gap-2">
+                    <CopyableRow
+                      label="Số tài khoản (STK)"
+                      value={detailRefund?.bankAccountNumber}
+                      mono
+                      hint="Sao chép số tài khoản"
+                    />
+                    <CopyableRow
+                      label="Tên chủ tài khoản"
+                      value={detailRefund?.bankAccountName}
+                      hint="Sao chép tên chủ tài khoản"
+                    />
+                    <CopyableRow
+                      label="Ngân hàng"
+                      value={detailRefund?.bankName}
+                      hint="Sao chép tên ngân hàng"
+                    />
+                  </div>
+                  <p className="text-[10.5px] leading-relaxed text-emerald-800/80">
+                    ⚠️ Đối chiếu tên chủ tài khoản với biên lai ngân hàng trước khi
+                    chuyển — khách gửi yêu cầu có thể nhờ người khác nhận tiền.
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-2 text-[11px] leading-relaxed text-amber-700">
+                  ⚠️ Khách KHÔNG khai báo tài khoản nhận tiền khi gửi yêu cầu —
+                  liên hệ khách để lấy số tài khoản / tên chủ tài khoản / ngân
+                  hàng trước khi chuyển.
+                </p>
+              )}
             </div>
 
             <Field
@@ -1482,24 +1789,6 @@ export function ManualTransferModal({ refund, busy, onClose, onSubmit }) {
                 {note.length}/{TRANSFER_NOTE_MAX}
               </p>
             </Field>
-
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={busy || uploading}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {busy && <Loader2 size={12} className="animate-spin" />}
-                Xác nhận đã chuyển
-              </button>
-            </div>
           </form>
         </div>
       </div>

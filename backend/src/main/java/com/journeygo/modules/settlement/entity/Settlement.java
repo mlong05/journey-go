@@ -16,12 +16,15 @@ import java.time.LocalDate;
  *
  * <p>Quy tắc:
  * <ul>
- *   <li>Kỳ tất toán dùng tháng dương lịch; chỉ tạo cho kỳ đã kết thúc.</li>
+ *   <li>Kỳ tất toán chia tháng thành các CHU KỲ 10 NGÀY (1-10, 11-20, 21-cuối tháng);
+ *       chỉ tạo cho kỳ đã kết thúc.</li>
  *   <li>Mỗi ProviderProfile chỉ có tối đa một Settlement đã duyệt cho mỗi kỳ doanh thu.</li>
  *   <li>Chỉ khi duyệt mới tạo giao dịch cộng tiền tương ứng trong Wallet.</li>
  *   <li>Duyệt phải nguyên tử: cập nhật Settlement + ProviderProfile Revenue + Wallet Transaction
  *       trong cùng một transaction, lỗi thì rollback toàn bộ.</li>
  * </ul>
+ *
+ * @see com.journeygo.modules.settlement.entity.SettlementPeriod
  */
 @Entity
 @Table(name = "settlements", uniqueConstraints = {
@@ -63,8 +66,12 @@ public class Settlement {
     @Builder.Default
     private SettlementScope scope = SettlementScope.PROVIDER;
 
-    /** Kỳ doanh thu (yyyy-MM) mà Settlement này tổng hợp. */
-    @Column(name = "revenue_period", nullable = false, length = 7)
+    /**
+     * Kỳ doanh thu (chu kỳ 10 ngày) mà Settlement này tổng hợp.
+     *
+     * <p>Định dạng {@code yyyy-MM-D}: {@code 2026-10-1} = 01/10 → 10/10/2026.
+     */
+    @Column(name = "revenue_period", nullable = false, length = 10)
     private String revenuePeriod;
 
     @Column(name = "period_start", nullable = false)

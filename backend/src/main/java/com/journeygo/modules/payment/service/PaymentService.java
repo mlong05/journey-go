@@ -399,13 +399,32 @@ public class PaymentService {
         // được xác nhận Booking — trả về lỗi rõ ràng cho khách.
         verifyAmountMatchesBooking(payment, params);
 
+        // Return URL ĐÃ ĐƯỢC VNPay KÝ ⇒ là nguồn xác minh ĐÁNG TIN CẬY.
+        // Nếu nó nói rõ "thành công" thì phải ÁP DỤNG kết quả đó, bất kể trạng
+        // thái hiện tại của giao dịch trong DB — nếu không, khách đã trả tiền
+        // vẫn thấy "đang chờ thanh toán" (đúng triệu chứng đã gặp).
+        //
+        // ⚠️ `SUCCESS` là trạng thái cuối, áp dụng lại là idempotent (callback
+        // trùng) ⇒ vẫn trả về luôn, không cần đi qua `applyVnPayResult`.
+        boolean signedSuccess = VNPAY_RESPONSE_SUCCESS.equals(params.get("vnp_ResponseCode"))
+                && VNPAY_STATUS_SUCCESS.equals(params.get("vnp_TransactionStatus"));
+
         // Nếu đã có kết quả rõ ràng → trả về luôn, không cần truy vấn lại.
         //
         // ⚠️ Ngoại lệ: `SUPERSEDED` (giao dịch bị thay thế) vẫn phải áp dụng kết quả
         // khi có Return URL ĐÃ KÝ — vì khách có thể đã hoàn tất thanh toán ở cửa sổ
         // trình duyệt CŨ ⇒ tiền ĐÃ trôi ⇒ phải ghi nhận thành công + đánh dấu
         // DUPLICATE (khoản tiền dư) để chuyển quy trình hoàn tiền/đối soát.
-        if (payment.getStatus().isFinal() && payment.getStatus() != PaymentStatus.SUPERSEDED) {
+        //
+        // ⚠️ `FAILED` / `CANCELLED` cũng KHÔNG được chặn khi Return URL đã ký
+        // báo thành công: trạng thái cũ có thể đến từ một lần quét trước đó
+        // (VD `markFailed` khi khách bấm hủy ở cửa sổ cũ rồi thực tế đã trả
+        // tiền ở cửa sổ mới) ⇒ tiền đã trôi thì phải ghi nhận.
+        boolean staleButSignedSuccess = signedSuccess
+                && payment.getStatus() != PaymentStatus.SUCCESS;
+        if (payment.getStatus().isFinal()
+                && payment.getStatus() != PaymentStatus.SUPERSEDED
+                && !staleButSignedSuccess) {
             return toVerificationResponse(payment, payment.isSuccess()
                     ? "Thanh toán thành công"
                     : "Thanh toán không thành công: " + (payment.getVnpMessage() != null ? payment.getVnpMessage() : ""));

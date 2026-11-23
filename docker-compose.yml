@@ -92,9 +92,17 @@ x-backend-env: &backend-env
   VNPAY_INTERNATIONAL_CARD_BANK_TYPE: ${VNPAY_INTERNATIONAL_CARD_BANK_TYPE:-3}
   # ── AI & Maps ──────────────────────────────────────────────────────────────
   GOONG_API_KEY: ${GOONG_API_KEY:-}
-  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  # ⚠️ Fail-fast: nếu thiếu GEMINI_API_KEY thì `docker compose up` dừng NGAY với
+  #    thông báo rõ ràng, thay vì deploy thành công rồi mới phát hiện AI hỏng lúc
+  #    người dùng mở chat (lỗi hiện ra rất muộn & khó truy nguyên).
+  #    Muốn chạy AI ở chế độ giả lập thì đặt GEMINI_API_KEY=mock trong .env.
+  GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY chưa được đặt trong .env — lấy tại https://aistudio.google.com/apikey}
+  GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
   GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
   GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-1.5-flash}
+  # Chống spam AI + bảo vệ quota Gemini (0 = tắt rate limit).
+  AI_RATE_LIMIT_PER_MINUTE: ${AI_RATE_LIMIT_PER_MINUTE:-20}
+  AI_MAX_QUESTION_LENGTH: ${AI_MAX_QUESTION_LENGTH:-1000}
   # ── Nghiệp vụ ──────────────────────────────────────────────────────────────
   FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
   REFUND_WINDOW_HOURS: ${REFUND_WINDOW_HOURS:-24}
