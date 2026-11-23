@@ -299,15 +299,21 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
   }
 
   void _handleReturnToAiPressed() {
-    if (_handoffLoading) return;
-    if (_isWaitingHuman) {
-      _showCancelWaitDialog();
-      return;
-    }
-    _returnToAi();
+    if (_handoffLoading || !_isLiveQueue) return;
+    _showReturnToAiDialog();
   }
 
-  Future<void> _showCancelWaitDialog() async {
+  Future<void> _showReturnToAiDialog() async {
+    final isHumanActive = _isHumanActive;
+    final title = isHumanActive ? 'Kết thúc hỗ trợ trực tiếp?' : 'Hủy yêu cầu hỗ trợ?';
+    final message = isHumanActive
+        ? 'Bạn có chắc muốn kết thúc cuộc trò chuyện với nhân viên hỗ trợ và quay lại chat với AI không?'
+        : 'Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?';
+    final primaryLabel = isHumanActive ? 'Tiếp tục chat' : 'Tiếp tục chờ';
+    final confirmLabel = isHumanActive ? 'Kết thúc & quay lại AI' : 'Hủy & quay lại AI';
+    final iconData = isHumanActive ? Icons.support_agent_rounded : Icons.hourglass_top_rounded;
+    final iconColor = isHumanActive ? AppCultureColors.oceanBlue : AppCultureColors.warning;
+
     var submitting = false;
     await showDialog<void>(
       context: context,
@@ -318,21 +324,21 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
           child: AlertDialog(
             backgroundColor: AppCultureColors.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.hourglass_top_rounded, color: AppCultureColors.warning, size: 22),
-                SizedBox(width: 8),
+                Icon(iconData, color: iconColor, size: 22),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Xác nhận quay lại AI',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
             ),
-            content: const Text(
-              'Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?',
-              style: TextStyle(fontSize: 13.5, height: 1.5, color: AppCultureColors.textMuted),
+            content: Text(
+              message,
+              style: const TextStyle(fontSize: 13.5, height: 1.5, color: AppCultureColors.textMuted),
             ),
             actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
             actions: [
@@ -361,9 +367,9 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                       ),
                       const SizedBox(width: 6),
                     ],
-                    const Text(
-                      'Hủy & quay lại AI',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                    Text(
+                      confirmLabel,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -375,9 +381,9 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text(
-                  'Tiếp tục chờ',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                child: Text(
+                  primaryLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
             ],
