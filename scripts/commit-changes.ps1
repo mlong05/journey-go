@@ -60,9 +60,12 @@ if ([string]::IsNullOrWhiteSpace($GitUserName) -or [string]::IsNullOrWhiteSpace(
 Write-Host "Commit identity: $GitUserName <$GitUserEmail>" -ForegroundColor DarkGray
 
 # Pattern that detects AI/automation ATTRIBUTION TRAILERS in a commit message.
-# It deliberately does NOT match a legitimate scope such as "feat(ai): ...",
-# otherwise the script would flag and re-amend its own correct commits.
-$AiPattern = "(?i)(co-authored-by|signed-off-by\s*:\s*(ai|bot|assistant)|generated\s+with|generated\s+by|co-created-by|claude|copilot|chatgpt|gpt-\d|openai|anthropic|codeium|cursor\s*<|cursoragent|ai[- ]assisted|written\s+by\s+ai)"
+# It deliberately does NOT match a legitimate scope or wording such as
+# "feat(ai): ..." or "add cursor-paginated ...", otherwise the script would
+# flag and re-amend its own correct commits.
+# Every alternative below requires an ATTRIBUTION CONTEXT (a trailer keyword,
+# an email domain, or a "<name>" author suffix) - never a bare product word.
+$AiPattern = "(?im)^(co-authored-by|co-created-by|signed-off-by|generated-by|generated-with|generated with|reviewed-by)\s*:?\s*.*(ai|bot|assistant|agent|claude|cursor|copilot|chatgpt|gpt|openai|anthropic|codeium)|\b(cursoragent|noreply@|anthropic\.com|openai\.com|github\.com/copilot|co-authored-by\s*:)"
 
 # --- Helpers -----------------------------------------------------------------
 function Write-Step { param([string]$m) Write-Host ""; Write-Host "==> $m" -ForegroundColor Cyan }
@@ -369,12 +372,34 @@ foreach ($group in $Groups) {
     # "feat(ai): ..." is a legitimate scope name and must NOT match - otherwise
     # the script would amend its own correct commit in a loop.
     $sha = (Invoke-Git rev-parse HEAD)[0].Trim()
-    $meta = (Invoke-Git show -s --format="%an|%ae|%B" $sha)[0]
+    # Read the FULL message body, not just the first line: an AI trailer can sit
+    # on line 3+. The record separator (\x1e) keeps each commit on one chunk so
+    # a multi-commit audit never bleeds one message into another.
+    $meta = (Invoke-Git show -s --format="%B%x1e" $sha) -join ""
+
+    # --- Guarantee: the commit message is EXACTLY ONE line -------------------
+    # $group.Message never contains a newline, but a hook or a stray template
+    # could still append a body. If the stored message has more than the
+    # single subject line, rewrite it so the commit stays one-line.
+    # NOTE: @() is required - without it PowerShell unrolls a 1-element result
+    # to a scalar and .Count would fail under Set-StrictMode.
+    $subject = @((($meta -split [char]0x1e)[0] -split "`r?`n") | Where-Object { $_.Trim() -ne "" })
+    if ($subject.Count -gt 1) {
+        & git -c "user.name=$GitUserName" -c "user.email=$GitUserEmail" `
+            commit --amend --cleanup=strip --no-verify --reset-author -m $group.Message 2>&1 | Out-Null
+        $meta = (Invoke-Git show -s --format="%B%x1e" $sha) -join ""
+        $subject = @((($meta -split [char]0x1e)[0] -split "`r?`n") | Where-Object { $_.Trim() -ne "" })
+        if ($subject.Count -gt 1) {
+            throw ("Commit message is still multi-line after amend: {0}" -f $group.Message)
+        }
+        Write-Warn ("Collapsed multi-line message to one line: {0}" -f $group.Message)
+    }
+
     if ($meta -match $AiPattern) {
         # Rewrite the commit without the offending trailer.
         & git -c "user.name=$GitUserName" -c "user.email=$GitUserEmail" `
             commit --amend --cleanup=strip --no-verify --reset-author -m $group.Message 2>&1 | Out-Null
-        $meta = (Invoke-Git show -s --format="%an|%ae|%B" $sha)[0]
+        $meta = (Invoke-Git show -s --format="%B%x1e" $sha) -join ""
         if ($meta -match $AiPattern) {
             throw ("Commit still contains AI attribution after amend: {0}" -f $group.Message)
         }
@@ -470,23 +495,23 @@ $audit = @()
 $prevPref = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $range = & git log --format="%H|%an|%ae|%B" "@{upstream}..$base" 2>&1
+    $range = & git log --format="%H%x1e%an%x1e%ae%x1e%B%x1e" "@{upstream}..$base" 2>&1
     $rangeCode = $LASTEXITCODE
 }
 finally {
     $ErrorActionPreference = $prevPref
 }
 if ($rangeCode -eq 0 -and @($range).Count -gt 0) {
-    $audit = @($range | ForEach-Object { [string]$_ } | Where-Object { $_ -match '^[0-9a-f]{40}\|' })
+    $audit = @($range | ForEach-Object { [string]$_ } | Where-Object { $_ -match "^[0-9a-f]{40}$([char]0x1e)" })
 }
 else {
     $n = [Math]::Max($committed.Count, 1)
     $prevPref = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $audit = @(& git log --format="%H|%an|%ae|%B" "-$n" 2>&1 |
+        $audit = @(& git log --format="%H%x1e%an%x1e%ae%x1e%B%x1e" "-$n" 2>&1 |
                    ForEach-Object { [string]$_ } |
-                   Where-Object { $_ -match '^[0-9a-f]{40}\|' })
+                   Where-Object { $_ -match "^[0-9a-f]{40}$([char]0x1e)" })
     }
     finally {
         $ErrorActionPreference = $prevPref
@@ -501,7 +526,15 @@ foreach ($entry in $audit) {
 }
 if ($bad.Count -gt 0) {
     Write-Warn "$($bad.Count) commit(s) contain a suspicious trailer:"
-    foreach ($b in $bad) { Write-Info "  $b" }
+    foreach ($b in $bad) {
+        # Print each offending commit as: <sha> <one-line message>
+        $p = [string]$b -split [char]0x1e
+        if ($p.Count -ge 4) {
+            $msg = (($p[3] -split "`r?`n") | Where-Object { $_.Trim() -ne "" } | Select-Object -First 1)
+            Write-Info ("  {0} {1}" -f $p[0], $msg)
+        }
+        else { Write-Info ("  " + $b) }
+    }
     Write-Info "Fix them manually with: git rebase -i --exec 'git commit --amend --reset-author --no-edit' <base>"
 }
 else {
@@ -510,7 +543,7 @@ else {
 
 $authors = @(
     $audit | ForEach-Object {
-        $p = $_ -split '\|'
+        $p = [string]$_ -split [char]0x1e
         if ($p.Count -ge 3) { "$($p[1]) <$($p[2])>" }
     } | Sort-Object -Unique
 )
@@ -528,9 +561,31 @@ Write-Host ""
 foreach ($m in $committed) { Write-Host "  * $m" -ForegroundColor Green }
 Write-Host ""
 
-$log = @(Invoke-Git log --oneline -10)
-Write-Info "Recent commits:"
-foreach ($l in $log) { Write-Info "  $l" }
+# Commits created by this run, printed in the compact two-line form:
+#   <full sha>
+#   <one-line message>
+Write-Info "Commits created:"
+$createdLog = @()
+$prevPref = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $n = [Math]::Max($committed.Count, 1)
+    $createdLog = @(& git log --format="%H%x1e%B%x1e" "-$n" 2>&1 |
+                ForEach-Object { [string]$_ } |
+                Where-Object { $_ -match "^[0-9a-f]{40}" })
+}
+finally {
+    $ErrorActionPreference = $prevPref
+}
+foreach ($chunk in $createdLog) {
+    $p = $chunk -split [char]0x1e
+    if ($p.Count -ge 2) {
+        $sha = $p[0].Trim()
+        $msg = (($p[1] -split "`r?`n") | Where-Object { $_.Trim() -ne "" } | Select-Object -First 1)
+        Write-Host "  commit $sha" -ForegroundColor Cyan
+        Write-Host "  $msg" -ForegroundColor Green
+    }
+}
 Write-Host ""
 
 Write-Host "=============================================================" -ForegroundColor Cyan
