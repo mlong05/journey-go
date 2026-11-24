@@ -15,20 +15,21 @@ import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeleto
 import 'tour_detail_screen.dart';
 import 'tour_detail_opener.dart';
 import 'tour_style.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Bảng màu hiện đại của màn "Chuyến đi": nền xám lạnh, chữ xanh than, nhấn xanh ngọc tươi,
 /// cam cho việc cần làm ngay (đếm ngược), vàng cho điểm thưởng.
 abstract final class TripsPalette {
-  static const background = Color(0xFFF3F5F8);
+  static const background = Color(0xFFF6F8FB);
   static const ink = Color(0xFF0F172A);
   static const muted = Color(0xFF64748B);
   static const line = Color(0xFFE2E8F0);
   static const track = Color(0xFFE8ECF1);
   static const chipIdle = Color(0xFFD5DCE4);
   static const surfaceSoft = Color(0xFFF1F5F9);
-  static const accent = Color(0xFF047857);
-  static const accentBright = Color(0xFF34D399);
-  static const accentInk = Color(0xFF052E1C);
+  static const accent = Color(0xFF0B7F7E);
+  static const accentBright = Color(0xFF2DD4BF);
+  static const accentInk = Color(0xFF042F2E);
   static const night = Color(0xFF0F172A);
   static const nightRaised = Color(0xFF1E293B);
   static const nightTrack = Color(0xFF334155);
@@ -291,7 +292,7 @@ class _MyToursViewState extends State<MyToursView> {
     if (_error != null && _items.isEmpty) {
       return RewardsMessageView(
         icon: Icons.cloud_off_rounded,
-        title: 'Không tải được chuyến đi của bạn',
+        title: context.l10n.tripsLoadFailed,
         message: _error,
         onRetry: _load,
       );
@@ -329,10 +330,10 @@ class _MyToursViewState extends State<MyToursView> {
               ),
             ),
             if (visible.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 48),
                 child: Text(
-                  'Chưa có chuyến đi nào ở mục này.',
+                  context.l10n.tripsEmptySection,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: TripsPalette.muted),
                 ),
@@ -367,9 +368,9 @@ class _MyToursViewState extends State<MyToursView> {
 
   Widget _sectionTitle(_Stage stage, int count) {
     final label = switch (stage) {
-      _Stage.active => 'Đang diễn ra',
-      _Stage.ready => 'Sắp khởi hành',
-      _Stage.done => 'Đã hoàn thành',
+      _Stage.active => context.l10n.tripsStageActive,
+      _Stage.ready => context.l10n.tripsStageReady,
+      _Stage.done => context.l10n.statusCompleted,
     };
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 22, 2, 12),
@@ -380,11 +381,11 @@ class _MyToursViewState extends State<MyToursView> {
                   fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.2, color: TripsPalette.ink)),
           const SizedBox(width: 8),
           if (stage == _Stage.active)
-            const _Pill(
+            _Pill(
               background: TripsPalette.successSoft,
               foreground: TripsPalette.successInk,
               leading: _LiveDot(color: TripsPalette.success),
-              label: 'Trực tiếp',
+              label: context.l10n.tripsLive,
             )
           else
             _Pill(background: TripsPalette.track, foreground: TripsPalette.slate, label: '$count'),
@@ -405,11 +406,11 @@ class _MyToursViewState extends State<MyToursView> {
             child: const Icon(Icons.confirmation_number_outlined, size: 42, color: TripsPalette.accent),
           ),
           const SizedBox(height: 18),
-          const Text('Bạn chưa có chuyến đi nào',
+          Text(context.l10n.tripsEmptyTitle,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: TripsPalette.ink)),
           const SizedBox(height: 6),
-          const Text(
-            'Đặt một tour ở trang Khám phá, vé sẽ nằm tại đây để bạn bắt đầu hành trình khi đến nơi.',
+          Text(
+            context.l10n.tripsEmptyMessage,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13.5, height: 1.45, color: TripsPalette.muted),
           ),
@@ -417,7 +418,7 @@ class _MyToursViewState extends State<MyToursView> {
           FilledButton.icon(
             onPressed: widget.onExplore,
             icon: const Icon(Icons.travel_explore_rounded, size: 19),
-            label: const Text('Khám phá tour', style: TextStyle(fontWeight: FontWeight.w700)),
+            label: Text(context.l10n.tripsExplore, style: const TextStyle(fontWeight: FontWeight.w700)),
             style: FilledButton.styleFrom(
               backgroundColor: TripsPalette.accent,
               minimumSize: const Size(0, 50),
@@ -440,12 +441,12 @@ class _FilterBar extends StatelessWidget {
 
   const _FilterBar({required this.selected, required this.counts, required this.onSelect});
 
-  static const _labels = {
-    _Filter.all: 'Tất cả',
-    _Filter.active: 'Đang đi',
-    _Filter.ready: 'Sắp tới',
-    _Filter.done: 'Đã xong',
-  };
+  static String _label(_Filter f) => switch (f) {
+        _Filter.all => appL10n.listAll,
+        _Filter.active => appL10n.tripsFilterActive,
+        _Filter.ready => appL10n.tripsFilterReady,
+        _Filter.done => appL10n.tripsFilterDone,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -480,7 +481,7 @@ class _FilterBar extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            _labels[f]!,
+                            _label(f),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -539,8 +540,8 @@ class _ActiveCard extends StatelessWidget {
     final current = total == 0 ? 0 : (item.done + 1).clamp(1, total);
     final meta = [
       if (booking?.experienceDate != null) _date(booking!.experienceDate!),
-      if (item.guests > 0) '${item.guests} khách',
-      if (total > 0) '$total trạm',
+      if (item.guests > 0) context.l10n.coGuestCount(item.guests),
+      if (total > 0) context.l10n.tourCheckpointCount(total),
     ].join(' · ');
 
     return Pressable(
@@ -570,18 +571,18 @@ class _ActiveCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const _Pill(
+                    _Pill(
                       background: Color(0x990F172A),
                       foreground: Colors.white,
                       leading: _LiveDot(color: TripsPalette.accentBright),
-                      label: 'Đang trải nghiệm',
+                      label: context.l10n.tripsExperiencing,
                       height: 30,
                     ),
                     if (total > 0)
                       _Pill(
                         background: Colors.white.withValues(alpha: 0.94),
                         foreground: TripsPalette.ink,
-                        label: 'Trạm $current/$total',
+                        label: context.l10n.tripsStopProgress(current, total),
                         height: 30,
                       ),
                   ],
@@ -622,13 +623,13 @@ class _ActiveCard extends StatelessWidget {
                                 text: '${item.done}/$total',
                                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
                               ),
-                              const TextSpan(text: ' trạm đã check-in'),
+                              TextSpan(text: context.l10n.tripsStopsCheckedIn),
                             ]),
                             style: const TextStyle(fontSize: 12.5, color: TripsPalette.nightMuted),
                           ),
                         ),
                         Text(
-                          '+${item.points} điểm',
+                          context.l10n.rewardPlusPoints('${item.points}'),
                           style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: TripsPalette.gold),
                         ),
                       ],
@@ -641,7 +642,7 @@ class _ActiveCard extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: onJourney,
                       icon: const Icon(Icons.navigation_rounded, size: 19),
-                      label: const Text('Tiếp tục hành trình', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                      label: Text(context.l10n.tdContinueJourney, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                       style: FilledButton.styleFrom(
                         backgroundColor: TripsPalette.accentBright,
                         foregroundColor: TripsPalette.accentInk,
@@ -791,8 +792,8 @@ class _ReadyCard extends StatelessWidget {
                           spacing: 12,
                           runSpacing: 4,
                           children: [
-                            if (item.guests > 0) _Meta(icon: Icons.group_outlined, text: '${item.guests} khách'),
-                            if (item.total > 0) _Meta(icon: Icons.place_outlined, text: '${item.total} điểm đến'),
+                            if (item.guests > 0) _Meta(icon: Icons.group_outlined, text: context.l10n.coGuestCount(item.guests)),
+                            if (item.total > 0) _Meta(icon: Icons.place_outlined, text: context.l10n.tripsDestinations(item.total)),
                           ],
                         ),
                       ],
@@ -826,7 +827,7 @@ class _ReadyCard extends StatelessWidget {
                               foregroundColor: TripsPalette.ink,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             ),
-                            child: const Text('Chi tiết vé', style: TextStyle(fontWeight: FontWeight.w700)),
+                            child: Text(context.l10n.tripsTicketDetails, style: const TextStyle(fontWeight: FontWeight.w700)),
                           ),
                         ),
                       ),
@@ -844,7 +845,7 @@ class _ReadyCard extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: onRebook,
                       icon: const Icon(Icons.replay_rounded, size: 18),
-                      label: const Text('Đặt lại tour', style: TextStyle(fontWeight: FontWeight.w700)),
+                      label: Text(context.l10n.mbRebook, style: const TextStyle(fontWeight: FontWeight.w700)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: TripsPalette.accent,
                         side: const BorderSide(color: TripsPalette.accent),
@@ -871,12 +872,12 @@ class _ReadyCard extends StatelessWidget {
     final refunding = item.isRefunding;
     final resolved = item.isRefundResolved;
     final (IconData icon, String label, Color color) = refunding
-        ? (Icons.pending_actions_rounded, 'Đang hoàn tiền', TripsPalette.orangeInk)
+        ? (Icons.pending_actions_rounded, appL10n.refundStatusProcessing, TripsPalette.orangeInk)
         : resolved
-            ? (Icons.verified_rounded, 'Đã hoàn tiền', TripsPalette.slate)
+            ? (Icons.verified_rounded, appL10n.refundToneRefunded, TripsPalette.slate)
             : locked
-                ? (Icons.map_outlined, 'Xem lịch trình', TripsPalette.accent)
-                : (Icons.explore_rounded, 'Bắt đầu', TripsPalette.accent);
+                ? (Icons.map_outlined, appL10n.tripsViewItinerary, TripsPalette.accent)
+                : (Icons.explore_rounded, appL10n.tripsStart, TripsPalette.accent);
     return SizedBox(
       height: 46,
       child: FilledButton.icon(
@@ -899,9 +900,9 @@ class _ReadyCard extends StatelessWidget {
     final now = DateTime.now().toUtc().add(const Duration(hours: 7));
     final days = DateUtils.dateOnly(d).difference(DateUtils.dateOnly(now)).inDays;
     if (days < 0) return null;
-    if (days == 0) return 'Hôm nay';
-    if (days == 1) return 'Ngày mai';
-    return 'Còn $days ngày';
+    if (days == 0) return appL10n.tripsToday;
+    if (days == 1) return appL10n.tripsTomorrow;
+    return appL10n.tripsDaysLeft(days);
   }
 }
 
@@ -914,7 +915,7 @@ class _CodeBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Mã vé $code, chạm để sao chép',
+      label: context.l10n.tripsCodeSemantics(code),
       excludeSemantics: true,
       child: Material(
         color: const Color(0xFFF8FAFC),
@@ -928,7 +929,7 @@ class _CodeBox extends StatelessWidget {
             Clipboard.setData(ClipboardData(text: code));
             ScaffoldMessenger.of(context)
               ..hideCurrentSnackBar()
-              ..showSnackBar(SnackBar(content: Text('Đã sao chép mã vé $code'), behavior: SnackBarBehavior.floating));
+              ..showSnackBar(SnackBar(content: Text(context.l10n.tripsCodeCopied(code)), behavior: SnackBarBehavior.floating));
           },
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
@@ -938,8 +939,8 @@ class _CodeBox extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Mã vé',
-                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: TripsPalette.muted)),
+                      Text(context.l10n.tripsTicketCode,
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: TripsPalette.muted)),
                       const SizedBox(height: 1),
                       Text(
                         code,
@@ -1057,7 +1058,7 @@ class _DoneCard extends StatelessWidget {
                         _Pill(
                           background: TripsPalette.goldSoft,
                           foreground: TripsPalette.goldInk,
-                          label: '+${item.points} điểm',
+                          label: context.l10n.rewardPlusPoints('${item.points}'),
                           height: 22,
                           radius: 6,
                         ),
@@ -1065,7 +1066,7 @@ class _DoneCard extends StatelessWidget {
                         _Pill(
                           background: TripsPalette.successSoft,
                           foreground: TripsPalette.successInk,
-                          label: '${item.done}/${item.total} trạm',
+                          label: '${item.done}/${context.l10n.tourCheckpointCount(item.total)}',
                           height: 22,
                           radius: 6,
                         ),
@@ -1077,7 +1078,7 @@ class _DoneCard extends StatelessWidget {
             if (onRebook != null) ...[
               const SizedBox(width: 8),
               Tooltip(
-                message: 'Đặt lại tour',
+                message: context.l10n.mbRebook,
                 child: Material(
                   color: TripsPalette.surfaceSoft,
                   borderRadius: BorderRadius.circular(14),
@@ -1239,6 +1240,5 @@ String _date(DateTime d) =>
 
 /// "T4 · 25/11", "CN · 30/11".
 String _weekdayDate(DateTime d) {
-  const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  return '${days[d.weekday - 1]} · ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+  return '${formatWeekdayShort(d)} · ${formatDayMonth(d)}';
 }

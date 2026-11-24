@@ -1,3 +1,4 @@
+import '../../l10n/locale_controller.dart';
 import 'gamification_model.dart' show formatThousands;
 
 int _asInt(dynamic value) {
@@ -64,17 +65,20 @@ String? _textOrNull(dynamic value) {
 
 /// Thời lượng tour: "4 giờ 30 phút" (trong ngày), "3N2Đ" (nhiều ngày), "2 ngày" (tour luồng cũ).
 String formatTourDuration({String? format, int? minutes, int days = 0, int? nights}) {
+  // Getter trong model không có BuildContext ⇒ đọc ngôn ngữ đang chọn trực tiếp;
+  // MaterialApp dựng lại khi đổi ngôn ngữ nên chuỗi luôn được tính lại.
+  final l10n = appL10n;
   if (format == 'DAY_TRIP' && minutes != null && minutes > 0) {
     final h = minutes ~/ 60;
     final m = minutes % 60;
-    if (h == 0) return '$m phút';
-    return m == 0 ? '$h giờ' : '$h giờ $m phút';
+    if (h == 0) return l10n.durationMinutes(m);
+    return m == 0 ? l10n.durationHours(h) : l10n.durationHoursMinutes(h, m);
   }
   if (format == 'MULTI_DAY' && days > 0) {
-    return nights != null && nights > 0 ? '${days}N$nightsĐ' : '$days ngày';
+    return nights != null && nights > 0 ? l10n.durationDaysNights(days, nights) : l10n.durationDays(days);
   }
-  if (format == 'DAY_TRIP') return 'Trong ngày';
-  return days <= 1 ? '1 ngày' : '$days ngày';
+  if (format == 'DAY_TRIP') return l10n.durationDayTrip;
+  return l10n.durationDays(days <= 1 ? 1 : days);
 }
 
 double? _asDoubleOrNull(dynamic value) {
@@ -188,8 +192,7 @@ class TourModel {
   /// Tour 5 bước đếm điểm dừng, tour luồng cũ đếm điểm đến.
   int get destinationCount => wizardTour ? stopCount : destinations.length;
 
-  String get formattedPrice =>
-      price <= 0 ? 'Miễn phí' : '${formatThousands(price)} đ';
+  String get formattedPrice => formatVndPrice(price);
 
   String get formattedDuration => formatTourDuration(
         format: tourFormat,
@@ -205,26 +208,33 @@ class TourModel {
   String get routePreview => destinations.map((d) => d.name).join(' → ');
 }
 
-/// Nhãn tiếng Việt cho loại hình tour (khớp enum TourType ở backend).
+/// Giá VND theo ngôn ngữ đang chọn: "450.000 đ" / "450.000 VND" / "450.000ドン"; 0 ⇒ "Miễn phí".
+String formatVndPrice(double price) {
+  final l10n = appL10n;
+  return price <= 0 ? l10n.tourPriceFree : l10n.priceVnd(formatThousands(price));
+}
+
+/// Nhãn loại hình tour theo ngôn ngữ đang chọn (khớp enum TourType ở backend).
 String tourTypeLabel(String type) {
+  final l10n = appL10n;
   switch (type) {
     case 'CULTURAL':
-      return 'Văn hóa';
+      return l10n.tourTypeCultural;
     case 'ADVENTURE':
-      return 'Phiêu lưu';
+      return l10n.tourTypeAdventure;
     case 'BEACH':
-      return 'Biển';
+      return l10n.tourTypeBeach;
     case 'MOUNTAIN':
-      return 'Núi';
+      return l10n.tourTypeMountain;
     case 'CITY':
-      return 'Thành phố';
+      return l10n.tourTypeCity;
     case 'ECOTOURISM':
-      return 'Sinh thái';
+      return l10n.tourTypeEco;
     case 'HISTORICAL':
-      return 'Lịch sử';
+      return l10n.tourTypeHistorical;
     case 'GASTRONOMY':
-      return 'Ẩm thực';
+      return l10n.tourTypeGastronomy;
     default:
-      return 'Khác';
+      return l10n.tourTypeOther;
   }
 }

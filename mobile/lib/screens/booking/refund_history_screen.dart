@@ -16,6 +16,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/refund_reason_config_service.dart';
 import '../../core/services/refund_service.dart';
 import '../common/inline_video.dart';
+import '../../l10n/locale_controller.dart';
 
 class RefundHistoryScreen extends StatefulWidget {
   const RefundHistoryScreen({super.key});
@@ -83,7 +84,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không thể tải lịch sử hoàn tiền.';
+        _error = appL10n.rhLoadFailed;
         _loading = false;
       });
     }
@@ -118,7 +119,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
     final group = _groupFor(refund);
     if (group != null) return group.name;
     if (refund.reasonSummary.isNotEmpty) return refund.reasonSummary;
-    return 'Chờ quản trị viên phân loại';
+    return context.l10n.rhAwaitingAdminTriage;
   }
 
   List<RefundModel> get _filtered {
@@ -144,8 +145,8 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
               size: 18, color: AppCultureColors.textDark),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Lịch Sử Hoàn Tiền',
+        title: Text(
+          context.l10n.rhTitle,
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
@@ -230,7 +231,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                               ElevatedButton.icon(
                                 onPressed: _load,
                                 icon: const Icon(Icons.refresh_rounded, size: 18),
-                                label: const Text('Thử lại'),
+                                label: Text(context.l10n.commonRetry),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppCultureColors.heritageJade,
                                   foregroundColor: Colors.white,
@@ -250,14 +251,14 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                         child: _filtered.isEmpty
                             ? ListView(
                                 physics: const AlwaysScrollableScrollPhysics(),
-                                children: const [
+                                children: [
                                   SizedBox(height: 70),
                                   Icon(Icons.assignment_turned_in_outlined,
                                       size: 52, color: AppCultureColors.textLight),
                                   SizedBox(height: 12),
                                   Center(
                                     child: Text(
-                                      'Chưa có yêu cầu hoàn tiền nào',
+                                      context.l10n.rhEmpty,
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700,
@@ -306,7 +307,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
             children: [
               Text(
                 refund.refundCode.isEmpty
-                    ? 'Yêu cầu #${refund.id}'
+                    ? context.l10n.bdRefundNumber(refund.id)
                     : refund.refundCode,
                 style: const TextStyle(
                   fontSize: 12.5,
@@ -362,7 +363,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                     ],
                     const SizedBox(height: 4),
                     Text(
-                      '${refund.bookingCode ?? 'Đơn của tôi'} • '
+                      '${refund.bookingCode ?? context.l10n.rhMyBooking} • '
                       '${refund.formattedCreatedAt}',
                       style: const TextStyle(
                           fontSize: 11.5, color: AppCultureColors.textMuted),
@@ -378,7 +379,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                     // số tiền đề xuất ⇒ hiển thị "Chờ phân loại" thay vì "0 đ".
                     refund.displayAmount != null && refund.displayAmount! > 0
                         ? refund.formattedEffectiveAmount
-                        : 'Chờ phân loại',
+                        : context.l10n.bdAwaitingTriage,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
@@ -392,11 +393,11 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                   Text(
                     refund.displayAmount != null && refund.displayAmount! > 0
                         ? (refund.refundRatePercent > 0
-                            ? 'Hoàn ${refund.refundRatePercent}%'
-                            : 'Không hoàn tiền')
+                            ? context.l10n.rfRefundPercent(refund.refundRatePercent)
+                            : context.l10n.rhNoRefund)
                         : (refund.isPending
-                            ? 'Chờ quản trị viên xử lý'
-                            : 'Không được hoàn'),
+                            ? context.l10n.rhAwaitingAdmin
+                            : context.l10n.rhNotRefunded),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -475,7 +476,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Lý do từ chối: ${refund.rejectionReason}',
+                    context.l10n.rhRejectReason(refund.rejectionReason),
                     style: const TextStyle(
                       fontSize: 11.5,
                       height: 1.35,
@@ -494,7 +495,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                     size: 14, color: AppCultureColors.textMuted),
                 const SizedBox(width: 6),
                 Text(
-                  'Phương thức: ${refund.methodLabel}',
+                  context.l10n.rhMethod(refund.methodLabel),
                   style: const TextStyle(
                       fontSize: 11.5, color: AppCultureColors.textMuted),
                 ),
@@ -562,8 +563,8 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                     : Image.network(
                         url,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, _, _) => const Text(
-                          'Không tải được bằng chứng',
+                        errorBuilder: (_, _, _) => Text(
+                          context.l10n.rhEvidenceLoadFailed,
                           style: TextStyle(color: Colors.white),
                         ),
                       ),
@@ -586,15 +587,15 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
   static String _filterLabel(String status) {
     switch (status) {
       case 'ALL':
-        return 'Tất cả';
+        return appL10n.listAll;
       case 'PENDING_REVIEW':
-        return 'Chờ xử lý';
+        return appL10n.rhFilterPending;
       case 'APPROVED':
-        return 'Đang xử lý';
+        return appL10n.payStatusProcessing;
       case 'REFUNDED':
-        return 'Đã hoàn';
+        return appL10n.rhFilterRefunded;
       case 'REJECTED':
-        return 'Từ chối';
+        return appL10n.refundToneRejected;
       default:
         return status;
     }

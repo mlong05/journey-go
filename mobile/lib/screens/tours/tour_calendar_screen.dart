@@ -10,6 +10,7 @@ import '../common/photo.dart';
 import '../rewards/rewards_widgets.dart' show RewardsMessageView;
 import 'tour_list_screen.dart' show openTourDetail;
 import 'tour_style.dart' show TourPlaceholder, TourStyle;
+import '../../l10n/locale_controller.dart';
 
 /// Mở màn "Xem tour theo ngày".
 Future<void> openTourCalendar(BuildContext context) =>
@@ -73,7 +74,7 @@ class _TourCalendarScreenState extends State<TourCalendarScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e is ApiException ? e.message : 'Không tải được lịch khởi hành.';
+        _error = e is ApiException ? e.message : appL10n.calLoadFailed;
       });
     }
   }
@@ -87,13 +88,13 @@ class _TourCalendarScreenState extends State<TourCalendarScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppInk.paper,
-      appBar: AppBar(title: const Text('Xem tour theo ngày')),
+      appBar: AppBar(title: Text(context.l10n.calTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? RewardsMessageView(
                   icon: Icons.cloud_off_rounded,
-                  title: 'Không tải được lịch',
+                  title: context.l10n.calLoadFailedTitle,
                   message: _error,
                   onRetry: _load,
                 )
@@ -134,14 +135,14 @@ class _TourCalendarScreenState extends State<TourCalendarScreen> {
         children: [
           Row(
             children: [
-              _navButton(Icons.chevron_left_rounded, 'Tháng trước', _canPrev ? () => _shiftMonth(-1) : null),
+              _navButton(Icons.chevron_left_rounded, context.l10n.calPrevMonth, _canPrev ? () => _shiftMonth(-1) : null),
               Expanded(
                 child: Column(
                   children: [
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        'Tháng ${_month.month}, ${_month.year}',
+                        formatMonthYear(_month),
                         maxLines: 1,
                         softWrap: false,
                         style: AppType.display(size: 17),
@@ -150,7 +151,7 @@ class _TourCalendarScreenState extends State<TourCalendarScreen> {
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        toursThisMonth == 0 ? 'Chưa có lịch khởi hành' : '$toursThisMonth lượt khởi hành',
+                        toursThisMonth == 0 ? context.l10n.calNoDepartures : context.l10n.calDepartureCount(toursThisMonth),
                         maxLines: 1,
                         softWrap: false,
                         style: const TextStyle(fontSize: 12.5, color: AppInk.muted),
@@ -159,7 +160,7 @@ class _TourCalendarScreenState extends State<TourCalendarScreen> {
                   ],
                 ),
               ),
-              _navButton(Icons.chevron_right_rounded, 'Tháng sau', _canNext ? () => _shiftMonth(1) : null),
+              _navButton(Icons.chevron_right_rounded, context.l10n.calNextMonth, _canNext ? () => _shiftMonth(1) : null),
             ],
           ),
           const SizedBox(height: 8),
@@ -224,7 +225,9 @@ class _TourCalendarScreenState extends State<TourCalendarScreen> {
     return Semantics(
       button: hasTours,
       selected: selected,
-      label: '$day tháng ${_month.month}${hasTours ? ', ${info.tours.length} tour' : ', không có tour'}',
+      label: hasTours
+          ? context.l10n.calDaySemantics(formatDayMonth(date), info.tours.length)
+          : context.l10n.calDaySemanticsNone(formatDayMonth(date)),
       child: GestureDetector(
         onTap: hasTours ? () => setState(() => _selected = date) : null,
         behavior: HitTestBehavior.opaque,
@@ -310,11 +313,11 @@ class _TourCalendarScreenState extends State<TourCalendarScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          item(AppTone.jade.tint, 'Còn chỗ'),
+          item(AppTone.jade.tint, context.l10n.calAvailable),
           const SizedBox(width: 14),
-          item(AppInk.soft, 'Hết chỗ'),
+          item(AppInk.soft, context.l10n.calFull),
           const SizedBox(width: 14),
-          item(Colors.transparent, 'Hôm nay', border: AppInk.accent),
+          item(Colors.transparent, context.l10n.tripsToday, border: AppInk.accent),
         ],
       ),
     );
@@ -322,18 +325,16 @@ class _TourCalendarScreenState extends State<TourCalendarScreen> {
 
   // ── Danh sách tour của ngày đang chọn ──────────────────────────────────────
 
-  static const _weekdayNames = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
-
   List<Widget> _dayTours() {
     final selected = _selected;
     if (_days.isEmpty || selected == null) {
-      return const [
+      return [
         Padding(
           padding: EdgeInsets.only(top: 12),
           child: RewardsMessageView(
             icon: Icons.event_busy_rounded,
-            title: 'Chưa có lịch khởi hành',
-            message: 'Các tour sẽ hiện ở đây khi đối tác mở ngày khởi hành.',
+            title: context.l10n.calNoDepartures,
+            message: context.l10n.calNoDeparturesHint,
           ),
         ),
       ];
@@ -350,7 +351,7 @@ class _TourCalendarScreenState extends State<TourCalendarScreen> {
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
-                '${_weekdayNames[selected.weekday - 1]}, $dd/$mm',
+                context.l10n.localeName == 'vi' ? '${formatWeekdayLong(selected)}, $dd/$mm' : '${formatWeekdayLong(selected)}, ${formatDayMonth(selected)}',
                 maxLines: 1,
                 softWrap: false,
                 style: AppType.display(size: 19),
@@ -462,7 +463,7 @@ class _DepartureRow extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    soldOut ? 'Hết chỗ' : 'Còn ${departure.remaining} chỗ',
+                                    soldOut ? context.l10n.calFull : context.l10n.bgSlotsLeft(departure.remaining),
                                     softWrap: false,
                                     style: TextStyle(
                                       fontSize: 12,
@@ -475,7 +476,7 @@ class _DepartureRow extends StatelessWidget {
                                 Text.rich(
                                   TextSpan(
                                     children: [
-                                      const TextSpan(text: 'Từ ', style: TextStyle(color: AppInk.muted)),
+                                      TextSpan(text: context.l10n.tourPriceFromPrefix, style: const TextStyle(color: AppInk.muted)),
                                       TextSpan(
                                         text: tour.formattedPrice,
                                         style: const TextStyle(fontWeight: FontWeight.w800, color: AppInk.accent),

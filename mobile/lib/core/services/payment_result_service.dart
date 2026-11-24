@@ -43,6 +43,7 @@ import '../models/payment_model.dart';
 import 'payment_deep_link_service.dart';
 import 'payment_service.dart';
 import 'token_storage.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Một kết quả thanh toán đã đi qua [PaymentResultService].
 class PaymentResultEvent {
@@ -87,7 +88,7 @@ class PaymentResultEvent {
   factory PaymentResultEvent.needsSync({String? txnRef}) => PaymentResultEvent(
         txnRef: txnRef,
         status: 'UNKNOWN',
-        message: 'Đang chờ xác nhận thanh toán...',
+        message: appL10n.payAwaitingConfirmation,
         needsSync: true,
       );
 

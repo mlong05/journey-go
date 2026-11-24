@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Lỗi định vị với thông điệp tiếng Việt hiển thị trực tiếp cho du khách.
 class LocationException implements Exception {
@@ -20,8 +21,8 @@ class LocationService {
 
   static Future<Position> currentPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
-      throw const LocationException(
-        'GPS đang tắt. Hãy bật định vị để xác thực vị trí của bạn.',
+      throw LocationException(
+        appL10n.locGpsOff,
         needsSettings: true,
       );
     }
@@ -31,11 +32,11 @@ class LocationService {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied) {
-      throw const LocationException('Bạn cần cho phép truy cập vị trí để check-in tại điểm đến.');
+      throw LocationException(appL10n.locPermissionNeeded);
     }
     if (permission == LocationPermission.deniedForever) {
-      throw const LocationException(
-        'Quyền vị trí đã bị chặn. Hãy cấp lại trong Cài đặt của ứng dụng.',
+      throw LocationException(
+        appL10n.locPermissionBlocked,
         needsSettings: true,
       );
     }
@@ -45,7 +46,7 @@ class LocationService {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       ).timeout(const Duration(seconds: 20));
     } on TimeoutException {
-      throw const LocationException('Chưa xác định được vị trí. Hãy ra nơi thoáng hơn rồi thử lại.');
+      throw LocationException(appL10n.locUnknown);
     }
   }
 

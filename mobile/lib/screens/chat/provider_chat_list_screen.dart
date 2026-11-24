@@ -15,6 +15,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/provider_chat_service.dart';
 import '../../core/services/realtime_service.dart';
 import 'provider_chat_screen.dart';
+import '../../l10n/locale_controller.dart';
 
 class ProviderChatListScreen extends StatefulWidget {
   /// Nhúng vào một màn khác (VD: tab "Hỗ trợ từ nhà tour" trong Đơn đặt tour)
@@ -98,7 +99,7 @@ class _ProviderChatListScreenState extends State<ProviderChatListScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không thể tải lịch sử hỗ trợ.';
+        _error = appL10n.chatListLoadFailed;
         _loading = false;
       });
     }
@@ -150,8 +151,8 @@ class _ProviderChatListScreenState extends State<ProviderChatListScreen> {
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: AppCultureColors.textDark),
-        title: const Text(
-          'Hỗ trợ từ nhà tour',
+        title: Text(
+          context.l10n.providerSupportTitle,
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w700,
@@ -182,7 +183,7 @@ class _ProviderChatListScreenState extends State<ProviderChatListScreen> {
               style: const TextStyle(color: AppCultureColors.textMuted),
             ),
             const SizedBox(height: 10),
-            TextButton(onPressed: _load, child: const Text('Thử lại')),
+            TextButton(onPressed: _load, child: Text(context.l10n.commonRetry)),
           ],
         ),
       ),
@@ -213,8 +214,8 @@ class _ProviderChatListScreenState extends State<ProviderChatListScreen> {
                   color: AppCultureColors.oceanBlue,
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  'Chưa có cuộc trò chuyện nào',
+                Text(
+                  context.l10n.chatEmpty,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -222,9 +223,8 @@ class _ProviderChatListScreenState extends State<ProviderChatListScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'Mở chi tiết bất kỳ tour nào và bấm "Chat với bên …" để hỏi nhà tour '
-                  'trước khi đặt vé. Lịch sử sẽ được lưu lại tại đây.',
+                Text(
+                  context.l10n.chatEmptyHint,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12.5,
@@ -314,7 +314,7 @@ class _ProviderChatListScreenState extends State<ProviderChatListScreen> {
                     ],
                     const SizedBox(height: 4),
                     Text(
-                      c.lastMessage ?? 'Chưa có tin nhắn nào',
+                      c.lastMessage ?? context.l10n.chatNoMessages,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

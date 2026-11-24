@@ -1,3 +1,4 @@
+import '../../l10n/locale_controller.dart';
 /// Nội dung văn hóa đã duyệt của điểm đến (API /destinations/{id}/contents).
 class CulturalContentModel {
   final int id;
@@ -81,6 +82,8 @@ class CulturalContentModel {
     if (d == null || d <= 0) return '';
     final m = d ~/ 60;
     final s = d % 60;
-    return m > 0 ? '$m phút${s > 0 ? ' $s giây' : ''}' : '$s giây';
+    return m > 0
+        ? (s > 0 ? appL10n.durationMinutesSeconds(m, s) : appL10n.durationMinutes(m))
+        : appL10n.durationSeconds(s);
   }
 }

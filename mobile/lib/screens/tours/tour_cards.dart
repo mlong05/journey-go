@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 import '../../core/models/gamification_model.dart' show formatThousands;
 import '../../core/models/tour_model.dart';
 import '../common/heritage_motion.dart' show Pressable;
@@ -22,15 +23,15 @@ IconData themeIcon(String nameOrSlug) {
 }
 
 /// "Khởi hành 20/11"; null nếu tour không còn ngày khởi hành.
-String? departureLabel(TourModel tour) {
+String? departureLabel(TourModel tour, AppLocalizations l10n) {
   final d = tour.nextDepartureDate;
   if (d == null) return null;
-  return 'Khởi hành ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+  return l10n.tourDepartsOn(formatDayMonth(d, l10n.localeName));
 }
 
 /// Giá ngắn gọn cho thẻ tour: "Từ 450.000 đ".
-String priceFromLabel(TourModel tour) =>
-    tour.price <= 0 ? 'Miễn phí' : 'Từ ${formatThousands(tour.price)} đ';
+String priceFromLabel(TourModel tour, AppLocalizations l10n) =>
+    tour.price <= 0 ? l10n.tourPriceFree : l10n.tourPriceFrom(l10n.priceVnd(formatThousands(tour.price)));
 
 /// Ảnh bìa tour bo góc; chưa có ảnh thì nền gradient kèm biểu tượng loại hình.
 class TourThumb extends StatelessWidget {
@@ -140,11 +141,11 @@ class TourMeta extends StatelessWidget {
 }
 
 /// Dòng điểm thưởng ngắn gọn: "+120 điểm · 4 nhiệm vụ"; null nếu tour không có phần thưởng.
-String? rewardLabel(TourModel tour) {
+String? rewardLabel(TourModel tour, AppLocalizations l10n) {
   final parts = <String>[
-    if (tour.totalTaskPoints > 0) '+${formatThousands(tour.totalTaskPoints)} điểm',
-    if (tour.taskCount > 0) '${tour.taskCount} nhiệm vụ',
-    if (tour.badgeCount > 0) '${tour.badgeCount} huy hiệu',
+    if (tour.totalTaskPoints > 0) l10n.rewardPlusPoints(formatThousands(tour.totalTaskPoints)),
+    if (tour.taskCount > 0) l10n.tourTaskCount(tour.taskCount),
+    if (tour.badgeCount > 0) l10n.tourBadgeCount(tour.badgeCount),
   ];
   return parts.isEmpty ? null : parts.join(' · ');
 }
@@ -164,31 +165,33 @@ class TourCard extends StatelessWidget {
     this.showDeparture = false,
   });
 
+  /// Thẻ trắng nổi (bóng mềm): ảnh 16:10 phía trên, tên 2 dòng, vùng miền, giá màu cam đỏ ở đáy.
   @override
   Widget build(BuildContext context) {
-    final reward = rewardLabel(tour);
-    final departure = showDeparture ? departureLabel(tour) : null;
+    final l10n = context.l10n;
+    final departure = showDeparture ? departureLabel(tour, l10n) : null;
     return Pressable(
       onTap: onTap,
-      child: SizedBox(
+      child: Container(
         width: width,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: AppCultureColors.softShadow,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TourThumb(
               tour: tour,
-              height: 140,
+              height: width / 1.6,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
               overlays: [
-                if (tour.regionName != null)
-                  Positioned(
-                    left: 8,
-                    top: 8,
-                    right: 8,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: ImageBadge(icon: Icons.place_rounded, label: tour.regionName!),
-                    ),
-                  ),
+                Positioned(
+                  left: 8,
+                  top: 8,
+                  child: ImageBadge(icon: Icons.schedule_rounded, label: tour.formattedDuration),
+                ),
                 if (departure != null)
                   Positioned(
                     left: 8,
@@ -196,41 +199,45 @@ class TourCard extends StatelessWidget {
                     child: ImageBadge(
                       icon: Icons.event_rounded,
                       label: departure,
-                      color: AppCultureColors.oceanBlue.withValues(alpha: 0.92),
+                      color: AppCultureColors.heritageJade.withValues(alpha: 0.95),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              tour.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14.5,
-                height: 1.3,
-                fontWeight: FontWeight.w700,
-                color: AppCultureColors.textDark,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tour.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        height: 1.3,
+                        fontWeight: FontWeight.w800,
+                        color: AppCultureColors.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    TourMeta(
+                      icon: Icons.place_outlined,
+                      text: [tour.regionName, if (tour.destinationCount > 0) l10n.tourDestinationStops(tour.destinationCount)]
+                          .whereType<String>()
+                          .join(' · '),
+                    ),
+                    const Spacer(),
+                    Text(
+                      priceFromLabel(tour, l10n),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppCultureColors.price),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 10,
-              runSpacing: 2,
-              children: [
-                TourMeta(icon: Icons.schedule_rounded, text: tour.formattedDuration),
-                if (tour.destinationCount > 0)
-                  TourMeta(icon: Icons.route_rounded, text: '${tour.destinationCount} điểm dừng'),
-              ],
-            ),
-            if (reward != null) ...[
-              const SizedBox(height: 3),
-              TourMeta(icon: Icons.stars_rounded, text: reward, color: AppCultureColors.amberDark),
-            ],
-            const SizedBox(height: 5),
-            Text(
-              priceFromLabel(tour),
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppCultureColors.jadeDark),
             ),
           ],
         ),
@@ -249,8 +256,9 @@ class TourListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reward = rewardLabel(tour);
-    final departure = departureLabel(tour);
+    final l10n = context.l10n;
+    final reward = rewardLabel(tour, l10n);
+    final departure = departureLabel(tour, l10n);
     return Pressable(
       onTap: onTap,
       child: Container(
@@ -270,12 +278,12 @@ class TourListTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               overlays: [
                 if (owned)
-                  const Positioned(
+                  Positioned(
                     left: 6,
                     top: 6,
                     child: ImageBadge(
                       icon: Icons.confirmation_number_rounded,
-                      label: 'Đã có vé',
+                      label: l10n.tourOwnedBadge,
                       color: AppCultureColors.heritageJade,
                     ),
                   ),
@@ -316,7 +324,7 @@ class TourListTile extends StatelessWidget {
                     children: [
                       TourMeta(icon: Icons.schedule_rounded, text: tour.formattedDuration),
                       if (tour.destinationCount > 0)
-                        TourMeta(icon: Icons.route_rounded, text: '${tour.destinationCount} điểm dừng'),
+                        TourMeta(icon: Icons.route_rounded, text: l10n.tourDestinationStops(tour.destinationCount)),
                       if (departure != null) TourMeta(icon: Icons.event_rounded, text: departure),
                     ],
                   ),
@@ -326,8 +334,8 @@ class TourListTile extends StatelessWidget {
                   ],
                   const SizedBox(height: 6),
                   Text(
-                    priceFromLabel(tour),
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppCultureColors.jadeDark),
+                    priceFromLabel(tour, l10n),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppCultureColors.price),
                   ),
                 ],
               ),

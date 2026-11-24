@@ -11,6 +11,7 @@ import '../common/live_time.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
 import 'compose_post_screen.dart';
 import 'forum_widgets.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Chi tiết bài viết: nội dung đầy đủ, cảm xúc, bình luận và báo cáo.
 /// Khi quay lại (`pop`) trả về bài đã cập nhật (hoặc null nếu bài bị xóa) để danh sách đồng bộ.
@@ -163,9 +164,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Future<void> _deleteComment(ForumComment comment) async {
     final ok = await confirmAction(
       context,
-      title: 'Xóa bình luận',
-      message: 'Bạn muốn xóa bình luận này?',
-      confirmLabel: 'Xóa',
+      title: context.l10n.forumDeleteComment,
+      message: context.l10n.forumDeleteCommentConfirm,
+      confirmLabel: context.l10n.forumDelete,
       destructive: true,
     );
     if (!ok || !mounted) return;
@@ -187,7 +188,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (result == null || !mounted) return;
     try {
       await _service.reportComment(comment.id, result.reason, description: result.description);
-      if (mounted) showForumSnack(context, 'Đã báo cáo bình luận. Cảm ơn bạn đã giúp cộng đồng.');
+      if (mounted) showForumSnack(context, appL10n.forumCommentReported);
     } on ApiException catch (e) {
       if (mounted) showForumSnack(context, e.message);
     }
@@ -205,13 +206,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             const SizedBox(height: 8),
             ListTile(
               leading: const Icon(Icons.flag_outlined, color: AppCultureColors.error),
-              title: const Text('Báo cáo bình luận'),
-              subtitle: const Text('Spam, ngôn từ xúc phạm, thông tin sai lệch…'),
+              title: Text(context.l10n.forumReportComment),
+              subtitle: Text(context.l10n.forumReportCommentHint),
               onTap: () => Navigator.of(ctx).pop('report'),
             ),
             ListTile(
               leading: const Icon(Icons.close_rounded),
-              title: const Text('Đóng'),
+              title: Text(context.l10n.commonClose),
               onTap: () => Navigator.of(ctx).pop(),
             ),
           ],
@@ -226,7 +227,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (result == null || !mounted) return;
     try {
       await _service.reportPost(_post.id, result.reason, description: result.description);
-      if (mounted) showForumSnack(context, 'Đã gửi báo cáo. Cảm ơn bạn đã giúp cộng đồng.');
+      if (mounted) showForumSnack(context, appL10n.forumReportSent);
     } on ApiException catch (e) {
       if (mounted) showForumSnack(context, e.message);
     }
@@ -235,9 +236,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Future<void> _deletePost() async {
     final ok = await confirmAction(
       context,
-      title: 'Xóa bài viết',
-      message: 'Bài viết và các bình luận sẽ bị xóa vĩnh viễn.',
-      confirmLabel: 'Xóa bài',
+      title: context.l10n.forumDeletePost,
+      message: context.l10n.forumDeletePostConfirm,
+      confirmLabel: context.l10n.forumDeletePostShort,
       destructive: true,
     );
     if (!ok || !mounted) return;
@@ -263,7 +264,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       final updated = await _service.submitPost(_post.id);
       if (!mounted) return;
       setState(() => _post = updated);
-      showForumSnack(context, 'Đã gửi bài viết để kiểm duyệt.');
+      showForumSnack(context, appL10n.forumSentForReview);
     } on ApiException catch (e) {
       if (mounted) showForumSnack(context, e.message);
     }
@@ -284,10 +285,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         backgroundColor: AppCultureColors.background,
         appBar: buildRewardsAppBar(
           context,
-          'Bài viết',
+          context.l10n.forumPost,
           actions: [
             PopupMenuButton<String>(
-              tooltip: 'Tùy chọn',
+              tooltip: context.l10n.forumOptions,
               icon: const Icon(Icons.more_vert_rounded, color: AppCultureColors.textDark),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               onSelected: (v) {
@@ -296,9 +297,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 if (v == 'delete') _deletePost();
               },
               itemBuilder: (_) => [
-                if (canEdit) const PopupMenuItem(value: 'edit', child: Text('Chỉnh sửa')),
-                if (_isMine) const PopupMenuItem(value: 'delete', child: Text('Xóa bài')),
-                if (!_isMine) const PopupMenuItem(value: 'report', child: Text('Báo cáo bài viết')),
+                if (canEdit) PopupMenuItem(value: 'edit', child: Text(context.l10n.forumEdit)),
+                if (_isMine) PopupMenuItem(value: 'delete', child: Text(context.l10n.forumDeletePostShort)),
+                if (!_isMine) PopupMenuItem(value: 'report', child: Text(context.l10n.forumReportPost)),
               ],
             ),
           ],
@@ -393,7 +394,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Text(
-                'Phản hồi từ kiểm duyệt viên: ${_post.moderationNote}',
+                context.l10n.forumModeratorFeedback(_post.moderationNote ?? ''),
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.45,
@@ -437,7 +438,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               child: FilledButton.icon(
                 onPressed: _submitForReview,
                 icon: const Icon(Icons.send_rounded, size: 18),
-                label: Text(_post.status == 'DRAFT' ? 'Gửi duyệt' : 'Gửi duyệt lại'),
+                label: Text(_post.status == 'DRAFT' ? context.l10n.forumSubmitReview : context.l10n.forumResubmit),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppCultureColors.heritageJade,
                   minimumSize: const Size(0, 46),
@@ -479,10 +480,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ],
             ),
           ] else
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 12),
               child: Text(
-                'Bài viết chỉ nhận cảm xúc và bình luận sau khi được kiểm duyệt.',
+                context.l10n.forumReactionsAfterReview,
                 style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
               ),
             ),
@@ -496,7 +497,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Bình luận (${_post.commentsCount})',
+          context.l10n.forumComments(_post.commentsCount),
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
@@ -514,15 +515,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           Column(
             children: [
               Text(_commentsError!, style: const TextStyle(color: AppCultureColors.error)),
-              TextButton(onPressed: _loadComments, child: const Text('Thử lại')),
+              TextButton(onPressed: _loadComments, child: Text(context.l10n.commonRetry)),
             ],
           )
         else if (_comments.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: Center(
               child: Text(
-                'Chưa có bình luận nào. Hãy là người đầu tiên!',
+                context.l10n.forumNoComments,
                 style: TextStyle(fontSize: 13, color: AppCultureColors.textMuted),
               ),
             ),
@@ -533,7 +534,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             Center(
               child: TextButton(
                 onPressed: _loadingMore ? null : _loadMore,
-                child: Text(_loadingMore ? 'Đang tải...' : 'Xem thêm bình luận'),
+                child: Text(_loadingMore ? context.l10n.forumLoading : context.l10n.forumMoreComments),
               ),
             ),
         ],
@@ -622,7 +623,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 textInputAction: TextInputAction.newline,
                 decoration: InputDecoration(
                   counterText: '',
-                  hintText: 'Viết bình luận...',
+                  hintText: context.l10n.forumCommentHint,
                   hintStyle: const TextStyle(fontSize: 13.5, color: AppCultureColors.textLight),
                   filled: true,
                   fillColor: AppCultureColors.surfaceSubtle,
@@ -636,7 +637,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
             const SizedBox(width: 6),
             IconButton(
-              tooltip: 'Gửi bình luận',
+              tooltip: context.l10n.forumSendComment,
               onPressed: _sending ? null : _sendComment,
               icon: _sending
                   ? const SizedBox(

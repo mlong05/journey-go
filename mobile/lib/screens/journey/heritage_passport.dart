@@ -5,13 +5,14 @@ import 'package:flutter/services.dart' show HapticFeedback;
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/tour_journey_model.dart';
+import '../../l10n/locale_controller.dart';
 
 /// "Dấu ấn di sản": mỗi trạm đã check-in được đóng một con dấu (tròn, viền đôi, nghiêng nhẹ như dấu đóng tay).
 /// Trạm chưa tới là ô trống viền đứt. Dùng ở màn hành trình (bảng xem nhanh), màn tổng kết và thẻ chia sẻ.
 
 /// Màu mực của con dấu theo thứ tự trạm (xoay vòng).
 const List<Color> _stampInks = [
-  Color(0xFF047857), // xanh ngọc
+  Color(0xFF0B7F7E), // xanh ngọc
   Color(0xFF4338CA), // chàm
   Color(0xFFC2410C), // cam
   Color(0xFFBE123C), // đỏ hồng
@@ -46,7 +47,7 @@ class HeritageStamp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ink = stampInk(order);
-    final label = 'TRẠM ${order.toString().padLeft(2, '0')}';
+    final label = appL10n.hpStopLabel(order.toString().padLeft(2, '0'));
     if (!stamped) {
       return SizedBox(
         width: size,
@@ -71,7 +72,7 @@ class HeritageStamp extends StatelessWidget {
       );
     }
     return Semantics(
-      label: 'Con dấu $label, $name${date == null ? '' : ', ${_dd(date!)}'}',
+      label: '${appL10n.hpStampSemantics(label, name)}${date == null ? '' : ', ${_dd(date!)}'}',
       child: Transform.rotate(
         angle: _tilt(order),
         child: Container(
@@ -170,7 +171,7 @@ class HeritagePassport extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Dấu ấn di sản',
+                    Text(appL10n.jsHeritageStamps,
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppCultureColors.textDark)),
                     Text(journey.tourName,
                         maxLines: 1,
@@ -182,14 +183,14 @@ class HeritagePassport extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(color: AppCultureColors.surfaceSubtle, borderRadius: BorderRadius.circular(999)),
-                child: Text('$stamped/${dests.length} dấu ấn',
+                child: Text(appL10n.hpStampCount(stamped, dests.length),
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppCultureColors.textDark)),
               ),
             ],
           ),
           const SizedBox(height: 18),
           if (dests.isEmpty)
-            const Text('Hành trình chưa có trạm nào.', style: TextStyle(color: AppCultureColors.textMuted))
+            Text(appL10n.hpNoStops, style: const TextStyle(color: AppCultureColors.textMuted))
           else
             Wrap(
               spacing: 14,
@@ -256,8 +257,8 @@ Future<void> showPassportSheet(BuildContext context, TourJourney journey) {
           const SizedBox(height: 14),
           HeritagePassport(journey: journey),
           const SizedBox(height: 12),
-          const Text(
-            'Check-in mỗi trạm (GPS hoặc quét mã QR tại cổng) để nhận thêm một dấu ấn.',
+          Text(
+            appL10n.hpHint,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
           ),
@@ -273,7 +274,7 @@ Future<void> showStampAnimation(BuildContext context, {required int order, requi
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'Đã đóng dấu',
+    barrierLabel: appL10n.hpStamped,
     barrierColor: Colors.black.withValues(alpha: 0.55),
     transitionDuration: Duration.zero,
     pageBuilder: (_, _, _) => _StampDrop(order: order, name: name, date: date ?? DateTime.now()),
@@ -370,12 +371,12 @@ class _StampDropState extends State<_StampDrop> with SingleTickerProviderStateMi
                     opacity: textIn,
                     child: Transform.translate(
                       offset: Offset(0, 12 * (1 - textIn)),
-                      child: const Column(
+                      child: Column(
                         children: [
-                          Text('Đã đóng dấu ấn!',
+                          Text(appL10n.hpStampedTitle,
                               style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
                           SizedBox(height: 4),
-                          Text('Đã mở khóa Nội dung văn hóa và Trải nghiệm',
+                          Text(appL10n.hpUnlocked,
                               style: TextStyle(color: AppCultureColors.onDarkMuted, fontSize: 13.5)),
                         ],
                       ),

@@ -8,6 +8,7 @@ import '../core/services/api_client.dart';
 import '../core/services/refund_reason_config_service.dart';
 import '../core/services/refund_service.dart';
 import 'rewards/rewards_widgets.dart';
+import '../l10n/locale_controller.dart';
 
 /// Danh sách yêu cầu hoàn tiền của du khách và trạng thái xử lý.
 class RefundsScreen extends StatefulWidget {
@@ -66,7 +67,7 @@ class _RefundsScreenState extends State<RefundsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppCultureColors.background,
-      appBar: buildRewardsAppBar(context, 'Hỗ trợ & Hoàn tiền'),
+      appBar: buildRewardsAppBar(context, context.l10n.rsTitle),
       body: RefreshIndicator(
         color: AppCultureColors.heritageJade,
         onRefresh: _load,
@@ -86,15 +87,15 @@ class _RefundsScreenState extends State<RefundsScreen> {
             child: _error != null
                 ? RewardsMessageView(
                     icon: Icons.cloud_off_rounded,
-                    title: 'Không tải được yêu cầu hoàn tiền',
+                    title: context.l10n.rsLoadFailed,
                     message: _error,
                     onRetry: _load,
                   )
-                : const RewardsMessageView(
+                : RewardsMessageView(
                     icon: Icons.receipt_long_outlined,
-                    title: 'Chưa có yêu cầu hoàn tiền',
+                    title: context.l10n.rsEmptyTitle,
                     message:
-                        'Các yêu cầu hoàn tiền vé của bạn và tiến độ xử lý sẽ hiển thị tại đây.',
+                        context.l10n.rsEmptyMessage,
                   ),
           ),
         ],
@@ -120,7 +121,7 @@ class _RefundsScreenState extends State<RefundsScreen> {
     final group = code == null ? null : _groupsByCode[code];
     if (group != null) return group.name;
     if (r.reasonSummary.isNotEmpty) return r.reasonSummary;
-    return 'Chờ quản trị viên phân loại';
+    return context.l10n.rhAwaitingAdminTriage;
   }
 
   /// Tên lý do cụ thể (tiếng Việt) — KHÔNG lộ mã kỹ thuật ra UI.
@@ -225,8 +226,8 @@ class _RefundsScreenState extends State<RefundsScreen> {
           const SizedBox(height: 6),
           Text(
             [
-              if (r.bookingId != null) 'Đơn #${r.bookingId}',
-              if (r.createdAt != null) 'Gửi lúc ${formatDateTime(r.createdAt)}',
+              if (r.bookingId != null) context.l10n.rsBookingNumber('${r.bookingId}'),
+              if (r.createdAt != null) context.l10n.rsSentAt(formatDateTime(r.createdAt)),
             ].join(' • '),
             style: const TextStyle(
               fontSize: 11.5,
@@ -294,7 +295,7 @@ class _RefundsScreenState extends State<RefundsScreen> {
           if (r.status == 'REJECTED' && r.rejectionReason.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              'Lý do từ chối: ${r.rejectionReason}',
+              context.l10n.rhRejectReason(r.rejectionReason),
               style: const TextStyle(
                 fontSize: 12,
                 color: AppCultureColors.error,
@@ -308,17 +309,17 @@ class _RefundsScreenState extends State<RefundsScreen> {
               children: [
                 Text(
                   r.refundedAmount > 0
-                      ? 'Đã hoàn'
+                      ? context.l10n.rhFilterRefunded
                       : r.approvedAmount > 0
-                      ? 'Số tiền được duyệt'
-                      : 'Số tiền đề xuất',
+                      ? context.l10n.rsApprovedAmount
+                      : context.l10n.rsProposedAmount,
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppCultureColors.textMuted,
                   ),
                 ),
                 Text(
-                  '${formatThousands(amount)} ₫',
+                  context.l10n.priceVnd(formatThousands(amount)),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -333,8 +334,8 @@ class _RefundsScreenState extends State<RefundsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Số tiền',
+                Text(
+                  context.l10n.rsAmount,
                   style: TextStyle(
                     fontSize: 12,
                     color: AppCultureColors.textMuted,
@@ -344,8 +345,8 @@ class _RefundsScreenState extends State<RefundsScreen> {
                   // ⚠️ Khách KHÔNG chọn nhóm lý do ⇒ chưa có tỷ lệ ⇒ chưa có
                   // số tiền đề xuất ⇒ hiển thị "Chờ quản trị viên phân loại".
                   r.isPending
-                      ? 'Chờ quản trị viên phân loại'
-                      : 'Không được hoàn',
+                      ? context.l10n.rhAwaitingAdminTriage
+                      : context.l10n.rhNotRefunded,
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,

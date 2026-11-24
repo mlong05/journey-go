@@ -23,6 +23,7 @@ class UserModel {
   final String role;
   final String? authProvider;
   final String? avatarUrl;
+  final String preferredLanguage;
   final bool active;
   final String? createdAt;
 
@@ -34,6 +35,7 @@ class UserModel {
     required this.role,
     this.authProvider,
     this.avatarUrl,
+    this.preferredLanguage = 'vi',
     this.active = true,
     this.createdAt,
   });
@@ -43,6 +45,8 @@ class UserModel {
   bool get isTourist => isTouristRole(role);
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    final rawLang = json['preferredLanguage']?.toString().trim().toLowerCase();
+    final lang = (rawLang == 'vi' || rawLang == 'en' || rawLang == 'ja') ? rawLang! : 'vi';
     return UserModel(
       id: json['id'] is num ? (json['id'] as num).toInt() : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       email: json['email']?.toString() ?? '',
@@ -51,6 +55,7 @@ class UserModel {
       role: json['role']?.toString().toUpperCase() ?? 'USER',
       authProvider: json['authProvider']?.toString(),
       avatarUrl: json['avatarUrl']?.toString(),
+      preferredLanguage: lang,
       active: json['active'] == true || json['active'] == null,
       createdAt: json['createdAt']?.toString(),
     );
@@ -65,6 +70,7 @@ class UserModel {
       'role': role,
       'authProvider': authProvider,
       'avatarUrl': avatarUrl,
+      'preferredLanguage': preferredLanguage,
       'active': active,
       'createdAt': createdAt,
     };

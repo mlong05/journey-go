@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/models/experience_model.dart';
 import '../../core/models/refund_model.dart' show RefundSummaryState, summarizeRefundState;
@@ -318,7 +319,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
           if (choice == PendingBookingChoice.resume) {
             await _resumePending(pending);
           } else if (choice == PendingBookingChoice.cancelAndRebook && await _cancelPending(pending)) {
-            _snack('Đã hủy đơn cũ. Bấm "Đặt tour" để đặt lại.');
+            if (!mounted) return;
+            _snack(context.l10n.tdCancelledOldBooking);
           }
           return;
         }
@@ -378,8 +380,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     if (providerName == null || providerName.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tour này chưa có nhà tour liên hệ.'),
+        SnackBar(
+          content: Text(context.l10n.tdNoProvider),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -389,8 +391,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     if (!await TokenStorage.hasValidSession()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng đăng nhập để nhắn tin cho nhà tour.'),
+        SnackBar(
+          content: Text(context.l10n.tdLoginToChat),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -443,8 +445,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         SnackBar(
           content: Text(
             _loadingDates
-                ? 'Đang tải lịch trải nghiệm, vui lòng thử lại sau.'
-                : 'Hiện chưa có ngày nào còn chỗ cho tour này. Vui lòng quay lại sau.',
+                ? context.l10n.tdDatesLoading
+                : context.l10n.tdNoDates,
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -490,22 +492,23 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: StatefulBuilder(
           builder: (ctx, setSheetState) {
+            final l10n = ctx.l10n;
             return Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Chọn ngày trải nghiệm',
-                  style: TextStyle(
+                Text(
+                  l10n.tdPickDateTitle,
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: AppCultureColors.textDark,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Số trong ô là số chỗ còn lại — chỉ ngày còn chỗ mới chọn được',
-                  style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                Text(
+                  l10n.tdPickDateHint,
+                  style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
                 ),
                 const SizedBox(height: 14),
                 Flexible(
@@ -533,8 +536,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                     Expanded(
                       child: Text(
                         tempSelected == null
-                            ? 'Chưa chọn ngày nào'
-                            : 'Đang chọn: ${formatLocalDateString(tempSelected)}',
+                            ? l10n.tdNoDateSelected
+                            : l10n.tdDateSelected(formatLocalDateString(tempSelected)),
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -553,9 +556,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                         ? null
                         : () => Navigator.of(ctx).pop(tempSelected),
                     icon: const Icon(Icons.check_rounded, size: 18),
-                    label: const Text(
-                      'Xác nhận chọn ngày',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                    label: Text(
+                      l10n.tdConfirmDate,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppCultureColors.heritageJade,
@@ -576,11 +579,15 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Tour 5 bước đã tải xong: ảnh tràn viền tự có thanh tiêu đề + nút quay lại riêng.
+    final immersive = _isWizard && _detail != null;
+    final l10n = context.l10n;
     return Scaffold(
       backgroundColor: AppCultureColors.background,
-      appBar: buildRewardsAppBar(context, 'Chi tiết tour'),
+      appBar: immersive ? null : buildRewardsAppBar(context, l10n.tdTitle),
       body: RefreshIndicator(
         color: AppCultureColors.heritageJade,
+        edgeOffset: immersive ? MediaQuery.paddingOf(context).top + kToolbarHeight : 0,
         onRefresh: _load,
         child: _isWizard ? _buildWizardBody() : ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -606,7 +613,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             ],
             if (_tour.destinations.any((d) => d.hasLocation)) ...[
               const SizedBox(height: 22),
-              _buildSectionTitle('Bản đồ lộ trình'),
+              _buildSectionTitle(l10n.tdRouteMap),
               const SizedBox(height: 12),
               TourRouteMap(
                 destinations: _tour.destinations,
@@ -614,15 +621,15 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               ),
             ],
             const SizedBox(height: 22),
-            _buildSectionTitle('Các chặng hành trình'),
+            _buildSectionTitle(l10n.tdLegs),
             const SizedBox(height: 12),
             if (_tour.destinations.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text(
-                    'Tour chưa có điểm đến.',
-                    style: TextStyle(color: AppCultureColors.textMuted),
+                    l10n.tdNoDestinations,
+                    style: const TextStyle(color: AppCultureColors.textMuted),
                   ),
                 ),
               )
@@ -644,12 +651,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   Widget _buildWizardBody() {
     final detail = _detail;
     if (detail != null) {
-      return SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: TourWizardDetailBody(
-          detail: detail,
-          onChatProvider: () => _openProviderChat(detail),
-        ),
+      // Thân trang tự cuộn (CustomScrollView: ảnh đầu trang + thanh tab dính)
+      return TourWizardDetailBody(
+        detail: detail,
+        onChatProvider: () => _openProviderChat(detail),
       );
     }
     return ListView(
@@ -666,11 +671,11 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               const Icon(Icons.cloud_off_rounded, size: 36, color: AppCultureColors.textLight),
               const SizedBox(height: 8),
               Text(
-                _detailError ?? 'Không tải được chi tiết tour.',
+                _detailError ?? context.l10n.tdLoadFailed,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppCultureColors.textMuted),
               ),
-              TextButton(onPressed: _load, child: const Text('Thử lại')),
+              TextButton(onPressed: _load, child: Text(context.l10n.commonRetry)),
             ],
           ),
       ],
@@ -741,7 +746,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   ),
                   TourChip(
                     icon: Icons.place_rounded,
-                    label: '${_tour.destinationCount} điểm đến',
+                    label: context.l10n.tdDestinationCount(_tour.destinationCount),
                     dark: true,
                   ),
                 ],
@@ -758,13 +763,13 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.verified_rounded, size: 15, color: AppCultureColors.onDarkMuted),
-                  SizedBox(width: 5),
+                  const Icon(Icons.verified_rounded, size: 15, color: AppCultureColors.onDarkMuted),
+                  const SizedBox(width: 5),
                   Text(
-                    'Tour đã được kiểm duyệt',
-                    style: TextStyle(fontSize: 12.5, color: AppCultureColors.onDarkMuted),
+                    context.l10n.tdVerified,
+                    style: const TextStyle(fontSize: 12.5, color: AppCultureColors.onDarkMuted),
                   ),
                 ],
               ),
@@ -847,8 +852,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                     ],
                     Text(
                       isLast && _tour.destinations.length > 1
-                          ? 'Chặng cuối'
-                          : 'Chặng ${d.sequenceOrder}',
+                          ? context.l10n.tdFinalLeg
+                          : context.l10n.tdLeg(d.sequenceOrder),
                       style: TextStyle(
                         fontSize: 10.5,
                         letterSpacing: 0.2,
@@ -914,7 +919,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
-                            'Check-in tại đây để mở khóa huy hiệu của điểm đến',
+                            context.l10n.tdCheckInBadgeHint,
                             style: const TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w600,
@@ -950,17 +955,17 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     }
     if (experiences == null) {
       return [
-        const Text(
-          'Không tải được trải nghiệm của điểm này. Kéo xuống để thử lại.',
-          style: TextStyle(fontSize: 12, color: AppCultureColors.error),
+        Text(
+          context.l10n.tdExperiencesError,
+          style: const TextStyle(fontSize: 12, color: AppCultureColors.error),
         ),
       ];
     }
     if (experiences.isEmpty) {
       return [
-        const Text(
-          'Điểm đến này chưa có trải nghiệm nào được phát hành.',
-          style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+        Text(
+          context.l10n.tdNoExperiences,
+          style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
         ),
       ];
     }
@@ -1013,11 +1018,11 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   children: [
                     _miniStat(Icons.schedule_rounded, e.formattedDuration),
                     if (e.taskCount > 0)
-                      _miniStat(Icons.flag_rounded, '${e.taskCount} nhiệm vụ'),
+                      _miniStat(Icons.flag_rounded, context.l10n.tourTaskCount(e.taskCount)),
                     if (e.checkInPointCount > 0)
                       _miniStat(
                         Icons.qr_code_2_rounded,
-                        '${e.checkInPointCount} trạm',
+                        context.l10n.tourCheckpointCount(e.checkInPointCount),
                       ),
                   ],
                 ),
@@ -1094,9 +1099,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Bạn đã mua tour này',
-                      style: TextStyle(
+                    Text(
+                      context.l10n.tdOwned,
+                      style: const TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                         color: AppCultureColors.textDark,
@@ -1105,8 +1110,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                     const SizedBox(height: 2),
                     Text(
                       booked.isTourLocked
-                          ? 'Còn ${booked.daysUntilStart} ngày nữa lên đường!'
-                          : 'Ngày trải nghiệm: ${formatLocalDateString(booked.experienceDate?.toIso8601String())}',
+                          ? context.l10n.tdDaysUntilStart(booked.daysUntilStart)
+                          : context.l10n.tdExperienceDate(formatLocalDateString(booked.experienceDate?.toIso8601String())),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppCultureColors.textMuted,
@@ -1127,9 +1132,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                     ),
                   ),
                   icon: const Icon(Icons.explore_rounded, size: 18),
-                  label: const Text(
-                    'Bắt đầu trải nghiệm',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  label: Text(
+                    context.l10n.tdStartExperience,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppCultureColors.heritageJade,
@@ -1146,13 +1151,15 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       );
     }
 
-    return SafeArea(
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        boxShadow: [BoxShadow(color: Color(0x140F172A), blurRadius: 20, offset: Offset(0, -6))],
+      ),
+      child: SafeArea(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppCultureColors.border)),
-        ),
+        padding: const EdgeInsets.fromLTRB(18, 14, 16, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1180,7 +1187,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                 child: FilledButton.icon(
                   onPressed: () => _continueJourney(progress!),
                   icon: const Icon(Icons.navigation_rounded, size: 19),
-                  label: const Text('Tiếp tục hành trình', style: TextStyle(fontWeight: FontWeight.w700)),
+                  label: Text(context.l10n.tdContinueJourney, style: const TextStyle(fontWeight: FontWeight.w700)),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppCultureColors.oceanBlue,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1197,18 +1204,33 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                     children: [
                       Text(
                         // Tour 5 bước: giá hiển thị là giá người lớn, giá theo loại khách nằm ở bảng giá.
-                        _isWizard ? 'Giá từ (người lớn)' : 'Tổng thanh toán',
+                        _isWizard ? context.l10n.tdPriceFromAdult : context.l10n.tdTotalPayment,
                         style: const TextStyle(
                           fontSize: 11.5,
                           color: AppCultureColors.textMuted,
                         ),
                       ),
-                      Text(
-                        _tour.formattedPrice,
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: _tour.formattedPrice),
+                            if (_isWizard)
+                              TextSpan(
+                                text: context.l10n.tdPerGuest,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppCultureColors.textMuted,
+                                ),
+                              ),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w700,
-                          color: AppCultureColors.jadeDark,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppCultureColors.price,
                         ),
                       ),
                       // Ngày trải nghiệm đang chọn — hiển thị rõ để khách không
@@ -1257,26 +1279,27 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   ),
                   label: Text(
                     _bookingInProgress
-                        ? 'Đang giữ chỗ...'
+                        ? context.l10n.tdHolding
                         : _pendingBooking != null
-                            ? 'Tiếp tục thanh toán'
+                            ? context.l10n.tdContinuePayment
                             : progress != null
-                                ? 'Đặt lại'
-                                : 'Đặt tour',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                ? context.l10n.tdBookAgain
+                                : context.l10n.tdBookNow,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5),
                   ),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppCultureColors.heritageJade,
-                    minimumSize: const Size(150, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                    minimumSize: const Size(156, 52),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    shape: const StadiumBorder(),
+                    elevation: 0,
                   ),
                 ),
               ],
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1321,8 +1344,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                 children: [
                   Text(
                     processing
-                        ? 'Đang trong quá trình hoàn tiền'
-                        : 'Đã xử lý hoàn tiền',
+                        ? context.l10n.tdRefundProcessingTitle
+                        : context.l10n.tdRefundDoneTitle,
                     style: const TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w700,
@@ -1332,8 +1355,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   const SizedBox(height: 2),
                   Text(
                     processing
-                        ? 'Đơn đặt tour này đang được xử lý hoàn tiền.'
-                        : 'Đơn đặt tour này đã được xử lý xong.',
+                        ? context.l10n.tdRefundProcessingMessage
+                        : context.l10n.tdRefundDoneMessage,
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppCultureColors.textMuted,
@@ -1390,7 +1413,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    cancelled ? 'Đơn đặt tour đã hủy' : 'Đơn đặt tour đã hết hạn',
+                    cancelled ? context.l10n.tdBookingCancelledTitle : context.l10n.tdBookingExpiredTitle,
                     style: const TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w700,
@@ -1400,8 +1423,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   const SizedBox(height: 2),
                   Text(
                     cancelled
-                        ? 'Chỗ đã được trả lại — bạn không thể trải nghiệm tour này.'
-                        : 'Đơn quá hạn thanh toán — chỗ đã được giải phóng.',
+                        ? context.l10n.tdBookingCancelledMessage
+                        : context.l10n.tdBookingExpiredMessage,
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppCultureColors.textMuted,
@@ -1444,7 +1467,7 @@ class _ProviderChatRow extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Chat với bên $providerName',
+                  context.l10n.tdChatWithProvider(providerName),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

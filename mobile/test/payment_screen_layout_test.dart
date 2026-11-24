@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/models/booking_model.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/screens/booking/booking_detail_screen.dart';
 import 'package:mobile/screens/booking/payment_screen.dart';
 
@@ -51,6 +52,9 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          locale: const Locale('vi'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: PaymentScreen(bookingId: 53, booking: _longTitleBooking()),
         ),
       );
@@ -62,6 +66,27 @@ void main() {
     },
   );
 
+  for (final lang in ['en', 'ja']) {
+    testWidgets('Màn Thanh Toán ($lang): chữ dịch không làm overflow ở màn 320dp', (WidgetTester tester) async {
+      useSmallScreen(tester);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: Locale(lang),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: PaymentScreen(bookingId: 53, booking: _longTitleBooking()),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(tester.takeException(), isNull);
+      final l10n = lookupAppLocalizations(Locale(lang));
+      expect(find.text(l10n.payMethodTitle), findsOneWidget);
+      expect(find.text(l10n.payTimeLimitNote), findsOneWidget);
+    });
+  }
+
   testWidgets(
     'Màn Thanh Toán: không overflow khi đơn đã thanh toán (không badge đếm ngược)',
     (WidgetTester tester) async {
@@ -69,6 +94,9 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          locale: const Locale('vi'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: PaymentScreen(
             bookingId: 53,
             booking: _longTitleBooking(
@@ -92,6 +120,9 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          locale: const Locale('vi'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: BookingDetailScreen(
             bookingId: 53,
             booking: _longTitleBooking(

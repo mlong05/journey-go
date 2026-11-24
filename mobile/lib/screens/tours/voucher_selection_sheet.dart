@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/gamification_model.dart';
 import '../../core/services/gamification_service.dart';
 import '../../core/services/voucher_service.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Kết quả trả về khi người dùng chọn voucher.
 class VoucherSelectionResult {
@@ -103,7 +104,7 @@ class _VoucherSelectionSheetState extends State<_VoucherSelectionSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không thể tải danh sách voucher.';
+        _error = context.l10n.voucherLoadFailed;
         _loading = false;
       });
     }
@@ -127,7 +128,7 @@ class _VoucherSelectionSheetState extends State<_VoucherSelectionSheet> {
       if (!result.valid) {
         setState(() {
           _validatingId = null;
-          _validateError = result.errorMessage ?? 'Voucher không áp dụng được cho tour này.';
+          _validateError = result.errorMessage ?? context.l10n.voucherNotApplicable;
         });
         return;
       }
@@ -135,7 +136,7 @@ class _VoucherSelectionSheetState extends State<_VoucherSelectionSheet> {
       Navigator.of(context).pop(VoucherSelectionResult(
         userVoucherCode: voucher.userVoucherCode,
         title: result.title ?? voucher.voucherTitle,
-        discountLabel: '-${formatThousands(result.discountAmount)}đ',
+        discountLabel: '-${context.l10n.priceVnd(formatThousands(result.discountAmount))}',
         discountAmount: result.discountAmount,
         finalPrice: result.finalPrice,
       ));
@@ -143,7 +144,7 @@ class _VoucherSelectionSheetState extends State<_VoucherSelectionSheet> {
       if (!mounted) return;
       setState(() {
         _validatingId = null;
-        _validateError = 'Không thể xác minh voucher. Vui lòng thử lại.';
+        _validateError = context.l10n.voucherValidateFailed;
       });
     }
   }
@@ -175,19 +176,20 @@ class _VoucherSelectionSheetState extends State<_VoucherSelectionSheet> {
                 const Icon(Icons.confirmation_number_outlined,
                     color: AppCultureColors.heritageJade, size: 22),
                 const SizedBox(width: 8),
-                const Text(
-                  'Chọn voucher giảm giá',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: AppCultureColors.textDark,
+                Expanded(
+                  child: Text(
+                    context.l10n.voucherSheetTitle,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppCultureColors.textDark,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Bỏ qua',
-                      style: TextStyle(color: AppCultureColors.textMuted)),
+                  child: Text(context.l10n.voucherSkip,
+                      style: const TextStyle(color: AppCultureColors.textMuted)),
                 ),
               ],
             ),
@@ -243,25 +245,25 @@ class _VoucherSelectionSheetState extends State<_VoucherSelectionSheet> {
               Text(_error!, textAlign: TextAlign.center,
                   style: const TextStyle(color: AppCultureColors.textMuted)),
               const SizedBox(height: 12),
-              OutlinedButton(onPressed: _loadVouchers, child: const Text('Thử lại')),
+              OutlinedButton(onPressed: _loadVouchers, child: Text(context.l10n.commonRetry)),
             ],
           ),
         ),
       );
 
-  Widget _buildEmpty() => const Center(
+  Widget _buildEmpty() => Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.confirmation_number_outlined,
+              const Icon(Icons.confirmation_number_outlined,
                   size: 48, color: AppCultureColors.textLight),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text(
-                'Bạn chưa có voucher nào.\nĐổi điểm thưởng để nhận voucher!',
+                context.l10n.voucherEmpty,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppCultureColors.textMuted, height: 1.5),
+                style: const TextStyle(color: AppCultureColors.textMuted, height: 1.5),
               ),
             ],
           ),
@@ -298,7 +300,7 @@ class _VoucherSelectionSheetState extends State<_VoucherSelectionSheet> {
                   const Icon(Icons.local_offer_rounded, color: Colors.white, size: 22),
                   const SizedBox(height: 4),
                   Text(
-                    'GIẢM',
+                    context.l10n.voucherOffTag,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.9),
                       fontSize: 9,
@@ -328,13 +330,13 @@ class _VoucherSelectionSheetState extends State<_VoucherSelectionSheet> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Mã: ${voucher.userVoucherCode}',
+                      context.l10n.voucherCode(voucher.userVoucherCode),
                       style: const TextStyle(fontSize: 11, color: AppCultureColors.textMuted),
                     ),
                     if (voucher.expiryDate != null) ...[
                       const SizedBox(height: 2),
                       Text(
-                        'HSD: ${_fmtDate(voucher.expiryDate!)}',
+                        context.l10n.voucherExpiry(_fmtDate(voucher.expiryDate!)),
                         style: const TextStyle(fontSize: 11, color: AppCultureColors.textMuted),
                       ),
                     ],

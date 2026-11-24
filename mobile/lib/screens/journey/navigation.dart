@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/route_service.dart';
 import 'map_kit.dart';
+import '../../l10n/locale_controller.dart';
 
 // Dẫn đường tới điểm đến: theo dõi vị trí trên tuyến, bước rẽ kế tiếp, lệch tuyến.
 
@@ -189,9 +190,9 @@ IconData maneuverIcon(String maneuver, String instruction) {
 
 String formatDuration(int seconds) {
   final minutes = (seconds / 60).ceil();
-  if (minutes < 60) return '$minutes phút';
+  if (minutes < 60) return appL10n.durationMinutes(minutes);
   final h = minutes ~/ 60, m = minutes % 60;
-  return m == 0 ? '$h giờ' : '$h giờ $m phút';
+  return m == 0 ? appL10n.durationHours(h) : appL10n.durationHoursMinutes(h, m);
 }
 
 String _arrivalClock(int seconds) {
@@ -242,16 +243,16 @@ class NavigationBanner extends StatelessWidget {
     final String detail;
     if (arrived) {
       icon = Icons.flag_rounded;
-      headline = 'Bạn đã đến nơi';
+      headline = appL10n.navArrived;
       detail = destinationName;
     } else if (rerouting) {
       icon = Icons.alt_route_rounded;
-      headline = 'Đang tìm lại đường…';
-      detail = 'Bạn đã đi khác tuyến gợi ý';
+      headline = appL10n.navRerouting;
+      detail = appL10n.navOffRoute;
     } else if (step == null) {
       icon = Icons.straight_rounded;
-      headline = p == null ? 'Bắt đầu đi' : 'Đi tiếp ${formatDistance(p.toNextStepMeters)}';
-      detail = 'Tới $destinationName';
+      headline = p == null ? appL10n.navStart : appL10n.navContinueFor(formatDistance(p.toNextStepMeters));
+      detail = appL10n.navTo(destinationName);
     } else {
       icon = maneuverIcon(step.maneuver, step.instruction);
       headline = 'Sau ${formatDistance(p!.toNextStepMeters)}';
@@ -321,7 +322,7 @@ class NavigationBanner extends StatelessWidget {
                 color: AppCultureColors.surfaceSubtle,
                 child: Row(
                   children: [
-                    const Text('Sau đó', style: TextStyle(color: AppCultureColors.textMuted, fontSize: 12.5)),
+                    Text(appL10n.navThen, style: const TextStyle(color: AppCultureColors.textMuted, fontSize: 12.5)),
                     const SizedBox(width: 8),
                     Icon(maneuverIcon(after.maneuver, after.instruction), color: AppCultureColors.jadeDark, size: 18),
                     const SizedBox(width: 6),
@@ -386,6 +387,13 @@ class NavigationMilestone extends StatelessWidget {
     );
   }
 }
+
+/// Tên phương tiện theo ngôn ngữ đang chọn.
+String vehicleLabel(RouteVehicle v) => switch (v) {
+      RouteVehicle.walk => appL10n.navWalk,
+      RouteVehicle.bike => appL10n.navBike,
+      RouteVehicle.car => appL10n.navCar,
+    };
 
 IconData vehicleIcon(RouteVehicle v) => switch (v) {
       RouteVehicle.walk => Icons.directions_walk_rounded,
@@ -523,7 +531,7 @@ class NavigationPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(arrived ? 'ĐÃ ĐẾN TRẠM $order' : 'ĐƯỜNG TỚI TRẠM $order', style: AppType.eyebrow()),
+              Text(arrived ? appL10n.navArrivedAtStop(order) : appL10n.navRouteToStop(order), style: AppType.eyebrow()),
               const SizedBox(height: 2),
               Text(destinationName, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.display(size: 17)),
             ],
@@ -536,7 +544,7 @@ class NavigationPanel extends StatelessWidget {
           ),
         IconButton(
           onPressed: onClose,
-          tooltip: active ? 'Kết thúc chỉ đường' : 'Đóng',
+          tooltip: active ? appL10n.navEnd : appL10n.commonClose,
           style: IconButton.styleFrom(backgroundColor: AppCultureColors.surfaceSubtle),
           icon: const Icon(Icons.close_rounded, color: AppCultureColors.textDark),
         ),
@@ -546,10 +554,10 @@ class NavigationPanel extends StatelessWidget {
 
   Widget _stats(RouteModel? r, int seconds, int meters) {
     if (loading && r == null) {
-      return const Text('Đang tìm đường…', style: TextStyle(fontSize: 15, color: AppCultureColors.textMuted));
+      return Text(appL10n.navFinding, style: const TextStyle(fontSize: 15, color: AppCultureColors.textMuted));
     }
     if (r == null) {
-      return Text(error ?? 'Không tìm được đường', style: const TextStyle(fontSize: 14.5, color: AppCultureColors.error));
+      return Text(error ?? appL10n.navNoRoute, style: const TextStyle(fontSize: 14.5, color: AppCultureColors.error));
     }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -564,7 +572,7 @@ class NavigationPanel extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: 2),
           child: Text(
-            'Đến lúc ${_arrivalClock(seconds)}',
+            appL10n.navArriveAt(_arrivalClock(seconds)),
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
           ),
         ),
@@ -662,7 +670,7 @@ class NavigationPanel extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        v.label,
+                        vehicleLabel(v),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: v == vehicle ? FontWeight.w700 : FontWeight.w500,
@@ -697,7 +705,7 @@ class NavigationPanel extends StatelessWidget {
             children: [
               const Icon(Icons.auto_stories_outlined, size: 15, color: AppCultureColors.lacquer),
               const SizedBox(width: 6),
-              Text('TRÊN ĐƯỜNG ĐI', style: AppType.eyebrow()),
+              Text(appL10n.navOnTheWay, style: AppType.eyebrow()),
             ],
           ),
           const SizedBox(height: 6),
@@ -738,18 +746,18 @@ class NavigationPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Icon(Icons.flag_rounded, color: AppCultureColors.coral, size: 20),
                 SizedBox(width: 8),
-                Text('Bạn đã đến nơi', style: TextStyle(color: AppCultureColors.coralDark, fontWeight: FontWeight.w700)),
+                Text(appL10n.navArrived, style: TextStyle(color: AppCultureColors.coralDark, fontWeight: FontWeight.w700)),
               ],
             ),
             const SizedBox(height: 6),
             Text(destinationName, style: AppType.display(size: 21)),
             const SizedBox(height: 4),
-            const Text(
-              'Check-in để mở khóa Nội dung văn hóa và Trải nghiệm tại trạm này.',
+            Text(
+              appL10n.navCheckInHint,
               style: TextStyle(color: AppCultureColors.textMuted, fontSize: 13, height: 1.4),
             ),
             const SizedBox(height: 14),
@@ -764,7 +772,7 @@ class NavigationPanel extends StatelessWidget {
                   shape: const StadiumBorder(),
                 ),
                 icon: const Icon(Icons.verified_outlined),
-                label: const Text('Check-in ngay', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+                label: Text(appL10n.navCheckInNow, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
               ),
             ),
           ],
@@ -782,26 +790,26 @@ class NavigationPanel extends StatelessWidget {
       children: [
         Expanded(
           child: r == null && !loading
-              ? _wideButton(label: 'Thử lại', icon: Icons.refresh_rounded, onTap: onRetry)
+              ? _wideButton(label: appL10n.commonRetry, icon: Icons.refresh_rounded, onTap: onRetry)
               : active
               ? OutlinedButton.icon(
                   onPressed: r == null ? null : onSteps,
                   icon: const Icon(Icons.format_list_bulleted_rounded),
-                  label: const Text('Các bước', style: TextStyle(fontWeight: FontWeight.w600)),
+                  label: Text(appL10n.navSteps, style: const TextStyle(fontWeight: FontWeight.w600)),
                   style: _outlined,
                 )
-              : _wideButton(label: 'Bắt đầu đi', icon: Icons.navigation_rounded, onTap: r == null ? null : onStart),
+              : _wideButton(label: appL10n.navStart, icon: Icons.navigation_rounded, onTap: r == null ? null : onStart),
         ),
         if (!active && r != null) ...[
           const SizedBox(width: 10),
           Tooltip(
-            message: 'Xem ${r.steps.length} bước chỉ đường',
+            message: appL10n.navViewSteps(r.steps.length),
             child: OutlinedButton(onPressed: onSteps, style: square, child: const Icon(Icons.format_list_bulleted_rounded)),
           ),
         ],
         const SizedBox(width: 10),
         Tooltip(
-          message: 'Mở Google Maps (có giọng nói)',
+          message: appL10n.navOpenGoogleMaps,
           child: OutlinedButton(onPressed: onExternal, style: square, child: const Icon(Icons.record_voice_over_outlined)),
         ),
       ],
@@ -865,7 +873,7 @@ Future<void> showRouteSteps(BuildContext context, RouteModel route, {int? curren
                       ),
                     ),
                     const SizedBox(height: 14),
-                    const Text('Các bước chỉ đường',
+                    Text(appL10n.navDirectionSteps,
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
                     const SizedBox(height: 2),
                     Text('${formatDuration(route.durationSeconds)} · ${formatDistance(route.distanceMeters)}',
@@ -895,7 +903,7 @@ Future<void> showRouteSteps(BuildContext context, RouteModel route, {int? curren
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
-                      step.instruction.isEmpty ? 'Đi tiếp' : step.instruction,
+                      step.instruction.isEmpty ? appL10n.navGoStraight : step.instruction,
                       style: TextStyle(
                         fontSize: 14,
                         height: 1.35,

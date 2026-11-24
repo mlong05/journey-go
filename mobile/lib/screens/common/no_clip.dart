@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Các khối "không bị cắt": thay cho hàng cuộn ngang (thẻ/chip lộ một nửa ở mép màn hình).
 /// Mọi mục hiện trọn, nhãn 1 dòng; hết chỗ thì tự xuống hàng.
@@ -131,7 +132,7 @@ class PhotoGridPreview extends StatelessWidget {
             for (var i = 0; i < shown; i++)
               Semantics(
                 button: true,
-                label: 'Xem ảnh ${i + 1} trên ${images.length}',
+                label: appL10n.photoViewOf(i + 1, images.length),
                 child: GestureDetector(
                   onTap: () => onOpen(i),
                   child: ClipRRect(

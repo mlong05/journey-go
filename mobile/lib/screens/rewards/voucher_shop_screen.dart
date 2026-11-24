@@ -4,6 +4,7 @@ import '../../core/models/gamification_model.dart';
 import '../../core/services/gamification_service.dart';
 import 'my_vouchers_screen.dart';
 import 'rewards_widgets.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Cửa hàng đổi thưởng: dùng điểm đổi lấy voucher giảm giá.
 class VoucherShopScreen extends StatefulWidget {
@@ -61,24 +62,23 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Text(
-          'Xác nhận đổi voucher',
+        title: Text(
+          appL10n.vsConfirmTitle,
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         content: Text(
-          'Dùng ${formatThousands(voucher.pointsRequired)} điểm để đổi '
-          '"${voucher.title}"? Điểm đã đổi sẽ không được hoàn lại.',
+          appL10n.vsConfirmMessage(formatThousands(voucher.pointsRequired), voucher.title),
           style: const TextStyle(fontSize: 13.5, height: 1.45),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Hủy'),
+            child: Text(appL10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(backgroundColor: AppCultureColors.heritageJade),
-            child: const Text('Đổi ngay'),
+            child: Text(appL10n.vsRedeemNow),
           ),
         ],
       ),
@@ -96,8 +96,8 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
       if (!mounted) return;
       await showCopyableCodeDialog(
         context,
-        title: 'Đổi voucher thành công',
-        subtitle: 'Mã của bạn đã được lưu trong mục "Voucher của tôi".',
+        title: appL10n.vsSuccessTitle,
+        subtitle: appL10n.vsSuccessSubtitle,
         code: result.userVoucherCode,
       );
     } on GamificationException catch (e) {
@@ -121,7 +121,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
         'Voucher',
         actions: [
           IconButton(
-            tooltip: 'Voucher của tôi',
+            tooltip: appL10n.mvTitle,
             icon: const Icon(Icons.local_activity_outlined, color: AppCultureColors.textDark),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MyVouchersScreen()),
@@ -147,7 +147,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
             height: MediaQuery.of(context).size.height * 0.6,
             child: RewardsMessageView(
               icon: Icons.cloud_off_rounded,
-              title: 'Không tải được danh sách voucher',
+              title: appL10n.vsLoadFailed,
               message: _error,
               onRetry: _load,
             ),
@@ -163,12 +163,12 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
         _buildBalanceStrip(),
         const SizedBox(height: 16),
         if (_vouchers.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 40),
             child: RewardsMessageView(
               icon: Icons.card_giftcard_outlined,
-              title: 'Chưa có voucher để đổi',
-              message: 'Các ưu đãi mới sẽ xuất hiện tại đây. Hãy quay lại sau nhé.',
+              title: appL10n.vsEmpty,
+              message: appL10n.vsEmptyHint,
             ),
           )
         else
@@ -189,9 +189,9 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
         children: [
           const Icon(Icons.star_rounded, color: AppCultureColors.gold, size: 26),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Điểm của bạn',
+              appL10n.vsYourPoints,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -221,10 +221,10 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
 
     final conditions = <String>[
       if (v.minOrderAmount != null && v.minOrderAmount! > 0)
-        'Đơn từ ${formatThousands(v.minOrderAmount!)}đ',
+        appL10n.vsMinOrder(appL10n.priceVnd(formatThousands(v.minOrderAmount!))),
       if (v.maxDiscountAmount != null && v.maxDiscountAmount! > 0)
-        'Giảm tối đa ${formatThousands(v.maxDiscountAmount!)}đ',
-      'Dùng trong ${v.validDays} ngày',
+        appL10n.vsMaxDiscount(appL10n.priceVnd(formatThousands(v.maxDiscountAmount!))),
+      appL10n.vsValidDays(v.validDays),
     ];
 
     return Opacity(
@@ -305,7 +305,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
                         if (v.endDate != null) ...[
                           const SizedBox(height: 2),
                           Text(
-                            'Đổi được đến ${formatDate(v.endDate)}',
+                            appL10n.vsRedeemUntil(formatDate(v.endDate)),
                             style: const TextStyle(
                               fontSize: 11.5,
                               color: AppCultureColors.textLight,
@@ -333,7 +333,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
                                 color: AppCultureColors.gold, size: 18),
                             const SizedBox(width: 4),
                             Text(
-                              '${formatThousands(v.pointsRequired)} điểm',
+                              appL10n.vsPoints(formatThousands(v.pointsRequired)),
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -346,8 +346,8 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
                         Text(
                           blockedReason ??
                               (notEnoughPoints
-                                  ? 'Cần thêm ${formatThousands(missing)} điểm'
-                                  : 'Còn ${v.remainingQuantity} lượt'),
+                                  ? appL10n.vsNeedMore(formatThousands(missing))
+                                  : appL10n.vsRemaining(v.remainingQuantity)),
                           style: TextStyle(
                             fontSize: 11.5,
                             color: (blockedReason != null || notEnoughPoints)
@@ -375,7 +375,7 @@ class _VoucherShopScreenState extends State<VoucherShopScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Đổi', style: TextStyle(fontWeight: FontWeight.w700)),
+                        : Text(appL10n.vsRedeem, style: const TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),

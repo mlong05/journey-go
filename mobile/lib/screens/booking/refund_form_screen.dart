@@ -27,6 +27,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/refund_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../core/utils/formatters.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Bằng chứng đính kèm — ảnh hoặc video đã tải lên máy chủ.
 class _EvidenceFile {
@@ -169,39 +170,39 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
     );
     return [
       _PolicyGroup(
-        title: 'Lỗi từ khách hàng (Hủy tour)',
+        title: context.l10n.rfPolicyCustomer,
         icon: Icons.person_outline_rounded,
         lines: [
           _PolicyLine(
-            'Hủy trước $_earlyCancelDays ngày',
-            'Hoàn 50%',
+            context.l10n.rfCancelBefore(_earlyCancelDays),
+            context.l10n.rfRefundPercent(50),
             tone: _PolicyTone.success,
           ),
           _PolicyLine(
-            'Hủy trong vòng $_noShowWindowHours giờ / Không đến (theo lịch trình)',
-            'Hoàn 0%',
+            context.l10n.rfCancelWithin(_noShowWindowHours),
+            context.l10n.rfRefundPercent(0),
             tone: personalZeroed ? _PolicyTone.danger : _PolicyTone.muted,
           ),
         ],
       ),
       _PolicyGroup(
-        title: 'Lỗi hệ thống / Đối tác',
+        title: context.l10n.rfPolicyPlatform,
         icon: Icons.storefront_outlined,
         lines: [
           _PolicyLine(
-            'Lỗi không mở khóa được trải nghiệm, đối tác không tổ chức...',
-            'Hoàn 100%',
+            context.l10n.rfPolicyPlatformLine,
+            context.l10n.rfRefundPercent(100),
             tone: _PolicyTone.success,
           ),
         ],
       ),
       _PolicyGroup(
-        title: 'Bất khả kháng',
+        title: context.l10n.rfPolicyForceMajeure,
         icon: Icons.thunderstorm_outlined,
         lines: [
           _PolicyLine(
-            'Thiên tai, dịch bệnh,...',
-            'Hoàn 0%',
+            context.l10n.rfPolicyForceMajeureLine,
+            context.l10n.rfRefundPercent(0),
             tone: _PolicyTone.muted,
           ),
         ],
@@ -235,7 +236,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
 
   Future<void> _pickImages() async {
     if (_files.length >= _maxFiles) {
-      _showSnack('Mỗi yêu cầu chỉ đính kèm tối đa $_maxFiles tệp.');
+      _showSnack(context.l10n.rfMaxFiles(_maxFiles));
       return;
     }
     try {
@@ -247,13 +248,13 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
       }
       setState(() {});
     } catch (_) {
-      _showSnack('Không thể mở thư viện ảnh.');
+      _showSnack(appL10n.rfGalleryFailed);
     }
   }
 
   Future<void> _pickVideo() async {
     if (_files.length >= _maxFiles) {
-      _showSnack('Mỗi yêu cầu chỉ đính kèm tối đa $_maxFiles tệp.');
+      _showSnack(context.l10n.rfMaxFiles(_maxFiles));
       return;
     }
     try {
@@ -265,7 +266,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
       _files.add(_EvidenceFile(localPath: picked.path, isVideo: true));
       setState(() {});
     } catch (_) {
-      _showSnack('Không thể chọn video.');
+      _showSnack(appL10n.rfVideoFailed);
     }
   }
 
@@ -328,7 +329,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
         setState(() {
           _submitting = false;
           _error =
-              'Không tải được toàn bộ bằng chứng lên máy chủ. Vui lòng thử lại.';
+              context.l10n.rfUploadFailed;
         });
         return;
       }
@@ -356,7 +357,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không thể gửi yêu cầu hoàn tiền. Vui lòng thử lại.';
+        _error = context.l10n.rfSubmitFailed;
         _submitting = false;
       });
     }
@@ -364,28 +365,27 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
 
   String _validationMessage() {
     if (_summaryController.text.trim().isEmpty) {
-      return 'Vui lòng nhập lý do ngắn gọn.';
+      return context.l10n.rfErrSummary;
     }
     if (_detailController.text.trim().isEmpty) {
-      return 'Vui lòng tường thuật chi tiết sự cố hoặc lý do không thể tham gia.';
+      return context.l10n.rfErrDetail;
     }
     if (_accountController.text.trim().isEmpty ||
         _nameController.text.trim().isEmpty ||
         _bankName.isEmpty) {
-      return 'Vui lòng điền đầy đủ thông tin tài khoản nhận tiền.';
+      return context.l10n.rfErrBank;
     }
     if (_phoneController.text.trim().isEmpty ||
         _emailController.text.trim().isEmpty) {
-      return 'Vui lòng điền đầy đủ thông tin liên hệ.';
+      return context.l10n.rfErrContact;
     }
     if (!_hasReceiptImage) {
-      return 'Vui lòng tải lên ảnh chụp biên lai giao dịch thành công '
-          '(bắt buộc để quản trị viên đối chiếu).';
+      return context.l10n.rfErrReceipt;
     }
     if (!_agreed) {
-      return 'Vui lòng xác nhận cam đoan thông tin và bằng chứng.';
+      return context.l10n.rfErrAgree;
     }
-    return 'Vui lòng kiểm tra lại thông tin đã nhập.';
+    return context.l10n.rfErrGeneric;
   }
 
   void _showSuccessDialog(RefundModel refund) {
@@ -412,8 +412,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Đã Gửi Yêu Cầu Hoàn Tiền',
+            Text(
+              ctx.l10n.rfSentTitle,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -422,9 +422,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Mã yêu cầu: '
-              '${refund.refundCode.isEmpty ? '#${refund.id}' : refund.refundCode}\n'
-              'Trạng thái: ${refund.statusLabel}',
+              ctx.l10n.rfSentDetail(refund.refundCode.isEmpty ? '#${refund.id}' : refund.refundCode, refund.statusLabel),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,
@@ -449,8 +447,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text(
-                  'Đã hiểu',
+                child: Text(
+                  ctx.l10n.rfGotIt,
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
@@ -479,8 +477,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Yêu Cầu Hoàn Tiền',
+        title: Text(
+          context.l10n.rfTitle,
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
@@ -521,10 +519,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
           const SizedBox(height: 22),
           _buildSubmitButton(),
           const SizedBox(height: 12),
-          const Text(
-            'Yêu cầu sẽ được quản trị viên xem xét và đối chiếu bằng chứng. '
-            'Số tiền thực nhận, tỷ lệ hoàn và phương thức hoàn sẽ được thông báo '
-            'sau khi phê duyệt.',
+          Text(
+            context.l10n.rfFooterNote,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
           ),
@@ -547,20 +543,20 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
       child: Column(
         children: [
           _buildSummaryRow(
-            'Đơn hàng',
-            booking?.bookingCode ?? 'Đơn đã thanh toán',
+            context.l10n.rfOrder,
+            booking?.bookingCode ?? context.l10n.rfPaidBooking,
             valueColor: AppCultureColors.heritageJade,
           ),
           const SizedBox(height: 8),
           _buildSummaryRow(
-            'Số tiền đã thanh toán',
+            context.l10n.rfAmountPaid,
             formatVndAmount(widget.amount),
             valueColor: AppCultureColors.textDark,
             bold: true,
           ),
           const SizedBox(height: 8),
           _buildSummaryRow(
-            'Ngày thanh toán',
+            context.l10n.rfPaidDate,
             booking?.paidAt != null
                 ? formatDateTimeVn(booking!.paidAt)
                 : '—',
@@ -569,7 +565,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
           ),
           const SizedBox(height: 8),
           _buildSummaryRow(
-            'Ngày trải nghiệm',
+            context.l10n.payExperienceDate,
             booking?.experienceDate != null
                 ? formatDateVn(booking!.experienceDate)
                 : '—',
@@ -642,8 +638,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                 color: AppCultureColors.heritageJade,
               ),
               const SizedBox(width: 8),
-              const Text(
-                'Chính sách Hoàn Tiền',
+              Text(
+                context.l10n.rfPolicyTitle,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
@@ -740,8 +736,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Lý do hoàn tiền',
+          Text(
+            context.l10n.rfReasonTitle,
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
@@ -749,8 +745,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Quản trị viên sẽ đọc nội dung này để đối chiếu và quyết định mức hoàn.',
+          Text(
+            context.l10n.rfReasonHint,
             style: TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
           ),
           const SizedBox(height: 12),
@@ -762,7 +758,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
             onChanged: (_) => setState(() {}),
             style: const TextStyle(fontSize: 13.5),
             decoration: InputDecoration(
-              hintText: 'Nhập lý do ngắn gọn (VD: Bị ốm đột xuất,....)',
+              hintText: context.l10n.rfSummaryHint,
               hintStyle: const TextStyle(
                 fontSize: 13,
                 color: AppCultureColors.textLight,
@@ -815,7 +811,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
             style: const TextStyle(fontSize: 13.5, height: 1.45),
             decoration: InputDecoration(
               hintText:
-                  'Vui lòng tường thuật chi tiết sự cố bạn gặp phải hoặc lý do không thể tham gia để admin hỗ trợ tốt nhất',
+                  context.l10n.rfDetailHint,
               hintStyle: const TextStyle(
                 fontSize: 12.5,
                 height: 1.45,
@@ -875,8 +871,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
         children: [
           Row(
             children: [
-              const Text(
-                'Đính kèm bằng chứng',
+              Text(
+                context.l10n.rfEvidenceTitle,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
@@ -884,8 +880,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-              const Text(
-                '(Ảnh/Video/Giấy tờ)',
+              Text(
+                context.l10n.rfEvidenceTypes,
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w600,
@@ -903,8 +899,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Giấy khám bệnh, hình ảnh sự cố, ảnh chụp màn hình lỗi ứng dụng, v.v.',
+          Text(
+            context.l10n.rfEvidenceExamples,
             style: TextStyle(
               fontSize: 11,
               height: 1.4,
@@ -937,8 +933,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Bắt buộc: ảnh chụp biên lai giao dịch thành công',
+                      Text(
+                        context.l10n.rfReceiptRequired,
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
@@ -946,9 +942,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      const Text(
-                        'Hãy chụp màn hình biên lai VNPay hiển thị "Giao dịch thành công" '
-                        'rồi bấm "Thêm ảnh" bên dưới. Không có ảnh, yêu cầu sẽ không được gửi.',
+                      Text(
+                        context.l10n.rfReceiptHint,
                         style: TextStyle(
                           fontSize: 11,
                           height: 1.4,
@@ -968,7 +963,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _files.length >= _maxFiles ? null : _pickImages,
                   icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-                  label: const Text('Thêm ảnh'),
+                  label: Text(context.l10n.rfAddPhoto),
                 ),
               ),
               const SizedBox(width: 10),
@@ -976,7 +971,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _files.length >= _maxFiles ? null : _pickVideo,
                   icon: const Icon(Icons.videocam_outlined, size: 18),
-                  label: const Text('Thêm video'),
+                  label: Text(context.l10n.rfAddVideo),
                 ),
               ),
             ],
@@ -1061,8 +1056,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                   bottom: Radius.circular(11),
                 ),
               ),
-              child: const Text(
-                'Lỗi tải lên',
+              child: Text(
+                context.l10n.rfUploadError,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 9,
@@ -1109,8 +1104,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Tài khoản nhận tiền',
+          Text(
+            context.l10n.rfBankTitle,
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
@@ -1118,27 +1113,27 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Cung cấp để hỗ trợ hoàn tiền bằng phương thức thủ công nếu cần.',
+          Text(
+            context.l10n.rfBankHint,
             style: TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
           ),
           const SizedBox(height: 12),
           _buildInput(
             controller: _accountController,
-            hint: 'Số tài khoản',
+            hint: context.l10n.rfAccountNumber,
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 10),
           _buildInput(
             controller: _nameController,
-            hint: 'Tên chủ tài khoản',
+            hint: context.l10n.rfAccountName,
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
             initialValue: _bankName.isEmpty ? null : _bankName,
             isExpanded: true,
-            hint: const Text(
-              'Ngân hàng',
+            hint: Text(
+              context.l10n.rfBank,
               style: TextStyle(
                 fontSize: 13,
                 color: AppCultureColors.textLight,
@@ -1155,7 +1150,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                 DropdownMenuItem(
                   value: b.value,
                   child: Text(
-                    b.name,
+                    b.code == kOtherBankOption.code ? context.l10n.rfOtherBank : b.name,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 13.5,
@@ -1206,8 +1201,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Thông tin liên hệ',
+          Text(
+            context.l10n.rfContactTitle,
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
@@ -1217,13 +1212,13 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
           const SizedBox(height: 12),
           _buildInput(
             controller: _phoneController,
-            hint: 'Số điện thoại',
+            hint: context.l10n.rfPhone,
             keyboardType: TextInputType.phone,
           ),
           const SizedBox(height: 10),
           _buildInput(
             controller: _emailController,
-            hint: 'Email dự phòng',
+            hint: context.l10n.rfBackupEmail,
             keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: 14),
@@ -1259,8 +1254,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               child: Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
-                  'Tôi cam đoan các thông tin và bằng chứng cung cấp là sự thật, '
-                  'đồng thời đã đọc và hiểu rõ chính sách hoàn tiền.',
+                  context.l10n.rfAgreement,
                   style: const TextStyle(
                     fontSize: 12,
                     height: 1.4,
@@ -1369,7 +1363,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               )
             : const Icon(Icons.send_rounded, size: 19),
         label: Text(
-          _submitting ? 'Đang gửi...' : 'Gửi yêu cầu hoàn tiền',
+          _submitting ? context.l10n.rfSending : context.l10n.rfSubmit,
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
         ),
         style: ElevatedButton.styleFrom(

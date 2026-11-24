@@ -1,3 +1,4 @@
+import '../../l10n/locale_controller.dart';
 // Mô hình dữ liệu cho điểm thưởng & voucher (khớp response của /api/v1/gamification).
 
 DateTime? _parseDate(dynamic value) {
@@ -66,17 +67,17 @@ class UserPointModel {
 String badgeTypeLabel(String type) {
   switch (type) {
     case 'DESTINATION_CHECKIN':
-      return 'Check-in điểm đến';
+      return appL10n.badgeTypeCheckin;
     case 'TOUR_COMPLETION':
-      return 'Hoàn thành tour';
+      return appL10n.badgeTypeTour;
     case 'TASK_MASTER':
-      return 'Bậc thầy nhiệm vụ';
+      return appL10n.badgeTypeTask;
     case 'STREAK':
-      return 'Chuỗi ngày';
+      return appL10n.badgeTypeStreak;
     case 'SPECIAL_EVENT':
-      return 'Sự kiện đặc biệt';
+      return appL10n.badgeTypeEvent;
     default:
-      return 'Huy hiệu';
+      return appL10n.badgeTypeOther;
   }
 }
 
@@ -169,23 +170,23 @@ class PointTransactionModel {
   String get typeLabel {
     switch (type) {
       case 'EARNED_CHECKIN':
-        return 'Check-in điểm đến';
+        return appL10n.badgeTypeCheckin;
       case 'EARNED_TASK':
-        return 'Hoàn thành nhiệm vụ';
+        return appL10n.ptxTask;
       case 'EARNED_EXPERIENCE':
-        return 'Trải nghiệm';
+        return appL10n.ptxExperience;
       case 'EARNED_TOUR':
-        return 'Hoàn thành tour';
+        return appL10n.badgeTypeTour;
       case 'EARNED_ACHIEVEMENT':
-        return 'Thưởng thành tựu';
+        return appL10n.ptxAchievement;
       case 'REDEEM_VOUCHER':
-        return 'Đổi voucher';
+        return appL10n.wRedeem;
       case 'ADMIN_ADJUST':
-        return 'Điều chỉnh bởi quản trị';
+        return appL10n.ptxAdmin;
       case 'REFUND_EXPIRED_VOUCHER':
-        return 'Hoàn điểm voucher hết hạn';
+        return appL10n.ptxVoucherRefund;
       default:
-        return 'Giao dịch điểm';
+        return appL10n.ptxOther;
     }
   }
 }
@@ -248,13 +249,13 @@ class VoucherModel {
   /// Nhãn giảm giá ngắn: "-10%" hoặc "-50.000đ".
   String get discountLabel => discountType == 'PERCENTAGE'
       ? '-${discountValue.toStringAsFixed(discountValue % 1 == 0 ? 0 : 1)}%'
-      : '-${formatThousands(discountValue)}đ';
+      : '-${appL10n.priceVnd(formatThousands(discountValue))}';
 
   /// Lý do không đổi được (null nếu đổi được về mặt voucher).
   String? get unavailableReason {
-    if (isOutOfStock) return 'Đã hết lượt đổi';
-    if (isExpired) return 'Đã hết hạn';
-    if (notStarted) return 'Chưa mở đổi';
+    if (isOutOfStock) return appL10n.voucherOutOfStock;
+    if (isExpired) return appL10n.statusExpired;
+    if (notStarted) return appL10n.voucherNotStarted;
     return null;
   }
 }

@@ -19,6 +19,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/provider_chat_service.dart';
 import '../../core/services/realtime_service.dart';
 import '../../core/services/token_storage.dart';
+import '../../l10n/locale_controller.dart';
 
 class ProviderChatScreen extends StatefulWidget {
   /// ID tour đang hỏi (dùng để mở/tạo hội thoại với đúng nhà tour).
@@ -130,7 +131,7 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không thể mở cuộc trò chuyện.';
+        _error = appL10n.chatOpenFailed;
         _loading = false;
       });
     }
@@ -177,7 +178,7 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
   @override
   Widget build(BuildContext context) {
     final providerName =
-        widget.providerName.isEmpty ? 'Nhà tour' : widget.providerName;
+        widget.providerName.isEmpty ? context.l10n.chatProviderFallback : widget.providerName;
     return Scaffold(
       backgroundColor: AppCultureColors.background,
       appBar: AppBar(
@@ -218,7 +219,7 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
                     ),
                   ),
                   Text(
-                    widget.tourTitle ?? 'Hỗ trợ từ nhà tour',
+                    widget.tourTitle ?? context.l10n.providerSupportTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -266,7 +267,7 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
                 style: const TextStyle(color: AppCultureColors.textMuted),
               ),
               const SizedBox(height: 10),
-              TextButton(onPressed: _load, child: const Text('Thử lại')),
+              TextButton(onPressed: _load, child: Text(context.l10n.commonRetry)),
             ],
           ),
         ),
@@ -293,7 +294,7 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Hỏi ${widget.providerName.isEmpty ? 'nhà tour' : widget.providerName} về tour này',
+                  context.l10n.chatAskAbout(widget.providerName.isEmpty ? context.l10n.chatProviderLower : widget.providerName),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 14,
@@ -302,9 +303,8 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'Bạn có thể hỏi về lịch trình, giá, điều kiện thời tiết hoặc thủ tục đặt tour — '
-                  'trước khi quyết định đặt vé.',
+                Text(
+                  context.l10n.chatAskHint,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12.5,
@@ -403,10 +403,10 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
                     fontSize: 13.5,
                     color: AppCultureColors.textDark,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
-                    hintText: 'Nhắn tin cho nhà tour…',
+                    hintText: context.l10n.chatInputHint,
                     hintStyle: TextStyle(
                       fontSize: 13.5,
                       color: AppCultureColors.textLight,

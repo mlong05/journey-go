@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Hiện hộp thoại thành công.
 ///
@@ -47,9 +48,9 @@ Future<void> showPaymentSuccessDialog(
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Thanh toán thành công',
-            style: TextStyle(
+          Text(
+            ctx.l10n.paySuccessTitle,
+            style: const TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.w800,
               color: AppCultureColors.textDark,
@@ -57,7 +58,7 @@ Future<void> showPaymentSuccessDialog(
           ),
           const SizedBox(height: 8),
           Text(
-            _buildDetail(bookingCode, amount),
+            _buildDetail(ctx.l10n, bookingCode, amount),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 13,
@@ -82,9 +83,9 @@ Future<void> showPaymentSuccessDialog(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: const Text(
-                'Xem đơn của tôi',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              child: Text(
+                ctx.l10n.paySuccessViewBooking,
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -95,16 +96,10 @@ Future<void> showPaymentSuccessDialog(
 }
 
 /// Dựng phần mô tả (mã đơn + số tiền) — bỏ trống phần không có.
-String _buildDetail(String? bookingCode, num? amount) {
-  final parts = <String>[];
-  if (bookingCode != null && bookingCode.isNotEmpty) {
-    parts.add('Mã đơn: $bookingCode');
-  }
-  if (amount != null && amount > 0) {
-    parts.add('Số tiền: ${formatVndAmount(amount)}');
-  }
-  if (parts.isEmpty) {
-    return 'Giao dịch của bạn đã được xác nhận thành công.';
-  }
-  return '${parts.join('\n')}\nGiao dịch của bạn đã được xác nhận thành công.';
+String _buildDetail(AppLocalizations l10n, String? bookingCode, num? amount) {
+  return [
+    if (bookingCode != null && bookingCode.isNotEmpty) l10n.paySuccessBookingCode(bookingCode),
+    if (amount != null && amount > 0) l10n.paySuccessAmount(formatVndAmount(amount)),
+    l10n.paySuccessConfirmed,
+  ].join('\n');
 }

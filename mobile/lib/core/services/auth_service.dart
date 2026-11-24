@@ -8,6 +8,7 @@ import '../models/auth_models.dart';
 import 'api_client.dart';
 import 'server_finder.dart';
 import 'token_storage.dart';
+import '../../l10n/locale_controller.dart';
 
 class AuthService {
   // Singleton pattern
@@ -30,6 +31,7 @@ class AuthService {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Accept-Language': acceptLanguage,
     };
     if (bearerToken != null && bearerToken.isNotEmpty) {
       headers['Authorization'] = 'Bearer $bearerToken';
@@ -48,97 +50,18 @@ class AuthService {
       ServerFinder.markUnreachable();
       throw Exception(
         kDebugMode
-            ? 'Không thể kết nối đến máy chủ ($baseUrl).\nChi tiết: ${e.message}\n\n${ServerFinder.unreachableHint}'
-            : 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.',
+            ? appL10n.authServerUnreachableDebug(baseUrl, e.message, ServerFinder.unreachableHint)
+            : appL10n.authServerUnreachable,
       );
     } on TimeoutException {
       ServerFinder.markUnreachable();
       throw Exception(
         kDebugMode
-            ? 'Kết nối đến máy chủ ($baseUrl) quá hạn.\n\n${ServerFinder.unreachableHint}'
-            : 'Kết nối đến máy chủ quá hạn (timeout). Vui lòng thử lại sau.',
+            ? appL10n.authServerTimeoutDebug(baseUrl, ServerFinder.unreachableHint)
+            : appL10n.authServerTimeout,
       );
     } catch (e) {
-      throw Exception('Lỗi kết nối mạng: $e');
-    }
-  }
-
-  /// Gửi yêu cầu HTTP GET
-  Future<http.Response> _get({
-    required String path,
-    String? bearerToken,
-    Duration timeout = const Duration(seconds: 15),
-  }) async {
-    final baseUrl = await TokenStorage.getBaseUrl();
-    // Dò máy chủ thất bại ⇒ báo lỗi ngay, không chờ request hết hạn 15 giây.
-    if (ServerFinder.lastProbeFailed) throw Exception(ServerFinder.unreachableHint);
-    final uri = Uri.parse('$baseUrl$path');
-
-    final headers = <String, String>{
-      'Accept': 'application/json',
-    };
-    if (bearerToken != null && bearerToken.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $bearerToken';
-    }
-
-    try {
-      final response = await http
-          .get(
-            uri,
-            headers: headers,
-          )
-          .timeout(timeout);
-      return response;
-    } on SocketException catch (e) {
-      ServerFinder.markUnreachable();
-      throw Exception(
-        'Không thể kết nối đến máy chủ ($baseUrl).\nChi tiết: ${e.message}',
-      );
-    } on TimeoutException {
-      ServerFinder.markUnreachable();
-      throw Exception('Kết nối quá hạn. Vui lòng thử lại.');
-    } catch (e) {
-      throw Exception('Lỗi mạng: $e');
-    }
-  }
-
-  /// Gửi yêu cầu HTTP PUT
-  Future<http.Response> _put({
-    required String path,
-    Map<String, dynamic>? body,
-    String? bearerToken,
-    Duration timeout = const Duration(seconds: 15),
-  }) async {
-    final baseUrl = await TokenStorage.getBaseUrl();
-    // Dò máy chủ thất bại ⇒ báo lỗi ngay, không chờ request hết hạn 15 giây.
-    if (ServerFinder.lastProbeFailed) throw Exception(ServerFinder.unreachableHint);
-    final uri = Uri.parse('$baseUrl$path');
-
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
-    if (bearerToken != null && bearerToken.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $bearerToken';
-    }
-
-    try {
-      final response = await http
-          .put(
-            uri,
-            headers: headers,
-            body: body != null ? jsonEncode(body) : null,
-          )
-          .timeout(timeout);
-      return response;
-    } on SocketException catch (e) {
-      ServerFinder.markUnreachable();
-      throw Exception('Không thể kết nối máy chủ: ${e.message}');
-    } on TimeoutException {
-      ServerFinder.markUnreachable();
-      throw Exception('Kết nối quá hạn. Vui lòng thử lại.');
-    } catch (e) {
-      throw Exception('Lỗi mạng: $e');
+      throw Exception(appL10n.authNetworkError('$e'));
     }
   }
 
@@ -157,15 +80,15 @@ class AuthService {
     } catch (_) {}
 
     if (response.statusCode == 401) {
-      return 'Thông tin đăng nhập không hợp lệ hoặc phiên đã hết hạn.';
+      return appL10n.authErr401;
     }
     if (response.statusCode == 403) {
-      return 'Bạn không có quyền truy cập chức năng này.';
+      return appL10n.authErr403;
     }
     if (response.statusCode == 404) {
-      return 'Không tìm thấy tài nguyên yêu cầu (404).';
+      return appL10n.authErr404;
     }
-    return 'Lỗi máy chủ (${response.statusCode}). Vui lòng thử lại sau.';
+    return appL10n.authErrServer('${response.statusCode}');
   }
 
   // ==========================================================================
@@ -208,6 +131,7 @@ class AuthService {
 
       // Lưu trữ phiên đăng nhập vào SharedPreferences
       await TokenStorage.saveAuthSession(authResponse);
+      await LocaleController.instance.applyFromServer(authResponse.user.preferredLanguage);
       return authResponse;
     } else {
       final errorMsg = _extractErrorMessage(response);
@@ -246,6 +170,7 @@ class AuthService {
       }
 
       await TokenStorage.saveAuthSession(authResponse);
+      await LocaleController.instance.applyFromServer(authResponse.user.preferredLanguage);
       return authResponse;
     } else {
       await TokenStorage.clear();
@@ -282,6 +207,7 @@ class AuthService {
       }
 
       await TokenStorage.saveAuthSession(authResponse);
+      await LocaleController.instance.applyFromServer(authResponse.user.preferredLanguage);
       return authResponse;
     } else {
       await TokenStorage.clear();
@@ -319,7 +245,7 @@ class AuthService {
     final refreshToken = await TokenStorage.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {
       await TokenStorage.clearSession();
-      throw Exception('Không tìm thấy Refresh Token. Vui lòng đăng nhập lại.');
+      throw Exception(appL10n.authNoRefreshToken);
     }
 
     final response = await _post(
@@ -362,7 +288,7 @@ class AuthService {
       // Refresh token không hợp lệ hoặc đã hết hạn
       await TokenStorage.clear();
       final errorMsg = _extractErrorMessage(response);
-      throw Exception('Phiên đăng nhập đã hết hạn: $errorMsg');
+      throw Exception(appL10n.authSessionExpiredDetail(errorMsg));
     }
   }
 
@@ -402,6 +328,7 @@ class AuthService {
       }
 
       await TokenStorage.saveAuthSession(authResponse);
+      await LocaleController.instance.applyFromServer(authResponse.user.preferredLanguage);
       return authResponse;
     } else {
       final errorMsg = _extractErrorMessage(response);
@@ -412,47 +339,36 @@ class AuthService {
   // ==========================================================================
   // 5. LẤY THÔNG TIN NGƯỜI DÙNG HIỆN TẠI (GET /api/v1/auth/me)
   // ==========================================================================
+  // Đi qua ApiClient: token hết hạn ⇒ tự làm mới rồi gọi lại; làm mới thất bại ⇒
+  // SessionExpiry mở màn đăng nhập đè lên màn đang xem (đăng nhập xong quay lại đúng màn).
   Future<UserModel> getCurrentUser() async {
-    String? token = await TokenStorage.getAccessToken();
-    if (token == null || token.isEmpty) {
-      throw Exception('Chưa đăng nhập');
+    final data = await ApiClient.request('GET', ApiConstants.meEndpoint);
+    if (data is! Map) throw ApiException(appL10n.apiInvalidData);
+    final user = UserModel.fromJson(Map<String, dynamic>.from(data));
+    if (!isTouristRole(user.role)) {
+      await TokenStorage.clear();
+      throw Exception(kInvalidAuthErrorMessage);
     }
+    await TokenStorage.saveUser(user);
+    await LocaleController.instance.applyFromServer(user.preferredLanguage);
+    return user;
+  }
 
-    var response = await _get(
-      path: ApiConstants.meEndpoint,
-      bearerToken: token,
-    );
-
-    // Nếu token hết hạn (401), tự động thử refresh token và gọi lại 1 lần
-    if (response.statusCode == 401) {
-      try {
-        final refreshed = await refreshToken();
-        token = refreshed.accessToken;
-        response = await _get(
-          path: ApiConstants.meEndpoint,
-          bearerToken: token,
-        );
-      } catch (e) {
-        throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+  /// Đồng bộ ngôn ngữ ưa thích (vi / en / ja) của tài khoản hiện tại lên backend.
+  Future<void> updatePreferredLanguage(String languageCode) async {
+    if (!await TokenStorage.hasValidSession()) return;
+    try {
+      final data = await ApiClient.request(
+        'PATCH',
+        '/auth/me/language',
+        body: {'preferredLanguage': languageCode},
+      );
+      if (data is Map) {
+        final user = UserModel.fromJson(Map<String, dynamic>.from(data));
+        await TokenStorage.saveUser(user);
       }
-    }
-
-    if (response.statusCode == 200) {
-      final dynamic decoded = jsonDecode(utf8.decode(response.bodyBytes));
-      final dynamic data = (decoded is Map && decoded.containsKey('data'))
-          ? decoded['data']
-          : decoded;
-
-      final user = UserModel.fromJson(data as Map<String, dynamic>);
-      if (!isTouristRole(user.role)) {
-        await TokenStorage.clear();
-        throw Exception(kInvalidAuthErrorMessage);
-      }
-
-      await TokenStorage.saveUser(user);
-      return user;
-    } else {
-      throw Exception(_extractErrorMessage(response));
+    } catch (_) {
+      // Mất mạng / chưa có phiên hợp lệ: giữ ngôn ngữ đã chọn cục bộ trên máy
     }
   }
 
@@ -464,33 +380,15 @@ class AuthService {
     String? phone,
     String? avatarUrl,
   }) async {
-    final token = await TokenStorage.getAccessToken();
-    if (token == null || token.isEmpty) {
-      throw Exception('Chưa đăng nhập');
-    }
-
-    final response = await _put(
-      path: ApiConstants.profileEndpoint,
-      bearerToken: token,
-      body: {
-        'fullName': fullName.trim(),
-        'phone': phone?.trim() ?? '',
-        'avatarUrl': avatarUrl?.trim() ?? '',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final dynamic decoded = jsonDecode(utf8.decode(response.bodyBytes));
-      final dynamic data = (decoded is Map && decoded.containsKey('data'))
-          ? decoded['data']
-          : decoded;
-
-      final updated = UserModel.fromJson(data as Map<String, dynamic>);
-      await TokenStorage.saveUser(updated);
-      return updated;
-    } else {
-      throw Exception(_extractErrorMessage(response));
-    }
+    final data = await ApiClient.request('PUT', ApiConstants.profileEndpoint, body: {
+      'fullName': fullName.trim(),
+      'phone': phone?.trim() ?? '',
+      'avatarUrl': avatarUrl?.trim() ?? '',
+    });
+    if (data is! Map) throw ApiException(appL10n.apiInvalidData);
+    final updated = UserModel.fromJson(Map<String, dynamic>.from(data));
+    await TokenStorage.saveUser(updated);
+    return updated;
   }
 
   // ── Mật khẩu (lỗi ném ApiException kèm thông báo tiếng Việt của máy chủ) ──
@@ -518,12 +416,14 @@ class AuthService {
       });
 
   /// Đổi mật khẩu khi đang đăng nhập; tài khoản Google chưa từng đặt mật khẩu thì bỏ trống [currentPassword].
+  /// Sai mật khẩu hiện tại: máy chủ trả 400 kèm câu báo; 401 chỉ còn nghĩa là hết phiên
+  /// ⇒ ApiClient tự làm mới token / mở màn đăng nhập lại.
   Future<void> changePassword({
     String? currentPassword,
     required String newPassword,
     required String confirmPassword,
   }) =>
-      ApiClient.request('POST', '/auth/change-password', keepUnauthorizedMessage: true, body: {
+      ApiClient.request('POST', '/auth/change-password', body: {
         if (currentPassword != null && currentPassword.isNotEmpty) 'currentPassword': currentPassword,
         'newPassword': newPassword,
         'confirmPassword': confirmPassword,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/models/tour_journey_model.dart';
 import 'package:mobile/screens/journey/journey_summary_screen.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 
 /// Hành trình đã xong: 1 điểm đến, câu đố sai một phần (vẫn COMPLETED) + hoạt động đúng hết.
 Map<String, dynamic> _completedJson({String rank = 'COMPLETED', int bonus = 50}) => {
@@ -52,7 +53,7 @@ void main() {
 
   testWidgets('summary screen shows rank, totals and bonus', (tester) async {
     final journey = TourJourney.fromJson(_completedJson(rank: 'PERFECT'));
-    await tester.pumpWidget(MaterialApp(home: JourneySummaryScreen(journey: journey)));
+    await tester.pumpWidget(MaterialApp(locale: const Locale('vi'), supportedLocales: AppLocalizations.supportedLocales, localizationsDelegates: AppLocalizations.localizationsDelegates, home: JourneySummaryScreen(journey: journey)));
     await tester.pumpAndSettle();
 
     expect(find.text('Hoàn thành trọn vẹn'), findsOneWidget);
@@ -64,7 +65,7 @@ void main() {
 
   testWidgets('summary explains missing bonus when a destination was skipped', (tester) async {
     final journey = TourJourney.fromJson(_completedJson(rank: 'PARTIAL', bonus: 0));
-    await tester.pumpWidget(MaterialApp(home: JourneySummaryScreen(journey: journey)));
+    await tester.pumpWidget(MaterialApp(locale: const Locale('vi'), supportedLocales: AppLocalizations.supportedLocales, localizationsDelegates: AppLocalizations.localizationsDelegates, home: JourneySummaryScreen(journey: journey)));
     await tester.pumpAndSettle();
 
     expect(find.text('Đã đi hết hành trình'), findsOneWidget);

@@ -14,6 +14,7 @@ import '../models/tour_journey_model.dart';
 import 'booking_service.dart';
 import 'gamification_service.dart';
 import 'journey_service.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Tiến độ của du khách lấy từ backend: điểm, huy hiệu, nhật ký check-in, nhiệm vụ, vé.
 /// Mọi hàm ném lỗi gốc (ApiException / GamificationException) để giao diện báo đúng thay vì
@@ -81,7 +82,7 @@ class ProgressService {
             siteName: d.name,
             location: journey.tourName,
             checkinDate: d.checkedInAt == null ? '' : formatDateTime(d.checkedInAt),
-            rewardPoints: points > 0 ? '+${formatThousands(points)} điểm' : 'Đã check-in',
+            rewardPoints: points > 0 ? appL10n.rewardPlusPoints(formatThousands(points)) : appL10n.progCheckedIn,
           ),
         ));
       }

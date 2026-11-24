@@ -1,27 +1,43 @@
 import 'package:flutter/material.dart';
 
-/// Bảng màu duy nhất của app — phong cách hiện đại: nền xám lạnh, bề mặt trắng, chữ xanh than,
-/// xanh ngọc tươi làm màu chính, cam cho thứ cần chú ý, vàng cho phần thưởng.
-/// (Đồng bộ với màn "Chuyến đi" — `TripsPalette`.) Tên màu cũ được giữ để các màn không phải đổi.
+/// Bảng màu duy nhất của app — phong cách tươi sáng: nền trắng ngà lạnh, bề mặt trắng, chữ xanh than,
+/// xanh ngọc tươi (teal, đồng bộ với bản web) làm màu chính, cam đỏ cho giá, vàng cho phần thưởng.
+/// Tên màu cũ được giữ để các màn không phải đổi.
 ///
 /// Quy tắc tương phản (WCAG AA, đo trên [background] và [surface]):
 /// - Mọi màu dùng làm CHỮ trong file này đạt ≥ 4.5:1 trên nền sáng.
-/// - Chữ trắng trên [heritageJade] đạt 5.5:1, trên [jadeDark] đạt 7.6:1.
+/// - [brand] (#0EA5A4) là màu tươi để TÔ NỀN / gradient / ô icon lớn — chữ trắng trên nó chỉ ~2.9:1,
+///   nên nút có chữ trắng và chữ màu chính dùng [heritageJade] (#0B7F7E, chữ trắng 4.8:1).
 /// - Màu ghi "chỉ trang trí" không được dùng cho chữ.
 class AppCultureColors {
   // Nền & bề mặt
-  static const Color background = Color(0xFFF3F5F8); // xám lạnh, sáng
+  static const Color background = Color(0xFFF6F8FB); // trắng lạnh, sáng
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceSubtle = Color(0xFFF1F5F9);
-  static const Color border = Color(0xFFE2E8F0);
-  static const Color borderLight = Color(0xFFEEF2F6);
+  static const Color border = Color(0xFFE5EAF0);
+  static const Color borderLight = Color(0xFFEFF3F7);
 
-  // Màu chính: xanh ngọc (emerald)
-  static const Color heritageJade = Color(0xFF047857); // chữ trắng 5.5:1
-  static const Color jadeLight = Color(0xFFE6F6EF);
-  static const Color jadeDark = Color(0xFF065F46);
-  static const Color jadeGradientStart = Color(0xFF047857);
-  static const Color jadeGradientEnd = Color(0xFF064E3B);
+  /// Xanh ngọc tươi của thương hiệu — tô nền, gradient, ô icon, chấm chỉ báo. KHÔNG dùng cho chữ nhỏ.
+  static const Color brand = Color(0xFF0EA5A4);
+  static const Color brandBright = Color(0xFF2DD4BF);
+
+  /// Gradient tươi cho banner / nút nổi bật (chữ trên nó nên đậm, ≥ 16px).
+  static const List<Color> brandGradient = [Color(0xFF14B8A6), Color(0xFF0B7F7E)];
+
+  /// Bóng mềm cho thẻ trắng trên nền sáng (thay cho viền).
+  static List<BoxShadow> get softShadow => const [
+        BoxShadow(color: Color(0x0F0F172A), blurRadius: 18, offset: Offset(0, 6)),
+      ];
+
+  // Màu chính: xanh ngọc (teal) — sắc đậm đạt tương phản chữ
+  static const Color heritageJade = Color(0xFF0B7F7E); // chữ trắng 4.8:1
+  static const Color jadeLight = Color(0xFFE3F7F5);
+  static const Color jadeDark = Color(0xFF115E59);
+  static const Color jadeGradientStart = Color(0xFF0EA5A4);
+  static const Color jadeGradientEnd = Color(0xFF0B7F7E);
+
+  /// Giá tiền: cam đỏ nổi bật, vẫn đạt 4.6:1 trên nền trắng.
+  static const Color price = Color(0xFFD63A14);
 
   // Màu phụ: chàm (tên cũ "ocean" giữ lại để không phải sửa các màn khác)
   static const Color oceanBlue = Color(0xFF3346A8);
@@ -43,7 +59,7 @@ class AppCultureColors {
   static const Color skyLight = Color(0xFFE0F2FE);
 
   // Nền pastel cho header / thẻ hero sáng (dùng qua [AppTone])
-  static const Color jadeTint = Color(0xFFE6F6EF);
+  static const Color jadeTint = Color(0xFFE3F7F5);
   static const Color brassTint = Color(0xFFFEF9C3);
   static const Color skyTint = Color(0xFFE0F2FE);
   static const Color coralTint = Color(0xFFFFF1E6);
@@ -116,16 +132,16 @@ class AppCultureColors {
   static const Color lacquer600 = Color(0xFFBE123C);
   static const Color lacquer700 = Color(0xFF9F1239);
 
-  // Xanh ngọc
-  static const Color jade50 = Color(0xFFECFDF5);
-  static const Color jade100 = Color(0xFFD1FAE5);
-  static const Color jade200 = Color(0xFFA7F3D0);
-  static const Color jade300 = Color(0xFF6EE7B7);
-  static const Color jade400 = Color(0xFF34D399);
-  static const Color jade600 = Color(0xFF047857);
-  static const Color jade700 = Color(0xFF065F46);
-  static const Color jade800 = Color(0xFF064E3B);
-  static const Color jade900 = Color(0xFF022C22);
+  // Xanh ngọc (teal)
+  static const Color jade50 = Color(0xFFF0FDFA);
+  static const Color jade100 = Color(0xFFCCFBF1);
+  static const Color jade200 = Color(0xFF99F6E4);
+  static const Color jade300 = Color(0xFF5EEAD4);
+  static const Color jade400 = Color(0xFF2DD4BF);
+  static const Color jade600 = Color(0xFF0B7F7E);
+  static const Color jade700 = Color(0xFF115E59);
+  static const Color jade800 = Color(0xFF134E4A);
+  static const Color jade900 = Color(0xFF042F2E);
 
   // Xám xanh (trung tính lạnh)
   static const Color ink50 = Color(0xFFF8FAFC);
@@ -166,7 +182,7 @@ class AppTone {
 
   const AppTone({required this.strong, required this.tint, required this.soft});
 
-  static const jade = AppTone(strong: AppCultureColors.jadeDark, tint: AppCultureColors.jadeTint, soft: Color(0xFFBBEBD4));
+  static const jade = AppTone(strong: AppCultureColors.jadeDark, tint: AppCultureColors.jadeTint, soft: Color(0xFFA7EBE4));
   static const brass = AppTone(strong: AppCultureColors.brass800, tint: AppCultureColors.brassTint, soft: Color(0xFFFDE68A));
   static const sky = AppTone(strong: AppCultureColors.skyDark, tint: AppCultureColors.skyTint, soft: Color(0xFFBAE6FD));
   static const coral = AppTone(strong: AppCultureColors.coralDark, tint: AppCultureColors.coralTint, soft: Color(0xFFFED7AA));

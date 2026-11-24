@@ -8,6 +8,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/tour_journey_model.dart';
 import '../common/photo.dart';
 import 'heritage_passport.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Thẻ chia sẻ khi xong hành trình: ảnh dọc kiểu story (9:16) gồm ảnh tour, điểm, số trạm, thử thách
 /// và các dấu ấn di sản — xem trước rồi chia sẻ lên mạng xã hội dưới dạng ảnh PNG.
@@ -41,18 +42,17 @@ class _ShareSheetState extends State<_ShareSheet> {
     try {
       final image = await boundary.toImage(pixelRatio: 3);
       final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (data == null) throw StateError('Không tạo được ảnh');
+      if (data == null) throw StateError(appL10n.shareImageFailed);
       final j = widget.journey;
       await SharePlus.instance.share(ShareParams(
         files: [XFile.fromData(data.buffer.asUint8List(), mimeType: 'image/png', name: 'journeygo-hanh-trinh.png')],
-        text: 'Mình vừa hoàn thành "${j.tourName}" cùng JourneyGo: ${j.totalPoints} điểm, '
-            '${j.doneCount - j.skippedCount}/${j.totalDestinations} trạm di sản!',
-        subject: 'Hành trình di sản cùng JourneyGo',
+        text: appL10n.shareText(j.tourName, j.totalPoints, j.doneCount - j.skippedCount, j.totalDestinations),
+        subject: appL10n.shareSubject,
       ));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không chia sẻ được ảnh. Vui lòng thử lại.'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(appL10n.shareFailed), behavior: SnackBarBehavior.floating),
         );
       }
     } finally {
@@ -76,7 +76,7 @@ class _ShareSheetState extends State<_ShareSheet> {
               decoration: BoxDecoration(color: AppCultureColors.decorative, borderRadius: BorderRadius.circular(4)),
             ),
             const SizedBox(height: 14),
-            const Text('Chia sẻ thành tích',
+            Text(appL10n.sumShare,
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppCultureColors.textDark)),
             const SizedBox(height: 14),
             ConstrainedBox(
@@ -100,7 +100,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                 icon: _busy
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.ios_share_rounded, size: 20),
-                label: const Text('Chia sẻ ảnh', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                label: Text(appL10n.shareImage, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppCultureColors.heritageJade,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -126,9 +126,9 @@ class JourneyShareCard extends StatelessWidget {
     final stamped = dests.where((d) => d.checkedIn).toList();
     final shown = stamped.take(6).toList();
     final rank = switch (journey.completionRank) {
-      CompletionRank.perfect => 'HOÀN THÀNH TRỌN VẸN',
-      CompletionRank.partial => 'ĐÃ ĐI HẾT HÀNH TRÌNH',
-      _ => 'HOÀN THÀNH HÀNH TRÌNH',
+      CompletionRank.perfect => appL10n.shareRankPerfect,
+      CompletionRank.partial => appL10n.shareRankPartial,
+      _ => appL10n.shareRankDone,
     };
     return SizedBox(
       width: 360,
@@ -177,7 +177,7 @@ class JourneyShareCard extends StatelessWidget {
                   const Spacer(flex: 5),
                   Text(rank,
                       style: const TextStyle(
-                          color: Color(0xFF34D399), fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1.6)),
+                          color: Color(0xFF2DD4BF), fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1.6)),
                   const SizedBox(height: 6),
                   Text(
                     journey.tourName,
@@ -188,11 +188,11 @@ class JourneyShareCard extends StatelessWidget {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      _stat('${journey.totalPoints}', 'điểm', const Color(0xFFFACC15)),
+                      _stat('${journey.totalPoints}', appL10n.shareStatPoints, const Color(0xFFFACC15)),
                       const SizedBox(width: 8),
-                      _stat('${journey.doneCount - journey.skippedCount}/${journey.totalDestinations}', 'trạm', const Color(0xFF34D399)),
+                      _stat('${journey.doneCount - journey.skippedCount}/${journey.totalDestinations}', appL10n.shareStatStops, const Color(0xFF2DD4BF)),
                       const SizedBox(width: 8),
-                      _stat('${journey.passedTaskCount}/${journey.allTasks.length}', 'thử thách', const Color(0xFFA5B4FC)),
+                      _stat('${journey.passedTaskCount}/${journey.allTasks.length}', appL10n.shareStatChallenges, const Color(0xFFA5B4FC)),
                     ],
                   ),
                   const SizedBox(height: 18),
@@ -206,7 +206,7 @@ class JourneyShareCard extends StatelessWidget {
                       ),
                       child: Column(
                         children: [
-                          Text('DẤU ẤN DI SẢN · ${stamped.length} DẤU ẤN',
+                          Text(appL10n.shareStamps(stamped.length),
                               style: const TextStyle(
                                   fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Color(0xFF475569))),
                           const SizedBox(height: 10),
@@ -223,7 +223,7 @@ class JourneyShareCard extends StatelessWidget {
                       ),
                     ),
                   const Spacer(flex: 2),
-                  const Text('Khám phá di sản Việt cùng JourneyGo · journeygo.id.vn',
+                  Text(appL10n.shareFooter,
                       style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5, fontWeight: FontWeight.w600)),
                 ],
               ),

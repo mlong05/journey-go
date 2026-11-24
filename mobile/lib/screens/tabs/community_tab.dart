@@ -14,6 +14,7 @@ import '../forum/forum_widgets.dart';
 import '../forum/my_posts_screen.dart';
 import '../forum/post_detail_screen.dart';
 import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeletonList;
+import '../../l10n/locale_controller.dart';
 
 /// Tab Diễn đàn: bảng tin bài viết đã được kiểm duyệt, lọc theo tour (bài viết chỉ gắn tour).
 class CommunityTab extends StatefulWidget {
@@ -180,7 +181,7 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
   Future<void> _filterTour() async {
     final picked = await showForumOptionPicker(
       context,
-      title: 'Lọc theo tour',
+      title: context.l10n.forumFilterTour,
       loader: () async =>
           (await TourService().getPublishedTours()).map((t) => ForumOption(t.id, t.title)).toList(),
     );
@@ -203,8 +204,8 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
       tone: AppTone.sky,
       padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
       child: HeroTitle(
-        title: 'Diễn đàn di sản',
-        subtitle: 'Chia sẻ trải nghiệm văn hoá cùng cộng đồng',
+        title: context.l10n.forumTitle,
+        subtitle: context.l10n.forumSubtitle,
         trailing: Padding(
           padding: const EdgeInsets.only(left: 10),
           child: Material(
@@ -213,7 +214,7 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
             child: InkWell(
               customBorder: const StadiumBorder(),
               onTap: _openMyPosts,
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -221,7 +222,7 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
                     Icon(Icons.article_outlined, size: 16, color: AppCultureColors.skyDark),
                     SizedBox(width: 5),
                     Text(
-                      'Bài của tôi',
+                      context.l10n.forumMyPosts,
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppCultureColors.skyDark),
                     ),
                   ],
@@ -244,7 +245,7 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
                 ? const RewardsSkeletonList(count: 3, itemHeight: 200)
                 : RewardsMessageView(
                     icon: Icons.cloud_off_rounded,
-                    title: 'Không tải được Diễn đàn',
+                    title: context.l10n.forumLoadFailed,
                     message: _error,
                     onRetry: _load,
                   ),
@@ -298,10 +299,10 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
               height: 300,
               child: RewardsMessageView(
                 icon: Icons.forum_outlined,
-                title: filtering ? 'Không có bài viết phù hợp' : 'Chưa có bài viết nào',
+                title: filtering ? context.l10n.forumNoMatch : context.l10n.forumNoPosts,
                 message: filtering
-                    ? 'Thử bỏ bớt bộ lọc để xem thêm bài viết.'
-                    : 'Hãy là người đầu tiên chia sẻ trải nghiệm của bạn.',
+                    ? context.l10n.forumNoMatchHint
+                    : context.l10n.forumNoPostsHint,
               ),
             )
           else ...[
@@ -347,9 +348,9 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
               size: 42,
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Bạn vừa có trải nghiệm gì thú vị?',
+                context.l10n.forumComposePrompt,
                 style: TextStyle(fontSize: 14, color: AppCultureColors.textMuted),
               ),
             ),
@@ -468,15 +469,15 @@ class _CommunityTabState extends State<CommunityTab> with RefreshOnTabReturn {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              sortButton('Mới nhất', Icons.schedule_rounded, false),
-              sortButton('Nổi bật', Icons.local_fire_department_rounded, true),
+              sortButton(context.l10n.forumSortNewest, Icons.schedule_rounded, false),
+              sortButton(context.l10n.forumSortTop, Icons.local_fire_department_rounded, true),
             ],
           ),
         ),
         const SizedBox(width: 8),
         chip(
           icon: Icons.route_rounded,
-          hint: 'Lọc theo tour',
+          hint: context.l10n.forumFilterTour,
           value: _tour,
           onTap: _filterTour,
           onClear: () {
