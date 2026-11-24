@@ -11,6 +11,7 @@ import com.journeygo.modules.tour.dto.TourSlotAvailabilityResponse;
 import com.journeygo.modules.tour.entity.TourFormat;
 import com.journeygo.modules.tour.service.TourAvailabilityService;
 import com.journeygo.modules.tour.service.TourService;
+import com.journeygo.modules.tour.service.TourTranslationService;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -39,6 +41,7 @@ public class TourController {
 
     private final TourService tourService;
     private final TourAvailabilityService tourAvailabilityService;
+    private final TourTranslationService tourTranslationService;
 
     // ── Public endpoints ──────────────────────────────────────────────────────
 
@@ -64,8 +67,10 @@ public class TourController {
             description = "Mô tả, điểm nổi bật, ảnh, lịch trình, bảng giá, chính sách và các điểm dừng. "
                     + "Không trả đáp án quiz, mã QR hay ghi chú kiểm duyệt. Chỉ tour đã duyệt.")
     public ResponseEntity<ApiResponse<TourPublicDetailResponse>> getPublicDetail(@PathVariable Long tourId) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tour thành công",
-                tourService.getPublicDetail(tourId)));
+        TourPublicDetailResponse detail = tourService.getPublicDetail(tourId);
+        TourPublicDetailResponse localized = tourTranslationService.localizePublicDetail(
+                detail, LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tour thành công", localized));
     }
 
     @GetMapping("/departures")

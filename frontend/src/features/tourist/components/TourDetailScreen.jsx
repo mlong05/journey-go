@@ -364,7 +364,7 @@ function CommunityPosts({ tourId }) {
 
 /** Trang /tours/[id] — chi tiết tour công khai + khung đặt chỗ. */
 export default function TourDetailScreen({ tourId }) {
-  const t = useT();
+  const { t, locale } = useI18n();
   const [tour, setTour] = useState(null);
   const [dates, setDates] = useState([]);
   // Ngày khởi hành đang chọn — dùng chung cho thẻ "Lịch khởi hành" và khung đặt tour.
@@ -379,7 +379,7 @@ export default function TourDetailScreen({ tourId }) {
       .then(([detail, d]) => { if (alive) { setTour(detail); setDates(d); } })
       .catch((err) => alive && setError(err?.message || translate(getLocale(), "tour.notFound")));
     return () => { alive = false; };
-  }, [tourId]);
+  }, [tourId, locale]);
 
   // Ảnh bìa riêng + ảnh tour (máy chủ ghép ảnh bìa vào đầu `images` ⇒ bỏ ra khỏi album).
   const album = useMemo(() => [...new Set((tour?.images || []).filter((u) => u && u !== tour?.coverImageUrl))], [tour]);
