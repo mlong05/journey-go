@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays, Users, AlertTriangle, ChevronRight, Compass, Undo2, RotateCcw, UserRoundPlus, ArrowRight,
-  Timer, CreditCard, Loader2, Award, Ban, Smartphone, Info, ChevronDown,
+  Timer, CreditCard, Loader2, Award, Ban, Info, ChevronDown,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TripsLayout from "./TripsLayout";
@@ -359,53 +359,6 @@ function EmptyTab({ tab }) {
   );
 }
 
-/* ─────────────────────────── Cột phụ ─────────────────────────── */
-
-function Overview({ counts, spent, active, onPick }) {
-  const t = useT();
-  const rows = [
-    ["purchased", t("trips.tabPurchased"), counts.upcoming],
-    ["completed", t("trips.tabCompleted"), counts.done],
-    ["refunding", t("trips.overviewRefunding"), counts.refunding],
-    ["closed", t("trips.overviewClosed"), counts.closed],
-  ];
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-bold text-slate-900">{t("trips.overviewTitle")}</h2>
-      <ul className="mt-2 divide-y divide-slate-100">
-        {rows.map(([k, label, n]) => (
-          <li key={k}>
-            <button type="button" onClick={() => onPick(k)}
-              className={`flex w-full cursor-pointer items-center justify-between py-2 text-left text-sm transition-colors ${active === k ? "font-bold text-teal-800" : "text-slate-600 hover:text-slate-900"}`}>
-              {label}
-              <span className="font-bold tabular-nums text-slate-900">{n}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      {spent > 0 && (
-        <p className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 text-sm text-slate-600">
-          {t("trips.totalSpent")}
-          <span className="font-extrabold tabular-nums text-slate-900">{vnd(spent)}</span>
-        </p>
-      )}
-    </section>
-  );
-}
-
-function AppHint() {
-  const t = useT();
-  return (
-    <section className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4 text-sm text-teal-900">
-      <p className="flex items-center gap-1.5 font-bold"><Smartphone size={15} />{t("trips.appHintTitle")}</p>
-      <p className="mt-1 text-teal-800/90">{t("trips.appHintDesc")}</p>
-      <Link href={`${ROUTES.HOME}#tai-app`} className="mt-2 inline-flex items-center gap-1 font-bold text-teal-700 hover:text-teal-900">
-        {t("trips.downloadApp")}<ArrowRight size={14} />
-      </Link>
-    </section>
-  );
-}
-
 /* ─────────────────────────── Trang ─────────────────────────── */
 
 function Trips() {
@@ -550,14 +503,9 @@ function Trips() {
   const safePage = Math.min(page, totalPages - 1);
   const list = fullList.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
-  const spent = useMemo(() => state.items
-    .filter((b) => !guestIds.has(String(b.id)) && (b.status === "CONFIRMED" || b.status === "COMPLETED")
-      && refundStateFor(b) === "none")
-    .reduce((s, b) => s + (Number(b.totalAmount) || 0), 0), [state.items, guestIds, refundStateFor]);
-
-  // Máy tính (≥1024px): khung (tab + danh sách + cột phụ) cao cố định bằng phần còn lại của màn hình
-  // (tính từ vị trí của khung, trừ lề dưới của trang) ⇒ trang không cuộn; danh sách và cột phụ
-  // cuộn riêng bên trong. Điện thoại giữ cuộn cả trang như bình thường.
+  // Máy tính (≥1024px): khung (tab + danh sách) cao cố định bằng phần còn lại của màn hình
+  // (tính từ vị trí của khung, trừ lề dưới của trang) ⇒ trang không cuộn; danh sách cuộn riêng
+  // bên trong. Điện thoại giữ cuộn cả trang như bình thường.
   const frameRef = useRef(null);
   const panelRef = useRef(null);
   const [frameH, setFrameH] = useState(null);
@@ -597,16 +545,10 @@ function Trips() {
 
   if (state.loading) {
     return (
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]" aria-busy="true">
-        <div className="space-y-3">
-          <div className="jg-shimmer h-11 rounded-xl" />
-          <div className="jg-shimmer h-48 rounded-3xl" />
-          {[0, 1].map((i) => <div key={i} className="jg-shimmer h-[118px] rounded-2xl" />)}
-        </div>
-        <div className="hidden space-y-3 lg:block">
-          <div className="jg-shimmer h-56 rounded-2xl" />
-          <div className="jg-shimmer h-32 rounded-2xl" />
-        </div>
+      <div className="space-y-3" aria-busy="true">
+        <div className="jg-shimmer h-11 rounded-xl" />
+        <div className="jg-shimmer h-48 rounded-3xl" />
+        {[0, 1].map((i) => <div key={i} className="jg-shimmer h-[118px] rounded-2xl" />)}
       </div>
     );
   }
@@ -614,12 +556,7 @@ function Trips() {
     return <p role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"><AlertTriangle size={16} />{state.error}</p>;
   }
   if (!state.items.length) {
-    return (
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <EmptyTab tab="upcoming" />
-        <aside className="space-y-4"><AppHint /></aside>
-      </div>
-    );
+    return <EmptyTab tab="all" />;
   }
 
   const isRefundTab = tab.key === "refunding" || tab.key === "refunded";
@@ -628,10 +565,9 @@ function Trips() {
     <div className="space-y-5">
       <ActionCenter pending={pendingMine} refundNeeded={refundNeeded} onChange={setStatus} />
 
-      {/* Máy tính: khung cao cố định = phần còn lại của màn hình; hai cột cuộn riêng bên trong. */}
-      <div ref={frameRef} style={frameH ? { height: frameH } : undefined}
-        className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-stretch">
-        <div className="min-w-0 space-y-4 lg:flex lg:min-h-0 lg:flex-col">
+      {/* Máy tính: khung cao cố định = phần còn lại của màn hình; danh sách cuộn riêng bên trong. */}
+      <div ref={frameRef} style={frameH ? { height: frameH } : undefined}>
+        <div className="min-w-0 space-y-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col">
           {/* 8 tab theo trạng thái — gạch chân; không đủ chỗ thì vuốt ngang. */}
           <div ref={tablistRef} className="flex gap-1 overflow-x-auto border-b border-slate-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label={t("trips.filterTripsAria")}>
             {TRIP_TABS.map((item) => {
@@ -647,9 +583,9 @@ function Trips() {
             })}
           </div>
 
-          {/* Điện thoại: hướng dẫn hoàn tiền dạng gập/mở (máy tính nằm ở cột phụ). */}
+          {/* Hướng dẫn hoàn tiền dạng gập/mở (chỉ ở 2 tab hoàn tiền). */}
           {isRefundTab && (
-            <details className="group rounded-2xl border border-slate-200 bg-white lg:hidden">
+            <details className="group shrink-0 rounded-2xl border border-slate-200 bg-white">
               <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-bold text-slate-900">
                 <Info size={15} />{t("trips.refundPolicySummary")}
                 <ChevronDown size={16} className="ml-auto transition-transform group-open:rotate-180" />
@@ -689,28 +625,12 @@ function Trips() {
             )}
           </div>
         </div>
-
-        {/* Cột phụ đứng yên trong khung; cao hơn khung thì tự cuộn bên trong. */}
-        <aside className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-width:thin]">
-          <div className="hidden lg:block">
-            <Overview
-              counts={{
-                upcoming: groups.purchased.length,
-                done: groups.completed.length,
-                refunding: groups.refunding.length,
-                closed: groups.closed.length,
-              }}
-              spent={spent} active={tab.key} onPick={(k) => go(k)} />
-          </div>
-          {isRefundTab && <div className="hidden lg:block"><RefundGuide stacked /></div>}
-          <AppHint />
-        </aside>
       </div>
     </div>
   );
 }
 
-/** Trang /trips — khu riêng "Chuyến đi của tôi": việc cần xử lý + 8 tab chuyến đi + cột phụ tổng quan. */
+/** Trang /trips — khu riêng "Chuyến đi của tôi": việc cần xử lý + 8 tab chuyến đi. */
 export default function TripsScreen() {
   const t = useT();
   return (
