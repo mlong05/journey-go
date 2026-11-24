@@ -62,14 +62,18 @@ public class FlywayConfig {
     @Bean
     public FlywayMigrationStrategy twoPhaseFlywayMigrationStrategy() {
         return flyway -> {
-            flyway.repair();
             DataSource dataSource = flyway.getConfiguration().getDataSource();
             forgetRenumberedTourTaskMigrations(dataSource);
             cleanupFailedAchievementMigration(dataSource);
             forgetStaleRenumberedFeatureMigrations(dataSource);
+            flyway.repair();
             if (hibernateTablesExist(dataSource)) {
                 syncMissingColumnDefaults(dataSource);
-                flyway.migrate();
+                Flyway.configure()
+                        .configuration(flyway.getConfiguration())
+                        .outOfOrder(true)
+                        .load()
+                        .migrate();
                 return;
             }
             log.info("[Flyway] Database trống: chạy migration tới V{} trước, phần còn lại chạy sau khi Hibernate tạo bảng.",
@@ -98,7 +102,11 @@ public class FlywayConfig {
             // trong {@link #syncMissingColumnDefaults}).
             syncMissingColumnDefaults(dataSource);
             restoreLegacyGuestTypeColumn(dataSource);
-            var result = flyway.migrate();
+            var result = Flyway.configure()
+                    .configuration(flyway.getConfiguration())
+                    .outOfOrder(true)
+                    .load()
+                    .migrate();
             if (result.migrationsExecuted > 0) {
                 log.info("[Flyway] Đã chạy thêm {} migration sau khi Hibernate tạo bảng.", result.migrationsExecuted);
             }
@@ -328,9 +336,9 @@ public class FlywayConfig {
             }
             try (PreparedStatement ps = conn.prepareStatement("""
                     DELETE FROM flyway_schema_history
-                    WHERE (version = '14' AND description = 'tour stop tasks')
-                       OR (version = '15' AND description = 'tour stop tasks under stop')
-                       OR (version = '16' AND description = 'tour task reward')
+                    WHERE (version = '14' AND (description = 'tour stop tasks' OR script = 'V14__tour_stop_tasks.sql'))
+                       OR (version = '15' AND (description = 'tour stop tasks under stop' OR script = 'V15__tour_stop_tasks_under_stop.sql'))
+                       OR (version = '16' AND (description = 'tour task reward' OR script = 'V16__tour_task_reward.sql'))
                     """)) {
                 int removed = ps.executeUpdate();
                 if (removed > 0) {
@@ -409,17 +417,17 @@ public class FlywayConfig {
             }
             try (PreparedStatement ps = conn.prepareStatement("""
                     DELETE FROM flyway_schema_history
-                    WHERE (version = '41' AND description = 'settlement batch scope')
-                       OR (version = '42' AND description = 'payment expiry index')
-                       OR (version = '43' AND description = 'ai knowledge documents')
-                       OR (version = '44' AND description = 'ai chat human handoff')
-                       OR (version = '47' AND description = 'refund personal three tier policy')
-                       OR (version = '48' AND description = 'refund personal short description')
-                       OR (version = '47' AND description = 'tour departure info')
-                       OR (version = '48' AND description = 'user preferred language')
-                       OR (version = '49' AND description = 'settlement ten day cycle')
-                       OR (version = '50' AND description = 'settlement strict period and recreate')
-                       OR (version = '51' AND description = 'settlement cleanup rejected details')
+                    WHERE (version = '41' AND (description = 'settlement batch scope' OR script = 'V41__settlement_batch_scope.sql'))
+                       OR (version = '42' AND (description = 'payment expiry index' OR script = 'V42__payment_expiry_index.sql'))
+                       OR (version = '43' AND (description = 'ai knowledge documents' OR script = 'V43__ai_knowledge_documents.sql'))
+                       OR (version = '44' AND (description = 'ai chat human handoff' OR script = 'V44__ai_chat_human_handoff.sql'))
+                       OR (version = '47' AND (description = 'refund personal three tier policy' OR script = 'V47__refund_personal_three_tier_policy.sql'))
+                       OR (version = '48' AND (description = 'refund personal short description' OR script = 'V48__refund_personal_short_description.sql'))
+                       OR (version = '47' AND (description = 'tour departure info' OR script = 'V47__tour_departure_info.sql'))
+                       OR (version = '48' AND (description = 'user preferred language' OR script = 'V48__user_preferred_language.sql'))
+                       OR (version = '49' AND (description = 'settlement ten day cycle' OR script = 'V49__settlement_ten_day_cycle.sql'))
+                       OR (version = '50' AND (description = 'settlement strict period and recreate' OR script = 'V50__settlement_strict_period_and_recreate.sql'))
+                       OR (version = '51' AND (description = 'settlement cleanup rejected details' OR script = 'V51__settlement_cleanup_rejected_details.sql'))
                     """)) {
                 int removed = ps.executeUpdate();
                 if (removed > 0) {

@@ -4,6 +4,7 @@ import com.journeygo.modules.aiguide.config.GeminiAiProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -26,35 +27,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>⇒ Test này nạp profile {@code prod} thật và kiểm tra khóa AI có bind đúng không.
  */
-@SpringBootTest(properties = {
-    // Giả lập biến môi trường production (docker-compose truyền vào container).
-    "GEMINI_API_KEY=test-gemini-key",
-    "GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta",
-    "GEMINI_EMBEDDING_MODEL=gemini-embedding-001",
-    "GEMINI_CHAT_MODEL=gemini-3.5-flash-lite",
-
-    // application-prod.yml cố tình KHÔNG đặt giá trị mặc định cho các biến
-    // bí mật (fail-fast khi thiếu ở production). Nhưng test nạp profile "prod"
-    // thì cũng sẽ thiếu các biến đó nếu CI không truyền vào → Spring context
-    // không khởi động được (jwt.secret → JwtTokenProvider → JwtAuthenticationFilter
-    // → SecurityConfig) và cả lớp test báo lỗi.
-    //
-    // Khai báo tại đây để lớp test tự chứa: không phụ thuộc biến môi trường
-    // của máy dev lẫn của runner CI.
-    "JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
-    "JWT_ACCESS_EXPIRATION_MS=900000",
-    "JWT_REFRESH_EXPIRATION_MS=604800000",
-    "SPRING_DATASOURCE_PASSWORD=journeygo",
-    "SPRING_MAIL_USERNAME=ci@example.com",
-    "SPRING_MAIL_PASSWORD=ci-password",
-    "GOOGLE_CLIENT_ID=ci-google-client-id",
-    "GOOGLE_CLIENT_SECRET=ci-google-client-secret",
-    "VNPAY_TMN_CODE=DEMOV210",
-    "VNPAY_HASH_SECRET=ci-vnpay-hash-secret",
-    "VNPAY_IPN_URL=http://localhost/api/v1/payments/ipn",
-    "VNPAY_RETURN_URL=http://localhost/api/v1/payments/return",
-    "VNPAY_WEB_RETURN_URL=http://localhost/payments/result"
-})
+@SpringBootTest(
+    classes = GeminiAiProperties.class,
+    webEnvironment = SpringBootTest.WebEnvironment.NONE,
+    properties = {
+        // Giả lập biến môi trường production (docker-compose truyền vào container).
+        "GEMINI_API_KEY=test-gemini-key",
+        "GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta",
+        "GEMINI_EMBEDDING_MODEL=gemini-embedding-001",
+        "GEMINI_CHAT_MODEL=gemini-3.5-flash-lite"
+    }
+)
+@EnableConfigurationProperties
 @ActiveProfiles("prod")
 class AiProdConfigBindingTest {
 
