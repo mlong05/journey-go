@@ -1199,17 +1199,33 @@ public class RefundService {
     @Transactional(readOnly = true)
     public PageResponse<RefundResponse> searchAll(RefundStatus status, String keyword, Pageable pageable) {
         String kw = keyword == null ? "" : keyword.trim();
+        // ⚠️ Dùng biến thể "PendingFirst" ⇒ yêu cầu ĐANG CHỜ XỬ LÝ luôn nằm trên
+        // cùng, các yêu cầu đã kết thúc (đã hoàn / từ chối / hủy) nằm dưới.
+        // Đồng thời BỎ sort từ Pageable — thứ tự do câu truy vấn quyết định.
+        Pageable unsorted = withoutSort(pageable);
         Page<RefundRequest> page;
         if (kw.isEmpty()) {
             page = (status != null)
-                    ? refundRepository.findByStatus(status, pageable)
-                    : refundRepository.findAll(pageable);
+                    ? refundRepository.findByStatusPendingFirst(status, unsorted)
+                    : refundRepository.findAllPendingFirst(unsorted);
         } else if (status != null) {
-            page = refundRepository.searchByKeywordAndStatus(kw, status, pageable);
+            page = refundRepository.searchByKeywordAndStatusPendingFirst(kw, status, unsorted);
         } else {
-            page = refundRepository.searchByKeyword(kw, pageable);
+            page = refundRepository.searchByKeywordPendingFirst(kw, unsorted);
         }
         return PageResponse.from(page, RefundResponse::fromEntity);
+    }
+
+    /**
+     * Bỏ phần {@code Sort} của Pageable — giữ nguyên số trang / kích thước trang.
+     *
+     * <p>Dùng khi thứ tự đã được quy định sẵn trong câu truy vấn ({@code ORDER BY}).
+     */
+    private Pageable withoutSort(Pageable pageable) {
+        if (pageable == null || pageable.isUnpaged()) {
+            return pageable;
+        }
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
     }
 
     @Transactional(readOnly = true)
