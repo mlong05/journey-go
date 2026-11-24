@@ -42,8 +42,6 @@ export function KpiCard({
   sparkline,
   tone = "indigo",
   loading = false,
-  baseline,
-  baselineLabel,
   href,
   hrefLabel = "Xem chi tiết",
 }) {
@@ -95,14 +93,6 @@ export function KpiCard({
         </p>
         <Sparkline data={sparkline} stroke={t.stroke} />
       </div>
-
-      {/* Mốc so sánh — hiển thị luôn để Admin không phải tự nhớ giá trị kỳ trước. */}
-      {baseline !== undefined && baseline !== null && (
-        <p className="text-[10.5px] font-semibold text-slate-400 leading-tight">
-          {baselineLabel || "Mốc so sánh"}:{" "}
-          <span className="text-slate-500 tabular-nums">{baseline}</span>
-        </p>
-      )}
 
       {/* Drill-down — chỉ trỏ tới các trang có sẵn trong khu vực Admin. */}
       {href && (
