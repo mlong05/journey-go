@@ -14,7 +14,7 @@ const EMPTY = new Set();
  * <p>Dùng để ẨN tour đã mua khỏi danh sách du khách có thể đặt:
  * <ul>
  *   <li>trang chủ;</li>
- *   <li>trang "Tất cả tour" (/tours) — kể cả khi lọc theo Vùng / Chủ đề;</li>
+ *   <li>trang chủ (/, danh sách tour) — kể cả khi lọc theo Vùng / Chủ đề;</li>
  *   <li>ô tìm kiếm.</li>
  * </ul>
  *

@@ -12,6 +12,7 @@ import { touristService } from "../services/touristService";
 import {
   REFUND_REASON, REFUND_STATUS, REFUND_OPEN_STATUSES, dateTime, vnd,
 } from "../utils";
+import { useT, useI18n, translate, getLocale, INTL_LOCALE } from "@/i18n";
 
 /**
  * ⛔ Cửa sổ no-show — KHỚP backend `FinanceProperties.effectiveRefundNoShowWindowHours()`
@@ -84,25 +85,27 @@ function isInNoShowWindow(experienceDate, now) {
 }
 
 function RefundBadge({ status }) {
+  const t = useT();
   const st = REFUND_STATUS[status] || REFUND_STATUS.CANCELLED;
-  return <span className={`rounded-md border px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.label}</span>;
+  const key = REFUND_STATUS[status] ? `refundStatus.${status}` : "refundStatus.CANCELLED";
+  return <span className={`rounded-md border px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{t(key)}</span>;
 }
 
 /**
- * Nhãn tiếng Việt cho từng hành động trong nhật ký kiểm toán refund.
+ * Khoá dịch cho từng hành động trong nhật ký kiểm toán refund.
  * ⚠️ Khớp enum `RefundAuditLog.Action` ở backend.
  */
-const AUDIT_ACTION_LABEL = {
-  CREATED: "Đã gửi yêu cầu hoàn tiền",
-  APPROVED: "Quản trị viên đã duyệt yêu cầu",
-  REJECTED: "Quản trị viên từ chối yêu cầu",
-  VNPAY_REQUEST_SENT: "Đã gửi yêu cầu hoàn tiền tới VNPay",
-  VNPAY_RESPONSE: "VNPay đã phản hồi kết quả",
-  VNPAY_STATUS_UPDATED: "Cập nhật trạng thái hoàn tiền từ VNPay",
-  MANUAL_TRANSFER_RECORDED: "Tạo yêu cầu chuyển khoản thủ công",
-  MANUAL_TRANSFER_CONFIRMED: "Quản trị viên đã thực hiện chuyển khoản",
-  STATUS_UPDATED: "Cập nhật trạng thái yêu cầu",
-  CANCELLED: "Đã huỷ yêu cầu",
+const AUDIT_ACTION_KEY = {
+  CREATED: "refunds.audit.CREATED",
+  APPROVED: "refunds.audit.APPROVED",
+  REJECTED: "refunds.audit.REJECTED",
+  VNPAY_REQUEST_SENT: "refunds.audit.VNPAY_REQUEST_SENT",
+  VNPAY_RESPONSE: "refunds.audit.VNPAY_RESPONSE",
+  VNPAY_STATUS_UPDATED: "refunds.audit.VNPAY_STATUS_UPDATED",
+  MANUAL_TRANSFER_RECORDED: "refunds.audit.MANUAL_TRANSFER_RECORDED",
+  MANUAL_TRANSFER_CONFIRMED: "refunds.audit.MANUAL_TRANSFER_CONFIRMED",
+  STATUS_UPDATED: "refunds.audit.STATUS_UPDATED",
+  CANCELLED: "refunds.audit.CANCELLED",
 };
 
 /** Trạng thái refund đã có kết quả cuối cùng. */
@@ -150,7 +153,7 @@ function FieldRow({ label, value, tone = "default" }) {
  *
  * @returns {Array<{key, title, at, done, current, note, tone}>}
  */
-function buildRefundSteps(r) {
+function buildRefundSteps(r, t) {
   const logs = Array.isArray(r.auditLogs) ? r.auditLogs : [];
   const findLog = (action) => logs.find((l) => l.action === action);
   const status = String(r.status || "");
@@ -159,11 +162,11 @@ function buildRefundSteps(r) {
   const created = findLog("CREATED");
   const step1 = {
     key: "created",
-    title: "Đã gửi yêu cầu hoàn tiền",
+    title: t("refunds.step.createdTitle"),
     at: created?.createdAt || r.createdAt,
     done: true,
     current: false,
-    note: created?.detail || "Yêu cầu đã được gửi tới quản trị viên xem xét.",
+    note: created?.detail || t("refunds.step.createdNote"),
     tone: "teal",
   };
 
@@ -178,14 +181,14 @@ function buildRefundSteps(r) {
     .includes(status);
   const step2 = {
     key: "processing",
-    title: isProcessing ? "Đang xử lý" : "Đã xử lý",
+    title: isProcessing ? t("refunds.step.processingTitle") : t("refunds.step.processedTitle"),
     at: processingLog?.createdAt || r.reviewedAt,
     done: !isProcessing,
     current: isProcessing,
     note: processingLog?.detail
       || (isProcessing
-        ? "Quản trị viên đang xem xét yêu cầu và thực hiện hoàn tiền."
-        : "Quản trị viên đã xử lý yêu cầu."),
+        ? t("refunds.step.processingNote")
+        : t("refunds.step.processedNote")),
     tone: isProcessing ? "amber" : "sky",
   };
 
@@ -198,11 +201,11 @@ function buildRefundSteps(r) {
   const finalLog = logs.length ? logs[logs.length - 1] : null;
   const step3 = {
     key: "result",
-    title: refunded ? "Hoàn tất — đã hoàn tiền"
-      : rejected ? "Bị từ chối"
-        : failed ? "Hoàn tiền thất bại"
-          : cancelled ? "Đã huỷ yêu cầu"
-            : "Kết quả cuối cùng",
+    title: refunded ? t("refunds.step.resultRefundedTitle")
+      : rejected ? t("refundStatus.REJECTED")
+        : failed ? t("refunds.step.resultFailedTitle")
+          : cancelled ? t("refunds.step.resultCancelledTitle")
+            : t("refunds.step.resultPendingTitle"),
     // Chỉ hiện mốc thời gian khi đã có kết quả — trạng thái đang xử lý thì chưa có.
     at: !finished ? null
       : refunded ? (finalLog?.createdAt || r.vnpResolvedAt || r.transferredAt)
@@ -211,11 +214,11 @@ function buildRefundSteps(r) {
     done: finished,
     current: false,
     note: refunded
-      ? `Đã hoàn ${vnd(r.refundedAmount)} về tài khoản của bạn.`
-      : rejected ? (r.rejectionReason || "Quản trị viên đã từ chối yêu cầu này.")
-        : failed ? "Giao dịch hoàn tiền không thành công — vui lòng liên hệ hỗ trợ."
-          : cancelled ? "Yêu cầu đã được huỷ trước khi xử lý."
-            : "Đang chờ kết quả cuối cùng.",
+      ? t("refunds.step.resultRefundedNote", { amount: vnd(r.refundedAmount) })
+      : rejected ? (r.rejectionReason || t("refunds.step.resultRejectedNote"))
+        : failed ? t("refunds.step.resultFailedNote")
+          : cancelled ? t("refunds.step.resultCancelledNote")
+            : t("refunds.step.resultPendingNote"),
     tone: refunded ? "emerald" : rejected || failed ? "rose" : "slate",
   };
 
@@ -229,7 +232,8 @@ function buildRefundSteps(r) {
  * bên dưới là nhật ký chi tiết từng bước (nếu backend có trả về).
  */
 function RefundTimeline({ r }) {
-  const steps = buildRefundSteps(r);
+  const t = useT();
+  const steps = buildRefundSteps(r, t);
   const logs = Array.isArray(r.auditLogs) ? r.auditLogs : [];
 
   /**
@@ -284,7 +288,7 @@ function RefundTimeline({ r }) {
   return (
     <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
       <p className="mb-3 flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
-        <Info size={13} />Lịch sử xử lý đơn hoàn tiền
+        <Info size={13} />{t("refunds.timeline.title")}
       </p>
 
       <ol className="space-y-0">
@@ -298,7 +302,7 @@ function RefundTimeline({ r }) {
             <div className="min-w-0 flex-1">
               <p className={`text-sm font-extrabold ${TEXT[s.tone]}`}>
                 {s.title}
-                {s.current && <span className="ml-2 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">đang thực hiện</span>}
+                {s.current && <span className="ml-2 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">{t("refunds.timeline.inProgress")}</span>}
               </p>
               {s.at && <p className="mt-0.5 text-[11px] font-semibold text-slate-400">{dateTime(s.at)}</p>}
               {s.note && <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{s.note}</p>}
@@ -311,7 +315,7 @@ function RefundTimeline({ r }) {
       {logs.length > 0 && (
         <details className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
           <summary className="cursor-pointer text-xs font-bold text-slate-700">
-            Xem nhật ký chi tiết ({logs.length} bước)
+            {t("refunds.timeline.viewLogs", { count: logs.length })}
           </summary>
           <ul className="mt-2 space-y-2 border-t border-dashed border-slate-200 pt-2">
             {logs.map((l) => {
@@ -323,7 +327,7 @@ function RefundTimeline({ r }) {
               return (
                 <li key={l.id ?? `${l.action}-${l.createdAt}`} className="text-xs">
                   <p className="font-bold text-slate-800">
-                    {AUDIT_ACTION_LABEL[l.action] || l.action}
+                    {AUDIT_ACTION_KEY[l.action] ? t(AUDIT_ACTION_KEY[l.action]) : l.action}
                     {l.amount != null && Number(l.amount) > 0 && (
                       <span className="ml-1.5 font-semibold text-slate-600">· {vnd(l.amount)}</span>
                     )}
@@ -338,11 +342,11 @@ function RefundTimeline({ r }) {
                           href={url}
                           target="_blank"
                           rel="noreferrer"
-                          title="Mở bằng chứng chuyển khoản"
+                          title={t("refunds.timeline.openEvidence")}
                           className="block h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element -- URL Cloudinary ngoài domain đã cấu hình */}
-                          <img src={url} alt="Bằng chứng chuyển khoản" className="h-full w-full object-cover" />
+                          <img src={url} alt={t("refunds.timeline.evidenceAlt")} className="h-full w-full object-cover" />
                         </a>
                       ))}
                     </div>
@@ -352,7 +356,7 @@ function RefundTimeline({ r }) {
                     <div className="mt-1.5 space-y-0.5">
                       {notes.map((n) => (
                         <p key={n} className="leading-relaxed text-slate-600">
-                          <span className="font-semibold text-slate-700">Ghi chú nền tảng: </span>
+                          <span className="font-semibold text-slate-700">{t("refunds.timeline.platformNoteLabel")} </span>
                           {n}
                         </p>
                       ))}
@@ -386,12 +390,13 @@ function RefundTimeline({ r }) {
  *  7. Số tiền + mốc thời gian gửi.
  */
 function RefundSummary({ r }) {
+  const t = useT();
   const approved = r.approvedAmount != null ? Number(r.approvedAmount) : null;
   const refunded = r.refundedAmount != null ? Number(r.refundedAmount) : null;
-  // Nhóm lý do Admin xác định — ưu tiên tên tiếng Việt backend gửi sẵn,
-  // fallback về nhãn tĩnh khi backend chưa có cấu hình nhóm lý do.
+  // Nhóm lý do Admin xác định — ưu tiên tên backend gửi sẵn,
+  // fallback về khoá dịch khi backend chưa có cấu hình nhóm lý do.
   const platformGroup = r.approvedReasonName
-    || REFUND_REASON[r.approvedReason]?.label
+    || (REFUND_REASON[r.approvedReason] ? t(`refundReason.${r.approvedReason}`) : null)
     || r.approvedReason
     || null;
   const platformReason = r.approvedReasonCodeName || null;
@@ -399,42 +404,42 @@ function RefundSummary({ r }) {
     <div className="space-y-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <RefundBadge status={r.status} />
-        <span className="text-xs text-slate-400">Mã {r.refundCode}</span>
+        <span className="text-xs text-slate-400">{t("refunds.summary.code", { code: r.refundCode })}</span>
       </div>
 
       {/* ── Lý do của người dùng ── */}
       {r.reasonSummary && (
-        <FieldRow label="Lý do của người dùng" value={r.reasonSummary} />
+        <FieldRow label={t("refunds.summary.userReason")} value={r.reasonSummary} />
       )}
 
       {/* ── Mô tả chi tiết của người dùng ── */}
       {r.reasonDetail && (
-        <FieldRow label="Mô tả chi tiết của người dùng" value={r.reasonDetail} tone="muted" />
+        <FieldRow label={t("refunds.summary.userDetail")} value={r.reasonDetail} tone="muted" />
       )}
 
       {/* ── Phần nền tảng đưa ra (chỉ hiện khi Admin đã xử lý) ── */}
       {(platformGroup || platformReason || r.adminNote) && (
         <div className="space-y-2 rounded-xl border border-teal-100 bg-teal-50/50 p-3">
           {platformGroup && (
-            <FieldRow label="Lỗi từ nền tảng" value={platformGroup} tone="brand" />
+            <FieldRow label={t("refunds.summary.platformCategory")} value={platformGroup} tone="brand" />
           )}
           {platformReason && (
-            <FieldRow label="Lý do nền tảng đưa ra" value={platformReason} tone="brand" />
+            <FieldRow label={t("refunds.summary.platformReason")} value={platformReason} tone="brand" />
           )}
           {r.adminNote && (
-            <FieldRow label="Ghi chú của nền tảng" value={r.adminNote} tone="brand" />
+            <FieldRow label={t("refunds.summary.platformNote")} value={r.adminNote} tone="brand" />
           )}
         </div>
       )}
 
       {/* Số tiền — không hiện "đề xuất hoàn" (có thể bằng 0 và gây hiểu nhầm). */}
       <p className="text-slate-600">
-        Số tiền đã thanh toán <b className="tabular-nums text-slate-900">{vnd(r.paymentAmount)}</b>
-        {approved != null && <> · Được duyệt <b className="tabular-nums text-slate-900">{vnd(approved)}</b></>}
-        {refunded != null && refunded > 0 && <> · Đã hoàn <b className="tabular-nums text-emerald-700">{vnd(refunded)}</b></>}
+        {t("refunds.summary.paidAmount")} <b className="tabular-nums text-slate-900">{vnd(r.paymentAmount)}</b>
+        {approved != null && <> · {t("refunds.summary.approvedAmount")} <b className="tabular-nums text-slate-900">{vnd(approved)}</b></>}
+        {refunded != null && refunded > 0 && <> · {t("refunds.summary.refundedAmount")} <b className="tabular-nums text-emerald-700">{vnd(refunded)}</b></>}
       </p>
-      {r.rejectionReason && <p className="text-rose-600">Lý do từ chối: {r.rejectionReason}</p>}
-      <p className="text-xs text-slate-400">Gửi lúc {dateTime(r.createdAt)}</p>
+      {r.rejectionReason && <p className="text-rose-600">{t("refunds.summary.rejectionReason", { reason: r.rejectionReason })}</p>}
+      <p className="text-xs text-slate-400">{t("refunds.summary.submittedAt", { time: dateTime(r.createdAt) })}</p>
       <RefundTimeline r={r} />
     </div>
   );
@@ -445,39 +450,40 @@ function RefundSummary({ r }) {
  * Số tiền do ADMIN quyết định ⇒ không hiện "dự kiến hoàn X" cho khách.
  */
 function RefundPolicyTable({ experienceDate, now }) {
+  const t = useT();
   const personalZeroed = isInNoShowWindow(experienceDate, now);
   return (
     <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 text-sm">
-      <p className="mb-3 font-bold text-slate-900">Chính sách hoàn tiền</p>
+      <p className="mb-3 font-bold text-slate-900">{t("refunds.policy.title")}</p>
       <div className="space-y-3">
         <div>
-          <p className="font-semibold text-slate-800">Lỗi từ khách hàng (huỷ tour)</p>
+          <p className="font-semibold text-slate-800">{t("refunds.policy.customerTitle")}</p>
           <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
             <li className="flex items-center justify-between gap-2">
-              <span>Huỷ trước {EARLY_CANCEL_DAYS} ngày</span>
-              <b className="text-emerald-700">Hoàn 50%</b>
+              <span>{t("refunds.policy.earlyCancel", { days: EARLY_CANCEL_DAYS })}</span>
+              <b className="text-emerald-700">{t("refunds.policy.refund50")}</b>
             </li>
             <li className="flex items-center justify-between gap-2">
-              <span>Huỷ trong vòng {NO_SHOW_WINDOW_HOURS} giờ / không đến</span>
-              <b className={personalZeroed ? "text-rose-600" : "text-slate-500"}>Hoàn 0%</b>
+              <span>{t("refunds.policy.lateCancel", { hours: NO_SHOW_WINDOW_HOURS })}</span>
+              <b className={personalZeroed ? "text-rose-600" : "text-slate-500"}>{t("refunds.policy.refund0")}</b>
             </li>
           </ul>
         </div>
         <div>
-          <p className="font-semibold text-slate-800">Lỗi hệ thống / đối tác</p>
+          <p className="font-semibold text-slate-800">{t("refunds.policy.systemTitle")}</p>
           <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-            <li className="flex items-center justify-between gap-2"><span>Sự cố từ nền tảng hoặc nhà tour</span><b className="text-emerald-700">Hoàn 100%</b></li>
+            <li className="flex items-center justify-between gap-2"><span>{t("refunds.policy.systemDesc")}</span><b className="text-emerald-700">{t("refunds.policy.refund100")}</b></li>
           </ul>
         </div>
         <div>
-          <p className="font-semibold text-slate-800">Bất khả kháng</p>
+          <p className="font-semibold text-slate-800">{t("refundReason.FORCE_MAJEURE")}</p>
           <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-            <li className="flex items-center justify-between gap-2"><span>Thiên tai, dịch bệnh, quy hoạch</span><b className="text-slate-500">Theo chính sách</b></li>
+            <li className="flex items-center justify-between gap-2"><span>{t("refunds.policy.forceMajeureDesc")}</span><b className="text-slate-500">{t("refunds.policy.perPolicy")}</b></li>
           </ul>
         </div>
       </div>
       <p className="mt-3 text-xs text-slate-500">
-        Khách chỉ mô tả lý do bằng văn bản — quản trị viên sẽ phân loại và quyết định mức hoàn khi duyệt.
+        {t("refunds.policy.footnote")}
       </p>
     </div>
   );
@@ -488,6 +494,7 @@ function RefundPolicyTable({ experienceDate, now }) {
  * hiện yêu cầu đã gửi, hoặc biểu mẫu gửi yêu cầu nếu còn trong thời hạn.
  */
 export function RefundPanel({ booking }) {
+  const { t, locale } = useI18n();
   const [state, setState] = useState({ loading: true, payment: null, refunds: [], error: "" });
   const [form, setForm] = useState({
     reasonSummary: "",
@@ -520,7 +527,7 @@ export function RefundPanel({ booking }) {
     })
     .catch((err) => setState({
       loading: false, payment: null, refunds: [],
-      error: err?.message || "Không tải được thông tin thanh toán.",
+      error: err?.message || translate(getLocale(), "refunds.error.loadPayment"),
     })), [booking.id]);
   useEffect(() => { load(); }, [load]);
 
@@ -562,7 +569,7 @@ export function RefundPanel({ booking }) {
     if (room <= 0) return;
     const accepted = picked.filter((f) => f.type.startsWith("image/")).slice(0, room);
     if (!accepted.length) {
-      setMsg({ ok: "", err: "Chỉ chấp nhận file ảnh (JPG/PNG/WEBP)." });
+      setMsg({ ok: "", err: t("refunds.error.imagesOnly") });
       return;
     }
     const slots = accepted.map((file) => ({ file, url: null, uploading: true, failed: false }));
@@ -584,15 +591,15 @@ export function RefundPanel({ booking }) {
     e.preventDefault();
     const summary = form.reasonSummary.trim();
     const detail = form.reasonDetail.trim();
-    if (!summary) { setMsg({ ok: "", err: "Vui lòng nhập lý do ngắn gọn." }); return; }
-    if (detail.length < 10) { setMsg({ ok: "", err: "Vui lòng mô tả chi tiết ít nhất 10 ký tự để quản trị viên xem xét." }); return; }
+    if (!summary) { setMsg({ ok: "", err: t("refunds.error.summaryRequired") }); return; }
+    if (detail.length < 10) { setMsg({ ok: "", err: t("refunds.error.detailMinLength") }); return; }
     const images = files.filter((f) => f.url);
     if (!images.length) {
-      setMsg({ ok: "", err: "Vui lòng đính kèm ảnh chụp biên lai giao dịch thành công (bắt buộc)." });
+      setMsg({ ok: "", err: t("refunds.error.receiptRequired") });
       return;
     }
     if (files.some((f) => f.uploading)) {
-      setMsg({ ok: "", err: "Ảnh đang tải lên — vui lòng đợi tải xong rồi gửi." });
+      setMsg({ ok: "", err: t("refunds.error.uploading") });
       return;
     }
     setBusy(true); setMsg({ ok: "", err: "" });
@@ -611,10 +618,10 @@ export function RefundPanel({ booking }) {
       setOpen(false);
       setFiles([]);
       setForm((f) => ({ ...f, reasonSummary: "", reasonDetail: "" }));
-      setMsg({ ok: "Đã gửi yêu cầu hoàn tiền. Kết quả xét duyệt sẽ được báo qua thông báo và email.", err: "" });
+      setMsg({ ok: t("refunds.success.submitted"), err: "" });
       load();
     } catch (err) {
-      setMsg({ ok: "", err: err?.message || "Không gửi được yêu cầu hoàn tiền." });
+      setMsg({ ok: "", err: err?.message || t("refunds.error.submitFailed") });
     } finally { setBusy(false); }
   };
 
@@ -634,7 +641,7 @@ export function RefundPanel({ booking }) {
   return (
     <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-5" aria-labelledby="refund-title">
       <h2 id="refund-title" className="flex items-center gap-2 font-extrabold text-slate-900">
-        <RotateCcw size={17} className="text-teal-700" />Hoàn tiền
+        <RotateCcw size={17} className="text-teal-700" />{t("refunds.panel.title")}
       </h2>
 
       {msg.ok && (
@@ -654,15 +661,22 @@ export function RefundPanel({ booking }) {
       {!active && inWindow && !open && (
         <div className="mt-3">
           <p className="text-sm text-slate-600">
-            Bạn có thể gửi yêu cầu hoàn tiền trước ngày trải nghiệm
-            {experienceDate ? <> (<b>{experienceDate.toLocaleDateString("vi-VN")}</b>)</> : null}.
+            {experienceDate ? (
+              <>
+                {t("refunds.panel.canRequestBeforePrefix")}
+                <b>{experienceDate.toLocaleDateString(INTL_LOCALE[locale])}</b>
+                {t("refunds.panel.canRequestBeforeSuffix")}
+              </>
+            ) : (
+              t("refunds.panel.canRequestBeforeNoDate")
+            )}
           </p>
           <button
             type="button"
             onClick={() => setOpen(true)}
             className="mt-3 cursor-pointer rounded-xl border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50"
           >
-            Yêu cầu hoàn tiền
+            {t("refunds.panel.requestBtn")}
           </button>
         </div>
       )}
@@ -670,8 +684,7 @@ export function RefundPanel({ booking }) {
       {!active && !inWindow && refunds.length === 0 && (
         <p className="mt-3 flex items-start gap-1.5 text-sm text-slate-500">
           <Info size={15} className="mt-0.5 shrink-0" />
-          Tour đã bắt đầu hoặc hoàn thành trải nghiệm nên không gửi yêu cầu hoàn tiền trực tuyến được.
-          Nếu có sự cố, hãy nhắn tin cho nhà tour qua mục Tin nhắn.
+          {t("refunds.panel.windowClosed")}
         </p>
       )}
 
@@ -681,7 +694,7 @@ export function RefundPanel({ booking }) {
 
           <div>
             <label htmlFor="refund-summary" className="mb-1 block text-sm font-bold text-slate-800">
-              Lý do ngắn gọn <span className="text-rose-600">*</span>
+              {t("refunds.form.summaryLabel")} <span className="text-rose-600">*</span>
             </label>
             <LimitedField
               as="input"
@@ -690,14 +703,14 @@ export function RefundPanel({ booking }) {
               id="refund-summary"
               value={form.reasonSummary}
               onChange={(e) => setForm((f) => ({ ...f, reasonSummary: e.target.value }))}
-              placeholder="Ví dụ: Bị ốm đột xuất"
+              placeholder={t("refunds.form.summaryPlaceholder")}
               className={input}
             />
           </div>
 
           <div>
             <label htmlFor="refund-detail" className="mb-1 block text-sm font-bold text-slate-800">
-              Mô tả chi tiết <span className="text-rose-600">*</span>
+              {t("refunds.form.detailLabel")} <span className="text-rose-600">*</span>
             </label>
             <LimitedField
               as="textarea"
@@ -707,7 +720,7 @@ export function RefundPanel({ booking }) {
               rows={4}
               value={form.reasonDetail}
               onChange={(e) => setForm((f) => ({ ...f, reasonDetail: e.target.value }))}
-              placeholder="Mô tả rõ tình huống: thời điểm xảy ra, bạn đã liên hệ ai, bằng chứng kèm theo…"
+              placeholder={t("refunds.form.detailPlaceholder")}
               className={`${input} resize-none`}
             />
           </div>
@@ -716,17 +729,17 @@ export function RefundPanel({ booking }) {
           <div>
             <p className="mb-1 flex items-center gap-1.5 text-sm font-bold text-slate-800">
               <ShieldCheck size={15} className="text-teal-700" />
-              Ảnh biên lai giao dịch <span className="text-rose-600">*</span>
+              {t("refunds.form.receiptLabel")} <span className="text-rose-600">*</span>
             </p>
             <p className="mb-2 text-xs text-slate-500">
-              Bắt buộc đính kèm ảnh chụp màn hình giao dịch thành công (tối đa {MAX_EVIDENCE_FILES} ảnh).
+              {t("refunds.form.receiptHelp", { max: MAX_EVIDENCE_FILES })}
             </p>
             <div className="flex flex-wrap gap-2">
               {files.map((f) => (
                 <div key={f.url || f.file.name} className="relative h-20 w-20 overflow-hidden rounded-xl border border-slate-200">
                   {f.url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={f.url} alt="Bằng chứng" className="h-full w-full object-cover" />
+                    <img src={f.url} alt={t("refunds.form.evidenceAlt")} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-slate-50 text-slate-400">
                       {f.uploading ? <Loader2 size={18} className="animate-spin" /> : <X size={18} />}
@@ -735,7 +748,7 @@ export function RefundPanel({ booking }) {
                   <button
                     type="button"
                     onClick={() => removeFile(f.file)}
-                    aria-label="Xoá ảnh"
+                    aria-label={t("refunds.form.removeImage")}
                     className="absolute right-1 top-1 cursor-pointer rounded-full bg-slate-900/70 p-0.5 text-white"
                   >
                     <X size={12} />
@@ -749,7 +762,7 @@ export function RefundPanel({ booking }) {
                   className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-700"
                 >
                   <ImagePlus size={18} />
-                  <span className="text-[10px] font-semibold">Thêm ảnh</span>
+                  <span className="text-[10px] font-semibold">{t("refunds.form.addImage")}</span>
                 </button>
               )}
             </div>
@@ -773,22 +786,21 @@ export function RefundPanel({ booking }) {
           >
             <h3 id="refund-payout-title" className="flex items-center gap-1.5 font-extrabold text-slate-900">
               <Info size={15} className="text-teal-700" />
-              Thông tin liên hệ &amp; Tài khoản nhận tiền
+              {t("refunds.form.payoutTitle")}
             </h3>
             <p className="mt-1.5 text-xs text-slate-600">
-              Thường tiền được hoàn về phương thức đã thanh toán qua VNPay. Chỉ cần điền khi
-              quản trị viên chọn chuyển khoản thủ công — nhưng điền sẵn giúp xử lý nhanh hơn.
+              {t("refunds.form.payoutHelp")}
             </p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="refund-contact-phone" className="mb-1 block text-xs font-bold text-slate-700">
-                  Số điện thoại liên hệ
+                  {t("refunds.form.contactPhone")}
                 </label>
                 <input
                   id="refund-contact-phone"
-                  aria-label="Số điện thoại liên hệ"
-                  placeholder="Số điện thoại liên hệ"
+                  aria-label={t("refunds.form.contactPhone")}
+                  placeholder={t("refunds.form.contactPhone")}
                   inputMode="tel"
                   maxLength={PHONE_MAX}
                   className={input}
@@ -799,12 +811,12 @@ export function RefundPanel({ booking }) {
               </div>
               <div>
                 <label htmlFor="refund-contact-email" className="mb-1 block text-xs font-bold text-slate-700">
-                  Email dự phòng
+                  {t("refunds.form.contactEmail")}
                 </label>
                 <input
                   id="refund-contact-email"
-                  aria-label="Email dự phòng"
-                  placeholder="Email dự phòng"
+                  aria-label={t("refunds.form.contactEmail")}
+                  placeholder={t("refunds.form.contactEmail")}
                   type="email"
                   maxLength={EMAIL_MAX}
                   className={input}
@@ -818,27 +830,27 @@ export function RefundPanel({ booking }) {
             <div className="mt-1 grid gap-3 sm:grid-cols-3">
               <div>
                 <label htmlFor="refund-bank-name" className="mb-1 block text-xs font-bold text-slate-700">
-                  Ngân hàng
+                  {t("refunds.form.bankName")}
                 </label>
                 <select
                   id="refund-bank-name"
-                  aria-label="Ngân hàng"
+                  aria-label={t("refunds.form.bankName")}
                   className={`${input} cursor-pointer appearance-none bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2364748b%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>')] bg-[length:16px] bg-[right_0.6rem_center] bg-no-repeat pr-9`}
                   value={form.bankName}
                   onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))}
                 >
-                  <option value="">— Chọn ngân hàng —</option>
+                  <option value="">{t("refunds.form.selectBank")}</option>
                   {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
               <div>
                 <label htmlFor="refund-bank-number" className="mb-1 block text-xs font-bold text-slate-700">
-                  Số tài khoản
+                  {t("refunds.form.bankAccountNumber")}
                 </label>
                 <input
                   id="refund-bank-number"
-                  aria-label="Số tài khoản"
-                  placeholder="Số tài khoản"
+                  aria-label={t("refunds.form.bankAccountNumber")}
+                  placeholder={t("refunds.form.bankAccountNumber")}
                   inputMode="numeric"
                   maxLength={BANK_ACCOUNT_NUMBER_MAX}
                   className={input}
@@ -849,12 +861,12 @@ export function RefundPanel({ booking }) {
               </div>
               <div>
                 <label htmlFor="refund-bank-name-owner" className="mb-1 block text-xs font-bold text-slate-700">
-                  Tên chủ tài khoản
+                  {t("refunds.form.bankAccountName")}
                 </label>
                 <input
                   id="refund-bank-name-owner"
-                  aria-label="Tên chủ tài khoản"
-                  placeholder="Tên chủ tài khoản"
+                  aria-label={t("refunds.form.bankAccountName")}
+                  placeholder={t("refunds.form.bankAccountName")}
                   maxLength={BANK_ACCOUNT_NAME_MAX}
                   className={input}
                   value={form.bankAccountName}
@@ -877,14 +889,14 @@ export function RefundPanel({ booking }) {
               disabled={busy}
               className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60"
             >
-              {busy && <Loader2 size={15} className="animate-spin" />}Gửi yêu cầu hoàn tiền
+              {busy && <Loader2 size={15} className="animate-spin" />}{t("refunds.form.submitBtn")}
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
               className="cursor-pointer rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600"
             >
-              Để sau
+              {t("refunds.form.later")}
             </button>
           </div>
         </form>
@@ -897,18 +909,21 @@ export function RefundPanel({ booking }) {
  * Hướng dẫn hoàn tiền — hiện ở tab "Đang hoàn tiền" / "Đã hoàn tiền" của trang Chuyến đi của tôi
  * (các đơn có yêu cầu hoàn tiền đã được gom vào 2 tab đó).
  */
-export function RefundGuide() {
+/** stacked: xếp dọc (dùng trong cột phụ trang Chuyến đi của tôi). */
+export function RefundGuide({ stacked = false }) {
+  const t = useT();
   return (
-    <div className="mb-4 grid gap-3 sm:grid-cols-2">
+    <div className={stacked ? "grid gap-3" : "mb-4 grid gap-3 sm:grid-cols-2"}>
       <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-        <p className="flex items-center gap-1.5 font-bold text-slate-900"><Info size={15} />Cách gửi yêu cầu</p>
-        <p className="mt-1">Mở đơn đã thanh toán ở tab <b>Đã mua</b>, chọn &quot;Yêu cầu hoàn tiền&quot; trước ngày trải nghiệm.</p>
+        <p className="flex items-center gap-1.5 font-bold text-slate-900"><Info size={15} />{t("refunds.guide.howToTitle")}</p>
+        <p className="mt-1">
+          {t("refunds.guide.howToBefore")}<b>{t("refunds.guide.upcomingTab")}</b>{t("refunds.guide.howToAfter")}
+        </p>
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-        <p className="flex items-center gap-1.5 font-bold text-slate-900"><LifeBuoy size={15} />Mức hoàn</p>
+        <p className="flex items-center gap-1.5 font-bold text-slate-900"><LifeBuoy size={15} />{t("refunds.guide.ratesTitle")}</p>
         <p className="mt-1">
-          Huỷ trước {EARLY_CANCEL_DAYS} ngày: hoàn 50%. Lỗi từ nền tảng hoặc nhà tour: hoàn 100%
-          sau khi quản trị viên xác minh. Trong vòng {NO_SHOW_WINDOW_HOURS} giờ trước giờ khởi hành: không hoàn.
+          {t("refunds.guide.ratesDesc", { days: EARLY_CANCEL_DAYS, hours: NO_SHOW_WINDOW_HOURS })}
         </p>
       </div>
     </div>

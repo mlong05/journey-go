@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Loader2, Bell, CheckCheck, ArrowRight } from "lucide-react";
 import AccountLayout from "./AccountLayout";
 import { useNotifications } from "@/context/NotificationContext";
-import { metaOf, timeAgo } from "@/components/notifications/notificationMeta";
+import { categoryLabel, metaOf, timeAgo } from "@/components/notifications/notificationMeta";
+import { useT, useI18n } from "@/i18n";
 
 /**
  * Trang /account/notifications — danh sách thông báo đầy đủ của du khách.
@@ -14,8 +15,9 @@ import { metaOf, timeAgo } from "@/components/notifications/notificationMeta";
  * luồng SSE. Bấm vào thông báo có `link` sẽ chuyển tới đơn / tour / trang hoàn tiền.
  */
 export default function NotificationsScreen() {
+  const t = useT();
   return (
-    <AccountLayout title="Thông báo" description="Trạng thái đơn, kết quả hoàn tiền, lời mời tham gia tour và phần thưởng của bạn.">
+    <AccountLayout title={t("notif.title")} description={t("notif.description")}>
       {/* ⚠️ `useNotifications` phải được gọi BÊN TRONG <AccountLayout> (→ TouristShell →
           TouristNotificationProvider). Nếu gọi ở component ngoài thì useContext sẽ trả null
           ⇒ trang luôn hiện "Chưa có thông báo" dù chuông có dữ liệu. */}
@@ -27,6 +29,7 @@ export default function NotificationsScreen() {
 /** Nội dung danh sách thông báo — nằm bên trong provider để đọc được context. */
 function NotificationList() {
   const ctx = useNotifications();
+  const { t, locale } = useI18n();
   const [tab, setTab] = useState("all");
 
   const items = useMemo(() => {
@@ -39,8 +42,8 @@ function NotificationList() {
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-xl bg-slate-100 p-0.5 text-sm font-semibold" role="tablist" aria-label="Lọc thông báo">
-          {[["all", "Tất cả"], ["unread", `Chưa đọc${unread ? ` (${unread})` : ""}`]].map(([key, label]) => (
+        <div className="inline-flex rounded-xl bg-slate-100 p-0.5 text-sm font-semibold" role="tablist" aria-label={t("notif.filter")}>
+          {[["all", t("common.all")], ["unread", `${t("notif.unread")}${unread ? ` (${unread})` : ""}`]].map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -61,21 +64,21 @@ function NotificationList() {
             onClick={() => ctx?.markAllRead()}
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-bold text-teal-700 hover:border-teal-300 hover:bg-teal-50"
           >
-            <CheckCheck size={15} />Đánh dấu đã đọc tất cả
+            <CheckCheck size={15} />{t("notif.markAllRead")}
           </button>
         )}
       </div>
 
       {ctx?.loading ? (
-        <p className="flex gap-2 py-10 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />Đang tải…</p>
+        <p className="flex gap-2 py-10 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />{t("common.loading")}</p>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <Bell size={30} className="mx-auto text-teal-600" />
           <p className="mt-2 font-bold text-slate-800">
-            {tab === "unread" ? "Bạn đã đọc hết thông báo" : "Chưa có thông báo"}
+            {tab === "unread" ? t("notif.allRead") : t("notif.empty")}
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            Khi đơn được xác nhận, hoàn tiền có kết quả hoặc bạn nhận huy hiệu, thông báo sẽ hiện ở đây.
+            {t("notif.emptyDesc")}
           </p>
         </div>
       ) : (
@@ -101,18 +104,18 @@ function NotificationList() {
                       <span className={`flex-1 text-sm leading-snug ${n.read ? "font-semibold text-slate-700" : "font-extrabold text-slate-900"}`}>
                         {n.title}
                       </span>
-                      {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-label="Chưa đọc" />}
+                      {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-label={t("notif.unread")} />}
                     </span>
                     {n.body && <span className="mt-1 block text-[13px] leading-relaxed text-slate-600">{n.body}</span>}
                     <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
-                      <span>{meta.label}</span>
+                      <span>{categoryLabel(t, n.category)}</span>
                       <span aria-hidden="true">·</span>
-                      <time dateTime={n.createdAt}>{timeAgo(n.createdAt)}</time>
+                      <time dateTime={n.createdAt}>{timeAgo(n.createdAt, t, locale)}</time>
                       {n.link && (
                         <>
                           <span aria-hidden="true">·</span>
                           <span className="inline-flex items-center gap-0.5 font-semibold text-teal-700">
-                            Xem <ArrowRight size={11} />
+                            {t("common.view")} <ArrowRight size={11} />
                           </span>
                         </>
                       )}
@@ -131,7 +134,7 @@ function NotificationList() {
           onClick={() => ctx?.loadMore()}
           className="mt-4 w-full cursor-pointer rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-600 hover:border-teal-300"
         >
-          Xem thông báo cũ hơn
+          {t("notif.loadOlder")}
         </button>
       )}
     </>

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { useT } from "@/i18n";
 
 /**
  * Form Đăng nhập hệ thống phỏng theo thiết kế Hình 2 (Travelista Tours):
@@ -19,6 +20,7 @@ export default function LoginForm({
   onShowToast,
   onForgotPassword,
 }) {
+  const t = useT();
   return (
     <form onSubmit={onSubmit} className="space-y-4 w-full">
       {/* Trường Email / Tên tài khoản - Viền bo tròn xanh da trời với nhãn nổi như Hình 2 */}
@@ -26,7 +28,7 @@ export default function LoginForm({
         <div className="relative w-full rounded-2xl border border-stone-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-4 focus-within:ring-emerald-600/10 bg-white transition-all">
           {/* Nhãn nổi Email đăng nhập */}
           <label className="absolute -top-2.5 left-4 bg-white px-2 text-[11px] font-bold text-emerald-800 tracking-wide select-none z-10">
-            Email đăng nhập
+            {t("misc.login.emailLabel")}
           </label>
 
           <div className="flex items-center px-4 h-12 sm:h-13">
@@ -52,7 +54,7 @@ export default function LoginForm({
         <div className="relative w-full rounded-2xl border border-stone-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-4 focus-within:ring-emerald-600/10 bg-white transition-all">
           {/* Nhãn nổi Mật khẩu */}
           <label className="absolute -top-2.5 left-4 bg-white px-2 text-[11px] font-bold text-emerald-800 tracking-wide select-none z-10">
-            Mật khẩu
+            {t("misc.login.passwordLabel")}
           </label>
 
           <div className="flex items-center px-4 h-12 sm:h-13">
@@ -73,7 +75,7 @@ export default function LoginForm({
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="text-slate-400 hover:text-slate-600 cursor-pointer p-1 transition-colors shrink-0"
-              title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+              title={showPassword ? t("misc.login.hidePassword") : t("misc.login.showPassword")}
             >
               {showPassword ? (
                 <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -94,13 +96,13 @@ export default function LoginForm({
               } else {
                 onShowToast?.(
                   "info",
-                  "Vui lòng liên hệ quản trị viên để khôi phục mật khẩu."
+                  t("misc.login.forgotContactAdmin")
                 );
               }
             }}
             className="text-[11px] sm:text-xs font-medium text-slate-400 hover:text-emerald-700 transition-colors cursor-pointer"
           >
-            Quên mật khẩu?
+            {t("misc.login.forgotPassword")}
           </button>
         </div>
       </div>
@@ -117,7 +119,7 @@ export default function LoginForm({
             className="w-4 h-4 text-emerald-800 rounded border-slate-300 focus:ring-emerald-600 cursor-pointer accent-emerald-700"
           />
           <span className="text-[11px] sm:text-xs text-slate-500">
-            Ghi nhớ phiên đăng nhập trên thiết bị
+            {t("misc.login.rememberMe")}
           </span>
         </label>
       </div>
@@ -131,10 +133,10 @@ export default function LoginForm({
         {loading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin text-white" />
-            <span>Đang đăng nhập...</span>
+            <span>{t("misc.login.submitting")}</span>
           </>
         ) : (
-          <span>Đăng nhập</span>
+          <span>{t("common.login")}</span>
         )}
       </button>
     </form>

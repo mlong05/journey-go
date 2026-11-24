@@ -450,6 +450,24 @@ export default function CustomerPreview({ tour }) {
               </>
             )}
 
+            {(tour.departureTime || tour.meetingPoint || tour.pickupInfo) && (
+              <>
+                <SectionTitle>Khởi hành và tập trung</SectionTitle>
+                <div className="mx-3.5 rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 text-[11.5px]">
+                  {[[Clock, "Giờ khởi hành", tour.departureTime], [MapPin, "Địa điểm tập trung", tour.meetingPoint], [Route, "Giờ đón và điểm đón", tour.pickupInfo]]
+                    .filter(([, , v]) => v).map(([Icon, k, v]) => (
+                      <div key={k} className="flex gap-2">
+                        <Icon size={13} className="mt-0.5 shrink-0 text-emerald-600" />
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900">{k}</p>
+                          <p className="text-slate-600 whitespace-pre-line">{v}</p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </>
+            )}
+
             {policies.length > 0 && (
               <>
                 <SectionTitle>Thông tin cần lưu ý</SectionTitle>

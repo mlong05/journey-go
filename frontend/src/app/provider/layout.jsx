@@ -10,7 +10,7 @@ import {
   Wallet,
   UserCog,
 } from "lucide-react";
-import { useAuthSession } from "@/hooks";
+import { useRequireLogin } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
 import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout";
 import { NotificationProvider } from "@/context/NotificationContext";
@@ -74,7 +74,7 @@ const PROVIDER_NAV_ITEMS = [
 
 export default function ProviderLayout({ children }) {
   const pathname = usePathname();
-  const authData = useAuthSession();
+  const authData = useRequireLogin();
   const { performLogout, logoutModal } = useLogout();
 
   // Khóa triệt để thanh cuộn của window/body để loại bỏ hoàn toàn thanh cuộn ngoài cùng của cả trang

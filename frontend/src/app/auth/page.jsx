@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { translateAuthError } from "@/services/errorMessage";
+import { useT } from "@/i18n";
+import LanguageSwitcher from "@/components/common/LanguageSwitcher";
 import {
   Compass,
   Sparkles,
@@ -50,41 +52,38 @@ const buildAuthUrl = (endpoint) => {
 const SLIDE_ITEMS = [
   {
     id: "trangan",
-    shortName: "Tràng An",
-    name: "Tràng An - Ninh Bình",
-    tag: "Di sản Kép Thế giới UNESCO",
-    slogan: "Chạm vào Hành trình - Khám phá Di sản",
-    subSlogan: "Quần thể danh thắng thiên nhiên & văn hoá kỳ vĩ giữa lòng cố đô Hoa Lư.",
-    quote:
-      "Nơi hội tụ trầm tích lịch sử ngàn năm, kết nối con người với thiên nhiên nguyên sơ, tạo tác nên tuyệt phẩm sơn thủy hữu tình.",
-    statNumber: "3,500+ ha",
-    statLabel: "Vùng lõi bảo tồn nghiêm ngặt",
+    shortNameKey: "misc.slide.trangan.shortName",
+    nameKey: "misc.slide.trangan.name",
+    tagKey: "misc.legacySlide.trangan.tag",
+    sloganKey: "misc.legacySlide.trangan.slogan",
+    subSloganKey: "misc.legacySlide.trangan.subSlogan",
+    quoteKey: "misc.legacySlide.trangan.quote",
+    statNumberKey: "misc.legacySlide.trangan.statNumber",
+    statLabelKey: "misc.legacySlide.trangan.statLabel",
     image: "/image/trangan.jpg",
   },
   {
     id: "hoian",
-    shortName: "Hội An",
-    name: "Phố Cổ Hội An - Quảng Nam",
-    tag: "Di sản Văn hóa Thế giới",
-    slogan: "Lung linh Đèn lồng - Dấu ấn Thương cảng",
-    subSlogan: "Không gian kiến trúc cổ kính giao thoa tinh hoa văn hóa Á - Âu thế kỷ XVII.",
-    quote:
-      "Mỗi mái ngói rêu phong, mỗi góc phố cổ là một câu chuyện lịch sử sống động trường tồn cùng dòng sông Hoài thơ mộng.",
-    statNumber: "400+ năm",
-    statLabel: "Lịch sử thương cảng quốc tế",
+    shortNameKey: "misc.slide.hoian.shortName",
+    nameKey: "misc.legacySlide.hoian.name",
+    tagKey: "misc.slide.hoian.tag",
+    sloganKey: "misc.legacySlide.hoian.slogan",
+    subSloganKey: "misc.legacySlide.hoian.subSlogan",
+    quoteKey: "misc.legacySlide.hoian.quote",
+    statNumberKey: "misc.legacySlide.hoian.statNumber",
+    statLabelKey: "misc.legacySlide.hoian.statLabel",
     image: "/image/hoian.jpg",
   },
   {
     id: "vanmieu",
-    shortName: "Văn Miếu",
-    name: "Văn Miếu Quốc Tử Giám - Hà Nội",
-    tag: "Di tích Quốc gia Đặc biệt",
-    slogan: "Ngàn năm Văn hiến - Tinh hoa Đạo học",
-    subSlogan: "Trường đại học đầu tiên của Việt Nam, nơi lưu giữ 82 bia tiến sĩ trứ danh.",
-    quote:
-      "Hiền tài là nguyên khí quốc gia, cội nguồn sức mạnh và hưng thịnh của dân tộc Việt Nam qua bao thăng trầm thời đại.",
-    statNumber: "82 Bia",
-    statLabel: "Di sản Tư liệu Thế giới UNESCO",
+    shortNameKey: "misc.slide.vanmieu.shortName",
+    nameKey: "misc.legacySlide.vanmieu.name",
+    tagKey: "misc.slide.vanmieu.tag",
+    sloganKey: "misc.legacySlide.vanmieu.slogan",
+    subSloganKey: "misc.legacySlide.vanmieu.subSlogan",
+    quoteKey: "misc.legacySlide.vanmieu.quote",
+    statNumberKey: "misc.legacySlide.vanmieu.statNumber",
+    statLabelKey: "misc.legacySlide.vanmieu.statLabel",
     image: "/image/vanmieu.jpg",
   },
 ];
@@ -97,31 +96,32 @@ const SAMPLE_ROLES = [
   {
     id: "admin",
     roleEnum: "ADMIN",
-    title: "Quản trị viên",
+    titleKey: "misc.role.admin.title",
     redirectPath: "/admin",
   },
   {
     id: "moderator",
     roleEnum: "CONTENT_MODERATOR",
-    title: "Kiểm duyệt viên",
+    titleKey: "misc.role.moderator.title",
     redirectPath: "/moderator",
   },
   {
     id: "provider",
     roleEnum: "CONTENT_PROVIDER",
-    title: "Đối tác cung cấp nội dung",
+    titleKey: "misc.role.provider.title",
     redirectPath: "/provider",
   },
   {
     id: "tourist",
     roleEnum: "TOURIST",
-    title: "Khách du lịch",
+    titleKey: "misc.role.tourist.title",
     redirectPath: "/",
   },
 ];
 
 export default function AuthPage() {
   const router = useRouter();
+  const t = useT();
 
   // Tab chính: "login" | "register" | "forgot_password"
   const [activeTab, setActiveTab] = useState("login");
@@ -242,11 +242,11 @@ export default function AuthPage() {
     const password = loginForm.password;
 
     if (!email) {
-      showToast("error", "Vui lòng nhập Email hoặc Tên tài khoản.");
+      showToast("error", t("misc.auth.errEmptyEmail"));
       return;
     }
     if (!password) {
-      showToast("error", "Vui lòng nhập Mật khẩu bảo mật.");
+      showToast("error", t("misc.auth.errEmptyPassword"));
       return;
     }
 
@@ -265,7 +265,7 @@ export default function AuthPage() {
       const result = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(result?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
+        throw new Error(result?.message || t("misc.authPage.loginFailedCheck"));
       }
 
       const payload = result?.data || result;
@@ -275,17 +275,17 @@ export default function AuthPage() {
 
       const roleStr = String(user?.role || "TOURIST").toUpperCase();
       let targetPath = "/";
-      let roleTitle = "Du khách khám phá";
+      let roleTitle = t("misc.role.tourist.titleExplorer");
 
       if (roleStr === "ADMIN") {
         targetPath = "/admin";
-        roleTitle = "Quản trị viên";
+        roleTitle = t("misc.role.admin.title");
       } else if (roleStr === "CONTENT_MODERATOR") {
         targetPath = "/moderator";
-        roleTitle = "Kiểm duyệt viên";
+        roleTitle = t("misc.role.moderator.title");
       } else if (roleStr === "CONTENT_PROVIDER") {
         targetPath = "/provider";
-        roleTitle = "Đối tác cung cấp nội dung";
+        roleTitle = t("misc.role.provider.title");
       }
 
       const authSession = {
@@ -310,7 +310,7 @@ export default function AuthPage() {
         window.dispatchEvent(new Event("storage"));
       }
 
-      showToast("success", `Đăng nhập thành công với vai trò ${roleTitle}!`);
+      showToast("success", t("misc.authPage.loginSuccessRole", { roleTitle }));
       setTimeout(() => {
         router.push(targetPath);
       }, 1000);
@@ -318,7 +318,7 @@ export default function AuthPage() {
       console.error("[Login Error]", err);
       showToast(
         "error",
-        translateAuthError(err, "Đăng nhập thất bại. Vui lòng kiểm tra lại.")
+        translateAuthError(err, t("misc.authPage.loginFailedShort"))
       );
     } finally {
       setLoading(false);
@@ -332,27 +332,27 @@ export default function AuthPage() {
     e.preventDefault();
 
     if (!registerForm.fullName.trim()) {
-      showToast("error", "Vui lòng nhập Họ và tên.");
+      showToast("error", t("misc.authPage.errName"));
       return;
     }
     if (!registerForm.phone.trim()) {
-      showToast("error", "Vui lòng cung cấp Số điện thoại.");
+      showToast("error", t("misc.authPage.errPhone"));
       return;
     }
     if (!registerForm.email.trim()) {
-      showToast("error", "Vui lòng nhập Email hợp lệ.");
+      showToast("error", t("misc.authPage.errEmail"));
       return;
     }
     if (registerForm.password.length < 6) {
-      showToast("error", "Mật khẩu cần tối thiểu 6 ký tự.");
+      showToast("error", t("misc.authPage.errPassMin"));
       return;
     }
     if (registerForm.password !== registerForm.confirmPassword) {
-      showToast("error", "Mật khẩu xác nhận không trùng khớp.");
+      showToast("error", t("misc.authPage.errPassMatch"));
       return;
     }
     if (!registerForm.agreeTerms) {
-      showToast("error", "Vui lòng đồng ý với Điều khoản & Quy chế hoạt động.");
+      showToast("error", t("misc.auth.errAgreeTerms"));
       return;
     }
 
@@ -379,10 +379,10 @@ export default function AuthPage() {
       const result = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(result?.message || "Đăng ký không thành công. Vui lòng thử lại.");
+        throw new Error(result?.message || t("misc.auth.registerFailedRetry"));
       }
 
-      showToast("success", "Đăng ký tài khoản thành công! Vui lòng đăng nhập.");
+      showToast("success", t("misc.authPage.regSuccess"));
       setLoginForm((prev) => ({
         ...prev,
         identifier: registerForm.email.trim(),
@@ -391,7 +391,7 @@ export default function AuthPage() {
       setActiveTab("login");
     } catch (err) {
       console.error("[Register Error]", err);
-      showToast("error", err?.message || "Đăng ký không thành công.");
+      showToast("error", err?.message || t("misc.authPage.regFailedShort"));
     } finally {
       setLoading(false);
     }
@@ -409,7 +409,7 @@ export default function AuthPage() {
     if (!targetEmail) {
       setInlineAlert({
         type: "error",
-        message: "Vui lòng nhập địa chỉ email tài khoản của bạn.",
+        message: t("misc.forgot.errEmailEmpty"),
       });
       return;
     }
@@ -418,7 +418,7 @@ export default function AuthPage() {
     if (!emailRegex.test(targetEmail)) {
       setInlineAlert({
         type: "error",
-        message: "Định dạng email không hợp lệ. Vui lòng kiểm tra lại.",
+        message: t("misc.forgot.errEmailInvalid"),
       });
       return;
     }
@@ -440,14 +440,14 @@ export default function AuthPage() {
 
       if (!res.ok) {
         if (res.status === 404 || result?.message?.includes("USER_NOT_EXISTED")) {
-          throw new Error("Email này chưa được đăng ký trong hệ thống JourneyGo.");
+          throw new Error(t("misc.forgot.errEmailNotRegistered"));
         }
-        throw new Error(result?.message || `Yêu cầu thất bại (Mã lỗi: ${res.status})`);
+        throw new Error(result?.message || t("misc.forgot.errRequestFailed", { status: res.status }));
       }
 
       setInlineAlert({
         type: "success",
-        message: "Đã gửi mã OTP 6 chữ số đến email của bạn!",
+        message: t("misc.forgot.otpSent"),
       });
       setCountdown(60);
       setOtp(["", "", "", "", "", ""]);
@@ -461,7 +461,7 @@ export default function AuthPage() {
       console.error("[Forgot Password Step 1 Error]", err);
       setInlineAlert({
         type: "error",
-        message: err.message || "Không thể gửi mã OTP. Vui lòng thử lại sau.",
+        message: err.message || t("misc.authPage.errSendOtp"),
       });
     } finally {
       setLoading(false);
@@ -542,12 +542,12 @@ export default function AuthPage() {
       const result = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(result?.message || "Không thể gửi lại mã OTP lúc này.");
+        throw new Error(result?.message || t("misc.forgot.errResendFailed"));
       }
 
       setInlineAlert({
         type: "success",
-        message: "Mã OTP mới đã được gửi lại vào email của bạn!",
+        message: t("misc.forgot.otpResent"),
       });
       setCountdown(60);
       setOtp(["", "", "", "", "", ""]);
@@ -555,7 +555,7 @@ export default function AuthPage() {
     } catch (err) {
       setInlineAlert({
         type: "error",
-        message: err.message || "Gửi lại mã OTP thất bại.",
+        message: err.message || t("misc.authPage.errResendOtp"),
       });
     } finally {
       setResendingOtp(false);
@@ -569,7 +569,7 @@ export default function AuthPage() {
     if (otpCode.length !== 6) {
       setInlineAlert({
         type: "error",
-        message: "Vui lòng nhập đủ 6 chữ số mã OTP.",
+        message: t("misc.forgot.errOtpIncomplete"),
       });
       setOtpError(true);
       return;
@@ -597,21 +597,21 @@ export default function AuthPage() {
       if (!res.ok) {
         setOtpError(true);
         throw new Error(
-          result?.message || "Mã OTP không chính xác hoặc đã hết hạn (10 phút). Vui lòng thử lại."
+          result?.message || t("misc.authPage.errOtpExpired10m")
         );
       }
 
       setVerifiedOtp(otpCode);
       setInlineAlert({
         type: "success",
-        message: "Xác thực OTP thành công!",
+        message: t("misc.authPage.otpVerifiedShort"),
       });
       setForgotStep("reset_password");
     } catch (err) {
       console.error("[Verify OTP Step 2 Error]", err);
       setInlineAlert({
         type: "error",
-        message: err.message || "Mã OTP không hợp lệ.",
+        message: err.message || t("misc.authPage.errOtpInvalidShort"),
       });
       setOtpError(true);
     } finally {
@@ -629,27 +629,27 @@ export default function AuthPage() {
     e.preventDefault();
 
     if (!newPassword) {
-      setInlineAlert({ type: "error", message: "Vui lòng nhập mật khẩu mới." });
+      setInlineAlert({ type: "error", message: t("misc.forgot.errNewPassEmpty") });
       return;
     }
     if (newPassword.length < 8) {
       setInlineAlert({
         type: "error",
-        message: "Mật khẩu mới phải có tối thiểu 8 ký tự.",
+        message: t("misc.forgot.errNewPassLength"),
       });
       return;
     }
     if (!isCaseValid || !isCharValid) {
       setInlineAlert({
         type: "error",
-        message: "Mật khẩu cần bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt.",
+        message: t("misc.authPage.errComplexShort"),
       });
       return;
     }
     if (newPassword !== confirmNewPassword) {
       setInlineAlert({
         type: "error",
-        message: "Mật khẩu xác nhận không trùng khớp hoàn toàn.",
+        message: t("misc.authPage.errConfirmMismatchShort"),
       });
       return;
     }
@@ -675,7 +675,7 @@ export default function AuthPage() {
       const result = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(result?.message || "Đặt lại mật khẩu thất bại. Vui lòng thử lại.");
+        throw new Error(result?.message || t("misc.forgot.errResetFailed"));
       }
 
       setResetSuccessModal(true);
@@ -689,13 +689,13 @@ export default function AuthPage() {
         }));
         setResetSuccessModal(false);
         setActiveTab("login");
-        showToast("success", "Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.");
+        showToast("success", t("misc.authPage.resetSuccessToast"));
       }, 1500);
     } catch (err) {
       console.error("[Reset Password Step 3 Error]", err);
       setInlineAlert({
         type: "error",
-        message: err.message || "Không thể đặt lại mật khẩu. Vui lòng thử lại.",
+        message: err.message || t("misc.forgot.errResetGeneric"),
       });
     } finally {
       setLoading(false);
@@ -762,7 +762,7 @@ export default function AuthPage() {
               >
                 <Image
                   src={currentLandmark.image}
-                  alt={currentLandmark.name}
+                  alt={t(currentLandmark.nameKey)}
                   fill
                   priority
                   sizes="(min-width: 1536px) 580px, (min-width: 1024px) 42vw, 100vw"
@@ -789,7 +789,7 @@ export default function AuthPage() {
                   </span>
                 </div>
                 <p className="text-[10px] text-white/70 font-medium leading-none">
-                  Quản Trị Du Lịch &amp; Di Sản
+                  {t("misc.authPage.brandSubtitle")}
                 </p>
               </div>
             </Link>
@@ -808,7 +808,7 @@ export default function AuthPage() {
                         : "bg-black/30 text-white/80 hover:bg-black/40"
                       }`}
                   >
-                    {item.shortName}
+                    {t(item.shortNameKey)}
                   </button>
                 );
               })}
@@ -828,26 +828,26 @@ export default function AuthPage() {
               >
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold backdrop-blur-md border border-white/20 shadow-xs bg-white/15 text-emerald-100">
                   <Sparkles className="w-3 h-3 text-amber-300" />
-                  <span>{currentLandmark.tag}</span>
+                  <span>{t(currentLandmark.tagKey)}</span>
                 </div>
 
                 <h2 className="text-2xl xl:text-3xl font-black tracking-tight text-white leading-tight drop-shadow-sm">
-                  {currentLandmark.slogan}
+                  {t(currentLandmark.sloganKey)}
                 </h2>
 
                 <p className="text-xs xl:text-sm text-white/85 leading-relaxed font-normal">
-                  {currentLandmark.subSlogan}
+                  {t(currentLandmark.subSloganKey)}
                 </p>
 
                 {/* Thẻ trích dẫn danh lam */}
                 <div className="rounded-2xl p-4 backdrop-blur-md bg-white/10 border border-white/15 shadow-md space-y-2">
                   <p className="text-[11px] xl:text-xs text-white/95 leading-relaxed italic">
-                    &ldquo;{currentLandmark.quote}&rdquo;
+                    &ldquo;{t(currentLandmark.quoteKey)}&rdquo;
                   </p>
                   <div className="pt-2 flex items-center justify-between text-[11px] text-white/70 border-t border-white/10">
-                    <span>{currentLandmark.statLabel}</span>
+                    <span>{t(currentLandmark.statLabelKey)}</span>
                     <span className="font-bold text-amber-300 text-xs xl:text-sm">
-                      {currentLandmark.statNumber}
+                      {t(currentLandmark.statNumberKey)}
                     </span>
                   </div>
                 </div>
@@ -878,6 +878,9 @@ export default function AuthPage() {
         {/* CỘT PHẢI: KHU VỰC FORM (7/12) */}
         {/* ============================================================================ */}
         <div className="relative lg:col-span-7 col-span-12 flex flex-col justify-between overflow-hidden h-full bg-white p-7 sm:p-9 xl:p-11">
+          <div className="absolute right-6 top-6 z-20">
+            <LanguageSwitcher />
+          </div>
           <div className="w-full flex flex-col justify-between h-full space-y-3.5">
             {/* THÔNG BÁO ĐẶT LẠI MẬT KHẨU THÀNH CÔNG (1.5s MODAL BANNER) */}
             {resetSuccessModal ? (
@@ -887,12 +890,12 @@ export default function AuthPage() {
                 </div>
                 <div className="space-y-1.5">
                   <h3 className="text-xl font-black text-slate-900 tracking-tight">
-                    Đặt Lại Mật Khẩu Thành Công!
+                    {t("misc.forgot.doneTitle")}
                   </h3>
                   <p className="text-xs text-slate-600 max-w-sm leading-relaxed">
-                    Tài khoản <span className="font-bold text-emerald-800">{forgotEmail}</span> đã
-                    được cập nhật mật khẩu mới an toàn. Hệ thống đang chuyển hướng về màn hình Đăng
-                    nhập...
+                    {t("misc.authPage.doneAccountBefore")}
+                    <span className="font-bold text-emerald-800">{forgotEmail}</span>
+                    {t("misc.authPage.doneAccountAfter")}
                   </p>
                 </div>
                 <div className="w-full max-w-xs h-2 bg-emerald-200/60 rounded-full overflow-hidden">
@@ -905,7 +908,7 @@ export default function AuthPage() {
               /* ============================================================================ */
               <div className="flex flex-col justify-between h-full">
                 {/* Header thanh tiến trình 3 bước & Nút quay lại */}
-                <div className="space-y-2">
+                <div className="space-y-2 pr-24">
                   <div className="flex items-center justify-between">
                     <button
                       type="button"
@@ -913,13 +916,13 @@ export default function AuthPage() {
                       className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:-translate-x-0.5 transition-all cursor-pointer select-none"
                     >
                       <ArrowLeft className="w-4 h-4 text-slate-500" />
-                      <span>Quay lại đăng nhập</span>
+                      <span>{t("misc.forgot.backToLogin")}</span>
                     </button>
 
                     <span className="text-[11px] font-bold tracking-wider text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      {forgotStep === "forgot_email" && "Bước 1/3: Nhập Email"}
-                      {forgotStep === "verify_otp" && "Bước 2/3: Xác thực OTP"}
-                      {forgotStep === "reset_password" && "Bước 3/3: Mật khẩu mới"}
+                      {forgotStep === "forgot_email" && t("misc.forgot.step1Badge")}
+                      {forgotStep === "verify_otp" && t("misc.forgot.step2Badge")}
+                      {forgotStep === "reset_password" && t("misc.authPage.step3Badge")}
                     </span>
                   </div>
 
@@ -963,17 +966,16 @@ export default function AuthPage() {
                     <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
                       <div className="space-y-1">
                         <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                          Khôi Phục Mật Khẩu
+                          {t("misc.forgot.step1Title")}
                         </h2>
                         <p className="text-xs text-slate-500 leading-relaxed">
-                          Nhập địa chỉ email liên kết với tài khoản của bạn để nhận mã xác thực OTP
-                          gồm 6 chữ số.
+                          {t("misc.forgot.step1Desc")}
                         </p>
                       </div>
 
                       <div className="space-y-1 w-full">
                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                          Địa chỉ Email tài khoản
+                          {t("misc.forgot.emailLabel")}
                         </label>
                         <div className="relative w-full">
                           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -1002,11 +1004,11 @@ export default function AuthPage() {
                         {loading ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin text-white" />
-                            <span>Đang gửi mã xác thực OTP...</span>
+                            <span>{t("misc.authPage.sendingOtpFull")}</span>
                           </>
                         ) : (
                           <>
-                            <span>Gửi mã xác thực OTP</span>
+                            <span>{t("misc.forgot.sendOtp")}</span>
                             <ArrowRight className="w-4 h-4 text-white" />
                           </>
                         )}
@@ -1020,7 +1022,7 @@ export default function AuthPage() {
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
                           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                            Xác Thực Mã Bảo Mật OTP
+                            {t("misc.forgot.step2Title")}
                           </h2>
                           <button
                             type="button"
@@ -1030,11 +1032,11 @@ export default function AuthPage() {
                             }}
                             className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 underline cursor-pointer"
                           >
-                            Đổi email
+                            {t("misc.forgot.changeEmail")}
                           </button>
                         </div>
                         <p className="text-xs text-slate-500 leading-relaxed">
-                          Vui lòng nhập mã OTP 6 chữ số vừa được gửi tới hộp thư{" "}
+                          {t("misc.forgot.step2DescBefore")}
                           <span className="font-semibold text-emerald-800">{forgotEmail}</span>.
                         </p>
                       </div>
@@ -1042,7 +1044,7 @@ export default function AuthPage() {
                       {/* 6 Ô NHẬP OTP CHUYÊN NGHIỆP */}
                       <div className="space-y-2">
                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">
-                          Mã OTP 6 chữ số
+                          {t("misc.authPage.otpLabel6")}
                         </label>
                         <div
                           className="flex items-center justify-center gap-2 sm:gap-2.5"
@@ -1073,7 +1075,7 @@ export default function AuthPage() {
                       <div className="flex items-center justify-center pt-1 text-xs">
                         {countdown > 0 ? (
                           <span className="text-slate-400 font-medium">
-                            Gửi lại mã sau{" "}
+                            {t("misc.forgot.resendIn")}
                             <span className="font-bold text-slate-600">
                               {countdown < 10 ? `0${countdown}` : countdown}s
                             </span>
@@ -1088,12 +1090,12 @@ export default function AuthPage() {
                             {resendingOtp ? (
                               <>
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                <span>Đang gửi lại...</span>
+                                <span>{t("misc.forgot.resending")}</span>
                               </>
                             ) : (
                               <>
                                 <RotateCcw className="w-3.5 h-3.5" />
-                                <span>Gửi lại mã OTP</span>
+                                <span>{t("misc.forgot.resendBtn")}</span>
                               </>
                             )}
                           </button>
@@ -1108,11 +1110,11 @@ export default function AuthPage() {
                         {loading ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin text-white" />
-                            <span>Đang kiểm tra mã OTP...</span>
+                            <span>{t("misc.forgot.verifyingOtp")}</span>
                           </>
                         ) : (
                           <>
-                            <span>Xác thực mã OTP</span>
+                            <span>{t("misc.forgot.verifyOtpBtn")}</span>
                             <ArrowRight className="w-4 h-4 text-white" />
                           </>
                         )}
@@ -1125,10 +1127,10 @@ export default function AuthPage() {
                     <form onSubmit={handleResetPasswordSubmit} className="space-y-3.5">
                       <div className="space-y-1">
                         <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                          Thiết Lập Mật Khẩu Mới
+                          {t("misc.forgot.step3Title")}
                         </h2>
                         <p className="text-xs text-slate-500 leading-relaxed">
-                          Tạo mật khẩu mới có độ bảo mật cao cho tài khoản{" "}
+                          {t("misc.forgot.step3DescBefore")}
                           <span className="font-semibold text-emerald-800">{forgotEmail}</span>.
                         </p>
                       </div>
@@ -1136,7 +1138,7 @@ export default function AuthPage() {
                       {/* Mật khẩu mới */}
                       <div className="space-y-1 w-full">
                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                          Mật khẩu mới
+                          {t("misc.activate.newPasswordLabel")}
                         </label>
                         <div className="relative w-full">
                           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -1182,7 +1184,7 @@ export default function AuthPage() {
                           >
                             ✓
                           </div>
-                          <span>Tối thiểu 8 ký tự</span>
+                          <span>{t("misc.forgot.ruleLength")}</span>
                         </div>
                         <div
                           className={`flex items-center gap-1.5 ${isCaseValid ? "text-emerald-700 font-bold" : "text-slate-400"
@@ -1196,7 +1198,7 @@ export default function AuthPage() {
                           >
                             ✓
                           </div>
-                          <span>Chữ hoa &amp; thường</span>
+                          <span>{t("misc.forgot.ruleCase")}</span>
                         </div>
                         <div
                           className={`flex items-center gap-1.5 col-span-2 ${isCharValid ? "text-emerald-700 font-bold" : "text-slate-400"
@@ -1210,7 +1212,7 @@ export default function AuthPage() {
                           >
                             ✓
                           </div>
-                          <span>Có số &amp; ký tự đặc biệt (@, #, $, ...)</span>
+                          <span>{t("misc.forgot.ruleSpecial")}</span>
                         </div>
                       </div>
 
@@ -1218,14 +1220,14 @@ export default function AuthPage() {
                       <div className="space-y-1 w-full">
                         <div className="flex items-center justify-between">
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                            Xác nhận mật khẩu mới
+                            {t("misc.forgot.confirmNewPassLabel")}
                           </label>
                           {confirmNewPassword.length > 0 && (
                             <span
                               className={`text-[10px] font-bold ${isPwdMatch ? "text-emerald-600" : "text-rose-600"
                                 }`}
                             >
-                              {isPwdMatch ? "✓ Khớp mật khẩu" : "✕ Chưa trùng khớp"}
+                              {isPwdMatch ? t("misc.forgot.passMatch") : t("misc.forgot.passMismatch")}
                             </span>
                           )}
                         </div>
@@ -1269,11 +1271,11 @@ export default function AuthPage() {
                         {loading ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin text-white" />
-                            <span>Đang đặt lại mật khẩu...</span>
+                            <span>{t("misc.forgot.resetting")}</span>
                           </>
                         ) : (
                           <>
-                            <span>Hoàn tất đặt lại mật khẩu</span>
+                            <span>{t("misc.forgot.resetSubmit")}</span>
                             <Check className="w-4 h-4 text-white" />
                           </>
                         )}
@@ -1300,7 +1302,7 @@ export default function AuthPage() {
                           : "text-slate-500 hover:text-slate-700"
                         }`}
                     >
-                      Đăng nhập
+                      {t("common.login")}
                     </button>
                     <button
                       type="button"
@@ -1310,13 +1312,13 @@ export default function AuthPage() {
                           : "text-slate-500 hover:text-slate-700"
                         }`}
                     >
-                      Đăng ký tài khoản
+                      {t("misc.auth.registerAccount")}
                     </button>
                   </div>
 
                   <div>
                     <h1 className="text-2xl xl:text-3xl font-black text-slate-900 tracking-tight">
-                      {activeTab === "login" ? "Đăng Nhập Hệ Thống" : "Đăng Ký Thành Viên"}
+                      {activeTab === "login" ? t("misc.authPage.loginHeading") : t("misc.authPage.registerHeading")}
                     </h1>
                   </div>
                 </div>
@@ -1327,9 +1329,9 @@ export default function AuthPage() {
                     {/* BỘ CHỌN MẪU NHANH (Pills) */}
                     <div className="space-y-1.5 w-full">
                       <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        <span>Vai trò truy cập</span>
+                        <span>{t("misc.authPage.accessRole")}</span>
                         <span className="text-[10px] font-semibold text-emerald-700 lowercase">
-                          (Click để nạp nhanh)
+                          {t("misc.authPage.quickFillHint")}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 gap-1.5">
@@ -1345,7 +1347,7 @@ export default function AuthPage() {
                                   : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                                 }`}
                             >
-                              {r.title}
+                              {t(r.titleKey)}
                             </button>
                           );
                         })}
@@ -1355,7 +1357,7 @@ export default function AuthPage() {
                     {/* Email / Username */}
                     <div className="space-y-1 w-full">
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        Tài khoản / Email đăng nhập
+                        {t("misc.authPage.identifierLabel")}
                       </label>
                       <div className="relative w-full">
                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -1381,14 +1383,14 @@ export default function AuthPage() {
                     <div className="space-y-1 w-full">
                       <div className="flex items-center justify-between">
                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                          Mật khẩu
+                          {t("misc.login.passwordLabel")}
                         </label>
                         <button
                           type="button"
                           onClick={handleOpenForgotPassword}
                           className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
                         >
-                          Quên mật khẩu?
+                          {t("misc.login.forgotPassword")}
                         </button>
                       </div>
                       <div className="relative w-full">
@@ -1436,7 +1438,7 @@ export default function AuthPage() {
                           }
                           className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
                         />
-                        <span>Ghi nhớ phiên đăng nhập trên thiết bị</span>
+                        <span>{t("misc.login.rememberMe")}</span>
                       </label>
                     </div>
 
@@ -1449,11 +1451,11 @@ export default function AuthPage() {
                       {loading ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin text-white" />
-                          <span>Đang đăng nhập...</span>
+                          <span>{t("misc.login.submitting")}</span>
                         </>
                       ) : (
                         <>
-                          <span>Đăng nhập</span>
+                          <span>{t("common.login")}</span>
                           <ArrowRight className="w-4 h-4 text-white" />
                         </>
                       )}
@@ -1465,7 +1467,7 @@ export default function AuthPage() {
                     <div className="grid grid-cols-2 gap-2.5">
                       <div className="space-y-1">
                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                          Họ và tên
+                          {t("misc.reg.fullNameLabel")}
                         </label>
                         <div className="relative">
                           <User className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
@@ -1476,7 +1478,7 @@ export default function AuthPage() {
                             onChange={(e) =>
                               setRegisterForm((p) => ({ ...p, fullName: e.target.value }))
                             }
-                            placeholder="Nguyễn Văn A"
+                            placeholder={t("misc.reg.fullNamePlaceholder")}
                             className="w-full h-10 pl-9 pr-3 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:border-emerald-600 outline-none"
                           />
                         </div>
@@ -1484,7 +1486,7 @@ export default function AuthPage() {
 
                       <div className="space-y-1">
                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                          Số điện thoại
+                          {t("misc.reg.phoneLabel")}
                         </label>
                         <div className="relative">
                           <Phone className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
@@ -1504,7 +1506,7 @@ export default function AuthPage() {
 
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        Email đăng ký
+                        {t("misc.reg.emailLabel")}
                       </label>
                       <div className="relative">
                         <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
@@ -1524,7 +1526,7 @@ export default function AuthPage() {
                     <div className="grid grid-cols-2 gap-2.5">
                       <div className="space-y-1">
                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                          Mật khẩu
+                          {t("misc.login.passwordLabel")}
                         </label>
                         <input
                           type={showPassword ? "text" : "password"}
@@ -1540,7 +1542,7 @@ export default function AuthPage() {
 
                       <div className="space-y-1">
                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                          Xác nhận MK
+                          {t("misc.authPage.confirmPassShort")}
                         </label>
                         <input
                           type={showConfirmPassword ? "text" : "password"}
@@ -1564,7 +1566,7 @@ export default function AuthPage() {
                         }
                         className="w-3.5 h-3.5 text-emerald-600 rounded border-slate-300 cursor-pointer"
                       />
-                      <span>Đồng ý với Điều khoản và Quy chế hoạt động</span>
+                      <span>{t("misc.authPage.agreeTermsShort")}</span>
                     </label>
 
                     <button
@@ -1575,11 +1577,11 @@ export default function AuthPage() {
                       {loading ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin text-white" />
-                          <span>Đang đăng ký...</span>
+                          <span>{t("misc.authPage.registering")}</span>
                         </>
                       ) : (
                         <>
-                          <span>Tạo tài khoản thành viên</span>
+                          <span>{t("misc.authPage.createMemberBtn")}</span>
                           <ArrowRight className="w-4 h-4 text-white" />
                         </>
                       )}
@@ -1592,7 +1594,7 @@ export default function AuthPage() {
                   <div className="relative flex items-center justify-center">
                     <div className="border-t border-slate-200 w-full" />
                     <span className="bg-white px-2 text-[10px] uppercase font-bold text-slate-400 shrink-0">
-                      Hoặc tiếp tục với
+                      {t("misc.authPage.orContinueWith")}
                     </span>
                   </div>
 
@@ -1600,7 +1602,7 @@ export default function AuthPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        showToast("info", "Tính năng Google OAuth đang đồng bộ với Google Console.")
+                        showToast("info", t("misc.authPage.googleSyncToast"))
                       }
                       className="flex items-center justify-center gap-2 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
                     >
@@ -1630,7 +1632,7 @@ export default function AuthPage() {
                       onClick={() =>
                         showToast(
                           "info",
-                          "Tính năng xác thực Định danh VNeID đang kết nối Cổng Dịch vụ công."
+                          t("misc.authPage.vneidToast")
                         )
                       }
                       className="flex items-center justify-center gap-2 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
@@ -1646,7 +1648,7 @@ export default function AuthPage() {
             {/* BẢN QUYỀN FOOTER */}
             <div className="text-center pt-1 w-full">
               <p className="text-[11px] text-slate-400">
-                Bảo hộ bởi JourneyGo Identity Service • Phiên bản 2.5
+                {t("misc.auth.footerCopyright")}
               </p>
             </div>
           </div>

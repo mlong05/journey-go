@@ -1,62 +1,48 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  BadgeDollarSign,
-  CalendarCheck,
-  CheckCircle2,
-  Handshake,
-  Percent,
-  Ticket,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, CheckCircle2, TrendingUp, Users } from "lucide-react";
 import { dashboardService } from "@/features/dashboard";
 import { useQueueRefresh } from "@/context/NotificationContext";
 import { formatDateTimeVN } from "@/lib/money";
 
 import OverviewHeader from "./overview/OverviewHeader";
 import { KpiCard } from "./overview/KpiCard";
-import RevenueTrendChart from "./overview/RevenueTrendChart";
+import PendingStrip from "./overview/PendingStrip";
+import PlatformRevenueSection from "./overview/revenue/PlatformRevenueSection";
 import BookingStatusChart from "./overview/BookingStatusChart";
-import ActionCenter from "./overview/ActionCenter";
-import FinanceSnapshot from "./overview/FinanceSnapshot";
 import {
   TopToursCard,
   ExperienceStatsCard,
   TopDestinationsCard,
 } from "./overview/TourPerformance";
-import {
-  TouristActivityCard,
-  PartnerActivityCard,
-} from "./overview/PartnerTouristActivity";
-import { RecentSettlementsCard } from "./overview/RecentSettlements";
-import RecentActivities from "./overview/RecentActivities";
 import { GRID } from "./overview.tokens";
 import { KPI_HINTS } from "./overview/glossary";
 
 /**
  * Trang Tổng quan vận hành (Operations Overview) — JourneyGo Admin.
  *
- * Vai trò Admin là GIÁM SÁT: chỉ đọc số liệu của toàn sàn (du khách, đối tác,
- * tour, tài chính) và xử lý các việc thuộc quyền quản trị (duyệt đối tác,
- * quyết toán, hoàn tiền, cấu hình). Không nhúng bảng CRUD chi tiết.
+ * Chỉ giữ những gì CHƯA có trang riêng:
+ *  1. Dải việc cần xử lý (chip → trang xử lý).
+ *  2. 4 KPI của kỳ đang lọc.
+ *  3. Doanh thu nền tảng theo tháng (không theo bộ lọc kỳ): so sánh tháng, lũy kế theo ngày,
+ *     12 tháng, phân bổ giá trị đơn, doanh thu theo đối tác.
+ *  4. Vận hành trong kỳ: trạng thái booking, top tour, trải nghiệm, địa điểm.
  *
- * Mọi thuật ngữ nghiệp vụ đều có giải thích khi rê chuột (component `Hint`).
+ * Đã chuyển đi: tài chính & dòng tiền → /admin/finance · quyết toán → /admin/settlements ·
+ * nhật ký → /admin/audit-logs · khách du lịch → /admin/users · đối tác → /admin/partners.
  */
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
+  // Tăng để khối doanh thu (tải riêng) nạp lại cùng lúc với phần còn lại.
+  const [revenueRefreshKey, setRevenueRefreshKey] = useState(0);
 
   // Bộ lọc thời gian — "30 ngày qua" là mặc định.
   const [range, setRange] = useState("month");
   const [customRange, setCustomRange] = useState({ from: "", to: "" });
-
-  // Toggle biểu đồ Doanh thu / GMV.
-  const [metric, setMetric] = useState("revenue");
 
   const loadDashboard = useCallback(
     async (silent = false) => {
@@ -85,47 +71,41 @@ export default function AdminDashboardPage() {
     queueMicrotask(() => loadDashboard());
   }, [loadDashboard]);
 
+  const refreshAll = useCallback(() => {
+    loadDashboard(true);
+    setRevenueRefreshKey((k) => k + 1);
+  }, [loadDashboard]);
+
   // Tự cập nhật khi có yêu cầu mới trong hàng đợi (hoàn tiền, booking, quyết toán…).
   useQueueRefresh(
     ["refund-review", "adjustment-review", "bookings", "settlements", "tour-review", "partner-review"],
-    () => loadDashboard(true),
+    refreshAll,
   );
 
   const kpis = data?.kpis;
   const previousKpis = data?.previousKpis;
+  const breakdown = data?.bookingBreakdown;
 
-  /**
-   * % thay đổi so với kỳ trước.
-   * @returns {number|null} null = không so sánh được (kỳ trước bằng 0)
-   */
-  const percentChange = useMemo(() => {
-    return (current, previous) => {
-      const cur = Number(current) || 0;
-      const prev = Number(previous) || 0;
-      if (prev === 0) return null;
-      return ((cur - prev) / prev) * 100;
-    };
-  }, []);
+  /** % thay đổi so với kỳ trước; null = không so sánh được (kỳ trước bằng 0). */
+  const percentChange = (current, previous) => {
+    const cur = Number(current) || 0;
+    const prev = Number(previous) || 0;
+    if (prev === 0) return null;
+    return ((cur - prev) / prev) * 100;
+  };
 
   /** Chuỗi số liệu rút gọn cho sparkline của từng KPI. */
   const sparks = useMemo(() => {
     const revenue = (data?.revenueTrend || []).map((p) => Number(p.value) || 0);
     const gmv = (data?.gmvTrend || []).map((p) => Number(p.value) || 0);
-    const bookings = (data?.bookingTrend || []).map(
-      (p) => (p.success || 0) + (p.pendingPayment || 0) + (p.cancelled || 0) + (p.failed || 0),
-    );
-    const tourists = (data?.bookingTrend || []).map((p) => p.success || 0);
     const successes = (data?.bookingTrend || []).map((p) => p.success || 0);
-    // ⚠️ KPI "Đối tác đang hoạt động" KHÔNG có chuỗi số liệu riêng trong API.
-    // Dùng nhầm chuỗi doanh thu sẽ vẽ ra đường sparkline vô nghĩa (số tiền cho
-    // một chỉ số đếm hồ sơ) ⇒ bỏ sparkline, chỉ hiện badge % thay đổi.
-    return { revenue, gmv, bookings, tourists, successes };
+    return { revenue, gmv, successes };
   }, [data]);
 
   const kpiCards = [
     {
       id: "revenue",
-      label: "Tổng doanh thu nền tảng",
+      label: "Doanh thu nền tảng",
       tooltip: KPI_HINTS.revenue,
       value: (kpis?.platformRevenue ?? 0).toLocaleString("vi-VN"),
       unit: "đ",
@@ -136,7 +116,7 @@ export default function AdminDashboardPage() {
     },
     {
       id: "gmv",
-      label: "Tổng giá trị giao dịch (GMV)",
+      label: "Giá trị giao dịch (GMV)",
       tooltip: KPI_HINTS.gmv,
       value: (kpis?.gmv ?? 0).toLocaleString("vi-VN"),
       unit: "đ",
@@ -146,22 +126,13 @@ export default function AdminDashboardPage() {
       tone: "sky",
     },
     {
-      id: "bookings",
-      label: "Tổng lượt đặt tour",
-      tooltip: KPI_HINTS.bookings,
-      value: (kpis?.totalBookings ?? 0).toLocaleString("vi-VN"),
-      unit: "lượt",
-      change: percentChange(kpis?.totalBookings, previousKpis?.totalBookings),
-      sparkline: sparks.bookings,
-      icon: Ticket,
-      tone: "amber",
-    },
-    {
       id: "success",
       label: "Booking thành công",
       tooltip: KPI_HINTS.success,
       value: (kpis?.successfulBookings ?? 0).toLocaleString("vi-VN"),
-      unit: "lượt",
+      unit: breakdown?.total
+        ? `/ ${breakdown.total.toLocaleString("vi-VN")} lượt · ${Number(breakdown.successRatio || 0).toFixed(0)}%`
+        : "lượt",
       change: percentChange(kpis?.successfulBookings, previousKpis?.successfulBookings),
       sparkline: sparks.successes,
       icon: CheckCircle2,
@@ -174,19 +145,8 @@ export default function AdminDashboardPage() {
       value: (kpis?.activeTourists ?? 0).toLocaleString("vi-VN"),
       unit: "khách",
       change: percentChange(kpis?.activeTourists, previousKpis?.activeTourists),
-      sparkline: sparks.tourists,
       icon: Users,
       tone: "sky",
-    },
-    {
-      id: "providers",
-      label: "Đối tác đang hoạt động",
-      tooltip: KPI_HINTS.providers,
-      value: (kpis?.activeProviders ?? 0).toLocaleString("vi-VN"),
-      unit: "đối tác",
-      change: percentChange(kpis?.activeProviders, previousKpis?.activeProviders),
-      icon: Handshake,
-      tone: "emerald",
     },
   ];
 
@@ -211,7 +171,7 @@ export default function AdminDashboardPage() {
         customRange={customRange}
         onApplyCustom={handleApplyCustom}
         lastUpdated={lastUpdated}
-        onRefresh={() => loadDashboard(true)}
+        onRefresh={refreshAll}
         isRefreshing={isRefreshing}
         health={data?.systemHealth}
       />
@@ -223,71 +183,46 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── Hàng 1: 6 thẻ KPI ── */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      {/* ── Việc cần xử lý (chip gọn) ── */}
+      <PendingStrip actions={data?.pendingActions} isLoading={isLoading} />
+
+      {/* ── 4 KPI của kỳ đang lọc ── */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {kpiCards.map((card) => (
           <KpiCard key={card.id} {...card} loading={isLoading && !data} />
         ))}
       </section>
 
-      {/* ── Hàng 2: Biểu đồ doanh thu/GMV + Trạng thái booking ── */}
+      {/* ── Doanh thu nền tảng theo tháng ── */}
+      <PlatformRevenueSection refreshKey={revenueRefreshKey} />
+
+      {/* ── Vận hành trong kỳ ── */}
+      <div className="px-1 pt-1">
+        <h2 className="text-[15px] font-bold text-slate-900 tracking-tight">Vận hành trong kỳ</h2>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Theo bộ lọc kỳ ở đầu trang{data?.period?.label ? ` · ${data.period.label}` : ""}
+        </p>
+      </div>
+
       <section className={GRID.row}>
-        <div className={GRID.col8}>
-          <RevenueTrendChart
-            trend={data?.revenueTrend}
-            previousTrend={data?.previousRevenueTrend}
-            metric={metric}
-            onMetricChange={setMetric}
-            isLoading={isLoading}
-          />
-        </div>
-        <div className={GRID.col4}>
+        <div className={GRID.col5}>
           <BookingStatusChart
             breakdown={data?.bookingBreakdown}
             trend={data?.bookingTrend}
             isLoading={isLoading}
           />
         </div>
-      </section>
-
-      {/* ── Hàng 3: Action Center (5) + Tài chính (7) ── */}
-      <section className={GRID.row}>
-        <div className={GRID.col5}>
-          <ActionCenter actions={data?.pendingActions} isLoading={isLoading} />
-        </div>
-        <div className={GRID.col7}>
-          <FinanceSnapshot finance={data?.finance} isLoading={isLoading} />
-        </div>
-      </section>
-
-      {/* ── Hàng 4: Top tour (7) + Experience & Địa điểm (5) ── */}
-      <section className={GRID.row}>
         <div className={GRID.col7}>
           <TopToursCard tours={data?.topTours} isLoading={isLoading} />
         </div>
-        <div className={`${GRID.col5} flex flex-col gap-4`}>
+      </section>
+
+      <section className={GRID.row}>
+        <div className={GRID.col6}>
           <ExperienceStatsCard experience={data?.experience} isLoading={isLoading} />
+        </div>
+        <div className={GRID.col6}>
           <TopDestinationsCard destinations={data?.topDestinations} isLoading={isLoading} />
-        </div>
-      </section>
-
-      {/* ── Hàng 5: Khách du lịch + Đối tác ── */}
-      <section className={GRID.row}>
-        <div className={GRID.col6}>
-          <TouristActivityCard tourists={data?.tourists} isLoading={isLoading} />
-        </div>
-        <div className={GRID.col6}>
-          <PartnerActivityCard partners={data?.partners} isLoading={isLoading} />
-        </div>
-      </section>
-
-      {/* ── Hàng 6: Quyết toán gần đây (7) + Nhật ký hoạt động (5) ── */}
-      <section className={GRID.row}>
-        <div className={GRID.col7}>
-          <RecentSettlementsCard settlements={data?.recentSettlements} isLoading={isLoading} />
-        </div>
-        <div className={GRID.col5}>
-          <RecentActivities activities={data?.recentActivities} isLoading={isLoading} />
         </div>
       </section>
     </div>

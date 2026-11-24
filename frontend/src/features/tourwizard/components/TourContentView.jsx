@@ -164,16 +164,24 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
           <NoticeAccordion tour={tour} showEmpty />
         </Block>
         <Block anchor={{ step: "BASIC_INFO", field: "images" }} label="Hình ảnh">
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-            {(tour.images || []).map((url) => (
-              <div key={url} className={`relative aspect-[4/3] rounded-lg overflow-hidden bg-slate-100 border-2 ${url === tour.coverImageUrl ? "border-amber-400" : "border-transparent"}`}>
+          {/* Ảnh bìa riêng + 5 ảnh tour (ảnh bìa trùng ảnh tour ở tour soạn theo quy tắc cũ vẫn hiện viền vàng) */}
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-slate-100 border-2 border-amber-400">
+              {tour.coverImageUrl
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={tour.coverImageUrl} alt="" className="w-full h-full object-cover" />
+                : <span className="absolute inset-0 grid place-items-center text-[10px] font-bold text-slate-400">Chưa có ảnh bìa</span>}
+              <span className="absolute top-1 left-1 px-1 rounded bg-amber-400 text-[10px] font-bold">Bìa</span>
+            </div>
+            {(tour.images || []).filter((url) => url !== tour.coverImageUrl).map((url, i) => (
+              <div key={url} className="relative aspect-[4/3] rounded-lg overflow-hidden bg-slate-100 border-2 border-transparent">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="w-full h-full object-cover" />
-                {url === tour.coverImageUrl && <span className="absolute top-1 left-1 px-1 rounded bg-amber-400 text-[10px] font-bold">Bìa</span>}
+                <span className="absolute top-1 left-1 px-1 rounded bg-slate-900/70 text-[10px] font-bold text-white">{i + 1}</span>
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">{(tour.images || []).length} ảnh</p>
+          <p className="text-[11px] text-slate-400 mt-1">1 ảnh bìa · {(tour.images || []).filter((url) => url !== tour.coverImageUrl).length}/5 ảnh tour</p>
         </Block>
       </Section>
 
@@ -315,6 +323,16 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
 
       {showSchedule && (
         <Section title="5. Lịch khởi hành" step="SCHEDULE" onEdit={onEdit}>
+          <Block anchor={{ step: "SCHEDULE", field: "departureInfo" }} label="Thông tin khởi hành">
+            <dl className="grid gap-2 text-sm sm:grid-cols-[150px_minmax(0,1fr)]">
+              {[["Giờ khởi hành", tour.departureTime], ["Địa điểm tập trung", tour.meetingPoint], ["Giờ đón và điểm đón", tour.pickupInfo]].map(([k, v]) => (
+                <React.Fragment key={k}>
+                  <dt className="text-xs font-bold text-slate-500">{k}</dt>
+                  <dd className="text-slate-800 whitespace-pre-line">{v || <i className="text-slate-400">Chưa nhập</i>}</dd>
+                </React.Fragment>
+              ))}
+            </dl>
+          </Block>
           <Block anchor={{ step: "SCHEDULE", field: "departureDates" }} label="Ngày khởi hành">
             <p className="text-xs text-slate-500 mb-2 inline-flex items-center gap-1"><CalendarDays size={12} />{(tour.departureDates || []).length} ngày mở bán</p>
             <div className="flex flex-wrap gap-1.5">

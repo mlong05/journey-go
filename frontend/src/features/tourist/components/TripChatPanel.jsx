@@ -7,6 +7,7 @@ import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { touristService } from "../services/touristService";
 import { ROUTES } from "@/constants/routes";
 import { dateTime } from "../utils";
+import { useT, translate, getLocale } from "@/i18n";
 
 const POLL_MS = 8000;
 
@@ -25,6 +26,7 @@ const POLL_MS = 8000;
  * `BOOKING_CHAT`); polling chỉ là lưới an toàn khi WebSocket rớt.
  */
 export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) {
+  const t = useT();
   const [open, setOpen] = useState(defaultOpen);
   const [messages, setMessages] = useState(null);
   const [text, setText] = useState("");
@@ -36,7 +38,7 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
 
   const load = useCallback(() => touristService.bookingMessages(bookingId)
     .then((m) => { setMessages(m); setError(""); })
-    .catch((e) => setError(e?.message || "Không tải được tin nhắn.")), [bookingId]);
+    .catch((e) => setError(e?.message || translate(getLocale(), "trips.chatErrLoad"))), [bookingId]);
 
   // Lấy hội thoại thống nhất để có link "mở trong Tin nhắn với nhà tour".
   useEffect(() => {
@@ -51,8 +53,8 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
   useEffect(() => {
     if (!open) return undefined;
     load();
-    const t = setInterval(load, POLL_MS);
-    return () => clearInterval(t);
+    const timer = setInterval(load, POLL_MS);
+    return () => clearInterval(timer);
   }, [open, load]);
 
   // Tin nhắn mới ⇒ thêm vào danh sách ngay (không cần chờ poll).
@@ -88,7 +90,7 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
       });
       setText("");
     } catch (err) {
-      setError(err?.message || "Không gửi được tin nhắn.");
+      setError(err?.message || t("trips.chatErrSend"));
     } finally {
       setBusy(false);
     }
@@ -103,7 +105,7 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
         className="flex w-full cursor-pointer items-center gap-2 px-5 py-4 text-left"
       >
         <MessagesSquare size={17} className="text-teal-700" />
-        <span id={`trip-chat-${bookingId}`} className="font-extrabold text-slate-900">Hỗ trợ trong đơn này</span>
+        <span id={`trip-chat-${bookingId}`} className="font-extrabold text-slate-900">{t("trips.chatTitle")}</span>
         {messages?.length > 0 && (
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{messages.length}</span>
         )}
@@ -114,25 +116,25 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
         <div className="border-t border-slate-100">
           {/* Gợi ý: đây chính là tab "Tin nhắn với nhà tour" — không phải hai kênh riêng. */}
           <p className="px-4 pt-3 text-xs text-slate-500">
-            Đây là cuộc trò chuyện với nhà tour của tour này — cùng với mục
-            <Link href={ROUTES.ACCOUNT_MESSAGES} className="mx-1 font-semibold text-teal-700 hover:underline">Tin nhắn với nhà tour</Link>
-            trong phần Tài khoản.
+            {t("trips.chatHintBefore")}
+            <Link href={ROUTES.ACCOUNT_MESSAGES} className="mx-1 font-semibold text-teal-700 hover:underline">{t("account.providerMessages")}</Link>
+            {t("trips.chatHintAfter")}
             {conversationId != null && (
               <Link
                 href={`${ROUTES.ACCOUNT_MESSAGES}?c=${conversationId}`}
                 className="ml-1 inline-flex items-center gap-0.5 font-semibold text-teal-700 hover:underline"
               >
-                Mở tab này<ExternalLink size={11} />
+                {t("trips.chatOpenTab")}<ExternalLink size={11} />
               </Link>
             )}
           </p>
 
           <div className="max-h-80 space-y-2 overflow-y-auto px-4 py-4 [scrollbar-width:thin]" aria-live="polite">
             {messages === null ? (
-              <p className="flex justify-center gap-2 py-8 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />Đang tải…</p>
+              <p className="flex justify-center gap-2 py-8 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />{t("common.loading")}</p>
             ) : messages.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-500">
-                Chưa có tin nhắn. Hãy hỏi nhà tour về giờ đón, trang phục hoặc khiếu nại trong đơn.
+                {t("trips.chatEmpty")}
               </p>
             ) : messages.map((m) => {
               const mine = myId != null && String(m.senderId) === String(myId);
@@ -158,7 +160,7 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
           )}
 
           <form onSubmit={send} className="flex items-end gap-2 border-t border-slate-100 p-3">
-            <label htmlFor={`trip-msg-${bookingId}`} className="sr-only">Tin nhắn hỗ trợ</label>
+            <label htmlFor={`trip-msg-${bookingId}`} className="sr-only">{t("trips.chatInputLabel")}</label>
             <textarea
               id={`trip-msg-${bookingId}`}
               rows={1}
@@ -166,13 +168,13 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(e); } }}
-              placeholder="Nhập tin nhắn… (Enter để gửi, Shift+Enter xuống dòng)"
+              placeholder={t("trips.chatPlaceholder")}
               className="max-h-32 min-h-[42px] flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
             />
             <button
               type="submit"
               disabled={busy || !text.trim()}
-              aria-label="Gửi tin nhắn"
+              aria-label={t("trips.chatSendAria")}
               className="grid h-[42px] w-[42px] shrink-0 cursor-pointer place-items-center rounded-xl bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-40"
             >
               {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

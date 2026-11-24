@@ -10,39 +10,48 @@ import AccountLayout, { refreshAccountSummary } from "./AccountLayout";
 import { touristService, getTourPreview } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { LimitedField } from "@/components/ui/LimitedField";
+import { useT, useI18n, translate, getLocale, INTL_LOCALE } from "@/i18n";
 
 const POLL_MS = 6000;
-const SUGGESTIONS = ["Điểm đón ở đâu ạ?", "Có chỗ gửi xe máy gần điểm hẹn không?", "Trẻ em cần chuẩn bị gì?", "Tour có phù hợp với người lớn tuổi không?"];
+const SUGGESTION_KEYS = [
+  "account.msg.suggestion1",
+  "account.msg.suggestion2",
+  "account.msg.suggestion3",
+  "account.msg.suggestion4",
+];
 
 const initials = (name) => String(name || "?").trim().split(/\s+/).slice(-2).map((w) => w[0]).join("").toUpperCase();
 const pad = (n) => String(n).padStart(2, "0");
 const dayKey = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const timeOf = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 /** "Hôm nay" / "Hôm qua" / "15/11/2026" cho dòng phân cách ngày. */
-function dayLabel(iso) {
-  const d = new Date(iso); const t = new Date(); const y = new Date(); y.setDate(t.getDate() - 1);
-  if (dayKey(d) === dayKey(t)) return "Hôm nay";
-  if (dayKey(d) === dayKey(y)) return "Hôm qua";
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+function dayLabel(iso, t, locale) {
+  const d = new Date(iso); const now = new Date(); const y = new Date(); y.setDate(now.getDate() - 1);
+  if (dayKey(d) === dayKey(now)) return t("account.msg.today");
+  if (dayKey(d) === dayKey(y)) return t("time.yesterday");
+  if (locale === "vi") return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  return new Intl.DateTimeFormat(INTL_LOCALE[locale] || locale, { year: "numeric", month: "short", day: "numeric" }).format(d);
 }
 /** Giờ ngắn cho danh sách: "01:51" (hôm nay), "Hôm qua", "15/11". */
-function shortWhen(iso) {
+function shortWhen(iso, t, locale) {
   if (!iso) return "";
-  const label = dayLabel(iso);
-  if (label === "Hôm nay") return timeOf(iso);
-  if (label === "Hôm qua") return label;
-  const d = new Date(iso); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+  const d = new Date(iso); const now = new Date(); const y = new Date(); y.setDate(now.getDate() - 1);
+  if (dayKey(d) === dayKey(now)) return timeOf(iso);
+  if (dayKey(d) === dayKey(y)) return t("time.yesterday");
+  if (locale === "vi") return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+  return new Intl.DateTimeFormat(INTL_LOCALE[locale] || locale, { month: "short", day: "numeric" }).format(d);
 }
 
 /** Thẻ tour trong khung chat — hiện khi tin nhắn chuyển sang hỏi một tour khác. */
 function TourChip({ tourId, title, cover }) {
+  const t = useT();
   return (
     <div className="flex justify-center py-1">
       <Link href={ROUTES.TOUR_DETAIL(tourId)} className="flex max-w-[92%] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-2 pr-3 shadow-sm transition hover:border-teal-300">
         {cover ? <img src={cover} alt="" className="h-11 w-14 shrink-0 rounded-xl object-cover" /> : <span className="h-11 w-14 shrink-0 rounded-xl bg-slate-100" />}
         <span className="min-w-0">
-          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Hỏi về tour</span>
-          <span className="line-clamp-1 text-sm font-bold text-slate-800">{title || `Tour #${tourId}`}</span>
+          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t("account.msg.askingAboutTour")}</span>
+          <span className="line-clamp-1 text-sm font-bold text-slate-800">{title || t("account.msg.tourFallback", { id: tourId })}</span>
         </span>
         <ExternalLink size={14} className="shrink-0 text-slate-400" />
       </Link>
@@ -51,6 +60,7 @@ function TourChip({ tourId, title, cover }) {
 }
 
 function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
+  const { t, locale } = useI18n();
   const [messages, setMessages] = useState(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -60,11 +70,11 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
 
   const load = useCallback(() => touristService.messages(conversation.id)
     .then((m) => { setMessages(m); setError(""); })
-    .catch((e) => setError(e?.message || "Không tải được tin nhắn.")), [conversation.id]);
+    .catch((e) => setError(e?.message || translate(getLocale(), "account.msg.loadError"))), [conversation.id]);
   useEffect(() => {
     load();
-    const t = setInterval(load, POLL_MS);
-    return () => clearInterval(t);
+    const timer = setInterval(load, POLL_MS);
+    return () => clearInterval(timer);
   }, [load]);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages?.length]);
 
@@ -98,7 +108,7 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
       setMessages((list) => [...(list || []), m]);
       setText("");
       onSent?.();
-    } catch (err) { setError(err?.message || "Không gửi được tin nhắn."); }
+    } catch (err) { setError(err?.message || translate(getLocale(), "account.msg.sendError")); }
     finally { setBusy(false); inputRef.current?.focus(); }
   };
 
@@ -107,44 +117,47 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
     const out = []; let lastDay = null; let lastTour = null;
     (messages || []).forEach((m, i, arr) => {
       const day = dayKey(m.createdAt);
-      if (day !== lastDay) { out.push({ type: "day", key: `d-${day}`, label: dayLabel(m.createdAt) }); lastDay = day; lastTour = null; }
+      if (day !== lastDay) { out.push({ type: "day", key: `d-${day}`, label: dayLabel(m.createdAt, t, locale) }); lastDay = day; lastTour = null; }
       if (m.tourId && m.tourId !== lastTour) { out.push({ type: "tour", key: `t-${m.id}`, m }); lastTour = m.tourId; }
       const next = arr[i + 1];
       const lastOfGroup = !next || next.senderId !== m.senderId || dayKey(next.createdAt) !== day || (next.tourId && next.tourId !== m.tourId);
       out.push({ type: "msg", key: `m-${m.id}`, m, lastOfGroup });
     });
     return out;
-  }, [messages]);
+  }, [messages, t, locale]);
   const myLast = [...(messages || [])].reverse().find((m) => m.senderId === myId);
 
   return (
     <div className="flex h-[max(420px,calc(100dvh-15.5rem))] min-w-0 flex-col md:h-[clamp(460px,calc(100dvh-12rem),760px)] overflow-hidden rounded-3xl border border-slate-200 bg-white">
       <header className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
-        <button type="button" onClick={onBack} aria-label="Quay lại danh sách" className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-100 md:hidden cursor-pointer"><ArrowLeft size={17} /></button>
+        <button type="button" onClick={onBack} aria-label={t("account.msg.backToList")} className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-100 md:hidden cursor-pointer"><ArrowLeft size={17} /></button>
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-teal-700 text-sm font-bold text-white">{initials(conversation.providerName)}</span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold text-slate-900">{conversation.providerName}</p>
-          <p className="text-xs text-slate-500">Nhà tour</p>
+          <p className="text-xs text-slate-500">{t("account.msg.tourProvider")}</p>
         </div>
         {tourId && (
           <Link href={ROUTES.TOUR_DETAIL(tourId)} className="hidden shrink-0 items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-teal-300 sm:inline-flex">
-            Xem tour<ExternalLink size={12} />
+            {t("account.msg.viewTour")}<ExternalLink size={12} />
           </Link>
         )}
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8faf9] px-4 py-4 [scrollbar-width:thin]" aria-live="polite">
         {messages === null ? (
-          <p className="flex justify-center gap-2 py-10 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />Đang tải…</p>
+          <p className="flex justify-center gap-2 py-10 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />{t("common.loading")}</p>
         ) : messages.length === 0 ? (
           <div className="mx-auto max-w-sm py-8 text-center">
-            <p className="font-bold text-slate-800">Bắt đầu hỏi nhà tour</p>
-            <p className="mt-1 text-sm text-slate-500">Chọn nhanh một câu hỏi hoặc tự nhập bên dưới.</p>
+            <p className="font-bold text-slate-800">{t("account.msg.startAskingTitle")}</p>
+            <p className="mt-1 text-sm text-slate-500">{t("account.msg.startAskingDesc")}</p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {SUGGESTIONS.map((s) => (
-                <button key={s} type="button" onClick={() => { setText(s); inputRef.current?.focus(); }}
-                  className="rounded-full border border-teal-200 bg-white px-3 py-1.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-50 active:scale-[0.97] cursor-pointer">{s}</button>
-              ))}
+              {SUGGESTION_KEYS.map((key) => {
+                const s = t(key);
+                return (
+                  <button key={key} type="button" onClick={() => { setText(s); inputRef.current?.focus(); }}
+                    className="rounded-full border border-teal-200 bg-white px-3 py-1.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-50 active:scale-[0.97] cursor-pointer">{s}</button>
+                );
+              })}
             </div>
           </div>
         ) : (
@@ -159,7 +172,7 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
                     <p className="whitespace-pre-line break-words">{r.m.body}</p>
                     <p className={`mt-0.5 flex items-center justify-end gap-1 text-[10.5px] ${mine ? "text-teal-100" : "text-slate-400"}`}>
                       {timeOf(r.m.createdAt)}
-                      {mine && r.m.id === myLast?.id && r.m.read && <><CheckCheck size={12} />Đã xem</>}
+                      {mine && r.m.id === myLast?.id && r.m.read && <><CheckCheck size={12} />{t("account.msg.seen")}</>}
                     </p>
                   </div>
                 </div>
@@ -174,28 +187,29 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
       <form onSubmit={send} className="border-t border-slate-100 p-3">
         {tourId && (
           <p className="mb-2 flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
-            <span className="shrink-0">Đang hỏi về:</span>
-            <Link href={ROUTES.TOUR_DETAIL(tourId)} className="truncate font-semibold text-teal-700 hover:underline">{tourTitle || `Tour #${tourId}`}</Link>
+            <span className="shrink-0">{t("account.msg.askingAboutLabel")}</span>
+            <Link href={ROUTES.TOUR_DETAIL(tourId)} className="truncate font-semibold text-teal-700 hover:underline">{tourTitle || t("account.msg.tourFallback", { id: tourId })}</Link>
           </p>
         )}
         <div className="flex items-end gap-2">
-          <label htmlFor="msg-input" className="sr-only">Tin nhắn</label>
+          <label htmlFor="msg-input" className="sr-only">{t("account.msg.inputLabel")}</label>
           <LimitedField as="textarea" counter="near" limit={1000} wrapperClassName="flex-1" id="msg-input" ref={inputRef} rows={1} value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
-            placeholder="Nhập tin nhắn…"
+            placeholder={t("account.msg.inputPlaceholder")}
             className="min-h-[44px] w-full resize-none rounded-2xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20" />
-          <button type="submit" disabled={busy || !text.trim()} aria-label="Gửi"
+          <button type="submit" disabled={busy || !text.trim()} aria-label={t("account.msg.send")}
             className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white transition active:scale-95 cursor-pointer disabled:cursor-not-allowed ${text.trim() ? "bg-orange-600 hover:bg-orange-700" : "bg-slate-300"}`}>
             {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </button>
         </div>
-        <p className="mt-1.5 hidden text-[11px] text-slate-400 sm:block">Enter để gửi · Shift + Enter để xuống dòng</p>
+        <p className="mt-1.5 hidden text-[11px] text-slate-400 sm:block">{t("account.msg.sendHint")}</p>
       </form>
     </div>
   );
 }
 
 function Messages() {
+  const { t, locale } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -207,11 +221,11 @@ function Messages() {
 
   const load = useCallback(() => touristService.conversations()
     .then((items) => setState({ loading: false, items, error: "" }))
-    .catch((err) => setState({ loading: false, items: [], error: err?.message || "Không tải được tin nhắn." })), []);
+    .catch((err) => setState({ loading: false, items: [], error: err?.message || translate(getLocale(), "account.msg.loadError") })), []);
   useEffect(() => {
     load();
-    const t = setInterval(load, POLL_MS * 3);
-    return () => clearInterval(t);
+    const timer = setInterval(load, POLL_MS * 3);
+    return () => clearInterval(timer);
   }, [load]);
 
   const open = (id) => router.replace(id ? `${pathname}?c=${id}` : pathname, { scroll: false });
@@ -228,9 +242,9 @@ function Messages() {
     return (
       <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
         <MessageCircle size={30} className="mx-auto text-teal-600" />
-        <p className="mt-2 font-bold text-slate-800">Chưa có cuộc trò chuyện nào</p>
-        <p className="mt-1 text-sm text-slate-500">Mở một tour và bấm &quot;Nhắn tin với nhà tour&quot; để hỏi trước khi đặt.</p>
-        <Link href={ROUTES.TOURS} className="mt-4 inline-flex rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700 active:scale-[0.97]">Xem tour</Link>
+        <p className="mt-2 font-bold text-slate-800">{t("account.msg.emptyTitle")}</p>
+        <p className="mt-1 text-sm text-slate-500">{t("account.msg.emptyDesc")}</p>
+        <Link href={ROUTES.HOME} className="mt-4 inline-flex rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700 active:scale-[0.97]">{t("account.msg.viewTour")}</Link>
       </div>
     );
   }
@@ -241,11 +255,11 @@ function Messages() {
         {state.items.length >= 6 && (
           <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3">
             <Search size={15} className="text-slate-400" />
-            <span className="sr-only">Tìm cuộc trò chuyện</span>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm nhà tour, tour…" className="w-full bg-transparent py-2.5 text-sm outline-none" />
+            <span className="sr-only">{t("account.msg.searchAria")}</span>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("account.msg.searchPlaceholder")} className="w-full bg-transparent py-2.5 text-sm outline-none" />
           </label>
         )}
-        <ul className="space-y-1.5" aria-label="Cuộc trò chuyện">
+        <ul className="space-y-1.5" aria-label={t("account.msg.conversationsAria")}>
           {list.map((c) => {
             const on = String(c.id) === activeId;
             return (
@@ -259,14 +273,14 @@ function Messages() {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-2">
                       <span className={`truncate text-sm ${c.unreadCount ? "font-extrabold text-slate-900" : "font-bold text-slate-800"}`}>{c.providerName}</span>
-                      <span className="shrink-0 text-[11px] text-slate-400">{shortWhen(c.lastMessageAt || c.updatedAt)}</span>
+                      <span className="shrink-0 text-[11px] text-slate-400">{shortWhen(c.lastMessageAt || c.updatedAt, t, locale)}</span>
                     </span>
                     {c.tourTitle && <span className="block truncate text-xs text-teal-700">{c.tourTitle}</span>}
                     {/* Gắn với đơn đặt tour ⇒ hiển thị mã đơn cho dễ tra cứu. */}
                     {c.bookingCode && (
-                      <span className="block truncate text-[11px] font-semibold text-orange-600">Đơn {c.bookingCode}</span>
+                      <span className="block truncate text-[11px] font-semibold text-orange-600">{t("account.msg.bookingCode", { code: c.bookingCode })}</span>
                     )}
-                    <span className={`block truncate text-xs ${c.unreadCount ? "font-semibold text-slate-700" : "text-slate-500"}`}>{c.lastMessage || "Chưa có tin nhắn"}</span>
+                    <span className={`block truncate text-xs ${c.unreadCount ? "font-semibold text-slate-700" : "text-slate-500"}`}>{c.lastMessage || t("account.msg.noMessagesYet")}</span>
                   </span>
                 </button>
               </li>
@@ -279,7 +293,7 @@ function Messages() {
           onBack={() => open(null)} onSent={() => { load(); refreshAccountSummary(); }} />
       ) : (
         <div className="hidden h-[clamp(460px,calc(100dvh-12rem),760px)] place-items-center rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500 md:grid">
-          <span><MessageCircle size={26} className="mx-auto mb-2 text-slate-300" />Chọn một cuộc trò chuyện để xem tin nhắn.</span>
+          <span><MessageCircle size={26} className="mx-auto mb-2 text-slate-300" />{t("account.msg.selectConversation")}</span>
         </div>
       )}
     </div>
@@ -288,8 +302,9 @@ function Messages() {
 
 /** Trang /account/messages — tin nhắn với nhà tour (?c={id}&tour={tourId}). */
 export default function MessagesScreen() {
+  const t = useT();
   return (
-    <AccountLayout title="Tin nhắn với nhà tour" wide>
+    <AccountLayout title={t("account.providerMessages")} wide>
       <Messages />
     </AccountLayout>
   );

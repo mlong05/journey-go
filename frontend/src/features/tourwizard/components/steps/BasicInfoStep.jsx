@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Plus, Trash2, Sun, CalendarRange } from "lucide-react";
-import { Field, TextInput, TextArea, Select, NumberInput, ImageGallery } from "../FormKit";
+import { Field, TextInput, TextArea, Select, NumberInput, ImageGallery, SingleImage } from "../FormKit";
 import { issueFor } from "../../hooks/useTourDraft";
 import { LIMITS, BANNED_TITLE_WORDS, NOTICE_SECTIONS } from "../../constants";
 
@@ -29,7 +29,8 @@ const fromTour = (tour) => ({
   themeId: tour.theme?.id ?? "",
   description: tour.description || "",
   highlights: tour.highlights?.length ? [...tour.highlights] : ["", "", ""],
-  images: tour.images || [],
+  // Ảnh bìa là ảnh riêng: tour soạn theo quy tắc cũ (ảnh bìa nằm trong bộ ảnh) ⇒ tách ra khỏi danh sách ảnh tour.
+  images: (tour.images || []).filter((u) => u && u !== tour.coverImageUrl),
   coverImageUrl: tour.coverImageUrl || "",
   ...Object.fromEntries(NOTICE_SECTIONS.map((s) => [s.key, tour[s.key] || ""])),
 });
@@ -201,12 +202,19 @@ export default function BasicInfoStep({ tour, regions, themes, issues, readOnly,
 
       <section className="space-y-3">
         <h3 className="text-sm font-bold text-slate-900">Hình ảnh</h3>
-        <Field required label={`Ảnh thật của tour (ít nhất ${LIMITS.IMAGES_MIN} ảnh)`}
-          hint="Ảnh đối tác có quyền sử dụng, tập trung vào con người và hoạt động trải nghiệm."
-          error={err("images") || err("coverImageUrl")}>
-          <ImageGallery value={form.images} cover={form.coverImageUrl} disabled={readOnly}
-            onChange={(images, coverImageUrl) => update({ images, coverImageUrl })} />
-        </Field>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+          <Field required label="Ảnh bìa (1 ảnh)"
+            hint="Ảnh đại diện hiện trên thẻ tour và đầu trang chi tiết. Nên chọn ảnh ngang, rõ chủ thể."
+            error={err("coverImageUrl")}>
+            <SingleImage value={form.coverImageUrl} disabled={readOnly} label="Tải ảnh bìa"
+              onChange={(coverImageUrl) => update({ coverImageUrl })} />
+          </Field>
+          <Field required label={`Ảnh tour (đúng ${LIMITS.IMAGES_MAX} ảnh, khác ảnh bìa)`}
+            hint="Ảnh đối tác có quyền sử dụng, tập trung vào con người và hoạt động trải nghiệm."
+            error={err("images")}>
+            <ImageGallery value={form.images} disabled={readOnly} onChange={(images) => update({ images })} />
+          </Field>
+        </div>
       </section>
     </div>
   );

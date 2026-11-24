@@ -14,7 +14,6 @@ import { ChevronsLeft, ChevronsRight, LogOut, X } from "lucide-react";
 const ROLE_THEMES = {
   admin: {
     groupLabel: "Quản trị",
-    homeHref: "/admin",
     chip: "bg-rose-50 text-rose-700 ring-rose-200/70",
     itemActive: "bg-rose-50 text-rose-700",
     iconActive: "text-rose-600",
@@ -22,7 +21,6 @@ const ROLE_THEMES = {
   },
   provider: {
     groupLabel: "Đối tác",
-    homeHref: "/provider",
     chip: "bg-emerald-50 text-emerald-700 ring-emerald-200/70",
     itemActive: "bg-emerald-50 text-emerald-700",
     iconActive: "text-emerald-600",
@@ -30,7 +28,6 @@ const ROLE_THEMES = {
   },
   moderator: {
     groupLabel: "Thẩm định",
-    homeHref: "/moderator",
     chip: "bg-indigo-50 text-indigo-700 ring-indigo-200/70",
     itemActive: "bg-indigo-50 text-indigo-700",
     iconActive: "text-indigo-600",
@@ -90,10 +87,10 @@ export default function Sidebar({
           }`}
         >
           <Link
-            href={theme.homeHref}
+            href="/"
             onClick={onCloseMobile}
             className="flex items-center gap-1.5 min-w-0 text-inherit no-underline"
-            title="Về trang tổng quan"
+            title="Về trang chủ"
           >
             {/* Logo thương hiệu: biểu tượng tròn + chữ "JourneyGo!" kèm khẩu hiệu (thu gọn: chỉ biểu tượng) */}
             <Image

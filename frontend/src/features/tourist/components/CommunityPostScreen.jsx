@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, AlertTriangle, MessageCircle, Send, Flag, Trash2, PenLine } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import { useI18n, translate, getLocale } from "@/i18n";
 import { LimitedField } from "@/components/ui/LimitedField";
 import TouristShell from "./TouristShell";
 import Breadcrumbs from "./Breadcrumbs";
@@ -25,6 +26,7 @@ const COMMENT_MAX = 1000;
  */
 export default function CommunityPostScreen({ postId }) {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const { user, isTourist } = useTouristSession();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
@@ -45,7 +47,7 @@ export default function CommunityPostScreen({ postId }) {
     setComments(c);
     setLoading(false);
   }).catch((err) => {
-    setError(err?.message || "Không tải được bài viết.");
+    setError(err?.message || translate(getLocale(), "community.errorLoadPost"));
     setLoading(false);
   }), [postId]);
   useEffect(() => { load(); }, [load]);
@@ -62,7 +64,7 @@ export default function CommunityPostScreen({ postId }) {
         myReaction: p.myReaction === "LOVE" ? null : "LOVE",
       } : p));
     } catch (err) {
-      setCommentError(err?.message || "Không thả tim được.");
+      setCommentError(err?.message || t("community.errorReact"));
     }
   };
 
@@ -77,7 +79,7 @@ export default function CommunityPostScreen({ postId }) {
       setText("");
       setPost((p) => (p ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p));
     } catch (err) {
-      setCommentError(err?.message || "Không gửi được bình luận.");
+      setCommentError(err?.message || t("community.errorSendComment"));
     } finally {
       setBusy(false);
     }
@@ -90,7 +92,7 @@ export default function CommunityPostScreen({ postId }) {
       setComments((list) => list.filter((c) => c.id !== comment.id));
       setPost((p) => (p ? { ...p, commentsCount: Math.max(0, (p.commentsCount || 0) - 1) } : p));
     } catch (err) {
-      setCommentError(err?.message || "Không xoá được bình luận.");
+      setCommentError(err?.message || t("community.errorDeleteComment"));
     }
   };
 
@@ -102,7 +104,7 @@ export default function CommunityPostScreen({ postId }) {
     } else {
       await touristService.reportCommunityPost(reportTarget.id, { reason, description });
     }
-    setNotice("Đã gửi báo cáo. Cảm ơn bạn đã đóng góp xây dựng cộng đồng.");
+    setNotice(t("community.reportSuccess"));
   };
 
   const myId = user?.id ? String(user.id) : null;
@@ -124,9 +126,9 @@ export default function CommunityPostScreen({ postId }) {
   } else if (!post) {
     body = (
       <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
-        <p className="font-bold text-slate-700">Không tìm thấy bài viết.</p>
-        <p className="mt-1 text-sm text-slate-500">Bài viết có thể đã bị ẩn hoặc chưa được duyệt.</p>
-        <Link href={ROUTES.COMMUNITY} className="mt-4 inline-flex rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-800">Về bảng tin</Link>
+        <p className="font-bold text-slate-700">{t("community.postNotFoundTitle")}</p>
+        <p className="mt-1 text-sm text-slate-500">{t("community.postNotFoundDesc")}</p>
+        <Link href={ROUTES.COMMUNITY} className="mt-4 inline-flex rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-800">{t("community.backToFeed")}</Link>
       </div>
     );
   } else {
@@ -138,7 +140,7 @@ export default function CommunityPostScreen({ postId }) {
 
         {isMyPost && (
           <Link href={ROUTES.ACCOUNT_POSTS} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-teal-800">
-            <PenLine size={13} />Quản lý bài viết của tôi
+            <PenLine size={13} />{t("community.manageMyPosts")}
           </Link>
         )}
 
@@ -146,24 +148,24 @@ export default function CommunityPostScreen({ postId }) {
 
         <section className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="comments-title">
           <h2 id="comments-title" className="flex items-center gap-2 font-extrabold text-slate-900">
-            <MessageCircle size={17} className="text-teal-700" />Bình luận <span className="text-slate-400">({comments.length})</span>
+            <MessageCircle size={17} className="text-teal-700" />{t("community.comments")} <span className="text-slate-400">({comments.length})</span>
           </h2>
 
           {isTourist ? (
             <form onSubmit={submitComment} className="mt-4 flex items-start gap-3">
-              <Avatar name={user?.fullName || "Bạn"} url={user?.avatarUrl} size={36} />
-              <label htmlFor="comment-input" className="sr-only">Viết bình luận</label>
+              <Avatar name={user?.fullName || t("community.you")} url={user?.avatarUrl} size={36} />
+              <label htmlFor="comment-input" className="sr-only">{t("community.writeCommentLabel")}</label>
               <LimitedField as="textarea" counter="near" limit={COMMENT_MAX} wrapperClassName="flex-1" id="comment-input" rows={2}
-                value={text} onChange={(e) => setText(e.target.value)} placeholder="Viết bình luận của bạn…"
+                value={text} onChange={(e) => setText(e.target.value)} placeholder={t("community.commentPlaceholder")}
                 className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20" />
-              <button type="submit" disabled={busy || !text.trim()} aria-label="Gửi bình luận"
+              <button type="submit" disabled={busy || !text.trim()} aria-label={t("community.sendComment")}
                 className="grid h-[42px] w-[42px] shrink-0 cursor-pointer place-items-center rounded-xl bg-teal-700 text-white transition hover:bg-teal-800 disabled:opacity-40">
                 {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
             </form>
           ) : (
             <button type="button" onClick={toLogin} className="mt-4 w-full cursor-pointer rounded-xl border border-dashed border-slate-300 py-3 text-sm font-semibold text-slate-600 hover:border-teal-300 hover:text-teal-800">
-              Đăng nhập để bình luận
+              {t("community.loginToComment")}
             </button>
           )}
           {commentError && (
@@ -172,23 +174,23 @@ export default function CommunityPostScreen({ postId }) {
 
           <ul className="mt-5 space-y-4">
             {comments.length === 0 ? (
-              <li className="rounded-2xl bg-slate-50 py-6 text-center text-sm text-slate-500">Chưa có bình luận nào. Hãy là người đầu tiên!</li>
+              <li className="rounded-2xl bg-slate-50 py-6 text-center text-sm text-slate-500">{t("community.noComments")}</li>
             ) : comments.map((c) => (
               <li key={c.id} className="flex gap-3">
-                <Avatar name={c.authorName || "Du khách"} url={c.authorAvatarUrl} size={36} />
+                <Avatar name={c.authorName || t("community.traveler")} url={c.authorAvatarUrl} size={36} />
                 <div className="min-w-0 flex-1">
                   <div className="rounded-2xl bg-slate-50 px-3.5 py-2.5">
-                    <p className="text-sm font-bold text-slate-900">{c.authorName || "Du khách"}</p>
+                    <p className="text-sm font-bold text-slate-900">{c.authorName || t("community.traveler")}</p>
                     <ExpandableText text={c.content} lines={4} className="mt-0.5 text-sm leading-relaxed text-slate-700" />
                   </div>
                   <div className="mt-1 flex items-center gap-3 px-1 text-xs text-slate-400">
-                    <span title={fullDateTime(c.createdAt)}>{timeAgo(c.createdAt)}</span>
+                    <span title={fullDateTime(c.createdAt, locale)}>{timeAgo(c.createdAt, t, locale)}</span>
                     {myId && String(c.authorId) === myId && (
-                      <button type="button" onClick={() => removeComment(c)} className="inline-flex cursor-pointer items-center gap-1 font-semibold hover:text-rose-600"><Trash2 size={12} />Xoá</button>
+                      <button type="button" onClick={() => removeComment(c)} className="inline-flex cursor-pointer items-center gap-1 font-semibold hover:text-rose-600"><Trash2 size={12} />{t("community.delete")}</button>
                     )}
                     {isTourist && myId && String(c.authorId) !== myId && (
                       <button type="button" onClick={() => setReportTarget({ kind: "comment", id: c.id, subject: `“${String(c.content || "").slice(0, 80)}”` })}
-                        className="inline-flex cursor-pointer items-center gap-1 font-semibold hover:text-rose-600"><Flag size={12} />Báo cáo</button>
+                        className="inline-flex cursor-pointer items-center gap-1 font-semibold hover:text-rose-600"><Flag size={12} />{t("community.report")}</button>
                     )}
                   </div>
                 </div>
@@ -202,17 +204,17 @@ export default function CommunityPostScreen({ postId }) {
 
   return (
     <TouristShell desktopFixed>
-      <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:pb-10">
-        <Breadcrumbs fallback={ROUTES.COMMUNITY} items={[{ label: "Cộng đồng", href: ROUTES.COMMUNITY }, { label: post?.title || "Bài viết" }]} />
+      <div className="mx-auto w-full max-w-wide px-4 py-5 sm:px-6 lg:px-8 lg:pb-10">
+        <Breadcrumbs fallback={ROUTES.COMMUNITY} items={[{ label: t("nav.community"), href: ROUTES.COMMUNITY }, { label: post?.title || t("community.post") }]} />
         <div className="mt-4 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="min-w-0">{body}</div>
           {/* Cột phải dính dưới menu như trang Cộng đồng — cuộn bằng thanh cuộn của trình duyệt */}
           <aside className="min-w-0 space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto [scrollbar-width:none]">
             <section className="rounded-3xl border border-slate-200 bg-white p-4">
-              <p className="text-sm font-extrabold text-slate-900">Bạn cũng vừa đi tour?</p>
-              <p className="mt-1 text-xs text-slate-500">Chia sẻ trải nghiệm của bạn để giúp du khách khác chọn tour.</p>
+              <p className="text-sm font-extrabold text-slate-900">{t("community.alsoWentOnTour")}</p>
+              <p className="mt-1 text-xs text-slate-500">{t("community.alsoWentOnTourDesc")}</p>
               <Link href={ROUTES.COMMUNITY} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-orange-600 py-2.5 text-sm font-bold text-white hover:bg-orange-700">
-                <PenLine size={15} />Viết bài trên bảng tin
+                <PenLine size={15} />{t("community.writeOnFeed")}
               </Link>
             </section>
             <GuidelinesCard />

@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, Loader2, X } from "lucide-react";
 import { useNotifications } from "@/context/NotificationContext";
-import { metaOf, timeAgo } from "@/components/notifications/notificationMeta";
+import { categoryLabel, metaOf, timeAgo } from "@/components/notifications/notificationMeta";
 import { ROUTES } from "@/constants/routes";
+import { useT, useI18n } from "@/i18n";
 
 /**
  * Chuông thông báo cho DU KHÁCH (trang header của web du khách).
@@ -20,6 +21,7 @@ import { ROUTES } from "@/constants/routes";
 export default function TouristNotificationBell() {
   const ctx = useNotifications();
   const router = useRouter();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("all");
   const [loadingMore, setLoadingMore] = useState(false);
@@ -69,8 +71,8 @@ export default function TouristNotificationBell() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label={unread ? `Thông báo, ${unread} chưa đọc` : "Thông báo"}
-        title="Thông báo"
+        aria-label={unread ? t("notif.bellUnread", { count: unread }) : t("notif.title")}
+        title={t("notif.title")}
         className={`relative grid h-10 w-10 place-items-center rounded-xl border transition-colors cursor-pointer ${
           open
             ? "border-teal-300 bg-teal-50 text-teal-700"
@@ -90,10 +92,10 @@ export default function TouristNotificationBell() {
           <div className="border-b border-slate-100 px-4 pb-2 pt-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900">Thông báo</h3>
+                <h3 className="text-sm font-bold text-slate-900">{t("notif.title")}</h3>
                 {unread > 0 && (
                   <span className="rounded-md bg-orange-50 px-1.5 py-0.5 text-[11px] font-bold text-orange-700 ring-1 ring-inset ring-orange-200">
-                    {unread} mới
+                    {t("notif.newCount", { count: unread })}
                   </span>
                 )}
               </div>
@@ -104,13 +106,13 @@ export default function TouristNotificationBell() {
                     onClick={() => ctx?.markAllRead()}
                     className="flex h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-teal-700 hover:bg-teal-50"
                   >
-                    <CheckCheck size={14} />Đọc tất cả
+                    <CheckCheck size={14} />{t("notif.readAll")}
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  aria-label="Đóng"
+                  aria-label={t("common.close")}
                   className="grid h-7 w-7 cursor-pointer place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 >
                   <X size={14} />
@@ -118,7 +120,7 @@ export default function TouristNotificationBell() {
               </div>
             </div>
             <div className="mt-2 inline-flex rounded-lg bg-slate-100 p-0.5 text-[12px] font-semibold">
-              {[["all", "Tất cả"], ["unread", "Chưa đọc"]].map(([key, label]) => (
+              {[["all", t("common.all")], ["unread", t("notif.unread")]].map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
@@ -142,10 +144,10 @@ export default function TouristNotificationBell() {
                   <Bell size={20} />
                 </span>
                 <p className="text-sm font-bold text-slate-800">
-                  {tab === "unread" ? "Bạn đã đọc hết thông báo" : "Chưa có thông báo"}
+                  {tab === "unread" ? t("notif.allRead") : t("notif.empty")}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Trạng thái đơn, kết quả hoàn tiền và phần thưởng sẽ hiện ở đây.
+                  {t("notif.bellEmptyDesc")}
                 </p>
               </div>
             ) : (
@@ -165,7 +167,7 @@ export default function TouristNotificationBell() {
                   className="flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg text-[12.5px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
                 >
                   {loadingMore && <Loader2 size={13} className="animate-spin" />}
-                  Xem thông báo cũ hơn
+                  {t("notif.loadOlder")}
                 </button>
               </div>
             )}
@@ -177,7 +179,7 @@ export default function TouristNotificationBell() {
               onClick={() => setOpen(false)}
               className="flex h-8 items-center justify-center rounded-lg text-[12.5px] font-bold text-teal-700 hover:bg-teal-50"
             >
-              Xem tất cả thông báo
+              {t("notif.viewAll")}
             </Link>
           </div>
         </div>
@@ -189,6 +191,7 @@ export default function TouristNotificationBell() {
 function NotificationRow({ n, onOpen }) {
   const meta = metaOf(n.category);
   const Icon = meta.icon;
+  const { t, locale } = useI18n();
   return (
     <li>
       <button
@@ -206,15 +209,15 @@ function NotificationRow({ n, onOpen }) {
             <span className={`flex-1 text-[13px] leading-snug ${n.read ? "font-medium text-slate-700" : "font-bold text-slate-900"}`}>
               {n.title}
             </span>
-            {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-label="Chưa đọc" />}
+            {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-label={t("notif.unread")} />}
           </span>
           {n.body && (
             <span className="mt-0.5 block line-clamp-2 text-[12.5px] leading-relaxed text-slate-500">{n.body}</span>
           )}
           <span className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400">
-            <span>{meta.label}</span>
+            <span>{categoryLabel(t, n.category)}</span>
             <span aria-hidden="true">·</span>
-            <time dateTime={n.createdAt}>{timeAgo(n.createdAt)}</time>
+            <time dateTime={n.createdAt}>{timeAgo(n.createdAt, t, locale)}</time>
           </span>
         </span>
       </button>

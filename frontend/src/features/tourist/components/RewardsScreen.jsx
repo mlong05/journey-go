@@ -9,19 +9,24 @@ import { ROUTES } from "@/constants/routes";
 import AccountLayout from "./AccountLayout";
 import { touristService } from "../services/touristService";
 import { dateTime, longDate, vnd } from "../utils";
+import { useI18n, translate, getLocale, INTL_LOCALE } from "@/i18n";
 
 const VOUCHER_STATUS = {
-  AVAILABLE: { label: "Dùng được", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  USED: { label: "Đã dùng", cls: "bg-slate-100 text-slate-600 border-slate-200" },
-  EXPIRED: { label: "Hết hạn", cls: "bg-rose-50 text-rose-700 border-rose-200" },
+  AVAILABLE: { labelKey: "account.rewards.voucherStatus.AVAILABLE", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  USED: { labelKey: "account.rewards.voucherStatus.USED", cls: "bg-slate-100 text-slate-600 border-slate-200" },
+  EXPIRED: { labelKey: "account.rewards.voucherStatus.EXPIRED", cls: "bg-rose-50 text-rose-700 border-rose-200" },
 };
-const discountLabel = (v) => (v.discountType === "PERCENTAGE" ? `Giảm ${Number(v.discountValue)}%` : `Giảm ${vnd(v.discountValue)}`);
+const discountLabel = (v, t) => (v.discountType === "PERCENTAGE"
+  ? t("account.rewards.discountPercent", { value: Number(v.discountValue) })
+  : t("account.rewards.discountAmount", { amount: vnd(v.discountValue) }));
 
 /**
  * Trang /account/rewards — số dư điểm, lịch sử điểm, voucher của tôi,
  * bộ sưu tập huy hiệu và đổi voucher NGAY TRÊN WEB.
  */
 export default function RewardsScreen() {
+  const { t, locale } = useI18n();
+  const numLocale = INTL_LOCALE[locale];
   const [data, setData] = useState({
     loading: true, points: null, history: [], mine: [], shop: [], badges: [], myBadges: [],
   });
@@ -52,36 +57,40 @@ export default function RewardsScreen() {
     setRedeeming(voucher.id); setNotice({ ok: "", err: "" });
     try {
       const res = await touristService.redeemVoucher(voucher.id);
+      const loc = getLocale();
       setNotice({
-        ok: `Đã đổi voucher "${voucher.title}". Mã: ${res?.userVoucherCode || "xem trong ví voucher"}`,
+        ok: translate(loc, "account.rewards.redeemSuccess", {
+          title: voucher.title,
+          code: res?.userVoucherCode || translate(loc, "account.rewards.viewInWallet"),
+        }),
         err: "",
       });
       load();
     } catch (err) {
-      setNotice({ ok: "", err: err?.message || "Không đổi được voucher." });
+      setNotice({ ok: "", err: err?.message || translate(getLocale(), "account.rewards.redeemError") });
     } finally {
       setRedeeming(null);
     }
   };
 
   return (
-    <AccountLayout title="Điểm thưởng & voucher">
+    <AccountLayout title={t("nav.rewards")}>
       {loading ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-busy="true"><div className="jg-shimmer h-28 rounded-3xl" /><div className="jg-shimmer h-28 rounded-3xl" /><div className="jg-shimmer h-28 rounded-3xl" /></div>
       ) : (
         <div className="space-y-5">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-3xl bg-[linear-gradient(150deg,#0b5d56,#0f766e)] p-5 text-white sm:col-span-1">
-              <p className="flex items-center gap-1.5 text-sm text-teal-50/85"><Sparkles size={15} />Điểm khả dụng</p>
-              <p className="mt-1 text-3xl font-extrabold tabular-nums">{balance.toLocaleString("vi-VN")}</p>
+              <p className="flex items-center gap-1.5 text-sm text-teal-50/85"><Sparkles size={15} />{t("account.rewards.availablePoints")}</p>
+              <p className="mt-1 text-3xl font-extrabold tabular-nums">{balance.toLocaleString(numLocale)}</p>
             </div>
             <div className="rounded-3xl border border-slate-200 bg-white p-5">
-              <p className="text-sm text-slate-500">Tổng điểm đã nhận</p>
-              <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900">{(points?.lifetimeEarned ?? 0).toLocaleString("vi-VN")}</p>
+              <p className="text-sm text-slate-500">{t("account.rewards.lifetimeEarned")}</p>
+              <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900">{(points?.lifetimeEarned ?? 0).toLocaleString(numLocale)}</p>
             </div>
             <div className="rounded-3xl border border-slate-200 bg-white p-5">
-              <p className="text-sm text-slate-500">Đã dùng đổi voucher</p>
-              <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900">{(points?.lifetimeSpent ?? 0).toLocaleString("vi-VN")}</p>
+              <p className="text-sm text-slate-500">{t("account.rewards.lifetimeSpent")}</p>
+              <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900">{(points?.lifetimeSpent ?? 0).toLocaleString(numLocale)}</p>
             </div>
           </div>
           <Link
@@ -93,18 +102,18 @@ export default function RewardsScreen() {
                 <Trophy size={18} />
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-extrabold text-amber-950">Sổ Thành tựu & Huy hiệu</p>
-                <p className="truncate text-xs text-amber-800/85">Khám phá các cột mốc hành trình và nhận thưởng Journey Points</p>
+                <p className="text-sm font-extrabold text-amber-950">{t("account.rewards.achievementsBannerTitle")}</p>
+                <p className="truncate text-xs text-amber-800/85">{t("account.rewards.achievementsBannerDesc")}</p>
               </div>
             </div>
             <span className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-white/90 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-xs transition group-hover:bg-white">
-              Mở ngay <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+              {t("account.rewards.openNow")} <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
             </span>
           </Link>
 
           <p className="flex items-start gap-2 rounded-2xl border border-teal-200 bg-teal-50 p-3.5 text-sm text-teal-900">
             <Smartphone size={17} className="mt-0.5 shrink-0" />
-            Bạn có thể đổi điểm lấy voucher ngay tại đây. Điểm thưởng và huy hiệu được cộng khi trả lời quiz và hoàn thành hoạt động tại điểm dừng trong app JourneyGo.
+            {t("account.rewards.appTip")}
           </p>
 
           {notice.ok && (
@@ -121,7 +130,7 @@ export default function RewardsScreen() {
           {/* ── Bộ sưu tập huy hiệu ── */}
           <section className="rounded-3xl border border-slate-200 bg-white p-5" aria-labelledby="my-badges">
             <h2 id="my-badges" className="flex items-center gap-2 font-extrabold text-slate-900">
-              <Award size={17} className="text-teal-700" />Huy hiệu của tôi ({myBadges.length})
+              <Award size={17} className="text-teal-700" />{t("account.rewards.myBadgesHeading", { count: myBadges.length })}
             </h2>
             {myBadges.length ? (
               <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -138,14 +147,14 @@ export default function RewardsScreen() {
                     <div className="min-w-0">
                       <p className="font-bold text-slate-900">{b.badgeName}</p>
                       {b.badgeDescription && <p className="mt-0.5 text-xs text-slate-600">{b.badgeDescription}</p>}
-                      <p className="mt-1 text-xs text-slate-400">Nhận lúc {dateTime(b.earnedAt)}</p>
+                      <p className="mt-1 text-xs text-slate-400">{t("account.rewards.earnedAt", { time: dateTime(b.earnedAt) })}</p>
                     </div>
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="mt-2 text-sm text-slate-500">
-                Bạn chưa có huy hiệu nào. Đi tour và trả lời quiz trong app để nhận huy hiệu đầu tiên.
+                {t("account.rewards.myBadgesEmpty")}
               </p>
             )}
           </section>
@@ -153,7 +162,7 @@ export default function RewardsScreen() {
           {/* ── Danh mục huy hiệu ── */}
           {badges.length > 0 && (
             <section className="rounded-3xl border border-slate-200 bg-white p-5" aria-labelledby="all-badges">
-              <h2 id="all-badges" className="font-extrabold text-slate-900">Danh mục huy hiệu ({badges.length})</h2>
+              <h2 id="all-badges" className="font-extrabold text-slate-900">{t("account.rewards.allBadgesHeading", { count: badges.length })}</h2>
               <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {badges.map((b) => {
                   const earned = earnedCodes.has(b.code);
@@ -171,14 +180,14 @@ export default function RewardsScreen() {
                         <div className="min-w-0">
                           <p className="truncate text-sm font-bold text-slate-900">{b.name}</p>
                           {b.bonusPoints > 0 && (
-                            <p className="text-[11px] font-semibold text-amber-700">+{b.bonusPoints} điểm</p>
+                            <p className="text-[11px] font-semibold text-amber-700">{t("account.rewards.bonusPoints", { count: b.bonusPoints })}</p>
                           )}
                         </div>
                       </div>
                       {b.description && <p className="mt-2 text-xs leading-relaxed text-slate-600">{b.description}</p>}
                       {earned && (
                         <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700">
-                          <CheckCircle2 size={12} />Đã đạt
+                          <CheckCircle2 size={12} />{t("account.rewards.earned")}
                         </p>
                       )}
                     </li>
@@ -190,7 +199,7 @@ export default function RewardsScreen() {
 
           <section className="rounded-3xl border border-slate-200 bg-white p-5" aria-labelledby="my-vouchers">
             <h2 id="my-vouchers" className="flex items-center gap-2 font-extrabold text-slate-900">
-              <Ticket size={17} className="text-teal-700" />Voucher của tôi ({mine.length})
+              <Ticket size={17} className="text-teal-700" />{t("account.rewards.myVouchersHeading", { count: mine.length })}
             </h2>
             {mine.length ? (
               <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -200,23 +209,23 @@ export default function RewardsScreen() {
                     <li key={v.id} className="min-w-0 rounded-2xl border border-dashed border-slate-300 p-3.5">
                       <div className="flex items-start justify-between gap-2">
                         <p className="min-w-0 font-bold text-slate-900">{v.voucherTitle}</p>
-                        <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.label}</span>
+                        <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{t(st.labelKey)}</span>
                       </div>
                       <p className="mt-1 break-all font-mono text-sm text-teal-800">{v.userVoucherCode}</p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {v.expiryDate ? `Hạn dùng ${longDate(v.expiryDate.slice(0, 10))}` : ""}
-                        {v.pointsSpent ? ` · Đổi bằng ${v.pointsSpent} điểm` : ""}
+                        {v.expiryDate ? t("account.rewards.expiryDate", { date: longDate(v.expiryDate.slice(0, 10), locale) }) : ""}
+                        {v.pointsSpent ? ` · ${t("account.rewards.redeemedWithPoints", { count: v.pointsSpent })}` : ""}
                       </p>
                     </li>
                   );
                 })}
               </ul>
-            ) : <p className="mt-2 text-sm text-slate-500">Bạn chưa có voucher nào.</p>}
+            ) : <p className="mt-2 text-sm text-slate-500">{t("account.rewards.myVouchersEmpty")}</p>}
           </section>
 
           {shop.length > 0 && (
             <section className="rounded-3xl border border-slate-200 bg-white p-5" aria-labelledby="shop-vouchers">
-              <h2 id="shop-vouchers" className="font-extrabold text-slate-900">Đổi voucher</h2>
+              <h2 id="shop-vouchers" className="font-extrabold text-slate-900">{t("account.rewards.redeemHeading")}</h2>
               <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {shop.map((v) => {
                   const need = Number(v.pointsRequired || 0);
@@ -226,12 +235,12 @@ export default function RewardsScreen() {
                       <p className="font-bold text-slate-900">{v.title}</p>
                       {v.description && <p className="mt-0.5 text-xs text-slate-600">{v.description}</p>}
                       <p className="mt-1 text-sm font-semibold text-orange-700">
-                        {discountLabel(v)}{v.maxDiscountAmount ? ` (tối đa ${vnd(v.maxDiscountAmount)})` : ""}
+                        {discountLabel(v, t)}{v.maxDiscountAmount ? ` ${t("account.rewards.maxDiscount", { amount: vnd(v.maxDiscountAmount) })}` : ""}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {need.toLocaleString("vi-VN")} điểm
-                        {v.minOrderAmount ? ` · đơn từ ${vnd(v.minOrderAmount)}` : ""}
-                        {v.validDays ? ` · dùng trong ${v.validDays} ngày` : ""}
+                        {need.toLocaleString(numLocale)} {t("account.points")}
+                        {v.minOrderAmount ? ` · ${t("account.rewards.minOrder", { amount: vnd(v.minOrderAmount) })}` : ""}
+                        {v.validDays ? ` · ${t("account.rewards.validDays", { count: v.validDays })}` : ""}
                       </p>
                       <button
                         type="button"
@@ -240,7 +249,11 @@ export default function RewardsScreen() {
                         className="mt-2.5 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
                       >
                         {redeeming === v.id && <Loader2 size={14} className="animate-spin" />}
-                        {can ? "Đổi voucher" : balance < need ? `Cần thêm ${(need - balance).toLocaleString("vi-VN")} điểm` : "Không còn voucher"}
+                        {can
+                          ? t("account.rewards.redeemBtn")
+                          : balance < need
+                            ? t("account.rewards.needMorePoints", { count: (need - balance).toLocaleString(numLocale) })
+                            : t("account.rewards.outOfVouchers")}
                       </button>
                     </li>
                   );
@@ -250,7 +263,7 @@ export default function RewardsScreen() {
           )}
 
           <section className="rounded-3xl border border-slate-200 bg-white p-5" aria-labelledby="point-history">
-            <h2 id="point-history" className="font-extrabold text-slate-900">Lịch sử điểm gần đây</h2>
+            <h2 id="point-history" className="font-extrabold text-slate-900">{t("account.rewards.pointHistoryHeading")}</h2>
             {history.length ? (
               <ul className="mt-3 divide-y divide-slate-100">
                 {history.map((h) => {
@@ -271,7 +284,7 @@ export default function RewardsScreen() {
                   );
                 })}
               </ul>
-            ) : <p className="mt-2 text-sm text-slate-500">Chưa có giao dịch điểm. Đi tour và trả lời quiz trong app để nhận điểm.</p>}
+            ) : <p className="mt-2 text-sm text-slate-500">{t("account.rewards.pointHistoryEmpty")}</p>}
           </section>
         </div>
       )}
