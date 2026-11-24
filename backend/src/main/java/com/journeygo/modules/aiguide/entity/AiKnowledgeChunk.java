@@ -39,9 +39,9 @@ public class AiKnowledgeChunk {
     private String sourceId;
 
     /**
-     * ID địa điểm (khớp với Destination.id).
+     * ID địa điểm (khớp với Destination.id; NULL nếu là tri thức GLOBAL toàn nền tảng).
      */
-    @Column(name = "destination_id", nullable = false)
+    @Column(name = "destination_id", nullable = true)
     private Long destinationId;
 
     /**
@@ -65,11 +65,10 @@ public class AiKnowledgeChunk {
     private Map<String, Object> metadata = new HashMap<>();
 
     /**
-     * Vector nhúng 768 chiều (tạo bởi Gemini text-embedding-004).
+     * Vector nhúng 768 chiều (tạo bởi Gemini gemini-embedding-001).
      */
     @Convert(converter = PGvectorConverter.class)
-    //@JdbcTypeCode(SqlTypes.OTHER)
-    @Column(name = "embedding", nullable = false, columnDefinition = "vector")
+    @Column(name = "embedding", nullable = false, columnDefinition = "TEXT")
     private float[] embedding;
 
     @Column(name = "created_at", nullable = false, updatable = false)

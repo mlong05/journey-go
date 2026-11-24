@@ -30,10 +30,16 @@ import jaCommunity from "./messages/community/ja.json";
 import viMisc from "./messages/misc/vi.json";
 import enMisc from "./messages/misc/en.json";
 import jaMisc from "./messages/misc/ja.json";
+import viMerge from "./messages/merge/vi.json";
+import enMerge from "./messages/merge/en.json";
+import jaMerge from "./messages/merge/ja.json";
+import viAiGuide from "./messages/aiguide/vi.json";
+import enAiGuide from "./messages/aiguide/en.json";
+import jaAiGuide from "./messages/aiguide/ja.json";
 
-const vi = { ...viCommon, ...viHome, ...viTour, ...viCheckout, ...viTrips, ...viRefunds, ...viAccount, ...viCommunity, ...viMisc };
-const en = { ...enCommon, ...enHome, ...enTour, ...enCheckout, ...enTrips, ...enRefunds, ...enAccount, ...enCommunity, ...enMisc };
-const ja = { ...jaCommon, ...jaHome, ...jaTour, ...jaCheckout, ...jaTrips, ...jaRefunds, ...jaAccount, ...jaCommunity, ...jaMisc };
+const vi = { ...viCommon, ...viHome, ...viTour, ...viCheckout, ...viTrips, ...viRefunds, ...viAccount, ...viCommunity, ...viMisc, ...viMerge, ...viAiGuide };
+const en = { ...enCommon, ...enHome, ...enTour, ...enCheckout, ...enTrips, ...enRefunds, ...enAccount, ...enCommunity, ...enMisc, ...enMerge, ...enAiGuide };
+const ja = { ...jaCommon, ...jaHome, ...jaTour, ...jaCheckout, ...jaTrips, ...jaRefunds, ...jaAccount, ...jaCommunity, ...jaMisc, ...jaMerge, ...jaAiGuide };
 
 export const DEFAULT_LOCALE = "vi";
 

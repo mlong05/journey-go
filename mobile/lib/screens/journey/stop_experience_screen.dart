@@ -8,6 +8,7 @@ import '../../core/models/tour_journey_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
+import '../chat/ai_guide_chat_screen.dart';
 import '../common/ink.dart';
 import 'map_kit.dart' show distanceMeters, formatDistance;
 import 'stop_checkpoints_map.dart';
@@ -115,6 +116,7 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
           taskId: task.taskId,
           fallbackName: task.name,
           destinationName: _dest.name,
+          destinationId: _dest.destinationId,
         ),
       ),
     );
@@ -159,7 +161,24 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
           backgroundColor: AppInk.paper,
           surfaceTintColor: Colors.transparent,
           foregroundColor: AppInk.ink,
-          title: Text(appL10n.jsExperienceTitle, style: AppType.display(size: 18)),
+          title: Text(context.l10n.jsExperienceTitle, style: AppType.display(size: 18)),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                onPressed: () => AiGuideChatScreen.showSheet(
+                  context,
+                  destinationId: _dest.destinationId,
+                  destinationName: _dest.name,
+                ),
+                icon: const Icon(Icons.auto_awesome_rounded, size: 17, color: AppCultureColors.heritageJade),
+                label: Text(
+                  context.l10n.aiAskButton,
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppCultureColors.heritageJade),
+                ),
+              ),
+            ),
+          ],
         ),
         body: RefreshIndicator(
           color: AppInk.accent,

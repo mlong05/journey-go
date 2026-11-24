@@ -4919,4 +4919,211 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get navCheckInNow => 'Check-in ngay';
+
+  @override
+  String get rfTier7DaysPlus => 'Từ 7 ngày trở lên';
+
+  @override
+  String get rfTier3To6Days => 'Từ 3 đến 6 ngày (72 giờ – 6 ngày)';
+
+  @override
+  String get rfTierUnder72Hours => 'Dưới 72 giờ (3 ngày)';
+
+  @override
+  String rfRefundRate(String rate) {
+    return 'Hoàn $rate';
+  }
+
+  @override
+  String get homeAiGuideTitle => 'Hướng dẫn viên ảo AI';
+
+  @override
+  String get homeAiGuideSubtitle =>
+      'Hỏi đáp văn hóa, lịch sử & gợi ý nhiệm vụ thông minh';
+
+  @override
+  String get aiAskButton => 'Hỏi AI';
+
+  @override
+  String get aiHintButton => 'Gợi ý AI';
+
+  @override
+  String get aiSuggestHint1 => 'Gợi ý hướng quan sát cho tôi';
+
+  @override
+  String get aiSuggestHint2 => 'Tôi nên chú ý chi tiết nào quanh đây?';
+
+  @override
+  String get aiSuggestHint3 => 'Cho tôi một manh mối nhỏ nhé';
+
+  @override
+  String aiSuggestDestHistory(String name) {
+    return 'Kể cho tôi về lịch sử của $name';
+  }
+
+  @override
+  String get aiSuggestHeritage => 'Giới thiệu nét văn hóa di sản nổi bật';
+
+  @override
+  String get aiSuggestArchitecture => 'Kiến trúc nơi đây có điểm gì đặc sắc?';
+
+  @override
+  String get aiSuggestVisitTips => 'Cần lưu ý gì khi tham quan điểm này?';
+
+  @override
+  String get aiErrInit => 'Không thể khởi tạo phiên trò chuyện AI.';
+
+  @override
+  String get aiErrRequestHuman =>
+      'Không thể gửi yêu cầu trò chuyện với Admin / Moderator.';
+
+  @override
+  String get aiErrReturnAi => 'Không thể chuyển lại về AI Hướng dẫn viên.';
+
+  @override
+  String get aiErrSend =>
+      'Không thể kết nối tới Hướng dẫn viên AI. Vui lòng thử lại.';
+
+  @override
+  String get aiEndHumanTitle => 'Kết thúc hỗ trợ trực tiếp?';
+
+  @override
+  String get aiCancelWaitTitle => 'Hủy yêu cầu hỗ trợ?';
+
+  @override
+  String get aiEndHumanBody =>
+      'Bạn có chắc muốn kết thúc cuộc trò chuyện với nhân viên hỗ trợ và quay lại chat với AI không?';
+
+  @override
+  String get aiCancelWaitBody =>
+      'Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?';
+
+  @override
+  String get aiKeepChatting => 'Tiếp tục chat';
+
+  @override
+  String get aiKeepWaiting => 'Tiếp tục chờ';
+
+  @override
+  String get aiEndAndReturnAi => 'Kết thúc & quay lại AI';
+
+  @override
+  String get aiCancelAndReturnAi => 'Hủy & quay lại AI';
+
+  @override
+  String get aiSenderName => 'AI Hướng dẫn viên';
+
+  @override
+  String get aiHeaderHintTitle => 'Trợ lý gợi ý AI';
+
+  @override
+  String get aiHeaderGuideTitle => 'Hướng dẫn viên AI';
+
+  @override
+  String get aiHistoryTooltip => 'Lịch sử phiên trò chuyện';
+
+  @override
+  String get aiNewChatTooltip => 'Cuộc trò chuyện mới';
+
+  @override
+  String aiChattingWithStaff(String role, String name) {
+    return 'Đang chat với $role: $name';
+  }
+
+  @override
+  String aiChattingWithRole(String role) {
+    return 'Đang chat với $role';
+  }
+
+  @override
+  String get aiHumanSubtitle => 'Nhân sự thật đang hỗ trợ trực tiếp';
+
+  @override
+  String get aiWaitingTitle => 'Đang chờ Admin / Moderator tiếp nhận';
+
+  @override
+  String get aiWaitingSubtitle =>
+      'Bạn vẫn có thể nhắn tin trong lúc chờ hỗ trợ';
+
+  @override
+  String get aiDefaultTaskName => 'Nhiệm vụ trải nghiệm';
+
+  @override
+  String get aiDefaultDestName => 'Hỏi đáp di sản & hỗ trợ';
+
+  @override
+  String get aiHintBannerSubtitle =>
+      'Chế độ gợi ý thông minh · Không tiết lộ đáp án';
+
+  @override
+  String get aiGuideBannerSubtitle =>
+      'Thuyết minh viên ảo dựa trên dữ liệu đã kiểm duyệt';
+
+  @override
+  String get aiReturnToAiBtn => 'Quay lại AI';
+
+  @override
+  String get aiChatHumanBtn => 'Chat Mod/Admin';
+
+  @override
+  String get aiEmptyHintTitle => 'Cần manh mối cho thử thách?';
+
+  @override
+  String get aiEmptyGuideTitle => 'Xin chào! Tôi có thể giúp gì cho bạn?';
+
+  @override
+  String get aiEmptyHintBody =>
+      'Hãy hỏi tôi để nhận gợi ý quan sát hiện trường. Tôi sẽ dẫn dắt bạn tự tìm ra đáp án!';
+
+  @override
+  String get aiEmptyGuideBody =>
+      'Đặt câu hỏi về lịch sử, câu chuyện văn hóa, kiến trúc hoặc gợi ý khám phá tại điểm dừng.';
+
+  @override
+  String get aiHumanBadge => 'NGƯỜI THẬT';
+
+  @override
+  String get aiSendingMessage => 'Đang gửi tin nhắn...';
+
+  @override
+  String get aiThinking => 'AI đang suy nghĩ...';
+
+  @override
+  String get aiInputHintHuman => 'Nhắn tin trực tiếp tới Admin / Moderator...';
+
+  @override
+  String get aiInputHintTask => 'Hỏi gợi ý cho nhiệm vụ...';
+
+  @override
+  String get aiInputHintGuide => 'Hỏi về lịch sử, kiến trúc điểm đến...';
+
+  @override
+  String get aiHistoryTitle => 'Lịch sử trò chuyện AI';
+
+  @override
+  String get aiHistoryEmpty => 'Chưa có phiên trò chuyện nào.';
+
+  @override
+  String aiDestinationFallback(int id) {
+    return 'Điểm đến #$id';
+  }
+
+  @override
+  String get aiGeneralQa => 'Hỏi đáp chung';
+
+  @override
+  String get aiStatusWaiting => 'Đang chờ Mod/Admin';
+
+  @override
+  String get aiStatusLive => 'Chat trực tiếp';
+
+  @override
+  String aiSessionSubtitle(String status, int count) {
+    return '$status · $count tin nhắn';
+  }
+
+  @override
+  String aiViewTour(int id) {
+    return 'Xem tour #$id';
+  }
 }

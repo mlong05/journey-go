@@ -4,11 +4,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Loader2, AlertTriangle, Send, ArrowLeft, MessageCircle, Search, ExternalLink, CheckCheck } from "lucide-react";
+import { Loader2, AlertTriangle, Send, ArrowLeft, ChevronDown, MessageCircle, Search, ExternalLink, CheckCheck } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import AccountLayout, { refreshAccountSummary } from "./AccountLayout";
 import { touristService, getTourPreview } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
+import { useChatHistory, CHAT_PAGE_SIZE } from "@/hooks/useChatHistory";
 import { LimitedField } from "@/components/ui/LimitedField";
 import { useT, useI18n, translate, getLocale, INTL_LOCALE } from "@/i18n";
 
@@ -61,22 +62,30 @@ function TourChip({ tourId, title, cover }) {
 
 function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
   const { t, locale } = useI18n();
-  const [messages, setMessages] = useState(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const endRef = useRef(null);
   const inputRef = useRef(null);
 
-  const load = useCallback(() => touristService.messages(conversation.id)
-    .then((m) => { setMessages(m); setError(""); })
-    .catch((e) => setError(e?.message || translate(getLocale(), "account.msg.loadError"))), [conversation.id]);
-  useEffect(() => {
-    load();
-    const timer = setInterval(load, POLL_MS);
-    return () => clearInterval(timer);
-  }, [load]);
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages?.length]);
+  // ⚠️ PHÂN TRANG KIỂU "CUỘN LÊN ĐỂ LOAD THÊM":
+  //  • Mở khung ⇒ chỉ tải 10 tin MỚI NHẤT, tự cuộn xuống cuối (thấy ngay tin mới).
+  //  • Cuộn lên gần đầu ⇒ tự nối thêm tin CŨ hơn.
+  const fetchPage = useCallback(
+    (cursor) => touristService.messagesPage(conversation.id, CHAT_PAGE_SIZE, cursor),
+    [conversation.id],
+  );
+
+  const {
+    messages,
+    loading,
+    loadingMore,
+    hasMore,
+    error: loadError,
+    containerRef,
+    handleScroll,
+    appendMessage,
+    loadMore,
+  } = useChatHistory(fetchPage, { enabled: true, resetKey: String(conversation.id) });
 
   // Tour đang hỏi: tour mở từ trang chi tiết (?tour=) hoặc tour hiện tại của cuộc trò chuyện.
   const tourId = contextTourId || conversation.tourId;
@@ -105,7 +114,7 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
     setBusy(true);
     try {
       const m = await touristService.sendMessage(conversation.id, body, tourId);
-      setMessages((list) => [...(list || []), m]);
+      appendMessage(m);
       setText("");
       onSent?.();
     } catch (err) { setError(err?.message || translate(getLocale(), "account.msg.sendError")); }
@@ -143,8 +152,13 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
         )}
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8faf9] px-4 py-4 [scrollbar-width:thin]" aria-live="polite">
-        {messages === null ? (
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#f8faf9] px-4 py-4 [scrollbar-width:thin]"
+        aria-live="polite"
+      >
+        {loading ? (
           <p className="flex justify-center gap-2 py-10 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />{t("common.loading")}</p>
         ) : messages.length === 0 ? (
           <div className="mx-auto max-w-sm py-8 text-center">
@@ -162,6 +176,22 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
           </div>
         ) : (
           <div className="space-y-1">
+            {/* Đầu danh sách: nút load thêm lịch sử cũ / dòng "đã xem hết". */}
+            {hasMore ? (
+              <div className="flex justify-center py-2">
+                <button type="button" onClick={loadMore} disabled={loadingMore}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 cursor-pointer">
+                  {loadingMore ? (
+                    <><Loader2 size={11} className="animate-spin" /> {t("merge.chat.loadingHistory")}</>
+                  ) : (
+                    <><ChevronDown size={11} /> {t("merge.chat.loadOlder")}</>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <p className="py-2 text-center text-[11px] text-slate-400">{t("merge.chat.endOfHistory")}</p>
+            )}
+
             {rows.map((r) => {
               if (r.type === "day") return <p key={r.key} className="py-2 text-center text-[11px] font-bold uppercase tracking-wide text-slate-400">{r.label}</p>;
               if (r.type === "tour") return <TourChip key={r.key} tourId={r.m.tourId} title={r.m.tourTitle} cover={r.m.tourCoverImageUrl} />;
@@ -178,12 +208,17 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
                 </div>
               );
             })}
+
+            {loadingMore && (
+              <p className="flex items-center justify-center gap-2 py-2 text-[11px] text-slate-400">
+                <Loader2 size={11} className="animate-spin" /> {t("merge.chat.loadingOlder")}
+              </p>
+            )}
           </div>
         )}
-        <div ref={endRef} />
       </div>
 
-      {error && <p role="alert" className="flex items-center gap-1.5 px-4 pt-2 text-xs font-semibold text-rose-600"><AlertTriangle size={13} />{error}</p>}
+      {(error || loadError) && <p role="alert" className="flex items-center gap-1.5 px-4 pt-2 text-xs font-semibold text-rose-600"><AlertTriangle size={13} />{error || loadError}</p>}
       <form onSubmit={send} className="border-t border-slate-100 p-3">
         {tourId && (
           <p className="mb-2 flex min-w-0 items-center gap-1.5 text-xs text-slate-500">

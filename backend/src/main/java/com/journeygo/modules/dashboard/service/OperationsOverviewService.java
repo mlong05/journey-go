@@ -45,7 +45,7 @@ import java.util.Map;
  * (xem {@link #buildFinance}) vì chúng khác nhau cả về mốc thời gian lẫn bản chất tiền:
  * <ol>
  *   <li><b>Dòng tiền khách hàng</b> — theo kỳ đang xem ({@code paid_at} / thời điểm hoàn tiền).</li>
- *   <li><b>Quyết toán</b> — theo đợt tất toán ({@code revenue_period} yyyy-MM).</li>
+ *   <li><b>Quyết toán</b> — theo đợt tất toán ({@code revenue_period} yyyy-MM-D).</li>
  *   <li><b>Doanh thu ghi nhận</b> — từ {@code ProviderRevenue}, chỉ gồm tour có đối tác gán.</li>
  * </ol>
  * Trộn 3 lớp này vào cùng một danh sách ô số khiến Admin hiểu nhầm (VD: tưởng

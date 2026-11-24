@@ -19,6 +19,8 @@ import {
   BOOKING_STATUS, REFUND_STATUS, REFUND_PENDING_STATUSES, longDate, todayIso, vnd,
 } from "../utils";
 import { useT, useI18n, INTL_LOCALE, translate, getLocale } from "@/i18n";
+import PaginationBar from "@/components/ui/PaginationBar";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 /**
  * Phân loại đơn — MỖI ĐƠN CHỈ THUỘC ĐÚNG MỘT NHÓM.
@@ -280,16 +282,29 @@ function NextTrip({ booking, today, isGuest }) {
   );
 }
 
-function TripCard({ b, refundByBooking, isGuest, past }) {
+function TripCard({ b, refundByBooking, isGuest, past, group }) {
   const { t, locale } = useI18n();
-  const st = BOOKING_STATUS[b.status] || BOOKING_STATUS.CANCELLED;
-  const statusLabel = t(BOOKING_STATUS[b.status] ? `bookingStatus.${b.status}` : "bookingStatus.CANCELLED");
+  // ⚠️ Nhãn trạng thái phải KHỚP với NHÓM đang hiển thị, không dùng thẳng
+  // `b.status`:
+  //  • Nhóm "Đã hoàn thành" gồm cả đơn CONFIRMED có ngày đi đã qua (backend
+  //    chưa kịp đánh dấu COMPLETED) ⇒ hiện "Đã xác nhận" ở tab "Đã hoàn thành"
+  //    là SAI ⇒ gán lại "Đã hoàn thành".
+  const effectiveStatus = group === "completed" ? "COMPLETED" : b.status;
+  const st = BOOKING_STATUS[effectiveStatus] || BOOKING_STATUS.CANCELLED;
+  const statusLabel = t(BOOKING_STATUS[effectiveStatus] ? `bookingStatus.${effectiveStatus}` : "bookingStatus.CANCELLED");
   const refund = refundBadgeFor(b.id, refundByBooking, t);
   const refundState = refundStateOf(latestRefundOf(b.id, refundByBooking));
   const closed = b.status === "CANCELLED" || b.status === "EXPIRED";
-  // ⚠️ "Đặt lại tour" chỉ hiện khi đơn ĐÃ xử lý xong hoàn tiền (tránh mua trùng lúc tiền hoàn
-  // còn bay) hoặc đơn đã hủy/hết hạn. Hành khách được mời không đặt lại được (đơn không thuộc họ).
-  const canRebook = !isGuest && b.tourId && (refundState === "resolved" || (closed && refundState === "none"));
+  // ⚠️ "Đặt lại tour" hiện khi:
+  //  • đơn ĐÃ xử lý xong hoàn tiền (tránh mua trùng lúc tiền hoàn còn bay),
+  //  • đơn đã hủy/hết hạn, HOẶC
+  //  • đơn ĐÃ HOÀN THÀNH (tour đã đi xong) ⇒ người dùng muốn thì đặt lại
+  //    tour cho lần sau. Hành khách được mời không đặt lại được (đơn không thuộc họ).
+  const canRebook = !isGuest && b.tourId && (
+    group === "completed"
+    || refundState === "resolved"
+    || (closed && refundState === "none")
+  );
   const mustRefund = needsRefund(b, refundState, isGuest);
   return (
     <div className="group relative flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition hover:border-teal-300 sm:gap-4">
@@ -329,7 +344,7 @@ function TripCard({ b, refundByBooking, isGuest, past }) {
         {canRebook ? (
           <TransitionLink href={ROUTES.TOUR_DETAIL(b.tourId)}
             className="relative z-10 inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-teal-200 bg-white px-3 py-1.5 text-xs font-bold text-teal-800 transition-colors hover:bg-teal-50">
-            <RotateCcw size={13} />{t("trips.rebookShort")}
+            <RotateCcw size={13} />{group === "completed" ? t("merge.trips.rebookThisTour") : t("trips.rebookTour")}
           </TransitionLink>
         ) : (
           <ChevronRight size={18} className="hidden text-slate-300 transition-colors group-hover:text-teal-600 sm:block" />
@@ -428,8 +443,10 @@ function Trips() {
     let alive = true;
     // ⚠️ `/bookings/accessible` = đơn tôi đặt + đơn tôi được MỜI tham gia. `/bookings/my` chỉ có đơn tôi đặt
     // ⇒ du khách được mời sẽ không thấy chuyến đi của mình. Tải song song danh sách tour công khai để có ảnh bìa.
+    // ⚠️ Phân trang chạy phía client (mỗi tab một danh sách riêng) ⇒ phải tải ĐỦ đơn,
+    //    nếu không sẽ thiếu chuyến ở các trang sau. `all: true` ⇒ gọi hết các trang.
     Promise.all([
-      touristService.myBookings(),
+      touristService.myBookings({ all: true }),
       touristService.accessibleBookings().catch(() => []),
       touristService.publishedTours().catch(() => null),
     ]).then(([mine, accessible]) => {
@@ -476,16 +493,18 @@ function Trips() {
     (b) => refundStateOf(latestRefundOf(b.id, refundByBooking)), [refundByBooking]);
 
   // Nhóm chi tiết (theo tripGroupOf) của từng đơn.
-  const groups = useMemo(() => {
+  const { groups, groupOf } = useMemo(() => {
     const g = {};
-    TRIP_TABS.forEach((t) => t.groups.forEach((k) => { g[k] = []; }));
+    const byId = new Map();
+    TRIP_TABS.forEach((item) => item.groups.forEach((k) => { g[k] = []; }));
     state.items.forEach((b) => {
       const key = tripGroupOf(b, today, refundStateFor(b), activeJourneyIds.has(String(b.id)));
       g[key]?.push(b);
+      byId.set(String(b.id), key);
     });
-    return g;
+    return { groups: g, groupOf: byId };
   }, [state.items, refundStateFor, today, activeJourneyIds]);
-  const tabCount = (t) => t.groups.reduce((n, k) => n + groups[k].length, 0);
+  const tabCount = (item) => item.groups.reduce((n, k) => n + groups[k].length, 0);
 
   // Khối "Cần xử lý": đơn giữ chỗ còn hạn (của tôi) + đơn đã trả tiền nhưng bị hủy chưa gửi hoàn tiền.
   const pendingMine = groups.pending.filter((b) => !guestIds.has(String(b.id)) && deadlineLeft(b) > 0);
@@ -498,9 +517,17 @@ function Trips() {
   // Tab + bộ lọc con nằm trên URL ⇒ link từ nơi khác mở đúng chỗ, F5 vẫn giữ.
   const rawTab = params.get("tab");
   const alias = TAB_ALIASES[rawTab];
-  const tab = TRIP_TABS.find((t) => t.key === (alias ? alias[0] : rawTab)) || TRIP_TABS[0];
+  const tab = TRIP_TABS.find((item) => item.key === (alias ? alias[0] : rawTab)) || TRIP_TABS[0];
   const rawSub = alias ? alias[1] : params.get("f");
   const sub = tab.groups.length > 1 && tab.groups.includes(rawSub) ? rawSub : null;
+
+  /**
+   * Trang hiện tại nằm trên URL (?page=) ⇒ link chia sẻ được, F5 vẫn giữ trang.
+   * Đổi tab / bộ lọc con ⇒ quay về trang 1 (xoá ?page= khỏi URL).
+   */
+  const pageParam = Number.parseInt(params.get("page") || "1", 10);
+  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam - 1 : 0;
+
   const go = (tabKey, subKey = null) => {
     const q = new URLSearchParams();
     if (tabKey !== TRIP_TABS[0].key) q.set("tab", tabKey);
@@ -509,16 +536,31 @@ function Trips() {
     router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
   };
 
+  /** Ghi trang mới lên URL (giữ nguyên tab và bộ lọc con). */
+  const pickPage = (p) => {
+    const q = new URLSearchParams(params.toString());
+    if (p > 0) q.set("page", String(p + 1));
+    else q.delete("page");
+    const s = q.toString();
+    router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
+  };
+
   // Tab "Sắp tới": ngày tăng dần (sắp đi trước). Các tab đã đóng: ngày giảm dần.
   const ascending = tab.key === "upcoming";
   const showNext = next && tab.key === "upcoming" && (!sub || sub === "purchased");
-  let list = (sub ? groups[sub] : tab.groups.flatMap((k) => groups[k]))
+  let fullList = (sub ? groups[sub] : tab.groups.flatMap((k) => groups[k]))
     .slice()
     .sort((a, b) => (ascending
       ? String(a.experienceDate || "").localeCompare(String(b.experienceDate || ""))
       : String(b.experienceDate || "").localeCompare(String(a.experienceDate || ""))));
-  if (showNext) list = list.filter((b) => b.id !== next.id);
+  if (showNext) fullList = fullList.filter((b) => b.id !== next.id);
   const past = tab.key !== "upcoming";
+
+  // ── Phân trang: mỗi trang 10 ô (PAGE_SIZE) ──────────────────────────────────
+  const totalElements = fullList.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const list = fullList.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   const spent = useMemo(() => state.items
     .filter((b) => !guestIds.has(String(b.id)) && (b.status === "CONFIRMED" || b.status === "COMPLETED")
@@ -554,8 +596,8 @@ function Trips() {
       mq.removeEventListener("change", measure);
     };
   }, [state.loading, tab.key, sub, needsAction]);
-  // Đổi tab / bộ lọc ⇒ danh sách về đầu.
-  useEffect(() => { if (panelRef.current) panelRef.current.scrollTop = 0; }, [tab.key, sub]);
+  // Đổi tab / bộ lọc / trang ⇒ danh sách về đầu.
+  useEffect(() => { if (panelRef.current) panelRef.current.scrollTop = 0; }, [tab.key, sub, safePage]);
 
   if (state.loading) {
     return (
@@ -642,11 +684,31 @@ function Trips() {
             className="space-y-3 lg:-mr-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pb-1 lg:pr-3 lg:[scrollbar-gutter:stable] lg:[scrollbar-width:thin]">
             {showNext && <NextTrip booking={next} today={today} isGuest={guestIds.has(String(next.id))} />}
             {list.length ? (
-              list.map((b) => <TripCard key={b.id} b={b} refundByBooking={refundByBooking} isGuest={guestIds.has(String(b.id))} past={past} />)
+              list.map((b) => (
+                <TripCard
+                  key={b.id}
+                  b={b}
+                  refundByBooking={refundByBooking}
+                  isGuest={guestIds.has(String(b.id))}
+                  past={past}
+                  group={groupOf.get(String(b.id))}
+                />
+              ))
             ) : showNext ? null : sub ? (
               <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">{t(GROUP_EMPTY_KEY[sub])}</p>
             ) : (
               <EmptyTab tab={tab.key} />
+            )}
+            {totalPages > 1 && (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <PaginationBar
+                  page={safePage}
+                  totalPages={totalPages}
+                  totalElements={totalElements}
+                  unit={t("merge.trips.unitTrip")}
+                  onChange={pickPage}
+                />
+              </div>
             )}
           </div>
         </div>

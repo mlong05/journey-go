@@ -13,16 +13,8 @@ import {
   REFUND_REASON, REFUND_STATUS, REFUND_OPEN_STATUSES, dateTime, vnd,
 } from "../utils";
 import { useT, useI18n, translate, getLocale, INTL_LOCALE } from "@/i18n";
+import { getPersonalRefundTiers } from "../refundPolicy";
 
-/**
- * ⛔ Cửa sổ no-show — KHỚP backend `FinanceProperties.effectiveRefundNoShowWindowHours()`
- * (mặc định 48 giờ). Tính từ ĐẦU NGÀY TRẢI NGHIỆM lùi 48h.
- *
- * ⚠️ KHÔNG dùng `paidAt` — backend quyết định theo ngày trải nghiệm.
- */
-const NO_SHOW_WINDOW_HOURS = 48;
-/** Số ngày "hủy trước N ngày" (chính sách: hủy trước 3 ngày khởi hành). */
-const EARLY_CANCEL_DAYS = 3;
 /** Số ký tự tối đa — khớp `@Size` ở `CreateRefundRequest`. */
 const SUMMARY_MAX = 200;
 const DETAIL_MAX = 2000;
@@ -75,13 +67,6 @@ function parseExperienceDate(value) {
   const raw = typeof value === "string" ? value.slice(0, 10) : value;
   const d = new Date(`${raw}T00:00:00`);
   return Number.isNaN(d.getTime()) ? null : d;
-}
-
-/** Có nằm trong cửa sổ no-show (hủy quá muộn) không. */
-function isInNoShowWindow(experienceDate, now) {
-  if (!experienceDate) return false;
-  const deadline = experienceDate.getTime() - NO_SHOW_WINDOW_HOURS * 3600 * 1000;
-  return now > deadline;
 }
 
 function RefundBadge({ status }) {
@@ -449,9 +434,9 @@ function RefundSummary({ r }) {
  * Bảng chính sách hoàn tiền — hiển thị giống mobile.
  * Số tiền do ADMIN quyết định ⇒ không hiện "dự kiến hoàn X" cho khách.
  */
-function RefundPolicyTable({ experienceDate, now }) {
+function RefundPolicyTable() {
   const t = useT();
-  const personalZeroed = isInNoShowWindow(experienceDate, now);
+  const personalTiers = getPersonalRefundTiers(t);
   return (
     <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 text-sm">
       <p className="mb-3 font-bold text-slate-900">{t("refunds.policy.title")}</p>
@@ -459,26 +444,37 @@ function RefundPolicyTable({ experienceDate, now }) {
         <div>
           <p className="font-semibold text-slate-800">{t("refunds.policy.customerTitle")}</p>
           <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-            <li className="flex items-center justify-between gap-2">
-              <span>{t("refunds.policy.earlyCancel", { days: EARLY_CANCEL_DAYS })}</span>
-              <b className="text-emerald-700">{t("refunds.policy.refund50")}</b>
-            </li>
-            <li className="flex items-center justify-between gap-2">
-              <span>{t("refunds.policy.lateCancel", { hours: NO_SHOW_WINDOW_HOURS })}</span>
-              <b className={personalZeroed ? "text-rose-600" : "text-slate-500"}>{t("refunds.policy.refund0")}</b>
-            </li>
+            {personalTiers.map((tier) => (
+              <li key={tier.id} className="flex items-center justify-between gap-2">
+                <span>{tier.condition}</span>
+                <span className={tier.rate > 0 ? "text-emerald-700" : "text-slate-500"}>
+                  {tier.label}
+                </span>
+              </li>
+            ))}
           </ul>
         </div>
         <div>
           <p className="font-semibold text-slate-800">{t("refunds.policy.systemTitle")}</p>
           <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-            <li className="flex items-center justify-between gap-2"><span>{t("refunds.policy.systemDesc")}</span><b className="text-emerald-700">{t("refunds.policy.refund100")}</b></li>
+            <li className="flex items-center justify-between gap-2">
+              <span>{t("refunds.policy.systemDesc")}</span>
+              <span className="text-emerald-700">{t("refunds.policy.refund100")}</span>
+            </li>
           </ul>
         </div>
         <div>
           <p className="font-semibold text-slate-800">{t("refundReason.FORCE_MAJEURE")}</p>
           <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-            <li className="flex items-center justify-between gap-2"><span>{t("refunds.policy.forceMajeureDesc")}</span><b className="text-slate-500">{t("refunds.policy.perPolicy")}</b></li>
+            {/*
+              ⚠️ Bất khả kháng (thiên tai, dịch bệnh, quy hoạch) → HOÀN 0%.
+              Trước đây hiển thị "Theo chính sách" ⇒ khách không biết mức thực tế.
+              Nhiệm vụ này KHỚP với cách Admin xử lý (refund_rate = 0.0000).
+            */}
+            <li className="flex items-center justify-between gap-2">
+              <span>{t("refunds.policy.forceMajeureDesc")}</span>
+              <span className="text-slate-500">{t("refunds.policy.refund0")}</span>
+            </li>
           </ul>
         </div>
       </div>
@@ -690,7 +686,7 @@ export function RefundPanel({ booking }) {
 
       {open && (
         <form onSubmit={submit} className="mt-4 space-y-4">
-          <RefundPolicyTable experienceDate={experienceDate} now={now} />
+          <RefundPolicyTable />
 
           <div>
             <label htmlFor="refund-summary" className="mb-1 block text-sm font-bold text-slate-800">
@@ -923,7 +919,7 @@ export function RefundGuide({ stacked = false }) {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
         <p className="flex items-center gap-1.5 font-bold text-slate-900"><LifeBuoy size={15} />{t("refunds.guide.ratesTitle")}</p>
         <p className="mt-1">
-          {t("refunds.guide.ratesDesc", { days: EARLY_CANCEL_DAYS, hours: NO_SHOW_WINDOW_HOURS })}
+          {t("merge.refund.guideRatesDesc")}
         </p>
       </div>
     </div>

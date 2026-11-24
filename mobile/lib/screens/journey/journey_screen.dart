@@ -14,6 +14,7 @@ import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/route_service.dart';
 import '../../core/services/tour_service.dart';
+import '../chat/ai_guide_chat_screen.dart';
 import '../common/heritage_motion.dart' show CountUpText;
 import '../common/ink.dart';
 import '../common/photo.dart';
@@ -916,6 +917,23 @@ class _JourneyScreenState extends State<JourneyScreen> {
             leadingWidth: 60,
             leading: Center(child: _FrostedBackButton(onPressed: () => Navigator.of(context).maybePop())),
             actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Center(
+                  child: _FrostedBackButton(
+                    icon: Icons.auto_awesome_rounded,
+                    tooltip: 'Hỏi Hướng dẫn viên AI',
+                    onPressed: () {
+                      final activeDest = _currentDestination;
+                      AiGuideChatScreen.showSheet(
+                        context,
+                        destinationId: activeDest?.destinationId,
+                        destinationName: activeDest?.name ?? journey.tourName,
+                      );
+                    },
+                  ),
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: Center(

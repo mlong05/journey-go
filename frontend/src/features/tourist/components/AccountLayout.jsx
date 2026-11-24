@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserRound, Ticket, MessageCircle, Gift, Trophy, ChevronDown, Check } from "lucide-react";
+import { UserRound, Ticket, MessageCircle, Gift, Trophy, ChevronDown, Check, Sparkles } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
 import RequireTourist from "./RequireTourist";
@@ -24,6 +24,7 @@ export const ACCOUNT_GROUPS = [
     { href: ROUTES.ACCOUNT_POSTS, labelKey: "account.myPosts", Icon: MessageCircle, match: (p) => p.startsWith("/account/posts") },
   ] },
   { titleKey: "account.groupContact", items: [
+    { href: ROUTES.ACCOUNT_AI_GUIDE, labelKey: "merge.nav.aiGuide", Icon: Sparkles, match: (p) => p.startsWith("/account/ai-guide") },
     { href: ROUTES.ACCOUNT_MESSAGES, labelKey: "account.providerMessages", Icon: MessageCircle, match: (p) => p.startsWith("/account/messages"), badge: "unread" },
     { href: ROUTES.ACCOUNT_INVITATIONS, labelKey: "account.invitations", Icon: Ticket, match: (p) => p.startsWith("/account/invitations") },
   ] },

@@ -14,7 +14,8 @@
  *
  * ── Luật nghiệp vụ ──
  *  • Chỉ hoàn được khi Payment đã SUCCESS (đã xác minh) và trong vòng 24h từ `paidAt`.
- *  • Số tiền do HỆ THỐNG tự tính theo nguyên nhân (50% lỗi khách / 100% lỗi nền tảng) —
+ *  • Số tiền do HỆ THỐNG tự tính theo nguyên nhân (nhóm cá nhân theo 3 bậc
+ *    80% / 50% / 0% theo thời điểm hủy; lỗi nền tảng / đối tác 100%) —
  *    Tourist KHÔNG tự nhập số tiền.
  *  • Phương thức hoàn (`VNPAY_API` / `MANUAL_BANK_TRANSFER`) do ADMIN quyết ở bước review.
  *    Vì vậy form của Tourist luôn thu thập số TK / tên chủ TK / ngân hàng để tránh

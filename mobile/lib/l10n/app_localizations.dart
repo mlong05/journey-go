@@ -8540,6 +8540,372 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Check-in ngay'**
   String get navCheckInNow;
+
+  /// No description provided for @rfTier7DaysPlus.
+  ///
+  /// In vi, this message translates to:
+  /// **'Từ 7 ngày trở lên'**
+  String get rfTier7DaysPlus;
+
+  /// No description provided for @rfTier3To6Days.
+  ///
+  /// In vi, this message translates to:
+  /// **'Từ 3 đến 6 ngày (72 giờ – 6 ngày)'**
+  String get rfTier3To6Days;
+
+  /// No description provided for @rfTierUnder72Hours.
+  ///
+  /// In vi, this message translates to:
+  /// **'Dưới 72 giờ (3 ngày)'**
+  String get rfTierUnder72Hours;
+
+  /// No description provided for @rfRefundRate.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hoàn {rate}'**
+  String rfRefundRate(String rate);
+
+  /// No description provided for @homeAiGuideTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hướng dẫn viên ảo AI'**
+  String get homeAiGuideTitle;
+
+  /// No description provided for @homeAiGuideSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hỏi đáp văn hóa, lịch sử & gợi ý nhiệm vụ thông minh'**
+  String get homeAiGuideSubtitle;
+
+  /// No description provided for @aiAskButton.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hỏi AI'**
+  String get aiAskButton;
+
+  /// No description provided for @aiHintButton.
+  ///
+  /// In vi, this message translates to:
+  /// **'Gợi ý AI'**
+  String get aiHintButton;
+
+  /// No description provided for @aiSuggestHint1.
+  ///
+  /// In vi, this message translates to:
+  /// **'Gợi ý hướng quan sát cho tôi'**
+  String get aiSuggestHint1;
+
+  /// No description provided for @aiSuggestHint2.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tôi nên chú ý chi tiết nào quanh đây?'**
+  String get aiSuggestHint2;
+
+  /// No description provided for @aiSuggestHint3.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cho tôi một manh mối nhỏ nhé'**
+  String get aiSuggestHint3;
+
+  /// No description provided for @aiSuggestDestHistory.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kể cho tôi về lịch sử của {name}'**
+  String aiSuggestDestHistory(String name);
+
+  /// No description provided for @aiSuggestHeritage.
+  ///
+  /// In vi, this message translates to:
+  /// **'Giới thiệu nét văn hóa di sản nổi bật'**
+  String get aiSuggestHeritage;
+
+  /// No description provided for @aiSuggestArchitecture.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kiến trúc nơi đây có điểm gì đặc sắc?'**
+  String get aiSuggestArchitecture;
+
+  /// No description provided for @aiSuggestVisitTips.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cần lưu ý gì khi tham quan điểm này?'**
+  String get aiSuggestVisitTips;
+
+  /// No description provided for @aiErrInit.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể khởi tạo phiên trò chuyện AI.'**
+  String get aiErrInit;
+
+  /// No description provided for @aiErrRequestHuman.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể gửi yêu cầu trò chuyện với Admin / Moderator.'**
+  String get aiErrRequestHuman;
+
+  /// No description provided for @aiErrReturnAi.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể chuyển lại về AI Hướng dẫn viên.'**
+  String get aiErrReturnAi;
+
+  /// No description provided for @aiErrSend.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể kết nối tới Hướng dẫn viên AI. Vui lòng thử lại.'**
+  String get aiErrSend;
+
+  /// No description provided for @aiEndHumanTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết thúc hỗ trợ trực tiếp?'**
+  String get aiEndHumanTitle;
+
+  /// No description provided for @aiCancelWaitTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hủy yêu cầu hỗ trợ?'**
+  String get aiCancelWaitTitle;
+
+  /// No description provided for @aiEndHumanBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn có chắc muốn kết thúc cuộc trò chuyện với nhân viên hỗ trợ và quay lại chat với AI không?'**
+  String get aiEndHumanBody;
+
+  /// No description provided for @aiCancelWaitBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?'**
+  String get aiCancelWaitBody;
+
+  /// No description provided for @aiKeepChatting.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiếp tục chat'**
+  String get aiKeepChatting;
+
+  /// No description provided for @aiKeepWaiting.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiếp tục chờ'**
+  String get aiKeepWaiting;
+
+  /// No description provided for @aiEndAndReturnAi.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết thúc & quay lại AI'**
+  String get aiEndAndReturnAi;
+
+  /// No description provided for @aiCancelAndReturnAi.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hủy & quay lại AI'**
+  String get aiCancelAndReturnAi;
+
+  /// No description provided for @aiSenderName.
+  ///
+  /// In vi, this message translates to:
+  /// **'AI Hướng dẫn viên'**
+  String get aiSenderName;
+
+  /// No description provided for @aiHeaderHintTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Trợ lý gợi ý AI'**
+  String get aiHeaderHintTitle;
+
+  /// No description provided for @aiHeaderGuideTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hướng dẫn viên AI'**
+  String get aiHeaderGuideTitle;
+
+  /// No description provided for @aiHistoryTooltip.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lịch sử phiên trò chuyện'**
+  String get aiHistoryTooltip;
+
+  /// No description provided for @aiNewChatTooltip.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cuộc trò chuyện mới'**
+  String get aiNewChatTooltip;
+
+  /// No description provided for @aiChattingWithStaff.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang chat với {role}: {name}'**
+  String aiChattingWithStaff(String role, String name);
+
+  /// No description provided for @aiChattingWithRole.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang chat với {role}'**
+  String aiChattingWithRole(String role);
+
+  /// No description provided for @aiHumanSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhân sự thật đang hỗ trợ trực tiếp'**
+  String get aiHumanSubtitle;
+
+  /// No description provided for @aiWaitingTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang chờ Admin / Moderator tiếp nhận'**
+  String get aiWaitingTitle;
+
+  /// No description provided for @aiWaitingSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn vẫn có thể nhắn tin trong lúc chờ hỗ trợ'**
+  String get aiWaitingSubtitle;
+
+  /// No description provided for @aiDefaultTaskName.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhiệm vụ trải nghiệm'**
+  String get aiDefaultTaskName;
+
+  /// No description provided for @aiDefaultDestName.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hỏi đáp di sản & hỗ trợ'**
+  String get aiDefaultDestName;
+
+  /// No description provided for @aiHintBannerSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chế độ gợi ý thông minh · Không tiết lộ đáp án'**
+  String get aiHintBannerSubtitle;
+
+  /// No description provided for @aiGuideBannerSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thuyết minh viên ảo dựa trên dữ liệu đã kiểm duyệt'**
+  String get aiGuideBannerSubtitle;
+
+  /// No description provided for @aiReturnToAiBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'Quay lại AI'**
+  String get aiReturnToAiBtn;
+
+  /// No description provided for @aiChatHumanBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chat Mod/Admin'**
+  String get aiChatHumanBtn;
+
+  /// No description provided for @aiEmptyHintTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cần manh mối cho thử thách?'**
+  String get aiEmptyHintTitle;
+
+  /// No description provided for @aiEmptyGuideTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xin chào! Tôi có thể giúp gì cho bạn?'**
+  String get aiEmptyGuideTitle;
+
+  /// No description provided for @aiEmptyHintBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hãy hỏi tôi để nhận gợi ý quan sát hiện trường. Tôi sẽ dẫn dắt bạn tự tìm ra đáp án!'**
+  String get aiEmptyHintBody;
+
+  /// No description provided for @aiEmptyGuideBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đặt câu hỏi về lịch sử, câu chuyện văn hóa, kiến trúc hoặc gợi ý khám phá tại điểm dừng.'**
+  String get aiEmptyGuideBody;
+
+  /// No description provided for @aiHumanBadge.
+  ///
+  /// In vi, this message translates to:
+  /// **'NGƯỜI THẬT'**
+  String get aiHumanBadge;
+
+  /// No description provided for @aiSendingMessage.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang gửi tin nhắn...'**
+  String get aiSendingMessage;
+
+  /// No description provided for @aiThinking.
+  ///
+  /// In vi, this message translates to:
+  /// **'AI đang suy nghĩ...'**
+  String get aiThinking;
+
+  /// No description provided for @aiInputHintHuman.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhắn tin trực tiếp tới Admin / Moderator...'**
+  String get aiInputHintHuman;
+
+  /// No description provided for @aiInputHintTask.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hỏi gợi ý cho nhiệm vụ...'**
+  String get aiInputHintTask;
+
+  /// No description provided for @aiInputHintGuide.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hỏi về lịch sử, kiến trúc điểm đến...'**
+  String get aiInputHintGuide;
+
+  /// No description provided for @aiHistoryTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lịch sử trò chuyện AI'**
+  String get aiHistoryTitle;
+
+  /// No description provided for @aiHistoryEmpty.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có phiên trò chuyện nào.'**
+  String get aiHistoryEmpty;
+
+  /// No description provided for @aiDestinationFallback.
+  ///
+  /// In vi, this message translates to:
+  /// **'Điểm đến #{id}'**
+  String aiDestinationFallback(int id);
+
+  /// No description provided for @aiGeneralQa.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hỏi đáp chung'**
+  String get aiGeneralQa;
+
+  /// No description provided for @aiStatusWaiting.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang chờ Mod/Admin'**
+  String get aiStatusWaiting;
+
+  /// No description provided for @aiStatusLive.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chat trực tiếp'**
+  String get aiStatusLive;
+
+  /// No description provided for @aiSessionSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'{status} · {count} tin nhắn'**
+  String aiSessionSubtitle(String status, int count);
+
+  /// No description provided for @aiViewTour.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xem tour #{id}'**
+  String aiViewTour(int id);
 }
 
 class _AppLocalizationsDelegate

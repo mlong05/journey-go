@@ -5267,4 +5267,210 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get navCheckInNow => 'Check in now';
+
+  @override
+  String get rfTier7DaysPlus => '7 or more days before';
+
+  @override
+  String get rfTier3To6Days => '3 to 6 days (72 hours – 6 days)';
+
+  @override
+  String get rfTierUnder72Hours => 'Under 72 hours (3 days)';
+
+  @override
+  String rfRefundRate(String rate) {
+    return 'Refund $rate';
+  }
+
+  @override
+  String get homeAiGuideTitle => 'AI Virtual Guide';
+
+  @override
+  String get homeAiGuideSubtitle =>
+      'Cultural & historical Q&A and smart task hints';
+
+  @override
+  String get aiAskButton => 'Ask AI';
+
+  @override
+  String get aiHintButton => 'AI Hint';
+
+  @override
+  String get aiSuggestHint1 => 'Give me a hint on what to observe';
+
+  @override
+  String get aiSuggestHint2 => 'What details around here should I notice?';
+
+  @override
+  String get aiSuggestHint3 => 'Give me a small clue, please';
+
+  @override
+  String aiSuggestDestHistory(String name) {
+    return 'Tell me about the history of $name';
+  }
+
+  @override
+  String get aiSuggestHeritage => 'Introduce the cultural heritage highlights';
+
+  @override
+  String get aiSuggestArchitecture =>
+      'What is special about the architecture here?';
+
+  @override
+  String get aiSuggestVisitTips =>
+      'What should I keep in mind when visiting here?';
+
+  @override
+  String get aiErrInit => 'Couldn\'t start the AI chat session.';
+
+  @override
+  String get aiErrRequestHuman =>
+      'Couldn\'t request live chat with an Admin or Moderator.';
+
+  @override
+  String get aiErrReturnAi => 'Couldn\'t switch back to the AI Guide.';
+
+  @override
+  String get aiErrSend => 'Couldn\'t reach the AI Guide. Please try again.';
+
+  @override
+  String get aiEndHumanTitle => 'End live support?';
+
+  @override
+  String get aiCancelWaitTitle => 'Cancel support request?';
+
+  @override
+  String get aiEndHumanBody =>
+      'Are you sure you want to end the chat with support staff and return to the AI Guide?';
+
+  @override
+  String get aiCancelWaitBody =>
+      'You\'re currently waiting for support staff. Returning to AI will cancel this request. Are you sure?';
+
+  @override
+  String get aiKeepChatting => 'Keep chatting';
+
+  @override
+  String get aiKeepWaiting => 'Keep waiting';
+
+  @override
+  String get aiEndAndReturnAi => 'End & return to AI';
+
+  @override
+  String get aiCancelAndReturnAi => 'Cancel & return to AI';
+
+  @override
+  String get aiSenderName => 'AI Guide';
+
+  @override
+  String get aiHeaderHintTitle => 'AI Hint Assistant';
+
+  @override
+  String get aiHeaderGuideTitle => 'AI Guide';
+
+  @override
+  String get aiHistoryTooltip => 'Chat history';
+
+  @override
+  String get aiNewChatTooltip => 'New chat';
+
+  @override
+  String aiChattingWithStaff(String role, String name) {
+    return 'Chatting with $role: $name';
+  }
+
+  @override
+  String aiChattingWithRole(String role) {
+    return 'Chatting with $role';
+  }
+
+  @override
+  String get aiHumanSubtitle => 'Live support from a team member';
+
+  @override
+  String get aiWaitingTitle => 'Waiting for an Admin / Moderator';
+
+  @override
+  String get aiWaitingSubtitle => 'You can still send messages while waiting';
+
+  @override
+  String get aiDefaultTaskName => 'Experience challenge';
+
+  @override
+  String get aiDefaultDestName => 'Heritage Q&A & support';
+
+  @override
+  String get aiHintBannerSubtitle => 'Smart hint mode · No spoilers';
+
+  @override
+  String get aiGuideBannerSubtitle =>
+      'Virtual guide powered by verified heritage data';
+
+  @override
+  String get aiReturnToAiBtn => 'Back to AI';
+
+  @override
+  String get aiChatHumanBtn => 'Chat Support';
+
+  @override
+  String get aiEmptyHintTitle => 'Need a clue for this challenge?';
+
+  @override
+  String get aiEmptyGuideTitle => 'Hello! How can I help you today?';
+
+  @override
+  String get aiEmptyHintBody =>
+      'Ask me for observation hints on site. I\'ll guide you to find the answer yourself!';
+
+  @override
+  String get aiEmptyGuideBody =>
+      'Ask about history, cultural stories, architecture, or exploration tips at this stop.';
+
+  @override
+  String get aiHumanBadge => 'LIVE AGENT';
+
+  @override
+  String get aiSendingMessage => 'Sending message...';
+
+  @override
+  String get aiThinking => 'AI is thinking...';
+
+  @override
+  String get aiInputHintHuman => 'Message Admin / Moderator directly...';
+
+  @override
+  String get aiInputHintTask => 'Ask for a task hint...';
+
+  @override
+  String get aiInputHintGuide => 'Ask about history, architecture, or tips...';
+
+  @override
+  String get aiHistoryTitle => 'AI Chat History';
+
+  @override
+  String get aiHistoryEmpty => 'No chat sessions yet.';
+
+  @override
+  String aiDestinationFallback(int id) {
+    return 'Destination #$id';
+  }
+
+  @override
+  String get aiGeneralQa => 'General Q&A';
+
+  @override
+  String get aiStatusWaiting => 'Waiting for staff';
+
+  @override
+  String get aiStatusLive => 'Live chat';
+
+  @override
+  String aiSessionSubtitle(String status, int count) {
+    return '$status · $count messages';
+  }
+
+  @override
+  String aiViewTour(int id) {
+    return 'View tour #$id';
+  }
 }

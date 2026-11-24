@@ -160,6 +160,25 @@ app:
   goong:
     api-key: ${GOONG_API_KEY:}
 
+  # ── AI Virtual Guide (RAG) — Google Gemini ────────────────────────────────
+  # ⚠️ KHỐI NÀY PHẢI CÓ Ở PROFILE PROD. Nếu thiếu, `GEMINI_API_KEY` truyền vào
+  # container KHÔNG có chỗ nào để bind vào ⇒ `journeygo.ai.api-key` rỗng ⇒ AI trả
+  # lỗi "Chưa cấu hình GEMINI_API_KEY" dù Admin đã đặt đúng biến trong .env.
+  #
+  #   (Spring thực ra vẫn merge từ application.yml, nhưng khai báo tường minh ở
+  #    đây giúp file prod tự đủ (self-contained) và không phụ thuộc hành vi merge.)
+  journeygo:
+    ai:
+      api-key: ${GEMINI_API_KEY:}
+      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+      embedding-model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-001}
+      chat-model: ${GEMINI_CHAT_MODEL:gemini-3.5-flash-lite}
+      chunk-size: 400
+      chunk-overlap: 50
+      top-k: 4
+      rate-limit-per-minute: ${AI_RATE_LIMIT_PER_MINUTE:20}
+      max-question-length: ${AI_MAX_QUESTION_LENGTH:1000}
+
   # ── VNPay Sandbox ───────────────────────────────────────────────────────────
   vnpay:
     enabled: ${VNPAY_ENABLED:true}

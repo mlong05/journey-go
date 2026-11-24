@@ -347,6 +347,11 @@ export default function AdminRefundsPage() {
                     Nhóm lý do · Số tiền · Phương thức · Thời điểm · Trạng thái ·
                     Thao tác. Bỏ "Bằng chứng" và "Ngày trải nghiệm" (chỉ cần khi
                     phân loại lý do, xem trong modal Chi tiết).
+
+                    ⚠️ KHÔNG thêm cột "TK nhận tiền" — tài khoản nhận tiền chỉ
+                    cần khi CHUYỂN KHOẢN THỦ CÔNG ⇒ hiện trong modal Chi tiết /
+                    modal ghi nhận chuyển khoản (có nút sao chép) là đủ, thêm
+                    vào đây chỉ làm bảng rộng và nhiễu.
                   */}
                   <th className="py-2.5 px-4 w-[150px]">Mã yêu cầu</th>
                   <th className="py-2.5 px-3 w-[160px]">Mã đơn / giao dịch</th>

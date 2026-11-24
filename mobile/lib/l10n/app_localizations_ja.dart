@@ -4767,4 +4767,202 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get navCheckInNow => '今すぐチェックイン';
+
+  @override
+  String get rfTier7DaysPlus => '7日前以上';
+
+  @override
+  String get rfTier3To6Days => '3〜6日前（72時間〜6日前）';
+
+  @override
+  String get rfTierUnder72Hours => '72時間（3日）未満';
+
+  @override
+  String rfRefundRate(String rate) {
+    return '$rate返金';
+  }
+
+  @override
+  String get homeAiGuideTitle => 'AIバーチャルガイド';
+
+  @override
+  String get homeAiGuideSubtitle => '文化・歴史のQ&Aやスマートなミッションヒント';
+
+  @override
+  String get aiAskButton => 'AIに質問';
+
+  @override
+  String get aiHintButton => 'AIヒント';
+
+  @override
+  String get aiSuggestHint1 => '観察のポイントを教えてください';
+
+  @override
+  String get aiSuggestHint2 => '周りのどんな細部に注目すべきですか？';
+
+  @override
+  String get aiSuggestHint3 => '小さなヒントをいただけますか？';
+
+  @override
+  String aiSuggestDestHistory(String name) {
+    return '$nameの歴史について教えてください';
+  }
+
+  @override
+  String get aiSuggestHeritage => '文化遺産の主な見どころを紹介してください';
+
+  @override
+  String get aiSuggestArchitecture => 'ここの建築にはどんな特徴がありますか？';
+
+  @override
+  String get aiSuggestVisitTips => 'ここを見学する際の注意点はありますか？';
+
+  @override
+  String get aiErrInit => 'AIチャットセッションを開始できませんでした。';
+
+  @override
+  String get aiErrRequestHuman => '管理者・モデレーターへのチャット依頼を送信できませんでした。';
+
+  @override
+  String get aiErrReturnAi => 'AIガイドへ戻すことができませんでした。';
+
+  @override
+  String get aiErrSend => 'AIガイドに接続できませんでした。もう一度お試しください。';
+
+  @override
+  String get aiEndHumanTitle => '有人サポートを終了しますか？';
+
+  @override
+  String get aiCancelWaitTitle => 'サポート依頼をキャンセルしますか？';
+
+  @override
+  String get aiEndHumanBody => 'サポートスタッフとのチャットを終了し、AIガイドに戻ってもよろしいですか？';
+
+  @override
+  String get aiCancelWaitBody =>
+      '現在スタッフの対応待ちです。AIに戻るとこのサポート依頼はキャンセルされます。よろしいですか？';
+
+  @override
+  String get aiKeepChatting => 'チャットを続ける';
+
+  @override
+  String get aiKeepWaiting => 'このまま待つ';
+
+  @override
+  String get aiEndAndReturnAi => '終了してAIに戻る';
+
+  @override
+  String get aiCancelAndReturnAi => 'キャンセルしてAIに戻る';
+
+  @override
+  String get aiSenderName => 'AIガイド';
+
+  @override
+  String get aiHeaderHintTitle => 'AIヒントアシスタント';
+
+  @override
+  String get aiHeaderGuideTitle => 'AIガイド';
+
+  @override
+  String get aiHistoryTooltip => 'チャット履歴';
+
+  @override
+  String get aiNewChatTooltip => '新しいチャット';
+
+  @override
+  String aiChattingWithStaff(String role, String name) {
+    return '$roleとチャット中：$name';
+  }
+
+  @override
+  String aiChattingWithRole(String role) {
+    return '$roleとチャット中';
+  }
+
+  @override
+  String get aiHumanSubtitle => 'スタッフが直接サポートしています';
+
+  @override
+  String get aiWaitingTitle => '管理者・モデレーターの対応待ち';
+
+  @override
+  String get aiWaitingSubtitle => 'お待ちの間もメッセージを送信できます';
+
+  @override
+  String get aiDefaultTaskName => '体験ミッション';
+
+  @override
+  String get aiDefaultDestName => '文化遺産Q&A・サポート';
+
+  @override
+  String get aiHintBannerSubtitle => 'スマートヒントモード · 答えは明かしません';
+
+  @override
+  String get aiGuideBannerSubtitle => '検証済みデータに基づくバーチャルガイド';
+
+  @override
+  String get aiReturnToAiBtn => 'AIに戻る';
+
+  @override
+  String get aiChatHumanBtn => 'スタッフに相談';
+
+  @override
+  String get aiEmptyHintTitle => 'チャレンジのヒントが必要ですか？';
+
+  @override
+  String get aiEmptyGuideTitle => 'こんにちは！何かお手伝いできますか？';
+
+  @override
+  String get aiEmptyHintBody => '現場での観察ヒントをお尋ねください。ご自身で答えを見つけられるようご案内します！';
+
+  @override
+  String get aiEmptyGuideBody => '歴史や文化の物語、建築、このスポットの散策のコツなどを質問してみてください。';
+
+  @override
+  String get aiHumanBadge => 'スタッフ';
+
+  @override
+  String get aiSendingMessage => 'メッセージを送信中...';
+
+  @override
+  String get aiThinking => 'AIが考えています...';
+
+  @override
+  String get aiInputHintHuman => '管理者・モデレーターへ直接メッセージ...';
+
+  @override
+  String get aiInputHintTask => 'ミッションのヒントを聞く...';
+
+  @override
+  String get aiInputHintGuide => '歴史や建築について質問する...';
+
+  @override
+  String get aiHistoryTitle => 'AIチャット履歴';
+
+  @override
+  String get aiHistoryEmpty => 'まだチャット履歴がありません。';
+
+  @override
+  String aiDestinationFallback(int id) {
+    return 'スポット #$id';
+  }
+
+  @override
+  String get aiGeneralQa => '一般Q&A';
+
+  @override
+  String get aiStatusWaiting => 'スタッフ対応待ち';
+
+  @override
+  String get aiStatusLive => '有人チャット';
+
+  @override
+  String aiSessionSubtitle(String status, int count) {
+    return '$status · $count件のメッセージ';
+  }
+
+  @override
+  String aiViewTour(int id) {
+    return 'ツアー #$id を見る';
+  }
 }

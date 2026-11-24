@@ -66,6 +66,7 @@ class ApiConstants {
   static const String bookingsEndpoint = '/bookings';
   static const String paymentsEndpoint = '/payments';
   static const String refundsEndpoint = '/refunds';
+  static const String aiGuideEndpoint = '/ai-guide';
 
   // Chu kỳ poll trạng thái thanh toán VNPay (milliseconds).
   static const int paymentPollIntervalMs = 2500;

@@ -3411,5 +3411,121 @@
       }
     }
   },
-  "navCheckInNow": "Check-in ngay"
+  "navCheckInNow": "Check-in ngay",
+  "rfTier7DaysPlus": "Từ 7 ngày trở lên",
+  "rfTier3To6Days": "Từ 3 đến 6 ngày (72 giờ – 6 ngày)",
+  "rfTierUnder72Hours": "Dưới 72 giờ (3 ngày)",
+  "rfRefundRate": "Hoàn {rate}",
+  "@rfRefundRate": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "homeAiGuideTitle": "Hướng dẫn viên ảo AI",
+  "homeAiGuideSubtitle": "Hỏi đáp văn hóa, lịch sử & gợi ý nhiệm vụ thông minh",
+  "aiAskButton": "Hỏi AI",
+  "aiHintButton": "Gợi ý AI",
+  "aiSuggestHint1": "Gợi ý hướng quan sát cho tôi",
+  "aiSuggestHint2": "Tôi nên chú ý chi tiết nào quanh đây?",
+  "aiSuggestHint3": "Cho tôi một manh mối nhỏ nhé",
+  "aiSuggestDestHistory": "Kể cho tôi về lịch sử của {name}",
+  "@aiSuggestDestHistory": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "aiSuggestHeritage": "Giới thiệu nét văn hóa di sản nổi bật",
+  "aiSuggestArchitecture": "Kiến trúc nơi đây có điểm gì đặc sắc?",
+  "aiSuggestVisitTips": "Cần lưu ý gì khi tham quan điểm này?",
+  "aiErrInit": "Không thể khởi tạo phiên trò chuyện AI.",
+  "aiErrRequestHuman": "Không thể gửi yêu cầu trò chuyện với Admin / Moderator.",
+  "aiErrReturnAi": "Không thể chuyển lại về AI Hướng dẫn viên.",
+  "aiErrSend": "Không thể kết nối tới Hướng dẫn viên AI. Vui lòng thử lại.",
+  "aiEndHumanTitle": "Kết thúc hỗ trợ trực tiếp?",
+  "aiCancelWaitTitle": "Hủy yêu cầu hỗ trợ?",
+  "aiEndHumanBody": "Bạn có chắc muốn kết thúc cuộc trò chuyện với nhân viên hỗ trợ và quay lại chat với AI không?",
+  "aiCancelWaitBody": "Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?",
+  "aiKeepChatting": "Tiếp tục chat",
+  "aiKeepWaiting": "Tiếp tục chờ",
+  "aiEndAndReturnAi": "Kết thúc & quay lại AI",
+  "aiCancelAndReturnAi": "Hủy & quay lại AI",
+  "aiSenderName": "AI Hướng dẫn viên",
+  "aiHeaderHintTitle": "Trợ lý gợi ý AI",
+  "aiHeaderGuideTitle": "Hướng dẫn viên AI",
+  "aiHistoryTooltip": "Lịch sử phiên trò chuyện",
+  "aiNewChatTooltip": "Cuộc trò chuyện mới",
+  "aiChattingWithStaff": "Đang chat với {role}: {name}",
+  "@aiChattingWithStaff": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "aiChattingWithRole": "Đang chat với {role}",
+  "@aiChattingWithRole": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "aiHumanSubtitle": "Nhân sự thật đang hỗ trợ trực tiếp",
+  "aiWaitingTitle": "Đang chờ Admin / Moderator tiếp nhận",
+  "aiWaitingSubtitle": "Bạn vẫn có thể nhắn tin trong lúc chờ hỗ trợ",
+  "aiDefaultTaskName": "Nhiệm vụ trải nghiệm",
+  "aiDefaultDestName": "Hỏi đáp di sản & hỗ trợ",
+  "aiHintBannerSubtitle": "Chế độ gợi ý thông minh · Không tiết lộ đáp án",
+  "aiGuideBannerSubtitle": "Thuyết minh viên ảo dựa trên dữ liệu đã kiểm duyệt",
+  "aiReturnToAiBtn": "Quay lại AI",
+  "aiChatHumanBtn": "Chat Mod/Admin",
+  "aiEmptyHintTitle": "Cần manh mối cho thử thách?",
+  "aiEmptyGuideTitle": "Xin chào! Tôi có thể giúp gì cho bạn?",
+  "aiEmptyHintBody": "Hãy hỏi tôi để nhận gợi ý quan sát hiện trường. Tôi sẽ dẫn dắt bạn tự tìm ra đáp án!",
+  "aiEmptyGuideBody": "Đặt câu hỏi về lịch sử, câu chuyện văn hóa, kiến trúc hoặc gợi ý khám phá tại điểm dừng.",
+  "aiHumanBadge": "NGƯỜI THẬT",
+  "aiSendingMessage": "Đang gửi tin nhắn...",
+  "aiThinking": "AI đang suy nghĩ...",
+  "aiInputHintHuman": "Nhắn tin trực tiếp tới Admin / Moderator...",
+  "aiInputHintTask": "Hỏi gợi ý cho nhiệm vụ...",
+  "aiInputHintGuide": "Hỏi về lịch sử, kiến trúc điểm đến...",
+  "aiHistoryTitle": "Lịch sử trò chuyện AI",
+  "aiHistoryEmpty": "Chưa có phiên trò chuyện nào.",
+  "aiDestinationFallback": "Điểm đến #{id}",
+  "@aiDestinationFallback": {
+    "placeholders": {
+      "id": {
+        "type": "int"
+      }
+    }
+  },
+  "aiGeneralQa": "Hỏi đáp chung",
+  "aiStatusWaiting": "Đang chờ Mod/Admin",
+  "aiStatusLive": "Chat trực tiếp",
+  "aiSessionSubtitle": "{status} · {count} tin nhắn",
+  "@aiSessionSubtitle": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "aiViewTour": "Xem tour #{id}",
+  "@aiViewTour": {
+    "placeholders": {
+      "id": {
+        "type": "int"
+      }
+    }
+  }
 }

@@ -33,11 +33,14 @@ public class FinanceProperties {
 
     /**
      * Số giờ trước ngày trải nghiệm mà yêu cầu hoàn tiền của nhóm cá nhân bị tính
-     * tỷ lệ 0% (khách hủy quá muộn hoặc không xuất hiện — no-show).
+     * tỷ lệ 0% (khách hủy quá muộn — bậc LATE).
      *
-     * <p>Chính sách: "Hủy trong vòng 48 giờ hoặc không xuất hiện thì hoàn 0%".
+     * <p>Chính sách: "Dưới 72 giờ (3 ngày) thì hoàn 0%".
+     *
+     * <p>⚠️ Khớp với {@link com.journeygo.modules.refund.service.PersonalRefundPolicy#LATE_CANCEL_HOURS}
+     * (72 giờ) — hai hằng số này phải giữ đồng bộ.
      */
-    private int refundNoShowWindowHours = 48;
+    private int refundNoShowWindowHours = 72;
 
     /**
      * Số giờ trước ngày trải nghiệm mà Tourist được gửi lại yêu cầu hoàn tiền
@@ -54,7 +57,13 @@ public class FinanceProperties {
 
     /**
      * Tỷ lệ hoàn tiền cho lỗi từ Tourist / lý do cá nhân (0.50 = 50%).
+     *
+     * @deprecated KHÔNG còn dùng cho tính tiền — nhóm cá nhân tính theo 3 BẬC
+     *             theo thời điểm hủy (xem
+     *             {@link com.journeygo.modules.refund.service.PersonalRefundPolicy}).
+     *             Giữ lại để không làm hỏng cấu hình môi trường cũ.
      */
+    @Deprecated(forRemoval = true)
     private BigDecimal touristFaultRefundRate = new BigDecimal("0.50");
 
     /**
@@ -73,6 +82,22 @@ public class FinanceProperties {
      * Mặc định false — theo tài liệu: "Chỉ cho phép tạo đợt tất toán chính thức cho kỳ đã kết thúc."
      */
     private boolean allowOpenPeriodSettlement = false;
+
+    /**
+     * Bật tác vụ nền TỰ ĐỘNG TẠO đợt tất toán khi kỳ 10 ngày kết thúc.
+     *
+     * <p>Admin chỉ việc xem xét rồi duyệt — không phải tự tạo đợt.
+     *
+     * <p>Mặc định {@code true}. Tắt (false) ⇒ Admin tạo đợt thủ công như trước.
+     */
+    private boolean settlementAutoCreateEnabled = true;
+
+    /**
+     * Số kỳ tất toán tối đa mà tác vụ tự động xét lùi mỗi lần quét.
+     *
+     * <p>Mặc định 6 — đủ để bù cho trường hợp server tắt vài giờ mà không bỏ sót kỳ.
+     */
+    private int settlementAutoCreateLookbackPeriods = 6;
 
     /**
      * Đặt tour vào ngày Provider chưa mở slot: true = tự mở slot với sức chứa

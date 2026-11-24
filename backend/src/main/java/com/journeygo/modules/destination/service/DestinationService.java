@@ -3,6 +3,7 @@ package com.journeygo.modules.destination.service;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
+import com.journeygo.modules.aiguide.event.DestinationInvalidatedEvent;
 import com.journeygo.modules.destination.dto.DestinationQrResponse;
 import com.journeygo.modules.destination.dto.DestinationRequest;
 import com.journeygo.modules.destination.dto.DestinationResponse;
@@ -18,6 +19,7 @@ import com.journeygo.modules.user.repository.UserRepository;
 import com.journeygo.modules.moderation.service.DestinationModerationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -41,6 +43,7 @@ public class DestinationService {
     private final RegionRepository regionRepository;
     private final ThemeRepository themeRepository;
     private final DestinationModerationService moderationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
             "id", "name", "address", "latitude", "longitude",
@@ -246,6 +249,7 @@ public class DestinationService {
             destination.getContents().forEach(c -> c.setDeleted(true));
         }
         destinationRepository.save(destination);
+        eventPublisher.publishEvent(new DestinationInvalidatedEvent(id, "DESTINATION_DELETED", true));
         log.info("Soft-deleted destination id={}", id);
     }
 

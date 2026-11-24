@@ -27,6 +27,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/refund_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/refund_policy.dart';
 import '../../l10n/locale_controller.dart';
 
 /// Bằng chứng đính kèm — ảnh hoặc video đã tải lên máy chủ.
@@ -43,7 +44,7 @@ class _EvidenceFile {
 /// Màu hiển thị của tỷ lệ hoàn trong bảng chính sách.
 enum _PolicyTone { success, danger, muted }
 
-/// Một dòng điều kiện trong nhóm lý do (VD: "Hủy trước 3 ngày" → "Hoàn 50%").
+/// Một dòng điều kiện trong nhóm lý do (VD: "Từ 7 ngày trở lên" → "Hoàn 80%").
 class _PolicyLine {
   final String condition;
   final String rateLabel;
@@ -144,45 +145,20 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
 
   // ── Chính sách hoàn tiền ──────────────────────────────────────────────────
 
-  /// Ngày trải nghiệm của booking — mốc để áp cửa sổ no-show 48h.
-  DateTime? get _experienceDate => widget.booking?.experienceDate;
-
-  /// Cửa sổ no-show: khách gửi trong vòng N giờ trước ngày trải nghiệm
-  /// (hoặc không xuất hiện) → nhóm cá nhân không hoàn tiền.
-  bool _isInNoShowWindow(DateTime? date, int hours) {
-    if (date == null || hours <= 0) return false;
-    final startOfExperience = DateTime(date.year, date.month, date.day);
-    final deadline = startOfExperience.subtract(Duration(hours: hours));
-    return DateTime.now().isAfter(deadline);
-  }
-
-  /// Số giờ cửa sổ no-show — lấy từ cấu hình backend (mặc định 48).
-  static const int _noShowWindowHours = 48;
-
-  /// Số giờ "hủy trước N ngày khởi hành" (chính sách: hủy trước 3 ngày).
-  static const int _earlyCancelDays = 3;
-
   /// Một nhóm trong bảng "Chính sách Hoàn Tiền" + các dòng điều kiện bên dưới.
   List<_PolicyGroup> get _policyGroups {
-    final personalZeroed = _isInNoShowWindow(
-      _experienceDate,
-      _noShowWindowHours,
-    );
     return [
       _PolicyGroup(
         title: context.l10n.rfPolicyCustomer,
         icon: Icons.person_outline_rounded,
         lines: [
-          _PolicyLine(
-            context.l10n.rfCancelBefore(_earlyCancelDays),
-            context.l10n.rfRefundPercent(50),
-            tone: _PolicyTone.success,
-          ),
-          _PolicyLine(
-            context.l10n.rfCancelWithin(_noShowWindowHours),
-            context.l10n.rfRefundPercent(0),
-            tone: personalZeroed ? _PolicyTone.danger : _PolicyTone.muted,
-          ),
+          for (final tier in kPersonalRefundTiers)
+            _PolicyLine(
+              tier.condition,
+              tier.label,
+              // Bậc 0% (không hoàn) dùng màu cảnh báo để khách thấy rõ.
+              tone: tier.rate > 0 ? _PolicyTone.muted : _PolicyTone.danger,
+            ),
         ],
       ),
       _PolicyGroup(
@@ -200,6 +176,8 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
         title: context.l10n.rfPolicyForceMajeure,
         icon: Icons.thunderstorm_outlined,
         lines: [
+          // ⚠️ Bất khả kháng (thiên tai, dịch bệnh, quy hoạch) → HOÀN 0%,
+          // khớp với cách Admin xử lý.
           _PolicyLine(
             context.l10n.rfPolicyForceMajeureLine,
             context.l10n.rfRefundPercent(0),
@@ -708,7 +686,6 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                             line.rateLabel,
                             style: TextStyle(
                               fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
                               color: _policyToneColor(line.tone),
                             ),
                           ),

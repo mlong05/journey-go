@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -52,7 +51,7 @@ class BookingServicePendingTest {
         // Tour luồng cũ (tourFormat = null) để không phải dựng lịch khởi hành.
         when(tourRepository.findByTourId(9L)).thenReturn(Optional.of(
                 Tour.builder().tourId(9L).status(TourStatus.PUBLISHED).approved(true).build()));
-        when(bookingRepository.existsByTour_TourIdAndTourist_IdAndStatusIn(eq(9L), eq(14L), anyList())).thenReturn(false);
+        when(bookingRepository.existsActiveConfirmedBooking(eq(9L), eq(14L), any(LocalDate.class))).thenReturn(false);
     }
 
     @Test

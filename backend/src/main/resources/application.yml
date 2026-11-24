@@ -291,9 +291,11 @@ journeygo:
   ai:
     api-key: ${GEMINI_API_KEY:}
     base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
-    embedding-model: ${GEMINI_EMBEDDING_MODEL:text-embedding-004}
-    chat-model: ${GEMINI_CHAT_MODEL:gemini-1.5-flash}
+    embedding-model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-001}
+    chat-model: ${GEMINI_CHAT_MODEL:gemini-3.5-flash-lite}
     chunk-size: 400
     chunk-overlap: 50
     top-k: 4
+    rate-limit-per-minute: ${AI_RATE_LIMIT_PER_MINUTE:20}
+    max-question-length: ${AI_MAX_QUESTION_LENGTH:1000}
 
