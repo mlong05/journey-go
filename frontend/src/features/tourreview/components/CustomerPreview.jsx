@@ -216,8 +216,8 @@ function StopSheet({ stop, onClose }) {
                 <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-100">
                   <HelpCircle size={16} className="text-sky-600 shrink-0" />
                   <span className="min-w-0">
-                    <span className="block text-[11.5px] font-bold text-slate-800">Câu đố văn hoá</span>
-                    <span className="block text-[10.5px] text-slate-500">{quizCount} câu trắc nghiệm</span>
+                    <span className="block text-[11.5px] font-bold text-slate-800">Câu đố văn hóa</span>
+                    <span className="block text-[10.5px] text-slate-500">{quizCount} câu đố</span>
                   </span>
                 </div>
               )}
@@ -225,7 +225,7 @@ function StopSheet({ stop, onClose }) {
                 <div key={a.id || i} className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-100">
                   <Footprints size={16} className="text-sky-600 shrink-0" />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[11.5px] font-bold text-slate-800">{a.activityName || "Hoạt động thực địa"}</span>
+                    <span className="block text-[11.5px] font-bold text-slate-800">{a.activityName || "Trải nghiệm thực tế"}</span>
                     <span className="block text-[10.5px] text-slate-500">
                       {[activityDuration(a.durationSeconds), "quét QR tại điểm để xác nhận"].filter(Boolean).join(" · ")}
                     </span>

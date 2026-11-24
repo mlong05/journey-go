@@ -46,13 +46,15 @@ function Section({ title, step, onEdit, children }) {
   );
 }
 
+const TYPE_BADGES = { TEXT: "Nhập chữ", IMAGE_CHOICE: "Chọn ảnh", ORDERING: "Xếp thứ tự", NUMBER: "Đoán số", MATCHING: "Nối cột" };
+
 function QuestionView({ q, label, points }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold text-slate-800">
           {label}
-          {q?.type === "TEXT" && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 text-[10px] font-bold align-middle">Nhập chữ</span>}
+          {TYPE_BADGES[q?.type] && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 text-[10px] font-bold align-middle">{TYPE_BADGES[q.type]}</span>}
           : {q?.content || <i className="text-slate-400">chưa nhập</i>}
         </p>
         {points != null && <span className="shrink-0 text-[11px] font-bold text-slate-400">+{points} điểm</span>}
@@ -62,6 +64,46 @@ function QuestionView({ q, label, points }) {
           Khách nhập câu trả lời bằng chữ.
           {q.referenceAnswer ? <> Đáp án đúng: <b className="text-slate-800">{q.referenceAnswer}</b></> : <span className="text-rose-600 font-semibold"> Chưa có đáp án đúng.</span>}
         </p>
+      ) : q?.type === "NUMBER" ? (
+        <p className="px-2 py-1.5 rounded-md bg-slate-50 text-xs text-slate-600">
+          Thanh trượt {q.numberMin ?? "?"} – {q.numberMax ?? "?"} · Đáp án đúng: <b className="text-slate-800">{q.numberCorrect ?? "?"}</b>
+          {q.numberTolerance ? <> (chấp nhận ±{q.numberTolerance})</> : null}
+        </p>
+      ) : q?.type === "ORDERING" ? (
+        <ol className="space-y-1">
+          {(q.answers || []).map((a, i) => (
+            <li key={i} className="px-2 py-1 rounded-md bg-slate-50 text-xs text-slate-700">
+              <b className="text-emerald-700">{i + 1}.</b> {a.content || "—"}
+            </li>
+          ))}
+        </ol>
+      ) : q?.type === "MATCHING" ? (
+        <ol className="space-y-1">
+          {(q.answers || []).map((a, i) => (
+            <li key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-slate-50 text-xs text-slate-700">
+              <b className="text-emerald-700 shrink-0">{i + 1}.</b>
+              {a.imageUrl && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={a.imageUrl} alt={a.content || `Cột A ${i + 1}`} className="w-9 h-9 rounded object-cover shrink-0 border border-slate-200" />
+              )}
+              <span className="flex-1 min-w-0">{a.content || (a.imageUrl ? "[Ảnh]" : "—")}</span>
+              <span className="text-slate-400 shrink-0">↔</span>
+              <span className="flex-1 min-w-0 font-semibold text-slate-800">{a.matchText || "—"}</span>
+            </li>
+          ))}
+        </ol>
+      ) : q?.type === "IMAGE_CHOICE" ? (
+        <ul className="grid grid-cols-4 gap-1.5">
+          {(q.answers || []).map((a, i) => (
+            <li key={i} className={`rounded-md overflow-hidden border-2 ${a.correct ? "border-emerald-500" : "border-transparent"}`}>
+              {a.imageUrl
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={a.imageUrl} alt={a.content || `Ảnh ${i + 1}`} className="w-full aspect-[4/3] object-cover" />
+                : <div className="w-full aspect-[4/3] bg-slate-100" />}
+              <p className="px-1 py-0.5 text-[10px] text-slate-600 truncate">{String.fromCharCode(65 + i)}. {a.content || ""}</p>
+            </li>
+          ))}
+        </ul>
       ) : (
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1">
         {(q?.answers || []).map((a, i) => (
@@ -70,6 +112,11 @@ function QuestionView({ q, label, points }) {
           </li>
         ))}
       </ul>
+      )}
+      {q?.explanation && (
+        <p className="px-2 py-1.5 rounded-md bg-amber-50 text-xs text-amber-900">
+          <b>Giải thích:</b> {q.explanation}
+        </p>
       )}
     </div>
   );
@@ -116,6 +163,26 @@ function StoryCard({ stop: s, panel = true }) {
                 {a.videoUrl && (
                   <a href={a.videoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-bold text-emerald-700"><Film size={11} />Video</a>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+        {s.thenNow?.length > 0 && (
+          <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Ảnh xưa và nay</p>
+            {s.thenNow.map((t) => (
+              <div key={t.id} className="flex items-start gap-2 text-xs text-slate-700">
+                {[t.thenImageUrl, t.nowImageUrl].map((u, k) => (u
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img key={k} src={u} alt={k === 0 ? "Ảnh xưa" : "Ảnh nay"} className="h-14 w-20 rounded-lg object-cover" />
+                  : <div key={k} className="h-14 w-20 rounded-lg bg-slate-100" />))}
+                <span>
+                  <b>{t.thenLabel || "?"} → nay</b>{t.caption ? ` — ${t.caption}` : ""}
+                  <br />
+                  <span className={t.credit ? "text-slate-500" : "text-rose-600 font-semibold"}>
+                    Nguồn: {t.credit || "chưa ghi nguồn"}
+                  </span>
+                </span>
               </div>
             ))}
           </div>
@@ -214,7 +281,7 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
 
       <Section title={`3. Điểm đến (${(tour.stops || []).length})`} step="STOPS" onEdit={onEdit}>
         <p className="text-[11px] text-slate-500">
-          Điểm thưởng {rp.snapshot ? "đã chốt" : "theo cấu hình hiện tại"}: {rp.quizPerQuestion ?? "—"} điểm / câu quiz · {rp.perExperience ?? "—"} điểm / trải nghiệm · tối đa {rp.maxTotalPoints ?? 0} điểm
+          Điểm thưởng {rp.snapshot ? "đã chốt" : "theo cấu hình hiện tại"}: {rp.quizPerQuestion ?? "—"} điểm / câu đố · {rp.perExperience ?? "—"} điểm / trải nghiệm · tối đa {rp.maxTotalPoints ?? 0} điểm
         </p>
         <div>
           <p className="text-xs font-bold text-slate-500 mb-1.5 inline-flex items-center gap-1"><MapPin size={12} />Bản đồ hành trình</p>
@@ -228,7 +295,7 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
               <div className="px-3 py-2.5 bg-slate-50 flex items-center justify-between gap-2">
                 <span className="text-sm font-bold text-slate-800 truncate">{i + 1}. {s.name || "Chưa đặt tên"}</span>
                 <span className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] text-slate-500">{s.quiz?.length || 0} quiz · {s.experiences?.length || 0} trải nghiệm · +{s.maxPoints} điểm</span>
+                  <span className="text-[11px] text-slate-500">{s.quiz?.length || 0} câu đố · {s.experiences?.length || 0} trải nghiệm · +{s.maxPoints} điểm</span>
                   {collapsibleStops && (
                     <button type="button" onClick={() => setOpenStops((o) => ({ ...o, [s.id]: !o[s.id] }))}
                       className="px-2 py-1 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-700 inline-flex items-center gap-1 cursor-pointer">
@@ -282,10 +349,10 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
                     )}
                     <StoryCard stop={s} panel={storyPanel} />
                   </Block>
-                  {(s.quiz || []).length > 0 && <p className="text-xs font-bold text-slate-500">Câu hỏi (quiz) – trắc nghiệm</p>}
+                  {(s.quiz || []).length > 0 && <p className="text-xs font-bold text-slate-500">Câu đố văn hóa</p>}
                   {(s.quiz || []).map((q, qi) => (
-                    <Block key={q.id || qi} anchor={{ step: "STOPS", stopId: s.id, field: `quiz[${qi}]` }} label={`Điểm ${i + 1} – Quiz câu ${qi + 1}`}>
-                      <QuestionView q={q} label={`Quiz câu ${qi + 1}`} points={q.points} />
+                    <Block key={q.id || qi} anchor={{ step: "STOPS", stopId: s.id, field: `quiz[${qi}]` }} label={`Điểm ${i + 1} – Câu đố ${qi + 1}`}>
+                      <QuestionView q={q} label={`Câu đố ${qi + 1}`} points={q.points} />
                     </Block>
                   ))}
                   {(s.experiences || []).length > 0 && <p className="text-xs font-bold text-slate-500">Trải nghiệm thực tế</p>}

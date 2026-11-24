@@ -55,7 +55,7 @@ export const LIMITS = {
   EXPERIENCES_MIN: 1,
   EXPERIENCES_MAX: 5,
   RADIUS_MIN: 10,
-  RADIUS_MAX: 500,
+  RADIUS_MAX: 100,
   RADIUS_DEFAULT: 50,
   /** Bán kính check-in trạm (đối tác tự nhập) — khớp STOP_RADIUS_* ở backend. */
   STOP_RADIUS_MIN: 50,
@@ -86,6 +86,7 @@ export const LIMITS = {
     QUESTION: 300,
     ANSWER: 200,
     REFERENCE_ANSWER: 500,
+    EXPLANATION: 500,
     ACTIVITY_NAME: 150,
     DEPARTURE_TIME: 100,
     MEETING_POINT: 300,

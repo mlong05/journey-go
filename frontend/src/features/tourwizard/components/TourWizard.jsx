@@ -2,7 +2,7 @@
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, AlertCircle, Loader2, CloudOff, CheckCircle2, RotateCw, PartyPopper } from "lucide-react";
+import { ArrowLeft, ArrowRight, AlertCircle, Loader2, CloudOff, CheckCircle2, RotateCw } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useTourDraft, issuesForStep } from "../hooks/useTourDraft";
 import { providerTourService, catalogService, extractIssues } from "../services/providerTourService";
@@ -42,29 +42,43 @@ const NOTICE_MS = 2500;
 
 /**
  * Hộp thông báo "gửi tour thành công" giữa màn hình (trang phía sau mờ đi).
- * Hiện khoảng 2.5 giây rồi chuyển về danh sách tour (trang đích được prefetch sẵn).
+ * Dấu tích gọn gàng, nút "Về danh sách tour" hiện mượt sau 350ms;
+ * bấm nút hoặc hết đếm ngược sẽ tải lại sạch trang danh sách tour.
  */
 function SubmittedNotice({ onDone }) {
+  const [showBtn, setShowBtn] = useState(false);
+
   useEffect(() => {
-    // Giữ thông báo khoảng 2.5 giây rồi mới chuyển trang (chỉ một lần khi hiện)
-    const t = setTimeout(onDone, NOTICE_MS);
-    return () => clearTimeout(t);
+    const reveal = setTimeout(() => setShowBtn(true), 350);
+    const done = setTimeout(onDone, NOTICE_MS);
+    return () => { clearTimeout(reveal); clearTimeout(done); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-[2px] animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/35 backdrop-blur-[2px] animate-in fade-in duration-200">
       <div role="status" aria-live="polite"
-        className="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-100 p-6 text-center space-y-3 animate-in zoom-in-95 fade-in duration-300">
-        <div className="mx-auto w-14 h-14 rounded-full bg-emerald-50 ring-8 ring-emerald-50/60 flex items-center justify-center">
-          <PartyPopper size={26} className="text-emerald-600" />
+        className="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-100 p-6 text-center space-y-3.5 animate-in zoom-in-95 fade-in duration-300">
+        <div className="mx-auto w-14 h-14 rounded-full bg-emerald-600 ring-8 ring-emerald-50 flex items-center justify-center shadow-md shadow-emerald-600/20">
+          <svg viewBox="0 0 24 24" className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M5 13l4 4L19 7" />
+          </svg>
         </div>
         <h2 className="text-base font-bold text-slate-900">Gửi tour thành công</h2>
         <p className="text-xs text-slate-600 leading-relaxed">
           Tour đã được gửi cho kiểm duyệt viên và chuyển sang <b>Chờ duyệt</b>. Bạn sẽ nhận thông báo và email khi có kết quả.
         </p>
+        <div className={`pt-1 transition-all duration-300 ${showBtn ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-95 pointer-events-none"}`}>
+          <button
+            type="button"
+            onClick={onDone}
+            className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition cursor-pointer"
+          >
+            Về danh sách tour <ArrowRight size={15} />
+          </button>
+        </div>
         <p className="text-[11px] text-slate-400 inline-flex items-center gap-1.5">
-          <Loader2 size={12} className="animate-spin" /> Đang chuyển về danh sách tour…
+          <Loader2 size={12} className="animate-spin" /> Tự động tải lại trang danh sách tour…
         </p>
       </div>
     </div>
@@ -283,7 +297,7 @@ export default function TourWizard({ tourId, initialStep }) {
   return (
     <div className="flex-1 min-h-0 h-full flex flex-col gap-4">
       {confirmDialog}
-      {submitted && <SubmittedNotice onDone={() => router.push(AFTER_SUBMIT_HREF)} />}
+      {submitted && <SubmittedNotice onDone={() => { window.location.assign(AFTER_SUBMIT_HREF); }} />}
       {/* Header */}
       <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -332,14 +346,14 @@ export default function TourWizard({ tourId, initialStep }) {
 
         {/* Nội dung bước — tự cuộn dọc */}
         <div ref={contentRef}
-          className="min-w-0 min-h-0 h-full overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-5 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+          className="min-w-0 min-h-0 h-full flex flex-col overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-5 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
           <h2 className="text-base font-bold text-slate-900 mb-4">Bước {stepIndex + 1} – {WIZARD_STEPS[stepIndex].label}</h2>
           {gateNotice && (
             <p className="mb-4 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-xs font-bold text-rose-700 flex items-center gap-1.5">
               <AlertCircle size={14} className="shrink-0" />{gateNotice}
             </p>
           )}
-          <div key={step} className="jg-page-enter">
+          <div key={step} className="jg-page-enter flex-1">
           {step === "BASIC_INFO" && (
             <BasicInfoStep key={tour.tourId} {...common} regions={regions} themes={themes} readOnly={contentReadOnly}
               onSave={(body) => queueSave("BASIC_INFO", body)} />

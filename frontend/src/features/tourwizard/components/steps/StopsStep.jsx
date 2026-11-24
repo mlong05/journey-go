@@ -29,6 +29,10 @@ const stopFromServer = (s) => ({
   artifacts: (s.artifacts || []).map((a) => ({
     _key: newKey(), name: a.name || "", imageUrl: a.imageUrl || "", shortDescription: a.shortDescription || "",
   })),
+  thenNow: (s.thenNow || []).map((t) => ({
+    _key: newKey(), thenImageUrl: t.thenImageUrl || "", nowImageUrl: t.nowImageUrl || "",
+    thenLabel: t.thenLabel || "", caption: t.caption || "", credit: t.credit || "",
+  })),
   quiz: (s.quiz || []).map((q) => ({ ...normalizeQuestion(q), _key: newKey() })),
   experiences: (s.experiences || []).map((e) => ({
     _key: newKey(),
@@ -46,7 +50,7 @@ const emptyStop = () => ({
   _key: newKey(), id: null, name: "", shortDescription: "", guestNote: "", imageUrl: "",
   // Mã QR check-in trạm sinh ngay để đối tác thấy và in trước khi lưu (backend giữ mã hợp lệ).
   latitude: null, longitude: null, checkInRadiusMeters: LIMITS.STOP_RADIUS_DEFAULT, qrToken: newStopQrToken(),
-  videoUrl: "", videoSource: "YOUTUBE", culturalContent: "", culturalImages: [], artifacts: [],
+  videoUrl: "", videoSource: "YOUTUBE", culturalContent: "", culturalImages: [], artifacts: [], thenNow: [],
   // Điểm đến mới chưa có câu hỏi / trải nghiệm nào — đối tác bấm "Thêm" để soạn từng mục.
   quiz: [],
   experiences: [],
@@ -69,6 +73,7 @@ const stopsBody = (stops) => ({
     culturalImages: s.culturalImages,
     // Video đã chuyển lên cấp điểm đến — cổ vật không còn video riêng.
     artifacts: s.artifacts.map(({ _key, ...a }) => ({ ...a, videoUrl: null, videoSource: null })),
+    thenNow: (s.thenNow || []).map(({ _key, ...t }) => t),
     quiz: s.quiz.map(questionBody),
     experiences: s.experiences.map(({ _key, question, ...e }) => ({ ...e, question: question ? questionBody(question) : null })),
   })),
@@ -132,7 +137,7 @@ export default function StopsStep({ tour, issues, readOnly, onSave, onFlush, onV
     const ok = await confirm({
       tone: "danger", icon: "trash", title: "Xóa điểm đến này?",
       subject: stops[i].name || `Điểm đến ${i + 1}`,
-      description: "Toàn bộ nội dung văn hóa, cổ vật, quiz và trải nghiệm của điểm đến sẽ bị xóa.",
+      description: "Toàn bộ nội dung văn hóa, cổ vật, câu đố văn hóa và trải nghiệm thực tế của điểm đến sẽ bị xóa.",
       confirmLabel: "Xóa điểm đến",
     });
     if (!ok) return;
