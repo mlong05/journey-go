@@ -65,6 +65,14 @@ public class JourneyTaskProgress {
     @Builder.Default
     private Integer currentQuestionIndex = 0;
 
+    /** Câu đố trả lời từng câu: số câu đúng đến hiện tại (null với nhiệm vụ nộp một lần). */
+    @Column(name = "correct_count")
+    private Integer correctCount;
+
+    /** Câu đố trả lời từng câu: điểm tạm tính, chỉ chốt (và cộng vào ví điểm) khi trả lời xong câu cuối. */
+    @Column(name = "partial_points")
+    private Integer partialPoints;
+
     @Column(name = "user_answer", columnDefinition = "TEXT")
     private String userAnswer;
 

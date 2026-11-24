@@ -17,6 +17,7 @@ public record UserResponse(
         AuthProvider authProvider,
         String avatarUrl,
         String avatar,
+        String coverImageUrl,
         String preferredLanguage,
         boolean active,
         Instant createdAt,
@@ -34,6 +35,7 @@ public record UserResponse(
                 .authProvider(user.getAuthProvider())
                 .avatarUrl(avatar)
                 .avatar(avatar)
+                .coverImageUrl(user.getCoverImageUrl())
                 .preferredLanguage((lang != null && !lang.isBlank()) ? lang : "vi")
                 .active(user.isActive())
                 .createdAt(user.getCreatedAt())

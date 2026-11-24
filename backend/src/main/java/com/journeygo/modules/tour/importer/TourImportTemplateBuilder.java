@@ -145,7 +145,7 @@ final class TourImportTemplateBuilder {
                 "ĐIỀU KIỆN ĐỂ GỬI DUYỆT (thiếu vẫn nhập được, hệ thống sẽ liệt kê mục cần bổ sung)",
                 "• 1 ảnh bìa + đúng 5 ảnh tour (https), 3–5 điểm nổi bật, đã chọn khu vực và chủ đề, có mô tả.",
                 "• Có giá cho cả 4 loại khách, ít nhất 1 loại khách tính vào số chỗ, có số chỗ tối đa và chính sách hủy.",
-                "• Ít nhất 1 điểm đến; mỗi điểm đến có mô tả ngắn, nội dung văn hóa, 1–4 câu quiz (đủ 4 đáp án, 1 đáp án đúng) "
+                "• Ít nhất 1 điểm đến; mỗi điểm đến có mô tả ngắn, nội dung văn hóa, 1–4 câu đố văn hóa (đủ 4 đáp án, 1 đáp án đúng) "
                         + "và 1–5 trải nghiệm (có tọa độ, thời gian, câu hỏi và đáp án).",
                 "• Ít nhất 1 ngày khởi hành trong tương lai.",
         };

@@ -38,10 +38,16 @@ public class TourSubmissionValidator {
     public static final int DAY_TRIP_MAX_MINUTES = 24 * 60;
     public static final int QUIZ_MIN = 1;
     public static final int QUIZ_MAX = 4;
+    public static final int ORDERING_MIN = 3;
+    public static final int ORDERING_MAX = 5;
+    public static final int MATCHING_MIN = 3;
+    public static final int MATCHING_MAX = 5;
+    /** Thanh trượt quá rộng thì trên điện thoại không kéo chính xác được. */
+    public static final int NUMBER_RANGE_MAX = 1000;
     public static final int EXPERIENCES_MIN = 1;
     public static final int EXPERIENCES_MAX = 5;
     public static final int RADIUS_MIN = 10;
-    public static final int RADIUS_MAX = 500;
+    public static final int RADIUS_MAX = 100;
     /** Bán kính check-in trạm (đối tác tự nhập). */
     public static final int STOP_RADIUS_MIN = 50;
     public static final int STOP_RADIUS_MAX = 500;
@@ -225,14 +231,28 @@ public class TourSubmissionValidator {
                 }
             }
 
+            for (int t = 0; t < stop.getThenNow().size(); t++) {
+                TourStopThenNow pair = stop.getThenNow().get(t);
+                String path = "thenNow[" + t + "]";
+                if (isBlank(pair.getThenImageUrl()) || isBlank(pair.getNowImageUrl())) {
+                    issues.add(TourValidationIssue.stop(i, path, "Cặp ảnh xưa và nay cần đủ ảnh tư liệu và ảnh hiện tại"));
+                }
+                if (isBlank(pair.getThenLabel())) {
+                    issues.add(TourValidationIssue.stop(i, path + ".thenLabel", "Vui lòng nhập thời điểm của ảnh tư liệu (vd. 1975)"));
+                }
+                if (isBlank(pair.getCredit())) {
+                    issues.add(TourValidationIssue.stop(i, path + ".credit", "Vui lòng ghi nguồn / bản quyền của ảnh tư liệu"));
+                }
+            }
+
             int quizCount = stop.getQuizQuestions().size();
             if (quizCount < QUIZ_MIN || quizCount > QUIZ_MAX) {
-                issues.add(TourValidationIssue.stop(i, "quiz", "Quiz cần từ " + QUIZ_MIN + " đến " + QUIZ_MAX + " câu"));
+                issues.add(TourValidationIssue.stop(i, "quiz", "Câu đố văn hóa cần từ " + QUIZ_MIN + " đến " + QUIZ_MAX + " câu"));
             }
             for (int q = 0; q < quizCount; q++) {
                 TourStopQuestion question = stop.getQuizQuestions().get(q);
                 if (question.isTextQuestion()) {
-                    issues.add(TourValidationIssue.stop(i, "quiz[" + q + "]", "Câu hỏi quiz phải là trắc nghiệm"));
+                    issues.add(TourValidationIssue.stop(i, "quiz[" + q + "]", "Câu đố văn hóa không dùng dạng nhập chữ"));
                     continue;
                 }
                 validateQuestion(question, i, "quiz[" + q + "]", issues);
@@ -304,8 +324,48 @@ public class TourSubmissionValidator {
             return;
         }
         List<TourStopAnswer> answers = question.getAnswers();
-        if (answers.size() != TourStopQuestion.ANSWER_COUNT || answers.stream().anyMatch(a -> isBlank(a.getContent()))) {
-            issues.add(TourValidationIssue.stop(stopIndex, path + ".answers", "Câu hỏi cần đủ 4 đáp án"));
+        QuestionType type = question.getQuestionType();
+        if (type == QuestionType.NUMBER) {
+            Integer min = question.getNumberMin(), max = question.getNumberMax(), correct = question.getNumberCorrect();
+            if (min == null || max == null || min >= max) {
+                issues.add(TourValidationIssue.stop(stopIndex, path + ".numberRange", "Khoảng thanh trượt cần có giá trị nhỏ nhất < lớn nhất"));
+            } else if (max - min > NUMBER_RANGE_MAX) {
+                issues.add(TourValidationIssue.stop(stopIndex, path + ".numberRange", "Khoảng thanh trượt tối đa " + NUMBER_RANGE_MAX + " đơn vị"));
+            }
+            if (correct == null || (min != null && correct < min) || (max != null && correct > max)) {
+                issues.add(TourValidationIssue.stop(stopIndex, path + ".numberCorrect", "Đáp án đúng phải nằm trong khoảng thanh trượt"));
+            }
+            return;
+        }
+        if (type == QuestionType.MATCHING) {
+            if (answers.size() < MATCHING_MIN || answers.size() > MATCHING_MAX) {
+                issues.add(TourValidationIssue.stop(stopIndex, path + ".answers",
+                        "Câu nối cột cần từ " + MATCHING_MIN + " đến " + MATCHING_MAX + " cặp"));
+            }
+            if (answers.stream().anyMatch(a -> (isBlank(a.getContent()) && isBlank(a.getImageUrl())) || isBlank(a.getMatchText()))) {
+                issues.add(TourValidationIssue.stop(stopIndex, path + ".answers",
+                        "Mỗi cặp cần có cột A (chữ hoặc ảnh) và cột B"));
+            }
+            List<String> rights = answers.stream().filter(a -> !isBlank(a.getMatchText()))
+                    .map(a -> a.getMatchText().trim().toLowerCase(java.util.Locale.ROOT)).toList();
+            if (rights.stream().distinct().count() < rights.size()) {
+                issues.add(TourValidationIssue.stop(stopIndex, path + ".answers",
+                        "Cột B có nội dung trùng nhau — mỗi mục cột B phải khác nhau"));
+            }
+            return;
+        }
+        if (type == QuestionType.ORDERING) {
+            if (answers.size() < ORDERING_MIN || answers.size() > ORDERING_MAX || answers.stream().anyMatch(a -> isBlank(a.getContent()))) {
+                issues.add(TourValidationIssue.stop(stopIndex, path + ".answers",
+                        "Câu xếp thứ tự cần từ " + ORDERING_MIN + " đến " + ORDERING_MAX + " mục, mục nào cũng có nội dung"));
+            }
+            return;
+        }
+        boolean image = type == QuestionType.IMAGE_CHOICE;
+        if (answers.size() != TourStopQuestion.ANSWER_COUNT
+                || answers.stream().anyMatch(a -> image ? isBlank(a.getImageUrl()) : isBlank(a.getContent()))) {
+            issues.add(TourValidationIssue.stop(stopIndex, path + ".answers",
+                    image ? "Câu chọn ảnh cần đủ 4 ảnh đáp án" : "Câu hỏi cần đủ 4 đáp án"));
         }
         long correct = answers.stream().filter(TourStopAnswer::isCorrect).count();
         if (correct != 1) {

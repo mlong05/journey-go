@@ -133,16 +133,22 @@ public class TourDetailMapper {
                                 a.getShortDescription(), a.getVideoUrl(), a.getVideoSource()))
                         .toList(),
                 quiz, experiences, maxPoints,
-                stop.getLatitude(), stop.getLongitude(), stop.getCheckInRadiusMeters(), stop.getQrToken());
+                stop.getLatitude(), stop.getLongitude(), stop.getCheckInRadiusMeters(), stop.getQrToken(),
+                stop.getThenNow().stream()
+                        .sorted(Comparator.comparingInt(TourStopThenNow::getSequenceOrder))
+                        .map(t -> new TourDetailResponse.ThenNow(t.getId(), t.getThenImageUrl(), t.getNowImageUrl(),
+                                t.getThenLabel(), t.getCaption(), t.getCredit()))
+                        .toList());
     }
 
     private TourDetailResponse.Question toQuestion(TourStopQuestion q, Integer points) {
         return new TourDetailResponse.Question(q.getId(), q.getKind(), q.getQuestionType(), q.getContent(), points,
                 q.getAnswers().stream()
                         .sorted(Comparator.comparingInt(TourStopAnswer::getSequenceOrder))
-                        .map(a -> new TourDetailResponse.Answer(a.getId(), a.getContent(), a.isCorrect()))
+                        .map(a -> new TourDetailResponse.Answer(a.getId(), a.getContent(), a.isCorrect(), a.getImageUrl(), a.getMatchText()))
                         .toList(),
-                q.getReferenceAnswer());
+                q.getReferenceAnswer(), q.getExplanation(),
+                q.getNumberMin(), q.getNumberMax(), q.getNumberCorrect(), q.getNumberTolerance());
     }
 
     private TourDetailResponse.LatestReview toLatestReview(TourReview review) {

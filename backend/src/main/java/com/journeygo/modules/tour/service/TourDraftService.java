@@ -245,11 +245,32 @@ public class TourDraftService {
                     .build());
         }
 
-        // Quiz: luôn trắc nghiệm (4 đáp án, 1 đúng).
+        // Ảnh xưa và nay (chỉ giữ cặp có nội dung). null = giữ nguyên (client cũ không gửi trường này).
+        if (item.thenNow() != null) stop.getThenNow().clear();
+        int t = 1;
+        for (TourWizardRequests.ThenNowItem pair : nullSafe(item.thenNow())) {
+            if (pair == null) continue;
+            String thenImage = trimToNull(pair.thenImageUrl());
+            String nowImage = trimToNull(pair.nowImageUrl());
+            if (thenImage == null && nowImage == null && trimToNull(pair.caption()) == null) continue;
+            if (t > TourStopThenNow.MAX_PER_STOP) break;
+            stop.getThenNow().add(TourStopThenNow.builder()
+                    .stop(stop).sequenceOrder(t++)
+                    .thenImageUrl(thenImage)
+                    .nowImageUrl(nowImage)
+                    .thenLabel(trimToNull(pair.thenLabel()))
+                    .caption(trimToNull(pair.caption()))
+                    .credit(trimToNull(pair.credit()))
+                    .build());
+        }
+
+        // Quiz: trắc nghiệm (mặc định), chọn ảnh, xếp thứ tự hoặc đoán số. Không có dạng nhập chữ.
         stop.getQuizQuestions().clear();
         int q = 1;
         for (TourWizardRequests.QuestionItem question : nullSafe(item.quiz())) {
-            TourStopQuestion entity = buildQuestion(question, StopQuestionKind.QUIZ, QuestionType.MULTIPLE_CHOICE, q++);
+            QuestionType type = question.type() != null && question.type().isQuizType()
+                    ? question.type() : QuestionType.MULTIPLE_CHOICE;
+            TourStopQuestion entity = buildQuestion(question, StopQuestionKind.QUIZ, type, q++);
             entity.setStop(stop);
             stop.getQuizQuestions().add(entity);
         }
@@ -283,14 +304,28 @@ public class TourDraftService {
         TourStopQuestion question = TourStopQuestion.builder()
                 .kind(kind).questionType(type).sequenceOrder(order).content(trimToNull(item.content()))
                 .referenceAnswer(type == QuestionType.TEXT ? trimToNull(item.referenceAnswer()) : null)
+                .explanation(trimToNull(item.explanation()))
                 .build();
-        if (type == QuestionType.TEXT) return question; // nhập chữ: không có đáp án lựa chọn
+        if (type == QuestionType.NUMBER) {
+            question.setNumberMin(item.numberMin());
+            question.setNumberMax(item.numberMax());
+            question.setNumberCorrect(item.numberCorrect());
+            question.setNumberTolerance(item.numberTolerance() == null ? 0 : item.numberTolerance());
+            return question;
+        }
+        if (!type.hasOptions()) return question; // nhập chữ: không có đáp án lựa chọn
         int n = 1;
         for (TourWizardRequests.AnswerItem answer : nullSafe(item.answers())) {
+            if (answer == null) continue;
             question.getAnswers().add(TourStopAnswer.builder()
                     .question(question).sequenceOrder(n++)
                     .content(trimToNull(answer.content()))
-                    .correct(Boolean.TRUE.equals(answer.correct()))
+                    .imageUrl(type == QuestionType.IMAGE_CHOICE || type == QuestionType.MATCHING
+                            ? trimToNull(answer.imageUrl()) : null)
+                    .matchText(type == QuestionType.MATCHING ? trimToNull(answer.matchText()) : null)
+                    // Xếp thứ tự / nối cột: đáp án nằm ở thứ tự / cặp đã nhập, không có cờ "đáp án đúng".
+                    .correct(type != QuestionType.ORDERING && type != QuestionType.MATCHING
+                            && Boolean.TRUE.equals(answer.correct()))
                     .build());
         }
         return question;
@@ -502,7 +537,9 @@ public class TourDraftService {
                         e.getQuestion() == null ? null : toQuestionItem(e.getQuestion())))
                         .toList(),
                 s.getLatitude(), s.getLongitude(), s.getCheckInRadiusMeters(),
-                null); // tour nhân bản: mã QR trạm mới, không dùng chung với tour gốc
+                null, // tour nhân bản: mã QR trạm mới, không dùng chung với tour gốc
+                s.getThenNow().stream().map(t -> new TourWizardRequests.ThenNowItem(t.getThenImageUrl(),
+                        t.getNowImageUrl(), t.getThenLabel(), t.getCaption(), t.getCredit())).toList());
     }
 
     /**
@@ -526,8 +563,9 @@ public class TourDraftService {
 
     private static TourWizardRequests.QuestionItem toQuestionItem(TourStopQuestion q) {
         return new TourWizardRequests.QuestionItem(q.getQuestionType(), q.getContent(), q.getAnswers().stream()
-                .map(a -> new TourWizardRequests.AnswerItem(a.getContent(), a.isCorrect())).toList(),
-                q.getReferenceAnswer());
+                .map(a -> new TourWizardRequests.AnswerItem(a.getContent(), a.isCorrect(), a.getImageUrl(), a.getMatchText())).toList(),
+                q.getReferenceAnswer(), q.getExplanation(),
+                q.getNumberMin(), q.getNumberMax(), q.getNumberCorrect(), q.getNumberTolerance());
     }
 
     private static <T> List<T> nullSafe(List<T> list) {

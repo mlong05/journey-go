@@ -26,6 +26,14 @@ public class TourStopAnswer {
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
+    /** Câu nối cột: nội dung cột B ghép đúng với dòng này (content = cột A). */
+    @Column(name = "match_text", length = 1000)
+    private String matchText;
+
+    /** Câu chọn ảnh: ảnh của đáp án. Câu nối cột: ảnh kèm cột A. */
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
     @Column(name = "is_correct", nullable = false)
     @Builder.Default
     private boolean correct = false;

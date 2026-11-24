@@ -18,6 +18,11 @@ public record UpdateProfileRequest(
         String avatarUrl,
 
         @Schema(description = "Bí danh cho avatarUrl")
-        String avatar
+        String avatar,
+
+        @Schema(description = "Ảnh bìa trang hồ sơ (URL https). Bỏ trống \"\" để về ảnh mặc định; null = giữ nguyên",
+                example = "https://res.cloudinary.com/demo/image/upload/cover.jpg")
+        @Size(max = 1000, message = "Đường dẫn ảnh bìa tối đa 1000 ký tự")
+        String coverImageUrl
 ) {
 }

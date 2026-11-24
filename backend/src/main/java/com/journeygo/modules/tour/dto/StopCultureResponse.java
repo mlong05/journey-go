@@ -18,12 +18,14 @@ public record StopCultureResponse(
         VideoSource videoSource,
         String culturalContent,
         List<String> culturalImages,
-        List<TourDetailResponse.Artifact> artifacts
+        List<TourDetailResponse.Artifact> artifacts,
+        List<TourDetailResponse.ThenNow> thenNow
 ) {
     public static StopCultureResponse from(TourDetailResponse.Stop s) {
         return new StopCultureResponse(s.id(), s.sequenceOrder(), s.name(), s.shortDescription(), s.imageUrl(),
                 s.videoUrl(), s.videoSource(), s.culturalContent(),
                 s.culturalImages() == null ? List.of() : s.culturalImages(),
-                s.artifacts() == null ? List.of() : s.artifacts());
+                s.artifacts() == null ? List.of() : s.artifacts(),
+                s.thenNow() == null ? List.of() : s.thenNow());
     }
 }
