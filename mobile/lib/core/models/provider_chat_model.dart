@@ -32,6 +32,12 @@ class ProviderConversationModel {
   final int unreadCount;
   final DateTime? createdAt;
 
+  /// Nhà tour đang mở trang quản lý (máy chủ thấy kết nối thời gian thực) ⇒ "Đang trực tuyến".
+  final bool providerOnline;
+
+  /// Nhà tour thường trả lời sau bao nhiêu phút (trung vị các lần trả lời gần đây); null = chưa đủ dữ liệu.
+  final int? providerReplyMinutes;
+
   const ProviderConversationModel({
     required this.id,
     required this.touristId,
@@ -45,6 +51,8 @@ class ProviderConversationModel {
     this.lastMessageAt,
     this.unreadCount = 0,
     this.createdAt,
+    this.providerOnline = false,
+    this.providerReplyMinutes,
   });
 
   factory ProviderConversationModel.fromJson(Map<String, dynamic> json) =>
@@ -61,6 +69,8 @@ class ProviderConversationModel {
         lastMessageAt: _date(json['lastMessageAt']),
         unreadCount: _asInt(json['unreadCount']),
         createdAt: _date(json['createdAt']),
+        providerOnline: json['providerOnline'] == true,
+        providerReplyMinutes: json['providerReplyMinutes'] == null ? null : _asInt(json['providerReplyMinutes']),
       );
 
   /// Tên hiển thị của đối tác trong hội thoại.
