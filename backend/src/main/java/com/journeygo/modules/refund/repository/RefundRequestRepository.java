@@ -27,6 +27,99 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, Lo
     Page<RefundRequest> findByStatus(RefundStatus status, Pageable pageable);
 
     /**
+     * Danh sách yêu cầu hoàn tiền — ưu tiên yêu cầu ĐANG CHỜ XỬ LÝ lên đầu.
+     *
+     * <p>⚠️ Vì sao cần? Danh sách mặc định sắp theo {@code createdAt DESC} ⇒ yêu cầu mới
+     * tạo nằm trên cùng, còn yêu cầu chờ xử lý từ lâu bị đẩy xuống dưới ⇒ Admin
+     * phải lật nhiều trang mới thấy việc cần làm. Đây là "hàng đợi" nên việc đang
+     * chờ phải nằm trên cùng.
+     *
+     * <p>Trạng thái "đang chờ xử lý" = {@code PENDING_REVIEW} (chờ Admin duyệt),
+     * {@code APPROVED} (đã duyệt, đang hoàn tiền), {@code VNPAY_PROCESSING} (chờ VNPay),
+     * {@code MANUAL_TRANSFER_PENDING} (chờ chuyển khoản thủ công) và {@code FAILED}
+     * (cần Admin xử lý lại). Các trạng thái kết thúc (REFUNDED / REJECTED / CANCELLED)
+     * nằm dưới cùng.
+     */
+    @Query("""
+            SELECT r FROM RefundRequest r
+            ORDER BY CASE WHEN r.status IN (
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.PENDING_REVIEW,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.APPROVED,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.VNPAY_PROCESSING,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.MANUAL_TRANSFER_PENDING,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.FAILED)
+                    THEN 0 ELSE 1 END,
+                     r.createdAt DESC
+            """)
+    Page<RefundRequest> findAllPendingFirst(Pageable pageable);
+    /**
+     * Lọc theo trạng thái + ưu tiên yêu cầu đang chờ xử lý lên đầu.
+     */
+    @Query("""
+            SELECT r FROM RefundRequest r
+            WHERE r.status = :status
+            ORDER BY CASE WHEN r.status IN (
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.PENDING_REVIEW,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.APPROVED,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.VNPAY_PROCESSING,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.MANUAL_TRANSFER_PENDING,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.FAILED)
+                    THEN 0 ELSE 1 END,
+                     r.createdAt DESC
+            """)
+    Page<RefundRequest> findByStatusPendingFirst(@Param("status") RefundStatus status, Pageable pageable);
+
+    /**
+     * Tìm yêu cầu hoàn tiền theo từ khoá + ưu tiên yêu cầu đang chờ xử lý lên đầu.
+     */
+    @Query("""
+            SELECT r FROM RefundRequest r
+            WHERE LOWER(r.refundCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(r.payment.txnRef) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(r.payment.booking.bookingCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(COALESCE(r.declaredReasonCode, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(COALESCE(r.approvedReasonCode, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(COALESCE(r.reasonDetail, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            ORDER BY CASE WHEN r.status IN (
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.PENDING_REVIEW,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.APPROVED,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.VNPAY_PROCESSING,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.MANUAL_TRANSFER_PENDING,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.FAILED)
+                    THEN 0 ELSE 1 END,
+                     r.createdAt DESC
+            """)
+    Page<RefundRequest> searchByKeywordPendingFirst(@Param("keyword") String keyword, Pageable pageable);
+
+    /**
+     * Tìm yêu cầu hoàn tiền theo từ khoá + trạng thái + ưu tiên yêu cầu đang chờ xử lý.
+     */
+    @Query("""
+            SELECT r FROM RefundRequest r
+            WHERE r.status = :status
+              AND (
+                    LOWER(r.refundCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(r.payment.txnRef) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(r.payment.booking.bookingCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(COALESCE(r.declaredReasonCode, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(COALESCE(r.approvedReasonCode, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(COALESCE(r.reasonDetail, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              )
+            ORDER BY CASE WHEN r.status IN (
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.PENDING_REVIEW,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.APPROVED,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.VNPAY_PROCESSING,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.MANUAL_TRANSFER_PENDING,
+                    com.journeygo.modules.refund.entity.enums.RefundStatus.FAILED)
+                    THEN 0 ELSE 1 END,
+                     r.createdAt DESC
+            """)
+    Page<RefundRequest> searchByKeywordAndStatusPendingFirst(
+            @Param("keyword") String keyword,
+            @Param("status") RefundStatus status,
+            Pageable pageable);
+
+    /**
      * Tìm yêu cầu hoàn tiền theo từ khoá (mã yêu cầu / mã đơn / mã giao dịch /
      * mã lý do / mô tả lý do) — dùng cho ô tìm kiếm ở trang "Yêu cầu hoàn tiền".
      */
