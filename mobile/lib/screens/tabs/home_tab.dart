@@ -131,14 +131,21 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    LocaleController.instance.addListener(_onLocaleChanged);
     _loadAllData();
   }
 
   @override
   void dispose() {
+    LocaleController.instance.removeListener(_onLocaleChanged);
     WidgetsBinding.instance.removeObserver(this);
     appRouteObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (!mounted) return;
+    _loadAllData();
   }
 
   Future<void> _loadAllData() async {
