@@ -523,6 +523,15 @@
     }
   },
   "tdStartExperience": "Bắt đầu trải nghiệm",
+  "tdExperienceExpired": "Đã quá ngày trải nghiệm",
+  "tdExperienceWindow": "Thời gian tour: {dates}",
+  "@tdExperienceWindow": {
+    "placeholders": {
+      "dates": {
+        "type": "String"
+      }
+    }
+  },
   "tdContinueJourney": "Tiếp tục hành trình",
   "tdPriceFromAdult": "Giá từ (người lớn)",
   "tdTotalPayment": "Tổng thanh toán",
@@ -581,6 +590,7 @@
     }
   },
   "tdDepartures": "Lịch khởi hành",
+  "tdDepartureInfo": "Thông tin khởi hành",
   "tdMoreDates": "+{count} ngày",
   "@tdMoreDates": {
     "placeholders": {
@@ -652,7 +662,7 @@
   "tdArtifacts": "Hiện vật",
   "tdChallenges": "Thử thách tại điểm",
   "tdCulturalQuiz": "Câu đố văn hoá",
-  "tdQuizQuestions": "{count} câu trắc nghiệm",
+  "tdQuizQuestions": "{count} câu đố",
   "@tdQuizQuestions": {
     "placeholders": {
       "count": {
@@ -661,7 +671,7 @@
     }
   },
   "tdScanQrToConfirm": "quét QR tại điểm để xác nhận",
-  "tdActivityFallback": "Hoạt động thực địa",
+  "tdActivityFallback": "Trải nghiệm thực tế",
   "tripCountdown": "{days} ngày nữa lên đường!",
   "@tripCountdown": {
     "placeholders": {
@@ -1474,6 +1484,8 @@
   "tripsEmptySection": "Chưa có chuyến đi nào ở mục này.",
   "tripsStageActive": "Đang diễn ra",
   "tripsStageReady": "Sắp khởi hành",
+  "tripsStageEnded": "Đã kết thúc",
+  "tripsNotJoined": "Bạn chưa tham gia tour này",
   "tripsLive": "Trực tiếp",
   "tripsEmptyTitle": "Bạn chưa có chuyến đi nào",
   "tripsEmptyMessage": "Đặt một tour ở trang Khám phá, vé sẽ nằm tại đây để bạn bắt đầu hành trình khi đến nơi.",
@@ -1493,7 +1505,30 @@
       }
     }
   },
-  "tripsStopsCheckedIn": " trạm đã check-in",
+  "tripsStopsCheckedIn": " trạm hoàn thành",
+  "tripsNextStop": "Trạm tiếp theo {current}/{total}",
+  "@tripsNextStop": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "tripsAllStopsChecked": "Đã đi trọn các trạm",
+  "tripsUnfinished": "Đi tiếp nhé",
+  "tripsUnfinishedHint": "Hành trình bắt đầu {date} nhưng chưa hoàn tất.",
+  "@tripsUnfinishedHint": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "tripsActionTitle": "Cần bạn xử lý",
+  "tripsRefundNeededTitle": "Đã thanh toán nhưng đơn bị hủy · cần gửi yêu cầu hoàn tiền",
   "tripsDestinations": "{count} điểm đến",
   "@tripsDestinations": {
     "placeholders": {
@@ -1804,7 +1839,25 @@
   "notifEmpty": "Chưa có thông báo",
   "notifEmptyHint": "Kết quả thanh toán, hoàn tiền, huy hiệu và bài viết của bạn sẽ hiện ở đây.",
   "notifChannelTimer": "Hẹn giờ hoạt động",
-  "notifChannelTimerDesc": "Nhắc khi hết giờ đếm ngược của hoạt động thực địa",
+  "notifChannelTimerDesc": "Nhắc khi hết giờ đếm ngược của trải nghiệm thực tế",
+  "notifChannelCountdown": "Đồng hồ đếm ngược",
+  "notifChannelCountdownDesc": "Thời gian còn lại của hoạt động thực địa, hiện cả trên màn hình khoá",
+  "tkCountdownBody": "Đang đếm ngược · {place}",
+  "@tkCountdownBody": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "ovHideTitle": "Ẩn đồng hồ nổi?",
+  "ovHideBody": "Thời gian vẫn tiếp tục đếm trong ứng dụng.",
+  "ovHide": "Ẩn",
+  "ovCancel": "Huỷ",
+  "ovPermTitle": "Hiện đồng hồ khi rời ứng dụng?",
+  "ovPermBody": "Cho phép Journey Go hiển thị trên ứng dụng khác để thấy thời gian còn lại ngay trên màn hình chính.",
+  "ovPermAllow": "Cho phép",
+  "ovPermLater": "Để sau",
   "notifChannelMain": "Thông báo Journey Go",
   "notifChannelMainDesc": "Đơn đặt tour, hoàn tiền, huy hiệu, bài viết diễn đàn",
   "chatListLoadFailed": "Không thể tải lịch sử hỗ trợ.",
@@ -1824,6 +1877,63 @@
   "chatProviderLower": "nhà tour",
   "chatAskHint": "Bạn có thể hỏi về lịch trình, giá, điều kiện thời tiết hoặc thủ tục đặt tour — trước khi quyết định đặt vé.",
   "chatInputHint": "Nhắn tin cho nhà tour…",
+  "pcVerified": "Đối tác đã xác minh",
+  "pcOnline": "Đang trực tuyến",
+  "pcReplyFewMinutes": "Thường trả lời trong vài phút",
+  "pcReplyMinutes": "Thường trả lời trong khoảng {minutes} phút",
+  "@pcReplyMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "pcReplyHours": "Thường trả lời trong khoảng {hours} giờ",
+  "@pcReplyHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "pcReplyDay": "Thường trả lời trong vòng 1 ngày",
+  "pcReplyDays": "Thường trả lời sau vài ngày",
+  "pcNotifyReply": "Bạn sẽ nhận thông báo khi nhà tour trả lời",
+  "pcAskingAbout": "Đang hỏi về: {tour}",
+  "@pcAskingAbout": {
+    "placeholders": {
+      "tour": {
+        "type": "String"
+      }
+    }
+  },
+  "pcToday": "Hôm nay",
+  "pcYesterday": "Hôm qua",
+  "pcQuick1": "Lịch khởi hành gần nhất?",
+  "pcQuick2": "Giá cho trẻ em thế nào?",
+  "pcQuick3": "Có đón tại khách sạn không?",
+  "pcQuick4": "Cần chuẩn bị mang gì?",
+  "pcQuickTitle": "Câu hỏi gợi ý",
+  "pcNewMessages": "{count} tin mới",
+  "@pcNewMessages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pcSending": "Đang gửi…",
+  "pcSendFailed": "Gửi lỗi · Chạm để gửi lại",
+  "pcCopied": "Đã sao chép tin nhắn",
+  "pcLoadOlder": "Xem tin nhắn cũ hơn",
+  "pcHistoryEnd": "Bạn đã xem hết lịch sử tin nhắn",
+  "pcInfoTitle": "Thông tin nhà tour",
+  "pcInfoBody": "Nhà tour được Journey Go kiểm duyệt. Tin nhắn được lưu lại để bạn xem tiếp bất cứ lúc nào.",
+  "pcViewTour": "Xem tour",
+  "pcSeen": "Đã xem",
+  "pcSent": "Đã gửi",
+  "pcStartChat": "Bắt đầu trò chuyện",
+  "pcListSubtitle": "Hỏi lịch trình, giá, điểm đón… trực tiếp với nhà tour",
   "forumFilterTour": "Lọc theo tour",
   "forumTitle": "Diễn đàn di sản",
   "forumSubtitle": "Chia sẻ trải nghiệm văn hoá cùng cộng đồng",
@@ -2492,6 +2602,7 @@
   "jsCheckInStop": "Check-in trạm",
   "jsCheckInGps": "Check-in GPS",
   "jsScanQr": "Quét mã QR tại điểm",
+  "jsScanQrShort": "Quét QR",
   "jsSkipStop": "Bỏ qua trạm này",
   "jsCompleteAll": "Đi trọn {count} trạm",
   "@jsCompleteAll": {
@@ -2681,7 +2792,7 @@
   "tkClue": "Manh mối",
   "tkGotIt": "Đã rõ",
   "tkLoadFailed": "Không tải được nhiệm vụ.",
-  "tkFieldMission": "Nhiệm vụ thực địa",
+  "tkFieldMission": "Trải nghiệm thực tế",
   "tkHeritageQuiz": "Đố vui di sản",
   "tkQuestionsLabel": "câu hỏi",
   "tkBonusLabel": "điểm thưởng",
@@ -2703,6 +2814,49 @@
   "tkDirectionsToStop": "Chỉ đường tới trạm",
   "tkRetryMission": "Làm lại nhiệm vụ",
   "tkStartMission": "Bắt đầu nhiệm vụ",
+  "tkInProgressTitle": "Đang làm dở",
+  "tkInProgressSummary": "Đã trả lời {answered}/{total} câu · đúng {correct} · +{points} điểm",
+  "@tkInProgressSummary": {
+    "placeholders": {
+      "answered": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "correct": {
+        "type": "int"
+      },
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "tkContinueFromQuestion": "Tiếp tục từ câu {number}",
+  "@tkContinueFromQuestion": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "tkExitConfirmTitle": "Thoát nhiệm vụ?",
+  "tkExitConfirmBody": "Tiến độ đã được lưu, bạn có thể làm tiếp sau.",
+  "tkExitActivityBody": "Thời gian vẫn tiếp tục đếm, bạn có thể quay lại bất cứ lúc nào.",
+  "tkStay": "Ở lại",
+  "tkExit": "Thoát",
+  "tkEarlierAnswered": "Các câu trước đã trả lời ở lần trước",
+  "tkQuestionsProgress": "{answered}/{total} câu",
+  "@tkQuestionsProgress": {
+    "placeholders": {
+      "answered": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "tkViewClue": "Xem manh mối",
   "tkStages": "Các chặng",
   "tkStagesDone": "{done}/{total} hoàn thành",
@@ -3133,7 +3287,7 @@
   "seNoChallenges": "Trạm này không có thử thách.",
   "seAllDone": "Đã hoàn thành mọi thử thách",
   "seDone": "Thử thách đã làm",
-  "seAnyOrder": "Làm theo thứ tự bất kỳ. Hoạt động thực địa cần quét mã QR tại điểm để xác nhận.",
+  "seAnyOrder": "Làm theo thứ tự bất kỳ. Trải nghiệm thực tế cần quét mã QR tại điểm để xác nhận.",
   "sePartial": "Đúng một phần",
   "seNoAttempts": "Đã hết lượt",
   "seAttempts": "Đã làm {count} lượt",
@@ -3146,10 +3300,10 @@
   },
   "seNotStarted": "Chưa làm",
   "seCulturalQuiz": "Câu đố văn hóa",
-  "seFieldActivity": "Hoạt động thực địa",
+  "seFieldActivity": "Trải nghiệm thực tế",
   "seLocationPuzzle": "Giải đố theo vị trí",
   "seChallenge": "Thử thách",
-  "seQuestions": "{count} câu hỏi",
+  "seQuestions": "{count} câu đố",
   "@seQuestions": {
     "placeholders": {
       "count": {
@@ -3527,5 +3681,121 @@
         "type": "int"
       }
     }
-  }
+  },
+  "tripsAtStop": "Đang ở trạm {current}/{total}",
+  "@tripsAtStop": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "tripsUnfinishedRemaining": "Bắt đầu {date} · còn {count} trạm nữa là trọn hành trình.",
+  "@tripsUnfinishedRemaining": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seFailedLeft": "Chưa đạt · còn {count} lượt",
+  "@seFailedLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seDirections": "Chỉ đường",
+  "seFarFromActivity": "Bạn đang cách hoạt động gần nhất {distance}",
+  "@seFarFromActivity": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "tkReviewTitle": "Xem lại đáp án",
+  "tkReviewCorrectAnswer": "Đáp án đúng: {answer}",
+  "@tkReviewCorrectAnswer": {
+    "placeholders": {
+      "answer": {
+        "type": "String"
+      }
+    }
+  },
+  "tkReviewYourAnswer": "Bạn trả lời: {answer}",
+  "@tkReviewYourAnswer": {
+    "placeholders": {
+      "answer": {
+        "type": "String"
+      }
+    }
+  },
+  "tkReviewNoAnswer": "(bỏ trống)",
+  "tkReviewWhy": "Vì sao?",
+  "jsGoalRemaining": "Còn {count} trạm nữa để nhận thưởng hoàn thành và bảng tổng kết",
+  "@jsGoalRemaining": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jsGoalLost": "Đã bỏ qua trạm nên chuyến này không còn thưởng hoàn thành — vẫn đi tiếp để tích điểm nhé.",
+  "tkOrderingHint": "Giữ và kéo để sắp xếp từ trên xuống theo thứ tự đúng",
+  "tkNumberHint": "Kéo thanh trượt hoặc bấm − / + để chọn",
+  "tkNumberNotChosen": "Chưa chọn",
+  "tkSeeResult": "Xem kết quả",
+  "tkAnswer": "Trả lời",
+  "tkUnsupportedQuestion": "Câu hỏi dạng mới — hãy cập nhật ứng dụng để trả lời.",
+  "tkNumberOff": "lệch {diff}",
+  "@tkNumberOff": {
+    "placeholders": {
+      "diff": {
+        "type": "int"
+      }
+    }
+  },
+  "tkImageOption": "Ảnh {letter}",
+  "@tkImageOption": {
+    "placeholders": {
+      "letter": {
+        "type": "String"
+      }
+    }
+  },
+  "tkRevealCorrect": "Chính xác!",
+  "tkRevealWrong": "Chưa đúng",
+  "tkCorrectOrder": "Thứ tự đúng",
+  "scStory": "Xem dạng story",
+  "scStoryEndTitle": "Sẵn sàng thử thách?",
+  "scStoryEndBody": "Bạn đã xem xong câu chuyện của trạm này. Giờ là lúc thử tài!",
+  "scReadAll": "Đọc toàn bộ",
+  "scStoryArtifact": "Hiện vật",
+  "scStoryClose": "Đóng story",
+  "scThenNowTitle": "Xưa và nay",
+  "scThenNowNow": "Nay",
+  "scThenNowThen": "Xưa",
+  "scThenNowHint": "Kéo vạch để so sánh",
+  "scThenNowCredit": "Ảnh tư liệu: {credit}",
+  "@scThenNowCredit": {
+    "placeholders": {
+      "credit": {
+        "type": "String"
+      }
+    }
+  },
+  "tkMatchingHint": "Chọn một mục ở cột A rồi chạm mục tương ứng ở cột B để nối. Đúng toàn bộ mới có điểm.",
+  "tkMatchingColA": "Cột A",
+  "tkMatchingColB": "Cột B",
+  "tkMatchingTapZoom": "Chạm ảnh để phóng to",
+  "tkMatchingCorrectPairs": "Cặp nối đúng",
+  "tkMatchingClear": "Bỏ nối"
 }

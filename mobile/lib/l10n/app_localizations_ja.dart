@@ -699,6 +699,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tdStartExperience => '体験を始める';
 
   @override
+  String get tdExperienceExpired => '体験日を過ぎました';
+
+  @override
+  String tdExperienceWindow(String dates) {
+    return 'ツアー期間：$dates';
+  }
+
+  @override
   String get tdContinueJourney => '旅を続ける';
 
   @override
@@ -797,6 +805,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tdDepartures => '出発日';
 
   @override
+  String get tdDepartureInfo => '出発情報';
+
+  @override
   String tdMoreDates(int count) {
     return '+$count日';
   }
@@ -878,14 +889,14 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String tdQuizQuestions(int count) {
-    return '選択式$count問';
+    return 'クイズ$count問';
   }
 
   @override
   String get tdScanQrToConfirm => '現地のQRコードをスキャンして確認';
 
   @override
-  String get tdActivityFallback => '現地アクティビティ';
+  String get tdActivityFallback => '現地体験';
 
   @override
   String tripCountdown(int days) {
@@ -2182,6 +2193,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tripsStageReady => 'まもなく出発';
 
   @override
+  String get tripsStageEnded => '終了';
+
+  @override
+  String get tripsNotJoined => 'このツアーには参加しませんでした';
+
+  @override
   String get tripsLive => 'ライブ';
 
   @override
@@ -2211,7 +2228,29 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get tripsStopsCheckedIn => ' か所チェックイン済み';
+  String get tripsStopsCheckedIn => ' か所完了';
+
+  @override
+  String tripsNextStop(int current, int total) {
+    return '次のスポット $current/$total';
+  }
+
+  @override
+  String get tripsAllStopsChecked => '全スポット完了';
+
+  @override
+  String get tripsUnfinished => '続きから';
+
+  @override
+  String tripsUnfinishedHint(String date) {
+    return '$dateに開始しましたが、まだ完了していません。';
+  }
+
+  @override
+  String get tripsActionTitle => '対応が必要です';
+
+  @override
+  String get tripsRefundNeededTitle => '支払い済みですがキャンセルされました・返金を申請してください';
 
   @override
   String tripsDestinations(int count) {
@@ -2711,7 +2750,42 @@ class AppLocalizationsJa extends AppLocalizations {
   String get notifChannelTimer => 'アクティビティのタイマー';
 
   @override
-  String get notifChannelTimerDesc => '現地アクティビティのカウントダウン終了をお知らせします';
+  String get notifChannelTimerDesc => '現地体験のカウントダウン終了をお知らせします';
+
+  @override
+  String get notifChannelCountdown => 'カウントダウン';
+
+  @override
+  String get notifChannelCountdownDesc => '現地アクティビティの残り時間（ロック画面にも表示）';
+
+  @override
+  String tkCountdownBody(String place) {
+    return 'カウントダウン中・$place';
+  }
+
+  @override
+  String get ovHideTitle => 'フローティングタイマーを隠しますか？';
+
+  @override
+  String get ovHideBody => 'タイマーはアプリ内で動き続けます。';
+
+  @override
+  String get ovHide => '隠す';
+
+  @override
+  String get ovCancel => 'キャンセル';
+
+  @override
+  String get ovPermTitle => 'アプリ外にもタイマーを表示しますか？';
+
+  @override
+  String get ovPermBody => 'Journey Go が他のアプリの上に表示できるようにすると、ホーム画面で残り時間を確認できます。';
+
+  @override
+  String get ovPermAllow => '許可する';
+
+  @override
+  String get ovPermLater => '後で';
 
   @override
   String get notifChannelMain => 'Journey Goのお知らせ';
@@ -2751,6 +2825,102 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get chatInputHint => 'ツアー会社にメッセージ…';
+
+  @override
+  String get pcVerified => '認証済みパートナー';
+
+  @override
+  String get pcOnline => 'オンライン';
+
+  @override
+  String get pcReplyFewMinutes => '通常数分以内に返信';
+
+  @override
+  String pcReplyMinutes(int minutes) {
+    return '通常約$minutes分で返信';
+  }
+
+  @override
+  String pcReplyHours(int hours) {
+    return '通常約$hours時間で返信';
+  }
+
+  @override
+  String get pcReplyDay => '通常1日以内に返信';
+
+  @override
+  String get pcReplyDays => '通常数日以内に返信';
+
+  @override
+  String get pcNotifyReply => 'ツアー会社から返信があると通知が届きます';
+
+  @override
+  String pcAskingAbout(String tour) {
+    return '問い合わせ中：$tour';
+  }
+
+  @override
+  String get pcToday => '今日';
+
+  @override
+  String get pcYesterday => '昨日';
+
+  @override
+  String get pcQuick1 => '直近の出発日は？';
+
+  @override
+  String get pcQuick2 => '子ども料金は？';
+
+  @override
+  String get pcQuick3 => 'ホテル送迎はありますか？';
+
+  @override
+  String get pcQuick4 => '持ち物は何が必要ですか？';
+
+  @override
+  String get pcQuickTitle => 'おすすめの質問';
+
+  @override
+  String pcNewMessages(int count) {
+    return '新着$count件';
+  }
+
+  @override
+  String get pcSending => '送信中…';
+
+  @override
+  String get pcSendFailed => '送信失敗・タップして再送';
+
+  @override
+  String get pcCopied => 'メッセージをコピーしました';
+
+  @override
+  String get pcLoadOlder => '以前のメッセージを表示';
+
+  @override
+  String get pcHistoryEnd => 'これ以上古いメッセージはありません';
+
+  @override
+  String get pcInfoTitle => 'ツアー会社の情報';
+
+  @override
+  String get pcInfoBody =>
+      'このツアー会社は Journey Go の審査済みです。メッセージは保存され、いつでも続きを確認できます。';
+
+  @override
+  String get pcViewTour => 'ツアーを見る';
+
+  @override
+  String get pcSeen => '既読';
+
+  @override
+  String get pcSent => '送信済み';
+
+  @override
+  String get pcStartChat => 'チャットを始める';
+
+  @override
+  String get pcListSubtitle => '旅程・料金・送迎などをツアー会社に直接質問';
 
   @override
   String get forumFilterTour => 'ツアーで絞り込み';
@@ -3683,6 +3853,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get jsScanQr => '現地のQRコードをスキャン';
 
   @override
+  String get jsScanQrShort => 'QRスキャン';
+
+  @override
   String get jsSkipStop => 'この地点をスキップ';
 
   @override
@@ -3884,7 +4057,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tkLoadFailed => 'ミッションを読み込めませんでした。';
 
   @override
-  String get tkFieldMission => '現地ミッション';
+  String get tkFieldMission => '現地体験';
 
   @override
   String get tkHeritageQuiz => '文化遺産クイズ';
@@ -3929,6 +4102,42 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get tkStartMission => 'ミッション開始';
+
+  @override
+  String get tkInProgressTitle => '途中まで回答済み';
+
+  @override
+  String tkInProgressSummary(int answered, int total, int correct, int points) {
+    return '$answered/$total問回答済み・正解$correct・+$pointsポイント';
+  }
+
+  @override
+  String tkContinueFromQuestion(int number) {
+    return '第$number問から再開';
+  }
+
+  @override
+  String get tkExitConfirmTitle => 'ミッションを中断しますか？';
+
+  @override
+  String get tkExitConfirmBody => '進捗は保存されています。後で続きから再開できます。';
+
+  @override
+  String get tkExitActivityBody => 'タイマーは動き続けます。いつでも戻れます。';
+
+  @override
+  String get tkStay => '続ける';
+
+  @override
+  String get tkExit => '中断する';
+
+  @override
+  String get tkEarlierAnswered => '前の問題は前回回答済みです';
+
+  @override
+  String tkQuestionsProgress(int answered, int total) {
+    return '$answered/$total問';
+  }
 
   @override
   String get tkViewClue => 'ヒントを見る';
@@ -4404,7 +4613,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get seDone => '完了したチャレンジ';
 
   @override
-  String get seAnyOrder => '順番は自由です。現地アクティビティは現地のQRコードをスキャンして確認します。';
+  String get seAnyOrder => '順番は自由です。現地体験は現地のQRコードをスキャンして確認します。';
 
   @override
   String get sePartial => '一部正解';
@@ -4424,7 +4633,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get seCulturalQuiz => '文化クイズ';
 
   @override
-  String get seFieldActivity => '現地アクティビティ';
+  String get seFieldActivity => '現地体験';
 
   @override
   String get seLocationPuzzle => '位置謎解き';
@@ -4965,4 +5174,144 @@ class AppLocalizationsJa extends AppLocalizations {
   String aiViewTour(int id) {
     return 'ツアー #$id を見る';
   }
+
+  @override
+  String tripsAtStop(int current, int total) {
+    return 'スポット $current/$total に滞在中';
+  }
+
+  @override
+  String tripsUnfinishedRemaining(String date, int count) {
+    return '$dateに開始 · あと$countか所で完走です。';
+  }
+
+  @override
+  String seFailedLeft(int count) {
+    return '未達成 · 残り$count回';
+  }
+
+  @override
+  String get seDirections => 'ルート案内';
+
+  @override
+  String seFarFromActivity(String distance) {
+    return '最寄りのアクティビティまで$distance';
+  }
+
+  @override
+  String get tkReviewTitle => '答えの振り返り';
+
+  @override
+  String tkReviewCorrectAnswer(String answer) {
+    return '正解: $answer';
+  }
+
+  @override
+  String tkReviewYourAnswer(String answer) {
+    return 'あなたの答え: $answer';
+  }
+
+  @override
+  String get tkReviewNoAnswer => '(未回答)';
+
+  @override
+  String get tkReviewWhy => '解説';
+
+  @override
+  String jsGoalRemaining(int count) {
+    return 'あと$countか所で完走ボーナスと旅のまとめがもらえます';
+  }
+
+  @override
+  String get jsGoalLost => 'スキップした地点があるため完走ボーナスは対象外です。引き続きポイントを集めましょう。';
+
+  @override
+  String get tkOrderingHint => '長押ししてドラッグし、上から正しい順に並べ替えてください';
+
+  @override
+  String get tkNumberHint => 'スライダーをドラッグするか − / + で選んでください';
+
+  @override
+  String get tkNumberNotChosen => '未選択';
+
+  @override
+  String get tkSeeResult => '結果を見る';
+
+  @override
+  String get tkAnswer => '回答する';
+
+  @override
+  String get tkUnsupportedQuestion => '新しい形式の問題です。回答するにはアプリを更新してください。';
+
+  @override
+  String tkNumberOff(int diff) {
+    return '$diffのずれ';
+  }
+
+  @override
+  String tkImageOption(String letter) {
+    return '画像$letter';
+  }
+
+  @override
+  String get tkRevealCorrect => '正解！';
+
+  @override
+  String get tkRevealWrong => '残念';
+
+  @override
+  String get tkCorrectOrder => '正しい順番';
+
+  @override
+  String get scStory => 'ストーリーで見る';
+
+  @override
+  String get scStoryEndTitle => '挑戦の準備はいい？';
+
+  @override
+  String get scStoryEndBody => 'このスポットのストーリーを見終わりました。腕試しの時間です！';
+
+  @override
+  String get scReadAll => '全文を読む';
+
+  @override
+  String get scStoryArtifact => '展示品';
+
+  @override
+  String get scStoryClose => 'ストーリーを閉じる';
+
+  @override
+  String get scThenNowTitle => '昔と今';
+
+  @override
+  String get scThenNowNow => '今';
+
+  @override
+  String get scThenNowThen => '昔';
+
+  @override
+  String get scThenNowHint => '線をドラッグして比較';
+
+  @override
+  String scThenNowCredit(String credit) {
+    return '資料写真: $credit';
+  }
+
+  @override
+  String get tkMatchingHint => 'A列の項目をタップし、対応するB列の項目をタップして結びます。全問正解でポイント獲得。';
+
+  @override
+  String get tkMatchingColA => 'A列';
+
+  @override
+  String get tkMatchingColB => 'B列';
+
+  @override
+  String get tkMatchingTapZoom => '画像をタップして拡大';
+
+  @override
+  String get tkMatchingCorrectPairs => '正しい組み合わせ';
+
+  @override
+  String get tkMatchingClear => '解除';
 }

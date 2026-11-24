@@ -201,6 +201,15 @@
   "tdDaysUntilStart": "出発まであと{days}日！",
   "tdExperienceDate": "体験日：{date}",
   "tdStartExperience": "体験を始める",
+  "tdExperienceExpired": "体験日を過ぎました",
+  "tdExperienceWindow": "ツアー期間：{dates}",
+  "@tdExperienceWindow": {
+    "placeholders": {
+      "dates": {
+        "type": "String"
+      }
+    }
+  },
   "tdContinueJourney": "旅を続ける",
   "tdPriceFromAdult": "料金（大人）",
   "tdTotalPayment": "お支払い合計",
@@ -231,6 +240,7 @@
   "tdPriceTable": "料金表",
   "tdMaxGuests": "1回あたり最大{count}名",
   "tdDepartures": "出発日",
+  "tdDepartureInfo": "出発情報",
   "tdMoreDates": "+{count}日",
   "tdNotes": "注意事項",
   "tdPriceIncludes": "料金に含まれるもの",
@@ -253,9 +263,9 @@
   "tdArtifacts": "展示品",
   "tdChallenges": "現地チャレンジ",
   "tdCulturalQuiz": "文化クイズ",
-  "tdQuizQuestions": "選択式{count}問",
+  "tdQuizQuestions": "クイズ{count}問",
   "tdScanQrToConfirm": "現地のQRコードをスキャンして確認",
-  "tdActivityFallback": "現地アクティビティ",
+  "tdActivityFallback": "現地体験",
   "tripCountdown": "出発まであと{days}日！",
   "statusPendingPayment": "支払い待ち",
   "statusConfirmed": "確定済み",
@@ -645,6 +655,8 @@
   "tripsEmptySection": "この項目に旅はまだありません。",
   "tripsStageActive": "進行中",
   "tripsStageReady": "まもなく出発",
+  "tripsStageEnded": "終了",
+  "tripsNotJoined": "このツアーには参加しませんでした",
   "tripsLive": "ライブ",
   "tripsEmptyTitle": "旅はまだありません",
   "tripsEmptyMessage": "探索ページでツアーを予約すると、ここにチケットが表示され、現地で旅を始められます。",
@@ -654,7 +666,13 @@
   "tripsFilterDone": "完了",
   "tripsExperiencing": "体験中",
   "tripsStopProgress": "{current}/{total}か所目",
-  "tripsStopsCheckedIn": " か所チェックイン済み",
+  "tripsStopsCheckedIn": " か所完了",
+  "tripsNextStop": "次のスポット {current}/{total}",
+  "tripsAllStopsChecked": "全スポット完了",
+  "tripsUnfinished": "続きから",
+  "tripsUnfinishedHint": "{date}に開始しましたが、まだ完了していません。",
+  "tripsActionTitle": "対応が必要です",
+  "tripsRefundNeededTitle": "支払い済みですがキャンセルされました・返金を申請してください",
   "tripsDestinations": "目的地{count}か所",
   "tripsTicketDetails": "チケット詳細",
   "tripsViewItinerary": "行程を見る",
@@ -806,7 +824,25 @@
   "notifEmpty": "お知らせはまだありません",
   "notifEmptyHint": "支払い結果、返金、バッジ、投稿に関するお知らせがここに表示されます。",
   "notifChannelTimer": "アクティビティのタイマー",
-  "notifChannelTimerDesc": "現地アクティビティのカウントダウン終了をお知らせします",
+  "notifChannelTimerDesc": "現地体験のカウントダウン終了をお知らせします",
+  "notifChannelCountdown": "カウントダウン",
+  "notifChannelCountdownDesc": "現地アクティビティの残り時間（ロック画面にも表示）",
+  "tkCountdownBody": "カウントダウン中・{place}",
+  "@tkCountdownBody": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "ovHideTitle": "フローティングタイマーを隠しますか？",
+  "ovHideBody": "タイマーはアプリ内で動き続けます。",
+  "ovHide": "隠す",
+  "ovCancel": "キャンセル",
+  "ovPermTitle": "アプリ外にもタイマーを表示しますか？",
+  "ovPermBody": "Journey Go が他のアプリの上に表示できるようにすると、ホーム画面で残り時間を確認できます。",
+  "ovPermAllow": "許可する",
+  "ovPermLater": "後で",
   "notifChannelMain": "Journey Goのお知らせ",
   "notifChannelMainDesc": "ツアー予約、返金、バッジ、フォーラム投稿",
   "chatListLoadFailed": "サポート履歴を読み込めませんでした。",
@@ -819,6 +855,63 @@
   "chatProviderLower": "ツアー会社",
   "chatAskHint": "予約を決める前に、行程、料金、天候、予約手続きについて質問できます。",
   "chatInputHint": "ツアー会社にメッセージ…",
+  "pcVerified": "認証済みパートナー",
+  "pcOnline": "オンライン",
+  "pcReplyFewMinutes": "通常数分以内に返信",
+  "pcReplyMinutes": "通常約{minutes}分で返信",
+  "@pcReplyMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "pcReplyHours": "通常約{hours}時間で返信",
+  "@pcReplyHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "pcReplyDay": "通常1日以内に返信",
+  "pcReplyDays": "通常数日以内に返信",
+  "pcNotifyReply": "ツアー会社から返信があると通知が届きます",
+  "pcAskingAbout": "問い合わせ中：{tour}",
+  "@pcAskingAbout": {
+    "placeholders": {
+      "tour": {
+        "type": "String"
+      }
+    }
+  },
+  "pcToday": "今日",
+  "pcYesterday": "昨日",
+  "pcQuick1": "直近の出発日は？",
+  "pcQuick2": "子ども料金は？",
+  "pcQuick3": "ホテル送迎はありますか？",
+  "pcQuick4": "持ち物は何が必要ですか？",
+  "pcQuickTitle": "おすすめの質問",
+  "pcNewMessages": "新着{count}件",
+  "@pcNewMessages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pcSending": "送信中…",
+  "pcSendFailed": "送信失敗・タップして再送",
+  "pcCopied": "メッセージをコピーしました",
+  "pcLoadOlder": "以前のメッセージを表示",
+  "pcHistoryEnd": "これ以上古いメッセージはありません",
+  "pcInfoTitle": "ツアー会社の情報",
+  "pcInfoBody": "このツアー会社は Journey Go の審査済みです。メッセージは保存され、いつでも続きを確認できます。",
+  "pcViewTour": "ツアーを見る",
+  "pcSeen": "既読",
+  "pcSent": "送信済み",
+  "pcStartChat": "チャットを始める",
+  "pcListSubtitle": "旅程・料金・送迎などをツアー会社に直接質問",
   "forumFilterTour": "ツアーで絞り込み",
   "forumTitle": "文化遺産フォーラム",
   "forumSubtitle": "コミュニティと文化体験をシェアしよう",
@@ -1094,6 +1187,7 @@
   "jsCheckInStop": "チェックイン",
   "jsCheckInGps": "GPSチェックイン",
   "jsScanQr": "現地のQRコードをスキャン",
+  "jsScanQrShort": "QRスキャン",
   "jsSkipStop": "この地点をスキップ",
   "jsCompleteAll": "全{count}か所を制覇",
   "jsCompleteAllHint": "完走ボーナスと旅のまとめを獲得できます。スキップした地点があると完走ボーナスはもらえません。",
@@ -1149,7 +1243,7 @@
   "tkClue": "ヒント",
   "tkGotIt": "わかった",
   "tkLoadFailed": "ミッションを読み込めませんでした。",
-  "tkFieldMission": "現地ミッション",
+  "tkFieldMission": "現地体験",
   "tkHeritageQuiz": "文化遺産クイズ",
   "tkQuestionsLabel": "問",
   "tkBonusLabel": "ボーナスポイント",
@@ -1164,6 +1258,49 @@
   "tkDirectionsToStop": "地点への道案内",
   "tkRetryMission": "ミッションに再挑戦",
   "tkStartMission": "ミッション開始",
+  "tkInProgressTitle": "途中まで回答済み",
+  "tkInProgressSummary": "{answered}/{total}問回答済み・正解{correct}・+{points}ポイント",
+  "@tkInProgressSummary": {
+    "placeholders": {
+      "answered": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "correct": {
+        "type": "int"
+      },
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "tkContinueFromQuestion": "第{number}問から再開",
+  "@tkContinueFromQuestion": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "tkExitConfirmTitle": "ミッションを中断しますか？",
+  "tkExitConfirmBody": "進捗は保存されています。後で続きから再開できます。",
+  "tkExitActivityBody": "タイマーは動き続けます。いつでも戻れます。",
+  "tkStay": "続ける",
+  "tkExit": "中断する",
+  "tkEarlierAnswered": "前の問題は前回回答済みです",
+  "tkQuestionsProgress": "{answered}/{total}問",
+  "@tkQuestionsProgress": {
+    "placeholders": {
+      "answered": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "tkViewClue": "ヒントを見る",
   "tkStages": "行程",
   "tkStagesDone": "{done}/{total} 完了",
@@ -1299,13 +1436,13 @@
   "seNoChallenges": "この地点にチャレンジはありません。",
   "seAllDone": "すべてのチャレンジを完了",
   "seDone": "完了したチャレンジ",
-  "seAnyOrder": "順番は自由です。現地アクティビティは現地のQRコードをスキャンして確認します。",
+  "seAnyOrder": "順番は自由です。現地体験は現地のQRコードをスキャンして確認します。",
   "sePartial": "一部正解",
   "seNoAttempts": "回数切れ",
   "seAttempts": "{count}回挑戦済み",
   "seNotStarted": "未挑戦",
   "seCulturalQuiz": "文化クイズ",
-  "seFieldActivity": "現地アクティビティ",
+  "seFieldActivity": "現地体験",
   "seLocationPuzzle": "位置謎解き",
   "seChallenge": "チャレンジ",
   "seQuestions": "{count}問",
@@ -1466,5 +1603,45 @@
   "aiStatusWaiting": "スタッフ対応待ち",
   "aiStatusLive": "有人チャット",
   "aiSessionSubtitle": "{status} · {count}件のメッセージ",
-  "aiViewTour": "ツアー #{id} を見る"
+  "aiViewTour": "ツアー #{id} を見る",
+  "tripsAtStop": "スポット {current}/{total} に滞在中",
+  "tripsUnfinishedRemaining": "{date}に開始 · あと{count}か所で完走です。",
+  "seFailedLeft": "未達成 · 残り{count}回",
+  "seDirections": "ルート案内",
+  "seFarFromActivity": "最寄りのアクティビティまで{distance}",
+  "tkReviewTitle": "答えの振り返り",
+  "tkReviewCorrectAnswer": "正解: {answer}",
+  "tkReviewYourAnswer": "あなたの答え: {answer}",
+  "tkReviewNoAnswer": "(未回答)",
+  "tkReviewWhy": "解説",
+  "jsGoalRemaining": "あと{count}か所で完走ボーナスと旅のまとめがもらえます",
+  "jsGoalLost": "スキップした地点があるため完走ボーナスは対象外です。引き続きポイントを集めましょう。",
+  "tkOrderingHint": "長押ししてドラッグし、上から正しい順に並べ替えてください",
+  "tkNumberHint": "スライダーをドラッグするか − / + で選んでください",
+  "tkNumberNotChosen": "未選択",
+  "tkSeeResult": "結果を見る",
+  "tkAnswer": "回答する",
+  "tkUnsupportedQuestion": "新しい形式の問題です。回答するにはアプリを更新してください。",
+  "tkNumberOff": "{diff}のずれ",
+  "tkImageOption": "画像{letter}",
+  "tkRevealCorrect": "正解！",
+  "tkRevealWrong": "残念",
+  "tkCorrectOrder": "正しい順番",
+  "scStory": "ストーリーで見る",
+  "scStoryEndTitle": "挑戦の準備はいい？",
+  "scStoryEndBody": "このスポットのストーリーを見終わりました。腕試しの時間です！",
+  "scReadAll": "全文を読む",
+  "scStoryArtifact": "展示品",
+  "scStoryClose": "ストーリーを閉じる",
+  "scThenNowTitle": "昔と今",
+  "scThenNowNow": "今",
+  "scThenNowThen": "昔",
+  "scThenNowHint": "線をドラッグして比較",
+  "scThenNowCredit": "資料写真: {credit}",
+  "tkMatchingHint": "A列の項目をタップし、対応するB列の項目をタップして結びます。全問正解でポイント獲得。",
+  "tkMatchingColA": "A列",
+  "tkMatchingColB": "B列",
+  "tkMatchingTapZoom": "画像をタップして拡大",
+  "tkMatchingCorrectPairs": "正しい組み合わせ",
+  "tkMatchingClear": "解除"
 }

@@ -1306,6 +1306,18 @@ abstract class AppLocalizations {
   /// **'Bắt đầu trải nghiệm'**
   String get tdStartExperience;
 
+  /// No description provided for @tdExperienceExpired.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã quá ngày trải nghiệm'**
+  String get tdExperienceExpired;
+
+  /// No description provided for @tdExperienceWindow.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thời gian tour: {dates}'**
+  String tdExperienceWindow(String dates);
+
   /// No description provided for @tdContinueJourney.
   ///
   /// In vi, this message translates to:
@@ -1486,6 +1498,12 @@ abstract class AppLocalizations {
   /// **'Lịch khởi hành'**
   String get tdDepartures;
 
+  /// No description provided for @tdDepartureInfo.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thông tin khởi hành'**
+  String get tdDepartureInfo;
+
   /// No description provided for @tdMoreDates.
   ///
   /// In vi, this message translates to:
@@ -1621,7 +1639,7 @@ abstract class AppLocalizations {
   /// No description provided for @tdQuizQuestions.
   ///
   /// In vi, this message translates to:
-  /// **'{count} câu trắc nghiệm'**
+  /// **'{count} câu đố'**
   String tdQuizQuestions(int count);
 
   /// No description provided for @tdScanQrToConfirm.
@@ -1633,7 +1651,7 @@ abstract class AppLocalizations {
   /// No description provided for @tdActivityFallback.
   ///
   /// In vi, this message translates to:
-  /// **'Hoạt động thực địa'**
+  /// **'Trải nghiệm thực tế'**
   String get tdActivityFallback;
 
   /// No description provided for @tripCountdown.
@@ -3975,6 +3993,18 @@ abstract class AppLocalizations {
   /// **'Sắp khởi hành'**
   String get tripsStageReady;
 
+  /// No description provided for @tripsStageEnded.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã kết thúc'**
+  String get tripsStageEnded;
+
+  /// No description provided for @tripsNotJoined.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn chưa tham gia tour này'**
+  String get tripsNotJoined;
+
   /// No description provided for @tripsLive.
   ///
   /// In vi, this message translates to:
@@ -4032,8 +4062,44 @@ abstract class AppLocalizations {
   /// No description provided for @tripsStopsCheckedIn.
   ///
   /// In vi, this message translates to:
-  /// **' trạm đã check-in'**
+  /// **' trạm hoàn thành'**
   String get tripsStopsCheckedIn;
+
+  /// No description provided for @tripsNextStop.
+  ///
+  /// In vi, this message translates to:
+  /// **'Trạm tiếp theo {current}/{total}'**
+  String tripsNextStop(int current, int total);
+
+  /// No description provided for @tripsAllStopsChecked.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã đi trọn các trạm'**
+  String get tripsAllStopsChecked;
+
+  /// No description provided for @tripsUnfinished.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đi tiếp nhé'**
+  String get tripsUnfinished;
+
+  /// No description provided for @tripsUnfinishedHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hành trình bắt đầu {date} nhưng chưa hoàn tất.'**
+  String tripsUnfinishedHint(String date);
+
+  /// No description provided for @tripsActionTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cần bạn xử lý'**
+  String get tripsActionTitle;
+
+  /// No description provided for @tripsRefundNeededTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã thanh toán nhưng đơn bị hủy · cần gửi yêu cầu hoàn tiền'**
+  String get tripsRefundNeededTitle;
 
   /// No description provided for @tripsDestinations.
   ///
@@ -4944,8 +5010,74 @@ abstract class AppLocalizations {
   /// No description provided for @notifChannelTimerDesc.
   ///
   /// In vi, this message translates to:
-  /// **'Nhắc khi hết giờ đếm ngược của hoạt động thực địa'**
+  /// **'Nhắc khi hết giờ đếm ngược của trải nghiệm thực tế'**
   String get notifChannelTimerDesc;
+
+  /// No description provided for @notifChannelCountdown.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đồng hồ đếm ngược'**
+  String get notifChannelCountdown;
+
+  /// No description provided for @notifChannelCountdownDesc.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thời gian còn lại của hoạt động thực địa, hiện cả trên màn hình khoá'**
+  String get notifChannelCountdownDesc;
+
+  /// No description provided for @tkCountdownBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang đếm ngược · {place}'**
+  String tkCountdownBody(String place);
+
+  /// No description provided for @ovHideTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ẩn đồng hồ nổi?'**
+  String get ovHideTitle;
+
+  /// No description provided for @ovHideBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thời gian vẫn tiếp tục đếm trong ứng dụng.'**
+  String get ovHideBody;
+
+  /// No description provided for @ovHide.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ẩn'**
+  String get ovHide;
+
+  /// No description provided for @ovCancel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Huỷ'**
+  String get ovCancel;
+
+  /// No description provided for @ovPermTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hiện đồng hồ khi rời ứng dụng?'**
+  String get ovPermTitle;
+
+  /// No description provided for @ovPermBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cho phép Journey Go hiển thị trên ứng dụng khác để thấy thời gian còn lại ngay trên màn hình chính.'**
+  String get ovPermBody;
+
+  /// No description provided for @ovPermAllow.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cho phép'**
+  String get ovPermAllow;
+
+  /// No description provided for @ovPermLater.
+  ///
+  /// In vi, this message translates to:
+  /// **'Để sau'**
+  String get ovPermLater;
 
   /// No description provided for @notifChannelMain.
   ///
@@ -5018,6 +5150,180 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Nhắn tin cho nhà tour…'**
   String get chatInputHint;
+
+  /// No description provided for @pcVerified.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đối tác đã xác minh'**
+  String get pcVerified;
+
+  /// No description provided for @pcOnline.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang trực tuyến'**
+  String get pcOnline;
+
+  /// No description provided for @pcReplyFewMinutes.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thường trả lời trong vài phút'**
+  String get pcReplyFewMinutes;
+
+  /// No description provided for @pcReplyMinutes.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thường trả lời trong khoảng {minutes} phút'**
+  String pcReplyMinutes(int minutes);
+
+  /// No description provided for @pcReplyHours.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thường trả lời trong khoảng {hours} giờ'**
+  String pcReplyHours(int hours);
+
+  /// No description provided for @pcReplyDay.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thường trả lời trong vòng 1 ngày'**
+  String get pcReplyDay;
+
+  /// No description provided for @pcReplyDays.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thường trả lời sau vài ngày'**
+  String get pcReplyDays;
+
+  /// No description provided for @pcNotifyReply.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn sẽ nhận thông báo khi nhà tour trả lời'**
+  String get pcNotifyReply;
+
+  /// No description provided for @pcAskingAbout.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang hỏi về: {tour}'**
+  String pcAskingAbout(String tour);
+
+  /// No description provided for @pcToday.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hôm nay'**
+  String get pcToday;
+
+  /// No description provided for @pcYesterday.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hôm qua'**
+  String get pcYesterday;
+
+  /// No description provided for @pcQuick1.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lịch khởi hành gần nhất?'**
+  String get pcQuick1;
+
+  /// No description provided for @pcQuick2.
+  ///
+  /// In vi, this message translates to:
+  /// **'Giá cho trẻ em thế nào?'**
+  String get pcQuick2;
+
+  /// No description provided for @pcQuick3.
+  ///
+  /// In vi, this message translates to:
+  /// **'Có đón tại khách sạn không?'**
+  String get pcQuick3;
+
+  /// No description provided for @pcQuick4.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cần chuẩn bị mang gì?'**
+  String get pcQuick4;
+
+  /// No description provided for @pcQuickTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Câu hỏi gợi ý'**
+  String get pcQuickTitle;
+
+  /// No description provided for @pcNewMessages.
+  ///
+  /// In vi, this message translates to:
+  /// **'{count} tin mới'**
+  String pcNewMessages(int count);
+
+  /// No description provided for @pcSending.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang gửi…'**
+  String get pcSending;
+
+  /// No description provided for @pcSendFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'Gửi lỗi · Chạm để gửi lại'**
+  String get pcSendFailed;
+
+  /// No description provided for @pcCopied.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã sao chép tin nhắn'**
+  String get pcCopied;
+
+  /// No description provided for @pcLoadOlder.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xem tin nhắn cũ hơn'**
+  String get pcLoadOlder;
+
+  /// No description provided for @pcHistoryEnd.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn đã xem hết lịch sử tin nhắn'**
+  String get pcHistoryEnd;
+
+  /// No description provided for @pcInfoTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thông tin nhà tour'**
+  String get pcInfoTitle;
+
+  /// No description provided for @pcInfoBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhà tour được Journey Go kiểm duyệt. Tin nhắn được lưu lại để bạn xem tiếp bất cứ lúc nào.'**
+  String get pcInfoBody;
+
+  /// No description provided for @pcViewTour.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xem tour'**
+  String get pcViewTour;
+
+  /// No description provided for @pcSeen.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã xem'**
+  String get pcSeen;
+
+  /// No description provided for @pcSent.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã gửi'**
+  String get pcSent;
+
+  /// No description provided for @pcStartChat.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu trò chuyện'**
+  String get pcStartChat;
+
+  /// No description provided for @pcListSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hỏi lịch trình, giá, điểm đón… trực tiếp với nhà tour'**
+  String get pcListSubtitle;
 
   /// No description provided for @forumFilterTour.
   ///
@@ -6669,6 +6975,12 @@ abstract class AppLocalizations {
   /// **'Quét mã QR tại điểm'**
   String get jsScanQr;
 
+  /// No description provided for @jsScanQrShort.
+  ///
+  /// In vi, this message translates to:
+  /// **'Quét QR'**
+  String get jsScanQrShort;
+
   /// No description provided for @jsSkipStop.
   ///
   /// In vi, this message translates to:
@@ -7002,7 +7314,7 @@ abstract class AppLocalizations {
   /// No description provided for @tkFieldMission.
   ///
   /// In vi, this message translates to:
-  /// **'Nhiệm vụ thực địa'**
+  /// **'Trải nghiệm thực tế'**
   String get tkFieldMission;
 
   /// No description provided for @tkHeritageQuiz.
@@ -7088,6 +7400,66 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Bắt đầu nhiệm vụ'**
   String get tkStartMission;
+
+  /// No description provided for @tkInProgressTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang làm dở'**
+  String get tkInProgressTitle;
+
+  /// No description provided for @tkInProgressSummary.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã trả lời {answered}/{total} câu · đúng {correct} · +{points} điểm'**
+  String tkInProgressSummary(int answered, int total, int correct, int points);
+
+  /// No description provided for @tkContinueFromQuestion.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiếp tục từ câu {number}'**
+  String tkContinueFromQuestion(int number);
+
+  /// No description provided for @tkExitConfirmTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thoát nhiệm vụ?'**
+  String get tkExitConfirmTitle;
+
+  /// No description provided for @tkExitConfirmBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiến độ đã được lưu, bạn có thể làm tiếp sau.'**
+  String get tkExitConfirmBody;
+
+  /// No description provided for @tkExitActivityBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thời gian vẫn tiếp tục đếm, bạn có thể quay lại bất cứ lúc nào.'**
+  String get tkExitActivityBody;
+
+  /// No description provided for @tkStay.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ở lại'**
+  String get tkStay;
+
+  /// No description provided for @tkExit.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thoát'**
+  String get tkExit;
+
+  /// No description provided for @tkEarlierAnswered.
+  ///
+  /// In vi, this message translates to:
+  /// **'Các câu trước đã trả lời ở lần trước'**
+  String get tkEarlierAnswered;
+
+  /// No description provided for @tkQuestionsProgress.
+  ///
+  /// In vi, this message translates to:
+  /// **'{answered}/{total} câu'**
+  String tkQuestionsProgress(int answered, int total);
 
   /// No description provided for @tkViewClue.
   ///
@@ -7902,7 +8274,7 @@ abstract class AppLocalizations {
   /// No description provided for @seAnyOrder.
   ///
   /// In vi, this message translates to:
-  /// **'Làm theo thứ tự bất kỳ. Hoạt động thực địa cần quét mã QR tại điểm để xác nhận.'**
+  /// **'Làm theo thứ tự bất kỳ. Trải nghiệm thực tế cần quét mã QR tại điểm để xác nhận.'**
   String get seAnyOrder;
 
   /// No description provided for @sePartial.
@@ -7938,7 +8310,7 @@ abstract class AppLocalizations {
   /// No description provided for @seFieldActivity.
   ///
   /// In vi, this message translates to:
-  /// **'Hoạt động thực địa'**
+  /// **'Trải nghiệm thực tế'**
   String get seFieldActivity;
 
   /// No description provided for @seLocationPuzzle.
@@ -7956,7 +8328,7 @@ abstract class AppLocalizations {
   /// No description provided for @seQuestions.
   ///
   /// In vi, this message translates to:
-  /// **'{count} câu hỏi'**
+  /// **'{count} câu đố'**
   String seQuestions(int count);
 
   /// No description provided for @seScanQr.
@@ -8906,6 +9278,246 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Xem tour #{id}'**
   String aiViewTour(int id);
+
+  /// No description provided for @tripsAtStop.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang ở trạm {current}/{total}'**
+  String tripsAtStop(int current, int total);
+
+  /// No description provided for @tripsUnfinishedRemaining.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu {date} · còn {count} trạm nữa là trọn hành trình.'**
+  String tripsUnfinishedRemaining(String date, int count);
+
+  /// No description provided for @seFailedLeft.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa đạt · còn {count} lượt'**
+  String seFailedLeft(int count);
+
+  /// No description provided for @seDirections.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chỉ đường'**
+  String get seDirections;
+
+  /// No description provided for @seFarFromActivity.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn đang cách hoạt động gần nhất {distance}'**
+  String seFarFromActivity(String distance);
+
+  /// No description provided for @tkReviewTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xem lại đáp án'**
+  String get tkReviewTitle;
+
+  /// No description provided for @tkReviewCorrectAnswer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đáp án đúng: {answer}'**
+  String tkReviewCorrectAnswer(String answer);
+
+  /// No description provided for @tkReviewYourAnswer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn trả lời: {answer}'**
+  String tkReviewYourAnswer(String answer);
+
+  /// No description provided for @tkReviewNoAnswer.
+  ///
+  /// In vi, this message translates to:
+  /// **'(bỏ trống)'**
+  String get tkReviewNoAnswer;
+
+  /// No description provided for @tkReviewWhy.
+  ///
+  /// In vi, this message translates to:
+  /// **'Vì sao?'**
+  String get tkReviewWhy;
+
+  /// No description provided for @jsGoalRemaining.
+  ///
+  /// In vi, this message translates to:
+  /// **'Còn {count} trạm nữa để nhận thưởng hoàn thành và bảng tổng kết'**
+  String jsGoalRemaining(int count);
+
+  /// No description provided for @jsGoalLost.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã bỏ qua trạm nên chuyến này không còn thưởng hoàn thành — vẫn đi tiếp để tích điểm nhé.'**
+  String get jsGoalLost;
+
+  /// No description provided for @tkOrderingHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Giữ và kéo để sắp xếp từ trên xuống theo thứ tự đúng'**
+  String get tkOrderingHint;
+
+  /// No description provided for @tkNumberHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kéo thanh trượt hoặc bấm − / + để chọn'**
+  String get tkNumberHint;
+
+  /// No description provided for @tkNumberNotChosen.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa chọn'**
+  String get tkNumberNotChosen;
+
+  /// No description provided for @tkSeeResult.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xem kết quả'**
+  String get tkSeeResult;
+
+  /// No description provided for @tkAnswer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Trả lời'**
+  String get tkAnswer;
+
+  /// No description provided for @tkUnsupportedQuestion.
+  ///
+  /// In vi, this message translates to:
+  /// **'Câu hỏi dạng mới — hãy cập nhật ứng dụng để trả lời.'**
+  String get tkUnsupportedQuestion;
+
+  /// No description provided for @tkNumberOff.
+  ///
+  /// In vi, this message translates to:
+  /// **'lệch {diff}'**
+  String tkNumberOff(int diff);
+
+  /// No description provided for @tkImageOption.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ảnh {letter}'**
+  String tkImageOption(String letter);
+
+  /// No description provided for @tkRevealCorrect.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chính xác!'**
+  String get tkRevealCorrect;
+
+  /// No description provided for @tkRevealWrong.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa đúng'**
+  String get tkRevealWrong;
+
+  /// No description provided for @tkCorrectOrder.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thứ tự đúng'**
+  String get tkCorrectOrder;
+
+  /// No description provided for @scStory.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xem dạng story'**
+  String get scStory;
+
+  /// No description provided for @scStoryEndTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Sẵn sàng thử thách?'**
+  String get scStoryEndTitle;
+
+  /// No description provided for @scStoryEndBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn đã xem xong câu chuyện của trạm này. Giờ là lúc thử tài!'**
+  String get scStoryEndBody;
+
+  /// No description provided for @scReadAll.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đọc toàn bộ'**
+  String get scReadAll;
+
+  /// No description provided for @scStoryArtifact.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hiện vật'**
+  String get scStoryArtifact;
+
+  /// No description provided for @scStoryClose.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đóng story'**
+  String get scStoryClose;
+
+  /// No description provided for @scThenNowTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xưa và nay'**
+  String get scThenNowTitle;
+
+  /// No description provided for @scThenNowNow.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nay'**
+  String get scThenNowNow;
+
+  /// No description provided for @scThenNowThen.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xưa'**
+  String get scThenNowThen;
+
+  /// No description provided for @scThenNowHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kéo vạch để so sánh'**
+  String get scThenNowHint;
+
+  /// No description provided for @scThenNowCredit.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ảnh tư liệu: {credit}'**
+  String scThenNowCredit(String credit);
+
+  /// No description provided for @tkMatchingHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chọn một mục ở cột A rồi chạm mục tương ứng ở cột B để nối. Đúng toàn bộ mới có điểm.'**
+  String get tkMatchingHint;
+
+  /// No description provided for @tkMatchingColA.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cột A'**
+  String get tkMatchingColA;
+
+  /// No description provided for @tkMatchingColB.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cột B'**
+  String get tkMatchingColB;
+
+  /// No description provided for @tkMatchingTapZoom.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chạm ảnh để phóng to'**
+  String get tkMatchingTapZoom;
+
+  /// No description provided for @tkMatchingCorrectPairs.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cặp nối đúng'**
+  String get tkMatchingCorrectPairs;
+
+  /// No description provided for @tkMatchingClear.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bỏ nối'**
+  String get tkMatchingClear;
 }
 
 class _AppLocalizationsDelegate
