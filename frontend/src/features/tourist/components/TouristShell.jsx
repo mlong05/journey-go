@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogOut, LayoutDashboard, ChevronDown, UserRound, MessageCircle, Gift } from "lucide-react";
+import { Menu, X, LogOut, LayoutDashboard, ChevronDown, UserRound, MessageCircle, Gift, Sparkles } from "lucide-react";
 import BrandLogo from "@/components/brand/BrandLogo";
 import { LogoutModal, useLogout } from "@/features/auth";
 import { ROUTES } from "@/constants/routes";
@@ -19,6 +19,7 @@ const NAV = [
   { href: ROUTES.HOME, label: "Khám phá", match: (p) => p === "/" },
   // Chỉ sáng ở trang danh sách; trang chi tiết /tours/{id} không tô mục nào (đã có dòng đường dẫn).
   { href: ROUTES.TOURS, label: "Tất cả tour", match: (p) => p === "/tours" },
+  { href: ROUTES.ACCOUNT_TOUR_REQUESTS, label: "Tour theo nhu cầu", match: (p) => p.startsWith("/account/requests"), touristOnly: true },
   { href: ROUTES.COMMUNITY, label: "Cộng đồng", match: (p) => p.startsWith("/community") },
   { href: ROUTES.TRIPS, label: "Chuyến đi của tôi", match: (p) => p.startsWith("/trips"), touristOnly: true },
   { href: ROUTES.PARTNER_PROGRAM, label: "Dành cho đối tác", match: (p) => p.startsWith("/partner"), hideForTourist: true },
@@ -33,6 +34,7 @@ const initials = (name) =>
  */
 const TOURIST_MENU = [
   [ROUTES.ACCOUNT, "Tài khoản của tôi", UserRound],
+  [ROUTES.ACCOUNT_TOUR_REQUESTS, "Tour theo nhu cầu", Sparkles],
   [ROUTES.ACCOUNT_MESSAGES, "Tin nhắn", MessageCircle, "unread"],
   [ROUTES.ACCOUNT_REWARDS, "Điểm thưởng & voucher", Gift],
 ];
