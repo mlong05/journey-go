@@ -56,7 +56,7 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
       : CameraFit.coordinates(coordinates: points, padding: const EdgeInsets.all(42), maxZoom: 18);
 
   void fitAll() {
-    final points = _fitPoints();
+    final points = _fitPoints(withUser: _userNearby);
     final fit = _cameraFit(points);
     if (fit != null) {
       _controller.fitCamera(fit);
@@ -65,14 +65,27 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
     }
   }
 
+  /// Du khách đủ gần để đưa vào khung (xa hơn thì checkpoint bé tí, vô dụng — màn cha hiện dải "Chỉ đường").
+  static const double _fitUserWithinMeters = 1500;
+
+  bool get _userNearby {
+    final user = widget.user;
+    if (user == null) return false;
+    final points = _fitPoints(withUser: false);
+    return points.any((p) => distanceMeters(user, p) <= _fitUserWithinMeters);
+  }
+
+  /// Lần đầu có vị trí du khách (và bản đồ đã sẵn sàng): căn lại để thấy cả du khách khi họ ở gần.
+  void _maybeFitWithUser() {
+    if (!_ready || _fittedWithUser || !_userNearby) return;
+    _fittedWithUser = true;
+    fitAll();
+  }
+
   @override
   void didUpdateWidget(covariant StopCheckpointsMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Lần đầu có vị trí du khách: căn lại để thấy cả du khách.
-    if (_ready && !_fittedWithUser && oldWidget.user == null && widget.user != null) {
-      _fittedWithUser = true;
-      fitAll();
-    }
+    if (widget.user != null) _maybeFitWithUser();
   }
 
   @override
@@ -97,7 +110,11 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
                 initialCameraFit: _cameraFit(points),
                 interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
                 backgroundColor: mapBackground,
-                onMapReady: () => _ready = true,
+                onMapReady: () {
+                  _ready = true;
+                  // Vị trí có thể về trước khi bản đồ sẵn sàng.
+                  _maybeFitWithUser();
+                },
               ),
               children: [
                 ...baseTileLayers(satellite: false),

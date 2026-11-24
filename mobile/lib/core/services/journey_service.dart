@@ -140,6 +140,31 @@ class JourneyService {
     return TaskSubmitResult.fromJson(data);
   }
 
+  /// Câu đố chấm theo từng câu: trả lời MỘT câu, nhận ngay đúng/sai + đáp án + giải thích (review).
+  Future<TaskSubmitResult> answerQuestion({
+    required int journeyId,
+    required int taskId,
+    required AnswerDraft answer,
+    double? latitude,
+    double? longitude,
+    String? qrValue,
+  }) async {
+    final data = await ApiClient.request(
+      'POST',
+      '/journeys/$journeyId/tasks/$taskId/questions/${answer.questionId}/answer',
+      body: {
+        'answers': [answer.toJson()],
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+        'qrValue': ?qrValue,
+      },
+    );
+    if (data is! Map<String, dynamic>) {
+      throw ApiException(appL10n.jsvcSubmitInvalid);
+    }
+    return TaskSubmitResult.fromJson(data);
+  }
+
   TourJourney _journey(dynamic data) {
     if (data is! Map<String, dynamic>) {
       throw ApiException(appL10n.jsvcJourneyInvalid);
