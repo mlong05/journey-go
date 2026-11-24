@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, RefreshCw, X } from "lucide-react";
+import { ChevronDown, MapPin, RefreshCw, X, Calendar } from "lucide-react";
 import { RANGE, PILL } from "@/app/admin/overview.tokens";
 import Hint from "./Hint";
-import { RANGE_HINTS } from "./glossary";
+import { COMPARE_MODES } from "./compareModes";
 
 /** Các khoảng thời gian có sẵn. `month` = 30 ngày qua (mặc định theo đặc tả). */
 export const RANGE_OPTIONS = [
@@ -29,17 +29,20 @@ export const RANGE_OPTIONS = [
  * bị hở 20px và không đè lên nội dung bên dưới quá nhiều.
  */
 export default function OverviewHeader({
-  range,
-  onRangeChange,
+  mode,
+  onModeChange,
   customRange,
   onApplyCustom,
+  regions = [],
+  regionId,
+  onRegionChange,
   lastUpdated,
   onRefresh,
   isRefreshing,
   health,
 }) {
   const [isCustomOpen, setIsCustomOpen] = useState(false);
-  const [draft, setDraft] = useState(customRange);
+  const [draft, setDraft] = useState({ from: "", to: "" });
   // Portal chỉ render được ở phía client.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -53,12 +56,33 @@ export default function OverviewHeader({
   }, []);
 
   const openCustom = () => {
-    setDraft(customRange);
+    // Convert từ YYYY-MM-DD (ISO) → dd/mm/yyyy (display format) khi mở modal
+    const convertFromIso = (isoStr) => {
+      if (!isoStr) return "";
+      const [year, month, day] = isoStr.split('-');
+      return `${day}/${month}/${year}`;
+    };
+    
+    const displayRange = {
+      from: convertFromIso(customRange.from) || "",
+      to: convertFromIso(customRange.to) || "",
+    };
+    setDraft(displayRange);
     setIsCustomOpen(true);
   };
 
   const applyCustom = () => {
-    onApplyCustom(draft);
+    // Convert từ dd/mm/yyyy → yyyy-MM-dd trước gửi API
+    const convertToIso = (dateStr) => {
+      if (!dateStr) return "";
+      const [day, month, year] = dateStr.split('/');
+      return `${year}-${month}-${day}`;
+    };
+    
+    const fromIso = convertToIso(draft.from);
+    const toIso = convertToIso(draft.to);
+    
+    onApplyCustom({ from: fromIso, to: toIso });
     setIsCustomOpen(false);
   };
 
@@ -108,24 +132,24 @@ export default function OverviewHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {/* Bộ lọc thời gian */}
-          <div className={RANGE.group} role="group" aria-label="Bộ lọc thời gian">
-            {RANGE_OPTIONS.map((option) => {
-              const active = range === option.key;
-              return (
-                <Hint key={option.key} text={RANGE_HINTS[option.key]}>
-                  <button
-                    type="button"
-                    onClick={() => (option.key === "custom" ? openCustom() : onRangeChange(option.key))}
-                    aria-pressed={active}
-                    className={`${RANGE.item} ${active ? RANGE.itemActive : ""}`}
-                  >
-                    {option.label}
-                  </button>
-                </Hint>
-              );
-            })}
-          </div>
+          {/* Bộ lọc khu vực */}
+          <label className="inline-flex items-center gap-1.5 h-9 pl-2.5 pr-2 rounded-xl bg-white border border-slate-200 text-slate-600">
+            <MapPin size={14} className="shrink-0 text-slate-400" />
+            <select
+              value={regionId ?? ""}
+              onChange={(e) => onRegionChange(e.target.value ? Number(e.target.value) : null)}
+              className="bg-transparent text-[11.5px] font-bold text-slate-700 focus:outline-none cursor-pointer max-w-[150px] truncate"
+              aria-label="Lọc theo khu vực"
+              title="Lọc theo khu vực của tour"
+            >
+              <option value="">Toàn sàn</option>
+              {regions.map((region) => (
+                <option key={region.id} value={region.id}>
+                  {region.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
           {/* Mốc cập nhật + nút làm mới */}
           <div className="flex items-center gap-1.5">
@@ -147,6 +171,31 @@ export default function OverviewHeader({
               </button>
             </Hint>
           </div>
+        </div>
+      </div>
+
+      {/* ── Hàng tab khung so sánh ── */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-bold text-slate-500 shrink-0">So sánh theo</span>
+        <div className={RANGE.group} role="tablist" aria-label="Khung so sánh">
+          {COMPARE_MODES.map((option) => {
+            const active = mode === option.key;
+            return (
+              <Hint key={option.key} text={option.hint}>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() =>
+                    option.key === "custom" ? openCustom() : onModeChange(option.key)
+                  }
+                  className={`${RANGE.item} ${active ? RANGE.itemActive : ""}`}
+                >
+                  {option.label}
+                </button>
+              </Hint>
+            );
+          })}
         </div>
       </div>
 
