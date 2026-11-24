@@ -29,9 +29,9 @@ class TourPublicDetailResponseTest {
                 "Văn Miếu xây năm nào?", 10,
                 List.of(new TourDetailResponse.Answer(11L, "1070", true),
                         new TourDetailResponse.Answer(12L, "1010", false)),
-                null);
+                null, null);
         var postQuestion = new TourDetailResponse.Question(2L, StopQuestionKind.POST_EXPERIENCE, QuestionType.TEXT,
-                "Tên bia tiến sĩ đầu tiên?", null, List.of(), "SECRET-ANSWER");
+                "Tên bia tiến sĩ đầu tiên?", null, List.of(), "SECRET-ANSWER", null);
         var experience = new TourDetailResponse.Experience(5L, "Tìm bia tiến sĩ",
                 new BigDecimal("21.0293"), new BigDecimal("105.8356"), 50, 300,
                 "JGE-0123456789ABCDEF", 20, postQuestion);

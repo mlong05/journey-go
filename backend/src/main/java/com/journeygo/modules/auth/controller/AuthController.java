@@ -117,6 +117,10 @@ public class AuthController {
         if (newAvatar != null) {
             user.setAvatarUrl(newAvatar.isEmpty() ? null : newAvatar);
         }
+        if (request.coverImageUrl() != null) {
+            String cover = request.coverImageUrl().trim();
+            user.setCoverImageUrl(cover.isEmpty() ? null : cover);
+        }
 
         user = userRepository.save(user);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin thành công", UserResponse.fromEntity(user)));

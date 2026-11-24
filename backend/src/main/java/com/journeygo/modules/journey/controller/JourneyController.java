@@ -38,7 +38,8 @@ public class JourneyController {
             @Valid @RequestBody StartJourneyRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        JourneyResponse response = journeyService.startJourney(userPrincipal.getId(), request);
+        JourneyResponse response = journeyTranslationService.localizeJourney(
+                journeyService.startJourney(userPrincipal.getId(), request), LocaleContextHolder.getLocale());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Bắt đầu chuyến đi thành công", response));
     }
@@ -49,7 +50,8 @@ public class JourneyController {
             @RequestParam(required = false) JourneyStatus status,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        List<JourneyResponse> list = journeyService.getMyJourneys(userPrincipal.getId(), status);
+        List<JourneyResponse> list = journeyTranslationService.localizeJourneys(
+                journeyService.getMyJourneys(userPrincipal.getId(), status), LocaleContextHolder.getLocale());
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách chuyến đi thành công", list));
     }
 
@@ -59,7 +61,8 @@ public class JourneyController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        JourneyResponse response = journeyService.getJourneyDetail(id, userPrincipal.getId());
+        JourneyResponse response = journeyTranslationService.localizeJourney(
+                journeyService.getJourneyDetail(id, userPrincipal.getId()), LocaleContextHolder.getLocale());
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin tiến độ chuyến đi thành công", response));
     }
 
@@ -129,7 +132,8 @@ public class JourneyController {
             @Valid @RequestBody SubmitTaskRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        JourneyTaskProgressResponse response = journeyService.submitTask(id, taskId, request, userPrincipal.getId());
+        JourneyTaskProgressResponse response = journeyTranslationService.localizeTaskSubmit(
+                journeyService.submitTask(id, taskId, request, userPrincipal.getId()), LocaleContextHolder.getLocale());
         String msg;
         if (response.status() == com.journeygo.modules.journey.entity.enums.TaskProgressStatus.COMPLETED) {
             msg = "Chính xác! Bạn đã hoàn thành nhiệm vụ và nhận được điểm thưởng";
@@ -146,6 +150,24 @@ public class JourneyController {
             msg = "Chưa chính xác, hãy thử lại nhé!";
         }
         return ResponseEntity.ok(ApiResponse.success(msg, response));
+    }
+
+    @PostMapping("/{id}/tasks/{taskId}/questions/{questionId}/answer")
+    @Operation(summary = "Trả lời một câu của câu đố (chấm theo từng câu)",
+            description = "Chỉ dành cho câu đố chấm theo từng câu (perQuestionPoints): trả lời lần lượt từng câu, mỗi câu một lần, "
+                    + "nhận ngay đúng/sai, đáp án đúng và giải thích (review). Trả lời xong câu cuối thì hoàn thành nhiệm vụ và chốt điểm.")
+    public ResponseEntity<ApiResponse<JourneyTaskProgressResponse>> answerQuestion(
+            @PathVariable Long id,
+            @PathVariable Long taskId,
+            @PathVariable Long questionId,
+            @Valid @RequestBody SubmitTaskRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        JourneyTaskProgressResponse response = journeyTranslationService.localizeTaskSubmit(
+                journeyService.answerQuestion(id, taskId, questionId, request, userPrincipal.getId()),
+                LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success(
+                Boolean.TRUE.equals(response.lastAnswerCorrect()) ? "Chính xác!" : "Chưa đúng", response));
     }
 
     @GetMapping("/{id}/destinations/{destinationId}/culture")

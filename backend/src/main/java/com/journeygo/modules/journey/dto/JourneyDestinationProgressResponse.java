@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 
-@Builder
+@Builder(toBuilder = true)
 public record JourneyDestinationProgressResponse(
         Long id,
         Long destinationId,

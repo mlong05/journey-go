@@ -91,18 +91,53 @@ public final class TourWizardRequests {
     @Schema(description = "Một đáp án")
     public record AnswerItem(
             @Size(max = 1000) String content,
-            @Schema(description = "Đáp án đúng") Boolean correct
-    ) {}
+            @Schema(description = "Đáp án đúng (câu xếp thứ tự: bỏ qua, thứ tự đúng = thứ tự trong mảng)") Boolean correct,
+            @Schema(description = "Câu chọn ảnh: ảnh của đáp án. Câu nối cột: ảnh kèm cột A (không bắt buộc)") @Size(max = 1000) String imageUrl,
+            @Schema(description = "Câu nối cột: nội dung cột B ghép đúng với dòng này") @Size(max = 1000) String matchText
+    ) {
+        public AnswerItem(String content, Boolean correct) {
+            this(content, correct, null, null);
+        }
 
-    @Schema(description = "Câu hỏi. Quiz luôn là trắc nghiệm; câu hỏi sau trải nghiệm luôn là nhập chữ (trường type bị bỏ qua)")
+        public AnswerItem(String content, Boolean correct, String imageUrl) {
+            this(content, correct, imageUrl, null);
+        }
+    }
+
+    @Schema(description = "Câu hỏi. Quiz: MULTIPLE_CHOICE | IMAGE_CHOICE | ORDERING | NUMBER; câu hỏi sau trải nghiệm luôn là nhập chữ (trường type bị bỏ qua)")
     public record QuestionItem(
-            @Schema(description = "Không dùng — dạng câu hỏi cố định theo vị trí câu hỏi")
+            @Schema(description = "Dạng câu quiz (bỏ trống = trắc nghiệm). Câu sau trải nghiệm: bỏ qua")
             QuestionType type,
             @Size(max = 2000) String content,
-            @Schema(description = "Quiz (trắc nghiệm): đúng 4 đáp án, 1 đáp án đúng")
-            @Valid @Size(max = 4, message = "Mỗi câu hỏi có đúng 4 đáp án") List<AnswerItem> answers,
+            @Schema(description = "Trắc nghiệm / chọn ảnh: đúng 4 đáp án, 1 đúng. Xếp thứ tự: 3–5 mục theo thứ tự đúng")
+            @Valid @Size(max = 5, message = "Tối đa 5 đáp án") List<AnswerItem> answers,
             @Schema(description = "Câu hỏi sau trải nghiệm (nhập chữ): đáp án đúng; nhiều đáp án chấp nhận cách nhau bằng dấu ;")
-            @Size(max = 2000) String referenceAnswer
+            @Size(max = 2000) String referenceAnswer,
+            @Schema(description = "Giải thích ngắn hiện cho du khách sau khi trả lời (không bắt buộc)")
+            @Size(max = 2000) String explanation,
+            @Schema(description = "Câu NUMBER: giá trị nhỏ nhất của thanh trượt") Integer numberMin,
+            @Schema(description = "Câu NUMBER: giá trị lớn nhất của thanh trượt") Integer numberMax,
+            @Schema(description = "Câu NUMBER: đáp án đúng") Integer numberCorrect,
+            @Schema(description = "Câu NUMBER: sai số cho phép (0 = phải đúng tuyệt đối)")
+            @Min(value = 0, message = "Sai số không được âm") Integer numberTolerance
+    ) {
+        public QuestionItem(QuestionType type, String content, List<AnswerItem> answers, String referenceAnswer) {
+            this(type, content, answers, referenceAnswer, null);
+        }
+
+        public QuestionItem(QuestionType type, String content, List<AnswerItem> answers, String referenceAnswer,
+                            String explanation) {
+            this(type, content, answers, referenceAnswer, explanation, null, null, null, null);
+        }
+    }
+
+    @Schema(description = "Cặp ảnh xưa và nay")
+    public record ThenNowItem(
+            @Schema(description = "Ảnh tư liệu") @Size(max = 1000) String thenImageUrl,
+            @Schema(description = "Ảnh hiện tại, chụp cùng góc") @Size(max = 1000) String nowImageUrl,
+            @Schema(description = "Thời điểm ảnh tư liệu, vd. \"1975\"") @Size(max = 50) String thenLabel,
+            @Size(max = 500) String caption,
+            @Schema(description = "Nguồn / bản quyền ảnh tư liệu (bắt buộc khi gửi duyệt)") @Size(max = 300) String credit
     ) {}
 
     @Schema(description = "Cổ vật")
@@ -120,7 +155,7 @@ public final class TourWizardRequests {
             @DecimalMin(value = "-90") @DecimalMax(value = "90") BigDecimal checkpointLatitude,
             @DecimalMin(value = "-180") @DecimalMax(value = "180") BigDecimal checkpointLongitude,
             @Schema(description = "Bán kính checkpoint (mét), mặc định 50")
-            @Min(value = 10, message = "Bán kính tối thiểu 10m") @Max(value = 500, message = "Bán kính tối đa 500m") Integer radiusMeters,
+            @Min(value = 10, message = "Bán kính tối thiểu 10m") @Max(value = 100, message = "Bán kính tối đa 100m") Integer radiusMeters,
             @Schema(description = "Thời gian trải nghiệm (giây), hết giờ thì hiện câu hỏi")
             @Min(value = 1, message = "Thời gian trải nghiệm phải lớn hơn 0") @Max(value = 86400) Integer durationSeconds,
             @Schema(description = "Mã QR xác nhận hoàn thành (JGE- + 16 ký tự hex). Gửi lại mã cũ để giữ QR đã in; để trống thì sinh mã mới")
@@ -143,8 +178,8 @@ public final class TourWizardRequests {
             @Size(max = 20000) String culturalContent,
             @Size(max = 20) List<@Size(max = 1000) String> culturalImages,
             @Valid @Size(max = 20) List<ArtifactItem> artifacts,
-            @Schema(description = "Quiz — câu hỏi trắc nghiệm (1–4 câu khi gửi duyệt)")
-            @Valid @Size(max = 4, message = "Quiz tối đa 4 câu") List<QuestionItem> quiz,
+            @Schema(description = "Câu đố văn hóa (1–4 câu khi gửi duyệt): chọn đáp án, chọn ảnh, xếp thứ tự hoặc đoán số")
+            @Valid @Size(max = 4, message = "Câu đố văn hóa tối đa 4 câu") List<QuestionItem> quiz,
             @Schema(description = "Trải nghiệm thực tế (1–5 khi gửi duyệt)")
             @Valid @Size(max = 5, message = "Tối đa 5 trải nghiệm thực tế mỗi điểm đến") List<ExperienceItem> experiences,
             @Schema(description = "Vĩ độ vị trí check-in trạm (nên đặt tại cổng / lối vào chính)")
@@ -155,8 +190,18 @@ public final class TourWizardRequests {
             @Min(value = 50, message = "Bán kính check-in tối thiểu 50m")
             @Max(value = 500, message = "Bán kính check-in tối đa 500m") Integer checkInRadiusMeters,
             @Schema(description = "Mã QR check-in trạm (JGS- + 16 ký tự hex). Gửi lại mã cũ để giữ QR đã in; để trống thì sinh mã mới")
-            @Size(max = 40) String qrToken
-    ) {}
+            @Size(max = 40) String qrToken,
+            @Schema(description = "Ảnh xưa và nay (không bắt buộc, tối đa 3 cặp)")
+            @Valid @Size(max = 3, message = "Tối đa 3 cặp ảnh xưa và nay") List<ThenNowItem> thenNow
+    ) {
+        public StopItem(Long id, String name, String shortDescription, String guestNote, String imageUrl,
+                        String videoUrl, VideoSource videoSource, String culturalContent, List<String> culturalImages,
+                        List<ArtifactItem> artifacts, List<QuestionItem> quiz, List<ExperienceItem> experiences,
+                        BigDecimal latitude, BigDecimal longitude, Integer checkInRadiusMeters, String qrToken) {
+            this(id, name, shortDescription, guestNote, imageUrl, videoUrl, videoSource, culturalContent, culturalImages,
+                    artifacts, quiz, experiences, latitude, longitude, checkInRadiusMeters, qrToken, null);
+        }
+    }
 
     @Schema(description = "Bước 3 — Danh sách điểm đến theo thứ tự (thứ tự trong mảng = thứ tự kéo thả)")
     public record Stops(

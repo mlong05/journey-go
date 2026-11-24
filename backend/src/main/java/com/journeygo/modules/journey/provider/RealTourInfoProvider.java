@@ -13,6 +13,7 @@ import com.journeygo.modules.experience.repository.QuestionRepository;
 import com.journeygo.modules.experience.repository.TaskRepository;
 import com.journeygo.modules.reward.entity.RewardSettingCode;
 import com.journeygo.modules.reward.service.RewardSettingService;
+import com.journeygo.modules.tour.entity.QuestionType;
 import com.journeygo.modules.tour.entity.StopQuestionKind;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourDestination;
@@ -176,17 +177,24 @@ public class RealTourInfoProvider implements TourInfoProvider {
     private static TourInfo.QuestionInfo wizardQuestion(TourStopQuestion q, TourStopExperience station, Integer points) {
         List<TourInfo.AnswerInfo> answers = q.getAnswers().stream()
                 .sorted(Comparator.comparingInt(TourStopAnswer::getSequenceOrder))
-                .map(a -> new TourInfo.AnswerInfo(a.getId(), a.getContent(), a.isCorrect(), a.getSequenceOrder()))
+                .map(a -> new TourInfo.AnswerInfo(a.getId(), a.getContent(), a.isCorrect(), a.getSequenceOrder(),
+                        a.getImageUrl(), a.getMatchText()))
                 .toList();
+        QuestionType type = q.getQuestionType() == null ? QuestionType.MULTIPLE_CHOICE : q.getQuestionType();
+        TourInfo.NumberSpec number = type == QuestionType.NUMBER
+                && q.getNumberMin() != null && q.getNumberMax() != null && q.getNumberCorrect() != null
+                ? new TourInfo.NumberSpec(q.getNumberMin(), q.getNumberMax(), q.getNumberCorrect(),
+                        q.getNumberTolerance() == null ? 0 : Math.max(0, q.getNumberTolerance()))
+                : null;
         return new TourInfo.QuestionInfo(
-                q.getId(), q.getContent(), q.isTextQuestion() ? "TEXT" : "MULTIPLE_CHOICE", q.getSequenceOrder(),
+                q.getId(), q.getContent(), type.name(), q.getSequenceOrder(),
                 q.getReferenceAnswer(),
                 station == null ? null : station.getActivityName(),
                 station == null ? null : station.getCheckpointLatitude(),
                 station == null ? null : station.getCheckpointLongitude(),
                 station == null ? null : station.getRadiusMeters(),
                 station == null ? null : station.getQrToken(),
-                answers, points, true);
+                answers, points, true, q.getExplanation(), number);
     }
 
     private List<TourInfo.TourTaskInfo> loadTasks(Long experienceId) {
@@ -207,6 +215,13 @@ public class RealTourInfoProvider implements TourInfoProvider {
                         .map(a -> new TourInfo.AnswerInfo(a.getId(), a.getContent(), a.isCorrect(), a.getSequenceOrder()))
                         .toList();
                 CheckInPoint station = q.getCheckInPoint();
+                // Luồng cũ lưu giải thích theo đáp án: lấy giải thích của đáp án đúng làm giải thích câu hỏi.
+                String explanation = q.getAnswers().stream()
+                        .filter(Answer::isCorrect)
+                        .map(Answer::getExplanation)
+                        .filter(e -> e != null && !e.isBlank())
+                        .findFirst()
+                        .orElse(null);
                 questions.add(new TourInfo.QuestionInfo(
                         q.getId(), q.getContent(), q.getQuestionType().name(),
                         q.getSequenceOrder(), q.getExpectedText(),
@@ -215,7 +230,7 @@ public class RealTourInfoProvider implements TourInfoProvider {
                         station == null ? null : station.getLongitude(),
                         station == null ? null : station.getRadiusMeters(),
                         station == null ? null : station.getQrToken(),
-                        answers));
+                        answers, null, false, explanation));
             }
 
             result.add(new TourInfo.TourTaskInfo(

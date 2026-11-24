@@ -137,7 +137,7 @@ class JourneyServiceWizardTest {
     void culture_openAfterCheckIn() {
         stop.setCheckedIn(true);
         var culture = new StopCultureResponse(7L, 1, "Văn Miếu", null, null, null, null,
-                "Câu chuyện", List.of(), List.of());
+                "Câu chuyện", List.of(), List.of(), List.of());
         when(journeyRepository.findByIdWithDestinations(50L)).thenReturn(Optional.of(journey));
         when(destinationProgressRepository.findByJourneyIdAndDestinationId(50L, 7L)).thenReturn(Optional.of(stop));
         when(tourService.getStopCulture(1L, 7L)).thenReturn(culture);
@@ -264,6 +264,26 @@ class JourneyServiceWizardTest {
         assertEquals(10, r.pointsEarned());
         assertEquals(1, r.correctCount());
         verify(gamificationService).awardPoints(eq(10L), eq(10), any(), anyString(), anyString());
+
+        // Nộp xong là xem lại được từng câu: đúng/sai và đáp án đúng
+        assertEquals(2, r.review().size());
+        assertTrue(r.review().get(0).correct());
+        assertEquals(11L, r.review().get(0).correctAnswerId());
+        assertFalse(r.review().get(1).correct());
+        assertEquals(21L, r.review().get(1).correctAnswerId());
+    }
+
+    @Test
+    void activity_WrongAnswerWithAttemptsLeft_ShouldNotRevealAnswer() {
+        stop.setCheckedIn(true);
+        stubTasks(tourInfo(LAT, LNG));
+        var submit = new SubmitTaskRequest(List.of(new SubmitTaskRequest.QuestionAnswer(3L, null, "Trần Thái Tông")),
+                LAT, LNG, QR);
+
+        JourneyTaskProgressResponse r = journeyService.submitTask(50L, 5L, submit, 10L);
+
+        assertNotEquals(TaskProgressStatus.COMPLETED, r.status());
+        assertNull(r.review());
     }
 
     @Test

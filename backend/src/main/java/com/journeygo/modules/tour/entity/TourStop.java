@@ -104,6 +104,12 @@ public class TourStop {
     @Builder.Default
     private List<TourStopArtifact> artifacts = new ArrayList<>();
 
+    /** Ảnh "xưa và nay" (tối đa 3 cặp). */
+    @OneToMany(mappedBy = "stop", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sequenceOrder ASC")
+    @Builder.Default
+    private List<TourStopThenNow> thenNow = new ArrayList<>();
+
     /** Quiz của điểm đến (kind = QUIZ). */
     @OneToMany(mappedBy = "stop", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequenceOrder ASC")

@@ -77,13 +77,28 @@ public record TourDetailResponse(
     public record Price(GuestType guestType, String label, String ageRange, BigDecimal price,
                         boolean countsTowardSlot, boolean alwaysFree) {}
 
-    public record Answer(Long id, String content, boolean correct) {}
+    /** @param matchText câu nối cột: cột B ghép đúng với dòng này */
+    public record Answer(Long id, String content, boolean correct, String imageUrl, String matchText) {
+        public Answer(Long id, String content, boolean correct) {
+            this(id, content, correct, null, null);
+        }
+    }
+
+    /** Cặp ảnh xưa và nay của điểm đến. */
+    public record ThenNow(Long id, String thenImageUrl, String nowImageUrl, String thenLabel, String caption,
+                          String credit) {}
 
     /** dayNumber bắt đầu từ 1. */
     public record ItineraryDay(int dayNumber, String title, String mainActivity, String content) {}
 
     public record Question(Long id, StopQuestionKind kind, QuestionType type, String content, Integer points,
-                           List<Answer> answers, String referenceAnswer) {}
+                           List<Answer> answers, String referenceAnswer, String explanation,
+                           Integer numberMin, Integer numberMax, Integer numberCorrect, Integer numberTolerance) {
+        public Question(Long id, StopQuestionKind kind, QuestionType type, String content, Integer points,
+                        List<Answer> answers, String referenceAnswer, String explanation) {
+            this(id, kind, type, content, points, answers, referenceAnswer, explanation, null, null, null, null);
+        }
+    }
 
     public record Artifact(Long id, String name, String imageUrl, String shortDescription,
                            String videoUrl, VideoSource videoSource) {}
@@ -101,7 +116,18 @@ public record TourDetailResponse(
                        @Schema(description = "Vĩ độ vị trí check-in trạm") BigDecimal latitude,
                        @Schema(description = "Kinh độ vị trí check-in trạm") BigDecimal longitude,
                        @Schema(description = "Bán kính check-in trạm (mét)") Integer checkInRadiusMeters,
-                       @Schema(description = "Mã QR check-in trạm (chỉ đối tác / Moderator thấy)") String qrToken) {}
+                       @Schema(description = "Mã QR check-in trạm (chỉ đối tác / Moderator thấy)") String qrToken,
+                       @Schema(description = "Ảnh xưa và nay") List<ThenNow> thenNow) {
+        public Stop(Long id, int sequenceOrder, String name, String shortDescription, String guestNote,
+                    String imageUrl, String videoUrl, VideoSource videoSource,
+                    String culturalContent, List<String> culturalImages,
+                    List<Artifact> artifacts, List<Question> quiz, List<Experience> experiences, int maxPoints,
+                    BigDecimal latitude, BigDecimal longitude, Integer checkInRadiusMeters, String qrToken) {
+            this(id, sequenceOrder, name, shortDescription, guestNote, imageUrl, videoUrl, videoSource, culturalContent,
+                    culturalImages, artifacts, quiz, experiences, maxPoints, latitude, longitude, checkInRadiusMeters,
+                    qrToken, List.of());
+        }
+    }
 
     /**
      * @param snapshot true = điểm đã chốt lúc duyệt; false = đang hiển thị theo cấu hình Admin hiện hành

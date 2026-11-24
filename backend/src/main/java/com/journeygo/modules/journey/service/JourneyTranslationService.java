@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.journeygo.common.i18n.ContentTranslationService;
+import com.journeygo.modules.journey.dto.JourneyDestinationProgressResponse;
+import com.journeygo.modules.journey.dto.JourneyResponse;
+import com.journeygo.modules.journey.dto.JourneyTaskProgressResponse;
 import com.journeygo.modules.journey.dto.PuzzleClueResponse;
 import com.journeygo.modules.journey.dto.TaskQuestionsResponse;
 import com.journeygo.modules.tour.dto.StopCultureResponse;
@@ -28,6 +31,72 @@ public class JourneyTranslationService {
     private final ContentTranslationService translationService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Dịch tên tour, tên điểm đến và tên nhiệm vụ trong tiến độ chuyến đi.
+     * Journey lưu bản sao tên tiếng Việt lúc bắt đầu ⇒ phải dịch lại khi trả về cho Mobile.
+     * Cache theo tourId: mọi chuyến đi của cùng một tour dùng chung bản dịch (hash nguồn đổi thì dịch lại).
+     */
+    public JourneyResponse localizeJourney(JourneyResponse journey, Locale locale) {
+        if (journey == null || journey.tourId() == null) return journey;
+        String lang = translationService.resolveTargetLang(locale);
+        if (lang == null) return journey;
+
+        List<JourneyDestinationProgressResponse> dests =
+                journey.destinations() != null ? journey.destinations() : List.of();
+
+        ObjectNode payload = objectMapper.createObjectNode();
+        putIfText(payload, "tourName", journey.tourName());
+        ArrayNode destArr = payload.putArray("destinations");
+        for (JourneyDestinationProgressResponse d : dests) {
+            ObjectNode item = destArr.addObject();
+            item.put("name", d.destinationName() != null ? d.destinationName() : "");
+            ArrayNode taskArr = item.putArray("tasks");
+            if (d.tasks() != null) {
+                for (JourneyTaskProgressResponse task : d.tasks()) {
+                    taskArr.add(task.taskName() != null ? task.taskName() : "");
+                }
+            }
+        }
+
+        JsonNode t = translationService.translateObject("JOURNEY_NAMES", journey.tourId(), lang, payload);
+        if (t == null || !t.isObject()) return journey;
+
+        List<JourneyDestinationProgressResponse> nextDests = dests;
+        JsonNode tDests = t.get("destinations");
+        if (tDests != null && tDests.isArray() && tDests.size() == dests.size()) {
+            nextDests = new ArrayList<>(dests.size());
+            for (int i = 0; i < dests.size(); i++) {
+                JourneyDestinationProgressResponse d = dests.get(i);
+                JsonNode td = tDests.get(i);
+                List<JourneyTaskProgressResponse> tasks = d.tasks();
+                JsonNode tTasks = td.get("tasks");
+                if (tasks != null && tTasks != null && tTasks.isArray() && tTasks.size() == tasks.size()) {
+                    List<JourneyTaskProgressResponse> nextTasks = new ArrayList<>(tasks.size());
+                    for (int j = 0; j < tasks.size(); j++) {
+                        JourneyTaskProgressResponse task = tasks.get(j);
+                        String name = tTasks.get(j).asText("");
+                        nextTasks.add(StringUtils.hasText(name) ? task.toBuilder().taskName(name).build() : task);
+                    }
+                    tasks = nextTasks;
+                }
+                nextDests.add(d.toBuilder()
+                        .destinationName(textOr(td, "name", d.destinationName()))
+                        .tasks(tasks)
+                        .build());
+            }
+        }
+
+        return journey.toBuilder()
+                .tourName(textOr(t, "tourName", journey.tourName()))
+                .destinations(nextDests)
+                .build();
+    }
+
+    public List<JourneyResponse> localizeJourneys(List<JourneyResponse> journeys, Locale locale) {
+        if (journeys == null || translationService.resolveTargetLang(locale) == null) return journeys;
+        return journeys.stream().map(j -> localizeJourney(j, locale)).toList();
+    }
+
     public StopCultureResponse localizeStopCulture(StopCultureResponse culture, Locale locale) {
         if (culture == null || culture.stopId() == null) return culture;
         String lang = translationService.resolveTargetLang(locale);
@@ -43,6 +112,12 @@ public class JourneyTranslationService {
                 ObjectNode item = arr.addObject();
                 putIfText(item, "name", a.name());
                 putIfText(item, "shortDescription", a.shortDescription());
+            }
+        }
+        if (culture.thenNow() != null && !culture.thenNow().isEmpty()) {
+            ArrayNode arr = payload.putArray("thenNow");
+            for (TourDetailResponse.ThenNow p : culture.thenNow()) {
+                arr.add(p.caption() != null ? p.caption() : "");
             }
         }
 
@@ -68,6 +143,20 @@ public class JourneyTranslationService {
             artifacts = next;
         }
 
+        // Chỉ dịch chú thích; nhãn thời điểm (vd. "1975") và nguồn ảnh giữ nguyên.
+        List<TourDetailResponse.ThenNow> thenNow = culture.thenNow();
+        JsonNode tThenNow = t.get("thenNow");
+        if (thenNow != null && tThenNow != null && tThenNow.isArray() && tThenNow.size() == thenNow.size()) {
+            List<TourDetailResponse.ThenNow> next = new ArrayList<>(thenNow.size());
+            for (int i = 0; i < thenNow.size(); i++) {
+                TourDetailResponse.ThenNow p = thenNow.get(i);
+                String caption = tThenNow.get(i).asText("");
+                next.add(new TourDetailResponse.ThenNow(p.id(), p.thenImageUrl(), p.nowImageUrl(), p.thenLabel(),
+                        StringUtils.hasText(caption) ? caption : p.caption(), p.credit()));
+            }
+            thenNow = next;
+        }
+
         return new StopCultureResponse(
                 culture.stopId(),
                 culture.sequenceOrder(),
@@ -78,7 +167,8 @@ public class JourneyTranslationService {
                 culture.videoSource(),
                 textOr(t, "culturalContent", culture.culturalContent()),
                 culture.culturalImages(),
-                artifacts
+                artifacts,
+                thenNow
         );
     }
 
@@ -110,11 +200,18 @@ public class JourneyTranslationService {
                         optArr.add(o.content() != null ? o.content() : "");
                     }
                 }
+                if (q.matchOptions() != null && !q.matchOptions().isEmpty()) {
+                    ArrayNode matchArr = qNode.putArray("matchOptions");
+                    for (TaskQuestionsResponse.MatchOption mo : q.matchOptions()) {
+                        matchArr.add(mo.content() != null ? mo.content() : "");
+                    }
+                }
             }
         }
 
         // Nhiệm vụ tuần tự có nhiều bước (questionIndex) và 2 trạng thái unlocked ⇒ tách entityType để cache riêng từng bước
-        String entityType = "TASK_Q_" + (resp.questionIndex() != null ? resp.questionIndex() : 0)
+        // (câu đố trả lời từng câu cũng có questionIndex nhưng nội dung không đổi theo bước ⇒ dùng chung một cache)
+        String entityType = "TASK_Q_" + (resp.sequential() && resp.questionIndex() != null ? resp.questionIndex() : 0)
                 + "_" + (resp.unlocked() ? "1" : "0");
         JsonNode t = translationService.translateObject(entityType, resp.taskId(), lang, payload);
         if (t == null || !t.isObject()) return resp;
@@ -159,16 +256,33 @@ public class JourneyTranslationService {
                         nextOpts.add(new TaskQuestionsResponse.Option(
                                 oo.id(),
                                 StringUtils.hasText(translatedOpt) ? translatedOpt : oo.content(),
-                                oo.orderIndex()));
+                                oo.orderIndex(),
+                                oo.imageUrl()));
                     }
                     opts = nextOpts;
+                }
+                List<TaskQuestionsResponse.MatchOption> matchOpts = orig.matchOptions();
+                if (matchOpts != null && qn.has("matchOptions") && qn.get("matchOptions").isArray()
+                        && qn.get("matchOptions").size() == matchOpts.size()) {
+                    List<TaskQuestionsResponse.MatchOption> nextMatchOpts = new ArrayList<>(matchOpts.size());
+                    for (int j = 0; j < matchOpts.size(); j++) {
+                        TaskQuestionsResponse.MatchOption mo = matchOpts.get(j);
+                        String translatedMatch = qn.get("matchOptions").get(j).asText("");
+                        nextMatchOpts.add(new TaskQuestionsResponse.MatchOption(
+                                mo.key(),
+                                StringUtils.hasText(translatedMatch) ? translatedMatch : mo.content()));
+                    }
+                    matchOpts = nextMatchOpts;
                 }
                 nextQs.add(new TaskQuestionsResponse.Question(
                         orig.id(),
                         textOr(qn, "content", orig.content()),
                         orig.questionType(),
                         orig.orderIndex(),
-                        opts));
+                        opts,
+                        orig.numberMin(),
+                        orig.numberMax(),
+                        matchOpts));
             }
             questions = nextQs;
         }
@@ -196,6 +310,25 @@ public class JourneyTranslationService {
                 .qrRequired(resp.qrRequired())
                 .perQuestionPoints(resp.perQuestionPoints())
                 .build();
+    }
+
+    /** Dịch giải thích trong phần xem lại sau khi nộp; cache theo từng câu hỏi (dùng chung cho mọi du khách). */
+    public JourneyTaskProgressResponse localizeTaskSubmit(JourneyTaskProgressResponse resp, Locale locale) {
+        if (resp == null || resp.review() == null || resp.review().isEmpty()) return resp;
+        String lang = translationService.resolveTargetLang(locale);
+        if (lang == null) return resp;
+
+        List<JourneyTaskProgressResponse.QuestionReview> review = resp.review().stream().map(r -> {
+            if (!StringUtils.hasText(r.explanation()) || r.questionId() == null) return r;
+            ObjectNode payload = objectMapper.createObjectNode();
+            payload.put("explanation", r.explanation());
+            JsonNode t = translationService.translateObject("QUESTION_EXPLANATION", r.questionId(), lang, payload);
+            if (t == null || !t.isObject()) return r;
+            return new JourneyTaskProgressResponse.QuestionReview(r.questionId(), r.correct(), r.correctAnswerId(),
+                    r.correctText(), textOr(t, "explanation", r.explanation()), r.correctOrder(), r.correctNumber(),
+                    r.correctMatches());
+        }).toList();
+        return resp.toBuilder().review(review).build();
     }
 
     public PuzzleClueResponse localizePuzzleClue(PuzzleClueResponse resp, Locale locale) {
