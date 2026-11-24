@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'gamification_model.dart' show formatDate;
 import '../constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 
 DateTime? _parseDate(dynamic value) {
   if (value == null) return null;
@@ -19,10 +20,11 @@ int? _asNullableInt(dynamic value) => value == null ? null : _asInt(value);
 String timeAgo(DateTime? time) {
   if (time == null) return '';
   final diff = DateTime.now().difference(time);
-  if (diff.inMinutes < 1) return 'Vừa xong';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
-  if (diff.inHours < 24) return '${diff.inHours} giờ trước';
-  if (diff.inDays < 7) return '${diff.inDays} ngày trước';
+  final l10n = appL10n;
+  if (diff.inMinutes < 1) return l10n.timeJustNow;
+  if (diff.inMinutes < 60) return l10n.timeMinutesAgo(diff.inMinutes);
+  if (diff.inHours < 24) return l10n.timeHoursAgo(diff.inHours);
+  if (diff.inDays < 7) return l10n.timeDaysAgo(diff.inDays);
   return formatDate(time);
 }
 
@@ -36,13 +38,13 @@ class ForumReportReason {
 
   const ForumReportReason(this.code, this.label);
 
-  static const all = <ForumReportReason>[
-    ForumReportReason('SPAM', 'Spam hoặc quảng cáo'),
-    ForumReportReason('INAPPROPRIATE_CONTENT', 'Nội dung không phù hợp'),
-    ForumReportReason('HATE_SPEECH', 'Ngôn từ thù ghét'),
-    ForumReportReason('FALSE_INFORMATION', 'Thông tin sai sự thật'),
-    ForumReportReason('COPYRIGHT_VIOLATION', 'Vi phạm bản quyền'),
-    ForumReportReason('OTHER', 'Lý do khác'),
+  static List<ForumReportReason> get all => [
+    ForumReportReason('SPAM', appL10n.forumReasonSpam),
+    ForumReportReason('INAPPROPRIATE_CONTENT', appL10n.forumReasonInappropriate),
+    ForumReportReason('HATE_SPEECH', appL10n.forumReasonHate),
+    ForumReportReason('FALSE_INFORMATION', appL10n.forumReasonFalse),
+    ForumReportReason('COPYRIGHT_VIOLATION', appL10n.forumReasonCopyright),
+    ForumReportReason('OTHER', appL10n.refundReasonOther),
   ];
 }
 
@@ -54,18 +56,18 @@ class ForumStatus {
   const ForumStatus(this.label, this.color);
 
   static ForumStatus of(String status, {bool hidden = false}) {
-    if (hidden) return const ForumStatus('Đang được xem xét', AppCultureColors.ink500);
+    if (hidden) return ForumStatus(appL10n.forumStatusHidden, AppCultureColors.ink500);
     switch (status) {
       case 'DRAFT':
-        return const ForumStatus('Bản nháp', AppCultureColors.ink500);
+        return ForumStatus(appL10n.forumStatusDraft, AppCultureColors.ink500);
       case 'PENDING_REVIEW':
-        return const ForumStatus('Chờ duyệt', AppCultureColors.brass500);
+        return ForumStatus(appL10n.forumTabPending, AppCultureColors.brass500);
       case 'PUBLISHED':
-        return const ForumStatus('Đã đăng', AppCultureColors.jade400);
+        return ForumStatus(appL10n.forumTabPublished, AppCultureColors.jade400);
       case 'NEEDS_REVISION':
-        return const ForumStatus('Cần chỉnh sửa', AppCultureColors.indigo500);
+        return ForumStatus(appL10n.forumStatusRevision, AppCultureColors.indigo500);
       case 'REJECTED':
-        return const ForumStatus('Bị từ chối', AppCultureColors.lacquer400);
+        return ForumStatus(appL10n.forumTabRejected, AppCultureColors.lacquer400);
       default:
         return ForumStatus(status, AppCultureColors.ink500);
     }
@@ -131,7 +133,7 @@ class ForumPost {
     return ForumPost(
       id: _asInt(json['id']),
       authorId: _asInt(json['authorId']),
-      authorName: json['authorName']?.toString() ?? 'Du khách',
+      authorName: json['authorName']?.toString() ?? appL10n.forumAuthorFallback,
       authorAvatarUrl: json['authorAvatarUrl']?.toString(),
       title: json['title']?.toString() ?? '',
       content: json['content']?.toString() ?? '',
@@ -216,7 +218,7 @@ class ForumComment {
   factory ForumComment.fromJson(Map<String, dynamic> json) => ForumComment(
         id: _asInt(json['id']),
         authorId: _asInt(json['authorId']),
-        authorName: json['authorName']?.toString() ?? 'Du khách',
+        authorName: json['authorName']?.toString() ?? appL10n.forumAuthorFallback,
         authorAvatarUrl: json['authorAvatarUrl']?.toString(),
         content: json['content']?.toString() ?? '',
         createdAt: _parseDate(json['createdAt']),

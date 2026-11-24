@@ -22,6 +22,7 @@ import '../../core/services/booking_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../core/utils/formatters.dart';
 import '../bookings/my_bookings_screen.dart';
+import '../../l10n/locale_controller.dart';
 
 class InvitationAcceptScreen extends StatefulWidget {
   /// Token lời mời (từ deep link).
@@ -79,7 +80,7 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không thể tải thông tin lời mời. Vui lòng thử lại.';
+        _error = appL10n.invLoadFailed;
         _loggedIn = loggedIn;
         _loading = false;
       });
@@ -92,7 +93,7 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
       if (!mounted) return;
       setState(() {
         _error =
-            'Vui lòng đăng nhập bằng email $_invitedEmail để xác nhận lời mời.';
+            appL10n.invLoginWithEmail(_invitedEmail);
         _submitting = false;
       });
       return;
@@ -124,7 +125,7 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không thể xác nhận lời mời. Vui lòng thử lại.';
+        _error = appL10n.invConfirmFailed;
         _submitting = false;
       });
     }
@@ -149,11 +150,11 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
   bool get _expired => _status == 'EXPIRED' || _status == 'REVOKED';
 
   String get _statusLabel => switch (_status) {
-        'PENDING' => 'Chờ xác nhận',
-        'ACCEPTED' => 'Đã xác nhận',
-        'EXPIRED' => 'Đã hết hạn',
-        'REVOKED' => 'Đã bị thu hồi',
-        _ => 'Chờ xác nhận',
+        'PENDING' => context.l10n.invStatusPending,
+        'ACCEPTED' => context.l10n.statusConfirmed,
+        'EXPIRED' => context.l10n.statusExpired,
+        'REVOKED' => context.l10n.invStatusRevoked,
+        _ => context.l10n.invStatusPending,
       };
 
   Color get _statusColor => switch (_status) {
@@ -167,8 +168,8 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
     return Scaffold(
       backgroundColor: AppCultureColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Lời mời tham gia tour',
+        title: Text(
+          context.l10n.invTitle,
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         backgroundColor: AppCultureColors.background,
@@ -211,14 +212,14 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
 
   Widget _buildHeroCard() {
     final title = _accepted
-        ? 'Bạn đã tham gia tour!'
-        : (_expired ? 'Lời mời không còn hiệu lực' : 'Bạn được mời tham gia tour');
+        ? context.l10n.invJoined
+        : (_expired ? context.l10n.invNoLongerValid : context.l10n.invInvited);
 
     final subtitle = _accepted
-        ? 'Hành khách đã được liên kết với đơn đặt tour.'
+        ? context.l10n.invLinked
         : (_expired
-            ? 'Lời mời đã hết hạn hoặc bị thu hồi. Vui lòng liên hệ người đặt tour để được gửi lại.'
-            : 'Xác nhận lời mời để được cấp quyền tham gia tour cùng nhóm.');
+            ? context.l10n.invExpiredHint
+            : context.l10n.invConfirmHint);
 
     final icon = _accepted
         ? Icons.check_circle_rounded
@@ -289,8 +290,8 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'THÔNG TIN LỜI MỜI',
+          Text(
+            context.l10n.invInfoTitle,
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w800,
@@ -299,16 +300,16 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          _infoRow(Icons.person_outline_rounded, 'Hành khách', _passengerName),
-          _infoRow(Icons.alternate_email_rounded, 'Email được mời', _invitedEmail),
+          _infoRow(Icons.person_outline_rounded, context.l10n.invPassenger, _passengerName),
+          _infoRow(Icons.alternate_email_rounded, context.l10n.invInvitedEmail, _invitedEmail),
           _infoRow(
             Icons.schedule_rounded,
-            'Hiệu lực đến',
+            context.l10n.invValidUntil,
             _expiresAt == null ? '—' : formatDateTimeVn(_expiresAt),
           ),
           _infoRow(
             Icons.info_outline_rounded,
-            'Trạng thái',
+            context.l10n.invStatus,
             _statusLabel,
             valueColor: _statusColor,
           ),
@@ -378,7 +379,7 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
           ElevatedButton.icon(
             onPressed: _openMyBookings,
             icon: const Icon(Icons.confirmation_number_outlined),
-            label: const Text('Xem đơn của tôi'),
+            label: Text(context.l10n.paySuccessViewBooking),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppCultureColors.heritageJade,
               foregroundColor: Colors.white,
@@ -389,7 +390,7 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
           const SizedBox(height: 10),
           TextButton(
             onPressed: () => Navigator.of(context).maybePop(),
-            child: const Text('Đóng'),
+            child: Text(context.l10n.commonClose),
           ),
         ],
       );
@@ -408,7 +409,7 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
               : const Icon(Icons.how_to_reg_rounded),
-          label: Text(_submitting ? 'Đang xác nhận...' : 'Xác nhận tham gia'),
+          label: Text(_submitting ? context.l10n.invConfirming : context.l10n.invConfirmJoin),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppCultureColors.heritageJade,
             foregroundColor: Colors.white,
@@ -423,7 +424,7 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
           TextButton.icon(
             onPressed: _goToLogin,
             icon: const Icon(Icons.login_rounded, size: 18),
-            label: const Text('Đăng nhập để xác nhận'),
+            label: Text(context.l10n.invLoginToConfirm),
             style: TextButton.styleFrom(foregroundColor: AppCultureColors.heritageJade),
           ),
         ],
@@ -464,14 +465,14 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Không tìm thấy lời mời',
+            Text(
+              context.l10n.invNotFound,
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             Text(
               _error.isEmpty
-                  ? 'Lời mời không tồn tại hoặc đã hết hạn.'
+                  ? context.l10n.invNotFoundHint
                   : _error,
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13.5, color: AppCultureColors.textMuted),
@@ -480,7 +481,7 @@ class _InvitationAcceptScreenState extends State<InvitationAcceptScreen> {
             OutlinedButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Thử lại'),
+              label: Text(context.l10n.commonRetry),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppCultureColors.heritageJade,
                 side: const BorderSide(color: AppCultureColors.heritageJade),

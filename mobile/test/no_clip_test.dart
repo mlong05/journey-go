@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/constants/app_theme.dart';
 import 'package:mobile/screens/common/no_clip.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 
 Future<void> _loadNunito() async {
   final loader = FontLoader('Nunito');
@@ -30,6 +31,9 @@ Future<void> _pump(WidgetTester tester, Widget body, {double textScale = 1}) asy
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(MaterialApp(
+      locale: const Locale('vi'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
     theme: AppTheme.light(),
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),

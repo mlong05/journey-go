@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Nền trung tính (giữ lại cho các màn cũ còn tham chiếu).
 const Color photoPlaceholder = AppCultureColors.surfaceSubtle;
@@ -115,13 +116,13 @@ class PhotoCreditButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: 'Ảnh: $credit',
+      message: appL10n.photoCredit(credit),
       triggerMode: TooltipTriggerMode.tap,
       showDuration: const Duration(seconds: 4),
       preferBelow: true,
       child: Semantics(
         button: true,
-        label: 'Nguồn ảnh: $credit',
+        label: appL10n.photoSource(credit),
         child: Container(
           width: 24,
           height: 24,

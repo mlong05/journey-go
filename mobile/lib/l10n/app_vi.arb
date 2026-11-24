@@ -1,0 +1,3415 @@
+{
+  "@@locale": "vi",
+  "appTitle": "Journey Go - Cổng Du Lịch Văn Hóa Việt Nam",
+  "reloginSuccess": "Đã đăng nhập lại. Bạn có thể tiếp tục thao tác.",
+  "commonClose": "Đóng",
+  "commonCancel": "Hủy bỏ",
+  "languageTitle": "Ngôn ngữ",
+  "languageSubtitle": "Ứng dụng hiển thị bằng tiếng Việt",
+  "languageSheetTitle": "Chọn ngôn ngữ",
+  "languageSheetNote": "Một số màn hình và nội dung tour, diễn đàn có thể vẫn hiển thị bằng tiếng Việt.",
+  "profileHeader": "Hồ sơ du khách",
+  "profileNotifications": "Thông báo",
+  "profileEdit": "Sửa hồ sơ",
+  "profileMemberSince": "Từ {date}",
+  "@profileMemberSince": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTopRank": "Bạn đã đạt hạng cao nhất",
+  "profilePointsToNextRank": "Còn {points} điểm lên {rank}",
+  "@profilePointsToNextRank": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      },
+      "rank": {
+        "type": "String"
+      }
+    }
+  },
+  "profileStatPoints": "Điểm khả dụng",
+  "profileStatBadges": "Huy hiệu",
+  "profileStatPlaces": "Điểm đã đến",
+  "rankBronze": "Hạng Đồng",
+  "rankSilver": "Hạng Bạc",
+  "rankGold": "Hạng Vàng",
+  "rankPlatinum": "Bạch Kim",
+  "heritageTitle": "Hành trình di sản",
+  "heritageSubtitle": "Dấu ấn văn hoá bạn đã ghi lại",
+  "achievementsTitle": "Thành tựu & Nhận thưởng",
+  "achievementsAchieved": "{count} đã đạt",
+  "@achievementsAchieved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "achievementsUnclaimed": "{count} chờ nhận",
+  "@achievementsUnclaimed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "journeyLogTitle": "Nhật ký hành trình",
+  "journeyPlacesVisited": "{count} điểm đã đến",
+  "@journeyPlacesVisited": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "journeyLogSubtitle": "{count} điểm di sản đã check-in",
+  "@journeyLogSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "journeyEmpty": "Chưa có điểm nào. Check-in tại điểm đến trong hành trình để ghi lại dấu ấn đầu tiên.",
+  "pointsHistoryTitle": "Lịch sử tích điểm",
+  "pointsHistorySubtitle": "Các giao dịch điểm gần đây",
+  "pointsNoTransactions": "Chưa có giao dịch",
+  "pointsLatestGain": "Gần nhất +{points}",
+  "@pointsLatestGain": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      }
+    }
+  },
+  "pointsEarned": "Đã tích lũy",
+  "pointsSpent": "Đã tiêu",
+  "pointsAvailable": "Khả dụng",
+  "pointsEmpty": "Chưa có giao dịch điểm. Check-in điểm đến và hoàn thành nhiệm vụ để bắt đầu tích điểm.",
+  "pointsOpenWallet": "Xem ví & đổi voucher",
+  "badgesTitle": "Huy hiệu di sản",
+  "badgesUnlocked": "{count} đã mở khoá",
+  "@badgesUnlocked": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "voucherTitle": "Voucher",
+  "voucherAvailablePoints": "{points} điểm khả dụng",
+  "@voucherAvailablePoints": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      }
+    }
+  },
+  "servicesTitle": "Vé & hỗ trợ",
+  "myBookingsTitle": "Đơn đặt tour của tôi",
+  "myBookingsSubtitle": "Theo dõi đơn, thanh toán & mã QR trải nghiệm",
+  "providerSupportTitle": "Hỗ trợ từ nhà tour",
+  "providerSupportSubtitle": "Lịch sử chat với các nhà tour (nhắn trước khi đặt vé)",
+  "supportTitle": "Hỗ trợ & khiếu nại",
+  "supportSubtitle": "Hoàn tiền và xử lý sự cố vé",
+  "refundsInProgress": "{count} đang xử lý",
+  "@refundsInProgress": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsTitle": "Cài đặt",
+  "personalInfoTitle": "Thông tin cá nhân",
+  "personalInfoSubtitle": "Họ tên, email, số điện thoại",
+  "changePasswordTitle": "Đổi mật khẩu",
+  "changePasswordSubtitle": "Bảo vệ tài khoản của bạn",
+  "hotlineTitle": "Tổng đài {number}",
+  "@hotlineTitle": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "hotlineSubtitle": "Bấm để gọi hỗ trợ du khách",
+  "hotlineCannotOpen": "Không mở được trình gọi điện trên thiết bị này.",
+  "logoutTitle": "Đăng xuất",
+  "logoutSubtitle": "Thoát tài khoản khỏi thiết bị",
+  "logoutConfirmTitle": "Xác nhận đăng xuất",
+  "logoutConfirmMessage": "Phiên làm việc hiện tại sẽ được hủy an toàn trên máy chủ và toàn bộ token trên thiết bị sẽ được xóa.",
+  "logoutConfirmButton": "Đăng xuất ngay",
+  "commonNotifications": "Thông báo",
+  "commonSeeAll": "Xem tất cả",
+  "commonRetry": "Thử lại",
+  "navHome": "Trang chủ",
+  "navTrips": "Chuyến đi",
+  "navCheckIn": "Check-in",
+  "navForum": "Diễn đàn",
+  "navAccount": "Tài khoản",
+  "navCheckInSemantics": "Check-in tại điểm đến",
+  "homeGreeting": "Xin chào, {name} 👋",
+  "@homeGreeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeGreetingNoName": "Xin chào 👋",
+  "homeHeadline": "Đi để hiểu,\nkhông chỉ để ngắm",
+  "homeSearchHint": "Bạn muốn đi đâu?",
+  "homeSearchSemantics": "Tìm tour, điểm đến, chủ đề",
+  "homePoints": "{points} điểm",
+  "@homePoints": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      }
+    }
+  },
+  "heroPlaceMuCangChai": "Ruộng bậc thang Mù Cang Chải",
+  "heroPlaceHoiAn": "Chùa Cầu, phố cổ Hội An",
+  "heroPlaceMuiNe": "Làng chài Mũi Né",
+  "homeCatDayTrip": "Trong ngày",
+  "homeCatMultiDay": "Nhiều ngày",
+  "homeCatByDate": "Theo ngày",
+  "homeCatDeals": "Ưu đãi",
+  "homeFeatured": "Tour nổi bật",
+  "homeAllTours": "Tất cả tour",
+  "homeUpcoming": "Khởi hành sắp tới",
+  "homeThemes": "Khám phá theo chủ đề",
+  "homeAllThemes": "Tất cả chủ đề",
+  "homeMoreThemes": "chủ đề",
+  "homeRegions": "Điểm đến theo vùng miền",
+  "homeAllRegions": "Tất cả vùng miền",
+  "homeMoreRegions": "vùng",
+  "homeRegionTourCount": "{count} tour",
+  "@homeRegionTourCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeDayTours": "Tour trong ngày",
+  "homeMultiDayTours": "Tour nhiều ngày",
+  "homeSeeAllCount": "Xem tất cả {count} tour",
+  "@homeSeeAllCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeSeeAllTours": "Xem tất cả tour",
+  "homeNoToursTitle": "Chưa có tour nào được mở bán",
+  "homeNoToursMessage": "Các tour mới sẽ xuất hiện ở đây ngay khi được duyệt.",
+  "homeAllOwnedTitle": "Bạn đã mua tất cả tour hiện có",
+  "homeAllOwnedMessage": "Xem mục \"Chuyến đi\" để trải nghiệm các tour đã đặt.",
+  "homeAllOwnedAction": "Xem chuyến đi của tôi",
+  "homeToursErrorTitle": "Không tải được danh sách tour",
+  "homeJourneyOngoing": "Đang đi · Trạm {position}/{total}",
+  "@homeJourneyOngoing": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "homeJourneyAtStop": "Đang ở trạm",
+  "homeJourneyNextStop": "Trạm kế tiếp",
+  "homeJourneyAllDone": "Đã đi hết các trạm",
+  "homeJourneyCheckedIn": "{name} · đã check-in",
+  "@homeJourneyCheckedIn": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeJourneyDistance": "{name} · cách {distance}",
+  "@homeJourneyDistance": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "homeJourneyContinue": "Tiếp tục",
+  "homeJourneyMissions": "{count} nhiệm vụ chờ: ",
+  "@homeJourneyMissions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tourPriceFree": "Miễn phí",
+  "tourPriceFromPrefix": "Từ ",
+  "tourPriceFromSuffix": "",
+  "tourStopCount": "{count} trạm",
+  "@tourStopCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "durationMinutes": "{minutes} phút",
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "durationHours": "{hours} giờ",
+  "@durationHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "durationHoursMinutes": "{hours} giờ {minutes} phút",
+  "@durationHoursMinutes": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "durationDaysNights": "{days}N{nights}Đ",
+  "@durationDaysNights": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "nights": {
+        "type": "int"
+      }
+    }
+  },
+  "durationDays": "{days} ngày",
+  "@durationDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "durationDayTrip": "Trong ngày",
+  "commonShowMore": "Xem thêm",
+  "commonShowLess": "Thu gọn",
+  "priceVnd": "{amount} đ",
+  "@priceVnd": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "tourPriceFrom": "Từ {price}",
+  "@tourPriceFrom": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "tourDepartsOn": "Khởi hành {date}",
+  "@tourDepartsOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "rewardPlusPoints": "+{points} điểm",
+  "@rewardPlusPoints": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      }
+    }
+  },
+  "rewardMaxPoints": "tối đa {points} điểm",
+  "@rewardMaxPoints": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      }
+    }
+  },
+  "tourTaskCount": "{count} nhiệm vụ",
+  "@tourTaskCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tourBadgeCount": "{count} huy hiệu",
+  "@tourBadgeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tourDestinationStops": "{count} điểm dừng",
+  "@tourDestinationStops": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tourCheckpointCount": "{count} trạm",
+  "@tourCheckpointCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tourOwnedBadge": "Đã có vé",
+  "tourLoadFailed": "Không tải được thông tin tour. Vui lòng thử lại.",
+  "tourTypeCultural": "Văn hóa",
+  "tourTypeAdventure": "Phiêu lưu",
+  "tourTypeBeach": "Biển",
+  "tourTypeMountain": "Núi",
+  "tourTypeCity": "Thành phố",
+  "tourTypeEco": "Sinh thái",
+  "tourTypeHistorical": "Lịch sử",
+  "tourTypeGastronomy": "Ẩm thực",
+  "tourTypeOther": "Khác",
+  "guestAdult": "Người lớn",
+  "guestChild": "Trẻ em",
+  "guestToddler": "Trẻ nhỏ",
+  "guestInfant": "Em bé",
+  "durationSeconds": "{seconds} giây",
+  "@durationSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "durationMinutesSeconds": "{minutes} phút {seconds} giây",
+  "@durationMinutesSeconds": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "durationFlexible": "Tự do",
+  "departureTime": "Giờ khởi hành",
+  "departureMeetingPoint": "Địa điểm tập trung",
+  "departurePickup": "Giờ đón và điểm đón",
+  "progressInProgress": "Đang trải nghiệm · {done}/{total} điểm",
+  "@progressInProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "progressCompleted": "Đã hoàn thành",
+  "progressCompletedOn": "Đã hoàn thành · {date}",
+  "@progressCompletedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "listSearchHint": "Tìm tour, vùng miền, chủ đề...",
+  "listFilter": "Bộ lọc",
+  "listAll": "Tất cả",
+  "listEmptyTitle": "Không tìm thấy tour phù hợp",
+  "listAllOwned": "Bạn đã mua tất cả các tour đang hiển thị. Hãy xem mục \"Chuyến đi\" để trải nghiệm.",
+  "listEmptyHint": "Thử bỏ bớt bộ lọc hoặc tìm bằng từ khóa khác.",
+  "listSort": "Sắp xếp",
+  "listSortNewest": "Mới nhất",
+  "listSortPriceAsc": "Giá thấp đến cao",
+  "listSortPriceDesc": "Giá cao đến thấp",
+  "listSortDeparture": "Khởi hành sớm nhất",
+  "listGroupFormat": "Hình thức",
+  "listGroupRegion": "Vùng miền",
+  "listGroupTheme": "Chủ đề",
+  "listReset": "Đặt lại",
+  "listApply": "Áp dụng",
+  "tdTitle": "Chi tiết tour",
+  "tdCancelledOldBooking": "Đã hủy đơn cũ. Bấm \"Đặt tour\" để đặt lại.",
+  "tdNoProvider": "Tour này chưa có nhà tour liên hệ.",
+  "tdLoginToChat": "Vui lòng đăng nhập để nhắn tin cho nhà tour.",
+  "tdDatesLoading": "Đang tải lịch trải nghiệm, vui lòng thử lại sau.",
+  "tdNoDates": "Hiện chưa có ngày nào còn chỗ cho tour này. Vui lòng quay lại sau.",
+  "tdPickDateTitle": "Chọn ngày trải nghiệm",
+  "tdPickDateHint": "Số trong ô là số chỗ còn lại — chỉ ngày còn chỗ mới chọn được",
+  "tdNoDateSelected": "Chưa chọn ngày nào",
+  "tdDateSelected": "Đang chọn: {date}",
+  "@tdDateSelected": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "tdConfirmDate": "Xác nhận chọn ngày",
+  "tdRouteMap": "Bản đồ lộ trình",
+  "tdLegs": "Các chặng hành trình",
+  "tdNoDestinations": "Tour chưa có điểm đến.",
+  "tdLoadFailed": "Không tải được chi tiết tour.",
+  "tdDestinationCount": "{count} điểm đến",
+  "@tdDestinationCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tdVerified": "Tour đã được kiểm duyệt",
+  "tdFinalLeg": "Chặng cuối",
+  "tdLeg": "Chặng {n}",
+  "@tdLeg": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "tdCheckInBadgeHint": "Check-in tại đây để mở khóa huy hiệu của điểm đến",
+  "tdExperiencesError": "Không tải được trải nghiệm của điểm này. Kéo xuống để thử lại.",
+  "tdNoExperiences": "Điểm đến này chưa có trải nghiệm nào được phát hành.",
+  "tdOwned": "Bạn đã mua tour này",
+  "tdDaysUntilStart": "Còn {days} ngày nữa lên đường!",
+  "@tdDaysUntilStart": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "tdExperienceDate": "Ngày trải nghiệm: {date}",
+  "@tdExperienceDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "tdStartExperience": "Bắt đầu trải nghiệm",
+  "tdContinueJourney": "Tiếp tục hành trình",
+  "tdPriceFromAdult": "Giá từ (người lớn)",
+  "tdTotalPayment": "Tổng thanh toán",
+  "tdPerGuest": " /khách",
+  "tdHolding": "Đang giữ chỗ...",
+  "tdContinuePayment": "Tiếp tục thanh toán",
+  "tdBookAgain": "Đặt lại",
+  "tdBookNow": "Đặt tour ngay",
+  "tdRefundProcessingTitle": "Đang trong quá trình hoàn tiền",
+  "tdRefundDoneTitle": "Đã xử lý hoàn tiền",
+  "tdRefundProcessingMessage": "Đơn đặt tour này đang được xử lý hoàn tiền.",
+  "tdRefundDoneMessage": "Đơn đặt tour này đã được xử lý xong.",
+  "tdBookingCancelledTitle": "Đơn đặt tour đã hủy",
+  "tdBookingExpiredTitle": "Đơn đặt tour đã hết hạn",
+  "tdBookingCancelledMessage": "Chỗ đã được trả lại — bạn không thể trải nghiệm tour này.",
+  "tdBookingExpiredMessage": "Đơn quá hạn thanh toán — chỗ đã được giải phóng.",
+  "tdChatWithProvider": "Chat với bên {name}",
+  "@tdChatWithProvider": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "tdProvidedBy": "Cung cấp bởi {name} · đã được kiểm duyệt",
+  "@tdProvidedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "tdTabIntro": "Giới thiệu",
+  "tdTabItinerary": "Lịch trình",
+  "tdTabStops": "Điểm dừng",
+  "tdTabPrices": "Giá & lịch",
+  "tdTabNotes": "Lưu ý",
+  "tdHighlights": "Điểm nổi bật",
+  "tdPhotos": "Hình ảnh nổi bật",
+  "tdItineraryDetail": "Lịch trình chi tiết",
+  "tdStopsTitle": "Các điểm dừng ({count})",
+  "@tdStopsTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tdPriceTable": "Bảng giá",
+  "tdMaxGuests": "Tối đa {count} khách mỗi chuyến",
+  "@tdMaxGuests": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tdDepartures": "Lịch khởi hành",
+  "tdMoreDates": "+{count} ngày",
+  "@tdMoreDates": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tdNotes": "Thông tin cần lưu ý",
+  "tdPriceIncludes": "Giá bao gồm",
+  "tdPriceExcludes": "Giá không bao gồm",
+  "tdCancellationPolicy": "Chính sách hủy",
+  "tdRefundPolicy": "Chính sách hoàn tiền",
+  "tdForceMajeure": "Trường hợp bất khả kháng",
+  "tdContact": "Liên hệ",
+  "tdDayN": "Ngày {day}",
+  "@tdDayN": {
+    "placeholders": {
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "tdQuizCount": "{count} câu đố",
+  "@tdQuizCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tdActivityCount": "{count} hoạt động",
+  "@tdActivityCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tdStopN": "Điểm dừng {n}",
+  "@tdStopN": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "tdIntroVideo": "Video giới thiệu",
+  "tdCulturalStory": "Câu chuyện văn hoá",
+  "tdCulturalContent": "Nội dung văn hóa",
+  "tdStoryLabel": "Câu chuyện",
+  "tdArchivePhotos": "{count} ảnh tư liệu",
+  "@tdArchivePhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tdArtifactCount": "{count} hiện vật",
+  "@tdArtifactCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tdUnlockOnCheckIn": "Mở khóa khi bạn check-in tại điểm dừng trong hành trình.",
+  "tdArtifacts": "Hiện vật",
+  "tdChallenges": "Thử thách tại điểm",
+  "tdCulturalQuiz": "Câu đố văn hoá",
+  "tdQuizQuestions": "{count} câu trắc nghiệm",
+  "@tdQuizQuestions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tdScanQrToConfirm": "quét QR tại điểm để xác nhận",
+  "tdActivityFallback": "Hoạt động thực địa",
+  "tripCountdown": "{days} ngày nữa lên đường!",
+  "@tripCountdown": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "statusPendingPayment": "Chờ thanh toán",
+  "statusConfirmed": "Đã xác nhận",
+  "statusCompleted": "Đã hoàn thành",
+  "statusExpired": "Đã hết hạn",
+  "statusPaymentExpired": "Hết hạn thanh toán",
+  "statusCancelled": "Đã hủy",
+  "statusUnknown": "Không rõ",
+  "payStatusPending": "Đang chờ",
+  "payStatusProcessing": "Đang xử lý",
+  "payStatusVerifying": "Đang xác minh",
+  "payStatusSuccess": "Thành công",
+  "payStatusFailed": "Thất bại",
+  "payStatusCustomerCancelled": "Khách đã hủy",
+  "payStatusSuperseded": "Đã bị thay thế",
+  "ageAdult": "Từ 12 tuổi",
+  "ageChild": "5 – 11 tuổi",
+  "ageToddler": "2 – 4 tuổi",
+  "ageInfant": "Dưới 2 tuổi",
+  "genderMale": "Nam",
+  "genderFemale": "Nữ",
+  "genderOther": "Khác",
+  "bgTitle": "Đặt tour",
+  "bgRemainingSlots": "Số chỗ còn",
+  "bgNoDate": "Chưa chọn ngày",
+  "bgSlotsLeft": "Còn {count} chỗ",
+  "@bgSlotsLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bgSlotsSelected": "Đã chọn {count} chỗ",
+  "@bgSlotsSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bgGuestsNotCounted": "{count} người không tính slot",
+  "@bgGuestsNotCounted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bgTotalGuests": "Tổng · {count} khách",
+  "@bgTotalGuests": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bgConfirm": "Xác nhận đặt",
+  "bgMissingPassenger": "Mở từng mục \"Hành khách\" và điền đủ thông tin để tiếp tục.",
+  "bgNoSlot": "không tính chỗ",
+  "bgPassengerN": "Hành khách {n}",
+  "@bgPassengerN": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "bgOwnerTag": "Người đặt tour",
+  "bgPassengerComplete": "Đã điền đủ thông tin",
+  "bgPassengerHintAdult": "Bấm để nhập họ tên, ngày sinh, giới tính, email",
+  "bgPassengerHint": "Bấm để nhập họ tên, ngày sinh, giới tính",
+  "bgPassengerInfo": "Thông tin hành khách",
+  "bgFullName": "Họ và tên *",
+  "bgBirthDate": "Ngày sinh *",
+  "bgGender": "Giới tính *",
+  "bgEmailHint": "Người lớn cần email để nhận vé, liên kết tài khoản và nhận lời mời tham gia tour.",
+  "bgAgeMismatch": "Tuổi tại ngày trải nghiệm thuộc loại \"{type}\" — hãy kiểm tra lại nhóm khách.",
+  "@bgAgeMismatch": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "calHasDates": "Còn lịch",
+  "calNoDates": "Không có lịch",
+  "calAvailable": "Còn chỗ",
+  "calAlmostFull": "Sắp hết",
+  "calFull": "Hết chỗ",
+  "calThisMonth": "Về tháng này",
+  "voucherSheetTitle": "Chọn voucher giảm giá",
+  "voucherSkip": "Bỏ qua",
+  "voucherLoadFailed": "Không thể tải danh sách voucher.",
+  "voucherNotApplicable": "Voucher không áp dụng được cho tour này.",
+  "voucherValidateFailed": "Không thể xác minh voucher. Vui lòng thử lại.",
+  "voucherEmpty": "Bạn chưa có voucher nào.\nĐổi điểm thưởng để nhận voucher!",
+  "voucherOffTag": "GIẢM",
+  "voucherCode": "Mã: {code}",
+  "@voucherCode": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "voucherExpiry": "HSD: {date}",
+  "@voucherExpiry": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "pendingDialogTitle": "Bạn đang có đơn giữ chỗ",
+  "pendingDialogMessage": "Đơn {code} cho ngày {date} ({total}) đang giữ chỗ, còn {countdown} để thanh toán.\n\nMuốn đổi ngày hoặc số khách, hãy hủy đơn cũ rồi đặt lại.",
+  "@pendingDialogMessage": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "countdown": {
+        "type": "String"
+      }
+    }
+  },
+  "pendingCancelAndRebook": "Hủy đơn cũ và đặt lại",
+  "pendingBannerHome": "Bạn có đơn chờ thanh toán · còn {countdown}",
+  "@pendingBannerHome": {
+    "placeholders": {
+      "countdown": {
+        "type": "String"
+      }
+    }
+  },
+  "pendingBannerTour": "Bạn đang giữ chỗ · còn {countdown}",
+  "@pendingBannerTour": {
+    "placeholders": {
+      "countdown": {
+        "type": "String"
+      }
+    }
+  },
+  "pendingBannerDetail": "Ngày {date} · {total}",
+  "@pendingBannerDetail": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "pendingPayAction": "Thanh toán",
+  "coTitle": "Thanh toán",
+  "coNoPaymentUrl": "Máy chủ không trả về đường dẫn thanh toán.",
+  "coOpenPaymentFailed": "Không mở được trang thanh toán. Vui lòng thử lại.",
+  "coVerifyingPrevious": "Giao dịch trước đang được xác minh với VNPay...",
+  "coAwaitingConfirmation": "Đang chờ xác nhận thanh toán. Sau khi thanh toán xong, hãy quay lại ứng dụng.",
+  "coNoResultYet": "Chưa nhận được kết quả từ VNPay. Tiền của bạn chưa bị mất, hãy kiểm tra lại mục \"Đơn của tôi\" sau ít phút.",
+  "coCancelTitle": "Hủy đơn đặt?",
+  "coCancelMessage": "Chỗ đã giữ sẽ được trả lại.",
+  "coKeep": "Giữ lại",
+  "coCancelBooking": "Hủy đơn",
+  "coCancelBookingLong": "Hủy đơn đặt",
+  "coHoldEnd": "hết thời gian giữ chỗ",
+  "coLeaveTitle": "Rời màn thanh toán?",
+  "coLeaveMessage": "Chỗ của bạn vẫn được giữ đến {until} (còn {countdown}). Bạn có thể quay lại thanh toán ở trang tour, Trang chủ hoặc mục Đơn đặt tour.",
+  "@coLeaveMessage": {
+    "placeholders": {
+      "until": {
+        "type": "String"
+      },
+      "countdown": {
+        "type": "String"
+      }
+    }
+  },
+  "coLeaveKeep": "Thoát, vẫn giữ chỗ",
+  "coStay": "Ở lại",
+  "coNotFound": "Không tìm thấy đơn đặt.",
+  "coGuestCount": "{count} khách",
+  "@coGuestCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "coPaymentDetails": "Chi tiết thanh toán",
+  "coTourPrice": "Giá tour",
+  "coTourPriceGuests": "Giá tour ({count} khách)",
+  "@coTourPriceGuests": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "coDiscount": "Ưu đãi · {code}",
+  "@coDiscount": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "coCancelled": "Đơn đã được hủy.",
+  "coSecureNote": "Thanh toán an toàn qua cổng VNPay, bảo mật thông tin",
+  "coCheckPrevious": "Kiểm tra kết quả giao dịch trước",
+  "coAttempts": "Các lần thanh toán",
+  "coDuplicateAttempt": "Giao dịch trùng với một giao dịch đã thanh toán",
+  "coPaidMessage": "Đơn đặt của bạn đã được xác nhận. Chúc bạn có chuyến đi đầy cảm hứng!",
+  "coChooseMethod": "Chọn phương thức thanh toán",
+  "coMethodDomestic": "Thẻ nội địa và tài khoản ngân hàng",
+  "coMethodDomesticDesc": "Thanh toán bằng thẻ ATM nội địa hoặc tài khoản ngân hàng (Internet Banking, Mobile Banking của các ngân hàng Việt Nam).",
+  "coProcessing": "Đang xử lý...",
+  "coPayAmount": "Thanh toán {amount}",
+  "@coPayAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "coExpired": "Đã quá hạn thanh toán. Chỗ giữ sẽ được giải phóng.",
+  "coHoldCountdown": "Giữ chỗ còn {countdown}",
+  "@coHoldCountdown": {
+    "placeholders": {
+      "countdown": {
+        "type": "String"
+      }
+    }
+  },
+  "paySuccessTitle": "Thanh toán thành công",
+  "paySuccessShort": "Thanh toán thành công!",
+  "paySuccessViewBooking": "Xem đơn của tôi",
+  "paySuccessBookingCode": "Mã đơn: {code}",
+  "@paySuccessBookingCode": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "paySuccessAmount": "Số tiền: {amount}",
+  "@paySuccessAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "paySuccessConfirmed": "Giao dịch của bạn đã được xác nhận thành công.",
+  "payNotSuccessful": "Thanh toán chưa thành công.",
+  "payFailedRetry": "Thanh toán không thành công. Bạn có thể thử lại.",
+  "payLoadFailed": "Không thể tải thông tin thanh toán.",
+  "payMethodsLoadFailed": "Không thể tải phương thức thanh toán.",
+  "payUnverifiedLater": "Chưa xác minh được kết quả giao dịch trước. Vui lòng thử lại sau.",
+  "payUnverifiedRetry": "Chưa xác minh được kết quả giao dịch trước. Nếu bạn chưa thanh toán, bạn có thể thử lại ngay; nếu đã thanh toán, hãy kiểm tra lại sau ít phút.",
+  "payAwaitingResult": "Đang chờ kết quả thanh toán...",
+  "payInitializingTxn": "Đang khởi tạo giao dịch...",
+  "payInitFailed": "Không thể khởi tạo thanh toán. Vui lòng thử lại.",
+  "payScanQrToFinish": "Quét mã QR để hoàn tất thanh toán.",
+  "payOpenBrowserFailed": "Không thể mở trang thanh toán. Vui lòng kiểm tra trình duyệt.",
+  "payStatusCheckFailed": "Không thể kiểm tra trạng thái thanh toán. Vui lòng thử lại.",
+  "payCheckingResult": "Đang kiểm tra kết quả thanh toán...",
+  "paySuperseded": "Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán bởi một giao dịch khác.",
+  "payDeadlineExceeded": "Đã hết thời hạn thanh toán 10 phút. Vui lòng đặt lại tour.",
+  "payRetryTitle": "Thanh toán lại?",
+  "payRetryMessage": "Hệ thống chưa xác minh được kết quả giao dịch trước.\n\n• Nếu bạn CHƯA thanh toán: bạn có thể thử lại ngay với thời hạn còn lại.\n• Nếu bạn ĐÃ thanh toán: vui lòng chọn \"Kiểm tra lại\" để hệ thống đồng bộ kết quả, tránh thanh toán trùng.",
+  "payCheckAgain": "Kiểm tra lại",
+  "payBookingNumber": "Đơn #{id}",
+  "@payBookingNumber": {
+    "placeholders": {
+      "id": {
+        "type": "int"
+      }
+    }
+  },
+  "payTourFallback": "Tour trải nghiệm",
+  "payExperienceDate": "Ngày trải nghiệm",
+  "payMethodTitle": "Phương thức thanh toán",
+  "payMethodsUnavailable": "Không tải được phương thức thanh toán. Bạn vẫn có thể thử lại.",
+  "payInitializing": "Đang khởi tạo...",
+  "payChecking": "Đang kiểm tra...",
+  "payCheckResult": "Kiểm tra kết quả thanh toán",
+  "payTimeLimitNote": "Bạn có 10 phút để hoàn tất thanh toán. Trang VNPay sẽ mở bằng trình duyệt.",
+  "payQrTitle": "Quét mã để thanh toán",
+  "payQrHint": "Mở ứng dụng ngân hàng hoặc ví điện tử hỗ trợ VNPay-QR để quét mã này.",
+  "payChooseCard": "Chọn loại thẻ",
+  "payChooseCardHint": "Chọn loại thẻ (Visa, Mastercard, JCB…)",
+  "payCardType": "Loại thẻ: {type}",
+  "@payCardType": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "payCardTypesUnavailable": "Không tải được danh sách loại thẻ. Bạn vẫn có thể thanh toán bằng thẻ quốc tế.",
+  "payMethodIntl": "Thẻ thanh toán quốc tế",
+  "payMethodQr": "Ứng dụng ngân hàng & Ví điện tử",
+  "mbTitle": "Đơn đặt tour",
+  "mbTabAll": "Tất cả ({count})",
+  "@mbTabAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mbTabPurchased": "Đã mua ({count})",
+  "@mbTabPurchased": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mbTabPending": "Chờ thanh toán ({count})",
+  "@mbTabPending": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mbTabExperiencing": "Đang trải nghiệm ({count})",
+  "@mbTabExperiencing": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mbTabCompleted": "Đã hoàn thành ({count})",
+  "@mbTabCompleted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mbTabRefunding": "Đang hoàn tiền ({count})",
+  "@mbTabRefunding": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mbTabRefunded": "Đã hoàn tiền ({count})",
+  "@mbTabRefunded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mbTabClosed": "Đã hủy/Hết hạn ({count})",
+  "@mbTabClosed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mbEmptyAll": "Chưa có đơn nào.",
+  "mbEmptyPurchased": "Chưa có đơn nào đã thanh toán.",
+  "mbEmptyPending": "Không có đơn nào đang chờ thanh toán.",
+  "mbEmptyExperiencing": "Không có chuyến nào đang diễn ra.",
+  "mbEmptyCompleted": "Chưa có đơn nào đã hoàn thành.",
+  "mbEmptyRefunding": "Không có đơn nào đang hoàn tiền.",
+  "mbEmptyRefunded": "Chưa có đơn nào đã hoàn tiền xong.",
+  "mbEmptyClosed": "Không có đơn nào đã hủy hoặc hết hạn.",
+  "mbDetails": "Chi tiết",
+  "mbRebook": "Đặt lại tour",
+  "mbBookingCancelled": "Đơn đã hủy",
+  "mbBookingExpired": "Đơn đã hết hạn",
+  "mbEnterExperience": "Vào trải nghiệm",
+  "mbReason": "Lý do: {reason}",
+  "@mbReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "mbPaidButClosed": "Khoản tiền đã được ghi nhận nhưng chỗ đã được trả lại. Vui lòng liên hệ hỗ trợ để được hoàn tiền.",
+  "mbViewDetails": "Xem chi tiết đơn",
+  "mbPaymentDeadline": "Hạn thanh toán: {time}",
+  "@mbPaymentDeadline": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "bdTitle": "Chi Tiết Đơn",
+  "bdLoadFailed": "Không thể tải chi tiết đơn.",
+  "bdPaymentConfirmedToast": "Đã xác nhận thanh toán thành công!",
+  "bdTxnFailedConfirmed": "Giao dịch đã được xác nhận không thành công.",
+  "bdUnverified": "Chưa xác minh được kết quả. Nếu bạn đã thanh toán, vui lòng thử lại sau ít phút.",
+  "bdCancelTitle": "Hủy đơn đặt tour",
+  "bdCancelMessage": "Sau khi hủy, chỗ đã giữ sẽ được trả lại cho khách khác. Bạn không thể hoàn tác thao tác này.",
+  "bdCancelReasonHint": "Lý do hủy (không bắt buộc)",
+  "bdKeepBooking": "Giữ đơn",
+  "bdCancelledToast": "Đã hủy đơn. Chỗ đã giữ được giải phóng.",
+  "bdCancelFailed": "Không thể hủy đơn. Vui lòng thử lại.",
+  "bdRefundWindowClosed": "Yêu cầu hoàn tiền chỉ được gửi trước ngày khởi hành của tour. Bạn đã trải nghiệm hoặc tour đã hoàn thành nên không thể gửi yêu cầu.",
+  "bdEyebrowCode": "MÃ ĐƠN",
+  "bdEyebrowTotal": "TỔNG TIỀN",
+  "bdNoExperienceDate": "Chưa có ngày trải nghiệm",
+  "bdExperienceCount": "{count} trải nghiệm",
+  "@bdExperienceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bdStepBooked": "Đặt tour",
+  "bdStepBookedCreated": "Đã tạo đơn",
+  "bdStepPayment": "Thanh toán",
+  "bdStepNotPaid": "Chưa thanh toán",
+  "bdStepConfirmed": "Xác nhận",
+  "bdStepCompleted": "Hoàn thành",
+  "bdStepNotDone": "Không thực hiện",
+  "bdStepNotExperienced": "Chưa trải nghiệm",
+  "bdProgressTitle": "Tiến trình đơn",
+  "bdCountdownHint": "Còn {countdown} để thanh toán. Quá hạn, chỗ đã giữ sẽ được trả lại cho khách khác.",
+  "@bdCountdownHint": {
+    "placeholders": {
+      "countdown": {
+        "type": "String"
+      }
+    }
+  },
+  "bdExperiencesTitle": "Trải nghiệm trong đơn",
+  "bdItemCount": "{count} mục",
+  "@bdItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bdExperiencesHint": "Mỗi trải nghiệm trong tour chiếm 1 chỗ trong ngày bạn chọn.",
+  "bdNoExperiences": "Đơn này không ghi nhận trải nghiệm nào.",
+  "bdExperiencesTotal": "Tổng giá trải nghiệm",
+  "bdExperienceNumber": "Trải nghiệm #{id}",
+  "@bdExperienceNumber": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "bdDepartureTitle": "Thông tin khởi hành",
+  "bdOrderInfoTitle": "Thông tin đơn",
+  "bdRowCode": "Mã đơn",
+  "bdRowTour": "Tour",
+  "bdRowExperienceCount": "Số trải nghiệm",
+  "bdRowPaidAt": "Thanh toán lúc",
+  "bdRowBookedAt": "Đặt lúc",
+  "bdRowDeadline": "Hạn thanh toán",
+  "bdRowCancelReason": "Lý do hủy",
+  "bdPassengersTitle": "Hành khách trong nhóm",
+  "bdPeopleCount": "{count} người",
+  "@bdPeopleCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bdPassengersHint": "Số người tham gia đã nhập khi đặt tour.",
+  "bdInviteHint": "Gửi lời mời để hành khách tạo tài khoản JourneyGo và xem tour cùng nhóm. Lời mời hết hạn sau 24 giờ.",
+  "bdBookerTag": "Người đặt",
+  "bdResendInvite": "Gửi lại lời mời",
+  "bdInvite": "Mời tham gia",
+  "bdAge": "{age} tuổi",
+  "@bdAge": {
+    "placeholders": {
+      "age": {
+        "type": "int"
+      }
+    }
+  },
+  "bdInfoHidden": "Thông tin cá nhân được ẩn",
+  "bdNoEmail": "Chưa có email",
+  "bdInviteSent": "Đã gửi lời mời tới {email}",
+  "@bdInviteSent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "bdInviteEmailTitle": "Nhập email người được mời",
+  "bdEmailExample": "vidu@gmail.com",
+  "bdSendInvite": "Gửi lời mời",
+  "bdPaymentHistory": "Lịch sử thanh toán",
+  "bdNoPayments": "Chưa có giao dịch thanh toán nào.",
+  "bdRefundEntryTitle": "Hủy chuyến & hoàn tiền",
+  "bdRefundEntryHint": "Gửi yêu cầu trước ngày khởi hành",
+  "bdRefundEntryHintDate": "Gửi yêu cầu trước ngày {date}",
+  "@bdRefundEntryHintDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "bdRefundRequests": "Yêu cầu hoàn tiền",
+  "bdRefundProcessingDetail": "Yêu cầu {code} đang được xử lý. Bạn có thể theo dõi từng bước trong \"Lịch sử xử lý hoàn tiền\" bên dưới.",
+  "@bdRefundProcessingDetail": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "bdRefundDoneDetail": "Yêu cầu {code} đã được xử lý: {status}.",
+  "@bdRefundDoneDetail": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "bdAuditTitle": "Lịch sử xử lý hoàn tiền",
+  "bdAuditHint": "Các bước xử lý được ghi nhận theo thứ tự thời gian — cũ nhất ở trên, mới nhất ở dưới.",
+  "bdRefundNumber": "Yêu cầu #{id}",
+  "@bdRefundNumber": {
+    "placeholders": {
+      "id": {
+        "type": "int"
+      }
+    }
+  },
+  "bdTransactionAt": "Giao dịch {time}",
+  "@bdTransactionAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "bdStuckHint": "Chưa nhận được xác nhận từ VNPay. Nếu bạn đã thanh toán, hãy kiểm tra lại.",
+  "bdChecking": "Đang kiểm tra",
+  "bdRefundAwaitingTriage": "{status} • Chờ quản trị viên phân loại",
+  "@bdRefundAwaitingTriage": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "bdAwaitingTriage": "Chờ phân loại",
+  "bdHintConfirmed": "Thanh toán thành công — chỗ của bạn đã được xác nhận.",
+  "bdHintCompleted": "Bạn đã hoàn thành trải nghiệm. Cảm ơn bạn đã đồng hành!",
+  "bdHintPending": "Đơn đang chờ thanh toán — hãy hoàn tất trong hạn 10 phút.",
+  "bdHintCancelled": "Đơn đã được hủy và chỗ đã được trả lại.",
+  "auditCreated": "Đã gửi yêu cầu hoàn tiền",
+  "auditApproved": "Quản trị viên đã duyệt yêu cầu",
+  "auditRejected": "Yêu cầu bị từ chối",
+  "auditCancelled": "Yêu cầu đã được hủy",
+  "auditVnpaySent": "Đã gửi yêu cầu hoàn tiền tới VNPay",
+  "auditVnpayResponse": "VNPay phản hồi kết quả hoàn tiền",
+  "auditManualRecorded": "Đã ghi nhận chuyển khoản thủ công",
+  "auditManualConfirmed": "Đã xác nhận chuyển khoản — hoàn tiền thành công",
+  "auditStatusUpdated": "Cập nhật trạng thái yêu cầu",
+  "auditOther": "Cập nhật yêu cầu hoàn tiền",
+  "holdReleased": "Đã trả lại",
+  "holdFreed": "Đã giải phóng",
+  "holdHolding": "Đang giữ chỗ",
+  "refundToneRefunded": "Đã hoàn tiền",
+  "refundToneRejected": "Từ chối",
+  "rfPolicyCustomer": "Lỗi từ khách hàng (Hủy tour)",
+  "rfCancelBefore": "Hủy trước {days} ngày",
+  "@rfCancelBefore": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "rfRefundPercent": "Hoàn {percent}%",
+  "@rfRefundPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "rfCancelWithin": "Hủy trong vòng {hours} giờ / Không đến (theo lịch trình)",
+  "@rfCancelWithin": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "rfPolicyPlatform": "Lỗi hệ thống / Đối tác",
+  "rfPolicyPlatformLine": "Lỗi không mở khóa được trải nghiệm, đối tác không tổ chức...",
+  "rfPolicyForceMajeure": "Bất khả kháng",
+  "rfPolicyForceMajeureLine": "Thiên tai, dịch bệnh,...",
+  "rfMaxFiles": "Mỗi yêu cầu chỉ đính kèm tối đa {max} tệp.",
+  "@rfMaxFiles": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "rfGalleryFailed": "Không thể mở thư viện ảnh.",
+  "rfVideoFailed": "Không thể chọn video.",
+  "rfUploadFailed": "Không tải được toàn bộ bằng chứng lên máy chủ. Vui lòng thử lại.",
+  "rfSubmitFailed": "Không thể gửi yêu cầu hoàn tiền. Vui lòng thử lại.",
+  "rfErrSummary": "Vui lòng nhập lý do ngắn gọn.",
+  "rfErrDetail": "Vui lòng tường thuật chi tiết sự cố hoặc lý do không thể tham gia.",
+  "rfErrBank": "Vui lòng điền đầy đủ thông tin tài khoản nhận tiền.",
+  "rfErrContact": "Vui lòng điền đầy đủ thông tin liên hệ.",
+  "rfErrReceipt": "Vui lòng tải lên ảnh chụp biên lai giao dịch thành công (bắt buộc để quản trị viên đối chiếu).",
+  "rfErrAgree": "Vui lòng xác nhận cam đoan thông tin và bằng chứng.",
+  "rfErrGeneric": "Vui lòng kiểm tra lại thông tin đã nhập.",
+  "rfSentTitle": "Đã Gửi Yêu Cầu Hoàn Tiền",
+  "rfSentDetail": "Mã yêu cầu: {code}\nTrạng thái: {status}",
+  "@rfSentDetail": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "rfGotIt": "Đã hiểu",
+  "rfTitle": "Yêu Cầu Hoàn Tiền",
+  "rfFooterNote": "Yêu cầu sẽ được quản trị viên xem xét và đối chiếu bằng chứng. Số tiền thực nhận, tỷ lệ hoàn và phương thức hoàn sẽ được thông báo sau khi phê duyệt.",
+  "rfOrder": "Đơn hàng",
+  "rfPaidBooking": "Đơn đã thanh toán",
+  "rfAmountPaid": "Số tiền đã thanh toán",
+  "rfPaidDate": "Ngày thanh toán",
+  "rfPolicyTitle": "Chính sách Hoàn Tiền",
+  "rfReasonTitle": "Lý do hoàn tiền",
+  "rfReasonHint": "Quản trị viên sẽ đọc nội dung này để đối chiếu và quyết định mức hoàn.",
+  "rfSummaryHint": "Nhập lý do ngắn gọn (VD: Bị ốm đột xuất,....)",
+  "rfDetailHint": "Vui lòng tường thuật chi tiết sự cố bạn gặp phải hoặc lý do không thể tham gia để admin hỗ trợ tốt nhất",
+  "rfEvidenceTitle": "Đính kèm bằng chứng",
+  "rfEvidenceTypes": "(Ảnh/Video/Giấy tờ)",
+  "rfEvidenceExamples": "Giấy khám bệnh, hình ảnh sự cố, ảnh chụp màn hình lỗi ứng dụng, v.v.",
+  "rfReceiptRequired": "Bắt buộc: ảnh chụp biên lai giao dịch thành công",
+  "rfReceiptHint": "Hãy chụp màn hình biên lai VNPay hiển thị \"Giao dịch thành công\" rồi bấm \"Thêm ảnh\" bên dưới. Không có ảnh, yêu cầu sẽ không được gửi.",
+  "rfAddPhoto": "Thêm ảnh",
+  "rfAddVideo": "Thêm video",
+  "rfUploadError": "Lỗi tải lên",
+  "rfBankTitle": "Tài khoản nhận tiền",
+  "rfBankHint": "Cung cấp để hỗ trợ hoàn tiền bằng phương thức thủ công nếu cần.",
+  "rfAccountNumber": "Số tài khoản",
+  "rfAccountName": "Tên chủ tài khoản",
+  "rfBank": "Ngân hàng",
+  "rfContactTitle": "Thông tin liên hệ",
+  "rfPhone": "Số điện thoại",
+  "rfBackupEmail": "Email dự phòng",
+  "rfAgreement": "Tôi cam đoan các thông tin và bằng chứng cung cấp là sự thật, đồng thời đã đọc và hiểu rõ chính sách hoàn tiền.",
+  "rfSending": "Đang gửi...",
+  "rfSubmit": "Gửi yêu cầu hoàn tiền",
+  "rhLoadFailed": "Không thể tải lịch sử hoàn tiền.",
+  "rhAwaitingAdminTriage": "Chờ quản trị viên phân loại",
+  "rhTitle": "Lịch Sử Hoàn Tiền",
+  "rhEmpty": "Chưa có yêu cầu hoàn tiền nào",
+  "rhMyBooking": "Đơn của tôi",
+  "rhNoRefund": "Không hoàn tiền",
+  "rhAwaitingAdmin": "Chờ quản trị viên xử lý",
+  "rhNotRefunded": "Không được hoàn",
+  "rhRejectReason": "Lý do từ chối: {reason}",
+  "@rhRejectReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "rhMethod": "Phương thức: {method}",
+  "@rhMethod": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "rhEvidenceLoadFailed": "Không tải được bằng chứng",
+  "rhFilterPending": "Chờ xử lý",
+  "rhFilterRefunded": "Đã hoàn",
+  "rsTitle": "Hỗ trợ & Hoàn tiền",
+  "rsLoadFailed": "Không tải được yêu cầu hoàn tiền",
+  "rsEmptyTitle": "Chưa có yêu cầu hoàn tiền",
+  "rsEmptyMessage": "Các yêu cầu hoàn tiền vé của bạn và tiến độ xử lý sẽ hiển thị tại đây.",
+  "rsBookingNumber": "Đơn #{id}",
+  "@rsBookingNumber": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "rsSentAt": "Gửi lúc {time}",
+  "@rsSentAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "rsApprovedAmount": "Số tiền được duyệt",
+  "rsProposedAmount": "Số tiền đề xuất",
+  "rsAmount": "Số tiền",
+  "refundStatusPendingReview": "Chờ duyệt",
+  "refundStatusApproved": "Đã duyệt",
+  "refundStatusVnpay": "Chờ VNPay xác nhận hoàn tiền",
+  "refundStatusProcessing": "Đang hoàn tiền",
+  "refundStatusManual": "Chờ chuyển khoản thủ công",
+  "refundStatusRejected": "Bị từ chối",
+  "refundStatusRejected2": "Đã từ chối",
+  "refundStatusFailed": "Hoàn tiền lỗi",
+  "refundReasonCustomer": "Lỗi khách hàng",
+  "refundReasonPlatform": "Lỗi nền tảng",
+  "refundReasonProvider": "Lỗi đối tác",
+  "refundReasonForceMajeure": "Lỗi bất khả kháng",
+  "refundReasonOther": "Lý do khác",
+  "refundMethodVnpay": "Hoàn qua VNPay",
+  "refundMethodManual": "Chuyển khoản thủ công",
+  "refundMethodUnknown": "Chưa xác định",
+  "rfOtherBank": "Khác (ghi rõ tên ngân hàng)",
+  "invLoadFailed": "Không thể tải thông tin lời mời. Vui lòng thử lại.",
+  "invLoginWithEmail": "Vui lòng đăng nhập bằng email {email} để xác nhận lời mời.",
+  "@invLoginWithEmail": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "invConfirmFailed": "Không thể xác nhận lời mời. Vui lòng thử lại.",
+  "invStatusPending": "Chờ xác nhận",
+  "invStatusRevoked": "Đã bị thu hồi",
+  "invTitle": "Lời mời tham gia tour",
+  "invJoined": "Bạn đã tham gia tour!",
+  "invNoLongerValid": "Lời mời không còn hiệu lực",
+  "invInvited": "Bạn được mời tham gia tour",
+  "invLinked": "Hành khách đã được liên kết với đơn đặt tour.",
+  "invExpiredHint": "Lời mời đã hết hạn hoặc bị thu hồi. Vui lòng liên hệ người đặt tour để được gửi lại.",
+  "invConfirmHint": "Xác nhận lời mời để được cấp quyền tham gia tour cùng nhóm.",
+  "invInfoTitle": "THÔNG TIN LỜI MỜI",
+  "invPassenger": "Hành khách",
+  "invInvitedEmail": "Email được mời",
+  "invValidUntil": "Hiệu lực đến",
+  "invStatus": "Trạng thái",
+  "invConfirming": "Đang xác nhận...",
+  "invConfirmJoin": "Xác nhận tham gia",
+  "invLoginToConfirm": "Đăng nhập để xác nhận",
+  "invNotFound": "Không tìm thấy lời mời",
+  "invNotFoundHint": "Lời mời không tồn tại hoặc đã hết hạn.",
+  "invListLoadFailed": "Không tải được danh sách lời mời. Vui lòng thử lại.",
+  "invConfirmFailed2": "Không xác nhận được lời mời. Vui lòng thử lại.",
+  "invInviterFallback": "Người đặt tour",
+  "invInvitedBy": "{inviter} đã mời bạn vào tour {tour}. Xác nhận lời mời để được cấp quyền tham gia tour cùng nhóm.",
+  "@invInvitedBy": {
+    "placeholders": {
+      "inviter": {
+        "type": "String"
+      },
+      "tour": {
+        "type": "String"
+      }
+    }
+  },
+  "invJoinedDetail": "Hành khách đã được liên kết với đơn đặt tour. Bạn có thể xem chi tiết booking và truy cập tour.",
+  "invNoneLeft": "Không còn lời mời nào",
+  "invNoneLeftHint": "Bạn không có lời mời tham gia tour nào đang chờ xác nhận.",
+  "invLoginSnack": "Bạn được mời tham gia tour. Vui lòng đăng nhập để xác nhận lời mời.",
+  "invTagSent": "Đã gửi lời mời",
+  "invTagJoined": "Đã tham gia",
+  "invTagExpired": "Lời mời đã hết hạn",
+  "invTagRevoked": "Lời mời đã hủy",
+  "tripsTitle": "Chuyến đi của tôi",
+  "tripsSubtitle": "Vé đã mua, hành trình đang đi và đã hoàn thành",
+  "tripsLoadFailed": "Không tải được chuyến đi của bạn",
+  "tripsEmptySection": "Chưa có chuyến đi nào ở mục này.",
+  "tripsStageActive": "Đang diễn ra",
+  "tripsStageReady": "Sắp khởi hành",
+  "tripsLive": "Trực tiếp",
+  "tripsEmptyTitle": "Bạn chưa có chuyến đi nào",
+  "tripsEmptyMessage": "Đặt một tour ở trang Khám phá, vé sẽ nằm tại đây để bạn bắt đầu hành trình khi đến nơi.",
+  "tripsExplore": "Khám phá tour",
+  "tripsFilterActive": "Đang đi",
+  "tripsFilterReady": "Sắp tới",
+  "tripsFilterDone": "Đã xong",
+  "tripsExperiencing": "Đang trải nghiệm",
+  "tripsStopProgress": "Trạm {current}/{total}",
+  "@tripsStopProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "tripsStopsCheckedIn": " trạm đã check-in",
+  "tripsDestinations": "{count} điểm đến",
+  "@tripsDestinations": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tripsTicketDetails": "Chi tiết vé",
+  "tripsViewItinerary": "Xem lịch trình",
+  "tripsStart": "Bắt đầu",
+  "tripsToday": "Hôm nay",
+  "tripsTomorrow": "Ngày mai",
+  "tripsDaysLeft": "Còn {days} ngày",
+  "@tripsDaysLeft": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "tripsCodeSemantics": "Mã vé {code}, chạm để sao chép",
+  "@tripsCodeSemantics": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "tripsCodeCopied": "Đã sao chép mã vé {code}",
+  "@tripsCodeCopied": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "tripsTicketCode": "Mã vé",
+  "calLoadFailed": "Không tải được lịch khởi hành.",
+  "calTitle": "Xem tour theo ngày",
+  "calLoadFailedTitle": "Không tải được lịch",
+  "calPrevMonth": "Tháng trước",
+  "calNextMonth": "Tháng sau",
+  "calNoDepartures": "Chưa có lịch khởi hành",
+  "calDepartureCount": "{count} lượt khởi hành",
+  "@calDepartureCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "calDaySemantics": "Ngày {date}, {count} tour",
+  "@calDaySemantics": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "calDaySemanticsNone": "Ngày {date}, không có tour",
+  "@calDaySemanticsNone": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "calNoDeparturesHint": "Các tour sẽ hiện ở đây khi đối tác mở ngày khởi hành.",
+  "authLoginSuccess": "Đăng nhập thành công!",
+  "authWelcomeBackName": "Chào mừng du khách {name} quay trở lại với Di sản Việt Nam.",
+  "@authWelcomeBackName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "authSignupSuccess": "Khởi tạo tài khoản thành công!",
+  "authSignupReward": "🎉 Quý khách đã nhận được +100 điểm thưởng khám phá di sản!",
+  "authLoginFailed": "Đăng nhập không thành công",
+  "authSignupFailedMessage": "Đăng ký tài khoản không thành công. Vui lòng thử lại.",
+  "authSignupFailed": "Đăng ký không thành công",
+  "authInvalid": "Tài khoản hoặc mật khẩu không hợp lệ!",
+  "authAppleUnsupported": "Đăng nhập Apple ID hiện chưa hỗ trợ trên Android.",
+  "authWelcomeBack": "Chào mừng quý khách quay trở lại với JourneyGo!",
+  "authPrivacyTitle": "Tiêu chuẩn Di sản số",
+  "authPrivacyBody": "Dữ liệu của du khách được mã hóa an toàn theo tiêu chuẩn bảo tồn văn hóa số quốc gia. Chúng tôi cam kết tuyệt đối bảo mật thông tin định danh, lịch sử chuyến đi và tài sản điểm thưởng di sản của quý khách.",
+  "authPrivacyAgree": "Đã hiểu và đồng ý",
+  "authFullName": "Họ và tên",
+  "authFullNameExample": "Nguyễn Văn An",
+  "authErrNameRequired": "Vui lòng nhập họ và tên của quý khách",
+  "authErrNameShort": "Họ tên quá ngắn",
+  "authErrEmailRequired": "Vui lòng nhập địa chỉ email",
+  "authErrEmailInvalid": "Định dạng email chưa hợp lệ",
+  "authPhone": "Số điện thoại",
+  "authErrPhoneRequired": "Vui lòng cung cấp số điện thoại",
+  "authErrPhoneLength": "Số điện thoại gồm 9 - 11 chữ số",
+  "authPassword": "Mật khẩu",
+  "authPasswordHintLogin": "Nhập mật khẩu",
+  "authPasswordHintSignup": "Tối thiểu 6 ký tự",
+  "authErrPasswordRequired": "Vui lòng nhập mật khẩu",
+  "authErrPasswordShort": "Mật khẩu phải chứa ít nhất 6 ký tự",
+  "authConfirmPassword": "Nhập lại mật khẩu",
+  "authConfirmPasswordHint": "Nhập lại mật khẩu vừa tạo",
+  "authErrConfirmRequired": "Vui lòng nhập lại mật khẩu",
+  "authErrConfirmMismatch": "Mật khẩu xác nhận không khớp",
+  "authHeaderLogin": "Chào mừng trở lại! Đăng nhập để tiếp tục hành trình.",
+  "authHeaderSignup": "Tạo tài khoản để khám phá di sản và nhận điểm thưởng.",
+  "authLogin": "Đăng nhập",
+  "authSignup": "Tạo tài khoản",
+  "authPromoPrefix": "Nhận ngay ",
+  "authPromoPoints": "+100 điểm thưởng ",
+  "authPromoSuffix": "khám phá di sản khi tạo tài khoản mới!",
+  "authRemember": "Ghi nhớ đăng nhập",
+  "authForgot": "Quên mật khẩu?",
+  "authOrContinue": "hoặc tiếp tục với",
+  "authGoogle": "Tiếp tục với Google",
+  "authFooter": "Bảo mật theo tiêu chuẩn Di sản Văn hóa số • Điều khoản",
+  "authServerUnreachableDebug": "Không thể kết nối đến máy chủ ({url}).\nChi tiết: {detail}\n\n{hint}",
+  "@authServerUnreachableDebug": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      },
+      "detail": {
+        "type": "String"
+      },
+      "hint": {
+        "type": "String"
+      }
+    }
+  },
+  "authServerUnreachable": "Không thể kết nối đến máy chủ. Vui lòng thử lại sau.",
+  "authServerTimeoutDebug": "Kết nối đến máy chủ ({url}) quá hạn.\n\n{hint}",
+  "@authServerTimeoutDebug": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      },
+      "hint": {
+        "type": "String"
+      }
+    }
+  },
+  "authServerTimeout": "Kết nối đến máy chủ quá hạn (timeout). Vui lòng thử lại sau.",
+  "authNetworkError": "Lỗi kết nối mạng: {error}",
+  "@authNetworkError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "authErr401": "Thông tin đăng nhập không hợp lệ hoặc phiên đã hết hạn.",
+  "authErr403": "Bạn không có quyền truy cập chức năng này.",
+  "authErr404": "Không tìm thấy tài nguyên yêu cầu (404).",
+  "authErrServer": "Lỗi máy chủ ({code}). Vui lòng thử lại sau.",
+  "@authErrServer": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "authNoRefreshToken": "Không tìm thấy Refresh Token. Vui lòng đăng nhập lại.",
+  "authSessionExpiredDetail": "Phiên đăng nhập đã hết hạn: {detail}",
+  "@authSessionExpiredDetail": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "apiInvalidData": "Máy chủ trả về dữ liệu không hợp lệ.",
+  "googleCancelled": "Người dùng đã huỷ đăng nhập Google.",
+  "googleNoToken": "Không lấy được idToken từ Google. Vui lòng thử lại.",
+  "sessionExpired": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.",
+  "apiRequestFailed": "Không thể xử lý yêu cầu (mã {code}).",
+  "@apiRequestFailed": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "apiTimeout": "Kết nối đến máy chủ quá hạn. Vui lòng thử lại.",
+  "apiUnreachable": "Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và địa chỉ API.",
+  "apiNoImageUrl": "Máy chủ không trả về đường dẫn ảnh.",
+  "apiImageUploadFailed": "Không thể tải ảnh lên (mã {code}).",
+  "@apiImageUploadFailed": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "apiImageTimeout": "Tải ảnh quá hạn. Vui lòng thử lại.",
+  "apiNoVideoUrl": "Máy chủ không trả về đường dẫn video.",
+  "apiVideoUploadFailed": "Không thể tải video lên (mã {code}).",
+  "@apiVideoUploadFailed": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "apiVideoTimeout": "Tải video quá hạn. Vui lòng thử lại.",
+  "pwShow": "Hiện mật khẩu",
+  "pwHide": "Ẩn mật khẩu",
+  "pwErrNewRequired": "Vui lòng nhập mật khẩu mới",
+  "pwErrNewShort": "Mật khẩu phải có ít nhất 6 ký tự",
+  "pwOtpResent": "Đã gửi lại mã OTP tới email của bạn.",
+  "pwResetSuccess": "Đặt lại mật khẩu thành công",
+  "pwResetSuccessHint": "Hãy đăng nhập bằng mật khẩu mới.",
+  "pwForgotTitle": "Khôi phục mật khẩu",
+  "pwForgotSubtitle": "Nhận mã OTP qua email để đặt lại mật khẩu",
+  "pwStepOtp": "Mã OTP",
+  "pwStepNewPassword": "Mật khẩu mới",
+  "pwEmailIntro": "Nhập email bạn đã dùng để đăng ký. Chúng tôi sẽ gửi mã gồm 6 chữ số.",
+  "pwErrEmailRequired": "Vui lòng nhập email",
+  "pwErrEmailInvalid": "Email không đúng định dạng",
+  "pwSendOtp": "Gửi mã OTP",
+  "pwCodeSentPrefix": "Mã đã được gửi tới ",
+  "pwCodeSentSuffix": ". Kiểm tra cả thư mục Spam nếu chưa thấy.",
+  "pwErrOtpLength": "Mã OTP gồm đúng 6 chữ số",
+  "pwVerifyCode": "Xác nhận mã",
+  "pwChangeEmail": "Đổi email",
+  "pwResendIn": "Gửi lại sau {seconds}s",
+  "@pwResendIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "pwResend": "Gửi lại mã",
+  "pwNewIntro": "Đặt mật khẩu mới cho tài khoản của bạn.",
+  "pwMin6": "Ít nhất 6 ký tự",
+  "pwConfirmNew": "Nhập lại mật khẩu mới",
+  "pwErrMismatch": "Mật khẩu nhập lại không khớp",
+  "pwResetButton": "Đặt lại mật khẩu",
+  "pwChangeSuccess": "Đổi mật khẩu thành công.",
+  "pwChangeSubtitle": "Giữ an toàn cho hành trang di sản của bạn",
+  "pwCurrent": "Mật khẩu hiện tại",
+  "pwCurrentGoogleHint": "Bỏ trống nếu bạn đăng nhập bằng Google và chưa từng đặt mật khẩu",
+  "pwErrCurrentRequired": "Vui lòng nhập mật khẩu hiện tại",
+  "pwNewHelper": "Ít nhất 6 ký tự, khác mật khẩu hiện tại",
+  "pwSave": "Lưu mật khẩu mới",
+  "epNameRequired": "Họ tên không được để trống!",
+  "epSaved": "Cập nhật hồ sơ cá nhân thành công qua máy chủ!",
+  "epTitle": "Chỉnh Sửa Hồ Sơ Du Khách",
+  "epEmailLabel": "Email tài khoản (không thể thay đổi):",
+  "epNameLabel": "Họ và tên:",
+  "epNameHint": "Nhập họ và tên đầy đủ",
+  "epPhoneLabel": "Số điện thoại:",
+  "epPhoneHint": "Nhập số điện thoại liên hệ",
+  "epSaving": "Đang lưu thay đổi lên máy chủ...",
+  "epSave": "Lưu Thông Tin Mới",
+  "notifCatBooking": "Đặt chỗ",
+  "notifCatRefund": "Hoàn tiền",
+  "notifCatReward": "Phần thưởng",
+  "notifCatApproved": "Đã duyệt",
+  "notifCatRejected": "Cần xem lại",
+  "notifCatCommunity": "Cộng đồng",
+  "notifCatFinance": "Tài chính",
+  "notifCatReview": "Thẩm định",
+  "notifCatChat": "Tin nhắn",
+  "timeJustNow": "Vừa xong",
+  "timeMinutesAgo": "{count} phút trước",
+  "@timeMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeHoursAgo": "{count} giờ trước",
+  "@timeHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeYesterday": "Hôm qua",
+  "timeDaysAgo": "{count} ngày trước",
+  "@timeDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notifNewCount": "{count} mới",
+  "@notifNewCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notifReadAll": "Đọc tất cả",
+  "notifOlder": "Xem thông báo cũ hơn",
+  "notifEmpty": "Chưa có thông báo",
+  "notifEmptyHint": "Kết quả thanh toán, hoàn tiền, huy hiệu và bài viết của bạn sẽ hiện ở đây.",
+  "notifChannelTimer": "Hẹn giờ hoạt động",
+  "notifChannelTimerDesc": "Nhắc khi hết giờ đếm ngược của hoạt động thực địa",
+  "notifChannelMain": "Thông báo Journey Go",
+  "notifChannelMainDesc": "Đơn đặt tour, hoàn tiền, huy hiệu, bài viết diễn đàn",
+  "chatListLoadFailed": "Không thể tải lịch sử hỗ trợ.",
+  "chatEmpty": "Chưa có cuộc trò chuyện nào",
+  "chatEmptyHint": "Mở chi tiết bất kỳ tour nào và bấm \"Chat với bên …\" để hỏi nhà tour trước khi đặt vé. Lịch sử sẽ được lưu lại tại đây.",
+  "chatNoMessages": "Chưa có tin nhắn nào",
+  "chatOpenFailed": "Không thể mở cuộc trò chuyện.",
+  "chatProviderFallback": "Nhà tour",
+  "chatAskAbout": "Hỏi {name} về tour này",
+  "@chatAskAbout": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatProviderLower": "nhà tour",
+  "chatAskHint": "Bạn có thể hỏi về lịch trình, giá, điều kiện thời tiết hoặc thủ tục đặt tour — trước khi quyết định đặt vé.",
+  "chatInputHint": "Nhắn tin cho nhà tour…",
+  "forumFilterTour": "Lọc theo tour",
+  "forumTitle": "Diễn đàn di sản",
+  "forumSubtitle": "Chia sẻ trải nghiệm văn hoá cùng cộng đồng",
+  "forumMyPosts": "Bài của tôi",
+  "forumLoadFailed": "Không tải được Diễn đàn",
+  "forumNoMatch": "Không có bài viết phù hợp",
+  "forumNoPosts": "Chưa có bài viết nào",
+  "forumNoMatchHint": "Thử bỏ bớt bộ lọc để xem thêm bài viết.",
+  "forumNoPostsHint": "Hãy là người đầu tiên chia sẻ trải nghiệm của bạn.",
+  "forumComposePrompt": "Bạn vừa có trải nghiệm gì thú vị?",
+  "forumSortNewest": "Mới nhất",
+  "forumSortTop": "Nổi bật",
+  "forumDestinationFallback": "Điểm đến",
+  "forumMaxImages": "Mỗi bài viết chỉ đính kèm tối đa {max} ảnh.",
+  "@forumMaxImages": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "forumGalleryFailed": "Không mở được thư viện ảnh. Hãy kiểm tra quyền truy cập.",
+  "forumChooseTour": "Chọn tour",
+  "forumJoinedNote": "Bạn đã tham gia",
+  "forumErrTitle": "Vui lòng nhập tiêu đề bài viết.",
+  "forumErrContent": "Vui lòng nhập nội dung bài viết.",
+  "forumSaving": "Đang lưu bài viết...",
+  "forumUploadingImage": "Đang tải ảnh {index}/{total}...",
+  "@forumUploadingImage": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "forumDraftSaved": "Đã lưu bản nháp.",
+  "forumSubmitted": "Đã gửi bài viết. Bài sẽ hiển thị sau khi được kiểm duyệt.",
+  "forumEditPost": "Chỉnh sửa bài viết",
+  "forumNewPost": "Viết bài mới",
+  "forumFieldTitle": "Tiêu đề",
+  "forumFieldContent": "Nội dung",
+  "forumFieldTour": "Tour liên quan",
+  "forumTourOptional": "Chọn tour (không bắt buộc)",
+  "forumTourLocked": "Không thể đổi tour sau khi đã đăng.",
+  "forumTourHint": "Tour bạn đã tham gia được đưa lên đầu danh sách.",
+  "forumPhotos": "Ảnh ({count}/{max})",
+  "@forumPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "forumModerationNote": "Bài viết sẽ hiển thị trên Diễn đàn sau khi được kiểm duyệt viên phê duyệt.",
+  "forumSaveChanges": "Lưu thay đổi",
+  "forumSaveDraft": "Lưu nháp",
+  "forumSubmitReview": "Gửi duyệt",
+  "forumAddPhotoHint": "Chạm để thêm ảnh từ thư viện",
+  "forumReportPost": "Báo cáo bài viết",
+  "forumReportDescription": "Mô tả thêm (không bắt buộc)",
+  "forumSendReport": "Gửi báo cáo",
+  "forumAgree": "Đồng ý",
+  "forumJoinedTour": "Đã tham gia tour",
+  "forumModeratorFeedback": "Phản hồi từ kiểm duyệt viên: {note}",
+  "@forumModeratorFeedback": {
+    "placeholders": {
+      "note": {
+        "type": "String"
+      }
+    }
+  },
+  "forumDeselect": "Bỏ chọn",
+  "forumListLoadFailed": "Không tải được danh sách. Vui lòng thử lại sau.",
+  "forumNothingToPick": "Chưa có mục nào để chọn.",
+  "forumTabDraft": "Nháp",
+  "forumTabPending": "Chờ duyệt",
+  "forumTabPublished": "Đã đăng",
+  "forumTabRevision": "Cần sửa",
+  "forumTabRejected": "Bị từ chối",
+  "forumWrite": "Viết bài",
+  "forumPostsLoadFailed": "Không tải được bài viết",
+  "forumMyEmpty": "Bạn chưa có bài viết nào",
+  "forumMyEmptyTab": "Không có bài ở mục \"{tab}\"",
+  "@forumMyEmptyTab": {
+    "placeholders": {
+      "tab": {
+        "type": "String"
+      }
+    }
+  },
+  "forumMyEmptyHint": "Chia sẻ trải nghiệm chuyến đi để mọi người cùng khám phá.",
+  "forumDeleteComment": "Xóa bình luận",
+  "forumDeleteCommentConfirm": "Bạn muốn xóa bình luận này?",
+  "forumDelete": "Xóa",
+  "forumCommentReported": "Đã báo cáo bình luận. Cảm ơn bạn đã giúp cộng đồng.",
+  "forumReportComment": "Báo cáo bình luận",
+  "forumReportCommentHint": "Spam, ngôn từ xúc phạm, thông tin sai lệch…",
+  "forumReportSent": "Đã gửi báo cáo. Cảm ơn bạn đã giúp cộng đồng.",
+  "forumDeletePost": "Xóa bài viết",
+  "forumDeletePostConfirm": "Bài viết và các bình luận sẽ bị xóa vĩnh viễn.",
+  "forumDeletePostShort": "Xóa bài",
+  "forumSentForReview": "Đã gửi bài viết để kiểm duyệt.",
+  "forumPost": "Bài viết",
+  "forumOptions": "Tùy chọn",
+  "forumEdit": "Chỉnh sửa",
+  "forumResubmit": "Gửi duyệt lại",
+  "forumReactionsAfterReview": "Bài viết chỉ nhận cảm xúc và bình luận sau khi được kiểm duyệt.",
+  "forumComments": "Bình luận ({count})",
+  "@forumComments": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "forumNoComments": "Chưa có bình luận nào. Hãy là người đầu tiên!",
+  "forumLoading": "Đang tải...",
+  "forumMoreComments": "Xem thêm bình luận",
+  "forumCommentHint": "Viết bình luận...",
+  "forumSendComment": "Gửi bình luận",
+  "forumReasonSpam": "Spam hoặc quảng cáo",
+  "forumReasonInappropriate": "Nội dung không phù hợp",
+  "forumReasonHate": "Ngôn từ thù ghét",
+  "forumReasonFalse": "Thông tin sai sự thật",
+  "forumReasonCopyright": "Vi phạm bản quyền",
+  "forumStatusHidden": "Đang được xem xét",
+  "forumStatusDraft": "Bản nháp",
+  "forumStatusRevision": "Cần chỉnh sửa",
+  "forumAuthorFallback": "Du khách",
+  "achCatTour": "Hành trình khám phá",
+  "achCatTourShort": "Hành trình",
+  "achCatTourDesc": "Chinh phục các chuyến đi & vùng đất mới",
+  "achUnitTour": "tour",
+  "achCatCheckin": "Dấu chân điểm đến",
+  "achCatCheckinShort": "Check-in",
+  "achCatCheckinDesc": "Check-in GPS tại các tọa độ di sản",
+  "achUnitDestination": "điểm đến",
+  "achCatCulture": "Văn hóa & Tri thức",
+  "achCatCultureShort": "Văn hóa",
+  "achCatCultureDesc": "Khám phá câu chuyện di sản & giải đố",
+  "achUnitLesson": "bài",
+  "achCatExperience": "Thử thách trải nghiệm",
+  "achCatExperienceShort": "Trải nghiệm",
+  "achCatExperienceDesc": "Vượt qua nhiệm vụ thực tế tại điểm dừng",
+  "achUnitMission": "nhiệm vụ",
+  "achCatStreak": "Kiên định & Gắn bó",
+  "achCatStreakShort": "Gắn bó",
+  "achCatStreakDesc": "Duy trì ngọn lửa đam mê cùng JourneyGo",
+  "achUnitMilestone": "mốc",
+  "achTierBronze": "Đồng",
+  "achTierSilver": "Bạc",
+  "achTierGold": "Vàng",
+  "achTierLegendary": "Huyền thoại",
+  "achUnitDays": "ngày",
+  "achTitle": "Thành tựu & Huy hiệu",
+  "achBadgeCollection": "Bộ sưu tập huy hiệu",
+  "achLoadFailed": "Không tải được thành tựu",
+  "achFilterUnlocked": "Đã mở khóa",
+  "achFilterClaimable": "Chờ nhận thưởng",
+  "achAchieved": "Thành tựu đã đạt",
+  "achPoints": "Điểm thành tựu",
+  "achBadgesClaimed": "Đã nhận {count} huy hiệu",
+  "@achBadgesClaimed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "achPending": "Chờ nhận",
+  "achAllClaimed": "Đã nhận hết",
+  "achCompleteToUnlock": "Hoàn thành để mở khóa",
+  "achCategoryProgress": "{achieved}/{total} thành tựu • {pct}%",
+  "@achCategoryProgress": {
+    "placeholders": {
+      "achieved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "pct": {
+        "type": "int"
+      }
+    }
+  },
+  "achNoMatch": "Không có thành tựu nào khớp bộ lọc trong danh mục này",
+  "achNoMatchHint": "Thử chuyển sang bộ lọc \"Tất cả\" hoặc chọn danh mục khác để tiếp tục theo dõi tiến độ.",
+  "achSeeAllInCategory": "Xem tất cả trong mục này",
+  "achReady": "Sẵn sàng nhận",
+  "achProgress": "Tiến độ: {current}/{target} {unit}",
+  "@achProgress": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      },
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "achClaiming": "Đang nhận...",
+  "achClaim": "Nhận thưởng",
+  "achClaimed": "Đã nhận",
+  "achClaimBarrier": "Nhận thưởng thành tựu",
+  "achUnlockedEyebrow": "THÀNH TỰU ĐẠT ĐƯỢC",
+  "achBadgeName": "Huy hiệu: {name}",
+  "@achBadgeName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "achRewardEyebrow": "PHẦN THƯỞNG VỪA NHẬN",
+  "achNewBalance": "Số dư hiện tại: {balance} JP",
+  "@achNewBalance": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      }
+    }
+  },
+  "achKeepExploring": "Tuyệt vời! Tiếp tục khám phá",
+  "bdgLoadFailed": "Không tải được huy hiệu",
+  "bdgEmpty": "Chưa có huy hiệu nào",
+  "bdgEmptyHint": "Check-in tại các điểm di sản để mở khóa huy hiệu đầu tiên.",
+  "bdgCount": "{earned} / {total} huy hiệu",
+  "@bdgCount": {
+    "placeholders": {
+      "earned": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "bdgViewProgress": "Xem tiến độ & nhận thưởng thành tựu",
+  "bdgLocked": "Chưa mở khóa",
+  "bdgEarnedOn": "Nhận ngày {date}",
+  "@bdgEarnedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "bdgBonus": "+{points} điểm thưởng",
+  "@bdgBonus": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      }
+    }
+  },
+  "mvCopied": "Đã sao chép mã voucher",
+  "mvTitle": "Voucher của tôi",
+  "mvTabUsable": "Còn dùng ({count})",
+  "@mvTabUsable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mvTabUsed": "Đã dùng ({count})",
+  "@mvTabUsed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mvTabExpired": "Hết hạn ({count})",
+  "@mvTabExpired": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mvLoadFailed": "Không tải được kho voucher",
+  "mvEmptyUsable": "Chưa có voucher nào",
+  "mvEmptyUsableHint": "Dùng điểm tích lũy để đổi voucher tại mục Đổi thưởng.",
+  "mvEmptyUsed": "Chưa dùng voucher nào",
+  "mvEmptyUsedHint": "Voucher bạn đã dùng sẽ hiển thị tại đây.",
+  "mvEmptyExpired": "Không có voucher hết hạn",
+  "mvEmptyExpiredHint": "Hãy dùng voucher trước ngày hết hạn nhé.",
+  "mvStatusUsable": "Còn dùng",
+  "mvStatusUsed": "Đã dùng",
+  "mvStatusExpired": "Hết hạn",
+  "mvUsedOn": "Đã dùng {date}",
+  "@mvUsedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "mvExpiredOn": "Hết hạn {date}",
+  "@mvExpiredOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "mvValidUntil": "Hạn dùng đến {date}",
+  "@mvValidUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "mvCopyCode": "Sao chép mã",
+  "mvRedeemedFor": "Đã đổi {points} điểm",
+  "@mvRedeemedFor": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      }
+    }
+  },
+  "rwBalanceLeft": "Còn {balance}",
+  "@rwBalanceLeft": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      }
+    }
+  },
+  "vsConfirmTitle": "Xác nhận đổi voucher",
+  "vsConfirmMessage": "Dùng {points} điểm để đổi \"{title}\"? Điểm đã đổi sẽ không được hoàn lại.",
+  "@vsConfirmMessage": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "vsRedeemNow": "Đổi ngay",
+  "vsSuccessTitle": "Đổi voucher thành công",
+  "vsSuccessSubtitle": "Mã của bạn đã được lưu trong mục \"Voucher của tôi\".",
+  "vsLoadFailed": "Không tải được danh sách voucher",
+  "vsEmpty": "Chưa có voucher để đổi",
+  "vsEmptyHint": "Các ưu đãi mới sẽ xuất hiện tại đây. Hãy quay lại sau nhé.",
+  "vsYourPoints": "Điểm của bạn",
+  "vsMinOrder": "Đơn từ {amount}",
+  "@vsMinOrder": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "vsMaxDiscount": "Giảm tối đa {amount}",
+  "@vsMaxDiscount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "vsValidDays": "Dùng trong {days} ngày",
+  "@vsValidDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "vsRedeemUntil": "Đổi được đến {date}",
+  "@vsRedeemUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "vsPoints": "{points} điểm",
+  "@vsPoints": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      }
+    }
+  },
+  "vsNeedMore": "Cần thêm {points} điểm",
+  "@vsNeedMore": {
+    "placeholders": {
+      "points": {
+        "type": "String"
+      }
+    }
+  },
+  "vsRemaining": "Còn {count} lượt",
+  "@vsRemaining": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "vsRedeem": "Đổi",
+  "wTitle": "Ví điểm",
+  "wLoadFailed": "Không tải được ví điểm",
+  "wEmpty": "Chưa có giao dịch điểm",
+  "wEmptyHint": "Check-in điểm đến và hoàn thành nhiệm vụ để bắt đầu tích điểm.",
+  "wBalance": "Số dư hiện tại",
+  "wPointsUnit": "điểm",
+  "wRedeem": "Đổi voucher",
+  "wMilestoneHint": "Mở khóa mốc hành trình để nhận thêm điểm thưởng",
+  "wHistory": "Lịch sử điểm",
+  "badgeTypeCheckin": "Check-in điểm đến",
+  "badgeTypeTour": "Hoàn thành tour",
+  "badgeTypeTask": "Bậc thầy nhiệm vụ",
+  "badgeTypeStreak": "Chuỗi ngày",
+  "badgeTypeEvent": "Sự kiện đặc biệt",
+  "badgeTypeOther": "Huy hiệu",
+  "ptxTask": "Hoàn thành nhiệm vụ",
+  "ptxExperience": "Trải nghiệm",
+  "ptxAchievement": "Thưởng thành tựu",
+  "ptxAdmin": "Điều chỉnh bởi quản trị",
+  "ptxVoucherRefund": "Hoàn điểm voucher hết hạn",
+  "ptxOther": "Giao dịch điểm",
+  "voucherOutOfStock": "Đã hết lượt đổi",
+  "voucherNotStarted": "Chưa mở đổi",
+  "jsEnded": "Hành trình này đã kết thúc. Bạn có thể xem lại câu chuyện văn hóa đã mở khóa.",
+  "jsAlreadyCheckedInCurrent": "Bạn đã check-in điểm đến hiện tại rồi. Hãy hoàn thành nhiệm vụ để mở điểm đến kế tiếp.",
+  "jsQrTitle": "Check-in bằng QR",
+  "jsQrHint": "Quét mã QR tại {place}",
+  "@jsQrHint": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "jsAlreadyCheckedInAt": "Bạn đã check-in {place} rồi.",
+  "@jsAlreadyCheckedInAt": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "jsHeritageBadge": "Huy hiệu di sản",
+  "jsCheckInSuccessAt": "Check-in thành công tại {place}. Đã mở khóa Nội dung văn hóa và Trải nghiệm.",
+  "@jsCheckInSuccessAt": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "jsExplore": "Khám phá",
+  "jsCheckInSuccess": "Check-in thành công. Đã mở khóa Nội dung văn hóa và Trải nghiệm.",
+  "jsSkipTitle": "Bỏ qua điểm đến?",
+  "jsSkipMessage": "Bạn sẽ không nhận huy hiệu và điểm thưởng tại {place}. Hành trình tiếp tục ở điểm kế tiếp.",
+  "@jsSkipMessage": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "jsSkip": "Bỏ qua",
+  "jsNoLocation": "Chưa lấy được vị trí",
+  "jsOpenSettings": "Mở cài đặt",
+  "jsCompletedJourney": "Bạn đã hoàn thành hành trình",
+  "jsAlreadyCheckedInShort": "Bạn đã check-in rồi",
+  "jsCheckedInAllDone": "Bạn đã check-in {place} và đi trọn hành trình. Không cần check-in thêm.",
+  "@jsCheckedInAllDone": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "jsCheckedInContinue": "Bạn đã check-in {place} rồi. Hãy tiếp tục làm nhiệm vụ tại điểm đến này.",
+  "@jsCheckedInContinue": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "jsCannotCheckIn": "Chưa thể check-in",
+  "jsRankPerfect": "Hoàn thành trọn vẹn",
+  "jsRankPartial": "Đã đi hết hành trình",
+  "jsRankDone": "Hoàn thành hành trình",
+  "jsCompletedPerfect": "Bạn đã đi trọn \"{tour}\" và nhận thêm {bonus} điểm thưởng. Cảm ơn bạn đã lan tỏa di sản!",
+  "@jsCompletedPerfect": {
+    "placeholders": {
+      "tour": {
+        "type": "String"
+      },
+      "bonus": {
+        "type": "String"
+      }
+    }
+  },
+  "jsCompletedPartial": "Bạn đã đi hết \"{tour}\". Cảm ơn bạn đã đồng hành cùng di sản!",
+  "@jsCompletedPartial": {
+    "placeholders": {
+      "tour": {
+        "type": "String"
+      }
+    }
+  },
+  "jsViewSummary": "Xem tổng kết",
+  "jsEnableLocation": "Hãy bật định vị và cho phép truy cập vị trí để chỉ đường.",
+  "jsNoRoute": "Không tìm được đường tới điểm này.",
+  "jsNear500": "Còn chưa tới 500 m nữa là đến {place}",
+  "jsAlmostThere": "Sắp tới nơi, chuẩn bị check-in",
+  "jsArrived": "Bạn đã đến {place}",
+  "@jsArrived": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "jsRoute": "Lộ trình",
+  "jsMap": "Bản đồ",
+  "jsHeritageStamps": "Dấu ấn di sản",
+  "jsCaptionSkipped": "Bỏ qua",
+  "jsCaptionStamped": "Đã đóng",
+  "jsCaptionOpen": "Đang mở",
+  "jsStopN": "Trạm {n}",
+  "@jsStopN": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "jsStampCount": "{done}/{total} dấu",
+  "@jsStampCount": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "jsPointsSuffix": " điểm",
+  "jsHeaderDone": "Đã đi xong · {count} trạm",
+  "@jsHeaderDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jsHeaderActive": "Đang trải nghiệm · {count} trạm",
+  "@jsHeaderActive": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jsNoPointsStop": "Không tính điểm cho trạm này",
+  "jsDoneReview": "Đã xong · +{points} điểm · chạm để xem lại",
+  "@jsDoneReview": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "jsUnlockAfter": "Mở khi xong trạm {n}",
+  "@jsUnlockAfter": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "jsChallengeCount": "{count} thử thách",
+  "@jsChallengeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jsLocked": "Chưa mở",
+  "jsSkippedStatus": "Đã bỏ qua",
+  "jsAtStop": "Bạn đang ở trạm",
+  "jsAtStopSince": "Bạn đang ở trạm · check-in lúc {time}",
+  "@jsAtStopSince": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "jsStopOpenDistance": "Trạm đang mở · cách {distance}",
+  "@jsStopOpenDistance": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "jsStopOpen": "Trạm đang mở",
+  "jsStory": "Câu chuyện",
+  "jsNoChallenges": "Không có thử thách",
+  "jsChallengeProgress": "{done}/{total} thử thách · +{points} điểm",
+  "@jsChallengeProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "jsQuizQuestions": "Câu đố {count} câu",
+  "@jsQuizQuestions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jsCultureTitle": "Nội dung văn hóa",
+  "jsCultureFallback": "Câu chuyện tại điểm",
+  "jsRead": "Đã đọc",
+  "jsNew": "Mới",
+  "jsExperienceTitle": "Trải nghiệm",
+  "jsExperienceFallback": "Thử thách tại điểm",
+  "jsCompletedBadge": "Hoàn thành",
+  "jsCheckInRadiusHint": "Đến trong bán kính {radius} m quanh điểm đến rồi check-in trạm, hoặc quét mã QR dán tại cổng, để mở khóa Nội dung văn hóa và Trải nghiệm.",
+  "@jsCheckInRadiusHint": {
+    "placeholders": {
+      "radius": {
+        "type": "String"
+      }
+    }
+  },
+  "jsCheckInHint": "Đến nơi rồi check-in để mở khóa Nội dung văn hóa, Trải nghiệm và nhận huy hiệu di sản.",
+  "jsDirections": "Chỉ đường",
+  "jsCheckInStop": "Check-in trạm",
+  "jsCheckInGps": "Check-in GPS",
+  "jsScanQr": "Quét mã QR tại điểm",
+  "jsSkipStop": "Bỏ qua trạm này",
+  "jsCompleteAll": "Đi trọn {count} trạm",
+  "@jsCompleteAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jsCompleteAllHint": "Nhận điểm thưởng hoàn thành và bảng tổng kết chuyến đi. Bỏ qua trạm nào thì không có thưởng hoàn thành.",
+  "jsSkippedNoBonus": "Bỏ qua {count} trạm nên chưa nhận thưởng hoàn thành.",
+  "@jsSkippedNoBonus": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jsStatPoints": "Điểm",
+  "jsStatPerfectChallenges": "Thử thách đạt trọn",
+  "jsStatStops": "Trạm đã đi",
+  "jsEndedLabel": "Hành trình đã kết thúc",
+  "jsEndedTitle": "{points} điểm · {done}/{total} trạm",
+  "@jsEndedTitle": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      },
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "jsNextStop": "Trạm kế tiếp",
+  "jsUnlockedCulture": "Đã mở khóa · Nội dung văn hóa",
+  "jsReadStory": "Đọc câu chuyện",
+  "jsUnlockedExperience": "Đã mở khóa · Trải nghiệm",
+  "jsChallengesWaiting": "{count} thử thách đang chờ",
+  "@jsChallengesWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jsDirectionsTo": "Chỉ đường tới {place}",
+  "@jsDirectionsTo": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "jsWholeRoute": "Xem toàn bộ đường đi",
+  "jsWholeTour": "Xem toàn tuyến",
+  "jsFollowMe": "Bám theo vị trí của tôi",
+  "jsMyLocation": "Vị trí của tôi",
+  "jsStreetMap": "Bản đồ đường phố",
+  "jsSatellite": "Ảnh vệ tinh",
+  "jsStateAtStop": "đang ở trạm",
+  "jsStateOpen": "đang mở",
+  "jsStateSkipped": "đã bỏ qua",
+  "jsStateDone": "đã xong",
+  "jsStateLocked": "chưa mở",
+  "jsChallengesLeft": "{count} thử thách còn lại",
+  "@jsChallengesLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "jsAllChallengesDone": "Đã làm hết thử thách",
+  "jsDistanceAway": "Cách {distance}",
+  "@jsDistanceAway": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "jsArriveToCheckIn": "Đến nơi để check-in",
+  "jsNoPointsHere": "Không nhận điểm tại trạm này",
+  "jsStopState": "Trạm {n} · {state}",
+  "@jsStopState": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "state": {
+        "type": "String"
+      }
+    }
+  },
+  "jsViewStop": "Xem trạm",
+  "jsLoadFailed": "Không tải được hành trình.",
+  "jsOpenTile": "Mở {title}",
+  "@jsOpenTile": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "jsTileLocked": "{title}, check-in để mở khóa",
+  "@jsTileLocked": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "jsCheckInToUnlock": "Check-in để mở khóa\n{info}",
+  "@jsCheckInToUnlock": {
+    "placeholders": {
+      "info": {
+        "type": "String"
+      }
+    }
+  },
+  "tkMapsFailed": "Không mở được ứng dụng bản đồ.",
+  "tkQrMismatchActivity": "Mã QR không khớp với điểm hoạt động này. Hãy quét đúng mã tại chỗ.",
+  "tkQrMismatchStop": "Mã QR không khớp với trạm này. Hãy thử lại.",
+  "tkQrConfirmTitle": "Quét QR xác nhận hoàn thành",
+  "tkQrStopTitle": "Quét QR tại trạm",
+  "tkQrAtPlace": "Quét mã QR tại {place}",
+  "@tkQrAtPlace": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "tkQrNextStop": "Quét mã QR tại trạm kế tiếp",
+  "tkCheckedIn": "Đã check-in!",
+  "tkNoLocation": "Chưa xác định được vị trí của bạn. Hãy bật GPS rồi thử lại.",
+  "tkTooFarToCheckIn": "Bạn còn cách trạm {distance}. Hãy vào trong bán kính {radius} m để check-in.",
+  "@tkTooFarToCheckIn": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      },
+      "radius": {
+        "type": "String"
+      }
+    }
+  },
+  "tkTimeUpTitle": "Hết giờ: {name}",
+  "@tkTimeUpTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "tkTimeUpBody": "Quét mã QR tại {place} để trả lời câu hỏi và nhận điểm.",
+  "@tkTimeUpBody": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "tkTimeUp": "Hết giờ!",
+  "tkPlusPoints": "+{points} điểm",
+  "@tkPlusPoints": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "tkLeg": "Chặng {current}/{total}",
+  "@tkLeg": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "tkClue": "Manh mối",
+  "tkGotIt": "Đã rõ",
+  "tkLoadFailed": "Không tải được nhiệm vụ.",
+  "tkFieldMission": "Nhiệm vụ thực địa",
+  "tkHeritageQuiz": "Đố vui di sản",
+  "tkQuestionsLabel": "câu hỏi",
+  "tkBonusLabel": "điểm thưởng",
+  "tkAttemptsLabel": "lượt còn lại",
+  "tkRules": "Thể lệ",
+  "tkRuleAllCorrect": "Trả lời đúng tất cả câu hỏi để nhận trọn điểm thưởng (chỉ một lần).",
+  "tkRuleLocation": "Mỗi câu hỏi gắn với một địa điểm. Bạn cần đứng trong bán kính của trạm để mở câu hỏi.",
+  "tkRuleRestart": "Trả lời sai một câu, bạn sẽ phải làm lại từ câu đầu.",
+  "tkRuleRetry": "Chưa đúng hết, bạn có thể làm lại nếu còn lượt (tối đa {max} lượt).",
+  "@tkRuleRetry": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "tkMissionDone": "Bạn đã hoàn thành nhiệm vụ này.",
+  "tkNoAttempts": "Bạn đã hết lượt làm nhiệm vụ này.",
+  "tkDirectionsToStop": "Chỉ đường tới trạm",
+  "tkRetryMission": "Làm lại nhiệm vụ",
+  "tkStartMission": "Bắt đầu nhiệm vụ",
+  "tkViewClue": "Xem manh mối",
+  "tkStages": "Các chặng",
+  "tkStagesDone": "{done}/{total} hoàn thành",
+  "@tkStagesDone": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "tkUnlockAfterStage": "Mở khóa sau chặng {n}",
+  "@tkUnlockAfterStage": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "tkLocating": "Đang xác định vị trí...",
+  "tkNoPosition": "Chưa có vị trí của bạn",
+  "tkArrivedReady": "Bạn đã tới trạm, sẵn sàng mở câu hỏi",
+  "tkDistanceRadius": "Cách {distance} · bán kính {radius} m",
+  "@tkDistanceRadius": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      },
+      "radius": {
+        "type": "String"
+      }
+    }
+  },
+  "tkStageAt": "Chặng {n} · {place}",
+  "@tkStageAt": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "tkRefreshDistance": "Cập nhật khoảng cách",
+  "tkShowBoth": "Xem cả bạn và trạm",
+  "tkStopOf": "Trạm {current}/{total}",
+  "@tkStopOf": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "tkLocatingYou": "Đang xác định vị trí của bạn...",
+  "tkTooFarToWalk": "Khá xa để đi bộ{eta}. Hãy đi xe tới gần rồi đi bộ vào trạm.",
+  "@tkTooFarToWalk": {
+    "placeholders": {
+      "eta": {
+        "type": "String"
+      }
+    }
+  },
+  "tkWalkRoute": "Đi bộ ~{duration} theo đường trên bản đồ",
+  "@tkWalkRoute": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "tkTurnHeading": "{turn} · hướng {direction}",
+  "@tkTurnHeading": {
+    "placeholders": {
+      "turn": {
+        "type": "String"
+      },
+      "direction": {
+        "type": "String"
+      }
+    }
+  },
+  "tkHeadTo": "Đi về hướng {direction}",
+  "@tkHeadTo": {
+    "placeholders": {
+      "direction": {
+        "type": "String"
+      }
+    }
+  },
+  "tkArrivedAtStop": "Bạn đã tới trạm",
+  "tkCheckedInPressStart": "Đã check-in · bấm \"Bắt đầu nhiệm vụ\"",
+  "tkPressCheckIn": "Bấm \"Check-in\" để xác nhận đã tới nơi",
+  "tkOpeningQuestion": "Đang mở câu hỏi...",
+  "tkQuestionAutoOpen": "Câu hỏi sẽ tự mở",
+  "tkRadius": "Bán kính {radius} m",
+  "@tkRadius": {
+    "placeholders": {
+      "radius": {
+        "type": "String"
+      }
+    }
+  },
+  "tkOpenLocationSettings": "Mở cài đặt vị trí",
+  "tkStartMissionTimed": "Bắt đầu nhiệm vụ · {duration}",
+  "@tkStartMissionTimed": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "tkCheckInAtStop": "Check-in tại trạm",
+  "tkNotAtStop": "Chưa tới trạm",
+  "tkNotAtStopDistance": "Chưa tới trạm · còn {distance}",
+  "@tkNotAtStopDistance": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "tkOpenQuestion": "Mở câu hỏi",
+  "tkGoogleMaps": "Chỉ đường bằng Google Maps",
+  "tkCheckLocation": "Kiểm tra vị trí",
+  "tkNextStop": "Trạm kế tiếp",
+  "tkNextPlace": "Địa điểm kế tiếp",
+  "tkFindQr": "Tìm mã QR đặt tại trạm và quét để mở câu hỏi.",
+  "tkStartActivity": "Bắt đầu hoạt động",
+  "tkActivityDone": "Hoàn thành hoạt động! Quét mã QR tại điểm để trả lời câu hỏi.",
+  "tkActivityInProgress": "Thực hiện hoạt động tại chỗ. Hết giờ bạn sẽ được quét mã QR.",
+  "tkCorrectReward": "Trả lời đúng nhận +{points} điểm",
+  "@tkCorrectReward": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "tkScanQrOnSite": "Quét mã QR tại điểm",
+  "tkSkipCountdownDev": "Bỏ qua đếm ngược (dev)",
+  "tkNoQuestions": "Nhiệm vụ này chưa có câu hỏi.",
+  "tkQuestionOf": "Câu {current} / {total}",
+  "@tkQuestionOf": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "tkAtPlace": "Tại: {place}",
+  "@tkAtPlace": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "tkConfirmAnswer": "Xác nhận câu trả lời",
+  "tkSubmit": "Nộp bài",
+  "tkNextQuestion": "Câu tiếp theo",
+  "tkAnswerHint": "Nhập câu trả lời của bạn...",
+  "tkExcellent": "Xuất sắc!",
+  "tkCompleted": "Hoàn thành!",
+  "tkSubmitted": "Đã nộp bài",
+  "tkResultScore": "Bạn trả lời đúng {correct}/{total} câu của \"{name}\".",
+  "@tkResultScore": {
+    "placeholders": {
+      "correct": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "tkMissionCompleted": "Bạn đã hoàn thành nhiệm vụ \"{name}\".",
+  "@tkMissionCompleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "tkCorrect": "Chính xác!",
+  "tkCorrectSoFar": "Bạn đã trả lời đúng {current}/{total} câu. Hãy đến địa điểm kế tiếp để mở câu hỏi tiếp theo.",
+  "@tkCorrectSoFar": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "tkIncorrect": "Chưa chính xác",
+  "tkRetryInfo": "Bạn đúng {correct}/{total} câu. Cần đúng tất cả để nhận điểm. Còn {attempts} lượt làm lại.",
+  "@tkRetryInfo": {
+    "placeholders": {
+      "correct": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "attempts": {
+        "type": "int"
+      }
+    }
+  },
+  "tkBonusPoints": "+{points} điểm thưởng",
+  "@tkBonusPoints": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "tkGoNextPlace": "Đến địa điểm kế tiếp",
+  "tkRetry": "Làm lại",
+  "tkBackToJourney": "Về hành trình",
+  "navArrived": "Bạn đã đến nơi",
+  "navRerouting": "Đang tìm lại đường…",
+  "navOffRoute": "Bạn đã đi khác tuyến gợi ý",
+  "navStart": "Bắt đầu đi",
+  "navContinueFor": "Đi tiếp {distance}",
+  "@navContinueFor": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "navTo": "Tới {place}",
+  "@navTo": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "navThen": "Sau đó",
+  "navArrivedAtStop": "ĐÃ ĐẾN TRẠM {n}",
+  "@navArrivedAtStop": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  },
+  "navRouteToStop": "ĐƯỜNG TỚI TRẠM {n}",
+  "@navRouteToStop": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  },
+  "navEnd": "Kết thúc chỉ đường",
+  "navFinding": "Đang tìm đường…",
+  "navNoRoute": "Không tìm được đường",
+  "navArriveAt": "Đến lúc {time}",
+  "@navArriveAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "navOnTheWay": "TRÊN ĐƯỜNG ĐI",
+  "navCheckInHint": "Check-in để mở khóa Nội dung văn hóa và Trải nghiệm tại trạm này.",
+  "navSteps": "Các bước",
+  "navViewSteps": "Xem {count} bước chỉ đường",
+  "@navViewSteps": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "navOpenGoogleMaps": "Mở Google Maps (có giọng nói)",
+  "navDirectionSteps": "Các bước chỉ đường",
+  "navGoStraight": "Đi tiếp",
+  "navWalk": "Đi bộ",
+  "navBike": "Xe 2 bánh",
+  "navCar": "Ô tô",
+  "compassN": "Bắc",
+  "compassNE": "Đông Bắc",
+  "compassE": "Đông",
+  "compassSE": "Đông Nam",
+  "compassS": "Nam",
+  "compassSW": "Tây Nam",
+  "compassW": "Tây",
+  "compassNW": "Tây Bắc",
+  "turnStraight": "Đi thẳng",
+  "turnBack": "Quay lại",
+  "turnRight": "Rẽ phải",
+  "turnLeft": "Rẽ trái",
+  "mapCredit": "Bản đồ: © Goong",
+  "sumPerfectTitle": "Hoàn thành trọn vẹn",
+  "sumPerfectSubtitle": "Bạn đã chinh phục mọi điểm đến và trả lời đúng mọi thử thách.",
+  "sumPartialSubtitle": "Bạn đã bỏ qua {count} điểm đến. Lần sau hãy thử đi đủ để nhận thưởng hoàn thành.",
+  "@sumPartialSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sumDoneSubtitle": "Bạn đã đi đủ mọi điểm đến. Vài thử thách còn chưa trọn điểm, thử lại ở chuyến sau nhé!",
+  "sumTitle": "Tổng kết hành trình",
+  "sumPointsEarned": "điểm nhận được",
+  "sumDestinationsVisited": "điểm đến đã ghé",
+  "sumPerfectChallenges": "thử thách đạt trọn",
+  "sumDuration": "thời gian trải nghiệm",
+  "sumRoute": "Lộ trình đã đi",
+  "sumEachDestination": "Từng điểm đến",
+  "sumShare": "Chia sẻ thành tích",
+  "sumReview": "Xem lại hành trình",
+  "sumBonus": "Thưởng hoàn thành: +{bonus} điểm (đã gồm trong tổng {total} điểm)",
+  "@sumBonus": {
+    "placeholders": {
+      "bonus": {
+        "type": "String"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "sumNoBonus": "Không có thưởng hoàn thành vì có điểm đến bị bỏ qua.",
+  "sumDestinationN": "Điểm {n} · {name}",
+  "@sumDestinationN": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "sumDestinationStats": "{done}/{total} nhiệm vụ · +{points} điểm",
+  "@sumDestinationStats": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "sumNoAttempts": "Hết lượt",
+  "shareImageFailed": "Không tạo được ảnh",
+  "shareText": "Mình vừa hoàn thành \"{tour}\" cùng JourneyGo: {points} điểm, {done}/{total} trạm di sản!",
+  "@shareText": {
+    "placeholders": {
+      "tour": {
+        "type": "String"
+      },
+      "points": {
+        "type": "int"
+      },
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "shareSubject": "Hành trình di sản cùng JourneyGo",
+  "shareFailed": "Không chia sẻ được ảnh. Vui lòng thử lại.",
+  "shareImage": "Chia sẻ ảnh",
+  "shareRankPerfect": "HOÀN THÀNH TRỌN VẸN",
+  "shareRankPartial": "ĐÃ ĐI HẾT HÀNH TRÌNH",
+  "shareRankDone": "HOÀN THÀNH HÀNH TRÌNH",
+  "shareStatPoints": "điểm",
+  "shareStatStops": "trạm",
+  "shareStatChallenges": "thử thách",
+  "shareStamps": "DẤU ẤN DI SẢN · {count} DẤU ẤN",
+  "@shareStamps": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "shareFooter": "Khám phá di sản Việt cùng JourneyGo · journeygo.id.vn",
+  "seInZone": "bạn đang ở trong vùng",
+  "seDistance": "cách {distance}",
+  "@seDistance": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "seStopHeader": "TRẠM {n}  ·  {name}",
+  "@seStopHeader": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "seHeadline": "Tự tay khám phá di sản",
+  "seMapHint": "Bấm vào số trên bản đồ để mở hoạt động. Vào trong vòng tròn của hoạt động mới bắt đầu được.",
+  "seNoChallenges": "Trạm này không có thử thách.",
+  "seAllDone": "Đã hoàn thành mọi thử thách",
+  "seDone": "Thử thách đã làm",
+  "seAnyOrder": "Làm theo thứ tự bất kỳ. Hoạt động thực địa cần quét mã QR tại điểm để xác nhận.",
+  "sePartial": "Đúng một phần",
+  "seNoAttempts": "Đã hết lượt",
+  "seAttempts": "Đã làm {count} lượt",
+  "@seAttempts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seNotStarted": "Chưa làm",
+  "seCulturalQuiz": "Câu đố văn hóa",
+  "seFieldActivity": "Hoạt động thực địa",
+  "seLocationPuzzle": "Giải đố theo vị trí",
+  "seChallenge": "Thử thách",
+  "seQuestions": "{count} câu hỏi",
+  "@seQuestions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seScanQr": "quét QR tại điểm",
+  "seChallengeHeader": "THỬ THÁCH {n}  ·  {kind}",
+  "@seChallengeHeader": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      },
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "seMaxPoints": "Tối đa +{max} điểm",
+  "@seMaxPoints": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "seEarnedPoints": "+{earned}{max} điểm",
+  "@seEarnedPoints": {
+    "placeholders": {
+      "earned": {
+        "type": "int"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "scStopHeader": "TRẠM {n}  ·  NỘI DUNG VĂN HÓA",
+  "@scStopHeader": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  },
+  "scVideo": "Video thuyết minh",
+  "scImages": "Hình ảnh",
+  "scImageCount": "{count} ảnh",
+  "@scImageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scArtifactCount": "{count} hiện vật",
+  "@scArtifactCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scNoContent": "Đối tác chưa bổ sung nội dung văn hóa cho trạm này.",
+  "scViewImage": "Xem hình ảnh {n}",
+  "@scViewImage": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "scArtifactNumber": "HIỆN VẬT SỐ {n}",
+  "@scArtifactNumber": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  },
+  "scHasVideo": "Có video",
+  "scToExperience": "Sang phần Trải nghiệm",
+  "scBackToRoute": "Quay lại lộ trình",
+  "qrTitle": "Quét mã QR",
+  "qrHint": "Đưa mã QR tại điểm đến vào khung",
+  "qrNoPermission": "Ứng dụng chưa được cấp quyền camera. Hãy cấp quyền trong Cài đặt, hoặc nhập mã thủ công bên dưới.",
+  "qrCameraFailed": "Không mở được camera. Bạn có thể nhập mã thủ công bên dưới.",
+  "qrSlowCamera": "Camera mở chậm? Bạn có thể nhập mã in dưới QR.",
+  "qrScanned": "ĐÃ QUÉT",
+  "qrTorchOff": "Tắt đèn",
+  "qrTorchOn": "Đèn flash",
+  "qrEnterCode": "Nhập mã",
+  "qrEnterPrintedCode": "Nhập mã in dưới QR",
+  "qrCodeHelper": "Mã điểm đến bắt đầu bằng JGS-, mã hoạt động bắt đầu bằng JGE-",
+  "qrConfirmCode": "Xác nhận mã",
+  "hpStopLabel": "TRẠM {n}",
+  "@hpStopLabel": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  },
+  "hpStampSemantics": "Con dấu {label}, {name}",
+  "@hpStampSemantics": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "hpStampCount": "{stamped}/{total} dấu ấn",
+  "@hpStampCount": {
+    "placeholders": {
+      "stamped": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "hpNoStops": "Hành trình chưa có trạm nào.",
+  "hpHint": "Check-in mỗi trạm (GPS hoặc quét mã QR tại cổng) để nhận thêm một dấu ấn.",
+  "hpStamped": "Đã đóng dấu",
+  "hpStampedTitle": "Đã đóng dấu ấn!",
+  "hpUnlocked": "Đã mở khóa Nội dung văn hóa và Trải nghiệm",
+  "hcCold": "Lạnh · còn xa",
+  "hcCool": "Mát · đang đến gần",
+  "hcWarm": "Ấm · gần lắm rồi",
+  "hcHot": "Nóng! Ngay quanh đây",
+  "hcArrived": "Đã tới checkpoint",
+  "rwAwesome": "Tuyệt vời",
+  "rwBadgeUnlockBarrier": "Mở khóa huy hiệu",
+  "rwNewBadge": "Mở khóa huy hiệu mới",
+  "cmActivity": "Hoạt động {n}: {name}",
+  "@cmActivity": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "cmShowAll": "Xem tất cả",
+  "cmLegendZone": " Vùng điểm đến   ",
+  "cmLegendActivity": " Hoạt động",
+  "jlNoActiveJourney": "Bạn chưa có hành trình đang đi. Hãy đặt tour và bấm \"Bắt đầu trải nghiệm\".",
+  "jsvcCheckInInvalid": "Máy chủ trả về kết quả check-in không hợp lệ.",
+  "jsvcCheckpointInvalid": "Máy chủ trả về bản đồ checkpoint không hợp lệ.",
+  "jsvcCultureInvalid": "Máy chủ trả về nội dung văn hóa không hợp lệ.",
+  "jsvcTaskInvalid": "Máy chủ trả về nội dung nhiệm vụ không hợp lệ.",
+  "jsvcClueFailed": "Không lấy được manh mối.",
+  "jsvcSubmitInvalid": "Máy chủ trả về kết quả nộp bài không hợp lệ.",
+  "jsvcJourneyInvalid": "Máy chủ trả về dữ liệu hành trình không hợp lệ.",
+  "tjTask": "Nhiệm vụ",
+  "tjDestination": "Điểm đến",
+  "tjJourney": "Hành trình",
+  "tjActivity": "Hoạt động",
+  "progCheckedIn": "Đã check-in",
+  "locGpsOff": "GPS đang tắt. Hãy bật định vị để xác thực vị trí của bạn.",
+  "locPermissionNeeded": "Bạn cần cho phép truy cập vị trí để check-in tại điểm đến.",
+  "locPermissionBlocked": "Quyền vị trí đã bị chặn. Hãy cấp lại trong Cài đặt của ứng dụng.",
+  "locUnknown": "Chưa xác định được vị trí. Hãy ra nơi thoáng hơn rồi thử lại.",
+  "destLoadFailed": "Không thể tải chi tiết điểm đến #{id}. Vui lòng kiểm tra kết nối và thử lại.",
+  "@destLoadFailed": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "ccAudio": "Thuyết minh",
+  "ccVideo": "Video tư liệu",
+  "ccStory": "Truyền thuyết",
+  "ccImage": "Hình ảnh",
+  "cc3d": "Mô hình 3D / VR",
+  "ccArticle": "Bài viết di sản",
+  "ccNone": "Điểm đến này chưa có câu chuyện văn hóa được duyệt.",
+  "ccUnlockOnCheckIn": "Mở khóa {count} nội dung khi check-in tại điểm đến",
+  "@ccUnlockOnCheckIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ccAudioFailed": "Không mở được bản thuyết minh.",
+  "ccListen": "Nghe thuyết minh",
+  "ccHasAudio": "Có thuyết minh audio",
+  "ccSeeAll": "Xem tất cả {count} nội dung văn hóa",
+  "@ccSeeAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ccLockedCount": "{count} nội dung văn hóa · mở khóa khi check-in",
+  "@ccLockedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ccMediaFailed": "Không mở được nội dung đa phương tiện.",
+  "ccWatchVideo": "Xem video",
+  "ccOpen": "Mở nội dung",
+  "ccGallery": "Hình ảnh ({count})",
+  "@ccGallery": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ccOpenFailed": "Không mở được nội dung.",
+  "expFallbackTitle": "Trải nghiệm Di sản",
+  "payLauncherExpired": "Đã hết thời hạn thanh toán.",
+  "payAwaitingConfirmation": "Đang chờ xác nhận thanh toán...",
+  "payInvalidData": "Máy chủ trả về dữ liệu thanh toán không hợp lệ.",
+  "paySyncCancelled": "Bạn đã hủy giao dịch thanh toán.",
+  "paySyncAlreadyProcessed": "Giao dịch này đã được xử lý trước đó.",
+  "tourNotFound": "Không tìm thấy tour.",
+  "videoPlayIntro": "Phát video giới thiệu",
+  "videoCannotPlay": "Không phát được video này trong ứng dụng",
+  "videoOpenExternal": "Mở bằng ứng dụng khác",
+  "photoViewOf": "Xem ảnh {index} trên {total}",
+  "@photoViewOf": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "photoCredit": "Ảnh: {credit}",
+  "@photoCredit": {
+    "placeholders": {
+      "credit": {
+        "type": "String"
+      }
+    }
+  },
+  "photoSource": "Nguồn ảnh: {credit}",
+  "@photoSource": {
+    "placeholders": {
+      "credit": {
+        "type": "String"
+      }
+    }
+  },
+  "navCheckInNow": "Check-in ngay"
+}

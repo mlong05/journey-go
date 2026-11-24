@@ -25,6 +25,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/services/invitation_deep_link_service.dart';
 import '../../core/services/token_storage.dart';
 import 'invitation_accept_screen.dart';
+import '../../l10n/locale_controller.dart';
 
 class InvitationDeepLinkHost extends StatefulWidget {
   final Widget child;
@@ -112,8 +113,8 @@ class _InvitationDeepLinkHostState extends State<InvitationDeepLinkHost> {
             behavior: SnackBarBehavior.floating,
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             backgroundColor: AppCultureColors.heritageJade,
-            content: const Text(
-              'Bạn được mời tham gia tour. Vui lòng đăng nhập để xác nhận lời mời.',
+            content: Text(
+              appL10n.invLoginSnack,
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
             ),
             duration: const Duration(seconds: 5),

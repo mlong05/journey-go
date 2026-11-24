@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/models/booking_model.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/core/models/tour_detail_model.dart';
 import 'package:mobile/screens/tours/booking_group_sheet.dart';
 
@@ -72,6 +73,9 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(MaterialApp(
+          locale: const Locale('vi'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Scaffold(
           body: Builder(
             builder: (ctx) => ElevatedButton(
@@ -113,6 +117,9 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(MaterialApp(
+          locale: const Locale('vi'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Scaffold(
           body: Builder(
             builder: (ctx) => ElevatedButton(

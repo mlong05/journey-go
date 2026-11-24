@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/forum_model.dart';
 import '../common/heritage_motion.dart';
 import '../common/live_time.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Màu trái tim khi đã thả tim.
 const Color _heartColor = AppCultureColors.lacquer500;
@@ -98,8 +99,8 @@ Future<({String reason, String? description})?> askReportReason(BuildContext con
       return StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-          title: const Text(
-            'Báo cáo bài viết',
+          title: Text(
+            context.l10n.forumReportPost,
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           content: SingleChildScrollView(
@@ -130,7 +131,7 @@ Future<({String reason, String? description})?> askReportReason(BuildContext con
                   maxLength: 500,
                   maxLines: 3,
                   decoration: InputDecoration(
-                    labelText: 'Mô tả thêm (không bắt buộc)',
+                    labelText: context.l10n.forumReportDescription,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
@@ -138,14 +139,14 @@ Future<({String reason, String? description})?> askReportReason(BuildContext con
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Hủy')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(context.l10n.commonCancel)),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop((
                 reason: selected,
                 description: description.text.trim().isEmpty ? null : description.text.trim(),
               )),
               style: FilledButton.styleFrom(backgroundColor: AppCultureColors.error),
-              child: const Text('Gửi báo cáo'),
+              child: Text(context.l10n.forumSendReport),
             ),
           ],
         ),
@@ -159,7 +160,7 @@ Future<bool> confirmAction(
   BuildContext context, {
   required String title,
   required String message,
-  String confirmLabel = 'Đồng ý',
+  String? confirmLabel,
   bool destructive = false,
 }) async {
   final ok = await showDialog<bool>(
@@ -169,13 +170,13 @@ Future<bool> confirmAction(
       title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       content: Text(message, style: const TextStyle(fontSize: 13.5, height: 1.45)),
       actions: [
-        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Hủy')),
+        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(context.l10n.commonCancel)),
         FilledButton(
           onPressed: () => Navigator.of(ctx).pop(true),
           style: FilledButton.styleFrom(
             backgroundColor: destructive ? AppCultureColors.error : AppCultureColors.heritageJade,
           ),
-          child: Text(confirmLabel),
+          child: Text(confirmLabel ?? context.l10n.forumAgree),
         ),
       ],
     ),
@@ -297,12 +298,12 @@ class _ForumPostCardState extends State<ForumPostCard> {
                               color: AppCultureColors.jade50,
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(Icons.verified_rounded, size: 12, color: AppCultureColors.jade600),
                                 SizedBox(width: 3),
-                                Text('Đã tham gia tour',
+                                Text(context.l10n.forumJoinedTour,
                                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppCultureColors.jade600)),
                               ],
                             ),
@@ -372,7 +373,7 @@ class _ForumPostCardState extends State<ForumPostCard> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    _expanded ? 'Thu gọn' : 'Xem thêm',
+                                    _expanded ? context.l10n.commonShowLess : context.l10n.commonShowMore,
                                     style: const TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.w600,
@@ -430,7 +431,7 @@ class _ForumPostCardState extends State<ForumPostCard> {
                   border: Border(left: BorderSide(color: status.color, width: 3)),
                 ),
                 child: Text(
-                  'Phản hồi từ kiểm duyệt viên: ${post.moderationNote}',
+                  context.l10n.forumModeratorFeedback(post.moderationNote ?? ''),
                   style: TextStyle(fontSize: 12.5, height: 1.45, color: status.color),
                 ),
               ),
@@ -771,7 +772,7 @@ class _ForumImageViewerState extends State<_ForumImageViewer> {
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close_rounded, color: Colors.white),
-                    tooltip: 'Đóng',
+                    tooltip: context.l10n.commonClose,
                   ),
                   const Spacer(),
                   if (widget.urls.length > 1)
@@ -834,7 +835,7 @@ Future<ForumOption?> showForumOptionPicker(
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(const ForumOption(-1, '')),
-                  child: const Text('Bỏ chọn'),
+                  child: Text(context.l10n.forumDeselect),
                 ),
               ],
             ),
@@ -853,8 +854,8 @@ Future<ForumOption?> showForumOptionPicker(
                       padding: const EdgeInsets.all(24),
                       child: Text(
                         snapshot.hasError
-                            ? 'Không tải được danh sách. Vui lòng thử lại sau.'
-                            : 'Chưa có mục nào để chọn.',
+                            ? context.l10n.forumListLoadFailed
+                            : context.l10n.forumNothingToPick,
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: AppCultureColors.textMuted),
                       ),

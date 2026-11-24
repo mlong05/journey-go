@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Hiệu ứng "+điểm" bay lên giữa màn hình rồi mờ dần, kèm vài ngôi sao tỏa ra. Tự gỡ sau khi chạy xong.
 void showPointsBurst(
@@ -142,12 +143,12 @@ Future<void> showBadgeUnlock(
   required String badgeName,
   String? badgeIconUrl,
   required String subtitle,
-  String buttonLabel = 'Tuyệt vời',
+  String? buttonLabel,
 }) {
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: false,
-    barrierLabel: 'Mở khóa huy hiệu',
+    barrierLabel: appL10n.rwBadgeUnlockBarrier,
     barrierColor: const Color(0xF5FFFBF2), // giấy sáng 96%
     transitionDuration: const Duration(milliseconds: 250),
     transitionBuilder: (ctx, anim, _, child) =>
@@ -156,7 +157,7 @@ Future<void> showBadgeUnlock(
       badgeName: badgeName,
       badgeIconUrl: badgeIconUrl,
       subtitle: subtitle,
-      buttonLabel: buttonLabel,
+      buttonLabel: buttonLabel ?? appL10n.rwAwesome,
     ),
   );
 }
@@ -254,8 +255,8 @@ class _BadgeUnlockViewState extends State<_BadgeUnlockView>
                 const Spacer(flex: 2),
                 Opacity(
                   opacity: textIn,
-                  child: const Text(
-                    'Mở khóa huy hiệu mới',
+                  child: Text(
+                    appL10n.rwNewBadge,
                     style: TextStyle(
                       color: AppCultureColors.brass800,
                       fontSize: 13,

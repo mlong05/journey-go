@@ -7,10 +7,15 @@ import 'core/services/token_storage.dart';
 import 'screens/tourist_home_screen.dart';
 
 import 'core/constants/app_colors.dart';
+import './l10n/locale_controller.dart';
 
 /// Màn hình Đăng nhập & Đăng ký Khách du lịch (Tourist Auth Screen)
 class TouristAuthScreen extends StatefulWidget {
-  const TouristAuthScreen({super.key});
+  /// Khác null ⇒ chế độ ĐĂNG NHẬP LẠI khi hết phiên: màn được mở đè lên màn đang xem,
+  /// hiện câu báo này, đăng nhập xong `pop` trả về [UserModel] để quay lại đúng màn cũ.
+  final String? reloginMessage;
+
+  const TouristAuthScreen({super.key, this.reloginMessage});
 
   @override
   State<TouristAuthScreen> createState() => _TouristAuthScreenState();
@@ -54,9 +59,38 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
   // Trạng thái hiệu ứng nảy (Active Scale) khi nhấn CTA
   bool _isButtonPressed = false;
 
+  bool get _isRelogin => widget.reloginMessage != null;
+
+  /// Đăng nhập / đăng ký xong: chế độ đăng nhập lại ⇒ quay về màn đang xem;
+  /// bình thường ⇒ vào Trang chủ.
+  void _finishAuth(UserModel user) {
+    if (_isRelogin) {
+      Navigator.of(context).pop(user);
+      return;
+    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TouristHomeScreen(initialUser: user),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+    if (_isRelogin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.reloginMessage!),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      });
+    }
     // Khôi phục email đã ghi nhớ nếu có
     TokenStorage.getSavedEmail().then((saved) {
       if (saved != null && saved.isNotEmpty && mounted) {
@@ -138,20 +172,15 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
         });
 
         _showSuccessFeedback(
-          title: 'Đăng nhập thành công!',
-          message: 'Chào mừng du khách ${auth.user.fullName} quay trở lại với Di sản Việt Nam.',
+          title: appL10n.authLoginSuccess,
+          message: appL10n.authWelcomeBackName(auth.user.fullName),
           isReward: false,
         );
 
         await Future.delayed(const Duration(milliseconds: 300));
         if (!mounted) return;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => TouristHomeScreen(initialUser: auth.user),
-          ),
-        );
+        _finishAuth(auth.user);
       } else {
         // ĐĂNG KÝ (POST /api/v1/auth/register) VỚI ROLE USER
         final cleanPhone = _phoneController.text.replaceAll(RegExp(r'\s+'), '').trim();
@@ -175,20 +204,15 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
         });
 
         _showSuccessFeedback(
-          title: 'Khởi tạo tài khoản thành công!',
-          message: '🎉 Quý khách đã nhận được +100 điểm thưởng khám phá di sản!',
+          title: appL10n.authSignupSuccess,
+          message: appL10n.authSignupReward,
           isReward: true,
         );
 
         await Future.delayed(const Duration(milliseconds: 300));
         if (!mounted) return;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => TouristHomeScreen(initialUser: auth.user),
-          ),
-        );
+        _finishAuth(auth.user);
       }
     } on AuthRoleException {
       // TUYỆT ĐỐI KHÔNG hiển thị dialog lộ thông tin vai trò hệ thống
@@ -198,7 +222,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
         _isLoading = false;
       });
       _showErrorFeedback(
-        title: 'Đăng nhập không thành công',
+        title: appL10n.authLoginFailed,
         message: kInvalidAuthErrorMessage,
       );
     } catch (e) {
@@ -217,17 +241,17 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                 rawError.contains('không hợp lệ') ||
                 rawError.contains('401') ||
                 rawError.contains('403'))
-            ? kInvalidAuthErrorMessage
-            : (rawError.isNotEmpty ? rawError : kInvalidAuthErrorMessage);
+            ? appL10n.authInvalid
+            : (rawError.isNotEmpty && rawError != kInvalidAuthErrorMessage ? rawError : appL10n.authInvalid);
       } else {
         // Luồng ĐĂNG KÝ: Hiển thị thông báo nghiệp vụ chi tiết từ backend (email trùng lặp, định dạng...)
         displayMessage = (rawError.contains('vai trò') || rawError.contains('Role'))
-            ? kInvalidAuthErrorMessage
-            : (rawError.isNotEmpty ? rawError : 'Đăng ký tài khoản không thành công. Vui lòng thử lại.');
+            ? appL10n.authInvalid
+            : (rawError.isNotEmpty ? rawError : appL10n.authSignupFailedMessage);
       }
 
       _showErrorFeedback(
-        title: _isLogin ? 'Đăng nhập không thành công' : 'Đăng ký không thành công',
+        title: _isLogin ? appL10n.authLoginFailed : appL10n.authSignupFailed,
         message: displayMessage,
       );
     }
@@ -330,7 +354,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
           auth = await _authService.loginWithGoogle(idToken: idToken);
         } else if (provider.toLowerCase().contains('apple')) {
           // TODO: tích hợp sign_in_with_apple sau. Hiện tại chưa hỗ trợ Apple trên Android.
-          throw Exception('Đăng nhập Apple ID hiện chưa hỗ trợ trên Android.');
+          throw Exception(appL10n.authAppleUnsupported);
         }
       }
 
@@ -348,20 +372,15 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
         });
 
         _showSuccessFeedback(
-          title: 'Đăng nhập thành công!',
-          message: 'Chào mừng quý khách quay trở lại với JourneyGo!',
+          title: appL10n.authLoginSuccess,
+          message: appL10n.authWelcomeBack,
           isReward: false,
         );
 
         await Future.delayed(const Duration(milliseconds: 250));
         if (!mounted) return;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => TouristHomeScreen(initialUser: loggedInUser),
-          ),
-        );
+        _finishAuth(loggedInUser);
       }
     } on AuthRoleException {
       // TUYỆT ĐỐI KHÔNG hiển thị dialog lộ thông tin vai trò hệ thống
@@ -371,7 +390,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
         _isLoading = false;
       });
       _showErrorFeedback(
-        title: 'Đăng nhập không thành công',
+        title: appL10n.authLoginFailed,
         message: kInvalidAuthErrorMessage,
       );
     } catch (e) {
@@ -387,11 +406,11 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
               rawError.contains('không hợp lệ') ||
               rawError.contains('401') ||
               rawError.contains('403'))
-          ? kInvalidAuthErrorMessage
-          : (rawError.isNotEmpty ? rawError : kInvalidAuthErrorMessage);
+          ? appL10n.authInvalid
+          : (rawError.isNotEmpty && rawError != kInvalidAuthErrorMessage ? rawError : appL10n.authInvalid);
 
       _showErrorFeedback(
-        title: 'Đăng nhập không thành công',
+        title: appL10n.authLoginFailed,
         message: displayMessage,
       );
     }
@@ -511,7 +530,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Row(
+                  Row(
                     children: [
                       Icon(
                         Icons.verified_user_rounded,
@@ -520,7 +539,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                       ),
                       SizedBox(width: 8),
                       Text(
-                        'Tiêu chuẩn Di sản số',
+                        context.l10n.authPrivacyTitle,
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -536,8 +555,8 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                 ],
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Dữ liệu của du khách được mã hóa an toàn theo tiêu chuẩn bảo tồn văn hóa số quốc gia. Chúng tôi cam kết tuyệt đối bảo mật thông tin định danh, lịch sử chuyến đi và tài sản điểm thưởng di sản của quý khách.',
+              Text(
+                context.l10n.authPrivacyBody,
                 style: TextStyle(
                   fontSize: 13.5,
                   color: AppCultureColors.textMuted,
@@ -557,8 +576,8 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Đã hiểu và đồng ý',
+                  child: Text(
+                    context.l10n.authPrivacyAgree,
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
@@ -575,6 +594,14 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Đăng nhập lại khi hết phiên: không cho vuốt/bấm quay lại màn cũ khi chưa có phiên.
+    return PopScope(
+      canPop: !_isRelogin,
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: AppCultureColors.background,
       body: GestureDetector(
@@ -632,18 +659,18 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                           // Các trường chỉ hiển thị khi ĐĂNG KÝ
                           if (!_isLogin) ...[
                             _buildInputField(
-                              label: 'Họ và tên',
-                              hintText: 'Nguyễn Văn An',
+                              label: context.l10n.authFullName,
+                              hintText: context.l10n.authFullNameExample,
                               controller: _fullNameController,
                               focusNode: _fullNameFocus,
                               prefixIcon: Icons.badge_outlined,
                               textCapitalization: TextCapitalization.words,
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Vui lòng nhập họ và tên của quý khách';
+                                  return context.l10n.authErrNameRequired;
                                 }
                                 if (value.trim().length < 2) {
-                                  return 'Họ tên quá ngắn';
+                                  return context.l10n.authErrNameShort;
                                 }
                                 return null;
                               },
@@ -661,13 +688,13 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                             keyboardType: TextInputType.emailAddress,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Vui lòng nhập địa chỉ email';
+                                return context.l10n.authErrEmailRequired;
                               }
                               final emailRegex = RegExp(
                                 r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
                               );
                               if (!emailRegex.hasMatch(value.trim())) {
-                                return 'Định dạng email chưa hợp lệ';
+                                return context.l10n.authErrEmailInvalid;
                               }
                               return null;
                             },
@@ -677,7 +704,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                           // Trường Số điện thoại (Chỉ hiển thị khi ĐĂNG KÝ)
                           if (!_isLogin) ...[
                             _buildInputField(
-                              label: 'Số điện thoại',
+                              label: context.l10n.authPhone,
                               hintText: '0987 654 321',
                               controller: _phoneController,
                               focusNode: _phoneFocus,
@@ -685,13 +712,13 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                               keyboardType: TextInputType.phone,
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Vui lòng cung cấp số điện thoại';
+                                  return context.l10n.authErrPhoneRequired;
                                 }
                                 final cleanPhone =
                                     value.replaceAll(RegExp(r'\s+'), '');
                                 if (cleanPhone.length < 9 ||
                                     cleanPhone.length > 11) {
-                                  return 'Số điện thoại gồm 9 - 11 chữ số';
+                                  return context.l10n.authErrPhoneLength;
                                 }
                                 return null;
                               },
@@ -701,8 +728,8 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
 
                           // Trường Mật khẩu (Dùng cho cả 2 tab)
                           _buildInputField(
-                            label: 'Mật khẩu',
-                            hintText: _isLogin ? 'Nhập mật khẩu' : 'Tối thiểu 6 ký tự',
+                            label: context.l10n.authPassword,
+                            hintText: _isLogin ? context.l10n.authPasswordHintLogin : context.l10n.authPasswordHintSignup,
                             controller: _passwordController,
                             focusNode: _passwordFocus,
                             prefixIcon: Icons.lock_outline_rounded,
@@ -724,10 +751,10 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Vui lòng nhập mật khẩu';
+                                return context.l10n.authErrPasswordRequired;
                               }
                               if (value.length < 6) {
-                                return 'Mật khẩu phải chứa ít nhất 6 ký tự';
+                                return context.l10n.authErrPasswordShort;
                               }
                               return null;
                             },
@@ -737,8 +764,8 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                           if (!_isLogin) ...[
                             const SizedBox(height: 14),
                             _buildInputField(
-                              label: 'Nhập lại mật khẩu',
-                              hintText: 'Nhập lại mật khẩu vừa tạo',
+                              label: context.l10n.authConfirmPassword,
+                              hintText: context.l10n.authConfirmPasswordHint,
                               controller: _confirmPasswordController,
                               focusNode: _confirmPasswordFocus,
                               prefixIcon: Icons.verified_user_outlined,
@@ -761,10 +788,10 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Vui lòng nhập lại mật khẩu';
+                                  return context.l10n.authErrConfirmRequired;
                                 }
                                 if (value != _passwordController.text) {
-                                  return 'Mật khẩu xác nhận không khớp';
+                                  return context.l10n.authErrConfirmMismatch;
                                 }
                                 return null;
                               },
@@ -847,8 +874,8 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                 duration: const Duration(milliseconds: 200),
                 child: Text(
                   _isLogin
-                      ? 'Chào mừng trở lại! Đăng nhập để tiếp tục hành trình.'
-                      : 'Tạo tài khoản để khám phá di sản và nhận điểm thưởng.',
+                      ? context.l10n.authHeaderLogin
+                      : context.l10n.authHeaderSignup,
                   key: ValueKey(_isLogin),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
@@ -928,7 +955,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                                 ? AppCultureColors.oceanBlue
                                 : AppCultureColors.textMuted,
                           ),
-                          child: const Text('Đăng nhập'),
+                          child: Text(context.l10n.authLogin),
                         ),
                       ),
                     ),
@@ -948,7 +975,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                                 ? AppCultureColors.heritageJade
                                 : AppCultureColors.textMuted,
                           ),
-                          child: const Text('Tạo tài khoản'),
+                          child: Text(context.l10n.authSignup),
                         ),
                       ),
                     ),
@@ -987,7 +1014,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
           const SizedBox(width: 10),
           Expanded(
             child: RichText(
-              text: const TextSpan(
+              text: TextSpan(
                 style: TextStyle(
                   color: AppCultureColors.rewardText,
                   fontSize: 12.5,
@@ -995,14 +1022,14 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                 ),
                 children: [
                   TextSpan(
-                    text: 'Nhận ngay ',
+                    text: context.l10n.authPromoPrefix,
                   ),
                   TextSpan(
-                    text: '+100 điểm thưởng ',
+                    text: context.l10n.authPromoPoints,
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   TextSpan(
-                    text: 'khám phá di sản khi tạo tài khoản mới!',
+                    text: context.l10n.authPromoSuffix,
                   ),
                 ],
               ),
@@ -1155,8 +1182,8 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
                       : null,
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'Ghi nhớ đăng nhập',
+                Text(
+                  context.l10n.authRemember,
                   style: TextStyle(
                     fontSize: 12.5,
                     color: AppCultureColors.textMuted,
@@ -1176,8 +1203,8 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          child: const Text(
-            'Quên mật khẩu?',
+          child: Text(
+            context.l10n.authForgot,
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
@@ -1198,7 +1225,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
     final Color buttonColor =
         _isLogin ? AppCultureColors.oceanBlue : AppCultureColors.heritageJade;
     final String buttonLabel =
-        _isLogin ? 'Đăng nhập' : 'Tạo tài khoản ';
+        _isLogin ? context.l10n.authLogin : context.l10n.authSignup;
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _isButtonPressed = true),
@@ -1285,7 +1312,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
     return Column(
       children: [
         // Dòng phân cách "HOẶC TIẾP TỤC VỚI"
-        const Row(
+        Row(
           children: [
             Expanded(
               child: Divider(
@@ -1296,7 +1323,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 12.0),
               child: Text(
-                'hoặc tiếp tục với',
+                context.l10n.authOrContinue,
                 style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w600,
@@ -1320,7 +1347,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
         SizedBox(
           width: double.infinity,
           child: _buildSocialButton(
-            label: 'Tiếp tục với Google',
+            label: context.l10n.authGoogle,
             iconWidget: CustomPaint(
               size: const Size(18, 18),
               painter: GoogleLogoPainter(),
@@ -1385,7 +1412,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
       child: InkWell(
         onTap: _showTermsModal,
         borderRadius: BorderRadius.circular(8),
-        child: const Padding(
+        child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1398,7 +1425,7 @@ class _TouristAuthScreenState extends State<TouristAuthScreen>
               SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  'Bảo mật theo tiêu chuẩn Di sản Văn hóa số • Điều khoản',
+                  context.l10n.authFooter,
                   style: TextStyle(
                     fontSize: 11.5,
                     color: AppCultureColors.textMuted,

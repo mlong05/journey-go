@@ -1,3 +1,4 @@
+import '../../l10n/locale_controller.dart';
 // Model của chuyến đi thực tế (API /journeys): điểm đến, nhiệm vụ, câu hỏi và kết quả.
 // Khác với `journey_model.dart` (nhật ký cục bộ), các model ở đây phản ánh đúng dữ liệu backend.
 
@@ -52,7 +53,7 @@ class JourneyTask {
 
   factory JourneyTask.fromJson(Map<String, dynamic> j) => JourneyTask(
         taskId: _int(j['taskId']),
-        name: _str(j['taskName'], 'Nhiệm vụ'),
+        name: _str(j['taskName'], appL10n.tjTask),
         type: _str(j['taskType']),
         orderIndex: _int(j['orderIndex']),
         status: _str(j['status'], ProgressStatus.notStarted),
@@ -101,7 +102,7 @@ class JourneyDestination {
       ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
     return JourneyDestination(
       destinationId: _int(j['destinationId']),
-      name: _str(j['destinationName'], 'Điểm đến'),
+      name: _str(j['destinationName'], appL10n.tjDestination),
       orderIndex: _int(j['orderIndex']),
       experienceId: _intOrNull(j['experienceId']),
       status: _str(j['status'], ProgressStatus.notStarted),
@@ -161,7 +162,7 @@ class TourJourney {
       id: _int(j['id']),
       tourId: _int(j['tourId']),
       bookingId: _intOrNull(j['bookingId']),
-      tourName: _str(j['tourName'], 'Hành trình'),
+      tourName: _str(j['tourName'], appL10n.tjJourney),
       status: _str(j['status']),
       currentOrder: _int(j['currentDestinationOrder'], 1),
       totalDestinations: _int(j['totalDestinations'], dests.length),
@@ -299,7 +300,7 @@ class TaskStation {
   });
 
   factory TaskStation.fromJson(Map<String, dynamic> j) => TaskStation(
-        name: _str(j['name'], 'Trạm kế tiếp'),
+        name: _str(j['name'], appL10n.jsNextStop),
         latitude: _doubleOrNull(j['latitude']),
         longitude: _doubleOrNull(j['longitude']),
         radiusMeters: _intOrNull(j['radiusMeters']),
@@ -366,7 +367,7 @@ class TaskContent {
     final station = j['station'];
     return TaskContent(
       taskId: _int(j['taskId']),
-      name: _str(j['taskName'], 'Nhiệm vụ'),
+      name: _str(j['taskName'], appL10n.tjTask),
       type: _str(j['taskType']),
       description: _str(j['description']),
       pointsReward: _int(j['pointsReward']),
@@ -511,7 +512,7 @@ class StopCheckpoint {
     if (lat == null || lng == null) return null;
     return StopCheckpoint(
       taskId: _int(j['taskId']),
-      name: _str(j['name'], 'Hoạt động'),
+      name: _str(j['name'], appL10n.tjActivity),
       orderIndex: _int(j['orderIndex']),
       latitude: lat,
       longitude: lng,

@@ -12,6 +12,7 @@ import '../common/ink.dart';
 import 'map_kit.dart' show distanceMeters, formatDistance;
 import 'stop_checkpoints_map.dart';
 import 'task_screen.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Phần "Trải nghiệm" của một trạm, mở sau khi check-in: các thử thách (câu đố, hoạt động thực địa) tại điểm.
 ///
@@ -86,7 +87,7 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
     final user = _user;
     if (c == null || user == null) return null;
     final d = distanceMeters(user, LatLng(c.latitude, c.longitude));
-    return d <= c.radiusMeters ? 'bạn đang ở trong vùng' : 'cách ${formatDistance(d)}';
+    return d <= c.radiusMeters ? appL10n.seInZone : appL10n.seDistance(formatDistance(d));
   }
 
   void _openCheckpoint(StopCheckpoint c) {
@@ -158,7 +159,7 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
           backgroundColor: AppInk.paper,
           surfaceTintColor: Colors.transparent,
           foregroundColor: AppInk.ink,
-          title: Text('Trải nghiệm', style: AppType.display(size: 18)),
+          title: Text(appL10n.jsExperienceTitle, style: AppType.display(size: 18)),
         ),
         body: RefreshIndicator(
           color: AppInk.accent,
@@ -168,13 +169,13 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
             children: [
               Text(
-                'TRẠM ${_dest.orderIndex.toString().padLeft(2, '0')}  ·  ${_dest.name.toUpperCase()}',
+                appL10n.seStopHeader(_dest.orderIndex.toString().padLeft(2, '0'), _dest.name.toUpperCase()),
                 style: AppType.eyebrow(),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 6),
-              Text('Tự tay khám phá di sản', style: AppType.display(size: 24)),
+              Text(appL10n.seHeadline, style: AppType.display(size: 24)),
               const SizedBox(height: 16),
               _summary(done, tasks.length, points),
               if ((_checkpoints?.checkpoints.isNotEmpty ?? false)) ...[
@@ -187,14 +188,14 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
                   onTapCheckpoint: _openCheckpoint,
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'Bấm vào số trên bản đồ để mở hoạt động. Vào trong vòng tròn của hoạt động mới bắt đầu được.',
+                Text(
+                  appL10n.seMapHint,
                   style: TextStyle(fontSize: 11.5, color: AppInk.muted, height: 1.4),
                 ),
               ],
               const SizedBox(height: 24),
               if (tasks.isEmpty)
-                const Text('Trạm này không có thử thách.', style: TextStyle(color: AppInk.muted))
+                Text(appL10n.seNoChallenges, style: const TextStyle(color: AppInk.muted))
               else
                 for (var i = 0; i < tasks.length; i++) _challenge(tasks[i], i + 1),
             ],
@@ -245,12 +246,12 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  done == total && total > 0 ? 'Đã hoàn thành mọi thử thách' : 'Thử thách đã làm',
+                  done == total && total > 0 ? appL10n.seAllDone : appL10n.seDone,
                   style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppInk.ink),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  'Làm theo thứ tự bất kỳ. Hoạt động thực địa cần quét mã QR tại điểm để xác nhận.',
+                Text(
+                  appL10n.seAnyOrder,
                   style: TextStyle(fontSize: 12.5, height: 1.4, color: AppInk.muted),
                 ),
               ],
@@ -260,7 +261,7 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
           Column(
             children: [
               Text('$points', style: AppType.display(size: 22, color: AppCultureColors.amberDark)),
-              const Text('điểm', style: TextStyle(fontSize: 11.5, color: AppInk.muted)),
+              Text(appL10n.wPointsUnit, style: const TextStyle(fontSize: 11.5, color: AppInk.muted)),
             ],
           ),
         ],
@@ -274,25 +275,25 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
     final activity = _activityOf(task);
     final max = _maxPoints(task);
     final (String status, Color tone, IconData statusIcon) = task.isPassed
-        ? ('Hoàn thành', AppInk.accent, Icons.check_circle_rounded)
+        ? (appL10n.jsCompletedBadge, AppInk.accent, Icons.check_circle_rounded)
         : task.isCompleted
-        ? ('Đúng một phần', AppCultureColors.amberDark, Icons.timelapse_rounded)
+        ? (appL10n.sePartial, AppCultureColors.amberDark, Icons.timelapse_rounded)
         : task.isFailed
-        ? ('Đã hết lượt', AppCultureColors.error, Icons.cancel_outlined)
+        ? (appL10n.seNoAttempts, AppCultureColors.error, Icons.cancel_outlined)
         : task.attempts > 0
-        ? ('Đã làm ${task.attempts} lượt', AppInk.ink, Icons.replay_rounded)
-        : ('Chưa làm', AppInk.muted, Icons.radio_button_unchecked_rounded);
+        ? (appL10n.seAttempts(task.attempts), AppInk.ink, Icons.replay_rounded)
+        : (appL10n.seNotStarted, AppInk.muted, Icons.radio_button_unchecked_rounded);
     final kind = quiz
-        ? 'Câu đố văn hóa'
+        ? appL10n.seCulturalQuiz
         : field
-        ? 'Hoạt động thực địa'
+        ? appL10n.seFieldActivity
         : (task.type.toUpperCase().contains('PUZZLE') || task.type.toUpperCase().contains('GPS'))
-        ? 'Giải đố theo vị trí'
-        : 'Thử thách';
+        ? appL10n.seLocationPuzzle
+        : appL10n.seChallenge;
     final meta = <String>[
-      if (quiz && (widget.stop?.quizCount ?? 0) > 0) '${widget.stop!.quizCount} câu hỏi',
+      if (quiz && (widget.stop?.quizCount ?? 0) > 0) appL10n.seQuestions(widget.stop!.quizCount),
       if (activity?.formattedDuration != null) activity!.formattedDuration!,
-      if (field) 'quét QR tại điểm',
+      if (field) appL10n.seScanQr,
       if (task.isOpen) ?_distanceLabel(task),
     ];
 
@@ -334,7 +335,7 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'THỬ THÁCH ${index.toString().padLeft(2, '0')}  ·  ${kind.toUpperCase()}',
+                            appL10n.seChallengeHeader(index.toString().padLeft(2, '0'), kind.toUpperCase()),
                             style: AppType.eyebrow(color: AppInk.muted),
                           ),
                           const SizedBox(height: 3),
@@ -359,8 +360,8 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
                     const Spacer(),
                     Text(
                       task.isOpen
-                          ? (max != null ? 'Tối đa +$max điểm' : '')
-                          : '+${task.pointsEarned}${max != null ? '/$max' : ''} điểm',
+                          ? (max != null ? appL10n.seMaxPoints(max) : '')
+                          : appL10n.seEarnedPoints(task.pointsEarned, max != null ? '/$max' : ''),
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppCultureColors.amberDark),
                     ),
                     if (task.isOpen) ...[
@@ -371,7 +372,7 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
                         alignment: Alignment.center,
                         decoration: const ShapeDecoration(color: AppInk.accent, shape: StadiumBorder()),
                         child: Text(
-                          task.attempts > 0 ? 'Làm lại' : 'Bắt đầu',
+                          task.attempts > 0 ? appL10n.tkRetry : appL10n.tripsStart,
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
                         ),
                       ),

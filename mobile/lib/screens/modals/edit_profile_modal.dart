@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/auth_models.dart';
 import '../../core/services/auth_service.dart';
+import '../../l10n/locale_controller.dart';
 
 class EditProfileModal extends StatefulWidget {
   final UserModel currentUser;
@@ -41,7 +42,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Họ tên không được để trống!')),
+        SnackBar(content: Text(context.l10n.epNameRequired)),
       );
       return;
     }
@@ -61,8 +62,8 @@ class _EditProfileModalState extends State<EditProfileModal> {
         widget.onProfileUpdated?.call(updatedUser);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cập nhật hồ sơ cá nhân thành công qua máy chủ!'),
+          SnackBar(
+            content: Text(context.l10n.epSaved),
             backgroundColor: AppCultureColors.heritageJade,
           ),
         );
@@ -109,8 +110,8 @@ class _EditProfileModalState extends State<EditProfileModal> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Chỉnh Sửa Hồ Sơ Du Khách',
+              Text(
+                context.l10n.epTitle,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -161,8 +162,8 @@ class _EditProfileModalState extends State<EditProfileModal> {
           const SizedBox(height: 20),
 
           // Email (read only)
-          const Text(
-            'Email tài khoản (không thể thay đổi):',
+          Text(
+            context.l10n.epEmailLabel,
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppCultureColors.textMuted),
           ),
           const SizedBox(height: 6),
@@ -183,15 +184,15 @@ class _EditProfileModalState extends State<EditProfileModal> {
           const SizedBox(height: 16),
 
           // Full Name input
-          const Text(
-            'Họ và tên:',
+          Text(
+            context.l10n.epNameLabel,
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
           ),
           const SizedBox(height: 6),
           TextField(
             controller: _nameController,
             decoration: InputDecoration(
-              hintText: 'Nhập họ và tên đầy đủ',
+              hintText: context.l10n.epNameHint,
               filled: true,
               fillColor: AppCultureColors.surfaceSubtle,
               border: OutlineInputBorder(
@@ -212,8 +213,8 @@ class _EditProfileModalState extends State<EditProfileModal> {
           const SizedBox(height: 16),
 
           // Phone input
-          const Text(
-            'Số điện thoại:',
+          Text(
+            context.l10n.epPhoneLabel,
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
           ),
           const SizedBox(height: 6),
@@ -221,7 +222,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
             controller: _phoneController,
             keyboardType: TextInputType.phone,
             decoration: InputDecoration(
-              hintText: 'Nhập số điện thoại liên hệ',
+              hintText: context.l10n.epPhoneHint,
               filled: true,
               fillColor: AppCultureColors.surfaceSubtle,
               border: OutlineInputBorder(
@@ -254,7 +255,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
               child: _isSaving
-                  ? const Row(
+                  ? Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         SizedBox(
@@ -264,13 +265,13 @@ class _EditProfileModalState extends State<EditProfileModal> {
                         ),
                         SizedBox(width: 12),
                         Text(
-                          'Đang lưu thay đổi lên máy chủ...',
+                          context.l10n.epSaving,
                           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                         ),
                       ],
                     )
-                  : const Text(
-                      'Lưu Thông Tin Mới',
+                  : Text(
+                      context.l10n.epSave,
                       style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                     ),
             ),

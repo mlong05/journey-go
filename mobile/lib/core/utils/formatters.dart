@@ -7,6 +7,8 @@
 ///  • `experienceDate` là `LocalDate` (`YYYY-MM-DD`) — không có phần giờ.
 library;
 
+import '../../l10n/locale_controller.dart';
+
 /// Định dạng số tiền VND kèm ký hiệu đồng. 1500000 → "1.500.000 đ"
 String formatVndAmount(dynamic value) {
   final amount = toAmount(value);
@@ -17,7 +19,7 @@ String formatVndAmount(dynamic value) {
     buffer.write(digits[i]);
   }
   final sign = amount < 0 ? '-' : '';
-  return '$sign${buffer.toString()} đ';
+  return '$sign${appL10n.priceVnd(buffer.toString())}';
 }
 
 /// Định dạng số tiền VND không ký hiệu. 1500000 → "1.500.000"
@@ -87,45 +89,47 @@ String todayLocalDate() {
   return '${now.year}-$mm-$dd';
 }
 
-/// Nhãn tiếng Việt cho trạng thái booking.
+/// Nhãn trạng thái booking theo ngôn ngữ đang chọn.
 String bookingStatusLabel(String? status) {
+  final l10n = appL10n;
   switch (status) {
     case 'PENDING_PAYMENT':
-      return 'Chờ thanh toán';
+      return l10n.statusPendingPayment;
     case 'CONFIRMED':
-      return 'Đã xác nhận';
+      return l10n.statusConfirmed;
     case 'COMPLETED':
-      return 'Đã hoàn thành';
+      return l10n.statusCompleted;
     case 'EXPIRED':
-      return 'Đã hết hạn';
+      return l10n.statusExpired;
     case 'CANCELLED':
-      return 'Đã hủy';
+      return l10n.statusCancelled;
     default:
-      return status ?? 'Không rõ';
+      return status ?? l10n.statusUnknown;
   }
 }
 
-/// Nhãn tiếng Việt cho trạng thái thanh toán.
+/// Nhãn trạng thái thanh toán theo ngôn ngữ đang chọn.
 /// `PROCESSING` là đang xử lý — KHÔNG phải lỗi.
 String paymentStatusLabel(String? status) {
+  final l10n = appL10n;
   switch (status) {
     case 'PENDING':
-      return 'Đang chờ';
+      return l10n.payStatusPending;
     case 'PROCESSING':
-      return 'Đang xử lý';
+      return l10n.payStatusProcessing;
     case 'SUCCESS':
-      return 'Thành công';
+      return l10n.payStatusSuccess;
     case 'FAILED':
-      return 'Thất bại';
+      return l10n.payStatusFailed;
     case 'CANCELLED':
-      return 'Đã hủy';
+      return l10n.statusCancelled;
     case 'EXPIRED':
-      return 'Đã hết hạn';
+      return l10n.statusExpired;
     // Giao dịch bị thay thế — khách đã tạo giao dịch mới và đơn đã được thanh toán.
     case 'SUPERSEDED':
-      return 'Đã bị thay thế';
+      return l10n.payStatusSuperseded;
     default:
-      return status ?? 'Không rõ';
+      return status ?? l10n.statusUnknown;
   }
 }
 
@@ -136,21 +140,21 @@ String paymentStatusLabel(String? status) {
 String refundStatusLabel(String? status) {
   switch (status) {
     case 'PENDING_REVIEW':
-      return 'Chờ duyệt';
+      return appL10n.refundStatusPendingReview;
     case 'APPROVED':
-      return 'Đã duyệt';
+      return appL10n.refundStatusApproved;
     case 'REFUND_PROCESSING':
-      return 'Đang hoàn tiền';
+      return appL10n.refundStatusProcessing;
     case 'REFUNDED':
-      return 'Đã hoàn tiền';
+      return appL10n.refundToneRefunded;
     case 'REJECTED':
-      return 'Đã từ chối';
+      return appL10n.refundStatusRejected2;
     case 'FAILED':
-      return 'Thất bại';
+      return appL10n.payStatusFailed;
     case 'CANCELLED':
-      return 'Đã hủy';
+      return appL10n.statusCancelled;
     default:
-      return status ?? 'Không rõ';
+      return status ?? appL10n.statusUnknown;
   }
 }
 
@@ -164,22 +168,22 @@ String refundStatusLabel(String? status) {
 String refundReasonLabel(String? reason) {
   switch (reason) {
     case 'PERSONAL':
-      return 'Lỗi khách hàng';
+      return appL10n.refundReasonCustomer;
     case 'PLATFORM_FAULT':
-      return 'Lỗi nền tảng';
+      return appL10n.refundReasonPlatform;
     case 'PROVIDER_FAULT':
-      return 'Lỗi đối tác';
+      return appL10n.refundReasonProvider;
     case 'FORCE_MAJEURE':
-      return 'Lỗi bất khả kháng';
+      return appL10n.refundReasonForceMajeure;
     case 'TOURIST_FAULT':
-      return 'Lỗi khách hàng';
+      return appL10n.refundReasonCustomer;
     case null:
     case '':
-      return 'Không rõ';
+      return appL10n.statusUnknown;
     default:
       // Mã lạ (VD: `PERSONAL_7` do Admin tự sinh, hoặc enum đã đổi) ⇒ KHÔNG lộ
       // mã kỹ thuật ra UI, chỉ hiển thị nhãn chung.
-      return 'Lý do khác';
+      return appL10n.refundReasonOther;
   }
 }
 
@@ -187,10 +191,10 @@ String refundReasonLabel(String? reason) {
 String refundMethodLabel(String? method) {
   switch (method) {
     case 'VNPAY_API':
-      return 'Hoàn qua VNPay';
+      return appL10n.refundMethodVnpay;
     case 'MANUAL_BANK_TRANSFER':
-      return 'Chuyển khoản thủ công';
+      return appL10n.refundMethodManual;
     default:
-      return method ?? 'Chưa xác định';
+      return method ?? appL10n.refundMethodUnknown;
   }
 }

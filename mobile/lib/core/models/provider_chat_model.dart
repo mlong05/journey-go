@@ -1,6 +1,8 @@
 /// Model cho chat với nhà tour (trước khi mua tour).
 library;
 
+import '../../l10n/locale_controller.dart';
+
 int _asInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
@@ -65,7 +67,7 @@ class ProviderConversationModel {
   String get counterpartName =>
       (providerName != null && providerName!.isNotEmpty)
           ? providerName!
-          : (tourTitle ?? 'Nhà tour');
+          : (tourTitle ?? appL10n.chatProviderFallback);
 
   /// Thời điểm sắp xếp — tin nhắn mới nhất lên đầu.
   DateTime? get sortAt => lastMessageAt ?? createdAt;
@@ -84,7 +86,7 @@ class ProviderConversationModel {
     if (at.year == yesterday.year &&
         at.month == yesterday.month &&
         at.day == yesterday.day) {
-      return 'Hôm qua';
+      return appL10n.timeYesterday;
     }
     return '${at.day.toString().padLeft(2, '0')}/${at.month.toString().padLeft(2, '0')}';
   }

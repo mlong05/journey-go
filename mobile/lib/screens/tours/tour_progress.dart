@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 import '../../core/models/tour_journey_model.dart';
 import '../../core/services/progress_service.dart';
 
@@ -21,11 +22,10 @@ class TourProgress {
   double get fraction => total == 0 ? 0 : done / total;
 
   String get label {
-    if (inProgress) return 'Đang trải nghiệm · $done/$total điểm';
+    final l10n = appL10n;
+    if (inProgress) return l10n.progressInProgress(done, total);
     final at = journey.completedAt;
-    return at == null
-        ? 'Đã hoàn thành'
-        : 'Đã hoàn thành · ${at.day.toString().padLeft(2, '0')}/${at.month.toString().padLeft(2, '0')}';
+    return at == null ? l10n.progressCompleted : l10n.progressCompletedOn(formatDayMonth(at, l10n.localeName));
   }
 
   /// Trạng thái theo từng tour: hành trình đang đi được ưu tiên, sau đó là lần hoàn thành gần nhất.

@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/models/tour_journey_model.dart';
 import '../../../core/models/tour_model.dart';
+import '../../../l10n/locale_controller.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import '../../common/heritage_motion.dart' show Pressable;
 import '../../common/ink.dart';
 import '../../common/photo.dart';
+import '../../tours/tour_cards.dart' show TourCard;
 import '../../tours/tour_style.dart' show TourPlaceholder, TourStyle;
 
 // Các khối của trang chủ: nền giấy sáng, ảnh chụp thật làm chủ đạo, chữ đậm, một màu nhấn xanh ngọc.
@@ -13,8 +18,9 @@ import '../../tours/tour_style.dart' show TourPlaceholder, TourStyle;
 /// Ảnh kèm ghi nguồn (ghi nguồn chỉ có khi ảnh do Admin gắn từ nguồn ngoài).
 typedef PhotoRef = ({String? url, String? credit});
 
-/// "T7, 14/11".
-String shortDate(DateTime d) {
+/// "T7, 14/11" (tiếng Việt); ngôn ngữ khác dùng định dạng chuẩn của intl ("Sat, Nov 14", "11月14日(土)").
+String shortDate(DateTime d, [String languageCode = 'vi']) {
+  if (languageCode != 'vi') return DateFormat.MMMEd(languageCode).format(d);
   final day = d.weekday == DateTime.sunday ? 'CN' : 'T${d.weekday + 1}';
   String two(int v) => v.toString().padLeft(2, '0');
   return '$day, ${two(d.day)}/${two(d.month)}';
@@ -69,10 +75,18 @@ class HomeSectionTitle extends StatelessWidget {
   }
 }
 
-/// Một nút danh mục của hàng lọc nhanh.
-typedef HomeCategory = ({IconData icon, String label, AppTone tone, bool selected, VoidCallback? onTap});
+/// Một nút danh mục của hàng lọc nhanh: [colors] là gradient tô ô icon (icon trắng trên nền màu).
+typedef HomeCategory = ({IconData icon, String label, List<Color> colors, VoidCallback onTap});
 
-/// Hàng danh mục: 4 nút chia đều bề ngang (không cuộn, không bị cắt ở mép), icon nét mảnh + nhãn ngắn.
+/// Màu ô danh mục — tươi, mỗi ô một màu (chỉ tô nền, chữ nhãn luôn màu xanh than).
+abstract final class HomeCategoryColors {
+  static const teal = [Color(0xFF2DD4BF), Color(0xFF0EA5A4)];
+  static const blue = [Color(0xFF60A5FA), Color(0xFF2563EB)];
+  static const orange = [Color(0xFFFDBA74), Color(0xFFF97316)];
+  static const violet = [Color(0xFFC4B5FD), Color(0xFF8B5CF6)];
+}
+
+/// Hàng danh mục trong một thẻ trắng nổi: 4 ô màu đặc chia đều bề ngang, icon trắng + nhãn ngắn.
 /// Nhãn luôn 1 dòng: nếu cỡ chữ hệ thống quá lớn thì chữ tự thu nhỏ vừa ô thay vì xuống dòng.
 class HomeCategoryRow extends StatelessWidget {
   final List<HomeCategory> items;
@@ -81,8 +95,13 @@ class HomeCategoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 14, 6, 10),
+      decoration: BoxDecoration(
+        color: AppInk.surface,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [BoxShadow(color: Color(0x1A0F172A), blurRadius: 24, offset: Offset(0, 10))],
+      ),
       child: Row(
         children: [for (final c in items) Expanded(child: _item(c))],
       ),
@@ -92,50 +111,265 @@ class HomeCategoryRow extends StatelessWidget {
   Widget _item(HomeCategory c) {
     return Semantics(
       button: true,
-      selected: c.selected,
       label: c.label,
-      child: InkWell(
+      child: Pressable(
         onTap: c.onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-          child: Column(
-            children: [
-              // Ô trắng viền mảnh + icon nét mảnh (Phosphor Light) — tinh gọn, không kiểu hình minh hoạ
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: c.selected ? AppInk.accentSoft : AppInk.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: c.selected ? AppInk.accent : AppInk.border,
-                    width: c.selected ? 1.5 : 1,
-                  ),
-                  boxShadow: c.selected
-                      ? null
-                      : [BoxShadow(color: AppInk.ink.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 3))],
-                ),
-                child: Icon(c.icon, size: 27, color: c.selected ? AppInk.accent : c.tone.strong),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(colors: c.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                boxShadow: [BoxShadow(color: c.colors.last.withValues(alpha: 0.30), blurRadius: 10, offset: const Offset(0, 4))],
               ),
-              const SizedBox(height: 6),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  c.label,
-                  maxLines: 1,
-                  softWrap: false,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: c.selected ? FontWeight.w800 : FontWeight.w600,
-                    color: c.selected ? AppInk.accent : AppInk.ink,
+              child: Icon(c.icon, size: 26, color: Colors.white),
+            ),
+            const SizedBox(height: 7),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                c.label,
+                maxLines: 1,
+                softWrap: false,
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppInk.ink),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Một ảnh banner đầu trang chủ: ảnh đóng gói sẵn trong app + tên địa danh.
+typedef HeroSlide = ({String asset, String place});
+
+/// Ảnh banner có sẵn (không phụ thuộc dữ liệu tour ⇒ chưa có tour nào vẫn có ảnh).
+/// Nguồn: Wikimedia Commons, bản thu nhỏ 1280px, giống ảnh banner bản web (frontend/public/image/CREDITS.md):
+/// - hero_mucangchai.jpg — Ruộng bậc thang Chế Cu Nha, Mù Cang Chải · Doan Tuan · CC0
+/// - hero_hoian.jpg — Chùa Cầu, Hội An · Alexkom000 · CC BY 4.0
+/// - hero_muine.jpg — Thuyền đánh cá, Mũi Né · Trevor Mills · CC BY 2.0
+List<HeroSlide> homeHeroSlides(AppLocalizations l10n) => [
+  (asset: 'assets/images/hero_mucangchai.jpg', place: l10n.heroPlaceMuCangChai),
+  (asset: 'assets/images/hero_hoian.jpg', place: l10n.heroPlaceHoiAn),
+  (asset: 'assets/images/hero_muine.jpg', place: l10n.heroPlaceMuiNe),
+];
+
+/// Banner đầu trang chủ: ảnh phong cảnh có sẵn trượt ngang (tự chuyển mỗi 5 giây), lớp phủ tối,
+/// lời chào lớn + tên địa danh của ảnh đang hiện.
+/// [bottomInset]: chừa khoảng dưới cùng (thẻ danh mục đè lên mép banner).
+class HomeHeroBanner extends StatefulWidget {
+  final List<HeroSlide> slides;
+  final String greeting;
+  final String headline;
+  final String? area;
+  final Widget? trailing;
+  final double bottomInset;
+
+  const HomeHeroBanner({
+    super.key,
+    required this.slides,
+    required this.greeting,
+    required this.headline,
+    this.area,
+    this.trailing,
+    this.bottomInset = 0,
+  });
+
+  @override
+  State<HomeHeroBanner> createState() => _HomeHeroBannerState();
+}
+
+class _HomeHeroBannerState extends State<HomeHeroBanner> {
+  final PageController _page = PageController();
+  Timer? _timer;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _next());
+  }
+
+  void _next() {
+    final n = widget.slides.length;
+    if (n < 2 || !_page.hasClients || !mounted) return;
+    if (MediaQuery.of(context).disableAnimations) return;
+    _page.animateToPage((_index + 1) % n, duration: const Duration(milliseconds: 600), curve: Curves.easeOutCubic);
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeHeroBanner old) {
+    super.didUpdateWidget(old);
+    if (_index >= widget.slides.length && widget.slides.isNotEmpty) {
+      _index = 0;
+      if (_page.hasClients) _page.jumpToPage(0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _page.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final slides = widget.slides;
+    final current = slides.isEmpty ? null : slides[_index.clamp(0, slides.length - 1)];
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          bottom: widget.bottomInset,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (slides.isEmpty)
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: AppCultureColors.brandGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                   ),
+                )
+              else
+                PageView.builder(
+                  controller: _page,
+                  itemCount: slides.length,
+                  onPageChanged: (i) => setState(() => _index = i),
+                  itemBuilder: (_, i) => Image.asset(
+                    slides[i].asset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const DecoratedBox(
+                      decoration: BoxDecoration(gradient: LinearGradient(colors: AppCultureColors.brandGradient)),
+                    ),
+                  ),
+                ),
+              // Phủ tối trên (để ô tìm kiếm / giờ hệ thống rõ) và dưới (để chữ trắng đạt tương phản)
+              const IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x66000000), Color(0x00000000), Color(0x14000000), Color(0xB3000000)],
+                      stops: [0.0, 0.3, 0.55, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 20 + (widget.bottomInset > 0 ? 34 : 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.greeting,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        ?widget.trailing,
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.headline,
+                      maxLines: 2,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        height: 1.2,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                        shadows: [Shadow(color: Color(0x66000000), blurRadius: 12)],
+                      ),
+                    ),
+                    if (current != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          // Tên địa danh của ảnh đang hiện
+                          const Icon(Icons.place_rounded, size: 14, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              current.place,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          if (slides.length > 1) ...[
+                            const SizedBox(width: 12),
+                            for (var i = 0; i < slides.length; i++)
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
+                                margin: const EdgeInsets.only(left: 4),
+                                width: i == _index ? 16 : 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: i == _index ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ] else if (widget.area != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.near_me_rounded, size: 14, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(widget.area!, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Dải "Tour nổi bật": thẻ dọc (ảnh lớn trên, tên, vùng, giá) kéo ngang.
+class HomeFeaturedStrip extends StatelessWidget {
+  final List<TourModel> tours;
+  final ValueChanged<TourModel> onOpen;
+
+  const HomeFeaturedStrip({super.key, required this.tours, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.4);
+    return SizedBox(
+      height: 268 * scale,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 2, 16, 14),
+        clipBehavior: Clip.none,
+        itemCount: tours.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (_, i) => TourCard(tour: tours[i], onTap: () => onOpen(tours[i]), width: 210),
       ),
     );
   }
@@ -166,8 +400,12 @@ class HomeJourneyCard extends StatelessWidget {
     this.onMission,
   });
 
-  static String _formatDistance(double m) =>
-      m >= 1000 ? '${(m / 1000).toStringAsFixed(m >= 10000 ? 0 : 1).replaceAll('.', ',')} km' : '${m.round()} m';
+  /// Tiếng Việt dùng dấu phẩy thập phân ("1,5 km"), tiếng Anh/Nhật dùng dấu chấm ("1.5 km").
+  static String _formatDistance(double m, String languageCode) {
+    if (m < 1000) return '${m.round()} m';
+    final km = (m / 1000).toStringAsFixed(m >= 10000 ? 0 : 1);
+    return '${languageCode == 'vi' ? km.replaceAll('.', ',') : km} km';
+  }
 
   /// Trạm đầu tiên chưa xong theo thứ tự lộ trình.
   static JourneyDestination? nextStop(TourJourney journey) {
@@ -183,6 +421,8 @@ class HomeJourneyCard extends StatelessWidget {
     final total = journey.totalDestinations;
     final position = next == null ? total : journey.destinations.indexOf(next) + 1;
     final m = mission;
+    final l10n = context.l10n;
+    final lang = Localizations.localeOf(context).languageCode;
     return Pressable(
       onTap: onContinue,
       child: Container(
@@ -208,7 +448,7 @@ class HomeJourneyCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Đang đi · Trạm $position/$total',
+                        l10n.homeJourneyOngoing(position, total),
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppInk.accent),
                       ),
                       const SizedBox(height: 3),
@@ -246,17 +486,17 @@ class HomeJourneyCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        next?.checkedIn == true ? 'Đang ở trạm' : 'Trạm kế tiếp',
+                        next?.checkedIn == true ? l10n.homeJourneyAtStop : l10n.homeJourneyNextStop,
                         style: const TextStyle(fontSize: 12, color: AppInk.muted),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         next == null
-                            ? 'Đã đi hết các trạm'
+                            ? l10n.homeJourneyAllDone
                             : next.checkedIn
-                            ? '${next.name} · đã check-in'
+                            ? l10n.homeJourneyCheckedIn(next.name)
                             : distance != null
-                            ? '${next.name} · cách ${_formatDistance(distance!)}'
+                            ? l10n.homeJourneyDistance(next.name, _formatDistance(distance!, lang))
                             : next.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -274,7 +514,7 @@ class HomeJourneyCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 18),
                     shape: const StadiumBorder(),
                   ),
-                  child: const Text('Tiếp tục', style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: Text(l10n.homeJourneyContinue, style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ],
             ),
@@ -292,7 +532,7 @@ class HomeJourneyCard extends StatelessWidget {
                           TextSpan(
                             children: [
                               TextSpan(
-                                text: '$missionCount nhiệm vụ chờ: ',
+                                text: l10n.homeJourneyMissions(missionCount),
                                 style: const TextStyle(fontWeight: FontWeight.w700),
                               ),
                               TextSpan(text: m.title),
@@ -323,22 +563,26 @@ class _PriceText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     if (tour.price <= 0) {
-      return const Text(
-        'Miễn phí',
+      return Text(
+        l10n.tourPriceFree,
         maxLines: 1,
         softWrap: false,
-        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppInk.accent),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppInk.accent),
       );
     }
     return Text.rich(
       TextSpan(
         children: [
-          const TextSpan(text: 'Từ ', style: TextStyle(color: AppInk.muted)),
+          if (l10n.tourPriceFromPrefix.isNotEmpty)
+            TextSpan(text: l10n.tourPriceFromPrefix, style: const TextStyle(color: AppInk.muted)),
           TextSpan(
             text: tour.formattedPrice,
-            style: const TextStyle(fontWeight: FontWeight.w800, color: AppInk.accent),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppCultureColors.price),
           ),
+          if (l10n.tourPriceFromSuffix.isNotEmpty)
+            TextSpan(text: l10n.tourPriceFromSuffix, style: const TextStyle(color: AppInk.muted)),
         ],
       ),
       maxLines: 1,
@@ -372,8 +616,7 @@ class TourRow extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppInk.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppInk.line),
-          boxShadow: [BoxShadow(color: AppInk.ink.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+          boxShadow: AppCultureColors.softShadow,
         ),
         // Cao tối thiểu bằng ảnh; chữ to (cỡ chữ hệ thống lớn) thì thẻ tự cao thêm thay vì tràn
         child: IntrinsicHeight(
@@ -399,7 +642,7 @@ class TourRow extends StatelessWidget {
                     children: [
                       _OneLine(
                         Text(
-                          [tourMeta(tour), if (!showDate && stops > 0) '$stops trạm'].join(' · '),
+                          [tourMeta(tour), if (!showDate && stops > 0) context.l10n.tourStopCount(stops)].join(' · '),
                           maxLines: 1,
                           softWrap: false,
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppInk.muted),
@@ -431,7 +674,7 @@ class TourRow extends StatelessWidget {
                                     const Icon(Icons.event_rounded, size: 13, color: AppCultureColors.coralDark),
                                     const SizedBox(width: 4),
                                     Text(
-                                      shortDate(date),
+                                      shortDate(date, Localizations.localeOf(context).languageCode),
                                       softWrap: false,
                                       style: const TextStyle(
                                         fontSize: 12,

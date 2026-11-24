@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/tour_journey_model.dart';
 import 'map_kit.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Bản đồ nhỏ ở đầu tab "Trải nghiệm" của một trạm: thấy cùng lúc
 /// - vùng check-in của điểm đến (vòng vàng nét đứt),
@@ -147,7 +148,7 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
                         onTap: () => widget.onTapCheckpoint(c),
                         child: Semantics(
                           button: true,
-                          label: 'Hoạt động ${_numberOf(c)}: ${c.name}',
+                          label: appL10n.cmActivity('${_numberOf(c)}', c.name),
                           child: _CheckpointPin(
                             number: _numberOf(c),
                             done: widget.doneTaskIds.contains(c.taskId),
@@ -164,7 +165,7 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
             Positioned(
               right: 10,
               top: 10,
-              child: MapRoundButton(icon: Icons.fit_screen_rounded, tooltip: 'Xem tất cả', onPressed: fitAll),
+              child: MapRoundButton(icon: Icons.fit_screen_rounded, tooltip: appL10n.cmShowAll, onPressed: fitAll),
             ),
             Positioned(
               left: 10,
@@ -177,9 +178,9 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   _legendDot(StopCheckpointsMap.stopColor),
-                  const Text(' Vùng điểm đến   ', style: _legendStyle),
+                  Text(appL10n.cmLegendZone, style: _legendStyle),
                   _legendDot(AppCultureColors.oceanBlue),
-                  const Text(' Hoạt động', style: _legendStyle),
+                  Text(appL10n.cmLegendActivity, style: _legendStyle),
                 ]),
               ),
             ),

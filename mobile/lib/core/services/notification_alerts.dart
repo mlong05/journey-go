@@ -5,6 +5,7 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import '../models/notification_model.dart';
 import '../constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Báo thông báo mới bằng thông báo hệ thống: phát âm thanh thông báo mặc định của điện thoại và rung,
 /// hiện banner trên cùng màn hình và lưu lại trong thanh thông báo.
@@ -74,8 +75,8 @@ class NotificationAlerts {
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             _timerChannelId,
-            'Hẹn giờ hoạt động',
-            channelDescription: 'Nhắc khi hết giờ đếm ngược của hoạt động thực địa',
+            appL10n.notifChannelTimer,
+            channelDescription: appL10n.notifChannelTimerDesc,
             importance: Importance.high,
             priority: Priority.high,
             playSound: true,
@@ -121,8 +122,8 @@ class NotificationAlerts {
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
-            'Thông báo Journey Go',
-            channelDescription: 'Đơn đặt tour, hoàn tiền, huy hiệu, bài viết diễn đàn',
+            appL10n.notifChannelMain,
+            channelDescription: appL10n.notifChannelMainDesc,
             importance: Importance.high,
             priority: Priority.high,
             playSound: true,

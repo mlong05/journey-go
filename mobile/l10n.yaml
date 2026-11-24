@@ -1,0 +1,8 @@
+# Đa ngôn ngữ (gen-l10n): tiếng Việt là bản gốc; chuỗi chưa dịch sang en/ja sẽ
+# hiện tiếng Việt và được liệt kê trong untranslated-messages.json khi build.
+arb-dir: lib/l10n
+template-arb-file: app_vi.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false
+untranslated-messages-file: build/untranslated-messages.json

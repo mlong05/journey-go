@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/core/constants/app_colors.dart';
 import 'package:mobile/core/constants/app_theme.dart';
 import 'package:mobile/core/models/tour_model.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 import 'package:mobile/screens/tabs/home/home_sections.dart';
 
 const _screenWidth = 360.0;
@@ -66,6 +66,9 @@ Future<void> _pump(WidgetTester tester, Widget child, {double textScale = 1}) as
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
+      locale: const Locale('vi'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: MediaQuery(
         data: MediaQueryData(size: const Size(_screenWidth, 800), textScaler: TextScaler.linear(textScale)),
         child: Scaffold(body: SingleChildScrollView(child: child)),
@@ -99,10 +102,10 @@ void main() {
           tester,
           HomeCategoryRow(
             items: [
-              (icon: Icons.explore_rounded, label: 'Tất cả', tone: AppTone.jade, selected: true, onTap: null),
-              (icon: Icons.wb_sunny_rounded, label: 'Trong ngày', tone: AppTone.brass, selected: false, onTap: () {}),
-              (icon: Icons.nights_stay_rounded, label: 'Nhiều ngày', tone: AppTone.sky, selected: false, onTap: () {}),
-              (icon: Icons.event_rounded, label: 'Sắp đi', tone: AppTone.coral, selected: false, onTap: () {}),
+              (icon: Icons.wb_sunny_rounded, label: 'Trong ngày', colors: HomeCategoryColors.teal, onTap: () {}),
+              (icon: Icons.nights_stay_rounded, label: 'Nhiều ngày', colors: HomeCategoryColors.blue, onTap: () {}),
+              (icon: Icons.event_rounded, label: 'Theo ngày', colors: HomeCategoryColors.orange, onTap: () {}),
+              (icon: Icons.local_offer_rounded, label: 'Ưu đãi', colors: HomeCategoryColors.violet, onTap: () {}),
             ],
           ),
           textScale: scale,
@@ -110,6 +113,26 @@ void main() {
         expect(tester.takeException(), isNull);
         _expectSingleLineInside(tester, find.byType(HomeCategoryRow));
       });
+
+      for (final lang in ['en', 'ja']) {
+        testWidgets('4 nút danh mục ($lang): nhãn dịch vẫn 1 dòng', (tester) async {
+          final l10n = lookupAppLocalizations(Locale(lang));
+          await _pump(
+            tester,
+            HomeCategoryRow(
+              items: [
+                (icon: Icons.wb_sunny_rounded, label: l10n.homeCatDayTrip, colors: HomeCategoryColors.teal, onTap: () {}),
+                (icon: Icons.nights_stay_rounded, label: l10n.homeCatMultiDay, colors: HomeCategoryColors.blue, onTap: () {}),
+                (icon: Icons.event_rounded, label: l10n.homeCatByDate, colors: HomeCategoryColors.orange, onTap: () {}),
+                (icon: Icons.local_offer_rounded, label: l10n.homeCatDeals, colors: HomeCategoryColors.violet, onTap: () {}),
+              ],
+            ),
+            textScale: scale,
+          );
+          expect(tester.takeException(), isNull);
+          _expectSingleLineInside(tester, find.byType(HomeCategoryRow));
+        });
+      }
 
       testWidgets('chip chủ đề: tên 1 dòng, không chip nào bị cắt, vừa đúng 2 hàng, dư gom vào "+N"', (tester) async {
         await _pump(
@@ -128,6 +151,21 @@ void main() {
         // 2 hàng chip cao 40 + khoảng cách 8
         expect(tester.getSize(find.byType(Wrap)).height, lessThanOrEqualTo(2 * 40 + 8 + 0.5));
         expect(find.textContaining('chủ đề'), findsOneWidget, reason: 'phải có chip "+N chủ đề" cho phần dư');
+      });
+
+      testWidgets('dải "Tour nổi bật": thẻ dọc không tràn', (tester) async {
+        await _pump(
+          tester,
+          HomeFeaturedStrip(
+            onOpen: (_) {},
+            tours: [
+              _tour(1, 'Một ngày làm nghệ nhân gốm Thanh Hà'),
+              _tour(2, 'Phố cổ Hội An: Chùa cổ Tấn Ký và hội quán'),
+            ],
+          ),
+          textScale: scale,
+        );
+        expect(tester.takeException(), isNull, reason: 'không được tràn (RenderFlex overflow)');
       });
 
       testWidgets('thẻ tour: tên tối đa 2 dòng, ngày + giá 1 dòng, không tràn', (tester) async {

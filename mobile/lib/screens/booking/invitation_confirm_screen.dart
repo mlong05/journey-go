@@ -23,6 +23,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
 import '../../core/utils/formatters.dart';
 import '../bookings/my_bookings_screen.dart';
+import '../../l10n/locale_controller.dart';
 
 class InvitationConfirmScreen extends StatefulWidget {
   /// ID lời mời cần xác nhận (lấy từ thông báo trong app).
@@ -70,7 +71,7 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không tải được danh sách lời mời. Vui lòng thử lại.';
+        _error = appL10n.invListLoadFailed;
         _loading = false;
       });
     }
@@ -114,7 +115,7 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không xác nhận được lời mời. Vui lòng thử lại.';
+        _error = appL10n.invConfirmFailed2;
         _submitting = false;
       });
     }
@@ -128,7 +129,7 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
 
   String get _inviterName {
     final raw = _current?['inviterName']?.toString();
-    if (raw == null || raw.isEmpty) return 'Người đặt tour';
+    if (raw == null || raw.isEmpty) return context.l10n.invInviterFallback;
     return raw;
   }
 
@@ -157,8 +158,8 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
     return Scaffold(
       backgroundColor: AppCultureColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Lời mời tham gia tour',
+        title: Text(
+          context.l10n.invTitle,
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         backgroundColor: AppCultureColors.background,
@@ -231,7 +232,7 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
           ),
           const SizedBox(height: 14),
           Text(
-            'Bạn được mời tham gia tour',
+            context.l10n.invInvited,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 18,
@@ -241,7 +242,7 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            '$_inviterName đã mời bạn vào tour $_tourTitle. Xác nhận lời mời để được cấp quyền tham gia tour cùng nhóm.',
+            context.l10n.invInvitedBy(_inviterName, _tourTitle),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 13.5,
@@ -265,8 +266,8 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'THÔNG TIN LỜI MỜI',
+          Text(
+            context.l10n.invInfoTitle,
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w800,
@@ -275,13 +276,13 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          _infoRow(Icons.person_outline_rounded, 'Hành khách', _passengerName),
-          _infoRow(Icons.alternate_email_rounded, 'Email được mời', _invitedEmail),
-          _infoRow(Icons.map_outlined, 'Tour', _tourTitle),
-          _infoRow(Icons.event_outlined, 'Ngày trải nghiệm', _experienceDate),
+          _infoRow(Icons.person_outline_rounded, context.l10n.invPassenger, _passengerName),
+          _infoRow(Icons.alternate_email_rounded, context.l10n.invInvitedEmail, _invitedEmail),
+          _infoRow(Icons.map_outlined, context.l10n.bdRowTour, _tourTitle),
+          _infoRow(Icons.event_outlined, context.l10n.payExperienceDate, _experienceDate),
           _infoRow(
             Icons.schedule_rounded,
-            'Hiệu lực đến',
+            context.l10n.invValidUntil,
             _expiresAt == null ? '—' : formatDateTimeVn(_expiresAt),
           ),
         ],
@@ -355,7 +356,7 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
               : const Icon(Icons.how_to_reg_rounded),
-          label: Text(_submitting ? 'Đang xác nhận...' : 'Xác nhận tham gia'),
+          label: Text(_submitting ? context.l10n.invConfirming : context.l10n.invConfirmJoin),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppCultureColors.heritageJade,
             foregroundColor: Colors.white,
@@ -386,13 +387,13 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
               child: const Icon(Icons.check_circle_rounded, size: 34, color: AppCultureColors.success),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Bạn đã tham gia tour!',
+            Text(
+              context.l10n.invJoined,
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Hành khách đã được liên kết với đơn đặt tour. Bạn có thể xem chi tiết booking và truy cập tour.',
+            Text(
+              context.l10n.invJoinedDetail,
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13.5, height: 1.45, color: AppCultureColors.textMuted),
             ),
@@ -400,7 +401,7 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
             ElevatedButton.icon(
               onPressed: _openMyBookings,
               icon: const Icon(Icons.confirmation_number_outlined),
-              label: const Text('Xem đơn của tôi'),
+              label: Text(context.l10n.paySuccessViewBooking),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppCultureColors.heritageJade,
                 foregroundColor: Colors.white,
@@ -411,7 +412,7 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
             const SizedBox(height: 10),
             TextButton(
               onPressed: () => Navigator.of(context).maybePop(),
-              child: const Text('Đóng'),
+              child: Text(context.l10n.commonClose),
             ),
           ],
         ),
@@ -436,14 +437,14 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
               child: const Icon(Icons.mail_outline_rounded, size: 34, color: AppCultureColors.textLight),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Không còn lời mời nào',
+            Text(
+              context.l10n.invNoneLeft,
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             Text(
               _error.isEmpty
-                  ? 'Bạn không có lời mời tham gia tour nào đang chờ xác nhận.'
+                  ? context.l10n.invNoneLeftHint
                   : _error,
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13.5, height: 1.45, color: AppCultureColors.textMuted),
@@ -452,7 +453,7 @@ class _InvitationConfirmScreenState extends State<InvitationConfirmScreen> {
             OutlinedButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Thử lại'),
+              label: Text(context.l10n.commonRetry),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppCultureColors.heritageJade,
                 side: const BorderSide(color: AppCultureColors.heritageJade),

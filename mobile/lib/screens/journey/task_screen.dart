@@ -21,6 +21,7 @@ import 'navigation.dart' show formatDuration;
 import 'reward_effects.dart';
 import 'station_map.dart';
 import 'hot_cold.dart';
+import '../../l10n/locale_controller.dart';
 
 /// `activity`: hoạt động thực địa của tour 5 bước — đếm ngược rồi quét QR tại điểm để mở câu hỏi.
 enum _Phase { loading, intro, locked, activity, quiz, result, error }
@@ -289,7 +290,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
       '&destination=${station.latitude},${station.longitude}&travelmode=${far ? 'two-wheeler' : 'walking'}',
     );
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) _snack('Không mở được ứng dụng bản đồ.');
+    if (!ok && mounted) _snack(appL10n.tkMapsFailed);
   }
 
   Future<void> _load() async {
@@ -356,8 +357,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
       _qr = (qr != null && content.unlocked) ? qr : null;
       if (qr != null && !content.unlocked && !content.isFinished) {
         _snack(content.qrRequired
-            ? 'Mã QR không khớp với điểm hoạt động này. Hãy quét đúng mã tại chỗ.'
-            : 'Mã QR không khớp với trạm này. Hãy thử lại.');
+            ? appL10n.tkQrMismatchActivity
+            : appL10n.tkQrMismatchStop);
       }
       setState(() {
         _content = content;
@@ -389,10 +390,10 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => QrScanScreen(
-          title: _task.qrRequired ? 'Quét QR xác nhận hoàn thành' : 'Quét QR tại trạm',
+          title: _task.qrRequired ? appL10n.tkQrConfirmTitle : appL10n.tkQrStopTitle,
           hint: _task.station != null
-              ? 'Quét mã QR tại ${_task.station!.name}'
-              : 'Quét mã QR tại trạm kế tiếp',
+              ? appL10n.tkQrAtPlace(_task.station!.name)
+              : appL10n.tkQrNextStop,
         ),
       ),
     );
@@ -428,11 +429,11 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
       });
       if (inside) {
         HapticFeedback.mediumImpact();
-        showPointsBurst(context, text: 'Đã check-in!', icon: Icons.where_to_vote_rounded);
+        showPointsBurst(context, text: appL10n.tkCheckedIn, icon: Icons.where_to_vote_rounded);
       } else {
         _snack(distance == null
-            ? 'Chưa xác định được vị trí của bạn. Hãy bật GPS rồi thử lại.'
-            : 'Bạn còn cách trạm ${formatDistance(distance)}. Hãy vào trong bán kính $radius m để check-in.');
+            ? appL10n.tkNoLocation
+            : appL10n.tkTooFarToCheckIn(formatDistance(distance), '$radius'));
       }
     } on LocationException catch (e) {
       if (!mounted) return;
@@ -479,8 +480,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
     NotificationAlerts.instance.scheduleReminder(
       id: _reminderId,
       at: endsAt,
-      title: 'Hết giờ: ${task?.name ?? widget.fallbackName}',
-      body: 'Quét mã QR tại ${task?.station?.name ?? widget.destinationName} để trả lời câu hỏi và nhận điểm.',
+      title: appL10n.tkTimeUpTitle(task?.name ?? widget.fallbackName),
+      body: appL10n.tkTimeUpBody(task?.station?.name ?? widget.destinationName),
     );
   }
 
@@ -510,7 +511,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
         NotificationAlerts.instance.cancelReminder(_reminderId);
       }
       HapticFeedback.heavyImpact();
-      showPointsBurst(context, text: 'Hết giờ!', icon: Icons.alarm_on_rounded);
+      showPointsBurst(context, text: appL10n.tkTimeUp, icon: Icons.alarm_on_rounded);
     }
   }
 
@@ -619,11 +620,11 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
         final earned = task.perQuestionPoints || result.pointsEarned > 0
             ? result.pointsEarned
             : task.pointsReward;
-        if (earned > 0) showPointsBurst(context, text: '+$earned điểm');
+        if (earned > 0) showPointsBurst(context, text: appL10n.tkPlusPoints(earned));
       } else if (result.lastAnswerCorrect == true) {
         showPointsBurst(
           context,
-          text: 'Chặng ${result.questionIndex}/${result.totalQuestions}',
+          text: appL10n.tkLeg(result.questionIndex, result.totalQuestions),
           icon: Icons.check_circle_rounded,
         );
       }
@@ -682,12 +683,12 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.lightbulb_rounded, color: AppCultureColors.gold),
-                    SizedBox(width: 8),
+                    const Icon(Icons.lightbulb_rounded, color: AppCultureColors.gold),
+                    const SizedBox(width: 8),
                     Text(
-                      'Manh mối',
+                      appL10n.tkClue,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -706,7 +707,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 18),
                 PrimaryButton(
-                  label: 'Đã rõ',
+                  label: appL10n.tkGotIt,
                   onPressed: () => Navigator.pop(ctx),
                 ),
               ],
@@ -804,11 +805,11 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _error ?? 'Không tải được nhiệm vụ.',
+                  _error ?? appL10n.tkLoadFailed,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
-                OutlinedButton(onPressed: _load, child: const Text('Thử lại')),
+                OutlinedButton(onPressed: _load, child: Text(appL10n.commonRetry)),
               ],
             ),
           ),
@@ -903,8 +904,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                   children: [
                     Text(
                       task.requiresLocation
-                          ? 'Nhiệm vụ thực địa'
-                          : 'Đố vui di sản',
+                          ? appL10n.tkFieldMission
+                          : appL10n.tkHeritageQuiz,
                       style: const TextStyle(
                         fontSize: 12,
                         letterSpacing: 0.2,
@@ -949,7 +950,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               child: _stat(
                 Icons.help_outline_rounded,
                 '${task.totalQuestions}',
-                'câu hỏi',
+                appL10n.tkQuestionsLabel,
               ),
             ),
             const SizedBox(width: 10),
@@ -957,7 +958,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               child: _stat(
                 Icons.stars_rounded,
                 '+${task.pointsReward}',
-                'điểm thưởng',
+                appL10n.tkBonusLabel,
               ),
             ),
             const SizedBox(width: 10),
@@ -965,7 +966,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               child: _stat(
                 Icons.replay_rounded,
                 '${task.attemptsRemaining}/${task.maxAttempts}',
-                'lượt còn lại',
+                appL10n.tkAttemptsLabel,
               ),
             ),
           ],
@@ -975,28 +976,28 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Thể lệ',
+              Text(
+                appL10n.tkRules,
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
               ),
               const SizedBox(height: 10),
               _rule(
                 Icons.check_circle_outline_rounded,
-                'Trả lời đúng tất cả câu hỏi để nhận trọn điểm thưởng (chỉ một lần).',
+                appL10n.tkRuleAllCorrect,
               ),
               if (task.requiresLocation) ...[
                 _rule(
                   Icons.place_outlined,
-                  'Mỗi câu hỏi gắn với một địa điểm. Bạn cần đứng trong bán kính của trạm để mở câu hỏi.',
+                  appL10n.tkRuleLocation,
                 ),
                 _rule(
                   Icons.refresh_rounded,
-                  'Trả lời sai một câu, bạn sẽ phải làm lại từ câu đầu.',
+                  appL10n.tkRuleRestart,
                 ),
               ] else
                 _rule(
                   Icons.refresh_rounded,
-                  'Chưa đúng hết, bạn có thể làm lại nếu còn lượt (tối đa ${task.maxAttempts} lượt).',
+                  appL10n.tkRuleRetry(task.maxAttempts),
                 ),
             ],
           ),
@@ -1005,14 +1006,14 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
         if (task.isCompleted)
           _banner(
             Icons.verified_rounded,
-            'Bạn đã hoàn thành nhiệm vụ này.',
+            appL10n.tkMissionDone,
             AppCultureColors.jadeLight,
             AppCultureColors.jadeDark,
           )
         else if (task.isFailed)
           _banner(
             Icons.block_rounded,
-            'Bạn đã hết lượt làm nhiệm vụ này.',
+            appL10n.tkNoAttempts,
             AppCultureColors.lacquer100,
             AppCultureColors.error,
           )
@@ -1022,10 +1023,10 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               Expanded(
                 child: PrimaryButton(
                   label: needsTravel
-                      ? 'Chỉ đường tới trạm'
+                      ? appL10n.tkDirectionsToStop
                       : (task.attempts > 0
-                            ? 'Làm lại nhiệm vụ'
-                            : 'Bắt đầu nhiệm vụ'),
+                            ? appL10n.tkRetryMission
+                            : appL10n.tkStartMission),
                   icon: needsTravel
                       ? Icons.near_me_rounded
                       : Icons.play_arrow_rounded,
@@ -1036,7 +1037,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               if (task.requiresLocation) ...[
                 const SizedBox(width: 10),
                 Tooltip(
-                  message: 'Xem manh mối',
+                  message: appL10n.tkViewClue,
                   child: OutlinedButton(
                     onPressed: _busy ? null : _showClue,
                     style: OutlinedButton.styleFrom(
@@ -1051,13 +1052,13 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.lightbulb_outline_rounded, size: 20),
                         SizedBox(width: 6),
                         Text(
-                          'Manh mối',
+                          appL10n.tkClue,
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ],
@@ -1085,13 +1086,13 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
         children: [
           Row(
             children: [
-              const Text(
-                'Các chặng',
+              Text(
+                appL10n.tkStages,
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
               ),
               const Spacer(),
               Text(
-                '${current.clamp(0, stations.length)}/${stations.length} hoàn thành',
+                appL10n.tkStagesDone(current.clamp(0, stations.length), stations.length),
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -1134,17 +1135,17 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
 
     late final String status;
     if (done) {
-      status = 'Đã hoàn thành';
+      status = appL10n.statusCompleted;
     } else if (!active) {
-      status = 'Mở khóa sau chặng $index';
+      status = appL10n.tkUnlockAfterStage(index);
     } else if (_locatingIntro && distance == null) {
-      status = 'Đang xác định vị trí...';
+      status = appL10n.tkLocating;
     } else if (distance == null) {
-      status = _introLocationError ?? 'Chưa có vị trí của bạn';
+      status = _introLocationError ?? appL10n.tkNoPosition;
     } else if (arrived) {
-      status = 'Bạn đã tới trạm, sẵn sàng mở câu hỏi';
+      status = appL10n.tkArrivedReady;
     } else {
-      status = 'Cách ${formatDistance(distance)} · bán kính $radius m';
+      status = appL10n.tkDistanceRadius(formatDistance(distance), '$radius');
     }
 
     return IntrinsicHeight(
@@ -1213,7 +1214,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Chặng ${index + 1} · ${station.name}',
+                    appL10n.tkStageAt(index + 1, station.name),
                     style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w700,
@@ -1237,7 +1238,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
           ),
           if (active && !arrived && _stationPoint != null)
             IconButton(
-              tooltip: 'Cập nhật khoảng cách',
+              tooltip: appL10n.tkRefreshDistance,
               onPressed: _locatingIntro ? null : _refreshIntroDistance,
               icon: _locatingIntro
                   ? const SizedBox(
@@ -1377,7 +1378,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               children: [
                 MapRoundButton(
                   icon: Icons.arrow_back_rounded,
-                  tooltip: 'Quay lại',
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                   onPressed: () => Navigator.of(context).pop(_changed),
                 ),
                 const SizedBox(width: 10),
@@ -1395,13 +1396,13 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
             children: [
               MapRoundButton(
                 icon: Icons.center_focus_strong_rounded,
-                tooltip: 'Xem cả bạn và trạm',
+                tooltip: appL10n.tkShowBoth,
                 onPressed: () => _mapKey.currentState?.fitAll(),
               ),
               const SizedBox(height: 10),
               MapRoundButton(
                 icon: Icons.my_location_rounded,
-                tooltip: 'Vị trí của tôi',
+                tooltip: appL10n.jsMyLocation,
                 color: AppCultureColors.oceanBlue,
                 onPressed: userPoint == null
                     ? _locateAndOpen
@@ -1412,7 +1413,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                 icon: _satellite
                     ? Icons.map_rounded
                     : Icons.satellite_alt_rounded,
-                tooltip: _satellite ? 'Bản đồ đường phố' : 'Ảnh vệ tinh',
+                tooltip: _satellite ? appL10n.jsStreetMap : appL10n.jsSatellite,
                 onPressed: () => setState(() => _satellite = !_satellite),
               ),
             ],
@@ -1479,7 +1480,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    'Trạm ${task.questionIndex + 1}/$total',
+                    appL10n.tkStopOf(task.questionIndex + 1, total),
                     style: const TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
@@ -1543,15 +1544,14 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
         : (bearing - (heading ?? 0)) * 3.141592653589793 / 180;
     final walkRoute = distance != null && distance > _compassRangeMeters ? _walkRoute : null;
     final directionText = bearing == null
-        ? 'Đang xác định vị trí của bạn...'
+        ? appL10n.tkLocatingYou
         : distance != null && distance > _walkableMeters
-        ? 'Khá xa để đi bộ${walkRoute != null ? ' (~${formatDuration(walkRoute.durationSeconds)})' : ''}. '
-              'Hãy đi xe tới gần rồi đi bộ vào trạm.'
+        ? appL10n.tkTooFarToWalk(walkRoute != null ? ' (~${formatDuration(walkRoute.durationSeconds)})' : '')
         : walkRoute != null
-        ? 'Đi bộ ~${formatDuration(walkRoute.durationSeconds)} theo đường trên bản đồ'
+        ? appL10n.tkWalkRoute(formatDuration(walkRoute.durationSeconds))
         : heading != null
-        ? '${turnHint(heading, bearing)} · hướng ${compassLabel(bearing)}'
-        : 'Đi về hướng ${compassLabel(bearing)}';
+        ? appL10n.tkTurnHeading(turnHint(heading, bearing), compassLabel(bearing))
+        : appL10n.tkHeadTo(compassLabel(bearing));
 
     return Container(
       width: double.infinity,
@@ -1616,7 +1616,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                       children: [
                         Text(
                           arrived
-                              ? 'Bạn đã tới trạm'
+                              ? appL10n.tkArrivedAtStop
                               : distance == null
                               ? '— m'
                               : formatDistance(distance),
@@ -1634,11 +1634,11 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                           arrived
                               ? (task.qrRequired
                                     ? (_checkedIn
-                                          ? 'Đã check-in · bấm "Bắt đầu nhiệm vụ"'
-                                          : 'Bấm "Check-in" để xác nhận đã tới nơi')
+                                          ? appL10n.tkCheckedInPressStart
+                                          : appL10n.tkPressCheckIn)
                                     : _busy
-                                        ? 'Đang mở câu hỏi...'
-                                        : 'Câu hỏi sẽ tự mở')
+                                        ? appL10n.tkOpeningQuestion
+                                        : appL10n.tkQuestionAutoOpen)
                               : directionText,
                           style: const TextStyle(
                             fontSize: 13.5,
@@ -1676,7 +1676,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   Text(
-                    'Bán kính $radius m',
+                    appL10n.tkRadius('$radius'),
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppCultureColors.textMuted,
@@ -1712,7 +1712,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                 if (_locationNeedsSettings)
                   TextButton(
                     onPressed: LocationService.openSettings,
-                    child: const Text('Mở cài đặt vị trí'),
+                    child: Text(appL10n.tkOpenLocationSettings),
                   ),
               ],
               const SizedBox(height: 16),
@@ -1725,30 +1725,30 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                         ? (_checkedIn
                             ? PrimaryButton(
                                 label: _task.durationSeconds != null && _task.durationSeconds! > 0
-                                    ? 'Bắt đầu nhiệm vụ · ${formatDuration(_task.durationSeconds!)}'
-                                    : 'Bắt đầu nhiệm vụ',
+                                    ? appL10n.tkStartMissionTimed(formatDuration(_task.durationSeconds!))
+                                    : appL10n.tkStartMission,
                                 icon: Icons.timer_outlined,
                                 onPressed: _startActivity,
                               )
                             : PrimaryButton(
                                 label: arrived
-                                    ? 'Check-in tại trạm'
+                                    ? appL10n.tkCheckInAtStop
                                     : distance == null
-                                        ? 'Chưa tới trạm'
-                                        : 'Chưa tới trạm · còn ${formatDistance(distance)}',
+                                        ? appL10n.tkNotAtStop
+                                        : appL10n.tkNotAtStopDistance(formatDistance(distance)),
                                 icon: arrived ? Icons.where_to_vote_rounded : Icons.lock_outline_rounded,
                                 loading: _busy,
                                 onPressed: arrived ? _checkIn : null,
                               ))
                         : arrived
                         ? PrimaryButton(
-                            label: 'Mở câu hỏi',
+                            label: appL10n.tkOpenQuestion,
                             icon: Icons.quiz_rounded,
                             loading: _busy,
                             onPressed: _locateAndOpen,
                           )
                         : PrimaryButton(
-                            label: 'Quét QR tại trạm',
+                            label: appL10n.tkQrStopTitle,
                             icon: Icons.qr_code_scanner_rounded,
                             loading: _busy,
                             onPressed: _scanQr,
@@ -1757,7 +1757,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                   const SizedBox(width: 10),
                   _squareAction(
                     icon: Icons.directions_rounded,
-                    tooltip: 'Chỉ đường bằng Google Maps',
+                    tooltip: appL10n.tkGoogleMaps,
                     onPressed: _openDirections,
                   ),
                 ],
@@ -1769,12 +1769,12 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                   TextButton.icon(
                     onPressed: _busy ? null : _showClue,
                     icon: const Icon(Icons.lightbulb_outline_rounded, size: 18),
-                    label: const Text('Manh mối'),
+                    label: Text(appL10n.tkClue),
                   ),
                   TextButton.icon(
                     onPressed: _busy ? null : _locateAndOpen,
                     icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: const Text('Kiểm tra vị trí'),
+                    label: Text(appL10n.tkCheckLocation),
                   ),
                 ],
               ),
@@ -1893,8 +1893,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               const SizedBox(height: 14),
               Text(
                 task.totalQuestions > 0
-                    ? 'Trạm ${task.questionIndex + 1}/${task.totalQuestions}'
-                    : 'Trạm kế tiếp',
+                    ? appL10n.tkStopOf(task.questionIndex + 1, task.totalQuestions)
+                    : appL10n.tkNextStop,
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppCultureColors.textMuted,
@@ -1902,7 +1902,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 4),
               Text(
-                station?.name ?? 'Địa điểm kế tiếp',
+                station?.name ?? appL10n.tkNextPlace,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 20,
@@ -1911,8 +1911,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Tìm mã QR đặt tại trạm và quét để mở câu hỏi.',
+              Text(
+                appL10n.tkFindQr,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -1925,13 +1925,13 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
         const SizedBox(height: 18),
         if (task.qrRequired)
           PrimaryButton(
-            label: 'Bắt đầu hoạt động',
+            label: appL10n.tkStartActivity,
             icon: Icons.play_arrow_rounded,
             onPressed: _startActivity,
           )
         else
           PrimaryButton(
-            label: 'Quét QR tại trạm',
+            label: appL10n.tkQrStopTitle,
             icon: Icons.qr_code_scanner_rounded,
             loading: _busy,
             onPressed: _scanQr,
@@ -1941,7 +1941,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
           child: TextButton.icon(
             onPressed: _busy ? null : _showClue,
             icon: const Icon(Icons.lightbulb_outline_rounded, size: 18),
-            label: const Text('Xem manh mối'),
+            label: Text(appL10n.tkViewClue),
           ),
         ),
       ],
@@ -1971,8 +1971,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               const SizedBox(height: 6),
               Text(
                 _activityDone
-                    ? 'Hoàn thành hoạt động! Quét mã QR tại điểm để trả lời câu hỏi.'
-                    : 'Thực hiện hoạt động tại chỗ. Hết giờ bạn sẽ được quét mã QR.',
+                    ? appL10n.tkActivityDone
+                    : appL10n.tkActivityInProgress,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 13.5, height: 1.45, color: AppCultureColors.textMuted),
               ),
@@ -2010,7 +2010,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 18),
                 InfoChip(
                   icon: Icons.stars_rounded,
-                  text: 'Trả lời đúng nhận +${task.pointsReward} điểm',
+                  text: appL10n.tkCorrectReward(task.pointsReward),
                   background: AppCultureColors.rewardBg,
                   foreground: AppCultureColors.rewardText,
                 ),
@@ -2020,7 +2020,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 18),
         PrimaryButton(
-          label: 'Quét mã QR tại điểm',
+          label: appL10n.tkScanQrOnSite,
           icon: Icons.qr_code_scanner_rounded,
           loading: _busy,
           onPressed: _activityDone ? _scanQr : null,
@@ -2030,7 +2030,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
             child: TextButton.icon(
               onPressed: _skipCountdown,
               icon: const Icon(Icons.fast_forward_rounded, size: 18),
-              label: const Text('Bỏ qua đếm ngược (dev)'),
+              label: Text(appL10n.tkSkipCountdownDev),
             ),
           ),
       ],
@@ -2047,7 +2047,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'Nhiệm vụ này chưa có câu hỏi.',
+            appL10n.tkNoQuestions,
             style: TextStyle(color: AppCultureColors.textMuted),
           ),
         ),
@@ -2070,7 +2070,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               Row(
                 children: [
                   Text(
-                    'Câu $shownNumber / $shownTotal',
+                    appL10n.tkQuestionOf(shownNumber, shownTotal),
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 13.5,
@@ -2079,7 +2079,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                   const Spacer(),
                   InfoChip(
                     icon: Icons.stars_rounded,
-                    text: '+${task.pointsReward} điểm',
+                    text: appL10n.tkPlusPoints(task.pointsReward),
                     background: AppCultureColors.rewardBg,
                     foreground: AppCultureColors.rewardText,
                   ),
@@ -2138,7 +2138,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Tại: ${task.station!.name}',
+                            appL10n.tkAtPlace(task.station!.name),
                             style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,
@@ -2198,8 +2198,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                 Expanded(
                   child: PrimaryButton(
                     label: task.sequential
-                        ? 'Xác nhận câu trả lời'
-                        : (isLast ? 'Nộp bài' : 'Câu tiếp theo'),
+                        ? appL10n.tkConfirmAnswer
+                        : (isLast ? appL10n.tkSubmit : appL10n.tkNextQuestion),
                     icon: isLast || task.sequential
                         ? Icons.send_rounded
                         : Icons.arrow_forward_rounded,
@@ -2306,7 +2306,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
       textCapitalization: TextCapitalization.sentences,
       style: const TextStyle(fontSize: 15, height: 1.4),
       decoration: InputDecoration(
-        hintText: 'Nhập câu trả lời của bạn...',
+        hintText: appL10n.tkAnswerHint,
         filled: true,
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.all(16),
@@ -2348,28 +2348,25 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
       final perfect = result.correctCount >= result.totalQuestions;
       icon = perfect ? Icons.emoji_events_rounded : Icons.fact_check_rounded;
       tone = result.correctCount > 0 ? AppCultureColors.heritageJade : AppCultureColors.amberDark;
-      title = perfect ? 'Xuất sắc!' : (result.correctCount > 0 ? 'Hoàn thành!' : 'Đã nộp bài');
-      body = 'Bạn trả lời đúng ${result.correctCount}/${result.totalQuestions} câu của "${task.name}".';
+      title = perfect ? appL10n.tkExcellent : (result.correctCount > 0 ? appL10n.tkCompleted : appL10n.tkSubmitted);
+      body = appL10n.tkResultScore(result.correctCount, result.totalQuestions, task.name);
     } else if (success) {
       icon = Icons.emoji_events_rounded;
       tone = AppCultureColors.heritageJade;
-      title = 'Xuất sắc!';
-      body = 'Bạn đã hoàn thành nhiệm vụ "${task.name}".';
+      title = appL10n.tkExcellent;
+      body = appL10n.tkMissionCompleted(task.name);
     } else if (stepCorrect) {
       icon = Icons.check_circle_rounded;
       tone = AppCultureColors.heritageJade;
-      title = 'Chính xác!';
-      body =
-          'Bạn đã trả lời đúng ${result.questionIndex}/${result.totalQuestions} câu. '
-          'Hãy đến địa điểm kế tiếp để mở câu hỏi tiếp theo.';
+      title = appL10n.tkCorrect;
+      body = appL10n.tkCorrectSoFar(result.questionIndex, result.totalQuestions);
     } else {
       icon = Icons.sentiment_dissatisfied_rounded;
       tone = AppCultureColors.error;
-      title = 'Chưa chính xác';
+      title = appL10n.tkIncorrect;
       body = result.exhausted
-          ? 'Bạn đã hết lượt làm nhiệm vụ này.'
-          : 'Bạn đúng ${result.correctCount}/${result.totalQuestions} câu. '
-                'Cần đúng tất cả để nhận điểm. Còn ${result.attemptsRemaining} lượt làm lại.';
+          ? appL10n.tkNoAttempts
+          : appL10n.tkRetryInfo(result.correctCount, result.totalQuestions, result.attemptsRemaining);
     }
 
     final earned = task.perQuestionPoints || result.pointsEarned > 0
@@ -2418,7 +2415,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
           Center(
             child: InfoChip(
               icon: Icons.stars_rounded,
-              text: '+$earned điểm thưởng',
+              text: appL10n.tkBonusPoints(earned),
               background: AppCultureColors.rewardBg,
               foreground: AppCultureColors.rewardText,
             ),
@@ -2427,14 +2424,14 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
         const SizedBox(height: 32),
         if (stepCorrect)
           PrimaryButton(
-            label: 'Đến địa điểm kế tiếp',
+            label: appL10n.tkGoNextPlace,
             icon: Icons.near_me_rounded,
             loading: _busy,
             onPressed: _continueNextStation,
           )
         else if (!success && !result.exhausted)
           PrimaryButton(
-            label: 'Làm lại',
+            label: appL10n.tkRetry,
             icon: Icons.replay_rounded,
             onPressed: _retry,
           ),
@@ -2447,7 +2444,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               borderRadius: BorderRadius.circular(16),
             ),
           ),
-          child: const Text('Về hành trình'),
+          child: Text(appL10n.tkBackToJourney),
         ),
       ],
     );

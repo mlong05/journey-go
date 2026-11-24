@@ -8,6 +8,7 @@ import 'achievements_screen.dart';
 import 'my_vouchers_screen.dart';
 import 'rewards_widgets.dart';
 import 'voucher_shop_screen.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Ví điểm: số dư, tổng tích lũy / đã tiêu và lịch sử giao dịch điểm.
 class WalletScreen extends StatefulWidget {
@@ -126,7 +127,7 @@ class _WalletScreenState extends State<WalletScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppCultureColors.background,
-      appBar: buildRewardsAppBar(context, 'Ví điểm'),
+      appBar: buildRewardsAppBar(context, appL10n.wTitle),
       body: RefreshIndicator(
         color: AppCultureColors.heritageJade,
         onRefresh: _load,
@@ -145,7 +146,7 @@ class _WalletScreenState extends State<WalletScreen> {
             height: MediaQuery.of(context).size.height * 0.6,
             child: RewardsMessageView(
               icon: Icons.cloud_off_rounded,
-              title: 'Không tải được ví điểm',
+              title: appL10n.wLoadFailed,
               message: _error,
               onRetry: _load,
             ),
@@ -164,13 +165,13 @@ class _WalletScreenState extends State<WalletScreen> {
         if (index == 1) return _buildActions();
         if (index == 2) return _buildHistoryHeader();
         if (_history.isEmpty) {
-          return const Padding(
+          return Padding(
             padding: EdgeInsets.only(top: 24),
             child: RewardsMessageView(
               icon: Icons.receipt_long_outlined,
-              title: 'Chưa có giao dịch điểm',
+              title: appL10n.wEmpty,
               message:
-                  'Check-in điểm đến và hoàn thành nhiệm vụ để bắt đầu tích điểm.',
+                  appL10n.wEmptyHint,
             ),
           );
         }
@@ -199,8 +200,8 @@ class _WalletScreenState extends State<WalletScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Số dư hiện tại',
+          Text(
+            appL10n.wBalance,
             style: TextStyle(color: AppCultureColors.textMuted, fontSize: 13.5, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
@@ -220,10 +221,10 @@ class _WalletScreenState extends State<WalletScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(bottom: 4),
                 child: Text(
-                  'điểm',
+                  appL10n.wPointsUnit,
                   style: TextStyle(color: AppCultureColors.brass800, fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -237,7 +238,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   icon: Icons.trending_up_rounded,
                   tone: AppTone.jade,
                   value: p?.lifetimeEarned ?? 0,
-                  label: 'Đã tích lũy',
+                  label: appL10n.pointsEarned,
                   compact: true,
                 ),
               ),
@@ -247,7 +248,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   icon: Icons.shopping_bag_outlined,
                   tone: AppTone.coral,
                   value: p?.lifetimeSpent ?? 0,
-                  label: 'Đã tiêu',
+                  label: appL10n.pointsSpent,
                   compact: true,
                 ),
               ),
@@ -317,14 +318,14 @@ class _WalletScreenState extends State<WalletScreen> {
             children: [
               action(
                 Icons.confirmation_number_outlined,
-                'Đổi voucher',
+                appL10n.wRedeem,
                 _openShop,
                 primary: true,
               ),
               const SizedBox(width: 10),
               action(
                 Icons.local_activity_outlined,
-                'Voucher của tôi',
+                appL10n.mvTitle,
                 _openMyVouchers,
               ),
             ],
@@ -345,7 +346,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppCultureColors.rewardBorder),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(
                       Icons.emoji_events_rounded,
@@ -358,7 +359,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Thành tựu & Huy hiệu',
+                            appL10n.achTitle,
                             style: TextStyle(
                               fontSize: 13.5,
                               fontWeight: FontWeight.w700,
@@ -367,7 +368,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                           SizedBox(height: 2),
                           Text(
-                            'Mở khóa mốc hành trình để nhận thêm điểm thưởng',
+                            appL10n.wMilestoneHint,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -394,10 +395,10 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildHistoryHeader() {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.only(top: 24, bottom: 10),
       child: Text(
-        'Lịch sử điểm',
+        appL10n.wHistory,
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,

@@ -6,6 +6,7 @@ import '../core/models/notification_model.dart';
 import '../core/services/notification_alerts.dart';
 import '../core/services/notification_service.dart';
 import '../core/services/realtime_service.dart';
+import '../l10n/locale_controller.dart';
 import 'booking/invitation_deep_link_host.dart';
 import 'journey/journey_launcher.dart';
 import 'modals/notification_dialog.dart';
@@ -173,7 +174,7 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
   Widget _buildCheckInFab() {
     return Semantics(
       button: true,
-      label: 'Check-in tại điểm đến',
+      label: context.l10n.navCheckInSemantics,
       child: Container(
         margin: const EdgeInsets.only(top: 22),
         width: 60,
@@ -208,6 +209,7 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
   }
 
   Widget _buildBottomNav() {
+    final l10n = context.l10n;
     return Container(
       decoration: BoxDecoration(
         color: AppCultureColors.surface,
@@ -229,26 +231,28 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
                 index: 0,
                 icon: Icons.home_rounded,
                 unselectedIcon: Icons.home_outlined,
-                label: 'Trang chủ',
+                label: l10n.navHome,
               ),
               _buildNavItem(
                 index: 1,
                 icon: Icons.confirmation_number_rounded,
                 unselectedIcon: Icons.confirmation_number_outlined,
-                label: 'Chuyến đi',
+                label: l10n.navTrips,
               ),
               // Chỗ cho nút Check-in nổi; nhãn nằm dưới nút
               Expanded(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: _openCheckIn,
-                  child: const Align(
+                  child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Padding(
-                      padding: EdgeInsets.only(bottom: 9),
+                      padding: const EdgeInsets.only(bottom: 9),
                       child: Text(
-                        'Check-in',
-                        style: TextStyle(
+                        l10n.navCheckIn,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                           color: AppCultureColors.heritageJade,
@@ -262,13 +266,13 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
                 index: 2,
                 icon: Icons.forum_rounded,
                 unselectedIcon: Icons.forum_outlined,
-                label: 'Diễn đàn',
+                label: l10n.navForum,
               ),
               _buildNavItem(
                 index: 3,
                 icon: Icons.person_rounded,
                 unselectedIcon: Icons.person_outline_rounded,
-                label: 'Tài khoản',
+                label: l10n.navAccount,
               ),
             ],
           ),
@@ -310,6 +314,7 @@ class _TouristHomeScreenState extends State<TouristHomeScreen> with WidgetsBindi
               Text(
                 label,
                 maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,

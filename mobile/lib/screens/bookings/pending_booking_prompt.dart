@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/booking_model.dart';
+import '../../l10n/locale_controller.dart';
 import 'booking_checkout_screen.dart';
 
 /// Lựa chọn của khách khi bấm "Đặt tour" mà đang có đơn giữ chỗ cho tour đó.
@@ -26,13 +27,16 @@ Future<PendingBookingChoice?> showPendingBookingDialog(BuildContext context, Boo
   return showDialog<PendingBookingChoice>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Bạn đang có đơn giữ chỗ'),
+      title: Text(ctx.l10n.pendingDialogTitle),
       content: _LiveCountdown(
         booking: booking,
         builder: (countdown) => Text(
-          'Đơn ${booking.bookingCode} cho ngày ${booking.formattedExperienceDate} '
-          '(${booking.formattedTotal}) đang giữ chỗ, còn $countdown để thanh toán.\n\n'
-          'Muốn đổi ngày hoặc số khách, hãy hủy đơn cũ rồi đặt lại.',
+          ctx.l10n.pendingDialogMessage(
+            booking.bookingCode,
+            booking.formattedExperienceDate,
+            booking.formattedTotal,
+            countdown,
+          ),
           style: const TextStyle(height: 1.45),
         ),
       ),
@@ -42,12 +46,12 @@ Future<PendingBookingChoice?> showPendingBookingDialog(BuildContext context, Boo
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(PendingBookingChoice.cancelAndRebook),
           style: TextButton.styleFrom(foregroundColor: AppCultureColors.lacquer),
-          child: const Text('Hủy đơn cũ và đặt lại'),
+          child: Text(ctx.l10n.pendingCancelAndRebook),
         ),
         FilledButton(
           onPressed: () => Navigator.of(ctx).pop(PendingBookingChoice.resume),
           style: FilledButton.styleFrom(backgroundColor: AppCultureColors.heritageJade),
-          child: const Text('Tiếp tục thanh toán'),
+          child: Text(ctx.l10n.tdContinuePayment),
         ),
       ],
     ),
@@ -97,14 +101,16 @@ class PendingBookingBanner extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        showTourTitle ? 'Bạn có đơn chờ thanh toán · còn $countdown' : 'Bạn đang giữ chỗ · còn $countdown',
+                        showTourTitle
+                            ? context.l10n.pendingBannerHome(countdown)
+                            : context.l10n.pendingBannerTour(countdown),
                         style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppCultureColors.amberDark),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         showTourTitle
                             ? '${booking.tourTitle} · ${booking.formattedExperienceDate}'
-                            : 'Ngày ${booking.formattedExperienceDate} · ${booking.formattedTotal}',
+                            : context.l10n.pendingBannerDetail(booking.formattedExperienceDate, booking.formattedTotal),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
@@ -114,9 +120,9 @@ class PendingBookingBanner extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              const Text(
-                'Thanh toán',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppCultureColors.heritageJade),
+              Text(
+                context.l10n.pendingPayAction,
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppCultureColors.heritageJade),
               ),
               const Icon(Icons.chevron_right_rounded, color: AppCultureColors.heritageJade),
             ],

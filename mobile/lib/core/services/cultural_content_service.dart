@@ -1,5 +1,6 @@
 import '../models/cultural_content_model.dart';
 import 'api_client.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Nội dung văn hóa công khai (chỉ bài đã được kiểm duyệt).
 class CulturalContentService {
@@ -18,7 +19,7 @@ class CulturalContentService {
   Future<CulturalContentModel> play(int id) async {
     final data = await ApiClient.request('GET', '/cultural-contents/$id/play', auth: false);
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Không mở được nội dung.');
+      throw ApiException(appL10n.ccOpenFailed);
     }
     return CulturalContentModel.fromJson(data);
   }
