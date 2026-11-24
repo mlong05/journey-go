@@ -23,6 +23,7 @@ import '../chat/ai_guide_chat_screen.dart';
 import '../journey/journey_launcher.dart';
 import '../journey/task_screen.dart';
 import '../modals/notification_dialog.dart';
+import '../common/ai_mascot.dart';
 import '../common/heritage_motion.dart';
 import '../common/ink.dart';
 import '../common/tab_refresh.dart';
@@ -419,7 +420,6 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
             ),
           ),
         ),
-      block(_buildAiGuideEntryCard()),
       if (_toursError != null && _tours.isEmpty)
         block(_buildToursError())
       else if (_tours.isEmpty)
@@ -693,55 +693,6 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
     );
   }
 
-  Widget _buildAiGuideEntryCard() {
-    final l10n = context.l10n;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Pressable(
-        onTap: _openAiGuide,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppCultureColors.jadeLight.withValues(alpha: 0.65),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppCultureColors.heritageJade.withValues(alpha: 0.25)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppCultureColors.heritageJade,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.homeAiGuideTitle,
-                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      l10n.homeAiGuideSubtitle,
-                      style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded, color: AppCultureColors.heritageJade),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   /// Banner ảnh tour thật kéo dài lên dưới thanh trạng thái; ô tìm kiếm + chuông luôn ghim trên cùng.
   /// Cuộn xuống thì banner trượt lên và thanh trên chuyển sang nền sáng.
   Widget _buildHeader() {
@@ -760,6 +711,8 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
         children: [
           Expanded(child: _buildSearchPill()),
           const SizedBox(width: 10),
+          _buildAiButton(),
+          const SizedBox(width: 8),
           _buildBell(),
         ],
       ),
@@ -871,6 +824,42 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
             style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Nút hướng dẫn viên ảo AI trên thanh đầu trang: linh vật robot "động" (nhấp nhô, chớp mắt, ăng-ten
+  /// nhấp nháy, vòng sáng lan ra) để du khách mở app là thấy ngay. Nhấn có hiệu ứng thu nhỏ; mở trang hỏi AI.
+  Widget _buildAiButton() {
+    return Semantics(
+      button: true,
+      label: context.l10n.homeAiGuideTitle,
+      child: Pressable(
+        onTap: _openAiGuide,
+        child: SizedBox(
+          width: 46,
+          height: 46,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const AiMascot(size: 46, pulseRing: true),
+              // Chấm "đang trực tuyến" nhỏ — gợi ý trợ lý luôn sẵn sàng trò chuyện
+              Positioned(
+                right: 1,
+                bottom: 1,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF22C55E),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
