@@ -205,6 +205,10 @@ public class TourService {
                 .orElseThrow(() -> new AppException(ErrorCode.TOUR_NOT_FOUND));
     }
 
+    private static Specification<Tour> publishedSpec(TourSearchFilter filter) {
+        return publishedSpec(filter, null);
+    }
+
     private static Specification<Tour> publishedSpec(TourSearchFilter filter, String currentUserEmail) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
