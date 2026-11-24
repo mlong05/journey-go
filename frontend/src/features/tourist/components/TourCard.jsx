@@ -61,7 +61,13 @@ export default function TourCard({ tour, badge }) {
         <span className="absolute left-3 top-3 hidden max-w-[calc(100%-1.5rem)] items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11.5px] font-bold text-slate-800 sm:inline-flex" title={durationLine}>
           <Clock size={12} className="shrink-0" /><span className="truncate">{durationLine}</span>
         </span>
-        {badge && <span className="absolute right-2 top-2 max-w-[45%] truncate rounded-full bg-orange-600 px-2 py-0.5 text-[11px] font-bold text-white sm:right-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11.5px]">{badge}</span>}
+        {tour.visibility === "SPECIFIC_USER" ? (
+          <span className="absolute right-2 top-2 max-w-[55%] truncate rounded-full bg-teal-700 px-2 py-0.5 text-[11px] font-bold text-white shadow-xs sm:right-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11.5px]">
+            Tour riêng của bạn
+          </span>
+        ) : (
+          badge && <span className="absolute right-2 top-2 max-w-[45%] truncate rounded-full bg-orange-600 px-2 py-0.5 text-[11px] font-bold text-white sm:right-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11.5px]">{badge}</span>
+        )}
       </Link>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-3 sm:gap-2.5 sm:p-4">
         {/* Tên cố định 2 dòng (tên ngắn vẫn giữ chỗ 2 dòng) — dài thì "…", rê chuột xem đủ */}
