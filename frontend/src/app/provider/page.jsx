@@ -22,16 +22,19 @@ import { tourService, TOUR_STATUS_META } from "@/features/tour";
 import { dashboardService, percentChange } from "@/features/dashboard";
 import { useQueueRefresh } from "@/context/NotificationContext";
 import { formatDateVN } from "@/lib/money";
+import ProviderTrendChart from "./ProviderTrendChart";
+import DestinationCheckInChart from "./DestinationCheckInChart";
 
 /**
  * Trang Tổng quan Đối tác — /provider
  * Số liệu: GET /api/v1/dashboard/provider (theo khoảng thời gian) + GET /api/v1/tours/my
  *
- * Bố cục khóa khung (màn xl+, không cuộn trang):
+ * Bố cục (cuộn dọc):
  *   Header 1 hàng (tên đối tác | tab thời gian)
- *   Dải 4 ô số liệu
+ *   Dải 4 ô số liệu (kèm % so với kỳ trước)
+ *   [Diễn biến theo thời gian — kỳ này vs kỳ trước (8/12)] | [Check-in theo điểm đến (4/12)]
  *   [Tour / Điểm đến — 2 tab, danh sách tự cuộn (7/12)] | [Kết quả thẩm định gần đây + Nhiệm vụ (5/12)]
- * Màn nhỏ: các khối xếp dọc, cho phép cuộn.
+ * Màn nhỏ: các khối xếp dọc.
  */
 
 const RANGE_OPTIONS = [
@@ -78,12 +81,15 @@ const TONE = {
 
 const fmtNumber = (n) => Number(n || 0).toLocaleString("vi-VN");
 
-/** Badge % so với kỳ trước; không hiển thị khi kỳ trước chưa có số liệu để so. */
+/**
+ * Badge so với kỳ trước: ▲/▼ kèm %. Kỳ trước bằng 0 mà kỳ này có số liệu ⇒ "Mới";
+ * cả hai bằng 0 ⇒ không hiện.
+ */
 function changeBadge(current, previous) {
   const pct = percentChange(current, previous);
-  if (pct === null) return null;
+  if (pct === null) return Number(current) > 0 ? { text: "Mới", positive: true } : null;
   return {
-    text: `${pct >= 0 ? "+" : ""}${pct.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`,
+    text: `${pct >= 0 ? "▲" : "▼"} ${Math.abs(pct).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`,
     positive: pct >= 0,
   };
 }
@@ -227,8 +233,8 @@ export default function ProviderOverviewPage() {
   const setActiveFilter = listTab === "tours" ? setTourFilter : setDestFilter;
 
   return (
-    // Màn xl+: vừa khít khung, chỉ danh sách trong thẻ cuộn. Màn nhỏ: xếp dọc, cho cuộn.
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto xl:overflow-hidden">
+    // Cuộn dọc cả trang; danh sách tour / điểm đến và kết quả thẩm định vẫn cuộn riêng trong thẻ.
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto [scrollbar-width:thin]">
       {/* ── Header 1 hàng ─────────────────────────────────────────────────── */}
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="min-w-0 truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl" title={providerName}>
@@ -302,8 +308,19 @@ export default function ProviderOverviewPage() {
         })}
       </section>
 
+      {/* ── Biểu đồ: diễn biến kỳ này vs kỳ trước | check-in theo điểm đến ── */}
+      <section aria-label="Biểu đồ" className="grid shrink-0 grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-8">
+          <ProviderTrendChart series={stats?.series} unit={stats?.seriesUnit} rangeLabel={range.label}
+            previousLabel={range.previous} loading={loadingValue} />
+        </div>
+        <div className="flex min-w-0 xl:col-span-4 [&>section]:flex-1">
+          <DestinationCheckInChart destinations={destinations} loading={loadingValue} />
+        </div>
+      </section>
+
       {/* ── Hai cột ──────────────────────────────────────────────────────── */}
-      <section className="grid grid-cols-1 gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-12 xl:grid-rows-[minmax(0,1fr)]">
+      <section className="grid shrink-0 grid-cols-1 gap-4 xl:h-[560px] xl:grid-cols-12 xl:grid-rows-[minmax(0,1fr)]">
         {/* Cột trái: Tour / Điểm đến */}
         <div className="flex h-[520px] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs xl:col-span-7 xl:h-auto xl:min-h-0">
           <div className="flex shrink-0 flex-col gap-2.5 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">

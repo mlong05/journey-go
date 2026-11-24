@@ -107,11 +107,15 @@ export default function AiChatThread({
   compact = false,
 }) {
   const { t, locale } = useI18n();
-  const bottomRef = useRef(null);
+  const listRef = useRef(null);
   const [showReturnAiModal, setShowReturnAiModal] = useState(false);
 
+  // ⚠️ Chỉ cuộn KHUNG TIN NHẮN xuống cuối. Không dùng `scrollIntoView`: nó cuộn cả các khung cha
+  // (kể cả trang) ⇒ mở trang Hướng dẫn viên AI là trang bị kéo tụt xuống.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: messages.length ? "smooth" : "auto" });
   }, [messages.length, sending, handoffStatus]);
 
   useEffect(() => {
@@ -264,6 +268,7 @@ export default function AiChatThread({
 
       {/* Khu vực tin nhắn */}
       <div
+        ref={listRef}
         className={`flex-1 overflow-y-auto space-y-3 [scrollbar-width:thin] ${
           compact ? "p-3" : "p-4 sm:p-5"
         }`}
@@ -431,7 +436,6 @@ export default function AiChatThread({
           </div>
         )}
 
-        <div ref={bottomRef} />
       </div>
 
       {/* Thông báo lỗi */}

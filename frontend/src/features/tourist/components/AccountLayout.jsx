@@ -191,7 +191,8 @@ function AccountBody({ pathname, title, actions, wide, children }) {
     <div className="mx-auto grid max-w-page grid-cols-1 gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-7 lg:px-8">
       <MobileSectionPicker pathname={pathname} unread={unread} unclaimedAchievements={unclaimedAchievements} />
       <aside className="hidden min-w-0 space-y-4 lg:sticky lg:top-24 lg:block lg:self-start">
-        <UserCard summary={summary} />
+        {/* Trang hồ sơ đã có "trang dữ liệu hộ chiếu" (tên, email, điểm) ⇒ không lặp thẻ người dùng. */}
+        {pathname !== ROUTES.ACCOUNT && <UserCard summary={summary} />}
         <nav aria-label={t("shell.account")} className="space-y-3">
           {ACCOUNT_GROUPS.map((g) => (
             <div key={g.titleKey}>

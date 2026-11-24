@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, X, Plus, Maximize2, MessageSquareText } from "lucide-react";
+import { Sparkles, X, Plus, Maximize2 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useT } from "@/i18n";
 import { useTouristSession } from "@/features/tourist/hooks/useTouristSession";
 import { aiGuideService } from "../services/aiGuideService";
 import AiChatThread from "./AiChatThread";
+
+const HINT_SEEN_KEY = "jg.aiGuideHintSeen";
 
 /**
  * Nút & khung chat nổi Hướng dẫn viên AI ở góc phải màn hình dành cho Du khách đã đăng nhập.
@@ -28,6 +30,7 @@ export default function AiGuideFloatingWidget() {
   const [sending, setSending] = useState(false);
   const [handoffLoading, setHandoffLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showHint, setShowHint] = useState(false);
 
   const handoffStatus = sessionInfo?.handoffStatus || "AI_ACTIVE";
 
@@ -62,6 +65,27 @@ export default function AiGuideFloatingWidget() {
     return () => clearInterval(timer);
   }, [open, isTourist, sessionId, handoffStatus, refreshActiveSession]);
 
+  // Bong bóng gợi ý lần đầu: hiện sau 1,5s nếu du khách chưa từng thấy / chưa mở chat.
+  useEffect(() => {
+    if (!isTourist) return undefined;
+    try {
+      if (localStorage.getItem(HINT_SEEN_KEY)) return undefined;
+    } catch {
+      return undefined;
+    }
+    const timer = setTimeout(() => setShowHint(true), 1500);
+    return () => clearTimeout(timer);
+  }, [isTourist]);
+
+  const dismissHint = () => {
+    setShowHint(false);
+    try {
+      localStorage.setItem(HINT_SEEN_KEY, "1");
+    } catch {
+      // Trình duyệt chặn localStorage: chỉ ẩn trong phiên hiện tại
+    }
+  };
+
   if (!isTourist || pathname.startsWith(ROUTES.ACCOUNT_AI_GUIDE)) {
     return null;
   }
@@ -69,6 +93,7 @@ export default function AiGuideFloatingWidget() {
   const handleToggleOpen = async () => {
     const nextOpen = !open;
     setOpen(nextOpen);
+    if (showHint) dismissHint();
     if (!nextOpen) return;
 
     if (sessionId) {
@@ -284,17 +309,74 @@ export default function AiGuideFloatingWidget() {
         </section>
       )}
 
+      {/* Bong bóng gợi ý — chỉ hiện lần đầu, tắt hẳn sau khi bấm mở hoặc đóng */}
+      {showHint && !open && (
+        <div
+          role="status"
+          className="jg-hint-pop fixed bottom-[5.5rem] right-5 z-40 w-60 rounded-2xl rounded-br-md border border-teal-100 bg-white p-3 pr-8 shadow-xl shadow-teal-900/10"
+        >
+          <button
+            type="button"
+            onClick={dismissHint}
+            aria-label={t("aiguide.widget.hintDismiss")}
+            className="absolute right-1.5 top-1.5 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+          <button type="button" onClick={handleToggleOpen} className="text-left cursor-pointer">
+            <p className="text-sm font-bold text-slate-800">{t("aiguide.widget.hintTitle")}</p>
+            <p className="mt-0.5 text-xs leading-snug text-slate-500">{t("aiguide.widget.hintBody")}</p>
+          </button>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={handleToggleOpen}
         aria-expanded={open}
         aria-label={t("aiguide.widget.openAria")}
         title={t("aiguide.widget.buttonTitle")}
-        className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-teal-700 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-teal-900/20 transition hover:scale-[1.03] hover:bg-teal-800 active:scale-[0.98] cursor-pointer"
+        className="group fixed bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-white shadow-lg shadow-teal-900/25 transition hover:scale-110 active:scale-95 cursor-pointer"
       >
-        {open ? <X size={18} /> : <MessageSquareText size={18} />}
-        <span className="hidden sm:inline">{t("aiguide.widget.fabLabel")}</span>
+        {showHint && !open && (
+          <span aria-hidden className="absolute inset-0 rounded-full bg-teal-400/60 animate-ping" />
+        )}
+        {open ? (
+          <X size={22} className="relative" />
+        ) : (
+          <span className={`relative ${showHint ? "" : "jg-bob"}`}>
+            <GuideMascot />
+          </span>
+        )}
       </button>
     </>
+  );
+}
+
+/** Linh vật robot nhỏ: mặt tròn, mắt chớp, má hồng, ăng-ten đèn cam. */
+function GuideMascot() {
+  return (
+    <svg width="34" height="34" viewBox="0 0 36 36" aria-hidden>
+      {/* ăng-ten */}
+      <line x1="18" y1="4.5" x2="18" y2="9" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="18" cy="4" r="2.4" fill="#fb923c" className="jg-antenna" />
+      {/* tai */}
+      <rect x="3" y="16" width="3.5" height="8" rx="1.75" fill="#ccfbf1" />
+      <rect x="29.5" y="16" width="3.5" height="8" rx="1.75" fill="#ccfbf1" />
+      {/* đầu */}
+      <rect x="6" y="9" width="24" height="21" rx="9" fill="#fff" />
+      {/* mắt */}
+      <g className="jg-blink" style={{ transformOrigin: "18px 18.5px" }}>
+        <ellipse cx="13.5" cy="18.5" rx="2" ry="2.6" fill="#134e4a" />
+        <ellipse cx="22.5" cy="18.5" rx="2" ry="2.6" fill="#134e4a" />
+        <circle cx="14.2" cy="17.6" r="0.7" fill="#fff" />
+        <circle cx="23.2" cy="17.6" r="0.7" fill="#fff" />
+      </g>
+      {/* má hồng */}
+      <ellipse cx="10.5" cy="23" rx="2" ry="1.2" fill="#fda4af" opacity="0.85" />
+      <ellipse cx="25.5" cy="23" rx="2" ry="1.2" fill="#fda4af" opacity="0.85" />
+      {/* miệng cười */}
+      <path d="M15.5 23.5 Q18 26 20.5 23.5" fill="none" stroke="#134e4a" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
   );
 }
