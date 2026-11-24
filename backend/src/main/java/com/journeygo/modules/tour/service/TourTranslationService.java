@@ -4,9 +4,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.journeygo.common.dto.PageResponse;
+import com.journeygo.common.i18n.ContentTranslationService;
 import com.journeygo.modules.aiguide.config.GeminiAiProperties;
 import com.journeygo.modules.aiguide.service.GeminiChatClient;
+import com.journeygo.modules.destination.dto.RegionResponse;
+import com.journeygo.modules.destination.dto.ThemeResponse;
+import com.journeygo.modules.tour.dto.TourPriceResponse;
 import com.journeygo.modules.tour.dto.TourPublicDetailResponse;
+import com.journeygo.modules.tour.dto.TourResponse;
 import com.journeygo.modules.tour.dto.wizard.TourDetailResponse;
 import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.TourTranslation;
@@ -42,12 +48,141 @@ public class TourTranslationService {
     private static final Pattern NUMBER_PATTERN = Pattern.compile("\\d+");
 
     private final TourTranslationRepository translationRepository;
+    private final ContentTranslationService contentTranslationService;
     private final GeminiChatClient geminiChatClient;
     private final GeminiAiProperties geminiProperties;
     private final ObjectMapper objectMapper;
 
     /** Khóa theo (tourId:locale) để tránh 2 request đồng thời gọi Gemini dịch trùng 1 tour. */
     private final ConcurrentHashMap<String, Object> inFlightLocks = new ConcurrentHashMap<>();
+
+    /** Dịch danh sách tour công khai trên Trang chủ (tên tour, vùng miền, chủ đề, nhãn giá). */
+    public PageResponse<TourResponse> localizePublishedTours(PageResponse<TourResponse> page, Locale locale) {
+        if (page == null || page.getContent() == null || page.getContent().isEmpty()) return page;
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null) return page;
+
+        Map<Long, String> tourTitles = new LinkedHashMap<>();
+        Map<Long, String> regionNames = new LinkedHashMap<>();
+        Map<Long, String> themeNames = new LinkedHashMap<>();
+        for (TourResponse t : page.getContent()) {
+            if (t.tourId() != null && StringUtils.hasText(t.title())) tourTitles.put(t.tourId(), t.title());
+            if (t.regionId() != null && StringUtils.hasText(t.regionName())) regionNames.put(t.regionId(), t.regionName());
+            if (t.themeId() != null && StringUtils.hasText(t.themeName())) themeNames.put(t.themeId(), t.themeName());
+        }
+
+        // Ưu tiên lấy title đã dịch trong bảng tour_translations (nếu tour đã từng dịch chi tiết)
+        Map<Long, String> translatedTitles = new HashMap<>();
+        if (!tourTitles.isEmpty()) {
+            for (TourTranslation tt : translationRepository.findByLocaleAndTourIdIn(lang, tourTitles.keySet())) {
+                try {
+                    String title = objectMapper.readTree(tt.getTranslatedJson()).path("title").asText("");
+                    if (StringUtils.hasText(title)) translatedTitles.put(tt.getTourId(), title);
+                } catch (Exception ignored) {
+                    // bỏ qua nếu cache hỏng
+                }
+            }
+            Map<Long, String> missingTitles = new LinkedHashMap<>();
+            tourTitles.forEach((id, title) -> {
+                if (!translatedTitles.containsKey(id)) missingTitles.put(id, title);
+            });
+            if (!missingTitles.isEmpty()) {
+                translatedTitles.putAll(contentTranslationService.translateBatchLabels("TOUR_TITLE", missingTitles, lang));
+            }
+        }
+
+        Map<Long, String> translatedRegions = contentTranslationService.translateBatchLabels("REGION", regionNames, lang);
+        Map<Long, String> translatedThemes = contentTranslationService.translateBatchLabels("THEME", themeNames, lang);
+
+        List<TourResponse> localizedContent = page.getContent().stream().map(t -> {
+            List<TourPriceResponse> localizedPrices = t.prices() == null ? null : t.prices().stream()
+                    .map(p -> new TourPriceResponse(
+                            p.guestType(),
+                            localizeGuestTypeLabel(p.guestType(), p.guestTypeLabel(), lang),
+                            localizeAgeRange(p.guestType(), p.ageRange(), lang),
+                            p.price(),
+                            p.countsTowardSlot(),
+                            p.alwaysFree()
+                    ))
+                    .toList();
+            return t.toBuilder()
+                    .title(translatedTitles.getOrDefault(t.tourId(), t.title()))
+                    .regionName(t.regionId() != null ? translatedRegions.getOrDefault(t.regionId(), t.regionName()) : t.regionName())
+                    .themeName(t.themeId() != null ? translatedThemes.getOrDefault(t.themeId(), t.themeName()) : t.themeName())
+                    .prices(localizedPrices)
+                    .build();
+        }).toList();
+
+        return PageResponse.<TourResponse>builder()
+                .content(localizedContent)
+                .page(page.getPage())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .first(page.isFirst())
+                .last(page.isLast())
+                .build();
+    }
+
+    /** Dịch danh sách Vùng miền theo Accept-Language (cache DB). */
+    public List<RegionResponse> localizeRegions(List<RegionResponse> regions, Locale locale) {
+        if (regions == null || regions.isEmpty()) return regions;
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null) return regions;
+
+        Map<Long, String> idToName = new LinkedHashMap<>();
+        for (RegionResponse r : regions) {
+            if (r.id() != null && StringUtils.hasText(r.name())) idToName.put(r.id(), r.name());
+        }
+        Map<Long, String> translated = contentTranslationService.translateBatchLabels("REGION", idToName, lang);
+        return regions.stream()
+                .map(r -> RegionResponse.builder()
+                        .id(r.id())
+                        .name(translated.getOrDefault(r.id(), r.name()))
+                        .slug(r.slug())
+                        .imageUrl(r.imageUrl())
+                        .imageCredit(r.imageCredit())
+                        .deleted(r.deleted())
+                        .createdAt(r.createdAt())
+                        .updatedAt(r.updatedAt())
+                        .build())
+                .toList();
+    }
+
+    public RegionResponse localizeRegion(RegionResponse region, Locale locale) {
+        if (region == null) return null;
+        return localizeRegions(List.of(region), locale).get(0);
+    }
+
+    /** Dịch danh sách Chủ đề du lịch theo Accept-Language (cache DB). */
+    public List<ThemeResponse> localizeThemes(List<ThemeResponse> themes, Locale locale) {
+        if (themes == null || themes.isEmpty()) return themes;
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null) return themes;
+
+        Map<Long, String> idToName = new LinkedHashMap<>();
+        for (ThemeResponse t : themes) {
+            if (t.id() != null && StringUtils.hasText(t.name())) idToName.put(t.id(), t.name());
+        }
+        Map<Long, String> translated = contentTranslationService.translateBatchLabels("THEME", idToName, lang);
+        return themes.stream()
+                .map(t -> ThemeResponse.builder()
+                        .id(t.id())
+                        .name(translated.getOrDefault(t.id(), t.name()))
+                        .slug(t.slug())
+                        .imageUrl(t.imageUrl())
+                        .imageCredit(t.imageCredit())
+                        .deleted(t.deleted())
+                        .createdAt(t.createdAt())
+                        .updatedAt(t.updatedAt())
+                        .build())
+                .toList();
+    }
+
+    public ThemeResponse localizeTheme(ThemeResponse theme, Locale locale) {
+        if (theme == null) return null;
+        return localizeThemes(List.of(theme), locale).get(0);
+    }
 
     public TourPublicDetailResponse localizePublicDetail(TourPublicDetailResponse detail, Locale locale) {
         if (detail == null || locale == null) return detail;

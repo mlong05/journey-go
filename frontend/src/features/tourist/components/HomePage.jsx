@@ -362,7 +362,7 @@ export default function HomePage() {
       .then(([{ items }, regions, themes]) => alive && setData({ loading: false, tours: items, regions, themes, error: "", loadFailed: false }))
       .catch((err) => alive && setData((d) => ({ ...d, loading: false, error: err?.message || "", loadFailed: true })));
     return () => { alive = false; };
-  }, []);
+  }, [locale]);
 
   const set = (patch) => { setF((p) => ({ ...p, ...patch })); setLimit(PAGE); };
   const reset = () => { setF(EMPTY); setBar({ q: "", region: "", date: "" }); setLimit(PAGE); };
