@@ -367,6 +367,24 @@ export const touristService = {
   async bookingConversation(bookingId) {
     return data(await apiClient.post("/provider-chat/conversations", { bookingId: Number(bookingId) }));
   },
+
+  // ── Yêu cầu tạo tour riêng theo nhu cầu (Tour Requests) ───────────────────
+  /** Du khách đăng yêu cầu tạo tour riêng */
+  async createTourRequest(body) {
+    return data(await apiClient.post("/tour-requests", body));
+  },
+  /** Lấy danh sách yêu cầu tour của tôi */
+  async myTourRequests({ page = 0, size = 10 } = {}) {
+    return data(await apiClient.get(`/tour-requests/my?page=${page}&size=${size}`));
+  },
+  /** Chi tiết một yêu cầu tạo tour */
+  async tourRequestDetail(requestId) {
+    return data(await apiClient.get(`/tour-requests/${requestId}`));
+  },
+  /** Hủy yêu cầu tạo tour (khi còn OPEN) */
+  async cancelTourRequest(requestId) {
+    return data(await apiClient.delete(`/tour-requests/${requestId}`));
+  },
 };
 
 export default touristService;

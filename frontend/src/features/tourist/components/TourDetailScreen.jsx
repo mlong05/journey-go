@@ -370,6 +370,12 @@ export default function TourDetailScreen({ tourId }) {
         <div className="mt-3 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="min-w-0 space-y-5">
         <header>
+          {tour.visibility === "SPECIFIC_USER" && (
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-teal-50 border border-teal-200 px-3 py-1 text-xs font-bold text-teal-800">
+              <Sparkles size={14} className="text-teal-600" />
+              Tour được thiết kế riêng dành cho tài khoản của bạn
+            </div>
+          )}
           <h1 className="text-[clamp(24px,3vw,34px)] font-extrabold leading-tight tracking-tight text-slate-900 text-balance">{tour.title}</h1>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-slate-600">
             <span className="inline-flex items-center gap-1"><Clock size={15} />{durationLabel(tour)}</span>

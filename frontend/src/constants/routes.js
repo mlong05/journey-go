@@ -35,8 +35,12 @@ export const ROUTES = {
   ACCOUNT_POSTS: "/account/posts",
   /** Lời mời tham gia tour đang chờ tôi xác nhận: /account/invitations */
   ACCOUNT_INVITATIONS: "/account/invitations",
-  // Custom tour request page for tourists
-  CUSTOM_TOUR_REQUEST: "/tourist/custom-request",
+  /** Yêu cầu tạo tour riêng theo nhu cầu: /account/requests */
+  ACCOUNT_TOUR_REQUESTS: "/account/requests",
+  /** Tạo yêu cầu tour mới: /account/requests/new */
+  ACCOUNT_TOUR_REQUEST_NEW: "/account/requests/new",
+  /** Chi tiết yêu cầu tour: /account/requests/{id} */
+  ACCOUNT_TOUR_REQUEST_DETAIL: (id) => `/account/requests/${id}`,
 
   // ── Cộng đồng ─────────────────────────────────────────────────────────────
   /** Bảng tin cộng đồng: /community */
