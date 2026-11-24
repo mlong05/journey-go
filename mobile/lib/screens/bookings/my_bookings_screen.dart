@@ -211,7 +211,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   /// Mở hành trình — nhưng nếu ngày trải nghiệm còn ở tương lai thì mở màn CHI TIẾT
   /// TOUR (không vào hành trình vì backend đang khoá tour tới ngày đó).
   void _startExperience(BookingModel b) {
-    if (b.isTourLocked) {
+    // Đã qua thời gian tour ⇒ cũng mở chi tiết tour: thanh dưới báo "Đã quá ngày trải nghiệm",
+    // hoặc "Tiếp tục" nếu khách đã bắt đầu hành trình trong hạn.
+    if (b.isTourLocked || b.isExperienceExpired) {
       openTourDetailScreen(context, tourId: b.tourId, bookedBooking: b);
       return;
     }
@@ -391,7 +393,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                                   ? Icons.event_busy_rounded
                                   : b.isTourLocked
                                       ? Icons.schedule_rounded
-                                      : Icons.explore_rounded,
+                                      : b.isExperienceExpired
+                                          ? Icons.event_busy_rounded
+                                          : Icons.explore_rounded,
                       size: 18,
                     ),
                     label: Text(
@@ -466,7 +470,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     // ⚠️ Đơn đã hủy/hết hạn ⇒ KHÔNG mở được hành trình ⇒ nhãn phải nói đúng
     // sự thật, không hiện "Vào trải nghiệm" (gây hiểu nhầm đã mua thành công).
     if (_isClosed(b)) return b.isCancelled ? l10n.mbBookingCancelled : l10n.mbBookingExpired;
-    return b.isTourLocked ? l10n.tripCountdown(b.daysUntilStart) : l10n.mbEnterExperience;
+    if (b.isTourLocked) return l10n.tripCountdown(b.daysUntilStart);
+    return b.isExperienceExpired ? l10n.tdExperienceExpired : l10n.mbEnterExperience;
   }
 
   /// Tile cho đơn ĐÃ HỦY / HẾT HẠN.
