@@ -405,7 +405,7 @@
   "mbTabCompleted": "Completed ({count})",
   "mbTabRefunding": "Refunding ({count})",
   "mbTabRefunded": "Refunded ({count})",
-  "mbTabClosed": "Cancelled/Expired ({count})",
+  "mbTabClosed": "Cancelled / Expired ({count})",
   "mbEmptyAll": "No bookings yet.",
   "mbEmptyPurchased": "No paid bookings yet.",
   "mbEmptyPending": "No bookings awaiting payment.",

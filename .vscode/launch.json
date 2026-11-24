@@ -1,22 +1,23 @@
 {
   "version": "0.2.0",
   "configurations": [
-  
-    
     {
+      // Điện thoại cắm USB hoặc máy ảo: trước khi chạy luôn bật adb reverse 8088/8080
+      // để app gọi được backend local qua http://127.0.0.1 (để trống API_BASE_URL trong mobile/.env).
       "name": "Mobile (USB)",
       "type": "dart",
       "request": "launch",
       "cwd": "mobile",
       "program": "lib/main.dart",
-      "preLaunchTask": "adb reverse 8088"
+      "preLaunchTask": "adb reverse (USB)"
     },
     {
       "name": "Mobile",
       "type": "dart",
       "request": "launch",
       "cwd": "mobile",
-      "program": "lib/main.dart"
+      "program": "lib/main.dart",
+      "preLaunchTask": "adb reverse (USB)"
     }
   ]
 }

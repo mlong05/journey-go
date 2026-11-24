@@ -54,44 +54,32 @@ export function tripGroupOf(b, today, refundState, journeyInProgress = false) {
 }
 
 /**
- * 4 tab chính (URL: /trips?tab=upcoming&f=pending). Mỗi tab gom một hoặc nhiều nhóm của
- * `tripGroupOf`; tab có nhiều nhóm thì có bộ lọc con (chip) theo nhóm.
+ * 8 tab theo trạng thái mua (URL: /trips?tab=purchased). "Tất cả" gom mọi nhóm, các tab còn lại
+ * ứng với đúng một nhóm của `tripGroupOf`.
  */
+const ALL_GROUPS = ["experiencing", "purchased", "pending", "completed", "refunding", "refunded", "closed"];
 export const TRIP_TABS = [
-  { key: "upcoming", labelKey: "trips.tabUpcoming", groups: ["experiencing", "purchased", "pending"] },
-  { key: "done", labelKey: "trips.tabDone", groups: ["completed"] },
-  { key: "refund", labelKey: "trips.tabRefund", groups: ["refunding", "refunded"] },
-  { key: "closed", labelKey: "trips.tabClosed", groups: ["closed"] },
+  { key: "all", labelKey: "trips.tabAll", groups: ALL_GROUPS },
+  { key: "purchased", labelKey: "trips.tabPurchased", groups: ["purchased"] },
+  { key: "pending", labelKey: "trips.tabPending", groups: ["pending"] },
+  { key: "experiencing", labelKey: "trips.tabExperiencing", groups: ["experiencing"] },
+  { key: "completed", labelKey: "trips.tabCompleted", groups: ["completed"] },
+  { key: "refunding", labelKey: "trips.tabRefunding", groups: ["refunding"] },
+  { key: "refunded", labelKey: "trips.tabRefunded", groups: ["refunded"] },
+  { key: "closed", labelKey: "trips.tabClosedExpired", groups: ["closed"] },
 ];
-const GROUP_LABEL_KEY = {
-  experiencing: "trips.groupExperiencing",
-  purchased: "trips.groupPurchased",
-  pending: "bookingStatus.PENDING_PAYMENT",
-  refunding: "trips.groupRefunding",
-  refunded: "trips.groupRefunded",
-};
-/** Link cũ (tab theo nhóm, /account/refunds → ?tab=refunds) ⇒ [tab chính, bộ lọc con]. */
-const TAB_ALIASES = {
-  all: ["upcoming", null],
-  purchased: ["upcoming", "purchased"],
-  pending: ["upcoming", "pending"],
-  experiencing: ["upcoming", "experiencing"],
-  completed: ["done", null],
-  refunding: ["refund", "refunding"],
-  refunds: ["refund", "refunding"],
-  refunded: ["refund", "refunded"],
-};
-const GROUP_EMPTY_KEY = {
-  experiencing: "trips.emptyGroupExperiencing",
-  purchased: "trips.emptyGroupPurchased",
-  pending: "trips.emptyGroupPending",
-  refunding: "trips.emptyGroupRefunding",
-  refunded: "trips.emptyGroupRefunded",
-};
+/** Tab "chưa đi" ⇒ ngày tăng dần (sắp đi trước); các tab đã đóng ⇒ ngày giảm dần. */
+const UPCOMING_TABS = ["all", "purchased", "pending", "experiencing"];
+/** Link cũ (4 tab gộp, /account/refunds → ?tab=refunds) ⇒ tab tương ứng. */
+const TAB_ALIASES = { upcoming: "all", done: "completed", refund: "refunding", refunds: "refunding" };
 const TAB_EMPTY = {
-  upcoming: { Icon: Compass, titleKey: "trips.emptyUpcomingTitle", textKey: "trips.emptyUpcomingText", cta: true },
-  done: { Icon: Award, titleKey: "trips.emptyDoneTitle", textKey: "trips.emptyDoneText" },
-  refund: { Icon: Undo2, titleKey: "trips.emptyRefundTitle", textKey: "trips.emptyRefundText" },
+  all: { Icon: Compass, titleKey: "trips.emptyUpcomingTitle", textKey: "trips.emptyUpcomingText", cta: true },
+  purchased: { Icon: Compass, titleKey: "trips.emptyGroupPurchased", textKey: "trips.emptyUpcomingText", cta: true },
+  pending: { Icon: Timer, titleKey: "trips.emptyGroupPending" },
+  experiencing: { Icon: Compass, titleKey: "trips.emptyGroupExperiencing" },
+  completed: { Icon: Award, titleKey: "trips.emptyDoneTitle", textKey: "trips.emptyDoneText" },
+  refunding: { Icon: Undo2, titleKey: "trips.emptyGroupRefunding", textKey: "trips.emptyRefundText" },
+  refunded: { Icon: Undo2, titleKey: "trips.emptyGroupRefunded" },
   closed: { Icon: Ban, titleKey: "trips.emptyClosedTitle", textKey: "trips.emptyClosedText" },
 };
 
@@ -361,7 +349,7 @@ function EmptyTab({ tab }) {
     <div className="flex flex-col items-center rounded-3xl border border-slate-200 bg-white px-6 py-12 text-center">
       <span className="grid h-14 w-14 place-items-center rounded-full bg-teal-50 text-teal-700"><Icon size={26} /></span>
       <p className="mt-3 font-bold text-slate-900">{t(titleKey)}</p>
-      <p className="mt-1 max-w-sm text-sm text-slate-500">{t(textKey)}</p>
+      {textKey && <p className="mt-1 max-w-sm text-sm text-slate-500">{t(textKey)}</p>}
       {cta && (
         <Link href={ROUTES.HOME} className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700 active:scale-[0.97]">
           <Compass size={16} />{t("footer.exploreTours")}
@@ -376,9 +364,9 @@ function EmptyTab({ tab }) {
 function Overview({ counts, spent, active, onPick }) {
   const t = useT();
   const rows = [
-    ["upcoming", t("trips.overviewUpcoming"), counts.upcoming],
-    ["done", t("trips.tabDone"), counts.done],
-    ["refund", t("trips.overviewRefunding"), counts.refunding],
+    ["purchased", t("trips.tabPurchased"), counts.upcoming],
+    ["completed", t("trips.tabCompleted"), counts.done],
+    ["refunding", t("trips.overviewRefunding"), counts.refunding],
     ["closed", t("trips.overviewClosed"), counts.closed],
   ];
   return (
@@ -516,10 +504,12 @@ function Trips() {
 
   // Tab + bộ lọc con nằm trên URL ⇒ link từ nơi khác mở đúng chỗ, F5 vẫn giữ.
   const rawTab = params.get("tab");
-  const alias = TAB_ALIASES[rawTab];
-  const tab = TRIP_TABS.find((item) => item.key === (alias ? alias[0] : rawTab)) || TRIP_TABS[0];
-  const rawSub = alias ? alias[1] : params.get("f");
-  const sub = tab.groups.length > 1 && tab.groups.includes(rawSub) ? rawSub : null;
+  // Link cũ dạng ?tab=upcoming&f=pending ⇒ ưu tiên bộ lọc con (f) nếu nó là một tab hợp lệ.
+  const legacySub = params.get("f");
+  const wanted = TAB_ALIASES[rawTab] && TRIP_TABS.some((item) => item.key === legacySub)
+    ? legacySub
+    : (TAB_ALIASES[rawTab] || rawTab);
+  const tab = TRIP_TABS.find((item) => item.key === wanted) || TRIP_TABS[0];
 
   /**
    * Trang hiện tại nằm trên URL (?page=) ⇒ link chia sẻ được, F5 vẫn giữ trang.
@@ -528,10 +518,9 @@ function Trips() {
   const pageParam = Number.parseInt(params.get("page") || "1", 10);
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam - 1 : 0;
 
-  const go = (tabKey, subKey = null) => {
+  const go = (tabKey) => {
     const q = new URLSearchParams();
     if (tabKey !== TRIP_TABS[0].key) q.set("tab", tabKey);
-    if (subKey) q.set("f", subKey);
     const s = q.toString();
     router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
   };
@@ -545,16 +534,15 @@ function Trips() {
     router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
   };
 
-  // Tab "Sắp tới": ngày tăng dần (sắp đi trước). Các tab đã đóng: ngày giảm dần.
-  const ascending = tab.key === "upcoming";
-  const showNext = next && tab.key === "upcoming" && (!sub || sub === "purchased");
-  let fullList = (sub ? groups[sub] : tab.groups.flatMap((k) => groups[k]))
+  const ascending = UPCOMING_TABS.includes(tab.key);
+  const showNext = next && (tab.key === "all" || tab.key === "purchased");
+  let fullList = tab.groups.flatMap((k) => groups[k])
     .slice()
     .sort((a, b) => (ascending
       ? String(a.experienceDate || "").localeCompare(String(b.experienceDate || ""))
       : String(b.experienceDate || "").localeCompare(String(a.experienceDate || ""))));
   if (showNext) fullList = fullList.filter((b) => b.id !== next.id);
-  const past = tab.key !== "upcoming";
+  const past = !ascending;
 
   // ── Phân trang: mỗi trang 10 ô (PAGE_SIZE) ──────────────────────────────────
   const totalElements = fullList.length;
@@ -595,9 +583,17 @@ function Trips() {
       window.removeEventListener("resize", measure);
       mq.removeEventListener("change", measure);
     };
-  }, [state.loading, tab.key, sub, needsAction]);
-  // Đổi tab / bộ lọc / trang ⇒ danh sách về đầu.
-  useEffect(() => { if (panelRef.current) panelRef.current.scrollTop = 0; }, [tab.key, sub, safePage]);
+  }, [state.loading, tab.key, needsAction]);
+  // Hàng tab cuộn ngang ⇒ đưa tab đang chọn vào tầm nhìn (vd. mở thẳng ?tab=refunded).
+  const tablistRef = useRef(null);
+  useEffect(() => {
+    const listEl = tablistRef.current;
+    const el = listEl?.querySelector('[aria-selected="true"]');
+    if (!listEl || !el || listEl.scrollWidth <= listEl.clientWidth) return;
+    listEl.scrollTo({ left: el.offsetLeft - (listEl.clientWidth - el.clientWidth) / 2, behavior: "smooth" });
+  }, [tab.key, state.loading]);
+  // Đổi tab / trang ⇒ danh sách về đầu.
+  useEffect(() => { if (panelRef.current) panelRef.current.scrollTop = 0; }, [tab.key, safePage]);
 
   if (state.loading) {
     return (
@@ -626,7 +622,7 @@ function Trips() {
     );
   }
 
-  const isRefundTab = tab.key === "refund";
+  const isRefundTab = tab.key === "refunding" || tab.key === "refunded";
 
   return (
     <div className="space-y-5">
@@ -636,37 +632,20 @@ function Trips() {
       <div ref={frameRef} style={frameH ? { height: frameH } : undefined}
         className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-stretch">
         <div className="min-w-0 space-y-4 lg:flex lg:min-h-0 lg:flex-col">
-          {/* 4 tab chính — gạch chân; màn hẹp vẫn vừa một hàng. */}
-          <div className="flex gap-1 overflow-x-auto border-b border-slate-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label={t("trips.filterTripsAria")}>
+          {/* 8 tab theo trạng thái — gạch chân; không đủ chỗ thì vuốt ngang. */}
+          <div ref={tablistRef} className="flex gap-1 overflow-x-auto border-b border-slate-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label={t("trips.filterTripsAria")}>
             {TRIP_TABS.map((item) => {
               const n = tabCount(item);
               const on = tab.key === item.key;
               return (
                 <button key={item.key} type="button" role="tab" aria-selected={on} onClick={() => go(item.key)}
-                  className={`-mb-px inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-bold transition-colors sm:px-4 ${on ? "border-teal-700 text-teal-800" : n ? "border-transparent text-slate-600 hover:text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}>
+                  className={`-mb-px inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-sm font-bold transition-colors sm:px-3 ${on ? "border-teal-700 text-teal-800" : n ? "border-transparent text-slate-600 hover:text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}>
                   {t(item.labelKey)}
                   <span className={`min-w-5 rounded-full px-1.5 text-center text-[11px] tabular-nums ${on ? "bg-teal-700 text-white" : n ? "bg-slate-200/70 text-slate-700" : "bg-slate-100 text-slate-400"}`}>{n}</span>
                 </button>
               );
             })}
           </div>
-
-          {/* Bộ lọc con — chỉ tab có nhiều nhóm; ẩn nhóm trống. */}
-          {tab.groups.length > 1 && tabCount(tab) > 0 && (
-            <div className="flex flex-wrap gap-2" aria-label={t("trips.filterStatusAria")}>
-              {[[null, t("common.all"), tabCount(tab)], ...tab.groups.map((k) => [k, t(GROUP_LABEL_KEY[k]), groups[k].length])]
-                .filter(([k, , n]) => k === null || n > 0 || sub === k)
-                .map(([k, label, n]) => {
-                  const on = sub === k;
-                  return (
-                    <button key={k || "all"} type="button" aria-pressed={on} onClick={() => go(tab.key, k)}
-                      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold transition-colors ${on ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"}`}>
-                      {label}<span className={`tabular-nums ${on ? "text-white/70" : "text-slate-400"}`}>{n}</span>
-                    </button>
-                  );
-                })}
-            </div>
-          )}
 
           {/* Điện thoại: hướng dẫn hoàn tiền dạng gập/mở (máy tính nằm ở cột phụ). */}
           {isRefundTab && (
@@ -694,9 +673,7 @@ function Trips() {
                   group={groupOf.get(String(b.id))}
                 />
               ))
-            ) : showNext ? null : sub ? (
-              <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">{t(GROUP_EMPTY_KEY[sub])}</p>
-            ) : (
+            ) : showNext ? null : (
               <EmptyTab tab={tab.key} />
             )}
             {totalPages > 1 && (
@@ -718,7 +695,7 @@ function Trips() {
           <div className="hidden lg:block">
             <Overview
               counts={{
-                upcoming: tabCount(TRIP_TABS[0]),
+                upcoming: groups.purchased.length,
                 done: groups.completed.length,
                 refunding: groups.refunding.length,
                 closed: groups.closed.length,
@@ -733,7 +710,7 @@ function Trips() {
   );
 }
 
-/** Trang /trips — khu riêng "Chuyến đi của tôi": việc cần xử lý + 4 tab chuyến đi + cột phụ tổng quan. */
+/** Trang /trips — khu riêng "Chuyến đi của tôi": việc cần xử lý + 8 tab chuyến đi + cột phụ tổng quan. */
 export default function TripsScreen() {
   const t = useT();
   return (

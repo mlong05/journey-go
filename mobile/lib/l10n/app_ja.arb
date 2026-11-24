@@ -403,7 +403,7 @@
   "mbTabPending": "支払い待ち（{count}）",
   "mbTabExperiencing": "体験中（{count}）",
   "mbTabCompleted": "完了（{count}）",
-  "mbTabRefunding": "返金中（{count}）",
+  "mbTabRefunding": "返金処理中（{count}）",
   "mbTabRefunded": "返金済み（{count}）",
   "mbTabClosed": "キャンセル・期限切れ（{count}）",
   "mbEmptyAll": "予約はまだありません。",
