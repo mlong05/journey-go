@@ -803,6 +803,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tdStartExperience => 'Start experience';
 
   @override
+  String get tdExperienceExpired => 'Experience date has passed';
+
+  @override
+  String tdExperienceWindow(String dates) {
+    return 'Tour dates: $dates';
+  }
+
+  @override
   String get tdContinueJourney => 'Continue journey';
 
   @override
@@ -901,6 +909,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tdDepartures => 'Departures';
+
+  @override
+  String get tdDepartureInfo => 'Departure info';
 
   @override
   String tdMoreDates(int count) {
@@ -1018,8 +1029,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count multiple-choice questions',
-      one: '1 multiple-choice question',
+      other: '$count quiz questions',
+      one: '1 quiz question',
     );
     return '$_temp0';
   }
@@ -1028,7 +1039,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tdScanQrToConfirm => 'scan the QR code on site to confirm';
 
   @override
-  String get tdActivityFallback => 'Field activity';
+  String get tdActivityFallback => 'Real-world experience';
 
   @override
   String tripCountdown(int days) {
@@ -2455,6 +2466,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tripsStageReady => 'Upcoming';
 
   @override
+  String get tripsStageEnded => 'Ended';
+
+  @override
+  String get tripsNotJoined => 'You didn\'t join this tour';
+
+  @override
   String get tripsLive => 'Live';
 
   @override
@@ -2485,7 +2502,30 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get tripsStopsCheckedIn => ' stops checked in';
+  String get tripsStopsCheckedIn => ' stops completed';
+
+  @override
+  String tripsNextStop(int current, int total) {
+    return 'Next stop $current/$total';
+  }
+
+  @override
+  String get tripsAllStopsChecked => 'All stops completed';
+
+  @override
+  String get tripsUnfinished => 'Keep going';
+
+  @override
+  String tripsUnfinishedHint(String date) {
+    return 'Started on $date but not finished yet.';
+  }
+
+  @override
+  String get tripsActionTitle => 'Needs your attention';
+
+  @override
+  String get tripsRefundNeededTitle =>
+      'Paid but cancelled · please request a refund';
 
   @override
   String tripsDestinations(int count) {
@@ -3048,7 +3088,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notifChannelTimerDesc =>
-      'Reminds you when a field activity countdown ends';
+      'Reminds you when a real-world experience countdown ends';
+
+  @override
+  String get notifChannelCountdown => 'Countdown timer';
+
+  @override
+  String get notifChannelCountdownDesc =>
+      'Time left for an on-site activity, also shown on the lock screen';
+
+  @override
+  String tkCountdownBody(String place) {
+    return 'Counting down · $place';
+  }
+
+  @override
+  String get ovHideTitle => 'Hide the floating timer?';
+
+  @override
+  String get ovHideBody => 'The timer keeps running in the app.';
+
+  @override
+  String get ovHide => 'Hide';
+
+  @override
+  String get ovCancel => 'Cancel';
+
+  @override
+  String get ovPermTitle => 'Show the timer outside the app?';
+
+  @override
+  String get ovPermBody =>
+      'Allow Journey Go to display over other apps so you can see the time left right on your home screen.';
+
+  @override
+  String get ovPermAllow => 'Allow';
+
+  @override
+  String get ovPermLater => 'Not now';
 
   @override
   String get notifChannelMain => 'Journey Go notifications';
@@ -3090,6 +3167,103 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatInputHint => 'Message the provider…';
+
+  @override
+  String get pcVerified => 'Verified partner';
+
+  @override
+  String get pcOnline => 'Online now';
+
+  @override
+  String get pcReplyFewMinutes => 'Usually replies within minutes';
+
+  @override
+  String pcReplyMinutes(int minutes) {
+    return 'Usually replies in about $minutes min';
+  }
+
+  @override
+  String pcReplyHours(int hours) {
+    return 'Usually replies in about $hours h';
+  }
+
+  @override
+  String get pcReplyDay => 'Usually replies within a day';
+
+  @override
+  String get pcReplyDays => 'Usually replies within a few days';
+
+  @override
+  String get pcNotifyReply => 'You will be notified when the operator replies';
+
+  @override
+  String pcAskingAbout(String tour) {
+    return 'Asking about: $tour';
+  }
+
+  @override
+  String get pcToday => 'Today';
+
+  @override
+  String get pcYesterday => 'Yesterday';
+
+  @override
+  String get pcQuick1 => 'Next departure dates?';
+
+  @override
+  String get pcQuick2 => 'What is the price for children?';
+
+  @override
+  String get pcQuick3 => 'Is hotel pickup included?';
+
+  @override
+  String get pcQuick4 => 'What should I bring?';
+
+  @override
+  String get pcQuickTitle => 'Suggested questions';
+
+  @override
+  String pcNewMessages(int count) {
+    return '$count new';
+  }
+
+  @override
+  String get pcSending => 'Sending…';
+
+  @override
+  String get pcSendFailed => 'Not sent · Tap to retry';
+
+  @override
+  String get pcCopied => 'Message copied';
+
+  @override
+  String get pcLoadOlder => 'Load older messages';
+
+  @override
+  String get pcHistoryEnd => 'You have reached the beginning of the chat';
+
+  @override
+  String get pcInfoTitle => 'Tour operator';
+
+  @override
+  String get pcInfoBody =>
+      'This operator is reviewed by Journey Go. Your messages are saved so you can continue any time.';
+
+  @override
+  String get pcViewTour => 'View tour';
+
+  @override
+  String get pcSeen => 'Seen';
+
+  @override
+  String get pcSent => 'Sent';
+
+  @override
+  String get pcStartChat => 'Start chatting';
+
+  @override
+  String get pcListSubtitle =>
+      'Ask operators about itineraries, prices, pickup…';
 
   @override
   String get forumFilterTour => 'Filter by tour';
@@ -4085,6 +4259,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get jsScanQr => 'Scan the QR code on site';
 
   @override
+  String get jsScanQrShort => 'Scan QR';
+
+  @override
   String get jsSkipStop => 'Skip this stop';
 
   @override
@@ -4306,7 +4483,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tkLoadFailed => 'Couldn\'t load the mission.';
 
   @override
-  String get tkFieldMission => 'Field mission';
+  String get tkFieldMission => 'Real-world experience';
 
   @override
   String get tkHeritageQuiz => 'Heritage quiz';
@@ -4354,6 +4531,45 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tkStartMission => 'Start mission';
+
+  @override
+  String get tkInProgressTitle => 'In progress';
+
+  @override
+  String tkInProgressSummary(int answered, int total, int correct, int points) {
+    return 'Answered $answered/$total · $correct correct · +$points pts';
+  }
+
+  @override
+  String tkContinueFromQuestion(int number) {
+    return 'Continue from question $number';
+  }
+
+  @override
+  String get tkExitConfirmTitle => 'Leave this mission?';
+
+  @override
+  String get tkExitConfirmBody =>
+      'Your progress is saved — you can continue later.';
+
+  @override
+  String get tkExitActivityBody =>
+      'The timer keeps running — you can come back any time.';
+
+  @override
+  String get tkStay => 'Stay';
+
+  @override
+  String get tkExit => 'Leave';
+
+  @override
+  String get tkEarlierAnswered =>
+      'Earlier questions were answered in a previous session';
+
+  @override
+  String tkQuestionsProgress(int answered, int total) {
+    return '$answered/$total questions';
+  }
 
   @override
   String get tkViewClue => 'View clue';
@@ -4852,7 +5068,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get seAnyOrder =>
-      'Do them in any order. Field activities require scanning the on-site QR code to confirm.';
+      'Do them in any order. Real-world experiences require scanning the on-site QR code to confirm.';
 
   @override
   String get sePartial => 'Partly correct';
@@ -4878,7 +5094,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seCulturalQuiz => 'Cultural quiz';
 
   @override
-  String get seFieldActivity => 'Field activity';
+  String get seFieldActivity => 'Real-world experience';
 
   @override
   String get seLocationPuzzle => 'Location puzzle';
@@ -5473,4 +5689,161 @@ class AppLocalizationsEn extends AppLocalizations {
   String aiViewTour(int id) {
     return 'View tour #$id';
   }
+
+  @override
+  String tripsAtStop(int current, int total) {
+    return 'At stop $current/$total';
+  }
+
+  @override
+  String tripsUnfinishedRemaining(String date, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more stops',
+      one: '1 more stop',
+    );
+    return 'Started $date · $_temp0 to finish.';
+  }
+
+  @override
+  String seFailedLeft(int count) {
+    return 'Not passed · $count left';
+  }
+
+  @override
+  String get seDirections => 'Directions';
+
+  @override
+  String seFarFromActivity(String distance) {
+    return 'Nearest activity is $distance away';
+  }
+
+  @override
+  String get tkReviewTitle => 'Review answers';
+
+  @override
+  String tkReviewCorrectAnswer(String answer) {
+    return 'Correct answer: $answer';
+  }
+
+  @override
+  String tkReviewYourAnswer(String answer) {
+    return 'Your answer: $answer';
+  }
+
+  @override
+  String get tkReviewNoAnswer => '(no answer)';
+
+  @override
+  String get tkReviewWhy => 'Why?';
+
+  @override
+  String jsGoalRemaining(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more stops',
+      one: '1 more stop',
+    );
+    return '$_temp0 to earn the completion bonus and trip summary';
+  }
+
+  @override
+  String get jsGoalLost =>
+      'A stop was skipped, so this trip no longer earns the completion bonus — keep going to collect points.';
+
+  @override
+  String get tkOrderingHint =>
+      'Hold and drag to put the items in the right order, top to bottom';
+
+  @override
+  String get tkNumberHint => 'Drag the slider or tap − / + to choose';
+
+  @override
+  String get tkNumberNotChosen => 'Not chosen';
+
+  @override
+  String get tkSeeResult => 'See results';
+
+  @override
+  String get tkAnswer => 'Answer';
+
+  @override
+  String get tkUnsupportedQuestion =>
+      'New question type — please update the app to answer.';
+
+  @override
+  String tkNumberOff(int diff) {
+    return '$diff off';
+  }
+
+  @override
+  String tkImageOption(String letter) {
+    return 'Image $letter';
+  }
+
+  @override
+  String get tkRevealCorrect => 'Correct!';
+
+  @override
+  String get tkRevealWrong => 'Not quite';
+
+  @override
+  String get tkCorrectOrder => 'Correct order';
+
+  @override
+  String get scStory => 'View as story';
+
+  @override
+  String get scStoryEndTitle => 'Ready for the challenge?';
+
+  @override
+  String get scStoryEndBody =>
+      'You have finished this stop\'s story. Time to test what you learned!';
+
+  @override
+  String get scReadAll => 'Read in full';
+
+  @override
+  String get scStoryArtifact => 'Artifact';
+
+  @override
+  String get scStoryClose => 'Close story';
+
+  @override
+  String get scThenNowTitle => 'Then and now';
+
+  @override
+  String get scThenNowNow => 'Now';
+
+  @override
+  String get scThenNowThen => 'Then';
+
+  @override
+  String get scThenNowHint => 'Drag the line to compare';
+
+  @override
+  String scThenNowCredit(String credit) {
+    return 'Archive photo: $credit';
+  }
+
+  @override
+  String get tkMatchingHint =>
+      'Tap an item in Column A, then tap its match in Column B. All pairs must be correct to earn points.';
+
+  @override
+  String get tkMatchingColA => 'Column A';
+
+  @override
+  String get tkMatchingColB => 'Column B';
+
+  @override
+  String get tkMatchingTapZoom => 'Tap image to zoom';
+
+  @override
+  String get tkMatchingCorrectPairs => 'Correct pairs';
+
+  @override
+  String get tkMatchingClear => 'Unlink';
 }

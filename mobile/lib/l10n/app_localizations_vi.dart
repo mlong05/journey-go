@@ -717,6 +717,14 @@ class AppLocalizationsVi extends AppLocalizations {
   String get tdStartExperience => 'Bắt đầu trải nghiệm';
 
   @override
+  String get tdExperienceExpired => 'Đã quá ngày trải nghiệm';
+
+  @override
+  String tdExperienceWindow(String dates) {
+    return 'Thời gian tour: $dates';
+  }
+
+  @override
   String get tdContinueJourney => 'Tiếp tục hành trình';
 
   @override
@@ -818,6 +826,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get tdDepartures => 'Lịch khởi hành';
 
   @override
+  String get tdDepartureInfo => 'Thông tin khởi hành';
+
+  @override
   String tdMoreDates(int count) {
     return '+$count ngày';
   }
@@ -900,14 +911,14 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String tdQuizQuestions(int count) {
-    return '$count câu trắc nghiệm';
+    return '$count câu đố';
   }
 
   @override
   String get tdScanQrToConfirm => 'quét QR tại điểm để xác nhận';
 
   @override
-  String get tdActivityFallback => 'Hoạt động thực địa';
+  String get tdActivityFallback => 'Trải nghiệm thực tế';
 
   @override
   String tripCountdown(int days) {
@@ -2260,6 +2271,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get tripsStageReady => 'Sắp khởi hành';
 
   @override
+  String get tripsStageEnded => 'Đã kết thúc';
+
+  @override
+  String get tripsNotJoined => 'Bạn chưa tham gia tour này';
+
+  @override
   String get tripsLive => 'Trực tiếp';
 
   @override
@@ -2290,7 +2307,30 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
-  String get tripsStopsCheckedIn => ' trạm đã check-in';
+  String get tripsStopsCheckedIn => ' trạm hoàn thành';
+
+  @override
+  String tripsNextStop(int current, int total) {
+    return 'Trạm tiếp theo $current/$total';
+  }
+
+  @override
+  String get tripsAllStopsChecked => 'Đã đi trọn các trạm';
+
+  @override
+  String get tripsUnfinished => 'Đi tiếp nhé';
+
+  @override
+  String tripsUnfinishedHint(String date) {
+    return 'Hành trình bắt đầu $date nhưng chưa hoàn tất.';
+  }
+
+  @override
+  String get tripsActionTitle => 'Cần bạn xử lý';
+
+  @override
+  String get tripsRefundNeededTitle =>
+      'Đã thanh toán nhưng đơn bị hủy · cần gửi yêu cầu hoàn tiền';
 
   @override
   String tripsDestinations(int count) {
@@ -2808,7 +2848,44 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get notifChannelTimerDesc =>
-      'Nhắc khi hết giờ đếm ngược của hoạt động thực địa';
+      'Nhắc khi hết giờ đếm ngược của trải nghiệm thực tế';
+
+  @override
+  String get notifChannelCountdown => 'Đồng hồ đếm ngược';
+
+  @override
+  String get notifChannelCountdownDesc =>
+      'Thời gian còn lại của hoạt động thực địa, hiện cả trên màn hình khoá';
+
+  @override
+  String tkCountdownBody(String place) {
+    return 'Đang đếm ngược · $place';
+  }
+
+  @override
+  String get ovHideTitle => 'Ẩn đồng hồ nổi?';
+
+  @override
+  String get ovHideBody => 'Thời gian vẫn tiếp tục đếm trong ứng dụng.';
+
+  @override
+  String get ovHide => 'Ẩn';
+
+  @override
+  String get ovCancel => 'Huỷ';
+
+  @override
+  String get ovPermTitle => 'Hiện đồng hồ khi rời ứng dụng?';
+
+  @override
+  String get ovPermBody =>
+      'Cho phép Journey Go hiển thị trên ứng dụng khác để thấy thời gian còn lại ngay trên màn hình chính.';
+
+  @override
+  String get ovPermAllow => 'Cho phép';
+
+  @override
+  String get ovPermLater => 'Để sau';
 
   @override
   String get notifChannelMain => 'Thông báo Journey Go';
@@ -2850,6 +2927,103 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get chatInputHint => 'Nhắn tin cho nhà tour…';
+
+  @override
+  String get pcVerified => 'Đối tác đã xác minh';
+
+  @override
+  String get pcOnline => 'Đang trực tuyến';
+
+  @override
+  String get pcReplyFewMinutes => 'Thường trả lời trong vài phút';
+
+  @override
+  String pcReplyMinutes(int minutes) {
+    return 'Thường trả lời trong khoảng $minutes phút';
+  }
+
+  @override
+  String pcReplyHours(int hours) {
+    return 'Thường trả lời trong khoảng $hours giờ';
+  }
+
+  @override
+  String get pcReplyDay => 'Thường trả lời trong vòng 1 ngày';
+
+  @override
+  String get pcReplyDays => 'Thường trả lời sau vài ngày';
+
+  @override
+  String get pcNotifyReply => 'Bạn sẽ nhận thông báo khi nhà tour trả lời';
+
+  @override
+  String pcAskingAbout(String tour) {
+    return 'Đang hỏi về: $tour';
+  }
+
+  @override
+  String get pcToday => 'Hôm nay';
+
+  @override
+  String get pcYesterday => 'Hôm qua';
+
+  @override
+  String get pcQuick1 => 'Lịch khởi hành gần nhất?';
+
+  @override
+  String get pcQuick2 => 'Giá cho trẻ em thế nào?';
+
+  @override
+  String get pcQuick3 => 'Có đón tại khách sạn không?';
+
+  @override
+  String get pcQuick4 => 'Cần chuẩn bị mang gì?';
+
+  @override
+  String get pcQuickTitle => 'Câu hỏi gợi ý';
+
+  @override
+  String pcNewMessages(int count) {
+    return '$count tin mới';
+  }
+
+  @override
+  String get pcSending => 'Đang gửi…';
+
+  @override
+  String get pcSendFailed => 'Gửi lỗi · Chạm để gửi lại';
+
+  @override
+  String get pcCopied => 'Đã sao chép tin nhắn';
+
+  @override
+  String get pcLoadOlder => 'Xem tin nhắn cũ hơn';
+
+  @override
+  String get pcHistoryEnd => 'Bạn đã xem hết lịch sử tin nhắn';
+
+  @override
+  String get pcInfoTitle => 'Thông tin nhà tour';
+
+  @override
+  String get pcInfoBody =>
+      'Nhà tour được Journey Go kiểm duyệt. Tin nhắn được lưu lại để bạn xem tiếp bất cứ lúc nào.';
+
+  @override
+  String get pcViewTour => 'Xem tour';
+
+  @override
+  String get pcSeen => 'Đã xem';
+
+  @override
+  String get pcSent => 'Đã gửi';
+
+  @override
+  String get pcStartChat => 'Bắt đầu trò chuyện';
+
+  @override
+  String get pcListSubtitle =>
+      'Hỏi lịch trình, giá, điểm đón… trực tiếp với nhà tour';
 
   @override
   String get forumFilterTour => 'Lọc theo tour';
@@ -3805,6 +3979,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get jsScanQr => 'Quét mã QR tại điểm';
 
   @override
+  String get jsScanQrShort => 'Quét QR';
+
+  @override
   String get jsSkipStop => 'Bỏ qua trạm này';
 
   @override
@@ -4007,7 +4184,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get tkLoadFailed => 'Không tải được nhiệm vụ.';
 
   @override
-  String get tkFieldMission => 'Nhiệm vụ thực địa';
+  String get tkFieldMission => 'Trải nghiệm thực tế';
 
   @override
   String get tkHeritageQuiz => 'Đố vui di sản';
@@ -4055,6 +4232,44 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get tkStartMission => 'Bắt đầu nhiệm vụ';
+
+  @override
+  String get tkInProgressTitle => 'Đang làm dở';
+
+  @override
+  String tkInProgressSummary(int answered, int total, int correct, int points) {
+    return 'Đã trả lời $answered/$total câu · đúng $correct · +$points điểm';
+  }
+
+  @override
+  String tkContinueFromQuestion(int number) {
+    return 'Tiếp tục từ câu $number';
+  }
+
+  @override
+  String get tkExitConfirmTitle => 'Thoát nhiệm vụ?';
+
+  @override
+  String get tkExitConfirmBody =>
+      'Tiến độ đã được lưu, bạn có thể làm tiếp sau.';
+
+  @override
+  String get tkExitActivityBody =>
+      'Thời gian vẫn tiếp tục đếm, bạn có thể quay lại bất cứ lúc nào.';
+
+  @override
+  String get tkStay => 'Ở lại';
+
+  @override
+  String get tkExit => 'Thoát';
+
+  @override
+  String get tkEarlierAnswered => 'Các câu trước đã trả lời ở lần trước';
+
+  @override
+  String tkQuestionsProgress(int answered, int total) {
+    return '$answered/$total câu';
+  }
 
   @override
   String get tkViewClue => 'Xem manh mối';
@@ -4539,7 +4754,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get seAnyOrder =>
-      'Làm theo thứ tự bất kỳ. Hoạt động thực địa cần quét mã QR tại điểm để xác nhận.';
+      'Làm theo thứ tự bất kỳ. Trải nghiệm thực tế cần quét mã QR tại điểm để xác nhận.';
 
   @override
   String get sePartial => 'Đúng một phần';
@@ -4559,7 +4774,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get seCulturalQuiz => 'Câu đố văn hóa';
 
   @override
-  String get seFieldActivity => 'Hoạt động thực địa';
+  String get seFieldActivity => 'Trải nghiệm thực tế';
 
   @override
   String get seLocationPuzzle => 'Giải đố theo vị trí';
@@ -4569,7 +4784,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String seQuestions(int count) {
-    return '$count câu hỏi';
+    return '$count câu đố';
   }
 
   @override
@@ -5126,4 +5341,149 @@ class AppLocalizationsVi extends AppLocalizations {
   String aiViewTour(int id) {
     return 'Xem tour #$id';
   }
+
+  @override
+  String tripsAtStop(int current, int total) {
+    return 'Đang ở trạm $current/$total';
+  }
+
+  @override
+  String tripsUnfinishedRemaining(String date, int count) {
+    return 'Bắt đầu $date · còn $count trạm nữa là trọn hành trình.';
+  }
+
+  @override
+  String seFailedLeft(int count) {
+    return 'Chưa đạt · còn $count lượt';
+  }
+
+  @override
+  String get seDirections => 'Chỉ đường';
+
+  @override
+  String seFarFromActivity(String distance) {
+    return 'Bạn đang cách hoạt động gần nhất $distance';
+  }
+
+  @override
+  String get tkReviewTitle => 'Xem lại đáp án';
+
+  @override
+  String tkReviewCorrectAnswer(String answer) {
+    return 'Đáp án đúng: $answer';
+  }
+
+  @override
+  String tkReviewYourAnswer(String answer) {
+    return 'Bạn trả lời: $answer';
+  }
+
+  @override
+  String get tkReviewNoAnswer => '(bỏ trống)';
+
+  @override
+  String get tkReviewWhy => 'Vì sao?';
+
+  @override
+  String jsGoalRemaining(int count) {
+    return 'Còn $count trạm nữa để nhận thưởng hoàn thành và bảng tổng kết';
+  }
+
+  @override
+  String get jsGoalLost =>
+      'Đã bỏ qua trạm nên chuyến này không còn thưởng hoàn thành — vẫn đi tiếp để tích điểm nhé.';
+
+  @override
+  String get tkOrderingHint =>
+      'Giữ và kéo để sắp xếp từ trên xuống theo thứ tự đúng';
+
+  @override
+  String get tkNumberHint => 'Kéo thanh trượt hoặc bấm − / + để chọn';
+
+  @override
+  String get tkNumberNotChosen => 'Chưa chọn';
+
+  @override
+  String get tkSeeResult => 'Xem kết quả';
+
+  @override
+  String get tkAnswer => 'Trả lời';
+
+  @override
+  String get tkUnsupportedQuestion =>
+      'Câu hỏi dạng mới — hãy cập nhật ứng dụng để trả lời.';
+
+  @override
+  String tkNumberOff(int diff) {
+    return 'lệch $diff';
+  }
+
+  @override
+  String tkImageOption(String letter) {
+    return 'Ảnh $letter';
+  }
+
+  @override
+  String get tkRevealCorrect => 'Chính xác!';
+
+  @override
+  String get tkRevealWrong => 'Chưa đúng';
+
+  @override
+  String get tkCorrectOrder => 'Thứ tự đúng';
+
+  @override
+  String get scStory => 'Xem dạng story';
+
+  @override
+  String get scStoryEndTitle => 'Sẵn sàng thử thách?';
+
+  @override
+  String get scStoryEndBody =>
+      'Bạn đã xem xong câu chuyện của trạm này. Giờ là lúc thử tài!';
+
+  @override
+  String get scReadAll => 'Đọc toàn bộ';
+
+  @override
+  String get scStoryArtifact => 'Hiện vật';
+
+  @override
+  String get scStoryClose => 'Đóng story';
+
+  @override
+  String get scThenNowTitle => 'Xưa và nay';
+
+  @override
+  String get scThenNowNow => 'Nay';
+
+  @override
+  String get scThenNowThen => 'Xưa';
+
+  @override
+  String get scThenNowHint => 'Kéo vạch để so sánh';
+
+  @override
+  String scThenNowCredit(String credit) {
+    return 'Ảnh tư liệu: $credit';
+  }
+
+  @override
+  String get tkMatchingHint =>
+      'Chọn một mục ở cột A rồi chạm mục tương ứng ở cột B để nối. Đúng toàn bộ mới có điểm.';
+
+  @override
+  String get tkMatchingColA => 'Cột A';
+
+  @override
+  String get tkMatchingColB => 'Cột B';
+
+  @override
+  String get tkMatchingTapZoom => 'Chạm ảnh để phóng to';
+
+  @override
+  String get tkMatchingCorrectPairs => 'Cặp nối đúng';
+
+  @override
+  String get tkMatchingClear => 'Bỏ nối';
 }

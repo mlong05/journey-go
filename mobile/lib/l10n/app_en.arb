@@ -201,6 +201,15 @@
   "tdDaysUntilStart": "{days, plural, =0{Your trip starts today!} =1{1 day until your trip!} other{{days} days until your trip!}}",
   "tdExperienceDate": "Experience date: {date}",
   "tdStartExperience": "Start experience",
+  "tdExperienceExpired": "Experience date has passed",
+  "tdExperienceWindow": "Tour dates: {dates}",
+  "@tdExperienceWindow": {
+    "placeholders": {
+      "dates": {
+        "type": "String"
+      }
+    }
+  },
   "tdContinueJourney": "Continue journey",
   "tdPriceFromAdult": "From (adult)",
   "tdTotalPayment": "Total",
@@ -231,6 +240,7 @@
   "tdPriceTable": "Prices",
   "tdMaxGuests": "Up to {count} guests per departure",
   "tdDepartures": "Departures",
+  "tdDepartureInfo": "Departure info",
   "tdMoreDates": "{count, plural, =1{+1 date} other{+{count} dates}}",
   "tdNotes": "Good to know",
   "tdPriceIncludes": "Price includes",
@@ -253,9 +263,9 @@
   "tdArtifacts": "Artifacts",
   "tdChallenges": "On-site challenges",
   "tdCulturalQuiz": "Cultural quiz",
-  "tdQuizQuestions": "{count, plural, =1{1 multiple-choice question} other{{count} multiple-choice questions}}",
+  "tdQuizQuestions": "{count, plural, =1{1 quiz question} other{{count} quiz questions}}",
   "tdScanQrToConfirm": "scan the QR code on site to confirm",
-  "tdActivityFallback": "Field activity",
+  "tdActivityFallback": "Real-world experience",
   "tripCountdown": "{days, plural, =0{Your trip starts today!} =1{1 day to go!} other{{days} days to go!}}",
   "statusPendingPayment": "Awaiting payment",
   "statusConfirmed": "Confirmed",
@@ -645,6 +655,8 @@
   "tripsEmptySection": "No trips in this section yet.",
   "tripsStageActive": "Happening now",
   "tripsStageReady": "Upcoming",
+  "tripsStageEnded": "Ended",
+  "tripsNotJoined": "You didn't join this tour",
   "tripsLive": "Live",
   "tripsEmptyTitle": "You don't have any trips yet",
   "tripsEmptyMessage": "Book a tour from Explore — your ticket will appear here so you can start the journey when you arrive.",
@@ -654,7 +666,13 @@
   "tripsFilterDone": "Done",
   "tripsExperiencing": "In progress",
   "tripsStopProgress": "Stop {current}/{total}",
-  "tripsStopsCheckedIn": " stops checked in",
+  "tripsStopsCheckedIn": " stops completed",
+  "tripsNextStop": "Next stop {current}/{total}",
+  "tripsAllStopsChecked": "All stops completed",
+  "tripsUnfinished": "Keep going",
+  "tripsUnfinishedHint": "Started on {date} but not finished yet.",
+  "tripsActionTitle": "Needs your attention",
+  "tripsRefundNeededTitle": "Paid but cancelled · please request a refund",
   "tripsDestinations": "{count, plural, =1{1 destination} other{{count} destinations}}",
   "tripsTicketDetails": "Ticket details",
   "tripsViewItinerary": "View itinerary",
@@ -806,7 +824,25 @@
   "notifEmpty": "No notifications yet",
   "notifEmptyHint": "Payment results, refunds, badges and your posts will appear here.",
   "notifChannelTimer": "Activity timers",
-  "notifChannelTimerDesc": "Reminds you when a field activity countdown ends",
+  "notifChannelTimerDesc": "Reminds you when a real-world experience countdown ends",
+  "notifChannelCountdown": "Countdown timer",
+  "notifChannelCountdownDesc": "Time left for an on-site activity, also shown on the lock screen",
+  "tkCountdownBody": "Counting down · {place}",
+  "@tkCountdownBody": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "ovHideTitle": "Hide the floating timer?",
+  "ovHideBody": "The timer keeps running in the app.",
+  "ovHide": "Hide",
+  "ovCancel": "Cancel",
+  "ovPermTitle": "Show the timer outside the app?",
+  "ovPermBody": "Allow Journey Go to display over other apps so you can see the time left right on your home screen.",
+  "ovPermAllow": "Allow",
+  "ovPermLater": "Not now",
   "notifChannelMain": "Journey Go notifications",
   "notifChannelMainDesc": "Bookings, refunds, badges and forum posts",
   "chatListLoadFailed": "Couldn't load your support history.",
@@ -819,6 +855,63 @@
   "chatProviderLower": "the provider",
   "chatAskHint": "You can ask about the itinerary, price, weather conditions or booking procedures before deciding to book.",
   "chatInputHint": "Message the provider…",
+  "pcVerified": "Verified partner",
+  "pcOnline": "Online now",
+  "pcReplyFewMinutes": "Usually replies within minutes",
+  "pcReplyMinutes": "Usually replies in about {minutes} min",
+  "@pcReplyMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "pcReplyHours": "Usually replies in about {hours} h",
+  "@pcReplyHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "pcReplyDay": "Usually replies within a day",
+  "pcReplyDays": "Usually replies within a few days",
+  "pcNotifyReply": "You will be notified when the operator replies",
+  "pcAskingAbout": "Asking about: {tour}",
+  "@pcAskingAbout": {
+    "placeholders": {
+      "tour": {
+        "type": "String"
+      }
+    }
+  },
+  "pcToday": "Today",
+  "pcYesterday": "Yesterday",
+  "pcQuick1": "Next departure dates?",
+  "pcQuick2": "What is the price for children?",
+  "pcQuick3": "Is hotel pickup included?",
+  "pcQuick4": "What should I bring?",
+  "pcQuickTitle": "Suggested questions",
+  "pcNewMessages": "{count} new",
+  "@pcNewMessages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pcSending": "Sending…",
+  "pcSendFailed": "Not sent · Tap to retry",
+  "pcCopied": "Message copied",
+  "pcLoadOlder": "Load older messages",
+  "pcHistoryEnd": "You have reached the beginning of the chat",
+  "pcInfoTitle": "Tour operator",
+  "pcInfoBody": "This operator is reviewed by Journey Go. Your messages are saved so you can continue any time.",
+  "pcViewTour": "View tour",
+  "pcSeen": "Seen",
+  "pcSent": "Sent",
+  "pcStartChat": "Start chatting",
+  "pcListSubtitle": "Ask operators about itineraries, prices, pickup…",
   "forumFilterTour": "Filter by tour",
   "forumTitle": "Heritage forum",
   "forumSubtitle": "Share cultural experiences with the community",
@@ -1094,6 +1187,7 @@
   "jsCheckInStop": "Check in",
   "jsCheckInGps": "GPS check-in",
   "jsScanQr": "Scan the QR code on site",
+  "jsScanQrShort": "Scan QR",
   "jsSkipStop": "Skip this stop",
   "jsCompleteAll": "Complete all {count} stops",
   "jsCompleteAllHint": "Earn completion points and a trip summary. Skipping any stop forfeits the completion reward.",
@@ -1149,7 +1243,7 @@
   "tkClue": "Clue",
   "tkGotIt": "Got it",
   "tkLoadFailed": "Couldn't load the mission.",
-  "tkFieldMission": "Field mission",
+  "tkFieldMission": "Real-world experience",
   "tkHeritageQuiz": "Heritage quiz",
   "tkQuestionsLabel": "questions",
   "tkBonusLabel": "bonus points",
@@ -1164,6 +1258,49 @@
   "tkDirectionsToStop": "Directions to the stop",
   "tkRetryMission": "Retry mission",
   "tkStartMission": "Start mission",
+  "tkInProgressTitle": "In progress",
+  "tkInProgressSummary": "Answered {answered}/{total} · {correct} correct · +{points} pts",
+  "@tkInProgressSummary": {
+    "placeholders": {
+      "answered": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "correct": {
+        "type": "int"
+      },
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "tkContinueFromQuestion": "Continue from question {number}",
+  "@tkContinueFromQuestion": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "tkExitConfirmTitle": "Leave this mission?",
+  "tkExitConfirmBody": "Your progress is saved — you can continue later.",
+  "tkExitActivityBody": "The timer keeps running — you can come back any time.",
+  "tkStay": "Stay",
+  "tkExit": "Leave",
+  "tkEarlierAnswered": "Earlier questions were answered in a previous session",
+  "tkQuestionsProgress": "{answered}/{total} questions",
+  "@tkQuestionsProgress": {
+    "placeholders": {
+      "answered": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "tkViewClue": "View clue",
   "tkStages": "Stages",
   "tkStagesDone": "{done}/{total} completed",
@@ -1299,13 +1436,13 @@
   "seNoChallenges": "This stop has no challenges.",
   "seAllDone": "All challenges completed",
   "seDone": "Challenges done",
-  "seAnyOrder": "Do them in any order. Field activities require scanning the on-site QR code to confirm.",
+  "seAnyOrder": "Do them in any order. Real-world experiences require scanning the on-site QR code to confirm.",
   "sePartial": "Partly correct",
   "seNoAttempts": "No attempts left",
   "seAttempts": "{count, plural, =1{1 attempt} other{{count} attempts}}",
   "seNotStarted": "Not started",
   "seCulturalQuiz": "Cultural quiz",
-  "seFieldActivity": "Field activity",
+  "seFieldActivity": "Real-world experience",
   "seLocationPuzzle": "Location puzzle",
   "seChallenge": "Challenge",
   "seQuestions": "{count, plural, =1{1 question} other{{count} questions}}",
@@ -1466,5 +1603,45 @@
   "aiStatusWaiting": "Waiting for staff",
   "aiStatusLive": "Live chat",
   "aiSessionSubtitle": "{status} · {count} messages",
-  "aiViewTour": "View tour #{id}"
+  "aiViewTour": "View tour #{id}",
+  "tripsAtStop": "At stop {current}/{total}",
+  "tripsUnfinishedRemaining": "Started {date} · {count, plural, =1{1 more stop} other{{count} more stops}} to finish.",
+  "seFailedLeft": "Not passed · {count} left",
+  "seDirections": "Directions",
+  "seFarFromActivity": "Nearest activity is {distance} away",
+  "tkReviewTitle": "Review answers",
+  "tkReviewCorrectAnswer": "Correct answer: {answer}",
+  "tkReviewYourAnswer": "Your answer: {answer}",
+  "tkReviewNoAnswer": "(no answer)",
+  "tkReviewWhy": "Why?",
+  "jsGoalRemaining": "{count, plural, =1{1 more stop} other{{count} more stops}} to earn the completion bonus and trip summary",
+  "jsGoalLost": "A stop was skipped, so this trip no longer earns the completion bonus — keep going to collect points.",
+  "tkOrderingHint": "Hold and drag to put the items in the right order, top to bottom",
+  "tkNumberHint": "Drag the slider or tap − / + to choose",
+  "tkNumberNotChosen": "Not chosen",
+  "tkSeeResult": "See results",
+  "tkAnswer": "Answer",
+  "tkUnsupportedQuestion": "New question type — please update the app to answer.",
+  "tkNumberOff": "{diff} off",
+  "tkImageOption": "Image {letter}",
+  "tkRevealCorrect": "Correct!",
+  "tkRevealWrong": "Not quite",
+  "tkCorrectOrder": "Correct order",
+  "scStory": "View as story",
+  "scStoryEndTitle": "Ready for the challenge?",
+  "scStoryEndBody": "You have finished this stop's story. Time to test what you learned!",
+  "scReadAll": "Read in full",
+  "scStoryArtifact": "Artifact",
+  "scStoryClose": "Close story",
+  "scThenNowTitle": "Then and now",
+  "scThenNowNow": "Now",
+  "scThenNowThen": "Then",
+  "scThenNowHint": "Drag the line to compare",
+  "scThenNowCredit": "Archive photo: {credit}",
+  "tkMatchingHint": "Tap an item in Column A, then tap its match in Column B. All pairs must be correct to earn points.",
+  "tkMatchingColA": "Column A",
+  "tkMatchingColB": "Column B",
+  "tkMatchingTapZoom": "Tap image to zoom",
+  "tkMatchingCorrectPairs": "Correct pairs",
+  "tkMatchingClear": "Unlink"
 }
