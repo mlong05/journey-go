@@ -9,6 +9,7 @@ import '../common/ink.dart';
 import '../common/photo.dart';
 import '../chat/ai_guide_chat_screen.dart';
 import '../culture/cultural_stories.dart';
+import '../culture/then_now_slider.dart' show ThenNowSlider;
 import '../../l10n/locale_controller.dart';
 
 /// Đánh dấu du khách đã đọc phần văn hoá của một trạm (lưu trên máy, chỉ để hiện nhãn "Mới").
@@ -44,7 +45,6 @@ class StopCultureScreen extends StatefulWidget {
   final int destinationId;
   final int order;
   final String name;
-  final String? coverImage;
   final bool wizard;
   final bool hasExperience;
 
@@ -54,7 +54,6 @@ class StopCultureScreen extends StatefulWidget {
     required this.destinationId,
     required this.order,
     required this.name,
-    required this.coverImage,
     required this.wizard,
     required this.hasExperience,
   });
@@ -74,10 +73,10 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
   @override
   void initState() {
     super.initState();
-    CultureReadStore.markRead(widget.journeyId, widget.destinationId);
     if (widget.wizard) {
       _load();
     } else {
+      CultureReadStore.markRead(widget.journeyId, widget.destinationId);
       _loading = false;
     }
   }
@@ -92,15 +91,18 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
         journeyId: widget.journeyId,
         destinationId: widget.destinationId,
       );
-      if (mounted) setState(() => _culture = culture);
+      if (!mounted) return;
+      setState(() => _culture = culture);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
+      CultureReadStore.markRead(widget.journeyId, widget.destinationId);
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  String? get _hero => _culture?.imageUrl ?? widget.coverImage;
+  /// Ảnh đầu trang: chỉ ảnh của nội dung văn hoá; không có ⇒ để trống (KHÔNG mượn ảnh trạm / tour).
+  String? get _hero => _culture?.imageUrl ?? _culture?.culturalImages.firstOrNull;
 
   @override
   Widget build(BuildContext context) {
@@ -127,9 +129,9 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
                 destinationName: widget.name,
               ),
               icon: const Icon(Icons.auto_awesome_rounded, size: 17, color: AppCultureColors.heritageJade),
-              label: const Text(
-                'Hỏi AI',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppCultureColors.heritageJade),
+              label: Text(
+                context.l10n.aiAskButton,
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppCultureColors.heritageJade),
               ),
             ),
           ),
@@ -242,6 +244,22 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
             const SizedBox(height: 22),
             _SectionTitle(label: appL10n.scImages, trailing: appL10n.scImageCount(c.culturalImages.length)),
             _gallery(c.culturalImages),
+          ],
+          if (c.thenNow.isNotEmpty) ...[
+            const SizedBox(height: 28),
+            _SectionTitle(label: appL10n.scThenNowTitle),
+            for (final pair in c.thenNow) ...[
+              ThenNowSlider(pair: pair, aspectRatio: 4 / 3),
+              if (pair.caption != null) ...[
+                const SizedBox(height: 8),
+                Text(pair.caption!, style: AppType.reading(size: 15)),
+              ],
+              if (pair.credit != null) ...[
+                const SizedBox(height: 4),
+                Text(appL10n.scThenNowCredit(pair.credit!), style: const TextStyle(fontSize: 12, color: AppInk.muted)),
+              ],
+              const SizedBox(height: 18),
+            ],
           ],
           if (c.artifacts.isNotEmpty) ...[
             const SizedBox(height: 28),

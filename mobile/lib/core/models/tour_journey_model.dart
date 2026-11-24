@@ -37,8 +37,15 @@ class JourneyTask {
   final int pointsEarned;
   final int attempts;
 
+  /// Số lượt còn lại (null: backend cũ chưa trả).
+  final int? attemptsRemaining;
+
   /// Đúng hết hay chưa (null: nhiệm vụ không chấm đúng/sai hoặc chưa làm).
   final bool? isCorrect;
+
+  /// Câu đố trả lời từng câu: số câu đã trả lời / tổng số câu (totalQuestions null với loại nhiệm vụ khác).
+  final int questionIndex;
+  final int? totalQuestions;
 
   const JourneyTask({
     required this.taskId,
@@ -48,7 +55,10 @@ class JourneyTask {
     required this.status,
     required this.pointsEarned,
     required this.attempts,
+    this.attemptsRemaining,
     this.isCorrect,
+    this.questionIndex = 0,
+    this.totalQuestions,
   });
 
   factory JourneyTask.fromJson(Map<String, dynamic> j) => JourneyTask(
@@ -59,12 +69,21 @@ class JourneyTask {
         status: _str(j['status'], ProgressStatus.notStarted),
         pointsEarned: _int(j['pointsEarned']),
         attempts: _int(j['attempts']),
+        attemptsRemaining: _intOrNull(j['attemptsRemaining']),
         isCorrect: j['isCorrect'] is bool ? j['isCorrect'] as bool : null,
+        questionIndex: _int(j['questionIndex']),
+        totalQuestions: _intOrNull(j['totalQuestions']),
       );
 
   bool get isCompleted => status == ProgressStatus.completed;
   bool get isFailed => status == ProgressStatus.failed;
   bool get isOpen => !isCompleted && !isFailed && status != ProgressStatus.skipped;
+
+  /// Câu đố trả lời từng câu đang làm dở ⇒ danh sách nhiệm vụ hiện "2/3 câu".
+  bool get isQuizInProgress {
+    final total = totalQuestions;
+    return total != null && isOpen && questionIndex > 0 && questionIndex < total;
+  }
 
   /// Hoàn thành và trả lời đúng hết (câu đố chấm theo câu vẫn "hoàn thành" khi sai).
   bool get isPassed => isCompleted && isCorrect != false;
@@ -253,23 +272,65 @@ class QuestionOption {
   final int id;
   final String content;
 
-  const QuestionOption({required this.id, required this.content});
+  /// Câu chọn ảnh: ảnh của đáp án.
+  final String? imageUrl;
 
-  factory QuestionOption.fromJson(Map<String, dynamic> j) =>
-      QuestionOption(id: _int(j['id']), content: _str(j['content']));
+  const QuestionOption({required this.id, required this.content, this.imageUrl});
+
+  factory QuestionOption.fromJson(Map<String, dynamic> j) => QuestionOption(
+        id: _int(j['id']),
+        content: _str(j['content']),
+        imageUrl: (j['imageUrl']?.toString().trim().isEmpty ?? true) ? null : j['imageUrl'].toString(),
+      );
+}
+
+class MatchOption {
+  final int key;
+  final String content;
+
+  const MatchOption({required this.key, required this.content});
+
+  factory MatchOption.fromJson(Map<String, dynamic> j) => MatchOption(
+        key: _int(j['key']),
+        content: _str(j['content']),
+      );
+}
+
+class MatchPair {
+  final int leftId;
+  final int rightKey;
+
+  const MatchPair({required this.leftId, required this.rightKey});
+
+  factory MatchPair.fromJson(Map<String, dynamic> j) => MatchPair(
+        leftId: _int(j['leftId']),
+        rightKey: _int(j['rightKey']),
+      );
+
+  Map<String, dynamic> toJson() => {'leftId': leftId, 'rightKey': rightKey};
 }
 
 class TaskQuestion {
   final int id;
   final String content;
-  final String type; // MULTIPLE_CHOICE | TEXT
+  final String type; // MULTIPLE_CHOICE | TEXT | IMAGE_CHOICE | ORDERING | NUMBER | MATCHING
   final List<QuestionOption> options;
+
+  /// Câu đoán số: khoảng thanh trượt.
+  final int? numberMin;
+  final int? numberMax;
+
+  /// Câu nối cột: các mục cột B đã xáo trộn.
+  final List<MatchOption> matchOptions;
 
   const TaskQuestion({
     required this.id,
     required this.content,
     required this.type,
     required this.options,
+    this.numberMin,
+    this.numberMax,
+    this.matchOptions = const [],
   });
 
   factory TaskQuestion.fromJson(Map<String, dynamic> j) {
@@ -279,11 +340,25 @@ class TaskQuestion {
       id: _int(j['id']),
       content: _str(j['content']),
       type: _str(j['questionType'], 'MULTIPLE_CHOICE'),
-      options: opts.map(QuestionOption.fromJson).toList(),
+      // Câu xếp thứ tự: giữ nguyên thứ tự server đã xáo trộn (orderIndex = null).
+      options: (j['questionType'] == 'ORDERING' ? _maps(j['options']) : opts).map(QuestionOption.fromJson).toList(),
+      numberMin: _intOrNull(j['numberMin']),
+      numberMax: _intOrNull(j['numberMax']),
+      matchOptions: _maps(j['matchOptions']).map(MatchOption.fromJson).toList(),
     );
   }
 
   bool get isText => type == 'TEXT';
+  bool get isImageChoice => type == 'IMAGE_CHOICE';
+  bool get isOrdering => type == 'ORDERING';
+  bool get isNumber => type == 'NUMBER' && numberMin != null && numberMax != null && numberMax! > numberMin!;
+  bool get isMatching => type == 'MATCHING' && options.isNotEmpty && matchOptions.isNotEmpty;
+
+  /// App chưa biết dạng câu này (server mới hơn app) ⇒ nhắc cập nhật thay vì hiện sai.
+  bool get isUnsupported =>
+      !const {'MULTIPLE_CHOICE', 'TEXT', 'IMAGE_CHOICE', 'ORDERING', 'NUMBER', 'MATCHING'}.contains(type) ||
+      (type == 'NUMBER' && !isNumber) ||
+      (type == 'MATCHING' && !isMatching);
 }
 
 class TaskStation {
@@ -339,6 +414,10 @@ class TaskContent {
   /// Nộp một lần, đúng câu nào cộng điểm câu đó (câu đố tour 5 bước).
   final bool perQuestionPoints;
 
+  /// Câu đố trả lời từng câu đang làm dở: số câu đã đúng + điểm tạm (null khi chưa trả lời câu nào).
+  final int? correctCount;
+  final int? pointsSoFar;
+
   const TaskContent({
     required this.taskId,
     required this.name,
@@ -361,6 +440,8 @@ class TaskContent {
     this.durationSeconds,
     this.qrRequired = false,
     this.perQuestionPoints = false,
+    this.correctCount,
+    this.pointsSoFar,
   });
 
   factory TaskContent.fromJson(Map<String, dynamic> j) {
@@ -387,26 +468,46 @@ class TaskContent {
       durationSeconds: _intOrNull(j['durationSeconds']),
       qrRequired: j['qrRequired'] == true,
       perQuestionPoints: j['perQuestionPoints'] == true,
+      correctCount: _intOrNull(j['correctCount']),
+      pointsSoFar: _intOrNull(j['pointsSoFar']),
     );
   }
 
   bool get isCompleted => status == ProgressStatus.completed;
   bool get isFailed => status == ProgressStatus.failed;
   bool get isFinished => isCompleted || isFailed;
+
+  /// Câu đố trả lời từng câu: đã trả lời ít nhất 1 câu và chưa xong ⇒ "Tiếp tục từ câu N".
+  bool get isInProgressQuiz =>
+      perQuestionPoints && !requiresLocation && !isFinished && questionIndex > 0 && questionIndex < totalQuestions;
 }
 
-/// Một câu trả lời gửi lên: trắc nghiệm dùng [answerId], tự luận dùng [text].
+/// Một câu trả lời gửi lên: trắc nghiệm / chọn ảnh dùng [answerId], tự luận dùng [text],
+/// xếp thứ tự dùng [answerIds] (theo thứ tự đã xếp), đoán số dùng [numberValue], nối cột dùng [matches].
 class AnswerDraft {
   final int questionId;
   final int? answerId;
   final String? text;
+  final List<int>? answerIds;
+  final int? numberValue;
+  final List<MatchPair>? matches;
 
-  const AnswerDraft({required this.questionId, this.answerId, this.text});
+  const AnswerDraft({
+    required this.questionId,
+    this.answerId,
+    this.text,
+    this.answerIds,
+    this.numberValue,
+    this.matches,
+  });
 
   Map<String, dynamic> toJson() => {
         'questionId': questionId,
         'answerId': ?answerId,
         'text': ?text,
+        'answerIds': ?answerIds,
+        'numberValue': ?numberValue,
+        if (matches != null) 'matches': matches!.map((m) => m.toJson()).toList(),
       };
 }
 
@@ -422,6 +523,9 @@ class TaskSubmitResult {
   final int questionIndex;
   final bool? lastAnswerCorrect;
 
+  /// Xem lại từng câu (chỉ có khi backend cho phép lộ đáp án: đã xong / hết lượt / câu vừa đúng).
+  final List<QuestionReview> review;
+
   const TaskSubmitResult({
     required this.status,
     required this.pointsEarned,
@@ -432,6 +536,7 @@ class TaskSubmitResult {
     required this.correctCount,
     required this.questionIndex,
     required this.lastAnswerCorrect,
+    this.review = const [],
   });
 
   factory TaskSubmitResult.fromJson(Map<String, dynamic> j) => TaskSubmitResult(
@@ -444,10 +549,55 @@ class TaskSubmitResult {
         correctCount: _int(j['correctCount']),
         questionIndex: _int(j['questionIndex']),
         lastAnswerCorrect: j['lastAnswerCorrect'] is bool ? j['lastAnswerCorrect'] as bool : null,
+        review: _maps(j['review']).map(QuestionReview.fromJson).toList(),
       );
 
   bool get completed => status == ProgressStatus.completed;
   bool get exhausted => status == ProgressStatus.failed || attemptsRemaining <= 0;
+}
+
+/// Một câu trong phần xem lại sau khi nộp.
+class QuestionReview {
+  final int questionId;
+  final bool correct;
+
+  /// Trắc nghiệm: id đáp án đúng.
+  final int? correctAnswerId;
+
+  /// Tự luận: một đáp án được chấp nhận.
+  final String? correctText;
+  final String? explanation;
+
+  /// Xếp thứ tự: id các mục theo thứ tự đúng.
+  final List<int> correctOrder;
+
+  /// Đoán số: đáp án đúng.
+  final int? correctNumber;
+
+  /// Nối cột: các cặp đúng (leftId → rightKey).
+  final List<MatchPair> correctMatches;
+
+  const QuestionReview({
+    required this.questionId,
+    required this.correct,
+    this.correctAnswerId,
+    this.correctText,
+    this.explanation,
+    this.correctOrder = const [],
+    this.correctNumber,
+    this.correctMatches = const [],
+  });
+
+  factory QuestionReview.fromJson(Map<String, dynamic> j) => QuestionReview(
+        questionId: _int(j['questionId']),
+        correct: j['correct'] == true,
+        correctAnswerId: _intOrNull(j['correctAnswerId']),
+        correctText: (j['correctText']?.toString().trim().isEmpty ?? true) ? null : j['correctText'].toString(),
+        explanation: (j['explanation']?.toString().trim().isEmpty ?? true) ? null : j['explanation'].toString(),
+        correctOrder: j['correctOrder'] is List ? (j['correctOrder'] as List).map(_int).toList() : const [],
+        correctNumber: _intOrNull(j['correctNumber']),
+        correctMatches: _maps(j['correctMatches']).map(MatchPair.fromJson).toList(),
+      );
 }
 
 class PuzzleClue {
