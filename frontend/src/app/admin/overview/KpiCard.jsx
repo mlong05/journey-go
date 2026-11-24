@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { CARD } from "@/app/admin/overview.tokens";
 import Hint from "./Hint";
 
@@ -40,10 +42,15 @@ export function KpiCard({
   sparkline,
   tone = "indigo",
   loading = false,
+  baseline,
+  baselineLabel,
+  href,
+  hrefLabel = "Xem chi tiết",
 }) {
   const t = TONES[tone] || TONES.indigo;
   const hasChange = typeof change === "number" && Number.isFinite(change);
   const positive = hasChange && change >= 0;
+
 
   return (
     <div className={KPI_CARD}>
@@ -88,6 +95,25 @@ export function KpiCard({
         </p>
         <Sparkline data={sparkline} stroke={t.stroke} />
       </div>
+
+      {/* Mốc so sánh — hiển thị luôn để Admin không phải tự nhớ giá trị kỳ trước. */}
+      {baseline !== undefined && baseline !== null && (
+        <p className="text-[10.5px] font-semibold text-slate-400 leading-tight">
+          {baselineLabel || "Mốc so sánh"}:{" "}
+          <span className="text-slate-500 tabular-nums">{baseline}</span>
+        </p>
+      )}
+
+      {/* Drill-down — chỉ trỏ tới các trang có sẵn trong khu vực Admin. */}
+      {href && (
+        <Link
+          href={href}
+          className="inline-flex items-center gap-1 text-[10.5px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
+        >
+          {hrefLabel}
+          <ArrowUpRight size={11} />
+        </Link>
+      )}
     </div>
   );
 }
@@ -155,7 +181,7 @@ export function Skeleton({ className = "h-4 w-24 rounded-md bg-slate-100" }) {
 /**
  * Tiêu đề một khối (card) kèm mô tả và nút hành động bên phải.
  */
-export function CardHeader({ icon: Icon, title, subtitle, tone = "slate", action, children }) {
+export function CardHeader({ icon: Icon, title, titleHint, subtitle, tone = "slate", action, children }) {
   const chip =
     {
       indigo: "bg-indigo-50 text-indigo-600",
@@ -176,7 +202,7 @@ export function CardHeader({ icon: Icon, title, subtitle, tone = "slate", action
         )}
         <div className="min-w-0">
           <h2 className={CARD.title}>
-            <Hint text={subtitle}>{title}</Hint>
+            <Hint text={titleHint || subtitle}>{title}</Hint>
           </h2>
           {subtitle && <p className={CARD.subtitle}>{subtitle}</p>}
         </div>
