@@ -415,6 +415,8 @@ public class FlywayConfig {
                        OR (version = '44' AND description = 'ai chat human handoff')
                        OR (version = '47' AND description = 'refund personal three tier policy')
                        OR (version = '48' AND description = 'refund personal short description')
+                       OR (version = '47' AND description = 'tour departure info')
+                       OR (version = '48' AND description = 'user preferred language')
                        OR (version = '49' AND description = 'settlement ten day cycle')
                        OR (version = '50' AND description = 'settlement strict period and recreate')
                        OR (version = '51' AND description = 'settlement cleanup rejected details')
