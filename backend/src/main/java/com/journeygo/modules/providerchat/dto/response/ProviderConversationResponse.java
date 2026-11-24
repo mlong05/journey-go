@@ -24,7 +24,9 @@ public record ProviderConversationResponse(
         @Schema(description = "Thời điểm tin nhắn cuối") Instant lastMessageAt,
         @Schema(description = "Số tin nhắn chưa đọc") int unreadCount,
         @Schema(description = "Thời điểm tạo") Instant createdAt,
-        @Schema(description = "Thời điểm cập nhật") Instant updatedAt
+        @Schema(description = "Thời điểm cập nhật") Instant updatedAt,
+        @Schema(description = "Nhà tour đang mở trang quản lý (kết nối thông báo thời gian thực)") boolean providerOnline,
+        @Schema(description = "Thời gian nhà tour thường trả lời (phút, trung vị các lần trả lời gần đây; null = chưa đủ dữ liệu)") Integer providerReplyMinutes
 ) {
 
     public static ProviderConversationResponse fromEntity(ProviderConversation c,
@@ -33,7 +35,9 @@ public record ProviderConversationResponse(
                                                            String tourTitle,
                                                            String bookingCode,
                                                            String lastMessage,
-                                                           int unreadCount) {
+                                                           int unreadCount,
+                                                           boolean providerOnline,
+                                                           Integer providerReplyMinutes) {
         if (c == null) return null;
         return ProviderConversationResponse.builder()
                 .id(c.getId())
@@ -51,6 +55,8 @@ public record ProviderConversationResponse(
                 .unreadCount(unreadCount)
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
+                .providerOnline(providerOnline)
+                .providerReplyMinutes(providerReplyMinutes)
                 .build();
     }
 }
