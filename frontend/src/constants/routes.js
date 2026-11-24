@@ -29,6 +29,8 @@ export const ROUTES = {
   ACCOUNT_MESSAGES: "/account/messages",
   ACCOUNT_REWARDS: "/account/rewards",
   ACCOUNT_ACHIEVEMENTS: "/account/achievements",
+  /** Hướng dẫn viên du lịch ảo AI (RAG): /account/ai-guide */
+  ACCOUNT_AI_GUIDE: "/account/ai-guide",
   /** Trung tâm thông báo (đầy đủ): /account/notifications */
   ACCOUNT_NOTIFICATIONS: "/account/notifications",
   /** Bài viết cộng đồng của tôi: /account/posts */
@@ -68,6 +70,7 @@ export const ROUTES = {
 
   // ── Khu vực quản trị ──────────────────────────────────────────────────────
   ADMIN: "/admin",
+  ADMIN_AI_GUIDE: "/admin/ai-guide",
   ADMIN_FINANCE: "/admin/finance",
   ADMIN_SETTLEMENTS: "/admin/settlements",
   ADMIN_AUDIT_LOGS: "/admin/audit-logs",

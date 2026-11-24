@@ -94,12 +94,6 @@ public class BookingService {
 
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
-    /**
-     * Trạng thái booking ĐÃ THANH TOÁN — dùng cho logic "tour đã mua rồi không đặt lại được".
-     */
-    private static final List<BookingStatus> PAID_BOOKING_STATUSES =
-            List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED);
-
     private final BookingRepository bookingRepository;
     private final BookingSlotHoldRepository slotHoldRepository;
     private final BookingPassengerRepository passengerRepository;
@@ -138,9 +132,16 @@ public class BookingService {
         validateExperienceDate(tour, request.experienceDate());
 
         // ── Chống đặt lại tour đã mua ──────────────────────────────────────────
-        // Logic quan trọng: du khách đã mua (đã thanh toán) một tour thì KHÔNG được
+        // Du khách đã mua (đã thanh toán) tour nào đó và chưa đi xong thì KHÔNG được
         // đặt lại tour đó dưới bất kỳ hình thức nào (cùng ngày hay ngày khác).
+        // ⚠️ Đơn `COMPLETED` (tour đã đi xong) KHÔNG chặn ⇒ muốn thì đặt tiếp lần sau.
         validateTourNotAlreadyPurchased(tour.getTourId(), touristId);
+
+        // ── Chống giữ chỗ trùng ───────────────────────────────────────────────
+        // Mỗi du khách chỉ có tối đa 1 đơn đang giữ chỗ cho một tour: thoát màn thanh toán rồi
+        // bấm "Đặt tour" lại không được tạo đơn thứ hai (giữ chỗ gấp đôi, đồng hồ "reset").
+        // App bắt mã này rồi mời tiếp tục đơn cũ hoặc hủy đơn cũ để đặt lại.
+        validateNoActivePendingBooking(tour.getTourId(), touristId);
 
         // ── Chuẩn bị danh sách hành khách + chốt giá ─────────────────────────
         PriceSnapshot price = buildPriceSnapshot(tour, request);
@@ -899,21 +900,53 @@ public class BookingService {
     }
 
     /**
-     * Chặn đặt lại một tour mà du khách ĐÃ MUA (đã thanh toán).
+     * Chặn đặt lại một tour mà du khách ĐÃ MUA và CHƯA ĐI XONG.
      *
-     * <p>Chỉ tính các booking {@code CONFIRMED} / {@code COMPLETED} — booking
-     * {@code PENDING_PAYMENT} (chưa thanh toán), {@code EXPIRED} hay {@code CANCELLED}
-     * không chặn đặt lại.
+     * <p>⚠️ Chỉ chặn khi còn booking {@code CONFIRMED} có ngày đi CHƯA TỚI. Đơn đã đi
+     * xong (ngày đi đã qua, hoặc {@code COMPLETED}) KHÔNG chặn — du khách muốn thì
+     * đặt tiếp tour đó cho lần sau. Khớp với {@code blocksRebook} ở frontend.
+     *
+     * <p>Booking {@code PENDING_PAYMENT} (chưa thanh toán), {@code EXPIRED} hay
+     * {@code CANCELLED} cũng không chặn đặt lại.
      *
      * @throws AppException {@link ErrorCode#BOOKING_TOUR_ALREADY_PURCHASED} nếu đã mua tour này
      */
     private void validateTourNotAlreadyPurchased(Long tourId, Long touristId) {
-        boolean alreadyBought = bookingRepository.existsByTour_TourIdAndTourist_IdAndStatusIn(
-                tourId, touristId, PAID_BOOKING_STATUSES);
+        LocalDate today = LocalDate.now(VIETNAM_ZONE);
+        boolean alreadyBought = bookingRepository.existsActiveConfirmedBooking(tourId, touristId, today);
         if (alreadyBought) {
             throw new AppException(ErrorCode.BOOKING_TOUR_ALREADY_PURCHASED,
                     "Bạn đã mua tour này rồi — không thể đặt lại.");
         }
+    }
+
+    /**
+     * Chặn tạo đơn mới khi du khách còn đơn {@code PENDING_PAYMENT} chưa hết hạn cho cùng tour.
+     *
+     * @throws AppException {@link ErrorCode#BOOKING_PENDING_EXISTS} — app tra đơn đó qua
+     *                      {@code GET /bookings/my/pending?tourId=} để mời tiếp tục thanh toán
+     */
+    private void validateNoActivePendingBooking(Long tourId, Long touristId) {
+        List<Booking> pending = bookingRepository.findActivePendingByTouristAndTour(touristId, tourId, Instant.now());
+        if (!pending.isEmpty()) {
+            Booking existing = pending.get(0);
+            throw new AppException(ErrorCode.BOOKING_PENDING_EXISTS,
+                    "Bạn đang có đơn " + existing.getBookingCode() + " giữ chỗ cho tour này — hãy tiếp tục thanh toán "
+                            + "hoặc hủy đơn đó trước khi đặt lại.");
+        }
+    }
+
+    /**
+     * Đơn đang giữ chỗ (chờ thanh toán, còn hạn) của du khách; {@code tourId} khác null thì chỉ của tour đó.
+     * Dùng cho thanh nhắc "Bạn có đơn chờ thanh toán" ở Trang chủ / trang tour.
+     */
+    @Transactional(readOnly = true)
+    public List<BookingResponse> getMyActivePendingBookings(Long touristId, Long tourId) {
+        Instant now = Instant.now();
+        List<Booking> pending = tourId == null
+                ? bookingRepository.findActivePendingByTourist(touristId, now)
+                : bookingRepository.findActivePendingByTouristAndTour(touristId, tourId, now);
+        return pending.stream().map(b -> buildResponse(b, touristId, false)).toList();
     }
 
     private void validateExperienceDate(Tour tour, LocalDate experienceDate) {

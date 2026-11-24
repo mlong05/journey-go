@@ -21,7 +21,7 @@ import java.time.LocalDate;
  * @param bookingCode     mã đơn đặt tour
  * @param tourTitle       tên tour
  * @param experienceDate  ngày trải nghiệm (ngày khởi hành)
- * @param revenuePeriod   kỳ doanh thu gốc của giao dịch (yyyy-MM)
+ * @param revenuePeriod   kỳ doanh thu gốc của giao dịch (chu kỳ 10 ngày, {@code yyyy-MM-D})
  */
 @Builder
 @Schema(description = "Giao dịch tour của đối tác trong kỳ tất toán")
@@ -33,7 +33,7 @@ public record ProviderSettlementTransactionResponse(
         @Schema(description = "Mã giao dịch thanh toán (txnRef)") String txnRef,
         @Schema(description = "Tên tour") String tourTitle,
         @Schema(description = "Ngày trải nghiệm") LocalDate experienceDate,
-        @Schema(description = "Kỳ doanh thu gốc (yyyy-MM)") String revenuePeriod,
+        @Schema(description = "Kỳ doanh thu gốc — chu kỳ 10 ngày (yyyy-MM-D)") String revenuePeriod,
         @Schema(description = "Giá trị gốc (tổng thanh toán ban đầu)") BigDecimal grossAmount,
         @Schema(description = "Số tiền voucher đã giảm (0 nếu giao dịch không áp voucher)")
         BigDecimal voucherDiscount,

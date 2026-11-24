@@ -13,6 +13,7 @@ import '../../core/services/tour_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../core/utils/formatters.dart' show formatLocalDateString;
 import '../bookings/booking_checkout_screen.dart';
+import '../bookings/pending_booking_prompt.dart';
 import '../chat/provider_chat_screen.dart';
 import '../journey/journey_screen.dart';
 import 'tour_progress.dart';
@@ -87,6 +88,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   String? _selectedDate;
   bool _loadingDates = false;
 
+  /// Đơn đang giữ chỗ (chờ thanh toán, còn hạn) của du khách cho tour này.
+  BookingModel? _pendingBooking;
+
   @override
   void initState() {
     super.initState();
@@ -97,6 +101,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     setState(() => _loading = true);
     _loadMyProgress();
     _loadBookedRefund();
+    _loadPending();
 
     // Làm mới thông tin tour (giá có thể đã đổi), nếu lỗi thì dùng bản từ danh sách.
     final detailFuture = _loadDetail();
@@ -227,6 +232,21 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   Future<void> _onBook() async {
     if (_bookingInProgress) return;
 
+    // 0) Đang có đơn giữ chỗ cho tour này ⇒ hỏi tiếp tục đơn cũ hay hủy để đặt lại
+    //    (không tạo đơn thứ hai — backend cũng chặn).
+    await _loadPending();
+    if (!mounted) return;
+    final pending = _pendingBooking;
+    if (pending != null) {
+      final choice = await showPendingBookingDialog(context, pending);
+      if (!mounted || choice == null) return;
+      if (choice == PendingBookingChoice.resume) {
+        await _resumePending(pending);
+        return;
+      }
+      if (!await _cancelPending(pending) || !mounted) return;
+    }
+
     // 1) Chọn ngày trải nghiệm còn chỗ.
     final bookedDate = await _pickExperienceDate();
     if (bookedDate == null || !mounted) return;
@@ -279,21 +299,73 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         voucherCode: voucherCode,
       );
       if (!mounted) return;
-      // Đơn chưa thanh toán vẫn nằm ở "Đơn đặt tour > Chờ thanh toán" nếu khách thoát giữa chừng.
+      // Thoát giữa chừng thì đơn vẫn giữ chỗ: thanh nhắc trên trang này đưa khách về đúng đơn.
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => BookingCheckoutScreen(bookingId: booking.id),
         ),
       );
+      _loadPending();
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), behavior: SnackBarBehavior.floating),
-      );
+      // 409 có thể là "đang có đơn giữ chỗ cho tour này" (đặt từ thiết bị khác / trang khác).
+      if (e.statusCode == 409) {
+        await _loadPending();
+        final pending = _pendingBooking;
+        if (pending != null && mounted) {
+          final choice = await showPendingBookingDialog(context, pending);
+          if (!mounted) return;
+          if (choice == PendingBookingChoice.resume) {
+            await _resumePending(pending);
+          } else if (choice == PendingBookingChoice.cancelAndRebook && await _cancelPending(pending)) {
+            _snack('Đã hủy đơn cũ. Bấm "Đặt tour" để đặt lại.');
+          }
+          return;
+        }
+      }
+      _snack(e.message);
       // Lỗi hết chỗ / ngày không mở bán ⇒ tải lại lịch để khách chọn ngày khác.
       _loadAvailableDates();
     } finally {
       if (mounted) setState(() => _bookingInProgress = false);
+    }
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  /// Tải đơn đang giữ chỗ của tour này (chỉ khi đã đăng nhập; lỗi thì coi như không có).
+  Future<void> _loadPending() async {
+    if (!await TokenStorage.hasValidSession()) return;
+    try {
+      final list = await _bookingService.getMyPending(tourId: widget.tour.id);
+      if (mounted) setState(() => _pendingBooking = list.firstOrNull);
+    } catch (_) {
+      // Không tải được thì giữ hành vi cũ (nút Đặt tour bình thường).
+    }
+  }
+
+  /// Mở lại màn thanh toán của đơn đang giữ chỗ — đồng hồ chạy tiếp theo hạn của server.
+  Future<void> _resumePending(BookingModel booking) async {
+    await openPendingBooking(context, booking);
+    _loadPending();
+  }
+
+  /// Hủy đơn đang giữ chỗ (trả chỗ ngay). true = hủy thành công.
+  Future<bool> _cancelPending(BookingModel booking) async {
+    try {
+      await _bookingService.cancelBooking(booking.id, reason: 'Khách hủy để đặt lại');
+      if (mounted) setState(() => _pendingBooking = null);
+      _loadAvailableDates();
+      return true;
+    } on ApiException catch (e) {
+      _snack(e.message);
+      await _loadPending();
+      return false;
     }
   }
 
@@ -688,11 +760,11 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               const SizedBox(height: 8),
               const Row(
                 children: [
-                  Icon(Icons.verified_rounded, size: 15, color: Colors.white70),
+                  Icon(Icons.verified_rounded, size: 15, color: AppCultureColors.onDarkMuted),
                   SizedBox(width: 5),
                   Text(
                     'Tour đã được kiểm duyệt',
-                    style: TextStyle(fontSize: 12.5, color: Colors.white70),
+                    style: TextStyle(fontSize: 12.5, color: AppCultureColors.onDarkMuted),
                   ),
                 ],
               ),
@@ -837,7 +909,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                         const Icon(
                           Icons.military_tech_rounded,
                           size: 16,
-                          color: Color(0xFF8B5CF6),
+                          color: AppCultureColors.indigo500,
                         ),
                         const SizedBox(width: 5),
                         Expanded(
@@ -846,7 +918,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                             style: const TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF6D28D9),
+                              color: AppCultureColors.indigo600,
                             ),
                           ),
                         ),
@@ -1088,6 +1160,18 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               TourProgressBadge(progress: progress),
               const SizedBox(height: 10),
             ],
+            // Đơn đang giữ chỗ cho tour này (khách đã thoát màn thanh toán): đưa về đúng đơn cũ.
+            if (_pendingBooking != null && !active) ...[
+              PendingBookingBanner(
+                key: ValueKey('pending-${_pendingBooking!.id}'),
+                booking: _pendingBooking!,
+                onTap: () => _resumePending(_pendingBooking!),
+                onExpired: () {
+                  if (mounted) setState(() => _pendingBooking = null);
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
             // Đang đi dở thì giá không còn quan trọng: nút tiếp tục chiếm cả hàng
             if (active)
               SizedBox(
@@ -1158,17 +1242,27 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                 ),
                 const SizedBox(width: 10),
                 FilledButton.icon(
-                  onPressed: _bookingInProgress ? null : _onBook,
+                  onPressed: _bookingInProgress
+                      ? null
+                      : _pendingBooking != null
+                          ? () => _resumePending(_pendingBooking!)
+                          : _onBook,
                   icon: Icon(
-                    progress != null ? Icons.replay_rounded : Icons.confirmation_number_outlined,
+                    _pendingBooking != null
+                        ? Icons.payments_outlined
+                        : progress != null
+                            ? Icons.replay_rounded
+                            : Icons.confirmation_number_outlined,
                     size: 19,
                   ),
                   label: Text(
                     _bookingInProgress
                         ? 'Đang giữ chỗ...'
-                        : progress != null
-                            ? 'Đặt lại'
-                            : 'Đặt tour',
+                        : _pendingBooking != null
+                            ? 'Tiếp tục thanh toán'
+                            : progress != null
+                                ? 'Đặt lại'
+                                : 'Đặt tour',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   style: FilledButton.styleFrom(
@@ -1281,7 +1375,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               height: 42,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFFFEF2F2),
+                color: AppCultureColors.lacquer50,
               ),
               child: Icon(
                 cancelled ? Icons.cancel_rounded : Icons.timer_off_rounded,
@@ -1383,7 +1477,7 @@ class _QuestNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = isFinal
-        ? const [Color(0xFFFBBF24), Color(0xFFD97706)]
+        ? const [AppCultureColors.brass400, AppCultureColors.brass600]
         : const [
             AppCultureColors.jadeGradientStart,
             AppCultureColors.jadeGradientEnd,

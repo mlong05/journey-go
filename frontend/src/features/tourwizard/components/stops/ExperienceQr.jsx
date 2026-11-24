@@ -10,6 +10,9 @@ export const newExperienceQrToken = () => {
   return `JGE-${hex.padEnd(16, "0").slice(0, 16).toUpperCase()}`;
 };
 
+/** Mã QR check-in trạm (cùng định dạng backend TourStop.newQrToken): JGS- + 16 ký tự hex in hoa. */
+export const newStopQrToken = () => newExperienceQrToken().replace(/^JGE-/, "JGS-");
+
 const fileName = (label) => `QR-${(label || "trai-nghiem").normalize("NFD").replace(/[̀-ͯ]/g, "")
   .replace(/đ/g, "d").replace(/Đ/g, "D").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "trai-nghiem"}.png`;
 
@@ -18,7 +21,12 @@ const fileName = (label) => `QR-${(label || "trai-nghiem").normalize("NFD").repl
  * này rồi mới hiện câu hỏi sau trải nghiệm.
  * compact: ảnh nhỏ + mã + nút tải (dùng trong màn xem lại / duyệt và khi tour đã bán, nội dung chỉ xem).
  */
-export default function ExperienceQr({ token, label, compact = false }) {
+export default function ExperienceQr({
+  token, label, compact = false,
+  title = "Mã QR xác nhận hoàn thành",
+  description = "In và dán mã này tại điểm trải nghiệm. Hết giờ đếm ngược, khách quét mã để xác nhận đã trải nghiệm xong rồi mới hiện câu hỏi. Mã được giữ nguyên khi bạn sửa trải nghiệm.",
+  emptyText = "Mã QR sẽ được tạo khi lưu điểm đến.",
+}) {
   const [src, setSrc] = useState("");
 
   useEffect(() => {
@@ -31,7 +39,7 @@ export default function ExperienceQr({ token, label, compact = false }) {
   }, [token]);
 
   if (!token) {
-    return <p className="text-[11px] text-slate-400 italic">Mã QR sẽ được tạo khi lưu điểm đến.</p>;
+    return <p className="text-[11px] text-slate-400 italic">{emptyText}</p>;
   }
 
   if (compact) {
@@ -42,7 +50,7 @@ export default function ExperienceQr({ token, label, compact = false }) {
           ? <img src={src} alt={`Mã QR ${token}`} className="w-16 h-16 rounded border border-slate-200 bg-white" />
           : <span className="w-16 h-16 rounded border border-slate-200 bg-slate-50" />}
         <span className="text-[11px] text-slate-500">
-          <span className="block font-bold text-slate-700">Mã QR xác nhận hoàn thành</span>
+          <span className="block font-bold text-slate-700">{title}</span>
           <span className="block font-mono">{token}</span>
           {src && (
             <a href={src} download={fileName(label)}
@@ -62,11 +70,8 @@ export default function ExperienceQr({ token, label, compact = false }) {
         ? <img src={src} alt={`Mã QR ${token}`} className="w-28 h-28 rounded-lg border border-slate-200 shrink-0" />
         : <span className="w-28 h-28 rounded-lg border border-slate-200 bg-slate-50 shrink-0 inline-flex items-center justify-center text-slate-300"><QrCode size={32} /></span>}
       <div className="min-w-0 space-y-1.5">
-        <p className="text-xs font-bold text-slate-800">Mã QR xác nhận hoàn thành</p>
-        <p className="text-[11px] text-slate-500 leading-relaxed">
-          In và dán mã này tại điểm trải nghiệm. Hết giờ đếm ngược, khách quét mã để xác nhận đã trải nghiệm xong
-          rồi mới hiện câu hỏi. Mã được giữ nguyên khi bạn sửa trải nghiệm.
-        </p>
+        <p className="text-xs font-bold text-slate-800">{title}</p>
+        <p className="text-[11px] text-slate-500 leading-relaxed">{description}</p>
         <p className="font-mono text-xs font-bold text-slate-700">{token}</p>
         {src && (
           <a href={src} download={fileName(label)}

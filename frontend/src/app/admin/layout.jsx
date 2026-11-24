@@ -19,6 +19,7 @@ import {
   FileText,
   UsersRound,
   Ticket,
+  Bot,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -117,6 +118,14 @@ const ADMIN_NAV_ITEMS = [
     label: "Cấu hình voucher",
     href: "/admin/vouchers",
     icon: Ticket,
+    group: "Cấu hình nền tảng",
+    badge: null,
+  },
+  {
+    id: "ai-guide",
+    label: "AI Hướng dẫn viên (RAG)",
+    href: "/admin/ai-guide",
+    icon: Bot,
     group: "Cấu hình nền tảng",
     badge: null,
   },

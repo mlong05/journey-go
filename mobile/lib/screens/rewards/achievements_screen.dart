@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/gamification_model.dart';
 import '../../core/services/gamification_service.dart';
+import '../common/bright.dart';
 import '../common/heritage_motion.dart';
 import 'badges_screen.dart';
 import 'rewards_widgets.dart';
@@ -98,39 +99,39 @@ class _TierStyle {
 const Map<String, _TierStyle> _tierStyles = {
   'BRONZE': _TierStyle(
     label: 'Đồng',
-    pillBg: Color(0xFFFFF7ED),
-    pillBorder: Color(0xFFFED7AA),
-    pillText: Color(0xFF9A3412),
-    ringGradient: [Color(0xFFFFF7ED), Color(0xFFFED7AA)],
-    ringBorder: Color(0xFFFDBA74),
-    iconColor: Color(0xFFC2410C),
+    pillBg: AppCultureColors.terra50,
+    pillBorder: AppCultureColors.terra200,
+    pillText: AppCultureColors.terra700,
+    ringGradient: [AppCultureColors.terra50, AppCultureColors.terra200],
+    ringBorder: AppCultureColors.terra300,
+    iconColor: AppCultureColors.terra600,
   ),
   'SILVER': _TierStyle(
     label: 'Bạc',
-    pillBg: Color(0xFFF1F5F9),
-    pillBorder: Color(0xFFCBD5E1),
-    pillText: Color(0xFF334155),
-    ringGradient: [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
-    ringBorder: Color(0xFFCBD5E1),
-    iconColor: Color(0xFF475569),
+    pillBg: AppCultureColors.ink50,
+    pillBorder: AppCultureColors.ink200,
+    pillText: AppCultureColors.ink700,
+    ringGradient: [AppCultureColors.ink50, AppCultureColors.ink100],
+    ringBorder: AppCultureColors.ink200,
+    iconColor: AppCultureColors.ink600,
   ),
   'GOLD': _TierStyle(
     label: 'Vàng',
-    pillBg: Color(0xFFFFFBEB),
-    pillBorder: Color(0xFFFCD34D),
-    pillText: Color(0xFF92400E),
-    ringGradient: [Color(0xFFFEF9C3), Color(0xFFFCD34D)],
-    ringBorder: Color(0xFFFBBF24),
-    iconColor: Color(0xFF78350F),
+    pillBg: AppCultureColors.brass50,
+    pillBorder: AppCultureColors.brass300,
+    pillText: AppCultureColors.brass800,
+    ringGradient: [AppCultureColors.brass100, AppCultureColors.brass300],
+    ringBorder: AppCultureColors.brass400,
+    iconColor: AppCultureColors.brass800,
   ),
   'LEGENDARY': _TierStyle(
     label: 'Huyền thoại',
-    pillBg: Color(0xFFFAF5FF),
-    pillBorder: Color(0xFFD8B4FE),
-    pillText: Color(0xFF581C87),
-    ringGradient: [Color(0xFFF3E8FF), Color(0xFFFDE68A)],
-    ringBorder: Color(0xFFFBBF24),
-    iconColor: Color(0xFF6B21A8),
+    pillBg: AppCultureColors.indigo50,
+    pillBorder: AppCultureColors.indigo200,
+    pillText: AppCultureColors.indigo700,
+    ringGradient: [AppCultureColors.indigo50, AppCultureColors.brass200],
+    ringBorder: AppCultureColors.brass400,
+    iconColor: AppCultureColors.indigo600,
     isLegendary: true,
   ),
 };
@@ -519,59 +520,58 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
       ),
     ];
 
-    Widget progressCard = _headerStatBox(
+    // Ô thống kê sáng theo nhóm màu: ngọc = tiến độ, vàng = điểm, san hô = chờ nhận thưởng
+    Widget statBox({required AppTone tone, required Widget child}) => Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppCultureColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: tone.soft),
+          ),
+          child: child,
+        );
+
+    Widget boxLabel(IconData icon, String text, AppTone tone, {Widget? trailing}) => Row(
+          children: [
+            IconTile(icon: icon, tone: tone, size: 26),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppCultureColors.textMuted),
+              ),
+            ),
+            ?trailing,
+          ],
+        );
+
+    const bigNum = TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppCultureColors.textDark, height: 1.1);
+
+    Widget progressCard = statBox(
+      tone: AppTone.jade,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.emoji_events_rounded,
-                size: 15,
-                color: Color(0xFFFCD34D),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Thành tựu đã đạt',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.teal.shade50.withValues(alpha: 0.9),
-                  ),
-                ),
-              ),
-              Text(
-                '${stats.overallPct}%',
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFFFDE68A),
-                ),
-              ),
-            ],
+          boxLabel(
+            Icons.emoji_events_rounded,
+            'Thành tựu đã đạt',
+            AppTone.jade,
+            trailing: Text(
+              '${stats.overallPct}%',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppCultureColors.jadeDark),
+            ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                '${stats.totalAchieved}',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  height: 1.05,
-                ),
-              ),
+              CountUpText(value: stats.totalAchieved, style: bigNum.copyWith(fontSize: 24)),
               Text(
                 '/${stats.totalCount}',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white.withValues(alpha: 0.72),
-                ),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppCultureColors.textMuted),
               ),
             ],
           ),
@@ -584,9 +584,9 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
               curve: Curves.easeOutCubic,
               builder: (_, val, _) => LinearProgressIndicator(
                 value: val,
-                minHeight: 6,
-                backgroundColor: Colors.black.withValues(alpha: 0.28),
-                valueColor: const AlwaysStoppedAnimation(Color(0xFFFBBF24)),
+                minHeight: 7,
+                backgroundColor: AppCultureColors.jadeTint,
+                valueColor: const AlwaysStoppedAnimation(AppCultureColors.heritageJade),
               ),
             ),
           ),
@@ -594,261 +594,138 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
       ),
     );
 
-    Widget pointsCard = _headerStatBox(
+    Widget pointsCard = statBox(
+      tone: AppTone.brass,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          boxLabel(Icons.auto_awesome_rounded, 'Điểm thành tựu', AppTone.brass),
+          const SizedBox(height: 8),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              const Icon(
-                Icons.auto_awesome_rounded,
-                size: 15,
-                color: Color(0xFFFCD34D),
+              const Text('+', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppCultureColors.brass700)),
+              CountUpText(
+                value: stats.totalPointsEarned,
+                style: bigNum.copyWith(fontSize: 21, color: AppCultureColors.brass700),
               ),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  'Điểm thành tựu',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.teal.shade50.withValues(alpha: 0.9),
-                  ),
-                ),
+              const Text(
+                ' JP',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppCultureColors.brass800),
               ),
             ],
-          ),
-          const SizedBox(height: 6),
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: '+${formatThousands(stats.totalPointsEarned)}',
-                  style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFFCD34D),
-                    height: 1.1,
-                  ),
-                ),
-                const TextSpan(
-                  text: ' JP',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFFFDE68A),
-                  ),
-                ),
-              ],
-            ),
           ),
           const SizedBox(height: 4),
           Text(
             'Đã nhận ${stats.totalClaimed} huy hiệu',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.72),
-            ),
+            style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
           ),
         ],
       ),
     );
 
-    Widget claimableCard = _headerStatBox(
+    final hasClaimable = stats.unclaimedCount > 0;
+    Widget claimableCard = statBox(
+      tone: hasClaimable ? AppTone.coral : AppTone.jade,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          boxLabel(Icons.card_giftcard_rounded, 'Chờ nhận thưởng', hasClaimable ? AppTone.coral : AppTone.jade),
+          const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(
-                Icons.card_giftcard_rounded,
-                size: 15,
-                color: Color(0xFFFCD34D),
-              ),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  'Chờ nhận thưởng',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.teal.shade50.withValues(alpha: 0.9),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Text(
-                '${stats.unclaimedCount}',
-                style: const TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  height: 1.1,
-                ),
+              CountUpText(
+                value: stats.unclaimedCount,
+                style: bigNum.copyWith(fontSize: 21, color: hasClaimable ? AppCultureColors.coralDark : AppCultureColors.textDark),
               ),
               const SizedBox(width: 6),
-              if (stats.unclaimedCount > 0)
+              if (hasClaimable)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE11D48),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: AppCultureColors.coral, borderRadius: BorderRadius.circular(20)),
                   child: const Text(
                     'Chờ nhận',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
                   ),
                 )
               else
-                Flexible(
+                const Flexible(
                   child: Text(
                     'Đã nhận hết',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.75),
-                    ),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppCultureColors.jadeDark),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             'Hoàn thành để mở khóa',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.72),
-            ),
+            style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
           ),
         ],
       ),
     );
 
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF093B37), Color(0xFF0D5C55), Color(0xFF134E4A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF115E59).withValues(alpha: 0.7),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF093B37).withValues(alpha: 0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Stack(
+    return BrightHeroCard(
+      tone: AppTone.jade,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            right: -52,
-            top: -54,
-            child: IgnorePointer(
-              child: SlowSpin(
-                child: DrumMotif(
-                  size: 195,
-                  color: const Color(0xFFFCD34D).withValues(alpha: 0.11),
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+          if (wide)
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (wide)
-                  Row(
-                    children: [
-                      Expanded(child: progressCard),
-                      const SizedBox(width: 10),
-                      Expanded(child: pointsCard),
-                      const SizedBox(width: 10),
-                      Expanded(child: claimableCard),
-                    ],
-                  )
-                else ...[
-                  progressCard,
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: pointsCard),
-                      const SizedBox(width: 10),
-                      Expanded(child: claimableCard),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 14),
-                Divider(
-                  height: 1,
-                  color: Colors.white.withValues(alpha: 0.14),
-                ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final (i, pill) in filterPills.indexed) ...[
-                        if (i > 0) const SizedBox(width: 8),
-                        _buildFilterPill(
-                          label: pill.label,
-                          count: pill.count,
-                          dot: pill.dot,
-                          selected: _statusFilter == pill.filter,
-                          onTap: () =>
-                              setState(() => _statusFilter = pill.filter),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                Expanded(child: progressCard),
+                const SizedBox(width: 10),
+                Expanded(child: pointsCard),
+                const SizedBox(width: 10),
+                Expanded(child: claimableCard),
               ],
+            )
+          else ...[
+            progressCard,
+            const SizedBox(height: 10),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: pointsCard),
+                  const SizedBox(width: 10),
+                  Expanded(child: claimableCard),
+                ],
+              ),
             ),
+          ],
+          const SizedBox(height: 14),
+          // Bộ lọc tự xuống hàng — không viên nào bị cắt ở mép màn hình
+          Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final pill in filterPills)
+                  _buildFilterPill(
+                    label: pill.label,
+                    count: pill.count,
+                    dot: pill.dot,
+                    selected: _statusFilter == pill.filter,
+                    onTap: () => setState(() => _statusFilter = pill.filter),
+                  ),
+              ],
           ),
         ],
       ),
     );
   }
 
-  Widget _headerStatBox({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.11),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-      ),
-      child: child,
-    );
-  }
-
+  /// Viên thuốc lọc: đang chọn nền xanh ngọc chữ trắng; chưa chọn nền trắng viền nhạt chữ màu mực.
   Widget _buildFilterPill({
     required String label,
     required int count,
@@ -857,26 +734,26 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: selected
-          ? const Color(0xFFFBBF24)
-          : Colors.white.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(24),
+      color: selected ? AppCultureColors.heritageJade : AppCultureColors.surface,
+      shape: StadiumBorder(
+        side: BorderSide(color: selected ? AppCultureColors.heritageJade : AppCultureColors.border),
+      ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        customBorder: const StadiumBorder(),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (dot) ...[
                 Container(
-                  width: 7,
-                  height: 7,
+                  width: 8,
+                  height: 8,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE11D48),
+                    color: AppCultureColors.coral,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1),
+                    border: Border.all(color: Colors.white, width: 1.2),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -884,28 +761,24 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: selected ? const Color(0xFF0F172A) : Colors.white,
+                  color: selected ? Colors.white : AppCultureColors.textDark,
                 ),
               ),
               const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
                 decoration: BoxDecoration(
-                  color: selected
-                      ? Colors.black.withValues(alpha: 0.14)
-                      : Colors.black.withValues(alpha: 0.25),
+                  color: selected ? Colors.white.withValues(alpha: 0.22) : AppCultureColors.surfaceSubtle,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '$count',
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: selected
-                        ? const Color(0xFF0F172A)
-                        : const Color(0xFFCCFBF1),
+                    color: selected ? Colors.white : AppCultureColors.textMuted,
                   ),
                 ),
               ),
@@ -920,9 +793,9 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1F2),
+        color: AppCultureColors.lacquer50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFECDD3)),
+        border: Border.all(color: AppCultureColors.lacquer200),
       ),
       child: Row(
         children: [
@@ -938,7 +811,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
               style: const TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF881337),
+                color: AppCultureColors.lacquer700,
               ),
             ),
           ),
@@ -959,132 +832,79 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     );
   }
 
+  /// Danh mục dạng chip tự xuống hàng (thay dải thẻ cuộn ngang bị cắt ở mép):
+  /// icon + tên ngắn + "đạt/tổng" + chấm số thưởng chờ nhận; đang chọn nền ngọc nhạt viền ngọc.
   Widget _buildMobileCategoryStrip(Map<String, _CategoryStat> byCategory) {
     return SizedBox(
-      height: 76,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: _categories.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (_, index) {
-          final cat = _categories[index];
-          final st = byCategory[cat.key] ?? const _CategoryStat();
-          final active = _selectedCategory == cat.key;
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => setState(() => _selectedCategory = cat.key),
-              borderRadius: BorderRadius.circular(18),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  gradient: active
-                      ? const LinearGradient(
-                          colors: [Color(0xFF0B5D56), Color(0xFF0F766E)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: active ? null : Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: active
-                        ? const Color(0xFFFBBF24)
-                        : AppCultureColors.border,
-                    width: active ? 1.5 : 1,
+      width: double.infinity,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final cat in _categories) _categoryChip(cat, byCategory[cat.key] ?? const _CategoryStat()),
+        ],
+      ),
+    );
+  }
+
+  Widget _categoryChip(_AchievementCategoryMeta cat, _CategoryStat st) {
+    final active = _selectedCategory == cat.key;
+    return Semantics(
+      button: true,
+      selected: active,
+      child: Material(
+        color: active ? AppCultureColors.jadeTint : AppCultureColors.surface,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: active ? AppCultureColors.heritageJade : AppCultureColors.border,
+            width: active ? 1.5 : 1,
+          ),
+        ),
+        child: InkWell(
+          onTap: () => setState(() => _selectedCategory = cat.key),
+          customBorder: const StadiumBorder(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(cat.icon, size: 16, color: active ? AppCultureColors.jadeDark : AppCultureColors.heritageJade),
+                const SizedBox(width: 6),
+                Text(
+                  cat.shortLabel,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: active ? AppCultureColors.jadeDark : AppCultureColors.textDark,
                   ),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          cat.icon,
-                          size: 16,
-                          color: active
-                              ? const Color(0xFFFCD34D)
-                              : AppCultureColors.heritageJade,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          cat.shortLabel,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w800,
-                            color: active
-                                ? Colors.white
-                                : AppCultureColors.textDark,
-                          ),
-                        ),
-                        if (st.claimable > 0) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE11D48),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '${st.claimable}',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${st.achieved}/${st.total} (${st.pct}%)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: active
-                                ? const Color(0xFFCCFBF1)
-                                : AppCultureColors.textMuted,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        SizedBox(
-                          width: 96,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: st.ratio,
-                              minHeight: 3.5,
-                              backgroundColor: active
-                                  ? Colors.black.withValues(alpha: 0.25)
-                                  : AppCultureColors.surfaceSubtle,
-                              valueColor: AlwaysStoppedAnimation(
-                                active
-                                    ? const Color(0xFFFBBF24)
-                                    : AppCultureColors.heritageJade,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                const SizedBox(width: 6),
+                Text(
+                  '${st.achieved}/${st.total}',
+                  maxLines: 1,
+                  softWrap: false,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppCultureColors.textMuted),
                 ),
-              ),
+                if (st.claimable > 0) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 18),
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(color: AppCultureColors.coral, borderRadius: BorderRadius.circular(9)),
+                    child: Text(
+                      '${st.claimable}',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -1116,19 +936,13 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            gradient: active
-                ? const LinearGradient(
-                    colors: [Color(0xFF0B5D56), Color(0xFF0F766E)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            color: active ? null : Colors.white,
+            
+            color: active ? AppCultureColors.jadeTint : AppCultureColors.surface,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: active
-                  ? const Color(0xFFFBBF24)
-                  : AppCultureColors.border,
+                  ? AppCultureColors.heritageJade
+                        : AppCultureColors.border,
             ),
           ),
           child: Column(
@@ -1139,17 +953,13 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: active
-                          ? Colors.white.withValues(alpha: 0.15)
-                          : AppCultureColors.jadeLight,
+                      color: active ? AppCultureColors.surface : AppCultureColors.jadeLight,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       cat.icon,
                       size: 19,
-                      color: active
-                          ? const Color(0xFFFCD34D)
-                          : AppCultureColors.heritageJade,
+                      color: active ? AppCultureColors.jadeDark : AppCultureColors.heritageJade,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1164,9 +974,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w800,
-                            color: active
-                                ? Colors.white
-                                : AppCultureColors.textDark,
+                            color: active ? AppCultureColors.jadeDark : AppCultureColors.textDark,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -1174,9 +982,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                           '${st.achieved}/${st.total} thành tựu • ${st.pct}%',
                           style: TextStyle(
                             fontSize: 11.5,
-                            color: active
-                                ? const Color(0xFFCCFBF1)
-                                : AppCultureColors.textMuted,
+                            color: active ? AppCultureColors.jadeDark : AppCultureColors.textMuted,
                           ),
                         ),
                       ],
@@ -1189,7 +995,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE11D48),
+                        color: AppCultureColors.coral,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -1212,13 +1018,9 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                       child: LinearProgressIndicator(
                         value: st.ratio,
                         minHeight: 5,
-                        backgroundColor: active
-                            ? Colors.black.withValues(alpha: 0.25)
-                            : AppCultureColors.surfaceSubtle,
+                        backgroundColor: active ? AppCultureColors.surface : AppCultureColors.surfaceSubtle,
                         valueColor: AlwaysStoppedAnimation(
-                          active
-                              ? const Color(0xFFFBBF24)
-                              : AppCultureColors.heritageJade,
+                          AppCultureColors.heritageJade,
                         ),
                       ),
                     ),
@@ -1227,9 +1029,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                   Icon(
                     Icons.chevron_right_rounded,
                     size: 16,
-                    color: active
-                        ? const Color(0xFFFCD34D)
-                        : AppCultureColors.textLight,
+                    color: active ? AppCultureColors.jadeDark : AppCultureColors.textLight,
                   ),
                 ],
               ),
@@ -1430,9 +1230,9 @@ class _AchievementCard extends StatelessWidget {
     final isClaimed = item.isClaimed;
 
     final borderColor = isClaimable
-        ? const Color(0xFFFCD34D)
+        ? AppCultureColors.brass300
         : isClaimed
-            ? const Color(0xFFA7F3D0)
+            ? AppCultureColors.jade200
             : AppCultureColors.border;
 
     return Container(
@@ -1440,7 +1240,7 @@ class _AchievementCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: isClaimable
             ? const LinearGradient(
-                colors: [Color(0xFFFFFBEB), Colors.white],
+                colors: [AppCultureColors.brass50, Colors.white],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
@@ -1451,7 +1251,7 @@ class _AchievementCard extends StatelessWidget {
         boxShadow: isClaimable
             ? [
                 BoxShadow(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                  color: AppCultureColors.brass500.withValues(alpha: 0.16),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -1492,7 +1292,7 @@ class _AchievementCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFEF3C7),
+                              color: AppCultureColors.brass100,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Text(
@@ -1500,7 +1300,7 @@ class _AchievementCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF92400E),
+                                color: AppCultureColors.brass800,
                               ),
                             ),
                           ),
@@ -1531,7 +1331,7 @@ class _AchievementCard extends StatelessWidget {
                               fontSize: 11.5,
                               fontWeight: FontWeight.w700,
                               color: isClaimable
-                                  ? const Color(0xFF92400E)
+                                  ? AppCultureColors.brass800
                                   : isClaimed
                                       ? AppCultureColors.success
                                       : AppCultureColors.textMuted,
@@ -1558,7 +1358,7 @@ class _AchievementCard extends StatelessWidget {
                         backgroundColor: AppCultureColors.surfaceSubtle,
                         valueColor: AlwaysStoppedAnimation(
                           isClaimable
-                              ? const Color(0xFFF59E0B)
+                              ? AppCultureColors.brass500
                               : isClaimed
                                   ? AppCultureColors.success
                                   : AppCultureColors.heritageJade,
@@ -1585,9 +1385,9 @@ class _AchievementCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
+                        color: AppCultureColors.brass50,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
+                        border: Border.all(color: AppCultureColors.brass200),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1595,7 +1395,7 @@ class _AchievementCard extends StatelessWidget {
                           const Icon(
                             Icons.auto_awesome_rounded,
                             size: 13,
-                            color: Color(0xFFD97706),
+                            color: AppCultureColors.brass600,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1603,7 +1403,7 @@ class _AchievementCard extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFFB45309),
+                              color: AppCultureColors.brass700,
                             ),
                           ),
                         ],
@@ -1651,16 +1451,13 @@ class _AchievementCard extends StatelessWidget {
       return Pressable(
         onTap: busy ? null : onClaim,
         child: Container(
+          // Nút chính màu xanh ngọc đặc: chữ trắng 5.3:1 (gradient vàng→cam cũ chỉ 2.7:1)
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFF59E0B), Color(0xFFEA580C)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: AppCultureColors.heritageJade,
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                color: AppCultureColors.heritageJade.withValues(alpha: 0.30),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -1729,9 +1526,9 @@ class _AchievementCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5),
+              color: AppCultureColors.jade50,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFA7F3D0)),
+              border: Border.all(color: AppCultureColors.jade200),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
@@ -1874,7 +1671,7 @@ class _AchievementBadgeThumb extends StatelessWidget {
                     width: 20,
                     height: 20,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B).withValues(alpha: 0.85),
+                      color: AppCultureColors.ink900.withValues(alpha: 0.85),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -1920,7 +1717,7 @@ Future<void> showClaimRewardDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Nhận thưởng thành tựu',
-    barrierColor: const Color(0xCC020617),
+    barrierColor: AppCultureColors.textDark.withValues(alpha: 0.45),
     transitionDuration: const Duration(milliseconds: 260),
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack);
@@ -1959,6 +1756,9 @@ class _ClaimRewardDialog extends StatelessWidget {
         result.pointsAwarded > 0 ? result.pointsAwarded : achievement.pointsReward;
     final hasImage = badgeIcon != null && badgeIcon.startsWith('http');
 
+    const fallbackIcon = Icon(Icons.emoji_events_rounded, size: 42, color: AppCultureColors.brass800);
+
+    // Bản sáng: nền trắng, dải vàng nhạt phía trên + hào quang đồng thau, chữ màu mực
     return SafeArea(
       child: Center(
         child: Padding(
@@ -1971,22 +1771,15 @@ class _ClaimRewardDialog extends StatelessWidget {
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF093B37),
-                      Color(0xFF0F524C),
-                      Color(0xFF132A2E),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                    colors: [AppCultureColors.brassTint, AppCultureColors.surface],
+                    begin: Alignment.topCenter,
+                    end: Alignment.center,
                   ),
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: const Color(0xFFFCD34D).withValues(alpha: 0.65),
-                    width: 1.5,
-                  ),
+                  border: Border.all(color: AppTone.brass.soft, width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFBBF24).withValues(alpha: 0.38),
+                      color: AppCultureColors.brass500.withValues(alpha: 0.25),
                       blurRadius: 40,
                       offset: const Offset(0, 14),
                     ),
@@ -2001,11 +1794,11 @@ class _ClaimRewardDialog extends StatelessWidget {
                       right: 0,
                       child: Center(
                         child: Container(
-                          width: 220,
-                          height: 150,
+                          width: 240,
+                          height: 160,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: const Color(0xFFFCD34D).withValues(alpha: 0.2),
+                            color: AppCultureColors.brass300.withValues(alpha: 0.25),
                           ),
                         ),
                       ),
@@ -2015,18 +1808,14 @@ class _ClaimRewardDialog extends StatelessWidget {
                       right: 14,
                       top: 14,
                       child: Material(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        shape: const CircleBorder(),
+                        color: AppCultureColors.surface,
+                        shape: const CircleBorder(side: BorderSide(color: AppCultureColors.border)),
                         child: InkWell(
                           customBorder: const CircleBorder(),
                           onTap: () => Navigator.of(context).pop(),
                           child: const Padding(
                             padding: EdgeInsets.all(8),
-                            child: Icon(
-                              Icons.close_rounded,
-                              size: 18,
-                              color: Colors.white,
-                            ),
+                            child: Icon(Icons.close_rounded, size: 18, color: AppCultureColors.textDark),
                           ),
                         ),
                       ),
@@ -2036,7 +1825,7 @@ class _ClaimRewardDialog extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Khung huy hiệu & Mặt trống đồng xoay chậm
+                          // Khung huy hiệu & mặt trống đồng xoay chậm
                           SizedBox(
                             width: 176,
                             height: 176,
@@ -2047,8 +1836,7 @@ class _ClaimRewardDialog extends StatelessWidget {
                                   period: const Duration(seconds: 28),
                                   child: DrumMotif(
                                     size: 176,
-                                    color: const Color(0xFFFCD34D)
-                                        .withValues(alpha: 0.28),
+                                    color: AppCultureColors.brass500.withValues(alpha: 0.22),
                                   ),
                                 ),
                                 Container(
@@ -2058,8 +1846,7 @@ class _ClaimRewardDialog extends StatelessWidget {
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFFFBBF24)
-                                            .withValues(alpha: 0.55),
+                                        color: AppCultureColors.brass400.withValues(alpha: 0.45),
                                         blurRadius: 28,
                                         spreadRadius: 4,
                                       ),
@@ -2073,54 +1860,31 @@ class _ClaimRewardDialog extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFFFEF3C7),
-                                        Color(0xFFF59E0B),
-                                      ],
+                                      colors: [AppCultureColors.brass100, AppCultureColors.brass400],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
-                                    border: Border.all(
-                                      color: const Color(0xFFFDE68A),
-                                      width: 2.5,
-                                    ),
+                                    border: Border.all(color: AppCultureColors.surface, width: 3),
                                   ),
                                   child: ClipOval(
                                     child: hasImage
                                         ? Image.network(
                                             badgeIcon,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (_, _, _) =>
-                                                const Icon(
-                                              Icons.emoji_events_rounded,
-                                              size: 42,
-                                              color: Color(0xFF451A03),
-                                            ),
+                                            errorBuilder: (_, _, _) => fallbackIcon,
                                           )
-                                        : const Icon(
-                                            Icons.emoji_events_rounded,
-                                            size: 42,
-                                            color: Color(0xFF451A03),
-                                          ),
+                                        : fallbackIcon,
                                   ),
                                 ),
                                 const Positioned(
                                   left: 20,
                                   top: 22,
-                                  child: Icon(
-                                    Icons.star_rounded,
-                                    size: 16,
-                                    color: Color(0xFFFDE68A),
-                                  ),
+                                  child: Icon(Icons.star_rounded, size: 18, color: AppCultureColors.brass500),
                                 ),
                                 const Positioned(
                                   right: 20,
                                   bottom: 24,
-                                  child: Icon(
-                                    Icons.auto_awesome_rounded,
-                                    size: 18,
-                                    color: Color(0xFFFDE68A),
-                                  ),
+                                  child: Icon(Icons.auto_awesome_rounded, size: 20, color: AppCultureColors.coral),
                                 ),
                               ],
                             ),
@@ -2129,30 +1893,20 @@ class _ClaimRewardDialog extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Container(
-                                width: 22,
-                                height: 1,
-                                color: const Color(0xFFFCD34D)
-                                    .withValues(alpha: 0.55),
-                              ),
+                              Container(width: 22, height: 1.2, color: AppTone.brass.soft),
                               const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(
                                   'THÀNH TỰU ĐẠT ĐƯỢC',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 11.5,
                                     fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.8,
-                                    color: Color(0xFFFCD34D),
+                                    letterSpacing: 1.6,
+                                    color: AppCultureColors.brass800,
                                   ),
                                 ),
                               ),
-                              Container(
-                                width: 22,
-                                height: 1,
-                                color: const Color(0xFFFCD34D)
-                                    .withValues(alpha: 0.55),
-                              ),
+                              Container(width: 22, height: 1.2, color: AppTone.brass.soft),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -2162,34 +1916,24 @@ class _ClaimRewardDialog extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 21,
                               fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              color: AppCultureColors.textDark,
                               height: 1.25,
+                              letterSpacing: -0.2,
                             ),
                           ),
                           if (badgeName != null) ...[
                             const SizedBox(height: 10),
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 5,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFBBF24)
-                                    .withValues(alpha: 0.16),
+                                color: AppCultureColors.coralTint,
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: const Color(0xFFFCD34D)
-                                      .withValues(alpha: 0.45),
-                                ),
+                                border: Border.all(color: AppTone.coral.soft),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
-                                    Icons.military_tech_rounded,
-                                    size: 15,
-                                    color: Color(0xFFFCD34D),
-                                  ),
+                                  const Icon(Icons.military_tech_rounded, size: 15, color: AppCultureColors.coralDark),
                                   const SizedBox(width: 5),
                                   Flexible(
                                     child: Text(
@@ -2197,9 +1941,9 @@ class _ClaimRewardDialog extends StatelessWidget {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
-                                        fontSize: 12,
+                                        fontSize: 12.5,
                                         fontWeight: FontWeight.w700,
-                                        color: Color(0xFFFEF3C7),
+                                        color: AppCultureColors.coralDark,
                                       ),
                                     ),
                                   ),
@@ -2212,37 +1956,37 @@ class _ClaimRewardDialog extends StatelessWidget {
                             width: double.infinity,
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.1),
+                              color: AppCultureColors.brassTint,
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.16),
-                              ),
+                              border: Border.all(color: AppTone.brass.soft),
                             ),
                             child: Column(
                               children: [
-                                Text(
+                                const Text(
                                   'PHẦN THƯỞNG VỪA NHẬN',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 11.5,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 1.0,
-                                    color: Colors.teal.shade50
-                                        .withValues(alpha: 0.8),
+                                    color: AppCultureColors.textMuted,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.baseline,
+                                  crossAxisAlignment: CrossAxisAlignment.baseline,
                                   textBaseline: TextBaseline.alphabetic,
                                   children: [
-                                    Text(
-                                      '+${formatThousands(pointsAwarded)}',
+                                    const Text(
+                                      '+',
+                                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppCultureColors.brass700),
+                                    ),
+                                    CountUpText(
+                                      value: pointsAwarded,
                                       style: const TextStyle(
                                         fontSize: 28,
                                         fontWeight: FontWeight.w900,
-                                        color: Color(0xFFFCD34D),
+                                        color: AppCultureColors.brass700,
                                       ),
                                     ),
                                     const SizedBox(width: 6),
@@ -2251,7 +1995,7 @@ class _ClaimRewardDialog extends StatelessWidget {
                                       style: TextStyle(
                                         fontSize: 13.5,
                                         fontWeight: FontWeight.w700,
-                                        color: Color(0xFFFDE68A),
+                                        color: AppCultureColors.brass800,
                                       ),
                                     ),
                                   ],
@@ -2261,19 +2005,14 @@ class _ClaimRewardDialog extends StatelessWidget {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(
-                                        Icons.check_circle_rounded,
-                                        size: 14,
-                                        color: Color(0xFF6EE7B7),
-                                      ),
+                                      const Icon(Icons.check_circle_rounded, size: 15, color: AppCultureColors.success),
                                       const SizedBox(width: 5),
                                       Text(
                                         'Số dư hiện tại: ${formatThousands(result.newPointBalance)} JP',
-                                        style: TextStyle(
-                                          fontSize: 12,
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.white
-                                              .withValues(alpha: 0.9),
+                                          color: AppCultureColors.textMuted,
                                         ),
                                       ),
                                     ],
@@ -2285,42 +2024,15 @@ class _ClaimRewardDialog extends StatelessWidget {
                           const SizedBox(height: 18),
                           SizedBox(
                             width: double.infinity,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFFFCD34D),
-                                    Color(0xFFF59E0B),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFF59E0B)
-                                        .withValues(alpha: 0.3),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
+                            child: FilledButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(50),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () => Navigator.of(context).pop(),
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 14),
-                                    child: Text(
-                                      'Tuyệt vời! Tiếp tục khám phá',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFF0F172A),
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                              child: const Text(
+                                'Tuyệt vời! Tiếp tục khám phá',
+                                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
                               ),
                             ),
                           ),

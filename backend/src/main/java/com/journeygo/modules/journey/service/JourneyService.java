@@ -34,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -169,6 +171,49 @@ public class JourneyService {
         return tourService.getStopCulture(journey.getTourId(), destinationId);
     }
 
+    /**
+     * Bản đồ checkpoint của trạm: vùng check-in và vị trí các hoạt động thực địa (theo thứ tự nhiệm vụ),
+     * kèm trạng thái của du khách. Chỉ mở sau khi check-in trạm — giống nhiệm vụ.
+     */
+    @Transactional(readOnly = true)
+    public StopCheckpointsResponse getStopCheckpoints(Long journeyId, Long destinationId, Long userId) {
+        Journey journey = findJourneyAndVerifyOwner(journeyId, userId);
+        JourneyDestinationProgress destProgress = destinationProgressRepository
+                .findByJourneyIdAndDestinationId(journeyId, destinationId)
+                .orElseThrow(() -> new ResourceNotFoundException("JourneyDestinationProgress", destinationId));
+        if (!destProgress.isCheckedIn()) {
+            throw new BusinessException("DEST-NOT-CHECKED-IN",
+                    "Bạn cần check-in tại " + destProgress.getDestinationName() + " trước khi xem bản đồ trải nghiệm");
+        }
+
+        TourInfo tourInfo = tourInfoProvider.getTourInfo(journey.getTourId());
+        TourInfo.TourDestinationInfo destInfo = tourInfo.destinations().stream()
+                .filter(d -> d.destinationId().equals(destinationId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException("DEST-NOT-IN-TOUR", "Điểm đến không nằm trong hành trình Tour này"));
+
+        Map<Long, TaskProgressStatus> statusByTask = new HashMap<>();
+        destProgress.getTasks().forEach(t -> statusByTask.put(t.getTaskId(), t.getStatus()));
+
+        List<StopCheckpointsResponse.Checkpoint> checkpoints = new ArrayList<>();
+        for (TourInfo.TourTaskInfo task : destInfo.tasks()) {
+            if (!task.requiresLocation() || task.questions() == null) continue;
+            // Vị trí của hoạt động nằm ở câu hỏi gắn trạm (tour 6 bước: câu hỏi sau trải nghiệm).
+            task.questions().stream()
+                    .filter(q -> q.stationLatitude() != null && q.stationLongitude() != null)
+                    .findFirst()
+                    .ifPresent(q -> checkpoints.add(new StopCheckpointsResponse.Checkpoint(
+                            task.taskId(), task.taskName(), task.orderIndex(),
+                            q.stationLatitude(), q.stationLongitude(), q.stationRadiusMeters(),
+                            statusByTask.getOrDefault(task.taskId(), TaskProgressStatus.NOT_STARTED))));
+        }
+        checkpoints.sort(Comparator.comparing(StopCheckpointsResponse.Checkpoint::orderIndex,
+                Comparator.nullsLast(Comparator.naturalOrder())));
+
+        return new StopCheckpointsResponse(destinationId, destInfo.destinationName(),
+                destInfo.latitude(), destInfo.longitude(), destInfo.radiusMeters(), checkpoints);
+    }
+
     // ── CHECK-IN LOGIC ──────────────────────────────────────────────────────────
 
     @Transactional
@@ -210,13 +255,9 @@ public class JourneyService {
                 .orElseThrow(() -> new BusinessException("DEST-NOT-IN-TOUR", "Điểm đến không nằm trong hành trình Tour này"));
 
         Integer distanceMeters = null;
-        // Điểm dừng của tour 5 bước chưa có checkpoint nào có toạ độ: không có gì để đối chiếu, check-in thẳng.
-        boolean nothingToVerify = tourInfo.wizard()
-                && (currentDestInfo.latitude() == null || currentDestInfo.longitude() == null);
-
-        if (nothingToVerify) {
-            log.info("Điểm dừng {} chưa có toạ độ: check-in không cần xác minh vị trí", destinationId);
-        } else if (request.verificationMethod() == CheckInVerificationMethod.GPS && skipLocationCheck) {
+        // Du khách phải có mặt tại điểm đến mới check-in (mở khoá trải nghiệm): GPS trong bán kính
+        // HOẶC quét đúng mã QR dán tại cổng. Không còn "check-in thẳng" khi điểm dừng thiếu toạ độ.
+        if (request.verificationMethod() == CheckInVerificationMethod.GPS && skipLocationCheck) {
             log.warn("[DEV] Bỏ kiểm tra GPS khi check-in: journey={}, dest={}", journeyId, destinationId);
         } else if (request.verificationMethod() == CheckInVerificationMethod.GPS) {
             if (request.latitude() == null || request.longitude() == null) {

@@ -5,6 +5,44 @@ import { X, Search, MapPin, Navigation, Check, Loader2, Layers, Keyboard } from 
 import { getDevicePosition, describeGeoError } from "@/lib/geolocation";
 import { geoService } from "../services/geoService";
 
+/** Đa giác xấp xỉ vòng tròn bán kính `meters` quanh (lat, lng) — GeoJSON Feature cho lớp fill/line. */
+export function circlePolygon(lat, lng, meters, steps = 64) {
+  const coords = [];
+  const dLat = meters / 111320;
+  const dLng = meters / (111320 * Math.cos((lat * Math.PI) / 180));
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * 2 * Math.PI;
+    coords.push([lng + dLng * Math.cos(t), lat + dLat * Math.sin(t)]);
+  }
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] } };
+}
+
+/** Khoảng cách (mét) giữa hai điểm — haversine. */
+function distanceBetween(aLat, aLng, bLat, bLng) {
+  const rad = (d) => (d * Math.PI) / 180;
+  const h = Math.sin(rad(bLat - aLat) / 2) ** 2
+    + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(rad(bLng - aLng) / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
+
+const formatMeters = (m) => (m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1).replace(".", ",")} km`);
+
+/** Màu vùng tham chiếu (vị trí check-in của điểm đến) — cam, khác ghim xanh đang chọn. */
+const REFERENCE_COLOR = "#d97706";
+
+/** Vẽ (hoặc vẽ lại sau khi đổi kiểu bản đồ) vòng tròn tham chiếu. */
+function drawReferenceCircle(map, ref) {
+  if (!ref || !map?.isStyleLoaded?.()) return;
+  const data = circlePolygon(ref.lat, ref.lng, ref.radius);
+  if (map.getSource("ref-radius")) {
+    map.getSource("ref-radius").setData(data);
+    return;
+  }
+  map.addSource("ref-radius", { type: "geojson", data });
+  map.addLayer({ id: "ref-radius-fill", type: "fill", source: "ref-radius", paint: { "fill-color": REFERENCE_COLOR, "fill-opacity": 0.12 } });
+  map.addLayer({ id: "ref-radius-line", type: "line", source: "ref-radius", paint: { "line-color": REFERENCE_COLOR, "line-width": 2, "line-dasharray": [2, 1.5] } });
+}
+
 /** Maptiles key (khác REST API key ở máy chủ) — giới hạn theo tên miền trên account.goong.io. */
 const MAPTILES_KEY = process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || "";
 
@@ -86,6 +124,9 @@ export function loadGoongJs() {
  * Chọn vị trí điểm đến trên bản đồ Goong.
  * - Bấm lên bản đồ / kéo ghim / tìm địa chỉ / vị trí của tôi → tra địa chỉ Goong (đơn vị hành chính mới)
  * - onSelect({ latitude, longitude, address }) với address = { display, detail, ward, province, lat, lng } | null
+ * - reference (không bắt buộc): vùng tham chiếu vẽ màu cam, ví dụ vị trí check-in của điểm đến khi chọn
+ *   checkpoint trải nghiệm — { latitude, longitude, radius, label, warnMeters, maxMeters }.
+ *   Hiện khoảng cách từ ghim đang chọn tới vùng này (vàng khi > warnMeters, đỏ khi > maxMeters).
  */
 export default function GoongMapPickerModal({
   isOpen,
@@ -94,10 +135,22 @@ export default function GoongMapPickerModal({
   initialLongitude,
   placeName = "",
   onSelect,
+  reference = null,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  // Vùng tham chiếu dạng số (null nếu không có / toạ độ không hợp lệ). Đọc qua ref để initMap
+  // không phải dựng lại bản đồ mỗi lần component cha render lại với object mới.
+  const refLat = Number(reference?.latitude);
+  const refLng = Number(reference?.longitude);
+  const ref = reference && reference.latitude != null && reference.longitude != null
+    && Number.isFinite(refLat) && Number.isFinite(refLng)
+    ? { lat: refLat, lng: refLng, radius: Number(reference.radius) || 0, label: reference.label || "Vị trí điểm đến",
+        warnMeters: reference.warnMeters, maxMeters: reference.maxMeters }
+    : null;
+  const referenceRef = useRef(ref);
+  useEffect(() => { referenceRef.current = ref; });
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -207,8 +260,27 @@ export default function GoongMapPickerModal({
         setCoordError("");
         lookupAddressRef.current(cLat, cLng);
       });
+      // Vùng tham chiếu: ghim cam (không kéo được) + vòng tròn bán kính; vẽ lại khi đổi kiểu bản đồ.
+      const reference = referenceRef.current;
+      if (reference) {
+        new goongjs.Marker({ color: REFERENCE_COLOR })
+          .setLngLat([reference.lng, reference.lat])
+          .setPopup(new goongjs.Popup({ closeButton: false, offset: 28 }).setText(reference.label))
+          .addTo(map);
+        map.on("style.load", () => drawReferenceCircle(map, referenceRef.current));
+      }
       map.on("load", () => {
         map.resize();
+        if (reference) {
+          drawReferenceCircle(map, reference);
+          // Ghim đang chọn ở xa vùng tham chiếu: thu bản đồ để thấy cả hai.
+          if (hasInitial && distanceBetween(lat, lng, reference.lat, reference.lng) > Math.max(reference.radius, 150)) {
+            map.fitBounds(
+              [[Math.min(lng, reference.lng), Math.min(lat, reference.lat)], [Math.max(lng, reference.lng), Math.max(lat, reference.lat)]],
+              { padding: 80, maxZoom: 16, duration: 0 },
+            );
+          }
+        }
         setLoading(false);
       });
       map.on("error", (e) => {
@@ -295,6 +367,21 @@ export default function GoongMapPickerModal({
 
   // Tọa độ dùng để xác nhận: ưu tiên giá trị gõ tay, không thì vị trí trên bản đồ.
   const effectivePos = parsedCoordDraft ?? currentPos;
+
+  // Khoảng cách từ ghim đang chọn tới vùng tham chiếu (vị trí check-in của điểm đến).
+  const refDistance = ref ? distanceBetween(effectivePos.lat, effectivePos.lng, ref.lat, ref.lng) : null;
+  const refInfo = ref ? {
+    distance: refDistance,
+    inside: ref.radius > 0 && refDistance <= ref.radius,
+    tone: ref.maxMeters && refDistance > ref.maxMeters ? "border-rose-200 bg-rose-50 text-rose-700"
+      : ref.warnMeters && refDistance > ref.warnMeters ? "border-amber-200 bg-amber-50 text-amber-800"
+      : "border-slate-200 bg-white/95 text-slate-700",
+  } : null;
+
+  const flyToReference = () => {
+    const r = referenceRef.current;
+    if (r) mapRef.current?.flyTo({ center: [r.lng, r.lat], zoom: 16, speed: 1.4 });
+  };
   const canConfirm = Boolean(parsedCoordDraft) || (!loadError && !addressLoading);
 
   const handleSearch = async () => {
@@ -479,6 +566,22 @@ export default function GoongMapPickerModal({
               <p className="text-[11px] font-medium text-slate-500 max-w-md mt-1">
                 Bạn vẫn có thể chọn checkpoint bằng cách nhập tọa độ thủ công ở ô bên dưới.
               </p>
+            </div>
+          )}
+
+          {refInfo && !loadError && (
+            <div className={`absolute top-3 left-3 z-10 max-w-[calc(100%-180px)] rounded-xl border shadow-md backdrop-blur-xs px-3 py-2 text-[11px] ${refInfo.tone}`}>
+              <p className="font-bold inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: REFERENCE_COLOR }} />
+                {ref.label}{ref.radius > 0 ? ` · bán kính ${ref.radius} m` : ""}
+              </p>
+              <p className="mt-0.5 font-semibold">
+                {refInfo.inside ? "Ghim đang nằm trong vùng check-in của điểm đến" : `Ghim cách vị trí điểm đến ${formatMeters(refInfo.distance)}`}
+              </p>
+              <button type="button" onClick={flyToReference}
+                className="mt-1 font-bold underline underline-offset-2 cursor-pointer hover:opacity-80">
+                Xem vị trí điểm đến
+              </button>
             </div>
           )}
 

@@ -358,6 +358,22 @@ class BookingModel {
 
   bool get isPaid => status == BookingStatus.confirmed || status == BookingStatus.completed;
 
+  /// Đơn này có còn CHẶN du khách đặt lại tour không.
+  ///
+  /// ⚠️ Chỉ đơn `CONFIRMED` **còn hiệu lực** (ngày đi chưa qua) mới chặn đặt lại.
+  /// Đơn `COMPLETED` (đã đi xong) hoặc `CONFIRMED` có ngày đi đã qua ⇒ tour hiện lại
+  /// trong danh sách và du khách có thể đặt tiếp cho lần sau.
+  /// (Xem `BookingService.validateTourNotAlreadyPurchased` ở backend.)
+  bool get blocksRebook {
+    if (status != BookingStatus.confirmed) return false;
+    final date = experienceDate;
+    if (date == null) return true;
+    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    return !target.isBefore(today);
+  }
+
   /// Đơn có áp voucher giảm giá không.
   bool get hasVoucher => appliedVoucherCode != null && discountAmount > 0;
 

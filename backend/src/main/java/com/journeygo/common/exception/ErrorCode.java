@@ -63,6 +63,7 @@ public enum ErrorCode {
     BOOKING_CANNOT_CANCEL_PAID("Booking đã thanh toán — không thể hủy trực tiếp", HttpStatus.CONFLICT),
     BOOKING_INVALID_STATUS_FOR_CANCEL("Trạng thái Booking không cho phép hủy", HttpStatus.CONFLICT),
     BOOKING_TOUR_ALREADY_PURCHASED("Bạn đã mua tour này rồi — không thể đặt lại", HttpStatus.CONFLICT),
+    BOOKING_PENDING_EXISTS("Bạn đang có đơn giữ chỗ chưa thanh toán cho tour này", HttpStatus.CONFLICT),
 
     // ── Payment ───────────────────────────────────────────────────────────────
     PAYMENT_NOT_FOUND("Giao dịch thanh toán không tồn tại", HttpStatus.NOT_FOUND),
@@ -148,6 +149,8 @@ public enum ErrorCode {
     AI_EMBEDDING_FAILED("Không thể tính toán vector nhúng từ mô hình AI", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_CHAT_FAILED("Xử lý hội thoại AI thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
     AI_SESSION_NOT_FOUND("Phiên hội thoại AI không tồn tại", HttpStatus.NOT_FOUND),
+    AI_DOCUMENT_NOT_FOUND("Tài liệu tri thức AI không tồn tại", HttpStatus.NOT_FOUND),
+    AI_RATE_LIMITED("Bạn đang gửi quá nhiều câu hỏi cho AI. Vui lòng thử lại sau giây lát.", HttpStatus.TOO_MANY_REQUESTS),
 
     // ── Booking nhóm (Đặt - Thanh toán tour) ────────────────────────────────
     BOOKING_GUEST_TYPE_NOT_AVAILABLE("Tour hiện không bán vé cho loại khách này", HttpStatus.BAD_REQUEST),

@@ -486,3 +486,55 @@ class JourneyMission {
     required this.isCompleted,
   });
 }
+
+/// Một checkpoint hoạt động thực địa trên bản đồ trạm (`GET /journeys/{id}/destinations/{destId}/checkpoints`).
+class StopCheckpoint {
+  final int taskId;
+  final String name;
+  final int orderIndex;
+  final double latitude;
+  final double longitude;
+  final int radiusMeters;
+
+  const StopCheckpoint({
+    required this.taskId,
+    required this.name,
+    required this.orderIndex,
+    required this.latitude,
+    required this.longitude,
+    required this.radiusMeters,
+  });
+
+  static StopCheckpoint? fromJson(Map<String, dynamic> j) {
+    final lat = _doubleOrNull(j['latitude']);
+    final lng = _doubleOrNull(j['longitude']);
+    if (lat == null || lng == null) return null;
+    return StopCheckpoint(
+      taskId: _int(j['taskId']),
+      name: _str(j['name'], 'Hoạt động'),
+      orderIndex: _int(j['orderIndex']),
+      latitude: lat,
+      longitude: lng,
+      radiusMeters: _int(j['radiusMeters'], 50),
+    );
+  }
+}
+
+/// Bản đồ checkpoint của một trạm: vùng check-in của điểm đến + vị trí các hoạt động thực địa.
+class StopCheckpoints {
+  final double? latitude;
+  final double? longitude;
+  final int? checkInRadiusMeters;
+  final List<StopCheckpoint> checkpoints;
+
+  const StopCheckpoints({this.latitude, this.longitude, this.checkInRadiusMeters, this.checkpoints = const []});
+
+  factory StopCheckpoints.fromJson(Map<String, dynamic> j) => StopCheckpoints(
+        latitude: _doubleOrNull(j['latitude']),
+        longitude: _doubleOrNull(j['longitude']),
+        checkInRadiusMeters: _intOrNull(j['checkInRadiusMeters']),
+        checkpoints: _maps(j['checkpoints']).map(StopCheckpoint.fromJson).nonNulls.toList(),
+      );
+
+  bool get hasStopLocation => latitude != null && longitude != null;
+}

@@ -1,65 +1,50 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/models/gamification_model.dart' show formatThousands;
 
-/// Màu và biểu tượng nhận diện theo loại hình tour (tour chưa có ảnh bìa).
+/// Màu và biểu tượng nhận diện theo loại hình tour (dùng khi tour chưa có ảnh bìa).
+/// Mọi cặp màu là tông trầm cùng họ với bảng màu chung; chữ trắng đạt ≥ 4.5:1 trên cả hai đầu gradient.
 class TourStyle {
   final List<Color> colors;
   final IconData icon;
 
   const TourStyle(this.colors, this.icon);
 
+  /// Màu chủ đạo (đầu gradient) — dùng cho icon/viền khi cần một màu đơn.
+  Color get primary => colors.first;
+
   static TourStyle of(String tourType) {
     switch (tourType) {
       case 'HISTORICAL':
-        return const TourStyle([
-          Color(0xFFB45309),
-          Color(0xFF92400E),
-        ], Icons.account_balance_rounded);
+        return const TourStyle([Color(0xFF4F46E5), Color(0xFF3730A3)], Icons.account_balance_rounded);
       case 'ADVENTURE':
-        return const TourStyle([
-          Color(0xFFEA580C),
-          Color(0xFFC2410C),
-        ], Icons.hiking_rounded);
+        return const TourStyle([Color(0xFFEA580C), Color(0xFF9A3412)], Icons.hiking_rounded);
       case 'BEACH':
-        return const TourStyle([
-          Color(0xFF0288D1),
-          Color(0xFF01579B),
-        ], Icons.beach_access_rounded);
+        return const TourStyle([Color(0xFF0284C7), Color(0xFF075985)], Icons.beach_access_rounded);
       case 'MOUNTAIN':
-        return const TourStyle([
-          Color(0xFF0F766E),
-          Color(0xFF134E4A),
-        ], Icons.landscape_rounded);
+        return const TourStyle([Color(0xFF059669), Color(0xFF065F46)], Icons.landscape_rounded);
       case 'CITY':
-        return const TourStyle([
-          Color(0xFF475569),
-          Color(0xFF1E293B),
-        ], Icons.location_city_rounded);
+        return const TourStyle([Color(0xFF475569), Color(0xFF1E293B)], Icons.location_city_rounded);
       case 'ECOTOURISM':
-        return const TourStyle([
-          Color(0xFF16A34A),
-          Color(0xFF166534),
-        ], Icons.eco_rounded);
+        return const TourStyle([Color(0xFF16A34A), Color(0xFF14532D)], Icons.eco_rounded);
       case 'GASTRONOMY':
-        return const TourStyle([
-          Color(0xFFE11D48),
-          Color(0xFF9F1239),
-        ], Icons.restaurant_rounded);
+        return const TourStyle([Color(0xFFE11D48), Color(0xFF9F1239)], Icons.restaurant_rounded);
       case 'CULTURAL':
-        return const TourStyle([
-          Color(0xFF00A86B),
-          Color(0xFF0288D1),
-        ], Icons.temple_buddhist_rounded);
+        return const TourStyle(
+          [AppCultureColors.jadeGradientStart, AppCultureColors.jadeGradientEnd],
+          Icons.temple_buddhist_rounded,
+        );
       default:
-        return const TourStyle([
-          Color(0xFF00A86B),
-          Color(0xFF0288D1),
-        ], Icons.explore_rounded);
+        return const TourStyle([AppCultureColors.oceanBlue, AppCultureColors.oceanDark], Icons.explore_rounded);
     }
   }
 }
 
-/// Nhãn nhỏ bo tròn dùng trên banner tour.
+/// Nhãn nhỏ bo tròn dùng trên ảnh bìa / banner tour.
+/// - [dark] = true: nền đen 55% làm mờ phía sau, chữ trắng — đọc được trên mọi ảnh.
+/// - [dark] = false: nền trắng, chữ màu mực.
 class TourChip extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -74,33 +59,36 @@ class TourChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final fg = dark ? Colors.white : AppCultureColors.textDark;
+    final content = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: dark ? Colors.black.withValues(alpha: 0.28) : Colors.white,
+        color: dark ? Colors.black.withValues(alpha: 0.55) : Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: dark ? Border.all(color: Colors.white.withValues(alpha: 0.14)) : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: Colors.white),
+          Icon(icon, size: 14, color: dark ? Colors.white : AppCultureColors.heritageJade),
           const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),
           ),
         ],
       ),
+    );
+    if (!dark) return content;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8), child: content),
     );
   }
 }
 
 /// Dải phần thưởng của tour: "3 nhiệm vụ · tối đa 300 điểm · 1 huy hiệu".
-/// [onDark] = true khi đặt trên banner màu, false khi đặt trên nền trắng.
+/// [onDark] = true khi đặt trên banner màu, false khi đặt trên nền sáng.
 class TourRewardStrip extends StatelessWidget {
   final int taskCount;
   final int points;
@@ -118,52 +106,37 @@ class TourRewardStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <(IconData, String, Color)>[
-      if (taskCount > 0)
-        (Icons.flag_rounded, '$taskCount nhiệm vụ', const Color(0xFF0EA5E9)),
-      if (points > 0)
-        (
-          Icons.stars_rounded,
-          'tối đa ${formatThousands(points)} điểm',
-          const Color(0xFFF59E0B),
-        ),
-      if (badgeCount > 0)
-        (
-          Icons.military_tech_rounded,
-          '$badgeCount huy hiệu',
-          const Color(0xFF8B5CF6),
-        ),
+      if (taskCount > 0) (Icons.flag_rounded, '$taskCount nhiệm vụ', AppCultureColors.heritageJade),
+      if (points > 0) (Icons.stars_rounded, 'tối đa ${formatThousands(points)} điểm', AppCultureColors.gold),
+      if (badgeCount > 0) (Icons.military_tech_rounded, '$badgeCount huy hiệu', AppCultureColors.lacquer),
     ];
     if (items.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: onDark
-            ? Colors.white.withValues(alpha: 0.16)
-            : const Color(0xFFFFFBEB),
+        color: onDark ? Colors.black.withValues(alpha: 0.35) : AppCultureColors.rewardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: onDark
-              ? Colors.white.withValues(alpha: 0.22)
-              : const Color(0xFFFDE68A),
+          color: onDark ? Colors.white.withValues(alpha: 0.18) : AppCultureColors.rewardBorder,
         ),
       ),
       child: Wrap(
-        spacing: 12,
+        spacing: 14,
         runSpacing: 4,
         children: [
           for (final (icon, label, color) in items)
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 15, color: onDark ? Colors.white : color),
-                const SizedBox(width: 4),
+                Icon(icon, size: 16, color: onDark ? Colors.white : color),
+                const SizedBox(width: 5),
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: onDark ? Colors.white : const Color(0xFF78350F),
+                    color: onDark ? Colors.white : AppCultureColors.rewardText,
                   ),
                 ),
               ],
@@ -174,7 +147,67 @@ class TourRewardStrip extends StatelessWidget {
   }
 }
 
-/// Ảnh bìa tour/điểm đến: ảnh thật (nếu có) phủ lớp tối để chữ trên ảnh dễ đọc;
+/// Ảnh giữ chỗ khi tour/điểm đến chưa có ảnh: gradient theo loại hình + icon lớn mờ + icon nhỏ rõ.
+/// Thay cho ô xám trống.
+class TourPlaceholder extends StatelessWidget {
+  final TourStyle style;
+  final double iconSize;
+
+  const TourPlaceholder({super.key, required this.style, this.iconSize = 96});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: style.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            right: -iconSize * 0.15,
+            bottom: -iconSize * 0.2,
+            child: Icon(style.icon, size: iconSize, color: Colors.white.withValues(alpha: 0.14)),
+          ),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), shape: BoxShape.circle),
+              child: Icon(style.icon, size: iconSize * 0.3, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Lớp phủ tối cho chữ đặt trên ảnh: trên trong suốt → đáy tối 75%.
+/// [top] = true thêm dải tối nhẹ phía trên (khi có nhãn/nút ở góc trên).
+class PhotoScrim extends StatelessWidget {
+  final bool top;
+  const PhotoScrim({super.key, this.top = true});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.black.withValues(alpha: top ? 0.28 : 0),
+            Colors.black.withValues(alpha: 0),
+            Colors.black.withValues(alpha: 0.75),
+          ],
+          stops: const [0, 0.4, 1],
+        ),
+      ),
+    );
+  }
+}
+
+/// Ảnh bìa tour/điểm đến: ảnh thật (nếu có) phủ lớp tối để chữ trên ảnh luôn đọc được;
 /// chưa có ảnh hoặc ảnh lỗi thì dùng nền gradient theo loại hình tour.
 class TourCover extends StatelessWidget {
   final String? imageUrl;
@@ -222,21 +255,7 @@ class TourCover extends StatelessWidget {
                 errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
             ),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.25),
-                      Colors.black.withValues(alpha: 0.05),
-                      Colors.black.withValues(alpha: 0.6),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            const Positioned.fill(child: PhotoScrim()),
           ],
           Padding(padding: padding, child: child),
         ],

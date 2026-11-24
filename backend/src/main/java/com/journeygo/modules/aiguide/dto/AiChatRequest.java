@@ -1,8 +1,8 @@
 package com.journeygo.modules.aiguide.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.util.UUID;
@@ -15,8 +15,7 @@ import java.util.UUID;
 @Schema(description = "Yêu cầu trò chuyện với AI Virtual Guide")
 public class AiChatRequest {
 
-    @JsonIgnore
-    @Schema(hidden = true)
+    @Schema(description = "ID phiên trò chuyện muốn tiếp tục (bỏ trống để dùng phiên gần nhất hoặc tạo mới)")
     private UUID sessionId;
 
     @Schema(description = "ID điểm đến du khách đang đứng hoặc quét mã QR", example = "1")
@@ -26,6 +25,7 @@ public class AiChatRequest {
     private Long taskId;
 
     @NotBlank(message = "Câu hỏi của du khách không được để trống")
+    @Size(max = 1000, message = "Câu hỏi không được vượt quá 1000 ký tự")
     @Schema(description = "Nội dung câu hỏi của du khách", example = "Chùa Một Cột được xây dựng từ triều đại nào?")
     private String question;
 }

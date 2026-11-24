@@ -27,6 +27,7 @@ import '../../core/services/api_client.dart';
 import '../../core/services/refund_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/refund_policy.dart';
 
 /// Bằng chứng đính kèm — ảnh hoặc video đã tải lên máy chủ.
 class _EvidenceFile {
@@ -42,7 +43,7 @@ class _EvidenceFile {
 /// Màu hiển thị của tỷ lệ hoàn trong bảng chính sách.
 enum _PolicyTone { success, danger, muted }
 
-/// Một dòng điều kiện trong nhóm lý do (VD: "Hủy trước 3 ngày" → "Hoàn 50%").
+/// Một dòng điều kiện trong nhóm lý do (VD: "Từ 7 ngày trở lên" → "Hoàn 80%").
 class _PolicyLine {
   final String condition;
   final String rateLabel;
@@ -143,45 +144,20 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
 
   // ── Chính sách hoàn tiền ──────────────────────────────────────────────────
 
-  /// Ngày trải nghiệm của booking — mốc để áp cửa sổ no-show 48h.
-  DateTime? get _experienceDate => widget.booking?.experienceDate;
-
-  /// Cửa sổ no-show: khách gửi trong vòng N giờ trước ngày trải nghiệm
-  /// (hoặc không xuất hiện) → nhóm cá nhân không hoàn tiền.
-  bool _isInNoShowWindow(DateTime? date, int hours) {
-    if (date == null || hours <= 0) return false;
-    final startOfExperience = DateTime(date.year, date.month, date.day);
-    final deadline = startOfExperience.subtract(Duration(hours: hours));
-    return DateTime.now().isAfter(deadline);
-  }
-
-  /// Số giờ cửa sổ no-show — lấy từ cấu hình backend (mặc định 48).
-  static const int _noShowWindowHours = 48;
-
-  /// Số giờ "hủy trước N ngày khởi hành" (chính sách: hủy trước 3 ngày).
-  static const int _earlyCancelDays = 3;
-
   /// Một nhóm trong bảng "Chính sách Hoàn Tiền" + các dòng điều kiện bên dưới.
   List<_PolicyGroup> get _policyGroups {
-    final personalZeroed = _isInNoShowWindow(
-      _experienceDate,
-      _noShowWindowHours,
-    );
     return [
       _PolicyGroup(
         title: 'Lỗi từ khách hàng (Hủy tour)',
         icon: Icons.person_outline_rounded,
         lines: [
-          _PolicyLine(
-            'Hủy trước $_earlyCancelDays ngày',
-            'Hoàn 50%',
-            tone: _PolicyTone.success,
-          ),
-          _PolicyLine(
-            'Hủy trong vòng $_noShowWindowHours giờ / Không đến (theo lịch trình)',
-            'Hoàn 0%',
-            tone: personalZeroed ? _PolicyTone.danger : _PolicyTone.muted,
-          ),
+          for (final tier in kPersonalRefundTiers)
+            _PolicyLine(
+              tier.condition,
+              tier.label,
+              // Bậc 0% (không hoàn) dùng màu cảnh báo để khách thấy rõ.
+              tone: tier.rate > 0 ? _PolicyTone.muted : _PolicyTone.danger,
+            ),
         ],
       ),
       _PolicyGroup(
@@ -199,8 +175,10 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
         title: 'Bất khả kháng',
         icon: Icons.thunderstorm_outlined,
         lines: [
+          // ⚠️ Bất khả kháng (thiên tai, dịch bệnh, quy hoạch) → HOÀN 0%,
+          // khớp với cách Admin xử lý.
           _PolicyLine(
-            'Thiên tai, dịch bệnh,...',
+            'Thiên tai, dịch bệnh, quy hoạch...',
             'Hoàn 0%',
             tone: _PolicyTone.muted,
           ),
@@ -617,7 +595,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
       case _PolicyTone.success:
         return AppCultureColors.heritageJade;
       case _PolicyTone.danger:
-        return const Color(0xFFB91C1C);
+        return AppCultureColors.lacquer600;
       case _PolicyTone.muted:
         return AppCultureColors.textMuted;
     }
@@ -712,7 +690,6 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                             line.rateLabel,
                             style: TextStyle(
                               fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
                               color: _policyToneColor(line.tone),
                             ),
                           ),
@@ -799,7 +776,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               style: TextStyle(
                 fontSize: 10.5,
                 color: _summaryController.text.length >= _summaryMax * 0.9
-                    ? const Color(0xFFC98A1B)
+                    ? AppCultureColors.brass500
                     : AppCultureColors.textLight,
               ),
             ),
@@ -850,7 +827,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               style: TextStyle(
                 fontSize: 10.5,
                 color: _detailController.text.length >= _detailMax * 0.9
-                    ? const Color(0xFFC98A1B)
+                    ? AppCultureColors.brass500
                     : AppCultureColors.textLight,
               ),
             ),
@@ -868,7 +845,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        border: Border.all(color: AppCultureColors.lacquer200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -920,9 +897,9 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
+              color: AppCultureColors.lacquer50,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFECACA)),
+              border: Border.all(color: AppCultureColors.lacquer200),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -930,7 +907,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                 const Icon(
                   Icons.receipt_long_rounded,
                   size: 18,
-                  color: Color(0xFF991B1B),
+                  color: AppCultureColors.lacquer700,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -942,7 +919,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF991B1B),
+                          color: AppCultureColors.lacquer700,
                         ),
                       ),
                       const SizedBox(height: 3),
@@ -952,7 +929,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
                         style: TextStyle(
                           fontSize: 11,
                           height: 1.4,
-                          color: Color(0xFF991B1B),
+                          color: AppCultureColors.lacquer700,
                         ),
                       ),
                     ],
@@ -1008,7 +985,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: file.failed
-                  ? const Color(0xFFFECACA)
+                  ? AppCultureColors.lacquer200
                   : AppCultureColors.border,
             ),
           ),
@@ -1056,7 +1033,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFDC2626),
+                color: AppCultureColors.lacquer500,
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(11),
                 ),
@@ -1081,7 +1058,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               width: 22,
               height: 22,
               decoration: const BoxDecoration(
-                color: Color(0xFFDC2626),
+                color: AppCultureColors.lacquer500,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -1324,9 +1301,9 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
+        color: AppCultureColors.lacquer50,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        border: Border.all(color: AppCultureColors.lacquer200),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1342,7 +1319,7 @@ class _RefundFormScreenState extends State<RefundFormScreen> {
               _error,
               style: const TextStyle(
                 fontSize: 12.5,
-                color: Color(0xFF991B1B),
+                color: AppCultureColors.lacquer700,
                 height: 1.35,
               ),
             ),

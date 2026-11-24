@@ -6,6 +6,8 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import StopDrawer, { newKey } from "../stops/StopDrawer";
 import { normalizeQuestion, questionBody } from "../stops/QuestionEditor";
 import { issueFor } from "../../hooks/useTourDraft";
+import { LIMITS } from "../../constants";
+import { newStopQrToken } from "../stops/ExperienceQr";
 
 /* ── Chuyển đổi dữ liệu server <-> form ─────────────────────────────────── */
 
@@ -13,6 +15,10 @@ const stopFromServer = (s) => ({
   _key: `s${s.id}`,
   id: s.id,
   name: s.name || "",
+  latitude: s.latitude ?? null,
+  longitude: s.longitude ?? null,
+  checkInRadiusMeters: s.checkInRadiusMeters ?? LIMITS.STOP_RADIUS_DEFAULT,
+  qrToken: s.qrToken || newStopQrToken(),
   shortDescription: s.shortDescription || "",
   guestNote: s.guestNote || "",
   imageUrl: s.imageUrl || "",
@@ -38,6 +44,8 @@ const stopFromServer = (s) => ({
 
 const emptyStop = () => ({
   _key: newKey(), id: null, name: "", shortDescription: "", guestNote: "", imageUrl: "",
+  // Mã QR check-in trạm sinh ngay để đối tác thấy và in trước khi lưu (backend giữ mã hợp lệ).
+  latitude: null, longitude: null, checkInRadiusMeters: LIMITS.STOP_RADIUS_DEFAULT, qrToken: newStopQrToken(),
   videoUrl: "", videoSource: "YOUTUBE", culturalContent: "", culturalImages: [], artifacts: [],
   // Điểm đến mới chưa có câu hỏi / trải nghiệm nào — đối tác bấm "Thêm" để soạn từng mục.
   quiz: [],
@@ -48,6 +56,10 @@ const stopsBody = (stops) => ({
   stops: stops.map((s) => ({
     id: s.id || null,
     name: s.name,
+    latitude: s.latitude ?? null,
+    longitude: s.longitude ?? null,
+    checkInRadiusMeters: s.checkInRadiusMeters ?? null,
+    qrToken: s.qrToken || null,
     shortDescription: s.shortDescription,
     guestNote: s.guestNote,
     imageUrl: s.imageUrl || null,

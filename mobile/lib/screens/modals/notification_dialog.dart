@@ -30,11 +30,11 @@ const _styles = {
   'REFUND': _CategoryStyle(Icons.currency_exchange_rounded, AppCultureColors.amberDark, AppCultureColors.rewardBg, 'Hoàn tiền'),
   'REWARD': _CategoryStyle(Icons.military_tech_rounded, AppCultureColors.amberDark, AppCultureColors.rewardBg, 'Phần thưởng'),
   'APPROVED': _CategoryStyle(Icons.verified_rounded, AppCultureColors.jadeDark, AppCultureColors.jadeLight, 'Đã duyệt'),
-  'REJECTED': _CategoryStyle(Icons.error_outline_rounded, Color(0xFFDC2626), Color(0xFFFEE2E2), 'Cần xem lại'),
+  'REJECTED': _CategoryStyle(Icons.error_outline_rounded, AppCultureColors.lacquer500, AppCultureColors.lacquer100, 'Cần xem lại'),
   'COMMUNITY': _CategoryStyle(Icons.forum_rounded, AppCultureColors.oceanBlue, AppCultureColors.oceanLight, 'Cộng đồng'),
   'FINANCE': _CategoryStyle(Icons.account_balance_wallet_rounded, AppCultureColors.jadeDark, AppCultureColors.jadeLight, 'Tài chính'),
   'REVIEW': _CategoryStyle(Icons.fact_check_rounded, AppCultureColors.oceanBlue, AppCultureColors.oceanLight, 'Thẩm định'),
-  'CHAT': _CategoryStyle(Icons.chat_bubble_rounded, Color(0xFF7C3AED), Color(0xFFEDE9FE), 'Tin nhắn'),
+  'CHAT': _CategoryStyle(Icons.chat_bubble_rounded, AppCultureColors.indigo500, AppCultureColors.indigo100, 'Tin nhắn'),
 };
 
 const _fallbackStyle =
@@ -198,7 +198,7 @@ class NotificationBellIcon extends StatelessWidget {
                   height: 17,
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE11D48),
+                    color: AppCultureColors.lacquer500,
                     borderRadius: BorderRadius.circular(9),
                     border: Border.all(color: Colors.white, width: 1.5),
                   ),
@@ -257,12 +257,12 @@ class NotificationDialog extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFE4E6),
+                          color: AppCultureColors.lacquer50,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text('${center.unread} mới',
                             style: const TextStyle(
-                                fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFFBE123C))),
+                                fontSize: 11.5, fontWeight: FontWeight.w700, color: AppCultureColors.lacquer600)),
                       ),
                     ],
                     const Spacer(),
@@ -363,7 +363,7 @@ class _NotificationTile extends StatelessWidget {
                             margin: const EdgeInsets.only(left: 6, top: 5),
                             width: 8,
                             height: 8,
-                            decoration: const BoxDecoration(color: Color(0xFFE11D48), shape: BoxShape.circle),
+                            decoration: const BoxDecoration(color: AppCultureColors.lacquer500, shape: BoxShape.circle),
                           ),
                       ],
                     ),

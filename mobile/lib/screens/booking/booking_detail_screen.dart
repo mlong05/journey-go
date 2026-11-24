@@ -13,6 +13,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../common/bright.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/models/refund_model.dart';
 import '../../core/services/api_client.dart';
@@ -590,19 +591,20 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   // ── Hero: mã đơn + trạng thái + tổng tiền ────────────────────────────────
+  /// Thẻ hero sáng: nền trắng → ngọc nhạt, chữ màu mực, tổng tiền màu xanh ngọc đậm.
   Widget _buildHeroHeader(BookingModel booking) {
     final tone = _statusTone(booking.status);
+    const eyebrow = TextStyle(
+      fontSize: 11.5,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 1.0,
+      color: AppCultureColors.textMuted,
+    );
 
-    return Container(
+    return BrightHeroCard(
+      tone: AppTone.jade,
+      radius: 22,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppCultureColors.jadeGradientStart, AppCultureColors.jadeGradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -612,25 +614,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'MÃ ĐƠN',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: Colors.white.withValues(alpha: 0.75),
-                      ),
-                    ),
+                    const Text('MÃ ĐƠN', style: eyebrow),
                     const SizedBox(height: 3),
                     Text(
-                      booking.bookingCode.isEmpty
-                          ? '#${booking.id}'
-                          : booking.bookingCode,
+                      booking.bookingCode.isEmpty ? '#${booking.id}' : booking.bookingCode,
                       style: const TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                         letterSpacing: 0.4,
-                        color: Colors.white,
+                        color: AppCultureColors.textDark,
                       ),
                     ),
                   ],
@@ -646,30 +638,30 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               fontSize: 17,
               height: 1.3,
               fontWeight: FontWeight.w800,
-              color: Colors.white,
+              color: AppCultureColors.textDark,
             ),
           ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
+              color: AppCultureColors.surface,
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTone.jade.soft),
             ),
             child: Row(
               children: [
-                const Icon(Icons.event_available_rounded,
-                    size: 16, color: Colors.white),
-                const SizedBox(width: 8),
+                const IconTile(icon: Icons.event_available_rounded, tone: AppTone.jade, size: 28),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     booking.formattedExperienceDate.isEmpty
                         ? 'Chưa có ngày trải nghiệm'
                         : 'Ngày trải nghiệm: ${booking.formattedExperienceDate}',
                     style: const TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: AppCultureColors.textDark,
                     ),
                   ),
                 ),
@@ -684,22 +676,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'TỔNG TIỀN',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: Colors.white.withValues(alpha: 0.75),
-                      ),
-                    ),
+                    const Text('TỔNG TIỀN', style: eyebrow),
                     const SizedBox(height: 3),
                     Text(
                       booking.formattedTotal,
                       style: const TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AppCultureColors.jadeDark,
+                        letterSpacing: -0.3,
                       ),
                     ),
                   ],
@@ -707,18 +692,18 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               ),
               if (booking.experienceCount > 0)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
+                    color: AppCultureColors.brassTint,
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTone.brass.soft),
                   ),
                   child: Text(
                     '${booking.experienceCount} trải nghiệm',
                     style: const TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: AppCultureColors.brass800,
                     ),
                   ),
                 ),
@@ -727,17 +712,18 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           if (tone.statusHint.isNotEmpty) ...[
             const SizedBox(height: 12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(tone.icon, size: 15, color: Colors.white),
+                Icon(tone.icon, size: 16, color: tone.fg),
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     tone.statusHint,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.35,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.95),
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.4,
+                      fontWeight: FontWeight.w500,
+                      color: AppCultureColors.textMuted,
                     ),
                   ),
                 ),
@@ -1731,14 +1717,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           'Yêu cầu bị từ chối',
           Icons.do_not_disturb_rounded,
           AppCultureColors.error,
-          Color(0xFFFEF2F2),
+          AppCultureColors.lacquer50,
         );
       case 'CANCELLED':
         return const _AuditTone(
           'Yêu cầu đã được hủy',
           Icons.cancel_rounded,
           AppCultureColors.error,
-          Color(0xFFFEF2F2),
+          AppCultureColors.lacquer50,
         );
       case 'VNPAY_REQUEST_SENT':
         return const _AuditTone(
@@ -1822,7 +1808,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         'Đã giải phóng',
         Icons.event_busy_rounded,
         AppCultureColors.error,
-        Color(0xFFFEF2F2),
+        AppCultureColors.lacquer50,
       );
     }
     return const _HoldTone(
@@ -1865,7 +1851,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           'Đã hủy',
           Icons.cancel_rounded,
           AppCultureColors.error,
-          Color(0xFFFEF2F2),
+          AppCultureColors.lacquer50,
           'Đơn đã được hủy và chỗ đã được trả lại.',
         );
       case 'EXPIRED':
@@ -1893,8 +1879,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
+        color: AppCultureColors.surface,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: tone.fg.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2171,7 +2158,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         'Từ chối',
         Icons.do_not_disturb_rounded,
         AppCultureColors.error,
-        Color(0xFFFEF2F2),
+        AppCultureColors.lacquer50,
       );
     }
     return const _AuditTone(

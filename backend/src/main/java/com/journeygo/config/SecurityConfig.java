@@ -69,6 +69,8 @@ public class SecurityConfig {
             "/api/v1/tours/*/public-detail",
             // Số chỗ còn theo ngày — du khách cần xem trước khi đặt (không cần đăng nhập).
             "/api/v1/tours/*/availability",
+            // Lịch khởi hành theo ngày (màn "Xem tour theo ngày") — xem trước khi đăng nhập.
+            "/api/v1/tours/departures",
             // Loại khách & độ tuổi (Admin cấu hình) — trang tạo tour và trang đặt tour cần đọc.
             "/api/v1/guest-types",
             // Master data: public read, admin write

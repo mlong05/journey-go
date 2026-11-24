@@ -3,6 +3,7 @@ package com.journeygo.modules.finance.controller;
 import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.finance.dto.request.CreateCommissionPolicyRequest;
 import com.journeygo.modules.finance.dto.response.CommissionPolicyResponse;
+import com.journeygo.modules.finance.dto.response.CurrentCommissionRateResponse;
 import com.journeygo.modules.finance.service.CommissionPolicyService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,6 +49,29 @@ public class CommissionPolicyController {
     public ResponseEntity<ApiResponse<CommissionPolicyResponse>> current() {
         return ResponseEntity.ok(ApiResponse.success("Lấy chính sách hoa hồng hiện hành thành công",
                 commissionPolicyService.getCurrentEffective()));
+    }
+
+    /**
+     * Tỷ lệ chia lợi nhuận hiện hành — XEM-ONLY cho ĐỐI TÁC.
+     *
+     * <p>⚠️ Endpoint RIÊNG (không dùng chung {@code /current} của Admin) vì:
+     * <ul>
+     *   <li>Admin cần TOÀN BỘ chi tiết (người tạo, lý do đổi, cờ cancelled/future)
+     *       để quản lý; Đối tác KHÔNG cần và KHÔNG nên thấy.</li>
+     *   <li>Giữ {@code /current} là ADMIN-only ⇒ không nới quyền của endpoint quản trị.</li>
+     * </ul>
+     *
+     * <p>⚠️ BR-05 — không áp dụng hồi tố: khoản đã tất toán dùng tỷ lệ chốt tại thời
+     * điểm duyệt ⇒ endpoint này chỉ mang tính THAM KHẢO cho doanh thu mới.
+     */
+    @GetMapping("/current-rate")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN')")
+    @Operation(summary = "Tỷ lệ chia lợi nhuận hiện hành (đối tác xem được)",
+            description = "Xem-only. Trả về tỷ lệ nền tảng thu, tỷ lệ đối tác thực nhận "
+                    + "và khoảng hiệu lực của chính sách. Không áp dụng hồi tố cho các khoản đã tất toán.")
+    public ResponseEntity<ApiResponse<CurrentCommissionRateResponse>> currentRate() {
+        return ResponseEntity.ok(ApiResponse.success("Lấy tỷ lệ chia lợi nhuận hiện hành thành công",
+                commissionPolicyService.getCurrentRateForProvider()));
     }
 
     @GetMapping("/{policyId}")

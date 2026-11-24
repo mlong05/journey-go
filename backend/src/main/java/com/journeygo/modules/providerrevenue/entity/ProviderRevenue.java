@@ -12,7 +12,6 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.YearMonth;
 
 /**
  * ProviderProfile Revenue — bản ghi doanh thu của ProviderProfile phát sinh từ một Booking.
@@ -65,8 +64,15 @@ public class ProviderRevenue {
     @JoinColumn(name = "payment_id", nullable = false)
     private Payment payment;
 
-    /** Kỳ doanh thu — tháng hoàn thành trải nghiệm (yyyy-MM). */
-    @Column(name = "revenue_period", nullable = false, length = 7)
+    /**
+     * Kỳ doanh thu — CHU KỲ 10 NGÀY trong tháng hoàn thành trải nghiệm.
+     *
+     * <p>Định dạng {@code yyyy-MM-D}: {@code 2026-10-1} = 01/10 → 10/10/2026,
+     * {@code 2026-10-2} = 11/10 → 20/10/2026, {@code 2026-10-3} = 21/10 → 31/10/2026.
+     *
+     * @see com.journeygo.modules.settlement.entity.SettlementPeriod
+     */
+    @Column(name = "revenue_period", nullable = false, length = 10)
     private String revenuePeriod;
 
     /** Ngày hoàn thành trải nghiệm — căn cứ xác định kỳ doanh thu. */
@@ -240,9 +246,12 @@ public class ProviderRevenue {
         this.status = ProviderRevenueStatus.ELIGIBLE;
     }
 
-    /** Tạo kỳ doanh thu từ ngày hoàn thành trải nghiệm. */
+    /**
+     * Tạo kỳ doanh thu từ ngày hoàn thành trải nghiệm — theo CHU KỲ 10 NGÀY.
+     *
+     * @see com.journeygo.modules.settlement.entity.SettlementPeriod
+     */
     public static String periodOf(LocalDate completedDate) {
-        YearMonth ym = YearMonth.of(completedDate.getYear(), completedDate.getMonth());
-        return String.format("%04d-%02d", ym.getYear(), ym.getMonthValue());
+        return com.journeygo.modules.settlement.entity.SettlementPeriod.of(completedDate).toPeriodString();
     }
 }

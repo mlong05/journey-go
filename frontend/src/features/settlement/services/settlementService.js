@@ -18,8 +18,11 @@
  *  • GET  /wallets/provider-profile/{providerProfileId}/transactions
  *
  * ── Luật nghiệp vụ ──
- *  • Kỳ doanh thu là THÁNG DƯƠNG LỊCH đã đóng (`YYYY-MM`). Backend từ chối tạo settlement
+ *  • Kỳ doanh thu là CHU KỲ 10 NGÀY đã đóng (`YYYY-MM-D`, D = 1|2|3):
+ *    K1 = 01→10, K2 = 11→20, K3 = 21→cuối tháng. Backend từ chối tạo settlement
  *    cho kỳ chưa kết thúc (`SETTLEMENT_PERIOD_NOT_CLOSED`).
+ *  • Hệ thống TỰ ĐỘNG tạo bản nháp đợt khi kỳ vừa kết thúc ⇒ Admin chỉ việc
+ *    xem xét rồi duyệt (nút "Tạo đợt" chỉ cần khi muốn tạo thủ công).
  *  • `POST /settlements` KHÔNG nhận danh sách revenueId — backend tự lấy các khoản ELIGIBLE
  *    của đối tác trong kỳ và chuyển chúng sang IN_SETTLEMENT.
  *  • Duyệt settlement ghi tiền vào ví trong CÙNG một transaction (nguyên tử).
@@ -54,6 +57,21 @@ export async function createSettlement({ providerProfileId, revenuePeriod, note 
 export async function getBatchSettlementCandidates(revenuePeriod) {
   const query = new URLSearchParams({ revenuePeriod: String(revenuePeriod) });
   const res = await apiClient.get(`${ENDPOINT}/batch/candidates?${query.toString()}`);
+  return res?.data ?? res;
+}
+
+/**
+ * Khoản doanh thu BỊ GIỮ LẠI của một kỳ — chưa đủ điều kiện nên không vào đợt.
+ *
+ * Dùng cho modal "Chi tiết đợt tất toán": khi đợt được hệ thống TỰ ĐỘNG tạo, Admin
+ * cần thấy được những gì đang bị đọng trong chính kỳ đó.
+ *
+ * Các khoản này KHÔNG bị mất — khi kỳ kế tiếp đóng, hệ thống xét lại chúng:
+ * đủ điều kiện thì vào đợt kỳ sau (và được trả tiền), chưa đủ thì giữ lại tiếp.
+ */
+export async function getBatchSettlementHeldItems(revenuePeriod) {
+  const query = new URLSearchParams({ revenuePeriod: String(revenuePeriod) });
+  const res = await apiClient.get(`${ENDPOINT}/batch/held?${query.toString()}`);
   return res?.data ?? res;
 }
 

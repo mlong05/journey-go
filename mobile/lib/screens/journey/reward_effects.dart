@@ -78,14 +78,12 @@ class _PointsBurstState extends State<_PointsBurst>
                         ),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
+                            colors: [AppCultureColors.brass200, AppCultureColors.brass300],
                           ),
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(
-                                0xFFF59E0B,
-                              ).withValues(alpha: 0.45),
+                              color: AppCultureColors.brass500.withValues(alpha: 0.4),
                               blurRadius: 24,
                               offset: const Offset(0, 8),
                             ),
@@ -94,12 +92,12 @@ class _PointsBurstState extends State<_PointsBurst>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(widget.icon, color: Colors.white, size: 26),
+                            Icon(widget.icon, color: AppCultureColors.brass800, size: 26),
                             const SizedBox(width: 8),
                             Text(
                               widget.text,
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppCultureColors.brass900,
                                 fontSize: 22,
                                 fontWeight: FontWeight.w700,
                                 decoration: TextDecoration.none,
@@ -130,7 +128,7 @@ class _PointsBurstState extends State<_PointsBurst>
         child: Icon(
           Icons.star_rounded,
           size: i.isEven ? 18 : 12,
-          color: const Color(0xFFFCD34D),
+          color: AppCultureColors.brass300,
         ),
       ),
     );
@@ -150,7 +148,7 @@ Future<void> showBadgeUnlock(
     context: context,
     barrierDismissible: false,
     barrierLabel: 'Mở khóa huy hiệu',
-    barrierColor: const Color(0xE60B1220),
+    barrierColor: const Color(0xF5FFFBF2), // giấy sáng 96%
     transitionDuration: const Duration(milliseconds: 250),
     transitionBuilder: (ctx, anim, _, child) =>
         FadeTransition(opacity: anim, child: child),
@@ -213,10 +211,10 @@ class _BadgeUnlockViewState extends State<_BadgeUnlockView>
       height: 168,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFFCD34D), width: 5),
+        border: Border.all(color: AppCultureColors.brass300, width: 5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFBBF24).withValues(alpha: 0.6),
+            color: AppCultureColors.brass400.withValues(alpha: 0.6),
             blurRadius: 40,
             spreadRadius: 4,
           ),
@@ -259,7 +257,7 @@ class _BadgeUnlockViewState extends State<_BadgeUnlockView>
                   child: const Text(
                     'Mở khóa huy hiệu mới',
                     style: TextStyle(
-                      color: Color(0xFFFCD34D),
+                      color: AppCultureColors.brass800,
                       fontSize: 13,
                       letterSpacing: 0.2,
                       fontWeight: FontWeight.w700,
@@ -308,7 +306,7 @@ class _BadgeUnlockViewState extends State<_BadgeUnlockView>
                             widget.badgeName,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: AppCultureColors.textDark,
                               fontSize: 24,
                               height: 1.25,
                               fontWeight: FontWeight.w700,
@@ -319,7 +317,7 @@ class _BadgeUnlockViewState extends State<_BadgeUnlockView>
                             widget.subtitle,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
-                              color: Colors.white70,
+                              color: AppCultureColors.textMuted,
                               fontSize: 14,
                               height: 1.5,
                             ),
@@ -339,9 +337,9 @@ class _BadgeUnlockViewState extends State<_BadgeUnlockView>
                           ? null
                           : () => Navigator.of(context).pop(),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFF59E0B),
+                        backgroundColor: AppCultureColors.heritageJade,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: const Color(0xFFF59E0B),
+                        disabledBackgroundColor: AppCultureColors.heritageJade,
                         disabledForegroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(54),
                         shape: RoundedRectangleBorder(
@@ -380,7 +378,7 @@ class _BadgeUnlockViewState extends State<_BadgeUnlockView>
         child: Icon(
           Icons.auto_awesome,
           size: i.isEven ? 18 : 12,
-          color: const Color(0xFFFDE68A),
+          color: i.isEven ? AppCultureColors.brass500 : AppCultureColors.coral,
         ),
       ),
     );
@@ -396,8 +394,8 @@ class _RaysPainter extends CustomPainter {
     final paint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFFFCD34D).withValues(alpha: 0.55),
-          const Color(0x00FCD34D),
+          AppCultureColors.brass300.withValues(alpha: 0.6),
+          AppCultureColors.brass300.withValues(alpha: 0),
         ],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     const rays = 12;

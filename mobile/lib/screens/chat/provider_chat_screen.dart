@@ -58,6 +58,13 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
   bool _sending = false;
   String _error = '';
 
+  // ⚠️ PHÂN TRANG KIỂU "CUỘN LÊN ĐỂ LOAD THÊM":
+  //  • Mở màn ⇒ chỉ tải 10 tin MỚI NHẤT, tự cuộn xuống cuối (thấy ngay tin mới).
+  //  • Cuộn lên gần đầu ⇒ tự nối thêm tin CŨ hơn.
+  bool _loadingMore = false;
+  bool _hasMore = false;
+  int? _nextCursor;
+
   StreamSubscription<RealtimeEvent>? _realtimeSub;
 
   @override
@@ -65,6 +72,14 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
     super.initState();
     _load();
     _listenRealtime();
+    // Cuộn lên gần đầu ⇒ nạp thêm tin nhắn cũ.
+    _scroll.addListener(_onScroll);
+  }
+
+  /// Người dùng cuộn lên gần đầu ⇒ tải trang tin nhắn cũ hơn.
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    if (_scroll.position.pixels < 80) _loadMore();
   }
 
   /// Nghe tin nhắn mới tới tức thì (WebSocket) ⇒ hiện ngay trong khung chat.
@@ -80,11 +95,15 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
       if (raw == null) return;
       final message = ProviderMessageModel.fromJson(raw);
       if (!mounted) return;
+      // ⚠️ Chỉ cuộn xuống cuối nếu người dùng ĐANG ở đáy (đang đọc lịch sử cũ
+      // thì không bị cưỡng ép kéo xuống).
+      final wasAtBottom = !_scroll.hasClients ||
+          _scroll.position.pixels >= _scroll.position.maxScrollExtent - 40;
       setState(() {
         if (_messages.any((m) => m.id == message.id)) return;
         _messages = [..._messages, message];
       });
-      _scrollToBottom();
+      if (wasAtBottom) _scrollToBottom();
     });
   }
 
@@ -112,12 +131,15 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
         tourId: widget.tourId,
         providerId: widget.providerId,
       );
-      final messages = await _service.getMessages(conversation.id);
+      // Chỉ tải 10 tin MỚI NHẤT ⇒ mở màn không phải tải cả lịch sử.
+      final page = await _service.getMessagesPage(conversation.id);
 
       if (!mounted) return;
       setState(() {
         _conversation = conversation;
-        _messages = messages;
+        _messages = page.items;
+        _hasMore = page.hasMore;
+        _nextCursor = page.nextCursor;
         _loading = false;
       });
       _scrollToBottom();
@@ -133,6 +155,52 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
         _error = 'Không thể mở cuộc trò chuyện.';
         _loading = false;
       });
+    }
+  }
+
+  /// Tải thêm tin nhắn CŨ hơn (nối vào ĐẦU danh sách).
+  Future<void> _loadMore() async {
+    final conversation = _conversation;
+    final cursor = _nextCursor;
+    if (conversation == null || cursor == null) return;
+    if (_loadingMore || !_hasMore) return;
+
+    setState(() => _loadingMore = true);
+    // Ghi lại chiều cao & vị trí cuộn TRƯỚC khi nối tin cũ ⇒ sau khi nối xong
+    // khôi phục lại ⇒ người dùng không bị "nhảy" mất chỗ đang đọc.
+    final prevMax = _scroll.hasClients ? _scroll.position.maxScrollExtent : 0.0;
+    final prevPixels = _scroll.hasClients ? _scroll.position.pixels : 0.0;
+
+    try {
+      final page = await _service.getMessagesPage(
+        conversation.id,
+        beforeId: cursor,
+      );
+      if (!mounted) return;
+      setState(() {
+        // Tránh trùng tin (phòng trường hợp cursor trùng với tin cuối cùng).
+        final existing = _messages.map((m) => m.id).toSet();
+        final older = page.items.where((m) => !existing.contains(m.id)).toList();
+        _messages = [...older, ..._messages];
+        _hasMore = page.hasMore;
+        _nextCursor = page.nextCursor;
+        _loadingMore = false;
+      });
+      // Khôi phục vị trí cuộn (giữ nguyên tin đang đọc).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scroll.hasClients) return;
+        final delta = _scroll.position.maxScrollExtent - prevMax;
+        if (delta > 0) _scroll.jumpTo(prevPixels + delta);
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), behavior: SnackBarBehavior.floating),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
     }
   }
 
@@ -319,11 +387,54 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
       );
     }
 
+    // ⚠️ itemCount + 1: hàng đầu là nút "Xem tin nhắn cũ hơn" / dòng "đã xem hết".
+    final headerCount = _messages.isEmpty ? 0 : 1;
     return ListView.builder(
       controller: _scroll,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-      itemCount: _messages.length,
-      itemBuilder: (_, i) => _buildBubble(_messages[i]),
+      itemCount: _messages.length + headerCount,
+      itemBuilder: (_, i) {
+        if (i == 0) return _buildHistoryHeader();
+        return _buildBubble(_messages[i - 1]);
+      },
+    );
+  }
+
+  /// Đầu danh sách: nút load thêm lịch sử cũ / dòng "đã xem hết lịch sử".
+  Widget _buildHistoryHeader() {
+    if (_hasMore) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Center(
+          child: _loadingMore
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppCultureColors.heritageJade,
+                  ),
+                )
+              : TextButton.icon(
+                  onPressed: _loadMore,
+                  icon: const Icon(Icons.expand_less_rounded, size: 18),
+                  label: const Text('Xem tin nhắn cũ hơn'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppCultureColors.textMuted,
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Center(
+        child: Text(
+          'Bạn đã xem hết lịch sử tin nhắn',
+          style: TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
+        ),
+      ),
     );
   }
 
@@ -364,7 +475,7 @@ class _ProviderChatScreenState extends State<ProviderChatScreen> {
               m.timeLabel,
               style: TextStyle(
                 fontSize: 10.5,
-                color: mine ? Colors.white70 : AppCultureColors.textLight,
+                color: mine ? AppCultureColors.onDarkMuted : AppCultureColors.textLight,
               ),
             ),
           ],

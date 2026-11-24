@@ -953,7 +953,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF00A86B), Color(0xFF0288D1)],
+              colors: [AppCultureColors.jade400, AppCultureColors.indigo500],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -983,7 +983,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Colors.white70,
+                            color: AppCultureColors.onDarkMuted,
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1,
@@ -1230,9 +1230,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
+              color: AppCultureColors.lacquer50,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFFECACA)),
+              border: Border.all(color: AppCultureColors.lacquer200),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1245,7 +1245,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     _error,
                     style: const TextStyle(
                       fontSize: 12.5,
-                      color: Color(0xFF991B1B),
+                      color: AppCultureColors.lacquer700,
                       height: 1.35,
                     ),
                   ),

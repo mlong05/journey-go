@@ -146,6 +146,52 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
     boolean existsByTour_TourIdAndTourist_IdAndStatusIn(Long tourId, Long touristId, List<BookingStatus> statuses);
 
     /**
+     * Đơn ĐÃ THANH TOÁN mà CHƯA ĐI XONG — còn chặn đặt lại tour.
+     *
+     * <p>⚠️ Loại đơn có {@code experienceDate < today}: tour đã đi xong (backend chưa
+     * kịp đánh dấu {@code COMPLETED}) ⇒ KHÔNG chặn đặt lại, du khách muốn thì đặt
+     * tiếp tour đó cho lần sau. Khớp với {@code blocksRebook} ở frontend.
+     *
+     * @param tourId    ID tour
+     * @param touristId ID du khách
+     * @param today     ngày hôm nay (giờ Việt Nam)
+     */
+    @Query("""
+            SELECT COUNT(b) > 0 FROM Booking b
+            WHERE b.tour.tourId = :tourId
+              AND b.tourist.id = :touristId
+              AND b.status = com.journeygo.modules.booking.entity.enums.BookingStatus.CONFIRMED
+              AND b.experienceDate >= :today
+            """)
+    boolean existsActiveConfirmedBooking(@Param("tourId") Long tourId,
+                                        @Param("touristId") Long touristId,
+                                        @Param("today") LocalDate today);
+
+    /** Đơn của du khách đang giữ chỗ (chờ thanh toán, còn hạn), mới nhất trước. */
+    @EntityGraph(attributePaths = {"tour"})
+    @Query("""
+            SELECT b FROM Booking b
+            WHERE b.tourist.id = :touristId
+              AND b.status = com.journeygo.modules.booking.entity.enums.BookingStatus.PENDING_PAYMENT
+              AND b.paymentDeadline > :now
+            ORDER BY b.createdAt DESC
+            """)
+    List<Booking> findActivePendingByTourist(@Param("touristId") Long touristId, @Param("now") Instant now);
+
+    /** Như {@link #findActivePendingByTourist} nhưng chỉ của một tour. */
+    @EntityGraph(attributePaths = {"tour"})
+    @Query("""
+            SELECT b FROM Booking b
+            WHERE b.tourist.id = :touristId
+              AND b.tour.tourId = :tourId
+              AND b.status = com.journeygo.modules.booking.entity.enums.BookingStatus.PENDING_PAYMENT
+              AND b.paymentDeadline > :now
+            ORDER BY b.createdAt DESC
+            """)
+    List<Booking> findActivePendingByTouristAndTour(@Param("touristId") Long touristId, @Param("tourId") Long tourId,
+                                                    @Param("now") Instant now);
+
+    /**
      * Booking ĐÃ THANH TOÁN của du khách cho một tour (CONFIRMED / COMPLETED).
      *
      * <p>Dùng cho logic "tour đã mua rồi thì không thể đặt lại" — cần biết đơn đó

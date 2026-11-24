@@ -20,13 +20,14 @@ import java.util.List;
 
 /**
  * Service kết nối trực tiếp đến Google Gemini REST API để tính toán vector nhúng (Embedding).
- * Mặc định sử dụng model text-embedding-004 với 768 chiều.
+ * Mặc định sử dụng model gemini-embedding-001 với 768 chiều.
  */
 @Service
 @Slf4j
 public class GeminiEmbeddingClient implements AiEmbeddingService {
 
     private static final int MAX_BATCH_SIZE = 50;
+    private static final int VECTOR_DIMENSION = 768;
 
     private final GeminiAiProperties properties;
     private final RestClient restClient;
@@ -43,7 +44,7 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
     @Override
     public float[] embed(String text) {
         if (!StringUtils.hasText(text)) {
-            return new float[768];
+            return new float[VECTOR_DIMENSION];
         }
 
         // Hỗ trợ chế độ mock khi chạy test hoặc local dev chưa có key
@@ -54,14 +55,13 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
 
         validateApiKey();
 
-        String url = String.format("%s/models/%s:embedContent?key=%s",
+        String url = String.format("%s/models/%s:embedContent",
                 properties.getBaseUrl(),
-                properties.getEmbeddingModel(),
-                properties.getApiKey());
+                properties.getEmbeddingModel());
 
         ObjectNode requestBody = objectMapper.createObjectNode();
         requestBody.put("model", "models/" + properties.getEmbeddingModel());
-        requestBody.put("outputDimensionality", 768);
+        requestBody.put("outputDimensionality", VECTOR_DIMENSION);
         ObjectNode content = requestBody.putObject("content");
         ArrayNode parts = content.putArray("parts");
         parts.addObject().put("text", text);
@@ -69,6 +69,7 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
         try {
             JsonNode response = restClient.post()
                     .uri(url)
+                    .header("x-goog-api-key", properties.getApiKey())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(requestBody.toString())
                     .retrieve()
@@ -80,9 +81,11 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
 
             JsonNode valuesNode = response.path("embedding").path("values");
             return parseValuesNode(valuesNode);
+        } catch (AppException ex) {
+            throw ex;
         } catch (RestClientResponseException ex) {
             log.error("Lỗi gọi Gemini embedContent API [status={}]: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            throw new AppException(ErrorCode.AI_EMBEDDING_FAILED, "Lỗi từ Gemini Embedding API: " + ex.getMessage());
+            throw new AppException(ErrorCode.AI_EMBEDDING_FAILED, "Lỗi từ Gemini Embedding API: " + ex.getStatusCode());
         } catch (Exception ex) {
             log.error("Lỗi không xác định khi tạo embedding từ Gemini", ex);
             throw new AppException(ErrorCode.AI_EMBEDDING_FAILED, "Lỗi tạo embedding: " + ex.getMessage());
@@ -114,10 +117,9 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
     }
 
     private List<float[]> callBatchEmbedContents(List<String> texts) {
-        String url = String.format("%s/models/%s:batchEmbedContents?key=%s",
+        String url = String.format("%s/models/%s:batchEmbedContents",
                 properties.getBaseUrl(),
-                properties.getEmbeddingModel(),
-                properties.getApiKey());
+                properties.getEmbeddingModel());
 
         ObjectNode requestBody = objectMapper.createObjectNode();
         ArrayNode requestsArray = requestBody.putArray("requests");
@@ -125,7 +127,7 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
         for (String text : texts) {
             ObjectNode item = requestsArray.addObject();
             item.put("model", "models/" + properties.getEmbeddingModel());
-            item.put("outputDimensionality", 768);
+            item.put("outputDimensionality", VECTOR_DIMENSION);
             ObjectNode content = item.putObject("content");
             ArrayNode parts = content.putArray("parts");
             parts.addObject().put("text", text != null ? text : "");
@@ -134,6 +136,7 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
         try {
             JsonNode response = restClient.post()
                     .uri(url)
+                    .header("x-goog-api-key", properties.getApiKey())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(requestBody.toString())
                     .retrieve()
@@ -149,9 +152,11 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
                 result.add(parseValuesNode(itemNode.path("values")));
             }
             return result;
+        } catch (AppException ex) {
+            throw ex;
         } catch (RestClientResponseException ex) {
             log.error("Lỗi gọi Gemini batchEmbedContents API [status={}]: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            throw new AppException(ErrorCode.AI_EMBEDDING_FAILED, "Lỗi từ Gemini Batch Embedding API: " + ex.getMessage());
+            throw new AppException(ErrorCode.AI_EMBEDDING_FAILED, "Lỗi từ Gemini Batch Embedding API: " + ex.getStatusCode());
         } catch (Exception ex) {
             log.error("Lỗi không xác định khi batch embedding từ Gemini", ex);
             throw new AppException(ErrorCode.AI_EMBEDDING_FAILED, "Lỗi tạo batch embedding: " + ex.getMessage());
@@ -160,7 +165,7 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
 
     private float[] parseValuesNode(JsonNode valuesNode) {
         if (!valuesNode.isArray()) {
-            return new float[768];
+            return new float[VECTOR_DIMENSION];
         }
         float[] vector = new float[valuesNode.size()];
         for (int i = 0; i < valuesNode.size(); i++) {
@@ -177,10 +182,34 @@ public class GeminiEmbeddingClient implements AiEmbeddingService {
     }
 
     private float[] generateMockVector(String text) {
-        float[] vector = new float[768];
-        int hash = text != null ? text.hashCode() : 0;
-        for (int i = 0; i < 768; i++) {
-            vector[i] = (float) (Math.sin(hash + i) * 0.05);
+        float[] vector = new float[VECTOR_DIMENSION];
+        if (StringUtils.hasText(text)) {
+            String[] tokens = text.toLowerCase(java.util.Locale.ROOT).split("[\\s\\p{Punct}]+");
+            for (String token : tokens) {
+                if (token.isEmpty()) {
+                    continue;
+                }
+                int bucket = Math.floorMod(token.hashCode(), VECTOR_DIMENSION);
+                vector[bucket] += 1.0f;
+            }
+        }
+
+        double normSq = 0.0;
+        for (float v : vector) {
+            normSq += v * v;
+        }
+
+        if (normSq == 0.0) {
+            int hash = text != null ? text.hashCode() : 0;
+            for (int i = 0; i < VECTOR_DIMENSION; i++) {
+                vector[i] = (float) Math.sin(hash + i);
+                normSq += vector[i] * vector[i];
+            }
+        }
+
+        float invNorm = (float) (1.0 / Math.sqrt(normSq));
+        for (int i = 0; i < VECTOR_DIMENSION; i++) {
+            vector[i] *= invNorm;
         }
         return vector;
     }
