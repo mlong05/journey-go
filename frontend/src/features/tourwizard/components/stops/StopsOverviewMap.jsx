@@ -11,8 +11,13 @@ const validPoint = (e) =>
   e && e.checkpointLatitude != null && e.checkpointLongitude != null
   && Number.isFinite(Number(e.checkpointLatitude)) && Number.isFinite(Number(e.checkpointLongitude));
 
-/** Vị trí đại diện của điểm đến = checkpoint của trải nghiệm đầu tiên có tọa độ. */
+/** Vị trí của điểm đến = vị trí check-in trạm; tour cũ chưa có thì lấy checkpoint đầu tiên có tọa độ. */
 export function stopLocation(stop) {
+  const lat = Number(stop?.latitude);
+  const lng = Number(stop?.longitude);
+  if (stop?.latitude != null && stop?.longitude != null && Number.isFinite(lat) && Number.isFinite(lng)) {
+    return { lat, lng };
+  }
   const e = (stop?.experiences || []).find(validPoint);
   return e ? { lat: Number(e.checkpointLatitude), lng: Number(e.checkpointLongitude) } : null;
 }

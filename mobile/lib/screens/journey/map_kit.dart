@@ -15,7 +15,7 @@ import '../../core/services/goong_map_style.dart';
 //  - Vệ tinh: ảnh vệ tinh Goong (satellite.goong.io) + lớp tên địa danh của style goong_satellite.
 // Đã bỏ hẳn ảnh nền Esri (nặng, tải chậm). Trong lúc style Goong đang tải, bản đồ chỉ hiện màu nền.
 
-const mapBackground = Color(0xFFEFF3F1);
+const mapBackground = AppCultureColors.jade50;
 
 /// Lớp nền bản đồ (Goong). Chưa có khóa Goong thì không có lớp nền — chỉ hiện màu [mapBackground].
 List<Widget> baseTileLayers({required bool satellite}) {

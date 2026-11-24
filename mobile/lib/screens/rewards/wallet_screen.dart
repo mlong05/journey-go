@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/gamification_model.dart';
 import '../../core/services/gamification_service.dart';
+import '../common/bright.dart';
+import '../common/heritage_motion.dart' show CountUpText;
 import 'achievements_screen.dart';
 import 'my_vouchers_screen.dart';
 import 'rewards_widgets.dart';
@@ -188,56 +190,33 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
+  /// Thẻ số dư sáng (nhóm vàng = điểm): số lớn màu đồng thau đậm, hai ô tích lũy / đã tiêu.
   Widget _buildBalanceCard() {
     final p = _points;
-    return Container(
+    return BrightHeroCard(
+      tone: AppTone.brass,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            AppCultureColors.jadeGradientStart,
-            AppCultureColors.jadeGradientEnd,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppCultureColors.heritageJade.withValues(alpha: 0.28),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'Số dư hiện tại',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(color: AppCultureColors.textMuted, fontSize: 13.5, fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Icon(
-                Icons.star_rounded,
-                color: Colors.amberAccent,
-                size: 30,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                formatThousands(p?.currentBalance ?? 0),
+              const IconTile(icon: Icons.star_rounded, tone: AppTone.brass, size: 40),
+              const SizedBox(width: 10),
+              CountUpText(
+                value: p?.currentBalance ?? 0,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppCultureColors.brass800,
                   fontSize: 38,
                   height: 1,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(width: 6),
@@ -245,50 +224,37 @@ class _WalletScreenState extends State<WalletScreen> {
                 padding: EdgeInsets.only(bottom: 4),
                 child: Text(
                   'điểm',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                  style: TextStyle(color: AppCultureColors.brass800, fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _statCell('Đã tích lũy', p?.lifetimeEarned ?? 0),
+          Row(
+            children: [
+              Expanded(
+                child: StatTile(
+                  icon: Icons.trending_up_rounded,
+                  tone: AppTone.jade,
+                  value: p?.lifetimeEarned ?? 0,
+                  label: 'Đã tích lũy',
+                  compact: true,
                 ),
-                Container(width: 1, height: 28, color: Colors.white24),
-                Expanded(child: _statCell('Đã tiêu', p?.lifetimeSpent ?? 0)),
-              ],
-            ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: StatTile(
+                  icon: Icons.shopping_bag_outlined,
+                  tone: AppTone.coral,
+                  value: p?.lifetimeSpent ?? 0,
+                  label: 'Đã tiêu',
+                  compact: true,
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
-
-  Widget _statCell(String label, int value) {
-    return Column(
-      children: [
-        Text(
-          formatThousands(value),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70, fontSize: 11.5),
-        ),
-      ],
     );
   }
 

@@ -378,13 +378,20 @@ public class FlywayConfig {
      * version tạm (V41 = settlement batch scope, V42 = payment expiry index). Sau khi merge vào
      * {@code main}, số version bị đánh lại cho khớp với các migration đã có trên main:
      * <pre>
-     *   DB cũ (đã chạy)          →  Mã nguồn hiện tại (main)
-     *   V41 settlement batch scope → V43 settlement batch scope
-     *   V42 payment expiry index   → V44 payment expiry index
-     *   V41 achievement system     → V41 achievement system   (mới)
-     *   V42 guest type pricing     → V42 guest type pricing   (mới)
+     *   DB cũ (đã chạy)              →  Mã nguồn hiện tại (main)
+     *   V41 settlement batch scope   → V43 settlement batch scope
+     *   V42 payment expiry index     → V44 payment expiry index
+     *   V43 ai knowledge documents   → V47 ai knowledge documents
+     *   V44 ai chat human handoff    → V48 ai chat human handoff
+     *   V47 refund personal 3 bậc    → V50 refund personal 3 bậc
+     *   V48 refund personal mô tả    → V51 refund personal mô tả
+     *   V49 settlement ten day cycle → V52 settlement ten day cycle
+     *   V50 settlement strict period → V53 settlement strict period
+     *   V51 settlement cleanup       → V54 settlement cleanup
+     *   V41 achievement system       → V41 achievement system   (mới)
+     *   V42 guest type pricing       → V42 guest type pricing   (mới)
      * </pre>
-     * ⇒ Flyway validate fail: "Migration checksum mismatch for migration version 41 / 42"
+     * ⇒ Flyway validate fail: "Migration checksum mismatch for migration version 41 / 42 / 43 / 44"
      * ⇒ {@code flywayInitializer} chết ⇒ {@code entityManagerFactory} không tạo được ⇒
      * ứng dụng không khởi động được ("Unable to start embedded Tomcat").
      *
@@ -404,11 +411,24 @@ public class FlywayConfig {
                     DELETE FROM flyway_schema_history
                     WHERE (version = '41' AND description = 'settlement batch scope')
                        OR (version = '42' AND description = 'payment expiry index')
+                       OR (version = '43' AND description = 'ai knowledge documents')
+                       OR (version = '44' AND description = 'ai chat human handoff')
+                       OR (version = '47' AND description = 'refund personal three tier policy')
+                       OR (version = '48' AND description = 'refund personal short description')
+                       OR (version = '49' AND description = 'settlement ten day cycle')
+                       OR (version = '50' AND description = 'settlement strict period and recreate')
+                       OR (version = '51' AND description = 'settlement cleanup rejected details')
                     """)) {
                 int removed = ps.executeUpdate();
                 if (removed > 0) {
                     log.warn("[Flyway] Đã xóa {} dòng lịch sử của migration đã đổi số phiên bản "
-                            + "(V41 settlement batch scope → V43, V42 payment expiry index → V44); "
+                            + "(V41 settlement batch scope → V43, V42 payment expiry index → V44, "
+                            + "V43 ai knowledge documents → V47, V44 ai chat human handoff → V48, "
+                            + "V47 refund personal three tier policy → V50, "
+                            + "V48 refund personal short description → V51, "
+                            + "V49 settlement ten day cycle → V52, "
+                            + "V50 settlement strict period and recreate → V53, "
+                            + "V51 settlement cleanup rejected details → V54); "
                             + "chúng sẽ được chạy lại với số mới.", removed);
                 }
             }

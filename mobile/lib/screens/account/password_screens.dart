@@ -8,7 +8,7 @@ import '../common/heritage_motion.dart';
 
 // Khôi phục mật khẩu bằng mã OTP qua email, và đổi mật khẩu khi đang đăng nhập.
 
-/// Đầu trang kiểu di sản: nền ngọc, hoa văn trống đồng xoay chậm, tiêu đề ánh vàng.
+/// Đầu trang sáng: nền trắng → ngọc nhạt, hoa văn trống đồng rất nhạt, chữ màu mực.
 class _HeritageHeader extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -23,18 +23,19 @@ class _HeritageHeader extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppCultureColors.jadeDark, AppCultureColors.oceanBlue],
+          colors: [AppCultureColors.surface, AppCultureColors.jadeTint],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+        border: Border(bottom: BorderSide(color: Color(0xFFBBEBD4))),
       ),
       child: Stack(
         children: [
           Positioned(
             right: -60,
             top: top - 30,
-            child: SlowSpin(child: DrumMotif(size: 210, color: Colors.white.withValues(alpha: 0.1))),
+            child: SlowSpin(child: DrumMotif(size: 210, color: AppCultureColors.heritageJade.withValues(alpha: 0.07))),
           ),
           Padding(
             padding: EdgeInsets.fromLTRB(8, top + 4, 20, 26),
@@ -43,7 +44,7 @@ class _HeritageHeader extends StatelessWidget {
               children: [
                 IconButton(
                   onPressed: () => Navigator.of(context).maybePop(),
-                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  icon: const Icon(Icons.arrow_back_rounded, color: AppCultureColors.textDark),
                   tooltip: 'Quay lại',
                 ),
                 const SizedBox(height: 6),
@@ -54,10 +55,11 @@ class _HeritageHeader extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.16),
+                          color: AppCultureColors.surface,
                           borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFBBEBD4)),
                         ),
-                        child: Icon(icon, color: Colors.white, size: 24),
+                        child: Icon(icon, color: AppCultureColors.heritageJade, size: 24),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -66,12 +68,12 @@ class _HeritageHeader extends StatelessWidget {
                           children: [
                             ShimmerText(
                               title,
-                              style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700, color: Colors.white),
+                              style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
                             ),
                             const SizedBox(height: 3),
                             Text(
                               subtitle,
-                              style: TextStyle(fontSize: 13, height: 1.4, color: Colors.white.withValues(alpha: 0.88)),
+                              style: const TextStyle(fontSize: 13, height: 1.4, color: AppCultureColors.textMuted),
                             ),
                           ],
                         ),
@@ -177,7 +179,7 @@ Widget _errorBox(String message) {
     margin: const EdgeInsets.only(bottom: 14),
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: const Color(0xFFFEF2F2),
+      color: AppCultureColors.lacquer50,
       borderRadius: BorderRadius.circular(14),
       border: const Border(left: BorderSide(color: AppCultureColors.error, width: 3)),
     ),

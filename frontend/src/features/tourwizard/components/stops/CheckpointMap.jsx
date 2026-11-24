@@ -2,35 +2,38 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { MapPin, ExternalLink } from "lucide-react";
-import { loadGoongJs } from "@/features/destination/components/GoongMapPickerModal";
+import { loadGoongJs, circlePolygon } from "@/features/destination/components/GoongMapPickerModal";
 
 const MAPTILES_KEY = process.env.NEXT_PUBLIC_GOONG_MAPTILES_KEY || "";
 const STYLE_URL = "https://tiles.goong.io/assets/goong_map_web.json";
+const REFERENCE_COLOR = "#d97706";
 
-/** Đa giác xấp xỉ vòng tròn bán kính `meters` quanh (lat, lng). */
-function circlePolygon(lat, lng, meters, steps = 64) {
-  const coords = [];
-  const dLat = meters / 111320;
-  const dLng = meters / (111320 * Math.cos((lat * Math.PI) / 180));
-  for (let i = 0; i <= steps; i++) {
-    const t = (i / steps) * 2 * Math.PI;
-    coords.push([lng + dLng * Math.cos(t), lat + dLat * Math.sin(t)]);
-  }
-  return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] } };
-}
+const toPoint = (latitude, longitude) => {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  return latitude != null && latitude !== "" && longitude != null && longitude !== ""
+    && Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+};
 
 /**
  * Bản đồ xem trước checkpoint: ghim + vòng tròn bán kính (vùng khách phải đến để mở trải nghiệm).
+ * reference (không bắt buộc): vùng check-in của điểm đến, vẽ màu cam nét đứt để so vị trí checkpoint.
  * Không có maptiles key thì hiện tọa độ + link Google Maps.
  */
-export default function CheckpointMap({ latitude, longitude, radius }) {
+export default function CheckpointMap({ latitude, longitude, radius, emptyLabel = "Chưa chọn checkpoint", reference = null }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const refMarkerRef = useRef(null);
   const [failed, setFailed] = useState(!MAPTILES_KEY);
-  const lat = Number(latitude);
-  const lng = Number(longitude);
-  const hasPoint = Number.isFinite(lat) && Number.isFinite(lng) && latitude !== null && latitude !== "" && longitude !== null;
+  const point = toPoint(latitude, longitude);
+  const hasPoint = point !== null;
+  const lat = point?.lat;
+  const lng = point?.lng;
+  const ref = toPoint(reference?.latitude, reference?.longitude);
+  const refLat = ref?.lat;
+  const refLng = ref?.lng;
+  const refRadius = Number(reference?.radius) || 0;
 
   useEffect(() => {
     if (!hasPoint || failed || !containerRef.current) return undefined;
@@ -40,18 +43,40 @@ export default function CheckpointMap({ latitude, longitude, radius }) {
         if (cancelled || !containerRef.current) return;
         goongjs.accessToken = MAPTILES_KEY;
         const radiusM = Number(radius) || 50;
+        const setCircle = (map, id, data, color, dashed) => {
+          if (map.getSource(id)) {
+            map.getSource(id).setData(data);
+            return;
+          }
+          map.addSource(id, { type: "geojson", data });
+          map.addLayer({ id: `${id}-fill`, type: "fill", source: id, paint: { "fill-color": color, "fill-opacity": dashed ? 0.1 : 0.18 } });
+          map.addLayer({ id: `${id}-line`, type: "line", source: id,
+            paint: { "line-color": color, "line-width": 2, ...(dashed ? { "line-dasharray": [2, 1.5] } : {}) } });
+        };
         const draw = (map) => {
-          const data = circlePolygon(lat, lng, radiusM);
-          if (map.getSource("cp-radius")) {
-            map.getSource("cp-radius").setData(data);
+          const hasRef = refLat !== undefined && refLng !== undefined;
+          // Vùng điểm đến vẽ trước để vòng checkpoint nằm trên.
+          if (hasRef && refRadius > 0) {
+            setCircle(map, "ref-radius", circlePolygon(refLat, refLng, refRadius), REFERENCE_COLOR, true);
+          } else if (map.getSource("ref-radius")) {
+            map.getSource("ref-radius").setData({ type: "FeatureCollection", features: [] });
+          }
+          setCircle(map, "cp-radius", circlePolygon(lat, lng, radiusM), "#10b981", false);
+          if (hasRef) {
+            if (!refMarkerRef.current) refMarkerRef.current = new goongjs.Marker({ color: REFERENCE_COLOR, scale: 0.75 });
+            refMarkerRef.current.setLngLat([refLng, refLat]).addTo(map);
           } else {
-            map.addSource("cp-radius", { type: "geojson", data });
-            map.addLayer({ id: "cp-radius-fill", type: "fill", source: "cp-radius", paint: { "fill-color": "#10b981", "fill-opacity": 0.18 } });
-            map.addLayer({ id: "cp-radius-line", type: "line", source: "cp-radius", paint: { "line-color": "#059669", "line-width": 2 } });
+            refMarkerRef.current?.remove();
           }
           if (!markerRef.current) markerRef.current = new goongjs.Marker({ color: "#059669" });
           markerRef.current.setLngLat([lng, lat]).addTo(map);
-          map.easeTo({ center: [lng, lat], zoom: radiusM > 200 ? 15 : 17 });
+          if (hasRef && (refLat !== lat || refLng !== lng)) {
+            // Thấy cả checkpoint lẫn điểm đến; gần nhau thì vẫn giữ mức zoom đủ chi tiết.
+            map.fitBounds([[Math.min(lng, refLng), Math.min(lat, refLat)], [Math.max(lng, refLng), Math.max(lat, refLat)]],
+              { padding: 40, maxZoom: radiusM > 200 ? 15 : 17, duration: 0 });
+          } else {
+            map.easeTo({ center: [lng, lat], zoom: radiusM > 200 ? 15 : 17 });
+          }
         };
         if (!mapRef.current) {
           const map = new goongjs.Map({ container: containerRef.current, style: STYLE_URL, center: [lng, lat], zoom: 16, interactive: false });
@@ -66,7 +91,7 @@ export default function CheckpointMap({ latitude, longitude, radius }) {
     return () => {
       cancelled = true;
     };
-  }, [hasPoint, lat, lng, radius, failed]);
+  }, [hasPoint, lat, lng, radius, failed, refLat, refLng, refRadius]);
 
   useEffect(() => () => mapRef.current?.remove(), []);
 
@@ -74,7 +99,7 @@ export default function CheckpointMap({ latitude, longitude, radius }) {
     return (
       <div className="h-40 rounded-xl border border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 text-slate-400 text-xs font-semibold">
         <MapPin size={18} />
-        Chưa chọn checkpoint
+        {emptyLabel}
       </div>
     );
   }
@@ -96,6 +121,12 @@ export default function CheckpointMap({ latitude, longitude, radius }) {
       <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-white/95 text-[11px] font-bold text-emerald-800 shadow-sm">
         Bán kính {radius || 50}m
       </span>
+      {ref && (
+        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-white/95 text-[11px] font-bold shadow-sm inline-flex items-center gap-1"
+          style={{ color: REFERENCE_COLOR }}>
+          <span className="w-2 h-2 rounded-full" style={{ background: REFERENCE_COLOR }} /> Vùng check-in điểm đến
+        </span>
+      )}
     </div>
   );
 }

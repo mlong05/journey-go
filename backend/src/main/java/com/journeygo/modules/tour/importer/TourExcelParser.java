@@ -91,7 +91,9 @@ final class TourExcelParser {
         TourWizardRequests.StopItem toItem() {
             return new TourWizardRequests.StopItem(null, name, shortDescription, guestNote, imageUrl,
                     videoUrl, videoSourceOf(videoUrl), culturalContent, List.of(),
-                    List.copyOf(artifacts), List.copyOf(quiz), List.copyOf(experiences));
+                    List.copyOf(artifacts), List.copyOf(quiz), List.copyOf(experiences),
+                    // File Excel không có vị trí check-in: đối tác chọn trên bản đồ sau khi nhập.
+                    null, null, null, null);
         }
     }
 

@@ -55,12 +55,40 @@ export const touristService = {
     return list(data(await apiClient.get("/themes")));
   },
 
-  /** body: { tourId, experienceDate: "yyyy-MM-dd", passengers: [{fullName, birthDate, gender, email, guestType}], note } */
+  /** body: { tourId, experienceDate: "yyyy-MM-dd", passengers: [{fullName, birthDate, gender, email, guestType}], note, voucherCode } */
   async createBooking(body) {
     return data(await apiClient.post("/bookings", body));
   },
-  async myBookings({ page = 0, size = 50 } = {}) {
-    return list(data(await apiClient.get(`/bookings/my?page=${page}&size=${size}`)));
+  /** Thẩm định và tính toán giảm giá khi người dùng áp dụng mã voucher cho tour */
+  async validateVoucher({ userVoucherCode, tourPrice, partnerId }) {
+    return data(await apiClient.post("/vouchers/validate-user-voucher", {
+      userVoucherCode,
+      tourPrice,
+      partnerId: partnerId ? Number(partnerId) : null,
+    }));
+  },
+  /**
+   * Đơn của tôi — mặc định LẤY HẾT mọi trang (không chỉ trang đầu).
+   *
+   * ⚠️ Backend giới hạn `max-page-size: 100` ⇒ không thể xin một lần hết danh sách.
+   *    Trang "Chuyến đi của tôi" phân trang phía client ⇒ phải có ĐỦ dữ liệu,
+   *    nếu không sẽ thiếu chuyến ở các trang sau. Vì vậy ta tự gọi tuần tự từng trang.
+   */
+  async myBookings({ page = 0, size = 50, all = false } = {}) {
+    if (!all) {
+      return list(data(await apiClient.get(`/bookings/my?page=${page}&size=${size}`)));
+    }
+    // Một trang "lớn" nhất có thể (100 — trần của backend).
+    const chunk = 100;
+    const first = data(await apiClient.get(`/bookings/my?page=0&size=${chunk}`));
+    const firstItems = list(first);
+    const totalPages = Number(first?.totalPages ?? 0) || 1;
+    if (totalPages <= 1) return firstItems;
+    const rest = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) =>
+        apiClient.get(`/bookings/my?page=${i + 1}&size=${chunk}`).then((r) => list(data(r)))),
+    );
+    return [...firstItems, ...rest.flat()];
   },
   /**
    * Các đơn còn có thể trải nghiệm (đủ điều kiện mở hành trình trong app).
@@ -71,6 +99,11 @@ export const touristService = {
   },
   async booking(bookingId) {
     return data(await apiClient.get(`/bookings/${bookingId}`));
+  },
+  /** Đơn đang giữ chỗ (chờ thanh toán, còn hạn), mới nhất trước; có tourId thì chỉ của tour đó. */
+  async myPendingBookings(tourId) {
+    const query = tourId ? `?tourId=${tourId}` : "";
+    return list(data(await apiClient.get(`/bookings/my/pending${query}`)));
   },
   async cancelBooking(bookingId, reason) {
     return data(await apiClient.post(`/bookings/${bookingId}/cancel`, reason ? { reason } : {}));
@@ -172,6 +205,26 @@ export const touristService = {
   },
   async messages(conversationId) {
     return list(data(await apiClient.get(`/provider-chat/conversations/${conversationId}/messages`)));
+  },
+  /**
+   * Trang tin nhắn MỚI NHẤT của một hội thoại — dùng cho phân trang "cuộn lên để load thêm".
+   *
+   * @param {number} conversationId
+   * @param {number} limit        số tin mỗi trang (mặc định 10)
+   * @param {number|null} cursor  id tin cũ nhất đã tải — lấy tin có id nhỏ hơn
+   */
+  async messagesPage(conversationId, limit = 10, cursor = null) {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (cursor != null) query.set("beforeId", String(cursor));
+    const payload = data(await apiClient.get(
+      `/provider-chat/conversations/${conversationId}/messages/page?${query.toString()}`,
+    ));
+    return {
+      items: Array.isArray(payload?.items) ? payload.items : (payload?.items?.content ?? []),
+      hasMore: Boolean(payload?.hasMore),
+      nextCursor: payload?.nextCursor ?? null,
+      totalCount: Number(payload?.totalCount ?? 0),
+    };
   },
   /** Hành trình trải nghiệm của tôi (mở trong app) — dùng để biết đơn nào đang trải nghiệm (IN_PROGRESS). */
   async myJourneys() {
@@ -355,6 +408,24 @@ export const touristService = {
   /** Tin nhắn của một đơn đặt tour. */
   async bookingMessages(bookingId) {
     return list(data(await apiClient.get(`/bookings/${bookingId}/messages`)));
+  },
+  /**
+   * Trang tin nhắn MỚI NHẤT của một đơn — dùng cho phân trang "cuộn lên để load thêm".
+   *
+   * @param {number} bookingId
+   * @param {number} limit        số tin mỗi trang (mặc định 10)
+   * @param {number|null} cursor  id tin cũ nhất đã tải — lấy tin có id nhỏ hơn
+   */
+  async bookingMessagesPage(bookingId, limit = 10, cursor = null) {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (cursor != null) query.set("beforeId", String(cursor));
+    const payload = data(await apiClient.get(`/bookings/${bookingId}/messages/page?${query.toString()}`));
+    return {
+      items: Array.isArray(payload?.items) ? payload.items : (payload?.items?.content ?? []),
+      hasMore: Boolean(payload?.hasMore),
+      nextCursor: payload?.nextCursor ?? null,
+      totalCount: Number(payload?.totalCount ?? 0),
+    };
   },
   /** Gửi tin nhắn trong đơn — body: { body }. */
   async sendBookingMessage(bookingId, body) {

@@ -28,6 +28,8 @@ public interface TourRepository extends JpaRepository<Tour, Long>,
 
     List<Tour> findByApprovedTrue();
 
+    long countByTourFormatIsNotNull();
+
     Page<Tour> findByCreatedBy_Id(Long creatorId, Pageable pageable);
 
     /** Tour của đối tác tạo theo luồng 5 bước. */
@@ -88,16 +90,6 @@ public interface TourRepository extends JpaRepository<Tour, Long>,
             GROUP BY e.stop.tour.tourId
             """)
     List<Object[]> sumStopExperiencesByTourIds(@Param("tourIds") List<Long> tourIds);
-
-    /** Ngày khởi hành gần nhất từ {@code from}: [tourId, ngày]. */
-    @Query("""
-            SELECT d.tour.tourId, MIN(d.departureDate)
-            FROM TourDepartureDate d
-            WHERE d.departureDate >= :from AND d.tour.tourId IN :tourIds
-            GROUP BY d.tour.tourId
-            """)
-    List<Object[]> findNextDepartureByTourIds(@Param("tourIds") List<Long> tourIds,
-                                              @Param("from") java.time.LocalDate from);
 
     boolean existsByTitle(String title);
 

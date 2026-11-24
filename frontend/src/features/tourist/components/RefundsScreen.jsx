@@ -12,16 +12,8 @@ import { touristService } from "../services/touristService";
 import {
   REFUND_REASON, REFUND_STATUS, REFUND_OPEN_STATUSES, dateTime, vnd,
 } from "../utils";
+import { PERSONAL_REFUND_TIERS } from "../refundPolicy";
 
-/**
- * ⛔ Cửa sổ no-show — KHỚP backend `FinanceProperties.effectiveRefundNoShowWindowHours()`
- * (mặc định 48 giờ). Tính từ ĐẦU NGÀY TRẢI NGHIỆM lùi 48h.
- *
- * ⚠️ KHÔNG dùng `paidAt` — backend quyết định theo ngày trải nghiệm.
- */
-const NO_SHOW_WINDOW_HOURS = 48;
-/** Số ngày "hủy trước N ngày" (chính sách: hủy trước 3 ngày khởi hành). */
-const EARLY_CANCEL_DAYS = 3;
 /** Số ký tự tối đa — khớp `@Size` ở `CreateRefundRequest`. */
 const SUMMARY_MAX = 200;
 const DETAIL_MAX = 2000;
@@ -74,13 +66,6 @@ function parseExperienceDate(value) {
   const raw = typeof value === "string" ? value.slice(0, 10) : value;
   const d = new Date(`${raw}T00:00:00`);
   return Number.isNaN(d.getTime()) ? null : d;
-}
-
-/** Có nằm trong cửa sổ no-show (hủy quá muộn) không. */
-function isInNoShowWindow(experienceDate, now) {
-  if (!experienceDate) return false;
-  const deadline = experienceDate.getTime() - NO_SHOW_WINDOW_HOURS * 3600 * 1000;
-  return now > deadline;
 }
 
 function RefundBadge({ status }) {
@@ -444,8 +429,7 @@ function RefundSummary({ r }) {
  * Bảng chính sách hoàn tiền — hiển thị giống mobile.
  * Số tiền do ADMIN quyết định ⇒ không hiện "dự kiến hoàn X" cho khách.
  */
-function RefundPolicyTable({ experienceDate, now }) {
-  const personalZeroed = isInNoShowWindow(experienceDate, now);
+function RefundPolicyTable() {
   return (
     <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 text-sm">
       <p className="mb-3 font-bold text-slate-900">Chính sách hoàn tiền</p>
@@ -453,26 +437,34 @@ function RefundPolicyTable({ experienceDate, now }) {
         <div>
           <p className="font-semibold text-slate-800">Lỗi từ khách hàng (huỷ tour)</p>
           <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-            <li className="flex items-center justify-between gap-2">
-              <span>Huỷ trước {EARLY_CANCEL_DAYS} ngày</span>
-              <b className="text-emerald-700">Hoàn 50%</b>
-            </li>
-            <li className="flex items-center justify-between gap-2">
-              <span>Huỷ trong vòng {NO_SHOW_WINDOW_HOURS} giờ / không đến</span>
-              <b className={personalZeroed ? "text-rose-600" : "text-slate-500"}>Hoàn 0%</b>
-            </li>
+            {PERSONAL_REFUND_TIERS.map((tier) => (
+              <li key={tier.id} className="flex items-center justify-between gap-2">
+                <span>{tier.condition}</span>
+                <span className={tier.rate > 0 ? "text-emerald-700" : "text-slate-500"}>
+                  {tier.label}
+                </span>
+              </li>
+            ))}
           </ul>
         </div>
         <div>
           <p className="font-semibold text-slate-800">Lỗi hệ thống / đối tác</p>
           <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-            <li className="flex items-center justify-between gap-2"><span>Sự cố từ nền tảng hoặc nhà tour</span><b className="text-emerald-700">Hoàn 100%</b></li>
+            <li className="flex items-center justify-between gap-2"><span>Sự cố từ nền tảng hoặc nhà tour</span><span className="text-emerald-700">Hoàn 100%</span></li>
           </ul>
         </div>
         <div>
           <p className="font-semibold text-slate-800">Bất khả kháng</p>
           <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-            <li className="flex items-center justify-between gap-2"><span>Thiên tai, dịch bệnh, quy hoạch</span><b className="text-slate-500">Theo chính sách</b></li>
+            {/*
+              ⚠️ Bất khả kháng (thiên tai, dịch bệnh, quy hoạch) → HOÀN 0%.
+              Trước đây hiển thị "Theo chính sách" ⇒ khách không biết mức thực tế.
+              Nhiệm vụ này KHỚP với cách Admin xử lý (refund_rate = 0.0000).
+            */}
+            <li className="flex items-center justify-between gap-2">
+              <span>Thiên tai, dịch bệnh, quy hoạch</span>
+              <span className="text-slate-500">Hoàn 0%</span>
+            </li>
           </ul>
         </div>
       </div>
@@ -677,7 +669,7 @@ export function RefundPanel({ booking }) {
 
       {open && (
         <form onSubmit={submit} className="mt-4 space-y-4">
-          <RefundPolicyTable experienceDate={experienceDate} now={now} />
+          <RefundPolicyTable />
 
           <div>
             <label htmlFor="refund-summary" className="mb-1 block text-sm font-bold text-slate-800">
@@ -907,8 +899,9 @@ export function RefundGuide() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
         <p className="flex items-center gap-1.5 font-bold text-slate-900"><LifeBuoy size={15} />Mức hoàn</p>
         <p className="mt-1">
-          Huỷ trước {EARLY_CANCEL_DAYS} ngày: hoàn 50%. Lỗi từ nền tảng hoặc nhà tour: hoàn 100%
-          sau khi quản trị viên xác minh. Trong vòng {NO_SHOW_WINDOW_HOURS} giờ trước giờ khởi hành: không hoàn.
+          Huỷ từ 7 ngày trở lên: hoàn 80%. Huỷ từ 3 đến 6 ngày (72 giờ – 6 ngày): hoàn 50%.
+          Dưới 72 giờ (3 ngày): không hoàn. Lỗi từ nền tảng hoặc nhà tour: hoàn 100%
+          sau khi quản trị viên xác minh.
         </p>
       </div>
     </div>

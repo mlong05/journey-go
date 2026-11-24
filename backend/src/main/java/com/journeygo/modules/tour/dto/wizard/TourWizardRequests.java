@@ -176,7 +176,16 @@ public final class TourWizardRequests {
             @Schema(description = "Quiz — câu hỏi trắc nghiệm (1–4 câu khi gửi duyệt)")
             @Valid @Size(max = 4, message = "Quiz tối đa 4 câu") List<QuestionItem> quiz,
             @Schema(description = "Trải nghiệm thực tế (1–5 khi gửi duyệt)")
-            @Valid @Size(max = 5, message = "Tối đa 5 trải nghiệm thực tế mỗi điểm đến") List<ExperienceItem> experiences
+            @Valid @Size(max = 5, message = "Tối đa 5 trải nghiệm thực tế mỗi điểm đến") List<ExperienceItem> experiences,
+            @Schema(description = "Vĩ độ vị trí check-in trạm (nên đặt tại cổng / lối vào chính)")
+            @DecimalMin(value = "-90") @DecimalMax(value = "90") BigDecimal latitude,
+            @Schema(description = "Kinh độ vị trí check-in trạm")
+            @DecimalMin(value = "-180") @DecimalMax(value = "180") BigDecimal longitude,
+            @Schema(description = "Bán kính check-in trạm (mét) do đối tác tự nhập, 50–500")
+            @Min(value = 50, message = "Bán kính check-in tối thiểu 50m")
+            @Max(value = 500, message = "Bán kính check-in tối đa 500m") Integer checkInRadiusMeters,
+            @Schema(description = "Mã QR check-in trạm (JGS- + 16 ký tự hex). Gửi lại mã cũ để giữ QR đã in; để trống thì sinh mã mới")
+            @Size(max = 40) String qrToken
     ) {}
 
     @Schema(description = "Bước 3 — Danh sách điểm đến theo thứ tự (thứ tự trong mảng = thứ tự kéo thả)")

@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 
-/// Bảng màu giao diện mới (trang chủ, lộ trình): đồng bộ với [AppCultureColors] — nền giấy, chữ mực, nhấn xanh ngọc.
+import '../../core/constants/app_colors.dart';
+
+/// Tên gọi ngắn cho các màn trang chủ / lộ trình. Mọi giá trị trỏ về [AppCultureColors]
+/// — bảng màu duy nhất của app — để không còn hai nguồn màu lệch nhau.
 class AppInk {
-  static const ink = Color(0xFF1E1A14);
-  static const muted = Color(0xFF6B6357);
-  static const border = Color(0xFFE3DACA);
-  static const line = Color(0xFFEEE7DA);
-  static const soft = Color(0xFFF1EBDF);
-  static const accent = Color(0xFF1F6F54);
-  static const paper = Color(0xFFF7F3EA);
-  static const lacquer = Color(0xFF9E2B25);
-  static const brass = Color(0xFFB8862B);
+  static const Color ink = AppCultureColors.textDark;
+  static const Color muted = AppCultureColors.textMuted;
+  static const Color faint = AppCultureColors.textLight;
+  static const Color border = AppCultureColors.border;
+  static const Color line = AppCultureColors.borderLight;
+  static const Color soft = AppCultureColors.surfaceSubtle;
+  static const Color accent = AppCultureColors.heritageJade;
+  static const Color accentSoft = AppCultureColors.jadeLight;
+  static const Color paper = AppCultureColors.background;
+  static const Color surface = AppCultureColors.surface;
+  static const Color lacquer = AppCultureColors.lacquer;
+
+  /// Đồng thau đạt tương phản chữ (trước đây #B8862B chỉ 3.2:1).
+  static const Color brass = AppCultureColors.gold;
 }

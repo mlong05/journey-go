@@ -82,7 +82,9 @@ public class EmailService {
 
         } catch (Exception ex) {
             log.error("Không thể gửi email OTP đến {}: {}", toEmail, ex.getMessage(), ex);
-            throw new AppException(ErrorCode.MAIL_SEND_FAILED, "Không thể gửi email OTP: " + ex.getMessage());
+            // Chi tiết kỹ thuật (SMTP/TLS) chỉ ghi log, không trả về cho người dùng.
+            throw new AppException(ErrorCode.MAIL_SEND_FAILED,
+                    "Hiện không gửi được email chứa mã OTP. Vui lòng thử lại sau ít phút.");
         }
     }
 

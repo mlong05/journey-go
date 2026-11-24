@@ -45,7 +45,7 @@ class ProgressRing extends StatelessWidget {
                   style: const TextStyle(
                       color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, height: 1)),
               const SizedBox(height: 2),
-              Text(caption, style: const TextStyle(color: Colors.white70, fontSize: 10.5)),
+              Text(caption, style: const TextStyle(color: AppCultureColors.onDarkMuted, fontSize: 11.5)),
             ],
           ),
         ],
@@ -216,7 +216,7 @@ Future<void> showRewardDialog(
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [AppCultureColors.rewardBg, Color(0xFFFDE68A)],
+                    colors: [AppCultureColors.rewardBg, AppCultureColors.brass200],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),

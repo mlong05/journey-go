@@ -5,13 +5,14 @@ import com.journeygo.modules.aiguide.event.ContentInvalidatedEvent;
 import com.journeygo.modules.aiguide.service.DocumentIngestionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Event Listener lắng nghe các sự kiện kiểm duyệt nội dung văn hóa.
- * Chạy hoàn toàn bất đồng bộ (@Async) trên aiTaskExecutor để không làm chậm luồng của người dùng.
+ * Chạy bất đồng bộ (@Async) sau khi transaction nguồn commit thành công (AFTER_COMMIT).
  */
 @Component
 @RequiredArgsConstructor
@@ -21,7 +22,7 @@ public class ContentModerationAiEventListener {
     private final DocumentIngestionService ingestionService;
 
     @Async("aiTaskExecutor")
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void handleContentApproved(ContentApprovedEvent event) {
         log.info("Nhận sự kiện ContentApprovedEvent: contentId={}, destination={}",
                 event.contentId(), event.destinationName());
@@ -40,7 +41,7 @@ public class ContentModerationAiEventListener {
     }
 
     @Async("aiTaskExecutor")
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void handleContentInvalidated(ContentInvalidatedEvent event) {
         log.info("Nhận sự kiện ContentInvalidatedEvent: contentId={}, reason={}",
                 event.contentId(), event.reason());

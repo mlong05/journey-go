@@ -104,6 +104,49 @@ class TourSubmissionValidatorTest {
     }
 
     @Test
+    @DisplayName("Điểm đến phải có vị trí check-in và bán kính 50–500 m")
+    void stopNeedsCheckInLocationAndRadius() {
+        Tour noLocation = validTour();
+        noLocation.getStops().get(0).setLatitude(null);
+        assertTrue(hasIssue(validator.validate(noLocation), "STOPS", "location"));
+
+        Tour noRadius = validTour();
+        noRadius.getStops().get(0).setCheckInRadiusMeters(null);
+        assertTrue(hasIssue(validator.validate(noRadius), "STOPS", "checkInRadiusMeters"));
+
+        Tour tooSmall = validTour();
+        tooSmall.getStops().get(0).setCheckInRadiusMeters(49);
+        assertTrue(hasIssue(validator.validate(tooSmall), "STOPS", "checkInRadiusMeters"));
+
+        Tour tooLarge = validTour();
+        tooLarge.getStops().get(0).setCheckInRadiusMeters(501);
+        assertTrue(hasIssue(validator.validate(tooLarge), "STOPS", "checkInRadiusMeters"));
+
+        Tour bounds = validTour();
+        bounds.getStops().get(0).setCheckInRadiusMeters(50);
+        assertTrue(validator.validate(bounds).isEmpty());
+        bounds.getStops().get(0).setCheckInRadiusMeters(500);
+        assertTrue(validator.validate(bounds).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Checkpoint cách điểm đến tới 3 km vẫn hợp lệ; xa hơn 3 km thì bị chặn")
+    void checkpointFarFromStopIsBlocked() {
+        Tour nearby = validTour();
+        // ≈ 2,2 km về phía bắc: chỉ là cảnh báo (hiển thị ở frontend), không chặn gửi duyệt.
+        nearby.getStops().get(0).getExperiences().get(0).setCheckpointLatitude(new BigDecimal("15.8990"));
+        assertTrue(validator.validate(nearby).isEmpty());
+
+        Tour far = validTour();
+        // ≈ 14,5 km — như ghim "Dinh Độc Lập" bị đặt nhầm sang Thủ Đức.
+        far.getStops().get(0).getExperiences().get(0).setCheckpointLatitude(new BigDecimal("16.0100"));
+        TourValidationIssue issue = validator.validate(far).stream()
+                .filter(i -> "experiences[0].checkpoint".equals(i.field())).findFirst().orElseThrow();
+        assertEquals("STOPS", issue.step());
+        assertTrue(issue.message().contains("km"));
+    }
+
+    @Test
     @DisplayName("Điểm đến chưa có câu quiz hoặc chưa có trải nghiệm thì bị báo lỗi")
     void stopNeedsQuizAndExperience() {
         Tour noQuiz = validTour();
@@ -221,6 +264,7 @@ class TourSubmissionValidatorTest {
         }
 
         TourStop stop = TourStop.builder().tour(tour).sequenceOrder(1).name("Xưởng mộc Kim Bồng")
+                .latitude(new BigDecimal("15.8790")).longitude(new BigDecimal("108.3345")).checkInRadiusMeters(300)
                 .shortDescription("Làng mộc 500 năm").culturalContent("Câu chuyện làng mộc").build();
         // Quiz: 1 câu trắc nghiệm. Trải nghiệm thực tế: 1 hoạt động + 1 câu hỏi nhập chữ có đáp án đúng.
         TourStopQuestion quiz = choiceQuestion(StopQuestionKind.QUIZ);

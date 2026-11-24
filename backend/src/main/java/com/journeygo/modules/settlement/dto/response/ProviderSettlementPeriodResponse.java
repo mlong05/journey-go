@@ -27,7 +27,9 @@ public record ProviderSettlementPeriodResponse(
         @Schema(description = "ID settlement") Long settlementId,
         @Schema(description = "Mã settlement") String settlementCode,
         @Schema(description = "Phạm vi đợt (PROVIDER | BATCH)") String scope,
-        @Schema(description = "Kỳ doanh thu (yyyy-MM)") String revenuePeriod,
+        @Schema(description = "Kỳ doanh thu — chu kỳ 10 ngày (yyyy-MM-D), VD: 2026-10-1 = 01/10 → 10/10/2026")
+        String revenuePeriod,
+        @Schema(description = "Nhãn kỳ tất toán đầy đủ, VD: '01/10 – 10/10/2026'") String periodLabel,
         @Schema(description = "Ngày bắt đầu kỳ") LocalDate periodStart,
         @Schema(description = "Ngày kết thúc kỳ") LocalDate periodEnd,
         @Schema(description = "Thời điểm admin duyệt") Instant approvedAt,

@@ -6,6 +6,7 @@ import NoticeAccordion from "./NoticeAccordion";
 import ItineraryView from "./ItineraryView";
 import StopsOverviewMap, { stopLocation, googleMapsUrl } from "./stops/StopsOverviewMap";
 import CheckpointMap from "./stops/CheckpointMap";
+import { CheckpointDistanceNotice } from "./stops/StopActivitiesEditor";
 import ExperienceQr from "./stops/ExperienceQr";
 import VideoPreview from "./VideoPreview";
 import { formatLocalDate } from "@/lib/money";
@@ -243,12 +244,24 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
                           <MapPin size={11} className="shrink-0" />
                           {loc ? (
                             <a href={googleMapsUrl(loc.lat, loc.lng)} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 hover:underline">
-                              {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)} · Xem trên Google Maps
+                              Vị trí check-in: {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
+                              {s.checkInRadiusMeters ? ` · bán kính ${s.checkInRadiusMeters}m` : ""} · Xem trên Google Maps
                             </a>
-                          ) : <i className="text-slate-400">Chưa có vị trí (chưa chọn checkpoint trải nghiệm)</i>}
+                          ) : <i className="text-slate-400">Chưa chọn vị trí check-in</i>}
                         </p>
                       </div>
                     </div>
+                    {s.latitude != null && s.longitude != null && (
+                      <div className="mt-2">
+                        <CheckpointMap latitude={s.latitude} longitude={s.longitude} radius={s.checkInRadiusMeters}
+                          emptyLabel="Chưa chọn vị trí check-in" />
+                      </div>
+                    )}
+                    {s.qrToken && (
+                      <div className="mt-2">
+                        <ExperienceQr token={s.qrToken} label={`check-in ${s.name || "diem-den"}`} compact title="Mã QR check-in trạm" />
+                      </div>
+                    )}
                   </Block>
                   <Block anchor={{ step: "STOPS", stopId: s.id, field: "culturalContent" }} label={`Điểm ${i + 1} – Nội dung văn hóa`}>
                     {s.videoUrl && (
@@ -278,7 +291,11 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
                         <span className="inline-flex items-center gap-1"><MapPin size={11} />{e.checkpointLatitude ?? "—"}, {e.checkpointLongitude ?? "—"} · {e.radiusMeters}m</span>
                         <span className="inline-flex items-center gap-1"><Timer size={11} />{e.durationSeconds ? `${Math.floor(e.durationSeconds / 60)} phút ${e.durationSeconds % 60 ? `${e.durationSeconds % 60} giây` : ""}` : "—"}</span>
                       </p>
-                      <div className="mb-2"><CheckpointMap latitude={e.checkpointLatitude} longitude={e.checkpointLongitude} radius={e.radiusMeters} /></div>
+                      <div className="mb-2"><CheckpointDistanceNotice stop={s} experience={e} /></div>
+                      <div className="mb-2">
+                        <CheckpointMap latitude={e.checkpointLatitude} longitude={e.checkpointLongitude} radius={e.radiusMeters}
+                          reference={{ latitude: s.latitude, longitude: s.longitude, radius: s.checkInRadiusMeters }} />
+                      </div>
                       <div className="mb-2"><ExperienceQr token={e.qrToken} label={e.activityName} compact /></div>
                       <QuestionView q={e.question} label="Câu hỏi sau trải nghiệm" />
                     </Block>

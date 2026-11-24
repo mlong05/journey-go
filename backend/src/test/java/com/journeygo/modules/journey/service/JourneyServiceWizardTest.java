@@ -6,6 +6,7 @@ import com.journeygo.modules.gamification.service.GamificationService;
 import com.journeygo.modules.journey.dto.CheckInJourneyRequest;
 import com.journeygo.modules.journey.dto.CheckInResultResponse;
 import com.journeygo.modules.journey.dto.JourneyTaskProgressResponse;
+import com.journeygo.modules.journey.dto.StopCheckpointsResponse;
 import com.journeygo.modules.journey.dto.SubmitTaskRequest;
 import com.journeygo.modules.journey.dto.TaskQuestionsResponse;
 import com.journeygo.modules.journey.entity.Journey;
@@ -45,6 +46,8 @@ class JourneyServiceWizardTest {
     private static final BigDecimal LAT = new BigDecimal("21.0293000");
     private static final BigDecimal LNG = new BigDecimal("105.8356000");
     private static final String QR = "JGE-0123456789ABCDEF";
+    /** Mã QR check-in trạm dán tại cổng. */
+    private static final String STOP_QR = "JGS-FEDCBA9876543210";
 
     @Mock private JourneyRepository journeyRepository;
     @Mock private JourneyDestinationProgressRepository destinationProgressRepository;
@@ -84,7 +87,7 @@ class JourneyServiceWizardTest {
 
     private TourInfo tourInfo(BigDecimal lat, BigDecimal lng) {
         return new TourInfo(1L, "Hà Nội ngàn năm", List.of(new TourInfo.TourDestinationInfo(
-                7L, "Văn Miếu", 1, null, lat, lng, 300, null, List.of(quizTask(), activityTask()))), true);
+                7L, "Văn Miếu", 1, null, lat, lng, 300, STOP_QR, List.of(quizTask(), activityTask()))), true);
     }
 
     @BeforeEach
@@ -167,12 +170,69 @@ class JourneyServiceWizardTest {
     }
 
     @Test
-    void checkIn_StopWithoutCoordinates_ShouldCheckInDirectly() {
+    void checkIn_StopWithoutCoordinates_ShouldBeRejected() {
+        // Trước đây điểm dừng thiếu toạ độ được "check-in thẳng" ⇒ du khách ở nhà vẫn mở khoá trải nghiệm.
         stubCheckIn(tourInfo(null, null));
-        var req = new CheckInJourneyRequest(CheckInVerificationMethod.GPS, null, null, null);
+        var req = new CheckInJourneyRequest(CheckInVerificationMethod.GPS, LAT, LNG, null);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> journeyService.checkInDestination(50L, 7L, req, 10L));
+        assertEquals("DEST-COORDINATES-MISSING", ex.getCode());
+        assertFalse(stop.isCheckedIn());
+    }
+
+    // ── Bản đồ checkpoint của trạm ────────────────────────────────────────────
+
+    @Test
+    void checkpoints_lockedUntilCheckIn() {
+        when(journeyRepository.findByIdWithDestinations(50L)).thenReturn(Optional.of(journey));
+        when(destinationProgressRepository.findByJourneyIdAndDestinationId(50L, 7L)).thenReturn(Optional.of(stop));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> journeyService.getStopCheckpoints(50L, 7L, 10L));
+        assertEquals("DEST-NOT-CHECKED-IN", ex.getCode());
+    }
+
+    @Test
+    void checkpoints_listOnlyFieldActivitiesWithStatusAndNoQr() throws Exception {
+        stubCheckIn(tourInfo(LAT, LNG));
+        stop.setCheckedIn(true);
+        activityProgress.setStatus(TaskProgressStatus.COMPLETED);
+
+        StopCheckpointsResponse result = journeyService.getStopCheckpoints(50L, 7L, 10L);
+
+        assertEquals(0, LAT.compareTo(result.latitude()));
+        assertEquals(300, result.checkInRadiusMeters());
+        // Câu đố không có vị trí ⇒ chỉ còn hoạt động thực địa.
+        assertEquals(1, result.checkpoints().size());
+        StopCheckpointsResponse.Checkpoint cp = result.checkpoints().get(0);
+        assertEquals(5L, cp.taskId());
+        assertEquals(50, cp.radiusMeters());
+        assertEquals(TaskProgressStatus.COMPLETED, cp.status());
+        String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(result);
+        assertFalse(json.contains(QR));
+    }
+
+    @Test
+    void checkIn_WizardStopByCorrectQr_ShouldSucceedWithoutGps() {
+        // GPS hoặc QR: quét đúng mã dán tại cổng là check-in được, không cần toạ độ.
+        stubCheckIn(tourInfo(LAT, LNG));
+        var req = new CheckInJourneyRequest(CheckInVerificationMethod.QR, null, null, STOP_QR.toLowerCase());
 
         assertTrue(journeyService.checkInDestination(50L, 7L, req, 10L).success());
         assertTrue(stop.isCheckedIn());
+    }
+
+    @Test
+    void checkIn_WizardStopByWrongQr_ShouldBeRejected() {
+        stubCheckIn(tourInfo(LAT, LNG));
+        // Mã của hoạt động (JGE-) không dùng để check-in trạm.
+        var req = new CheckInJourneyRequest(CheckInVerificationMethod.QR, null, null, QR);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> journeyService.checkInDestination(50L, 7L, req, 10L));
+        assertEquals("QR-INVALID", ex.getCode());
+        assertFalse(stop.isCheckedIn());
     }
 
     @Test

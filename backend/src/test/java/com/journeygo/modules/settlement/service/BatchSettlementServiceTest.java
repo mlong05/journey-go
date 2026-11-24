@@ -13,8 +13,11 @@ import com.journeygo.modules.providerrevenue.repository.ProviderRevenueRepositor
 import com.journeygo.modules.providerrevenue.service.ProviderRevenueService;
 import com.journeygo.modules.settlement.dto.request.CreateBatchSettlementRequest;
 import com.journeygo.modules.settlement.dto.response.BatchSettlementCandidatesResponse;
+import com.journeygo.modules.settlement.dto.response.SettlementHeldResponse;
+import com.journeygo.modules.settlement.dto.response.SettlementResponse;
 import com.journeygo.modules.settlement.entity.Settlement;
 import com.journeygo.modules.settlement.entity.SettlementDetail;
+import com.journeygo.modules.settlement.entity.SettlementPeriod;
 import com.journeygo.modules.settlement.entity.enums.SettlementScope;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
 import com.journeygo.modules.settlement.repository.SettlementDetailRepository;
@@ -37,11 +40,13 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -85,8 +90,27 @@ class BatchSettlementServiceTest {
     private FinanceProperties financeProperties;
     private User admin;
 
-    /** Kỳ đã đóng (kỳ trước) — luôn hợp lệ để tạo đợt tất toán. */
-    private static final String CLOSED_PERIOD = YearMonth.now().minusMonths(1).toString();
+    /**
+     * Kỳ 10 ngày ĐÃ ĐÓNG — luôn hợp lệ để tạo đợt tất toán.
+     *
+     * <p>Kỳ 3 của tháng trước (21 → cuối tháng trước) luôn đã kết thúc.
+     */
+    private static final String CLOSED_PERIOD = SettlementPeriod
+            .of(YearMonth.now().minusMonths(1), SettlementPeriod.CYCLE_COUNT)
+            .toPeriodString();
+
+    /**
+     * Kỳ 10 ngày CHƯA kết thúc — kỳ 1 của tháng hiện tại (chưa qua ngày 10 hôm nay).
+     *
+     * <p>Chỉ dùng khi hôm nay ≤ 10; nếu hôm nay đã qua ngày 10 thì kỳ 1 đã đóng.
+     */
+    private static String openPeriod() {
+        YearMonth current = YearMonth.now();
+        int day = LocalDate.now().getDayOfMonth();
+        // Nếu hôm nay đã qua ngày 10 ⇒ kỳ 1 đã đóng ⇒ dùng kỳ 2 (đóng từ ngày 20).
+        int cycle = day <= 10 ? 1 : 2;
+        return SettlementPeriod.of(current, cycle).toPeriodString();
+    }
 
     @BeforeEach
     void setUp() {
@@ -222,24 +246,202 @@ class BatchSettlementServiceTest {
     }
 
     @Test
-    @DisplayName("Doanh thu chuyển tiếp từ kỳ TRƯỚC được mang sang kỳ đang lập đợt")
-    void getBatchCandidates_carriesOverFromPreviousPeriod() {
-        ProviderProfile a = partner(10L, "Đối tác A");
-        String olderPeriod = YearMonth.now().minusMonths(3).toString();
+    @DisplayName("CHỈ gom khoản thuộc ĐÚNG kỳ — không kéo khoản của kỳ khác vào")
+    void getBatchCandidates_onlyIncludesExactPeriod() {
+        ProviderProfile a = partner(10L, "Đối tác B");
+        String olderPeriod = SettlementPeriod
+                .of(YearMonth.now().minusMonths(3), SettlementPeriod.CYCLE_COUNT)
+                .toPeriodString();
 
-        ProviderRevenue carried = revenue(1L, a, olderPeriod,
+        // Khoản của kỳ TRƯỚC — chưa tất toán (đã bị từ chối ở kỳ đó).
+        ProviderRevenue otherPeriod = revenue(1L, a, olderPeriod,
                 new BigDecimal("1000000"), new BigDecimal("800000"));
 
         lenient().when(revenueRepository.findByRevenuePeriod(CLOSED_PERIOD)).thenReturn(List.of());
         lenient().when(revenueRepository.findUnsettledByAllProviders())
-                .thenReturn(List.of(carried));
-        lenient().when(revenueRepository.findById(1L)).thenReturn(Optional.of(carried));
+                .thenReturn(List.of(otherPeriod));
+        lenient().when(revenueRepository.findById(1L)).thenReturn(Optional.of(otherPeriod));
         lenient().when(revenueService.evaluateEligibility(1L))
                 .thenReturn(EligibilityEvaluationResponse.builder().eligible(true).build());
 
         BatchSettlementCandidatesResponse result = service.getBatchCandidates(CLOSED_PERIOD);
 
-        assertEquals(1, result.eligible().size(), "Doanh thu kỳ trước chưa tất toán phải được mang sang");
+        assertTrue(result.eligible().isEmpty(),
+                "Khoản của kỳ KHÁC không được gom vào đợt của kỳ đang chọn");
+        assertTrue(result.held().isEmpty(),
+                "Khoản ngoài kỳ không được tính vào 'đủ điều kiện' lẫn 'bị giữ lại'");
+    }
+
+    // ── Khoản bị giữ lại (chưa đủ điều kiện) ─────────────────────────────
+
+    @Test
+    @DisplayName("Xem khoản bị giữ lại của kỳ — kèm lý do và kỳ sẽ xét lại")
+    void getHeldItems_listsHeldWithReason() {
+        ProviderProfile a = partner(10L, "Đối tác A");
+
+        ProviderRevenue held = revenue(1L, a, CLOSED_PERIOD,
+                new BigDecimal("500000"), new BigDecimal("400000"));
+        held.setStatus(ProviderRevenueStatus.PENDING);
+        held.setDeferredReason(DeferredReason.BOOKING_NOT_COMPLETED);
+
+        lenient().when(revenueRepository.findByRevenuePeriod(CLOSED_PERIOD))
+                .thenReturn(List.of(held));
+        lenient().when(revenueRepository.findUnsettledByAllProviders()).thenReturn(List.of());
+        lenient().when(revenueService.evaluateEligibilityInternal(1L))
+                .thenReturn(EligibilityEvaluationResponse.builder()
+                        .eligible(false)
+                        .deferredReason(DeferredReason.BOOKING_NOT_COMPLETED)
+                        .checks(List.of(
+                                EligibilityEvaluationResponse.CheckItem.builder()
+                                        .code("3_BOOKING_COMPLETED")
+                                        .description("Booking đã hoàn thành trải nghiệm")
+                                        .passed(false)
+                                        .detail("Booking chưa hoàn thành trải nghiệm")
+                                        .build()))
+                        .build());
+
+        SettlementHeldResponse result = service.getHeldItems(CLOSED_PERIOD);
+
+        assertEquals(1, result.held().size(), "Phải thấy khoản bị giữ lại của kỳ");
+        assertEquals(DeferredReason.BOOKING_NOT_COMPLETED,
+                result.held().get(0).deferredReason());
+        assertEquals(1, result.held().get(0).failedChecks().size(),
+                "Phải kèm điều kiện chưa đạt");
+        assertEquals(new BigDecimal("400000"), result.totalAmount());
+        assertEquals(1, result.partnerCount());
+        // Kỳ kế tiếp là nơi khoản này sẽ được xét lại.
+        assertEquals(SettlementPeriod.parse(CLOSED_PERIOD).plusCycles(1).toPeriodString(),
+                result.carriedTo());
+    }
+
+    @Test
+    @DisplayName("Khoản đủ điều kiện KHÔNG tính là 'bị giữ lại'")
+    void getHeldItems_excludesEligible() {
+        ProviderProfile a = partner(10L, "Đối tác A");
+        ProviderRevenue eligible = revenue(1L, a, CLOSED_PERIOD,
+                new BigDecimal("1000000"), new BigDecimal("800000"));
+
+        lenient().when(revenueRepository.findByRevenuePeriod(CLOSED_PERIOD))
+                .thenReturn(List.of(eligible));
+        lenient().when(revenueRepository.findUnsettledByAllProviders()).thenReturn(List.of());
+        lenient().when(revenueService.evaluateEligibilityInternal(1L))
+                .thenReturn(EligibilityEvaluationResponse.builder().eligible(true).build());
+
+        SettlementHeldResponse result = service.getHeldItems(CLOSED_PERIOD);
+
+        assertTrue(result.held().isEmpty(), "Khoản đủ điều kiện không phải 'bị giữ lại'");
+        assertEquals(BigDecimal.ZERO, result.totalAmount());
+    }
+
+    // ── Đẩy khoản chưa đủ điều kiện sang kỳ kế tiếp ───────────────────────
+
+    @Test
+    @DisplayName("Khoản CHƯA ĐỦ ĐIỀU KIỆN của kỳ trước được đẩy sang kỳ này")
+    void getBatchCandidates_carriesHeldFromPreviousPeriod() {
+        ProviderProfile a = partner(10L, "Đối tác A");
+        String previousPeriod = SettlementPeriod.parse(CLOSED_PERIOD).minusCycles(1).toPeriodString();
+
+        // Khoản của kỳ TRƯỚC, chưa đủ điều kiện ⇒ được đẩy sang kỳ này.
+        ProviderRevenue carried = revenue(1L, a, previousPeriod,
+                new BigDecimal("500000"), new BigDecimal("400000"));
+        carried.setStatus(ProviderRevenueStatus.PENDING);
+        carried.setDeferredReason(DeferredReason.BOOKING_NOT_COMPLETED);
+
+        // Khoản của kỳ TRƯỚC, ĐÃ đủ điều kiện ⇒ KHÔNG đẩy (thuộc đợt của kỳ đó).
+        ProviderRevenue oldEligible = revenue(2L, a, previousPeriod,
+                new BigDecimal("1000000"), new BigDecimal("800000"));
+
+        lenient().when(revenueRepository.findByRevenuePeriod(CLOSED_PERIOD)).thenReturn(List.of());
+        lenient().when(revenueRepository.findUnsettledByAllProviders())
+                .thenReturn(List.of(carried, oldEligible));
+        lenient().when(revenueService.evaluateEligibility(1L))
+                .thenReturn(EligibilityEvaluationResponse.builder().eligible(true).build());
+        lenient().when(revenueService.evaluateEligibility(2L))
+                .thenReturn(EligibilityEvaluationResponse.builder().eligible(true).build());
+
+        BatchSettlementCandidatesResponse result = service.getBatchCandidates(CLOSED_PERIOD);
+
+        assertEquals(1, result.eligible().size(),
+                "Chỉ khoản BỊ GIỮ LẠI được đẩy sang, khoản đã đủ điều kiện thì không");
+        assertEquals(1L, result.eligible().get(0).id());
+    }
+
+    @Test
+    @DisplayName("Danh sách 'bị giữ lại' gồm khoản của kỳ này + khoản đẩy từ kỳ trước, KHÔNG có kỳ về sau")
+    void getBatchCandidates_heldListIsScopedToQueriedPeriod() {
+        ProviderProfile a = partner(10L, "Đối tác A");
+        String previousPeriod = SettlementPeriod.parse(CLOSED_PERIOD).minusCycles(1).toPeriodString();
+        String laterPeriod = SettlementPeriod.parse(CLOSED_PERIOD).plusCycles(1).toPeriodString();
+
+        // Khoản THỰC SỰ của kỳ đang xem, chưa đủ điều kiện.
+        ProviderRevenue ownHeld = revenue(1L, a, CLOSED_PERIOD,
+                new BigDecimal("500000"), new BigDecimal("400000"));
+        ownHeld.setStatus(ProviderRevenueStatus.PENDING);
+        ownHeld.setDeferredReason(DeferredReason.BOOKING_NOT_COMPLETED);
+
+        // Khoản của kỳ TRƯỚC, vẫn chưa đủ điều kiện ⇒ được đẩy sang kỳ này để xét
+        // lại, nhưng VẪN chưa đủ ⇒ hiển thị kèm cờ carriedOver.
+        ProviderRevenue carriedHeld = revenue(2L, a, previousPeriod,
+                new BigDecimal("300000"), new BigDecimal("240000"));
+        carriedHeld.setStatus(ProviderRevenueStatus.PENDING);
+        carriedHeld.setDeferredReason(DeferredReason.BOOKING_NOT_COMPLETED);
+
+        // Khoản của kỳ VỀ SAU ⇒ TUYỆT ĐỐI không được lọt vào danh sách của kỳ này.
+        ProviderRevenue futureHeld = revenue(3L, a, laterPeriod,
+                new BigDecimal("900000"), new BigDecimal("720000"));
+        futureHeld.setStatus(ProviderRevenueStatus.PENDING);
+        futureHeld.setDeferredReason(DeferredReason.BOOKING_NOT_COMPLETED);
+
+        lenient().when(revenueRepository.findByRevenuePeriod(CLOSED_PERIOD))
+                .thenReturn(List.of(ownHeld));
+        lenient().when(revenueRepository.findUnsettledByAllProviders())
+                .thenReturn(List.of(ownHeld, carriedHeld, futureHeld));
+        lenient().when(revenueService.evaluateEligibility(1L)).thenReturn(
+                EligibilityEvaluationResponse.builder().eligible(false).build());
+        lenient().when(revenueService.evaluateEligibility(2L)).thenReturn(
+                EligibilityEvaluationResponse.builder().eligible(false).build());
+        lenient().when(revenueService.evaluateEligibility(3L)).thenReturn(
+                EligibilityEvaluationResponse.builder().eligible(false).build());
+
+        BatchSettlementCandidatesResponse result = service.getBatchCandidates(CLOSED_PERIOD);
+
+        assertEquals(2, result.held().size(),
+                "Gồm khoản của kỳ này + khoản đẩy từ kỳ trước, KHÔNG gồm khoản kỳ về sau");
+
+        BatchSettlementCandidatesResponse.HeldItem own = result.held().stream()
+                .filter(h -> h.revenueId().equals(1L)).findFirst().orElseThrow();
+        assertEquals(CLOSED_PERIOD, own.revenuePeriod());
+        assertFalse(Boolean.TRUE.equals(own.carriedOver()), "Khoản của kỳ này không phải carriedOver");
+
+        BatchSettlementCandidatesResponse.HeldItem carried = result.held().stream()
+                .filter(h -> h.revenueId().equals(2L)).findFirst().orElseThrow();
+        assertEquals(previousPeriod, carried.revenuePeriod(), "Khoản đẩy sang giữ nguyên kỳ GỐC");
+        assertTrue(Boolean.TRUE.equals(carried.carriedOver()), "Khoản đẩy từ kỳ trước phải có cờ carriedOver");
+    }
+
+    @Test
+    @DisplayName("Khoản đã đủ điều kiện của kỳ cũ KHÔNG bị kéo sang kỳ mới")
+    void getBatchCandidates_doesNotCarryOldEligibleRevenue() {
+        ProviderProfile a = partner(10L, "Đối tác A");
+        String olderPeriod = SettlementPeriod
+                .of(YearMonth.now().minusMonths(3), SettlementPeriod.CYCLE_COUNT)
+                .toPeriodString();
+
+        // Khoản của kỳ cũ — đã đủ điều kiện nhưng chưa có đợt (đợt của kỳ đó được tạo riêng).
+        ProviderRevenue oldEligible = revenue(1L, a, olderPeriod,
+                new BigDecimal("1000000"), new BigDecimal("800000"));
+
+        lenient().when(revenueRepository.findByRevenuePeriod(CLOSED_PERIOD)).thenReturn(List.of());
+        lenient().when(revenueRepository.findUnsettledByAllProviders())
+                .thenReturn(List.of(oldEligible));
+        lenient().when(revenueRepository.findById(1L)).thenReturn(Optional.of(oldEligible));
+        lenient().when(revenueService.evaluateEligibility(1L))
+                .thenReturn(EligibilityEvaluationResponse.builder().eligible(true).build());
+
+        BatchSettlementCandidatesResponse result = service.getBatchCandidates(CLOSED_PERIOD);
+
+        assertTrue(result.eligible().isEmpty(),
+                "Khoản đã đủ điều kiện của kỳ cũ KHÔNG được kéo sang đợt của kỳ mới");
     }
 
     // ── Tạo đợt tổng ─────────────────────────────────────────────────────
@@ -264,8 +466,8 @@ class BatchSettlementServiceTest {
             }
             return s;
         });
-        lenient().when(settlementRepository.findFirstByScopeAndRevenuePeriod(
-                eq(SettlementScope.BATCH), eq(CLOSED_PERIOD))).thenReturn(Optional.empty());
+        lenient().when(settlementRepository.findByScopeAndRevenuePeriod(
+                eq(SettlementScope.BATCH), eq(CLOSED_PERIOD))).thenReturn(List.of());
         lenient().when(detailRepository.findBySettlementIdWithRevenue(anyLong())).thenReturn(List.of());
 
         service.createBatchSettlement(
@@ -306,8 +508,8 @@ class BatchSettlementServiceTest {
                 .settlementCode("ST-EXISTING")
                 .build();
 
-        when(settlementRepository.findFirstByScopeAndRevenuePeriod(
-                eq(SettlementScope.BATCH), eq(CLOSED_PERIOD))).thenReturn(Optional.of(existing));
+        when(settlementRepository.findByScopeAndRevenuePeriod(
+                eq(SettlementScope.BATCH), eq(CLOSED_PERIOD))).thenReturn(List.of(existing));
 
         AppException ex = assertThrows(AppException.class, () ->
                 service.createBatchSettlement(
@@ -320,7 +522,7 @@ class BatchSettlementServiceTest {
     @Test
     @DisplayName("Từ chối tạo đợt tổng cho kỳ CHƯA kết thúc")
     void createBatchSettlement_rejectsOpenPeriod() {
-        String openPeriod = YearMonth.now().toString();
+        String openPeriod = openPeriod();
 
         AppException ex = assertThrows(AppException.class, () ->
                 service.createBatchSettlement(
@@ -346,8 +548,69 @@ class BatchSettlementServiceTest {
                         .eligible(false)
                         .deferredReason(DeferredReason.BOOKING_NOT_COMPLETED)
                         .build());
-        lenient().when(settlementRepository.findFirstByScopeAndRevenuePeriod(
-                eq(SettlementScope.BATCH), eq(CLOSED_PERIOD))).thenReturn(Optional.empty());
+        lenient().when(settlementRepository.findByScopeAndRevenuePeriod(
+                eq(SettlementScope.BATCH), eq(CLOSED_PERIOD))).thenReturn(List.of());
+
+        AppException ex = assertThrows(AppException.class, () ->
+                service.createBatchSettlement(
+                        new CreateBatchSettlementRequest(CLOSED_PERIOD, null), 1L));
+
+        assertNotNull(ex.getMessage());
+        verify(settlementRepository, never()).save(any(Settlement.class));
+    }
+
+    // ── Từ chối → tạo lại thủ công ──────────────────────────────────────
+
+    @Test
+    @DisplayName("Tạo lại được đợt tổng cho kỳ đã bị TỪ CHỐI")
+    void createBatchSettlement_allowsRecreateAfterRejection() {
+        ProviderProfile a = partner(10L, "Đối tác A");
+
+        // Đợt cũ đã bị từ chối ⇒ không còn chiếm chỗ ⇒ Admin tạo lại được.
+        Settlement rejected = Settlement.builder()
+                .id(100L)
+                .scope(SettlementScope.BATCH)
+                .revenuePeriod(CLOSED_PERIOD)
+                .status(SettlementStatus.REJECTED)
+                .settlementCode("ST-REJECTED")
+                .build();
+
+        List<ProviderRevenue> revenues = List.of(
+                revenue(1L, a, CLOSED_PERIOD, new BigDecimal("1000000"), new BigDecimal("800000"))
+        );
+        stubCandidates(revenues);
+
+        when(settlementRepository.findByScopeAndRevenuePeriod(
+                eq(SettlementScope.BATCH), eq(CLOSED_PERIOD))).thenReturn(List.of(rejected));
+        when(settlementRepository.save(any(Settlement.class))).thenAnswer(inv -> {
+            Settlement s = inv.getArgument(0);
+            if (s.getId() == null) {
+                s.setId(200L);
+            }
+            return s;
+        });
+        lenient().when(detailRepository.findBySettlementIdWithRevenue(anyLong())).thenReturn(List.of());
+
+        SettlementResponse created = service.createBatchSettlement(
+                new CreateBatchSettlementRequest(CLOSED_PERIOD, "Tạo lại sau khi từ chối"), 1L);
+
+        assertEquals(CLOSED_PERIOD, created.revenuePeriod());
+        assertEquals(SettlementStatus.DRAFT, created.status());
+    }
+
+    @Test
+    @DisplayName("Từ chối tạo lại khi kỳ có đợt ĐANG CHỜ DUYỆT")
+    void createBatchSettlement_rejectsRecreateWhileOpenBatchExists() {
+        Settlement open = Settlement.builder()
+                .id(100L)
+                .scope(SettlementScope.BATCH)
+                .revenuePeriod(CLOSED_PERIOD)
+                .status(SettlementStatus.DRAFT)
+                .settlementCode("ST-DRAFT")
+                .build();
+
+        when(settlementRepository.findByScopeAndRevenuePeriod(
+                eq(SettlementScope.BATCH), eq(CLOSED_PERIOD))).thenReturn(List.of(open));
 
         AppException ex = assertThrows(AppException.class, () ->
                 service.createBatchSettlement(

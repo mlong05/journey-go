@@ -9,6 +9,7 @@ import com.journeygo.modules.booking.repository.BookingRepository;
 import com.journeygo.modules.providerchat.dto.request.SendProviderMessageRequest;
 import com.journeygo.modules.providerchat.dto.request.StartProviderConversationRequest;
 import com.journeygo.modules.providerchat.dto.response.ProviderConversationResponse;
+import com.journeygo.modules.providerchat.dto.response.ProviderMessagePageResponse;
 import com.journeygo.modules.providerchat.dto.response.ProviderMessageResponse;
 import com.journeygo.modules.providerchat.entity.ProviderConversation;
 import com.journeygo.modules.providerchat.entity.ProviderMessage;
@@ -20,6 +21,9 @@ import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +63,13 @@ public class ProviderChatService {
     private final BookingPassengerRepository passengerRepository;
     private final com.journeygo.modules.realtime.service.RealtimeHub realtimeHub;
     private final com.journeygo.modules.notification.service.NotificationPublisher notifications;
+
+    /**
+     * Số tin nhắn tối đa cho 1 trang khi phân trang kiểu "cuộn lên để load thêm".
+     *
+     * <p>Frontend mặc định 10 tin / trang ⇒ giá trị này chỉ là trần an toàn.
+     */
+    private static final int MAX_PAGE_SIZE = 100;
 
     // ── Mở cuộc trò chuyện ─────────────────────────────────────────────────────
 
@@ -281,6 +292,73 @@ public class ProviderChatService {
         }
 
         return toResponses(messages);
+    }
+
+    /**
+     * Trang tin nhắn MỚI NHẤT của cuộc trò chuyện — phân trang kiểu "cuộn lên để
+     * load thêm".
+     *
+     * <p>⚠️ Luôn trả về {@code limit} tin MỚI NHẤT (mặc định 10). Muốn xem lịch sử
+     * cũ hơn thì gọi lại với {@code beforeId} = {@code nextCursor} của lần trước.
+     *
+     * <p>⚠️ Tin nhắn được trả về theo thứ tự thời gian TĂNG dần (tin cũ ở trên,
+     * tin mới ở dưới) ⇒ frontend render thẳng, không cần đảo mảng.
+     *
+     * <p>⚠️ Đánh dấu đã đọc CHỈ cho các tin nằm TRONG trang vừa trả về (đúng phía
+     * đang xem) — không đụng tới tin cũ chưa tải.
+     *
+     * @param conversationId ID cuộc trò chuyện
+     * @param readerId       người đang đọc (đánh dấu đã đọc đúng phía)
+     * @param limit          số tin tối đa mỗi trang (mặc định 10)
+     * @param beforeId       chỉ lấy tin có id NHỎ HƠN mốc này (null = lấy mới nhất)
+     */
+    @Transactional
+    public ProviderMessagePageResponse listMessagesPage(Long conversationId, Long readerId,
+                                                        int limit, Long beforeId) {
+        ProviderConversation conversation = requireConversation(conversationId);
+        requireAccess(conversation, readerId);
+
+        int safeLimit = Math.max(1, Math.min(limit, MAX_PAGE_SIZE));
+        // Lấy (limit + 1) tin để biết còn trang kế tiếp hay không.
+        Pageable pageable = PageRequest.of(0, safeLimit + 1, Sort.by(Sort.Direction.DESC, "id"));
+
+        List<ProviderMessage> fetched = beforeId == null
+                ? messageRepository.findByConversation_IdOrderByIdDesc(conversationId, pageable)
+                : messageRepository.findByConversation_IdAndIdLessThanOrderByIdDesc(
+                        conversationId, beforeId, pageable);
+
+        boolean hasMore = fetched.size() > safeLimit;
+        List<ProviderMessage> page = hasMore
+                ? fetched.subList(0, safeLimit)
+                : fetched;
+
+        // Đánh dấu đã đọc cho những tin gửi TỪ phía đối tác (đối với đối tác đang
+        // đọc thì "phía đối tác" = tin của khách) nằm trong trang này.
+        Instant now = Instant.now();
+        List<ProviderMessage> unread = page.stream()
+                .filter(m -> !readerId.equals(m.getSenderId()) && !m.isRead())
+                .toList();
+        for (ProviderMessage m : unread) {
+            m.setReadAt(now);
+        }
+        if (!unread.isEmpty()) {
+            messageRepository.saveAll(unread);
+        }
+
+        // Đảo lại để trả về theo thứ tự thời gian TĂNG dần (cũ → mới).
+        List<ProviderMessage> ordered = new ArrayList<>(page);
+        java.util.Collections.reverse(ordered);
+
+        // nextCursor = id của tin CŨ NHẤT trong trang ⇒ lần sau lấy tin có id nhỏ hơn.
+        Long nextCursor = hasMore && !ordered.isEmpty()
+                ? ordered.get(0).getId()
+                : null;
+
+        return new ProviderMessagePageResponse(
+                toResponses(ordered),
+                hasMore,
+                nextCursor,
+                messageRepository.countByConversation_Id(conversationId));
     }
 
     /**

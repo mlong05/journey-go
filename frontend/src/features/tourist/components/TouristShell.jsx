@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, LogOut, LayoutDashboard, ChevronDown, UserRound, MessageCircle, Gift, Sparkles } from "lucide-react";
 import BrandLogo from "@/components/brand/BrandLogo";
 import { LogoutModal, useLogout } from "@/features/auth";
+import { AiGuideFloatingWidget } from "@/features/aiguide";
 import { ROUTES } from "@/constants/routes";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { touristService } from "../services/touristService";
@@ -14,6 +15,7 @@ import { PAGE_EVENT, rememberPage } from "../navigation";
 import "../tourist-motion.css";
 import TouristNotificationBell from "./TouristNotificationBell";
 import TouristNotificationProvider from "./TouristNotificationProvider";
+import { PendingBookingBar } from "./PendingBooking";
 
 const NAV = [
   { href: ROUTES.HOME, label: "Khám phá", match: (p) => p === "/" },
@@ -35,6 +37,7 @@ const initials = (name) =>
 const TOURIST_MENU = [
   [ROUTES.ACCOUNT, "Tài khoản của tôi", UserRound],
   [ROUTES.ACCOUNT_TOUR_REQUESTS, "Tour theo nhu cầu", Sparkles],
+  [ROUTES.ACCOUNT_AI_GUIDE, "Hướng dẫn viên AI", Sparkles],
   [ROUTES.ACCOUNT_MESSAGES, "Tin nhắn", MessageCircle, "unread"],
   [ROUTES.ACCOUNT_REWARDS, "Điểm thưởng & voucher", Gift],
 ];

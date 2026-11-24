@@ -236,11 +236,11 @@ class _ExperienceDateCalendarState extends State<ExperienceDateCalendar> {
           const SizedBox(height: 8),
           const Row(
             children: [
-              _LegendDot(color: Color(0xFF10B981), label: 'Còn chỗ'),
+              _LegendDot(color: AppCultureColors.jade400, label: 'Còn chỗ'),
               SizedBox(width: 12),
-              _LegendDot(color: Color(0xFFF59E0B), label: 'Sắp hết'),
+              _LegendDot(color: AppCultureColors.brass500, label: 'Sắp hết'),
               SizedBox(width: 12),
-              _LegendDot(color: Color(0xFFCBD5E1), label: 'Hết chỗ'),
+              _LegendDot(color: AppCultureColors.ink200, label: 'Hết chỗ'),
             ],
           ),          const SizedBox(height: 6),
           Center(
@@ -304,8 +304,8 @@ class _ExperienceDateCalendarState extends State<ExperienceDateCalendar> {
       badgeBg = Colors.transparent;
       badgeFg = AppCultureColors.textLight;
     } else if (remaining <= 3) {
-      badgeBg = const Color(0xFFFEF3C7);
-      badgeFg = const Color(0xFF92400E);
+      badgeBg = AppCultureColors.brass100;
+      badgeFg = AppCultureColors.brass800;
     } else {
       badgeBg = AppCultureColors.jadeLight;
       badgeFg = AppCultureColors.jadeDark;

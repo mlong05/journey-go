@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  AlertTriangle,
+  ArrowRightLeft,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -28,6 +28,7 @@ import {
   createBatchSettlement,
   getAllSettlements,
   getBatchSettlementCandidates,
+  getBatchSettlementHeldItems,
   getPlatformRevenueSummary,
   getSettlementById,
   getSettlementDetails,
@@ -42,6 +43,7 @@ import { getBookingById } from "@/features/booking/services/bookingService";
 import { getPaymentsByBooking } from "@/features/payment/services/paymentService";
 import {
   BOOKING_STATUS_LABELS,
+  daysInVietnamMonth,
   DEFERRED_REASON_LABELS,
   formatDateTimeVN,
   formatLocalDate,
@@ -51,20 +53,36 @@ import {
   formatVND,
   MONTH_NAMES_VI,
   normalizePage,
+  parseSettlementPeriod,
+  previousSettlementPeriod,
   PROVIDER_REVENUE_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
-  previousMonth,
   SETTLEMENT_STATUS_LABELS,
   settlementCheckLabel,
   VN_TIME_ZONE,
 } from "@/lib/money";
 import { LimitedField } from "@/components/ui/LimitedField";
 import { PAGE_SIZE } from "@/lib/pagination";
+import { useClientOnlyValue } from "@/hooks/useClientOnlyValue";
 
 const TABS = [
   { id: "overview", label: "Tổng quan & Duyệt đợt" },
   { id: "candidates", label: "Tạo đợt tất toán" },
 ];
+
+/**
+ * Giá trị CỐ ĐỊNH dùng cho SSR & render đầu ở client.
+ *
+ * Mục đích: tránh lỗi hydration của React. `previousSettlementPeriod()` và
+ * "hôm nay" phụ thuộc thời điểm hiện tại — server (UTC) và client có thể rơi
+ * vào 2 kỳ khác nhau quanh nửa đêm ⇒ HTML server-render ≠ HTML render đầu client.
+ *
+ * ⇒ Với SSR & render đầu client dùng kỳ "kỳ 2 của tháng 1/2024" (một kỳ đã đóng
+ *   nên vẫn chọn được, và sau khi mount sẽ thay bằng kỳ thật).
+ */
+const DEFAULT_SETTLEMENT_PERIOD = "2024-01-2";
+const DEFAULT_SETTLEMENT_PERIOD_YEAR = 2024;
+const DEFAULT_VN_TODAY = { year: 2024, month: 1, day: 20 };
 
 /**
  * Trang Quản trị Tất toán — JourneyGo.
@@ -506,10 +524,31 @@ function SettlementOverviewTab() {
  *
  * NAY: chỉ cần chọn KỲ doanh thu ⇒ đợt sẽ bao gồm TOÀN BỘ đối tác.
  *  • Chỉ khoản ĐỦ ĐIỀU KIỆN mới vào đợt (giữ nguyên logic lọc hiện tại).
- *  • Khoản BỊ GIỮ LẠI không vào đợt — vẫn hiện kèm lý do, xét lại ở kỳ sau.
+ *  • Khoản BỊ GIỮ LẠI không vào đợt — vẫn hiện kèm lý do, xét lại ở kỳ của chính nó.
+ *  • Đợt CHỈ gom giao dịch thuộc ĐÚNG kỳ đã chọn — chọn "Kỳ 2 · 11–20/08/2026"
+ *    thì chỉ thấy giao dịch có ngày hoàn thành trong khoảng 11–20/08/2026.
+ *
+ * ── Kỳ 10 ngày ──
+ * Kỳ tất toán chia mỗi tháng thành 3 kỳ (01-10, 11-20, 21-cuối tháng).
+ * Ngoài ra hệ thống TỰ ĐỘNG tạo đợt khi kỳ vừa kết thúc ⇒ đợt thường đã có sẵn
+ * ở trạng thái "Chờ duyệt" và Admin chỉ cần xem xét rồi duyệt.
+ *
+ * ── Luồng từ chối ──
+ * Admin từ chối đợt (tab "Tổng quan & Duyệt đợt") ⇒ khoản doanh thu được giải phóng
+ * về trạng thái đủ điều kiện ⇒ quay lại tab này, chọn LẠI kỳ doanh thu rồi bấm
+ * "Tạo đợt tất toán" để tạo đợt mới cho kỳ đó.
  */
 function SettlementCandidatesTab() {
-  const [revenuePeriod, setRevenuePeriod] = useState(previousMonth());
+  // ⚠️ An toàn hydration: kỳ mặc định phụ thuộc thời điểm hiện tại (server vs client
+  // có thể khác nhau quanh nửa đêm) ⇒ dùng `useClientOnlyValue` với giá trị cố định
+  // cho SSR, sau khi mount mới thay bằng kỳ thật.
+  const defaultPeriod = useClientOnlyValue(
+    () => previousSettlementPeriod(),
+    DEFAULT_SETTLEMENT_PERIOD,
+  );
+  // Kỳ do Admin CHỌN — null ⇒ đang dùng kỳ mặc định (kỳ vừa kết thúc).
+  const [pickedPeriod, setPickedPeriod] = useState(null);
+  const revenuePeriod = pickedPeriod || defaultPeriod;
   const [candidates, setCandidates] = useState(null);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [error, setError] = useState("");
@@ -615,21 +654,24 @@ function SettlementCandidatesTab() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
           <Field
             label="Kỳ doanh thu"
-            hint="Chỉ tạo được cho tháng đã kết thúc. Mặc định là tháng trước."
+            hint="Tất toán theo chu kỳ 10 ngày: K1 = 01-10, K2 = 11-20, K3 = 21-cuối tháng. Đợt chỉ gom giao dịch thuộc đúng kỳ đã chọn. Chỉ chọn kỳ đã kết thúc."
           >
-            <MonthPicker value={revenuePeriod} onChange={setRevenuePeriod} />
+            <PeriodPicker
+              value={revenuePeriod}
+              onChange={(next) => setPickedPeriod(next)}
+            />
           </Field>
 
           <Field
             label="Ghi chú đối soát (không bắt buộc)"
-            hint="Ghi chú nội bộ cho đợt này, ví dụ: 'Đối soát tháng 9/2026'."
+            hint="Ghi chú nội bộ cho đợt này, ví dụ: 'Đối soát kỳ 01-10/10/2026'."
           >
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               maxLength={2000}
-              placeholder="VD: Đối soát tháng 9/2026"
+              placeholder="VD: Đối soát kỳ 01-10/10/2026"
               className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs focus:bg-white focus:outline-none"
             />
           </Field>
@@ -755,7 +797,7 @@ function SettlementCandidatesTab() {
                           {r?.bookingCode ?? `#${r?.bookingId}`}
                         </p>
                         <p className="mt-0.5 text-[11px] text-slate-500">
-                          {r?.txnRef ?? "—"} · Kỳ {formatPeriod(r?.revenuePeriod)}
+                          {r?.txnRef ?? "—"}
                         </p>
                         {/* Tên đối tác — quan trọng vì đợt gom nhiều đối tác. */}
                         <p className="mt-0.5 text-[11px] font-medium text-emerald-700">
@@ -814,21 +856,27 @@ function SettlementCandidatesTab() {
                         <p className="font-mono text-xs font-semibold text-slate-800">
                           {h?.bookingCode ?? (h?.bookingId ? `Đơn #${h.bookingId}` : `#${h?.revenueId}`)}
                         </p>
-                        {/* Kỳ gốc ngay dưới mã đơn */}
-                        <p className="mt-0.5 text-[11px] text-slate-500">
-                          Kỳ gốc: {formatPeriod(h?.revenuePeriod)}
-                        </p>
                         {/* Tên đối tác — đợt gom nhiều đối tác nên cần biết ai bị giữ. */}
                         <p className="mt-0.5 text-[11px] font-medium text-amber-700">
                           {h?.providerName ?? "—"}
                         </p>
                         {/* LÝ DO BỊ GIỮ LẠI — hiện thẳng ở danh sách để Admin
                             không phải mở modal mới biết vì sao khoản này chưa
-                            được tất toán. */}
-                        <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-800">
-                          <AlertTriangle size={9} className="shrink-0" />
+                            được tất toán.
+                            ⚠️ `flex` (không phải `inline-flex`) để badge nằm TRỌN
+                            một dòng — nếu `inline-flex` thì 2 badge sẽ xếp cạnh
+                            nhau và dính sát không tách. */}
+                        <p className="mt-1 flex w-fit items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-800">
                           {DEFERRED_REASON_LABELS[h?.deferredReason] ?? h?.deferredReason ?? "Chưa đủ điều kiện"}
                         </p>
+                        {/* Khoản ĐÃ BỊ ĐẨY từ kỳ trước sang kỳ này và vẫn chưa đủ
+                            điều kiện. Hiện kỳ GỐC để Admin biết nó đang chờ từ lâu. */}
+                        {h?.carriedOver ? (
+                          <p className="mt-1.5 flex w-fit items-center gap-1 rounded-md bg-sky-100 px-1.5 py-0.5 text-[10.5px] font-medium text-sky-800">
+                            <ArrowRightLeft size={9} className="shrink-0" />
+                            Đẩy từ kỳ {formatPeriodVN(h?.revenuePeriod)} · vẫn chưa đủ điều kiện
+                          </p>
+                        ) : null}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="font-mono text-xs font-semibold text-slate-600">
@@ -1017,15 +1065,16 @@ function useSettlementOverview() {
  */
 function PeriodRevenuePanel({ revenue, className = "" }) {
   const { summary, periods, loading, error, load } = revenue;
-  // Mức tổng hợp của biểu đồ cột: theo THÁNG hay theo NĂM.
-  const [granularity, setGranularity] = useState("month");
+  // Mức tổng hợp của biểu đồ cột: theo KỲ 10 NGÀY / theo THÁNG / theo NĂM.
+  const [granularity, setGranularity] = useState("cycle");
   const maxPlatform = periods.reduce(
     (max, p) => Math.max(max, Number(p?.platformRevenue ?? 0)),
     0,
   );
 
   // ── Chuỗi dữ liệu cho biểu đồ cột ──
-  // Theo tháng: mỗi kỳ doanh thu (yyyy-MM) là một cột.
+  // Theo kỳ: mỗi CHU KỲ 10 NGÀY (yyyy-MM-D) là một cột.
+  // Theo tháng: gom 3 kỳ của cùng một tháng lại.
   // Theo năm: gom các kỳ của cùng một năm lại (so sánh doanh thu giữa các năm).
   const chartRows = useMemo(() => {
     const rows = periods.map((p) => ({
@@ -1034,9 +1083,25 @@ function PeriodRevenuePanel({ revenue, className = "" }) {
       platform: Number(p?.platformRevenue ?? 0),
       partner: Number(p?.providerNetAmount ?? 0),
     }));
-    if (granularity === "month") {
+    if (granularity === "cycle") {
       // Cũ → mới để biểu đồ đọc theo chiều thời gian.
       return [...rows].reverse();
+    }
+    if (granularity === "month") {
+      const byMonth = new Map();
+      for (const r of rows) {
+        const month = String(r.key ?? "").slice(0, 7) || "—";
+        const acc = byMonth.get(month) ?? {
+          key: month,
+          label: `T${month.slice(5, 7)}/${month.slice(2, 4)}`,
+          platform: 0,
+          partner: 0,
+        };
+        acc.platform += r.platform;
+        acc.partner += r.partner;
+        byMonth.set(month, acc);
+      }
+      return Array.from(byMonth.values()).sort((a, b) => a.key.localeCompare(b.key));
     }
     const byYear = new Map();
     for (const r of rows) {
@@ -1064,9 +1129,10 @@ function PeriodRevenuePanel({ revenue, className = "" }) {
           </p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Chuyển mức tổng hợp: theo tháng ↔ theo năm */}
+          {/* Chuyển mức tổng hợp: theo kỳ 10 ngày ↔ theo tháng ↔ theo năm */}
           <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
             {[
+              { id: "cycle", label: "Kỳ 10n" },
               { id: "month", label: "Tháng" },
               { id: "year", label: "Năm" },
             ].map((g) => (
@@ -1835,9 +1901,7 @@ function ProviderRevenueDetailModal({ revenue, onClose }) {
           >
             {eligible ? (
               <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
-            ) : (
-              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
-            )}
+            ) : null}
             <div className="min-w-0">
               <p
                 className={`text-xs font-bold ${
@@ -1982,6 +2046,10 @@ function SettlementDetailModal({ settlementId, onClose }) {
   const [details, setDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Khoản BỊ GIỮ LẠI của kỳ (chưa đủ điều kiện ⇒ không vào đợt). Đợt có thể được
+  // hệ thống TỰ ĐỘNG tạo ⇒ Admin cần thấy được phần đang bị đọng trong chính kỳ đó.
+  const [held, setHeld] = useState([]);
+  const [heldMeta, setHeldMeta] = useState(null);
   // Đối tác đang chọn trong bảng tổng hợp — lọc bảng chi tiết bên dưới.
   // null = xem tất cả.
   const [partnerFilter, setPartnerFilter] = useState(null);
@@ -2007,6 +2075,27 @@ function SettlementDetailModal({ settlementId, onClose }) {
       active = false;
     };
   }, [settlementId]);
+
+  // Khoản bị giữ lại — gọi RIÊNG theo kỳ của đợt. Lỗi ở đây KHÔNG được làm hỏng
+  // modal (thông tin chính vẫn tải được) ⇒ chỉ hiện cảnh báo nhỏ.
+  useEffect(() => {
+    let active = true;
+    if (!settlement?.revenuePeriod) return undefined;
+    getBatchSettlementHeldItems(settlement.revenuePeriod)
+      .then((h) => {
+        if (!active) return;
+        setHeld(Array.isArray(h?.held) ? h.held : []);
+        setHeldMeta(h ?? null);
+      })
+      .catch(() => {
+        if (!active) return;
+        setHeld([]);
+        setHeldMeta(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [settlement?.revenuePeriod]);
 
   // ── Tổng hợp TOÀN BỘ đối tác trong đợt ──
   // Đợt TỔNG gom doanh thu của nhiều đối tác ⇒ Admin cần thấy ngay ai được
@@ -2226,6 +2315,89 @@ function SettlementDetailModal({ settlementId, onClose }) {
                   </table>
                 </div>
               </div>
+
+              {/* ── KHOẢN BỊ GIỮ LẠI (chưa đủ điều kiện) ──
+                  Đợt có thể được hệ thống TỰ ĐỘNG tạo ⇒ mở đợt ra chỉ thấy các khoản
+                  ĐỦ ĐIỀU KIỆN (đã vào đợt). Block này cho Admin thấy phần đang BỊ ĐỌNG
+                  trong chính kỳ đó, kèm lý do — để biết tiền nào chưa về và vì sao.
+                  Các khoản này KHÔNG bị mất: kỳ kế tiếp sẽ xét lại, đủ điều kiện thì
+                  vào đợt kỳ sau và được trả tiền cho đối tác. */}
+              <div className="mt-4 shrink-0">
+                <div className="mb-2 flex items-center justify-between gap-2 shrink-0">
+                  <h3 className="text-[11px] font-semibold text-slate-500">
+                    Bị giữ lại — chưa đủ điều kiện ({held.length})
+                  </h3>
+                  {held.length > 0 && heldMeta?.carriedTo ? (
+                    <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10.5px] font-medium text-amber-700">
+                      Sẽ xét lại ở kỳ {formatPeriod(heldMeta.carriedTo)}
+                    </span>
+                  ) : null}
+                </div>
+
+                {held.length === 0 ? (
+                  <p className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-[11px] text-slate-500">
+                    Không có khoản nào của kỳ này bị giữ lại — toàn bộ đã đủ điều kiện
+                    và được gom vào đợt.
+                  </p>
+                ) : (                  <div className="rounded-xl border border-amber-100 bg-amber-50/40">
+                    <table className="w-full text-left text-[11px] border-collapse">
+                      <thead>
+                        <tr className="text-[10.5px] font-semibold text-amber-800/70 border-b border-amber-100">
+                          <th className="py-2 px-2">Mã đơn</th>
+                          <th className="py-2 px-2">Đối tác</th>
+                          <th className="py-2 px-2">Lý do giữ lại</th>
+                          <th className="py-2 px-2 text-right">Tiền đối tác chờ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-amber-100/70">
+                        {held.map((h) => (
+                          <tr key={h?.revenueId} className="align-middle">
+                            <td className="py-2 px-2 font-mono text-[10.5px] text-slate-700">
+                              {h?.bookingCode ?? `#${h?.bookingId ?? "—"}`}
+                            </td>
+                            <td className="py-2 px-2 text-slate-700">{h?.providerName ?? "—"}</td>
+                            <td className="py-2 px-2">
+                              {/* Chỉ hiện LÝ DO giữ lại (VD: "Còn yêu cầu hoàn tiền").
+                                  Danh sách điều kiện chưa đạt chi tiết quá rườm rà,
+                                  Admin chỉ cần biết VÌ SAO bị giữ.
+                                  ⚠️ `flex` + `w-fit` để badge nằm trọn một dòng;
+                                  nếu `inline-flex` thì 2 badge xếp cạnh nhau,
+                                  dính sát không tách. */}
+                              <span className="flex w-fit items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-800">
+                                {DEFERRED_REASON_LABELS[h?.deferredReason] ??
+                                  h?.deferredReason ??
+                                  "Chưa đủ điều kiện"}
+                              </span>
+                              {/* Khoản đã bị ĐẨY từ kỳ trước sang kỳ này và vẫn
+                                  chưa đủ điều kiện ⇒ hiện kỳ GỐC cho Admin biết
+                                  nó đang chờ từ kỳ nào. */}
+                              {h?.carriedOver ? (
+                                <span className="mt-1.5 flex w-fit items-center gap-1 rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-800">
+                                  <ArrowRightLeft size={9} className="shrink-0" />
+                                  Đẩy từ kỳ {formatPeriodVN(h?.revenuePeriod)}
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono font-semibold text-amber-700">
+                              {formatVND(h?.providerNetAmount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-amber-100 text-[10.5px] font-bold text-amber-900">
+                          <td className="py-2 px-2" colSpan={3}>
+                            TỔNG CỘNG — {heldMeta?.partnerCount ?? 0} đối tác
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono">
+                            {formatVND(heldMeta?.totalAmount)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* ══ CỘT PHẢI: Các khoản doanh thu trong đợt ══ */}
@@ -2247,16 +2419,19 @@ function SettlementDetailModal({ settlementId, onClose }) {
                 ) : (
                   // Container cha đã `overflow-auto` ⇒ đây chính là scroll
                   // container, sticky header bám đúng vào nó.
-                  // `min-w-[1000px]` ⇒ khi khung hẹp, bảng cuộn NGANG thay vì bị
+                  // `min-w-[980px]` ⇒ khi khung hẹp, bảng cuộn NGANG thay vì bị
                   // bóp dẹp làm các cột "Mã GD / Mã đơn" dồn chữ, và đủ rộng cho
                   // cả cột "Voucher" + "Hoàn tiền" mà không chen chúc.
-                  <table className="w-full min-w-[1150px] text-left text-[11px] border-collapse">
+                  <table className="w-full min-w-[980px] text-left text-[11px] border-collapse">
                     {/* Sticky header — tiêu đề cột luôn nhìn thấy khi cuộn */}
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-white border-b border-slate-200 text-[10.5px] font-semibold text-slate-500">
                         <th className="py-2 px-2">Mã GD / Mã đơn</th>
                         <th className="py-2 px-2">Đối tác</th>
-                        <th className="py-2 px-2">Kỳ</th>
+                        {/* ⚠️ KHÔNG có cột "Kỳ" — cột trái của modal đã hiện
+                            "Kỳ doanh thu" của đợt. Mọi khoản trong đợt đều thuộc
+                            ĐÚNG kỳ đó (mỗi đợt chỉ gom giao dịch của kỳ mình)
+                            ⇒ lặp lại ở từng dòng chỉ là nhiễu. */}
                         <th className="py-2 px-2 text-right">Tổng tiền</th>
                         {/* Voucher & Hoàn tiền là TUỲ CHỌN THEO GIAO DỊCH — không
                             phải giao dịch nào cũng có ⇒ giao dịch không có thì "—". */}
@@ -2283,9 +2458,6 @@ function SettlementDetailModal({ settlementId, onClose }) {
                             </span>
                           </td>
                           <td className="py-2 px-2 text-slate-600">{d?.providerName ?? "—"}</td>
-                          <td className="py-2 px-2 text-slate-600">
-                            {formatPeriod(d?.revenuePeriod)}
-                          </td>
                           <td className="py-2 px-2 text-right font-mono text-slate-600">
                             {formatVND(d?.grossAmount)}
                           </td>
@@ -2335,7 +2507,6 @@ function SettlementDetailModal({ settlementId, onClose }) {
                     <tfoot className="sticky bottom-0 z-10">
                       <tr className="border-t border-slate-200 bg-slate-50 text-[10.5px] font-bold text-slate-700">
                         <td className="py-2 px-2">TỔNG CỘNG ({visibleDetails.length})</td>
-                        <td className="py-2 px-2" />
                         <td className="py-2 px-2" />
                         <td className="py-2 px-2 text-right font-mono">
                           {formatVND(detailTotals.gross)}
@@ -2755,27 +2926,45 @@ function ModalShell({ title, onClose, children, footer, wide = false, xwide = fa
 }
 
 /**
- * Ô chọn KỲ doanh thu — LỊCH TIẾNG VIỆT (thay cho `<input type="month">`).
+ * Ô chọn KỲ doanh thu — CHU KỲ 10 NGÀY (thay cho `<input type="month">`).
  *
  * ── Vì sao không dùng `<input type="month">` ──
  * Trình duyệt dùng bảng chọn tháng theo NGÔN NGỮ của hệ điều hành (Chrome/Edge
  * trên Windows mở picker tiếng Anh: "month", "year", "January"…). Admin dùng
  * tiếng Việt ⇒ giao diện không nhất quán. Component này dựng lại lịch hoàn toàn
- * bằng tiếng Việt: "Tháng 1/2026", các nút "‹" / "›" đổi năm, lưới 12 tháng.
+ * bằng tiếng Việt.
+ *
+ * ── Cấu trúc ──
+ * Mỗi tháng có 3 kỳ tất toán:
+ *   • Kỳ 1 — 01 → 10
+ *   • Kỳ 2 — 11 → 20
+ *   • Kỳ 3 — 21 → cuối tháng
+ * ⇒ Lưới chọn gồm 12 tháng × 3 kỳ = 36 ô (4 cột × 9 hàng), mỗi ô là 1 kỳ.
  *
  * ── Ràng buộc nghiệp vụ ──
- * Kỳ tất toán chỉ được tạo cho tháng ĐÃ KẾT THÚC ⇒ các tháng trong năm hiện tại
- * sau tháng hiện tại bị VÔ HIỆU (disabled, mờ đi).
+ * Kỳ tất toán chỉ được tạo cho kỳ ĐÃ KẾT THÚC ⇒ các kỳ chưa qua bị VÔ HIỆU
+ * (disabled, mờ đi).
  */
-function MonthPicker({ value, onChange, disabled = false }) {
+function PeriodPicker({ value, onChange, disabled = false }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
-  // Kỳ đang chọn: "YYYY-MM". Nếu value rỗng ⇒ mặc định tháng trước.
-  const [fallback] = useState(() => previousMonth());
-  const current = value || fallback;
-  const match = /^(\d{4})-(\d{2})$/.exec(String(current).slice(0, 7));
-  const [viewYear, setViewYear] = useState(() => (match ? Number(match[1]) : new Date().getFullYear()));
+  // Kỳ đang chọn: "YYYY-MM-D". Nếu value rỗng ⇒ mặc định kỳ vừa kết thúc.
+  //
+  // ⚠️ An toàn hydration: `previousSettlementPeriod()` phụ thuộc thời điểm hiện tại,
+  // server (UTC) và client có thể rơi vào 2 kỳ khác nhau quanh nửa đêm ⇒ gọi trực
+  // tiếp trong useState sẽ gây lỗi "Text content does not match server-rendered HTML".
+  // ⇒ Dùng `useClientOnlyValue`: SSR + render đầu client dùng giá trị CỐ ĐỊNH,
+  //   sau khi mount mới thay bằng kỳ thật.
+  const fallbackPeriod = useClientOnlyValue(
+    () => previousSettlementPeriod(),
+    DEFAULT_SETTLEMENT_PERIOD,
+  );
+  const current = value || fallbackPeriod;
+  const parsed = parseSettlementPeriod(current);
+  const [viewYear, setViewYear] = useState(() =>
+    parsed ? parsed.year : DEFAULT_SETTLEMENT_PERIOD_YEAR,
+  );
 
   // Đóng dropdown khi click ra ngoài / bấm Esc.
   useEffect(() => {
@@ -2794,37 +2983,59 @@ function MonthPicker({ value, onChange, disabled = false }) {
     };
   }, [open]);
 
-  // Tháng hiện tại (múi giờ VN) — để chặn kỳ chưa kết thúc.
-  const now = useMemo(() => {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: VN_TIME_ZONE,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-    const [y, m] = parts.split("-");
-    return { year: Number(y), month: Number(m) };
-  }, []);
+  // Hôm nay (múi giờ VN) — để chặn kỳ chưa kết thúc. Cũng an toàn hydration.
+  const now = useClientOnlyValue(
+    () => {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: VN_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      const [y, m, d] = parts.split("-").map(Number);
+      return { year: y, month: m, day: d };
+    },
+    DEFAULT_VN_TODAY,
+  );
 
-  const isFuture = (year, month) =>
-    year > now.year || (year === now.year && month > now.month);
+  /**
+   * Kỳ (year, month, cycle) đã kết thúc chưa.
+   *
+   * Kỳ đóng khi hôm nay ĐÃ QUA ngày cuối của kỳ:
+   *   • Kỳ 1 đóng từ ngày 10 trở đi.
+   *   • Kỳ 2 đóng từ ngày 20 trở đi.
+   *   • Kỳ 3 đóng từ ngày cuối tháng trở đi.
+   */
+  const isClosed = (year, month, cycle) => {
+    if (year < now.year || (year === now.year && month < now.month)) return true;
+    if (year > now.year || (year === now.year && month > now.month)) return false;
+    const daysInMonth = daysInVietnamMonth(year, month);
+    const cycleEnd = cycle === 1 ? 10 : cycle === 2 ? 20 : daysInMonth;
+    return now.day >= cycleEnd;
+  };
 
-  const pick = (year, month) => {
-    if (isFuture(year, month)) return;
-    onChange(`${year}-${String(month).padStart(2, "0")}`);
+  const pick = (year, month, cycle) => {
+    if (!isClosed(year, month, cycle)) return;
+    onChange(`${year}-${String(month).padStart(2, "0")}-${cycle}`);
     setOpen(false);
   };
 
   const toggle = () => {
     if (!open) {
       // Mở ⇒ nhảy về năm của kỳ đang chọn.
-      const m = /^(\d{4})-(\d{2})$/.exec(String(current).slice(0, 7));
-      if (m) setViewYear(Number(m[1]));
+      const p = parseSettlementPeriod(current);
+      if (p) setViewYear(p.year);
     }
     setOpen(!open);
   };
 
-  const label = match ? formatPeriodVN(current) : "Chọn kỳ";
+  const label = parsed ? formatPeriodVN(current) : "Chọn kỳ";
+
+  // 36 kỳ = 12 tháng × 3 kỳ — chia thành 3 cột (mỗi cột 1 tháng, 3 kỳ xếp dọc).
+  const monthBlocks = MONTH_NAMES_VI.map((name, idx) => {
+    const month = idx + 1;
+    return { name, month, cycles: [1, 2, 3] };
+  });
 
   return (
     <div className="relative" ref={wrapRef}>
@@ -2844,7 +3055,7 @@ function MonthPicker({ value, onChange, disabled = false }) {
         <div
           role="dialog"
           aria-label="Chọn kỳ doanh thu"
-          className="absolute left-0 top-full z-40 mt-1 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
+          className="absolute left-0 top-full z-40 mt-1 max-h-[420px] w-[420px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
         >
           {/* Điều hướng năm */}
           <div className="flex items-center justify-between gap-2">
@@ -2868,35 +3079,52 @@ function MonthPicker({ value, onChange, disabled = false }) {
             </button>
           </div>
 
-          {/* Lưới 12 tháng */}
-          <div className="mt-3 grid grid-cols-3 gap-1.5">
-            {MONTH_NAMES_VI.map((name, idx) => {
-              const month = idx + 1;
-              const future = isFuture(viewYear, month);
-              const selected =
-                match && Number(match[1]) === viewYear && Number(match[2]) === month;
-              return (
-                <button
-                  key={name}
-                  type="button"
-                  disabled={future}
-                  onClick={() => pick(viewYear, month)}
-                  className={`rounded-lg px-1 py-2 text-[11px] font-semibold transition-colors ${
-                    selected
-                      ? "bg-sky-600 text-white"
-                      : future
-                        ? "cursor-not-allowed text-slate-300"
-                        : "text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
+          {/* Lưới 12 tháng × 3 kỳ */}
+          <div className="mt-3 grid grid-cols-4 gap-1.5">
+            {monthBlocks.map(({ name, month }) => (
+              <div key={name} className="rounded-lg bg-slate-50/70 p-1">
+                <p className="mb-0.5 text-center text-[10px] font-bold text-slate-500">
                   {name}
-                </button>
-              );
-            })}
+                </p>
+                {[1, 2, 3].map((cycle) => {
+                  const closed = isClosed(viewYear, month, cycle);
+                  const selected =
+                    parsed &&
+                    parsed.year === viewYear &&
+                    parsed.month === month &&
+                    parsed.cycle === cycle;
+                  const range = (() => {
+                    const dim = daysInVietnamMonth(viewYear, month);
+                    const s = cycle === 1 ? "01" : cycle === 2 ? "11" : "21";
+                    const e = cycle === 1 ? "10" : cycle === 2 ? "20" : String(dim);
+                    return `${s}-${e}`;
+                  })();
+                  return (
+                    <button
+                      key={cycle}
+                      type="button"
+                      disabled={!closed}
+                      onClick={() => pick(viewYear, month, cycle)}
+                      title={`${name} — Kỳ ${cycle} (${range})`}
+                      className={`mb-0.5 block w-full rounded px-1 py-1 text-[10px] font-semibold transition-colors ${
+                        selected
+                          ? "bg-sky-600 text-white"
+                          : closed
+                            ? "text-slate-700 hover:bg-slate-200"
+                            : "cursor-not-allowed text-slate-300"
+                      }`}
+                    >
+                      K{cycle}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
 
           <p className="mt-2.5 border-t border-slate-100 pt-2 text-[10.5px] leading-snug text-slate-400">
-            Chỉ chọn được tháng đã kết thúc.
+            Tất toán theo chu kỳ 10 ngày: K1 = 01-10, K2 = 11-20, K3 = 21-cuối tháng. Chỉ
+            chọn được kỳ đã kết thúc.
           </p>
         </div>
       )}
@@ -2945,7 +3173,6 @@ function DetailBlock({ title, children, flush = false, action = null }) {
 function ErrorBox({ text }) {
   return (
     <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-      <AlertTriangle size={14} className="mt-0.5 shrink-0" />
       <span>{text}</span>
     </div>
   );

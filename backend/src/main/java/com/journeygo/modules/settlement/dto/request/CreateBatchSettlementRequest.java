@@ -14,7 +14,9 @@ import jakarta.validation.constraints.Size;
 @Schema(description = "Yêu cầu tạo đợt tất toán tổng cho toàn bộ đối tác")
 public record CreateBatchSettlementRequest(
 
-        @Schema(description = "Kỳ doanh thu (yyyy-MM) — phải là kỳ đã kết thúc", example = "2026-09")
+        @Schema(description = "Kỳ doanh thu — chu kỳ 10 ngày (yyyy-MM-D), phải là kỳ đã kết thúc. "
+                + "VD: 2026-10-1 = 01/10 → 10/10/2026, 2026-10-2 = 11/10 → 20/10/2026, "
+                + "2026-10-3 = 21/10 → 31/10/2026", example = "2026-10-1")
         @NotNull(message = "Kỳ doanh thu không được để trống")
         String revenuePeriod,
 

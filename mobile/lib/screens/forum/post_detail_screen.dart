@@ -460,7 +460,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   ),
                   style: TextButton.styleFrom(
                     foregroundColor:
-                        _post.isLiked ? const Color(0xFFE11D48) : AppCultureColors.textMuted,
+                        _post.isLiked ? AppCultureColors.lacquer500 : AppCultureColors.textMuted,
                     minimumSize: const Size(0, 44),
                   ),
                 ),

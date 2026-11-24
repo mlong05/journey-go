@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserRound, Ticket, MessageCircle, Gift, Trophy, Sparkles, ChevronDown, Check } from "lucide-react";
+import { UserRound, Ticket, MessageCircle, Gift, Trophy, ChevronDown, Check, Sparkles } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
 import RequireTourist from "./RequireTourist";
@@ -24,6 +25,8 @@ export const ACCOUNT_GROUPS = [
   ] },
   { title: "Liên hệ & Dịch vụ", items: [
     { href: ROUTES.ACCOUNT_TOUR_REQUESTS, label: "Tour theo nhu cầu", Icon: Sparkles, match: (p) => p.startsWith("/account/requests") },
+  { title: "Liên hệ", items: [
+    { href: ROUTES.ACCOUNT_AI_GUIDE, label: "Hướng dẫn viên AI", Icon: Sparkles, match: (p) => p.startsWith("/account/ai-guide") },
     { href: ROUTES.ACCOUNT_MESSAGES, label: "Tin nhắn với nhà tour", Icon: MessageCircle, match: (p) => p.startsWith("/account/messages"), badge: "unread" },
     { href: ROUTES.ACCOUNT_INVITATIONS, label: "Lời mời tham gia tour", Icon: Ticket, match: (p) => p.startsWith("/account/invitations") },
   ] },

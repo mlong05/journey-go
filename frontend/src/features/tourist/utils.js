@@ -105,12 +105,16 @@ export const REFUND_STATUS = {
  * ⚠️ Khách KHÔNG chọn nhóm lý do (form chỉ mô tả bằng văn bản — admin phân loại
  * khi duyệt). Bảng này chỉ dùng để HIỂN THỊ khi admin đã xác định nhóm lý do
  * (`approvedReason` / `declaredReason`).
+ *
+ * ⚠️ Nội dung `note` phải khớp chính sách hiện hành:
+ *   • Cá nhân → 3 bậc theo thời điểm hủy (80% / 50% / 0%) — xem `refundPolicy.js`.
+ *   • Bất khả kháng → 0% (thiên tai, dịch bệnh, quy hoạch) — khớp cách Admin xử lý.
  */
 export const REFUND_REASON = {
-  PERSONAL: { label: "Lý do cá nhân", note: "Hoàn 50% số tiền đã thanh toán" },
+  PERSONAL: { label: "Lý do cá nhân", note: "Hoàn 80% / 50% / 0% tùy thời điểm hủy" },
   PLATFORM_FAULT: { label: "Lỗi từ nền tảng", note: "Hoàn 100% sau khi quản trị viên xác minh" },
   PROVIDER_FAULT: { label: "Lỗi từ nhà tour", note: "Hoàn 100% sau khi quản trị viên xác minh" },
-  FORCE_MAJEURE: { label: "Bất khả kháng", note: "Theo chính sách không hoàn tiền" },
+  FORCE_MAJEURE: { label: "Bất khả kháng", note: "Không hoàn tiền" },
 };
 
 /**

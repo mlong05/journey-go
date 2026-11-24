@@ -29,6 +29,8 @@ public class TourPricingService {
 
     private final TourRepository tourRepository;
     private final TourPriceRepository tourPriceRepository;
+    /** Tính ngày khởi hành gần nhất cho CẢ tour luồng 5 bước lẫn tour luồng cũ. */
+    private final TourAvailabilityService availabilityService;
 
     @Transactional(readOnly = true)
     public TourResponse toResponse(Tour tour) {
@@ -59,23 +61,18 @@ public class TourPricingService {
             for (Object[] row : tourRepository.sumStopQuizByTourIds(wizardIds)) addReward(stopRewards, row);
             for (Object[] row : tourRepository.sumStopExperiencesByTourIds(wizardIds)) addReward(stopRewards, row);
         }
-        Map<Long, LocalDate> nextDepartures = new java.util.HashMap<>();
-        if (!wizardIds.isEmpty()) {
-            for (Object[] row : tourRepository.findNextDepartureByTourIds(wizardIds, LocalDate.now())) {
-                nextDepartures.put((Long) row[0], (LocalDate) row[1]);
-            }
-        }
+        Map<Long, LocalDate> nextDepartures = availabilityService.nextDepartureDates(tours);
         return tour -> {
             TourResponse.TourResponseBuilder builder = TourResponse.fromEntity(tour)
                     .toBuilder()
-                    .price(totals.getOrDefault(tour.getTourId(), BigDecimal.ZERO));
+                    .price(totals.getOrDefault(tour.getTourId(), BigDecimal.ZERO))
+                    .nextDepartureDate(nextDepartures.get(tour.getTourId()));
             if (tour.isWizardTour()) {
                 long[] reward = stopRewards.getOrDefault(tour.getTourId(), new long[2]);
                 return builder
                         .taskCount((int) reward[0])
                         .totalTaskPoints((int) reward[1])
                         .badgeCount(0)
-                        .nextDepartureDate(nextDepartures.get(tour.getTourId()))
                         .build();
             }
             TourRewardProjection reward = rewards.get(tour.getTourId());

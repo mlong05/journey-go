@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  ArrowLeft, CalendarDays, Loader2, AlertTriangle, Lock, UserRound, Timer, CreditCard, CheckCircle2,
+  ArrowLeft, CalendarDays, Loader2, AlertTriangle, Lock, UserRound, Timer, CreditCard, CheckCircle2, Ticket, Check, X,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
@@ -14,6 +14,7 @@ import RequireTourist from "./RequireTourist";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { usePurchasedBooking } from "../hooks/usePurchasedBooking";
+import { PaymentCountdown, usePendingBooking } from "./PendingBooking";
 import { GUEST_TYPES, ageAt, durationLabel, longDate, vnd } from "../utils";
 import { LimitedField } from "@/components/ui/LimitedField";
 import { useGuestTypes } from "@/lib/guestTypes";
@@ -64,7 +65,8 @@ function CheckoutForm({ tourId }) {
   const params = useSearchParams();
   const guestTypes = useGuestTypes();
   const { user } = useTouristSession();
-  // Tour đã mua ⇒ không thể đặt lại (chặn ngay ở bước nhập hành khách).
+  // Tour đã mua và CÒN HIỆU LỰC ⇒ không thể đặt lại (chặn ngay ở bước nhập hành khách).
+  // ⚠️ Đơn `COMPLETED` (tour đã đi xong) KHÔNG chặn ⇒ du khách đặt tiếp được.
   const { booking: purchased, loading: purchasedLoading } = usePurchasedBooking(tourId);
   const date = params.get("date") || "";
   const [tour, setTour] = useState(null);
@@ -78,6 +80,48 @@ function CheckoutForm({ tourId }) {
   /** Người dùng đã đọc & đồng ý với quy định mang theo giấy tờ tùy thân khi check-in. */
   const [docsAcknowledged, setDocsAcknowledged] = useState(false);
 
+  // ── Voucher state ────────────────────────────────────────────────────────
+  const [voucherInput, setVoucherInput] = useState("");
+  const [validatingVoucher, setValidatingVoucher] = useState(false);
+  const [voucherResult, setVoucherResult] = useState(null);
+  const [voucherError, setVoucherError] = useState("");
+  const [myVouchersList, setMyVouchersList] = useState([]);
+
+  // Đơn giữ chỗ từ lần đặt trước (đã thoát / quay lại từ VNPay chưa trả tiền): backend không cho tạo
+  // đơn thứ hai cho cùng tour ⇒ mời tiếp tục đơn đó hoặc hủy để đặt lại theo thông tin mới.
+  const { pending: heldBooking, reload: reloadHeld, clear: clearHeld } = usePendingBooking(tourId);
+  const held = heldBooking && heldBooking.id !== pendingBooking?.id ? heldBooking : null;
+  const [heldBusy, setHeldBusy] = useState("");
+
+  const resumeHeld = async () => {
+    if (!held) return;
+    setHeldBusy("resume");
+    setError("");
+    try {
+      const payment = await touristService.initPayment(held.id);
+      if (!payment?.paymentUrl) throw new Error("Không nhận được đường dẫn thanh toán từ VNPay.");
+      window.location.href = payment.paymentUrl;
+    } catch (err) {
+      setError(err?.message || "Không mở được trang thanh toán. Vui lòng thử lại.");
+      setHeldBusy("");
+    }
+  };
+
+  const cancelHeld = async () => {
+    if (!held) return;
+    setHeldBusy("cancel");
+    setError("");
+    try {
+      await touristService.cancelBooking(held.id, "Khách hủy để đặt lại");
+      clearHeld();
+    } catch (err) {
+      setError(err?.message || "Không hủy được đơn cũ. Vui lòng thử lại.");
+      reloadHeld();
+    } finally {
+      setHeldBusy("");
+    }
+  };
+
   useEffect(() => {
     let alive = true;
     touristService.tourDetail(tourId).then((t) => alive && setTour(t))
@@ -85,11 +129,74 @@ function CheckoutForm({ tourId }) {
     return () => { alive = false; };
   }, [tourId]);
 
+  // Tải danh sách voucher khả dụng trong ví của du khách để gợi ý
+  useEffect(() => {
+    let alive = true;
+    touristService.myVouchers()
+      .then((list) => {
+        if (!alive) return;
+        const available = (list || []).filter((v) => v.status === "AVAILABLE");
+        setMyVouchersList(available);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   const priceOf = (type) => {
     const p = tour?.prices?.find((x) => x.guestType === type);
     return Number(p?.price || 0);
   };
   const total = passengers.reduce((s, p) => s + priceOf(p.guestType), 0);
+
+  // Nếu tổng tiền thay đổi so với lúc validate voucher, voucher không còn hiệu lực
+  const isVoucherPriceMatched = !voucherResult?.originalPrice || Number(voucherResult.originalPrice) === total;
+  const activeVoucher = isVoucherPriceMatched ? voucherResult : null;
+
+  const discountAmount = activeVoucher?.valid && Number(activeVoucher?.discountAmount || 0) > 0
+    ? Number(activeVoucher.discountAmount)
+    : 0;
+  const finalTotal = Math.max(0, total - discountAmount);
+
+  const handleValidateVoucher = async (codeToValidate) => {
+    const code = (codeToValidate || voucherInput).trim();
+    if (!code) {
+      setVoucherError("Vui lòng nhập mã voucher.");
+      setVoucherResult(null);
+      return;
+    }
+    if (total <= 0) {
+      setVoucherError("Vui lòng chọn ít nhất một hành khách để kiểm tra voucher.");
+      return;
+    }
+    setValidatingVoucher(true);
+    setVoucherError("");
+    try {
+      const res = await touristService.validateVoucher({
+        userVoucherCode: code,
+        tourPrice: total,
+        partnerId: tour?.providerId,
+      });
+      if (res?.valid) {
+        setVoucherResult(res);
+        setVoucherError("");
+        setVoucherInput(res.voucherCode || code);
+      } else {
+        setVoucherResult(null);
+        setVoucherError(res?.errorMessage || "Mã voucher không hợp lệ hoặc không đủ điều kiện áp dụng.");
+      }
+    } catch (err) {
+      setVoucherResult(null);
+      setVoucherError(err?.message || "Không thể kiểm tra mã voucher. Vui lòng thử lại.");
+    } finally {
+      setValidatingVoucher(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setVoucherResult(null);
+    setVoucherError("");
+    setVoucherInput("");
+  };
   const errors = useMemo(() => validate(passengers, date, guestTypes), [passengers, date, guestTypes]);
   const hasErrors = errors.some((e) => Object.keys(e).length);
   const set = (i, patch) => setPassengers((list) => list.map((p, j) => (j === i ? { ...p, ...patch } : p)));
@@ -100,6 +207,10 @@ function CheckoutForm({ tourId }) {
     setError("");
     if (purchased) {
       setError("Bạn đã mua tour này rồi — không thể đặt lại.");
+      return;
+    }
+    if (held) {
+      document.getElementById("held-booking")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if (hasErrors) {
@@ -118,6 +229,7 @@ function CheckoutForm({ tourId }) {
         tourId: Number(tourId),
         experienceDate: date,
         note: note.trim() || null,
+        voucherCode: activeVoucher?.valid ? (activeVoucher.voucherCode || voucherInput.trim()) : null,
         passengers: passengers.map((p) => ({
           fullName: p.fullName.trim(), birthDate: p.birthDate, gender: p.gender,
           email: p.guestType === "ADULT" ? p.email.trim() || null : null, guestType: p.guestType,
@@ -128,8 +240,13 @@ function CheckoutForm({ tourId }) {
       if (!payment?.paymentUrl) throw new Error("Không nhận được đường dẫn thanh toán từ VNPay.");
       window.location.href = payment.paymentUrl;
     } catch (err) {
-      setError(err?.message || "Không đặt được tour. Vui lòng thử lại.");
       setBusy(false);
+      // 409 có thể là "đang có đơn giữ chỗ cho tour này" (đặt ở tab / thiết bị khác) ⇒ hiện khung đơn đó.
+      if (err?.status === 409 && !pendingBooking && (await reloadHeld())) {
+        document.getElementById("held-booking")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      setError(err?.message || "Không đặt được tour. Vui lòng thử lại.");
     }
   };
 
@@ -146,9 +263,10 @@ function CheckoutForm({ tourId }) {
   if (!tour) return <div className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />Đang tải…</div>;
 
   /*
-    ⚠️ TOUR ĐÃ MUA ⇒ KHÔNG THỂ ĐẶT LẠI.
+    ⚠️ TOUR ĐÃ MUA (còn hiệu lực) ⇒ KHÔNG THỂ ĐẶT LẠI.
     Chặn ngay ở bước thanh toán (backend cũng chặn với lỗi 409
     `BOOKING_TOUR_ALREADY_PURCHASED` — frontend chỉ để trải nghiệm tốt hơn).
+    ⚠️ Đơn `COMPLETED` (tour đã đi xong) KHÔNG bị chặn ở đây.
   */
   if (purchased) {
     return (
@@ -181,6 +299,28 @@ function CheckoutForm({ tourId }) {
       <div className="pt-1">
         <Breadcrumbs fallback={ROUTES.TOUR_DETAIL(tourId)} items={[{ label: "Khám phá", href: ROUTES.HOME }, { label: tour.title, href: ROUTES.TOUR_DETAIL(tourId) }, { label: "Thông tin hành khách" }]} />
       </div>
+
+      {held && (
+        <section id="held-booking" role="alert" className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-5">
+          <p className="flex items-center gap-2 font-extrabold text-amber-900">
+            <Timer size={18} />Bạn đang có đơn giữ chỗ · còn <PaymentCountdown deadline={held.paymentDeadline} onExpire={clearHeld} />
+          </p>
+          <p className="mt-1.5 text-sm text-amber-900/80">
+            Đơn <b className="font-mono">{held.bookingCode}</b> cho ngày <b>{longDate(held.experienceDate)}</b> ({vnd(held.totalAmount)}) đang giữ chỗ.
+            Mỗi tour chỉ giữ được một đơn chưa thanh toán — hãy tiếp tục đơn này, hoặc hủy để đặt lại theo thông tin bên dưới.
+          </p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <button type="button" onClick={resumeHeld} disabled={Boolean(heldBusy)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-60 cursor-pointer disabled:cursor-wait">
+              {heldBusy === "resume" ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}Tiếp tục thanh toán đơn này
+            </button>
+            <button type="button" onClick={cancelHeld} disabled={Boolean(heldBusy)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-5 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-60 cursor-pointer disabled:cursor-wait">
+              {heldBusy === "cancel" && <Loader2 size={16} className="animate-spin" />}Hủy đơn cũ và đặt lại
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Bố cục 2 cột: cột trái = thông tin hành khách (dọc, dài tự nhiên),
           cột phải = ô thông tin thanh toán (dính theo khung nhìn, rộng để chữ không chật chội).
@@ -251,14 +391,15 @@ function CheckoutForm({ tourId }) {
           </div>
         </div>
 
-        {/* Ô thông tin thanh toán: sticky ngay dưới header dính (lg:top-16 = 4rem),
+        {/* Ô thông tin thanh toán: sticky dính ngay dưới header dính (navbar h-16 = 4rem),
+            cộng thêm 10px khoảng cách ⇒ lg:top-[4.625rem] (4rem + 10px).
             chiều cao ôm sát nội dung (không kéo dài theo viewport) ⇒ không có khoảng
             trống thừa trước nút "Xác nhận và thanh toán".
             `lg:self-start` ⇒ grid không kéo giãn ô, nên nó dính đúng chỗ và hiển thị
             trọn vẹn khi cuộn từ đầu đến cuối trang.
             Khối nội dung cuộn nhỏ bên trong khi màn hình thấp (không cuộn cả trang). */}
-        <aside className="lg:sticky lg:top-16 lg:self-start">
-          <div className="flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(16,32,29,0.08)] lg:max-h-[calc(100vh-5rem)]">
+        <aside className="lg:sticky lg:top-[4.625rem] lg:self-start">
+          <div className="flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(16,32,29,0.08)] lg:max-h-[calc(100vh-5.625rem)]">
             <div className="flex min-h-0 flex-col p-4 sm:p-5 lg:p-6">
               {/* Vùng nội dung cuộn riêng khi màn hình thấp (không cuộn trang). */}
               <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
@@ -281,9 +422,124 @@ function CheckoutForm({ tourId }) {
                   ) : null;
                 })}
               </ul>
+
+              {/* ── Khối mã giảm giá / Voucher ── */}
+              <div className="mt-4 border-t border-dashed border-slate-200 pt-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="voucher-code-input" className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                    <Ticket size={14} className="text-teal-700" />
+                    Mã ưu đãi / Voucher
+                  </label>
+                  {myVouchersList.length > 0 && !voucherResult && (
+                    <span className="text-[11px] font-medium text-teal-700">
+                      Có {myVouchersList.length} voucher khả dụng
+                    </span>
+                  )}
+                </div>
+
+                {!activeVoucher ? (
+                  <div>
+                    <div className="flex gap-2">
+                      <input
+                        id="voucher-code-input"
+                        type="text"
+                        placeholder="Nhập mã voucher"
+                        value={voucherInput}
+                        onChange={(e) => {
+                          setVoucherInput(e.target.value.toUpperCase());
+                          if (voucherError) setVoucherError("");
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleValidateVoucher();
+                          }
+                        }}
+                        className="flex-1 uppercase font-mono tracking-wider rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleValidateVoucher()}
+                        disabled={validatingVoucher || !voucherInput.trim()}
+                        className="inline-flex items-center justify-center rounded-xl bg-teal-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      >
+                        {validatingVoucher ? <Loader2 size={13} className="animate-spin" /> : "Áp dụng"}
+                      </button>
+                    </div>
+
+                    {/* Gợi ý voucher trong ví */}
+                    {myVouchersList.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-[11px] text-slate-500">Hoặc chọn từ ví của bạn:</p>
+                        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                          {myVouchersList.map((v) => (
+                            <button
+                              key={v.userVoucherCode}
+                              type="button"
+                              onClick={() => {
+                                setVoucherInput(v.userVoucherCode);
+                                handleValidateVoucher(v.userVoucherCode);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50/70 px-2 py-1 text-[11px] font-medium text-teal-800 hover:bg-teal-100 transition"
+                            >
+                              <span className="font-mono font-bold">{v.userVoucherCode}</span>
+                              <span className="text-teal-600 truncate max-w-[120px]">({v.voucherTitle})</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {voucherError && (
+                      <p className="mt-2 text-xs font-semibold text-rose-600 flex items-start gap-1">
+                        <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                        {voucherError}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                        <Check size={14} className="text-emerald-600" />
+                        <span>Đã áp dụng: <span className="font-mono">{activeVoucher.voucherCode || voucherInput}</span></span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveVoucher}
+                        className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        title="Bỏ chọn voucher"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {activeVoucher.title && (
+                      <p className="mt-0.5 text-xs text-emerald-700">{activeVoucher.title}</p>
+                    )}
+                    <p className="mt-1 text-xs font-semibold text-emerald-700">
+                      Giảm: -{vnd(discountAmount)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {discountAmount > 0 && (
+                <div className="mt-3 flex items-center justify-between text-sm text-emerald-700 font-semibold border-t border-slate-100 pt-2">
+                  <span>Giảm giá voucher</span>
+                  <span className="tabular-nums">-{vnd(discountAmount)}</span>
+                </div>
+              )}
+
               <div className="mt-3 flex items-end justify-between border-t border-slate-200 pt-3">
                 <span className="text-sm font-bold text-slate-800">Tổng thanh toán</span>
-                <span className="text-xl font-extrabold tabular-nums text-slate-900">{vnd(total)}</span>
+                <div className="text-right">
+                  {discountAmount > 0 && (
+                    <div className="text-xs text-slate-400 line-through tabular-nums">
+                      {vnd(total)}
+                    </div>
+                  )}
+                  <span className="text-xl font-extrabold tabular-nums text-slate-900">{vnd(finalTotal)}</span>
+                </div>
               </div>
               {error && (
                 <div role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700">
@@ -316,7 +572,7 @@ function CheckoutForm({ tourId }) {
               </div>
               {/* Nút thanh toán + điều khoản: ghim cố định ở đáy thẻ (không cuộn theo nội dung). */}
               <div className="lg:shrink-0">
-              <button type="submit" disabled={busy || !docsAcknowledged || (touched && hasErrors)}
+              <button type="submit" disabled={busy || Boolean(held) || !docsAcknowledged || (touched && hasErrors)}
                 className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] hover:bg-orange-700 disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none transition duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none cursor-pointer disabled:cursor-not-allowed">
                 {busy ? <Loader2 size={17} className="animate-spin" /> : <CreditCard size={17} />}
                 {pendingBooking ? "Thử thanh toán lại" : "Xác nhận và thanh toán"}

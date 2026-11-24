@@ -6,8 +6,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, Clock, MapPin, Tag, Store, Check, X, Minus, Plus, CalendarDays, Loader2, AlertTriangle, ListChecks,
-  Footprints, Info, ShieldCheck, Sparkles, MessageCircle, Heart, MessagesSquare, CheckCircle2, Lock,
+  Footprints, Info, ShieldCheck, Sparkles, MessageCircle, Heart, MessagesSquare, CheckCircle2, Lock, Timer,
 } from "lucide-react";
+import { PaymentCountdown, usePendingBooking } from "./PendingBooking";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
 import { touristService, getTourPreview } from "../services/touristService";
@@ -78,6 +79,8 @@ function BookingPanel({ tour, dates }) {
   // Đơn đã mua của du khách cho tour này (nếu có) ⇒ khung đặt tour bị khoá.
   const bookingId = params?.get("bookingId") || "";
   const { booking: purchased, loading: purchasedLoading } = usePurchasedBooking(tour.tourId, bookingId);
+  // Đơn đang giữ chỗ cho tour này (khách đã thoát trang thanh toán / quay lại từ VNPay).
+  const { pending, clear: clearPending } = usePendingBooking(tour.tourId);
   const open = dates.filter((d) => d.available && (d.remaining ?? 0) > 0);
   const [date, setDate] = useState("");
   const [allDates, setAllDates] = useState(false);
@@ -224,6 +227,26 @@ function BookingPanel({ tour, dates }) {
         </>
       ) : ready && isLoggedIn && !isTourist ? (
         <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">Bạn đang đăng nhập bằng tài khoản quản trị hoặc đối tác. Dùng tài khoản du khách để đặt tour.</p>
+      ) : pending ? (
+        /* ĐANG GIỮ CHỖ — đưa khách về đúng đơn cũ (đồng hồ chạy tiếp), không tạo đơn mới. */
+        <>
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
+            <p className="flex items-center gap-2 text-sm font-extrabold text-amber-900">
+              <Timer size={15} />Bạn đang giữ chỗ · còn <PaymentCountdown deadline={pending.paymentDeadline} onExpire={clearPending} />
+            </p>
+            <p className="mt-1 text-xs text-amber-800">
+              Đơn <b className="font-mono">{pending.bookingCode}</b> · {longDate(pending.experienceDate)} · {vnd(pending.totalAmount)}
+            </p>
+          </div>
+          <Link href={ROUTES.TRIP_DETAIL(pending.id)}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] transition duration-200 hover:-translate-y-0.5 hover:bg-orange-700">
+            Tiếp tục thanh toán
+          </Link>
+          <button type="button" onClick={book} disabled={Boolean(problem)}
+            className="mt-2 w-full rounded-xl py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed">
+            Muốn đổi ngày / số khách? Hủy đơn cũ và đặt lại
+          </button>
+        </>
       ) : (
         <button type="button" onClick={book} disabled={Boolean(problem) || purchasedLoading}
           className="mt-4 w-full rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] transition duration-200 hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-[0_10px_22px_rgba(234,88,12,0.38)] active:translate-y-0 active:scale-[0.98] disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none motion-reduce:transition-none cursor-pointer disabled:cursor-not-allowed">

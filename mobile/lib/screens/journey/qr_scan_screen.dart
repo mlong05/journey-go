@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/constants/app_colors.dart';
 
@@ -22,7 +23,7 @@ class QrScanScreen extends StatefulWidget {
   State<QrScanScreen> createState() => _QrScanScreenState();
 }
 
-class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver {
+class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
   final MobileScannerController _controller = MobileScannerController(
     autoStart: false,
     formats: const [BarcodeFormat.qrCode],
@@ -37,6 +38,15 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
   bool _manualOpen = false;
   bool _slowStart = false;
   Timer? _slowTimer;
+
+  /// Vạch quét chạy lên xuống trong khung.
+  late final AnimationController _scanLine =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat(reverse: true);
+
+  /// Quét / nhập được mã: con dấu ✓ đóng xuống rồi mới đóng màn (để du khách biết đã nhận mã).
+  late final AnimationController _stamp =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+  bool _success = false;
 
   @override
   void initState() {
@@ -76,6 +86,8 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
     unawaited(_subscription?.cancel());
     _subscription = null;
     _manualController.dispose();
+    _scanLine.dispose();
+    _stamp.dispose();
     super.dispose();
     unawaited(_controller.dispose());
   }
@@ -87,7 +99,13 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
     _subscription = null;
     unawaited(_controller.stop());
     FocusManager.instance.primaryFocus?.unfocus();
-    Navigator.of(context).pop(value);
+    HapticFeedback.mediumImpact();
+    setState(() => _success = true);
+    _scanLine.stop();
+    _stamp.forward();
+    Future<void>.delayed(const Duration(milliseconds: 650), () {
+      if (mounted) Navigator.of(context).pop(value);
+    });
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -145,7 +163,7 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
           ),
           // Lớp tối với khung ngắm trong suốt.
           Positioned.fill(
-            child: IgnorePointer(child: CustomPaint(painter: _ScanOverlayPainter(window))),
+            child: IgnorePointer(child: CustomPaint(painter: _ScanOverlayPainter(window, _scanLine, success: _success))),
           ),
           SafeArea(
             child: Padding(
@@ -162,11 +180,7 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
                         style: const TextStyle(
                             color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
                   ),
-                  IconButton(
-                    onPressed: _toggleTorch,
-                    icon: Icon(_torch ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                        color: Colors.white, size: 24),
-                  ),
+                  const SizedBox(width: 48),
                 ],
               ),
             ),
@@ -177,14 +191,21 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
             top: window.bottom + 24,
             child: Column(
               children: [
-                Text(widget.hint,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 14.5, height: 1.4)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(widget.hint,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600, height: 1.35)),
+                ),
                 if (_slowStart && !_manualOpen) ...[
                   const SizedBox(height: 8),
                   const Text('Camera mở chậm? Bạn có thể nhập mã in dưới QR.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white70, fontSize: 12.5)),
+                      style: TextStyle(color: AppCultureColors.onDarkMuted, fontSize: 12.5)),
                 ],
               ],
             ),
@@ -195,20 +216,63 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
               top: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                child: _manualOpen ? _buildManualPanel() : _buildManualButton(),
+                child: _manualOpen ? _buildManualPanel() : _buildActionBar(),
               ),
             ),
           ),
+          if (_success)
+            Positioned.fromRect(
+              rect: window,
+              child: Center(
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 2.2, end: 1).animate(CurvedAnimation(parent: _stamp, curve: Curves.easeOutBack)),
+                  child: FadeTransition(
+                    opacity: _stamp,
+                    child: Container(
+                      width: 116,
+                      height: 116,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF047857),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 5),
+                        boxShadow: const [BoxShadow(color: Color(0x6634D399), blurRadius: 30, spreadRadius: 6)],
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_rounded, color: Colors.white, size: 52),
+                          Text('ĐÃ QUÉT', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.4)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildManualButton() {
-    return TextButton.icon(
-      onPressed: () => setState(() => _manualOpen = true),
-      icon: const Icon(Icons.keyboard_rounded, color: Colors.white70, size: 18),
-      label: const Text('Nhập mã thủ công', style: TextStyle(color: Colors.white70)),
+  /// Hai nút lớn có chữ: bật đèn flash (chỗ tối) và nhập mã in dưới QR (camera lỗi / mã mờ).
+  Widget _buildActionBar() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _ScanAction(
+          icon: _torch ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+          label: _torch ? 'Tắt đèn' : 'Đèn flash',
+          active: _torch,
+          onTap: _toggleTorch,
+        ),
+        const SizedBox(width: 28),
+        _ScanAction(
+          icon: Icons.keyboard_rounded,
+          label: 'Nhập mã',
+          active: _slowStart,
+          onTap: () => setState(() => _manualOpen = true),
+        ),
+      ],
     );
   }
 
@@ -247,7 +311,8 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _submitManual(),
             decoration: InputDecoration(
-              hintText: 'VD: JGD-3F9A1C7E52B04D18',
+              hintText: 'VD: JGS-3F9A1C7E52B04D18',
+              helperText: 'Mã điểm đến bắt đầu bằng JGS-, mã hoạt động bắt đầu bằng JGE-',
               filled: true,
               fillColor: AppCultureColors.surfaceSubtle,
               border: OutlineInputBorder(
@@ -300,10 +365,52 @@ class _CameraProblem extends StatelessWidget {
   }
 }
 
+/// Nút tròn lớn có chữ ở đáy màn quét (kiểu kính mờ).
+class _ScanAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _ScanAction({required this.icon, required this.label, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: active ? Colors.white : Colors.white.withValues(alpha: 0.16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+              ),
+              child: Icon(icon, size: 28, color: active ? const Color(0xFF0F172A) : Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ScanOverlayPainter extends CustomPainter {
   final Rect window;
+  final Animation<double> line;
+  final bool success;
 
-  _ScanOverlayPainter(this.window);
+  _ScanOverlayPainter(this.window, this.line, {this.success = false}) : super(repaint: line);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -314,9 +421,32 @@ class _ScanOverlayPainter extends CustomPainter {
       ..fillType = PathFillType.evenOdd;
     canvas.drawPath(overlay, Paint()..color = Colors.black.withValues(alpha: 0.62));
 
-    // Bốn góc ngọc di sản.
+    // Vạch quét có quầng sáng chạy lên xuống trong khung.
+    if (!success) {
+      final y = window.top + 14 + (window.height - 28) * Curves.easeInOut.transform(line.value);
+      final glow = Rect.fromLTRB(window.left + 16, y - 26, window.right - 16, y);
+      canvas.drawRect(
+        glow,
+        Paint()
+          ..shader = LinearGradient(
+            begin: line.status == AnimationStatus.reverse ? Alignment.bottomCenter : Alignment.topCenter,
+            end: line.status == AnimationStatus.reverse ? Alignment.topCenter : Alignment.bottomCenter,
+            colors: [const Color(0x0034D399), const Color(0x4434D399)],
+          ).createShader(glow),
+      );
+      canvas.drawLine(
+        Offset(window.left + 16, y),
+        Offset(window.right - 16, y),
+        Paint()
+          ..color = const Color(0xFF34D399)
+          ..strokeWidth = 2.5
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+
+    // Bốn góc xanh ngọc sáng.
     final corner = Paint()
-      ..color = AppCultureColors.heritageJade
+      ..color = success ? Colors.white : const Color(0xFF34D399)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;
@@ -339,5 +469,5 @@ class _ScanOverlayPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _ScanOverlayPainter old) => old.window != window;
+  bool shouldRepaint(covariant _ScanOverlayPainter old) => old.window != window || old.success != success;
 }

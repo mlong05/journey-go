@@ -24,8 +24,11 @@ public class AiChatResponse {
     @Schema(description = "Nội dung câu trả lời từ AI Virtual Guide")
     private String answer;
 
-    @Schema(description = "Chế độ hội thoại đã áp dụng", example = "NORMAL_GUIDE hoặc TASK_HINT")
+    @Schema(description = "Chế độ hội thoại đã áp dụng", example = "NORMAL_GUIDE, TASK_HINT, WAITING_HUMAN hoặc HUMAN_ACTIVE")
     private String mode;
+
+    @Schema(description = "Trạng thái handoff hiện tại của phiên")
+    private String handoffStatus;
 
     @Schema(description = "Các trích dẫn/nguồn tài liệu đã sử dụng để trả lời")
     private List<String> citations;

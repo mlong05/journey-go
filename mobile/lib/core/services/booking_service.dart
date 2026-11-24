@@ -116,6 +116,18 @@ class BookingService {
         .toList();
   }
 
+  /// Đơn đang giữ chỗ của tôi (chờ thanh toán, còn hạn), mới nhất trước.
+  /// Truyền [tourId] để chỉ lấy đơn của một tour.
+  Future<List<BookingModel>> getMyPending({int? tourId}) async {
+    final query = tourId == null ? '' : '?tourId=$tourId';
+    final data = await ApiClient.request('GET', '$_endpoint/my/pending$query');
+    return ApiClient.asList(data)
+        .map(BookingModel.fromJson)
+        // Lọc lại theo giờ máy: đơn vừa quá hạn trong lúc tải thì bỏ.
+        .where((b) => b.isPaymentWindowOpen)
+        .toList();
+  }
+
   /// Danh sách booking của tôi (alias theo kiểu gọi của màn danh sách).
   Future<List<BookingModel>> getMine({int page = 0, int size = 50}) =>
       getMyBookings(page: page, size: size);

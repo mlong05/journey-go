@@ -1,6 +1,10 @@
 package com.journeygo.modules.aiguide.service;
 
+import com.journeygo.modules.aiguide.entity.AiKnowledgeDocument;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import java.util.List;
 
 /**
  * Định nghĩa các khuôn mẫu chỉ thị hệ thống (System Prompt) và quy tắc chống ảo giác (Guardrails)
@@ -8,6 +12,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class VirtualGuidePromptTemplate {
+
+    public static final int MAX_DYNAMIC_RULES_CHARS = 4000;
 
     /**
      * System Prompt cho Chế độ Thuyết minh viên văn hóa (Normal Guide Mode)
@@ -23,6 +29,8 @@ public class VirtualGuidePromptTemplate {
             2. Nếu câu hỏi của du khách KHÔNG CÓ thông tin trong [NGỮ CẢNH TRI THỨC], bạn TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ BỊA ĐẶT lịch sử, số liệu, năm tháng, giá vé hay địa chỉ.
             3. Khi thiếu thông tin, hãy từ chối lịch sự, ví dụ: "Hiện tại tôi chưa có dữ liệu chính xác về thông tin này tại điểm đến. Bạn có thể hỏi ban quản lý di tích hoặc hỏi tôi về [nêu các chủ đề có trong ngữ cảnh] nhé!"
             4. Trả lời bằng tiếng Việt chuẩn, rõ ràng, gãy gọn, có cấu trúc dễ đọc trên điện thoại di động (có thể gạch đầu dòng ngắn gọn nếu cần).
+            5. KHI GIỚI THIỆU HOẶC ĐỀ XUẤT TOUR: Nếu trong [NGỮ CẢNH TRI THỨC] có đường dẫn chi tiết tour dạng /tours/{id}, bạn BẮT BUỘC phải kèm theo liên kết Markdown chính xác dạng [Xem tour: Tên tour](/tours/{id}) ngay tại mục giới thiệu tour đó. Chỉ dùng đúng /tours/{id} xuất hiện trong ngữ cảnh, tuyệt đối không tự bịa mã tour.
+            6. ĐỊNH DẠNG VĂN BẢN: TUYỆT ĐỐI KHÔNG dùng dấu ** **, *, __ hoặc ### để in đậm hay làm tiêu đề cho tên địa điểm, tên tour hoặc nội dung. Chỉ viết chữ thuần sạch sẽ (ví dụ: "- Văn Miếu – Quốc Tử Giám: ...") kết hợp gạch đầu dòng "- ", và chỉ giữ cú pháp link [Xem tour: ...](/tours/{id}) khi đề xuất tour.
             """;
 
     /**
@@ -38,7 +46,38 @@ public class VirtualGuidePromptTemplate {
                - Gợi mở các liên tưởng văn hóa, lịch sử hoặc câu đố chữ để du khách tự tìm ra lời giải.
             3. Giữ giọng điệu hào hứng, khích lệ tinh thần phiêu lưu, khám phá của người chơi.
             4. Nếu du khách cố tình nài nỉ hỏi đáp án thẳng, hãy vui vẻ từ chối và tặng họ một manh mối nhỏ để tiếp tục hành trình.
+            5. Không dùng ký hiệu Markdown ** **, *, __ hay ### trong câu trả lời; chỉ trình bày văn bản thuần tự nhiên dễ đọc.
             """;
+
+    /**
+     * Nối các quy tắc hành vi đang bật (AI_RULE) do Admin cấu hình vào System Prompt gốc.
+     * Giới hạn tổng độ dài {@link #MAX_DYNAMIC_RULES_CHARS} ký tự để không làm phình prompt.
+     */
+    public String appendAdminRules(String baseSystemPrompt, List<AiKnowledgeDocument> activeRules) {
+        if (activeRules == null || activeRules.isEmpty()) {
+            return baseSystemPrompt;
+        }
+        StringBuilder sb = new StringBuilder(baseSystemPrompt != null ? baseSystemPrompt : "");
+        sb.append("\n\nQUY TẮC BỔ SUNG TỪ QUẢN TRỊ VIÊN JOURNEYGO (BẮT BUỘC TUÂN THỦ):\n");
+        int appendedChars = 0;
+        for (AiKnowledgeDocument rule : activeRules) {
+            if (rule == null || !StringUtils.hasText(rule.getRawText())) {
+                continue;
+            }
+            String title = StringUtils.hasText(rule.getTitle()) ? rule.getTitle().trim() : "Quy tắc";
+            String line = "- [" + title + "]: " + rule.getRawText().trim() + "\n";
+            if (appendedChars + line.length() > MAX_DYNAMIC_RULES_CHARS) {
+                int remaining = MAX_DYNAMIC_RULES_CHARS - appendedChars;
+                if (remaining > 20) {
+                    sb.append(line, 0, remaining).append("\n");
+                }
+                break;
+            }
+            sb.append(line);
+            appendedChars += line.length();
+        }
+        return sb.toString();
+    }
 
     /**
      * Lắp ráp Prompt hoàn chỉnh bao gồm Ngữ cảnh tìm kiếm được (Context Chunks) và Câu hỏi của người dùng.

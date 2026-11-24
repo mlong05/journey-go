@@ -32,9 +32,10 @@ void main() {
       expect(sizedImageUrl(sized, 300), sized);
     });
 
-    test('uses the 500px Wikimedia thumbnail for small boxes', () {
+    test('keeps the 960px Wikimedia image even for small boxes (smaller thumbnails return 429)', () {
       const url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/X.jpg/960px-X.jpg';
-      expect(sizedImageUrl(url, 400), 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/X.jpg/500px-X.jpg');
+      expect(sizedImageUrl(url, 80), url);
+      expect(sizedImageUrl(url, 400), url);
       expect(sizedImageUrl(url, 900), url);
     });
 

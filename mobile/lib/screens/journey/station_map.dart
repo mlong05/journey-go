@@ -23,6 +23,9 @@ class StationMap extends StatefulWidget {
   /// Du khách đã ở trong bán kính: vòng tròn đổi sang màu xanh ngọc.
   final bool inside;
 
+  /// Màu vòng bán kính tuỳ chỉnh (vd theo mức "nóng – lạnh"); null thì theo [inside].
+  final Color? ringColor;
+
   /// Khoảng chừa khi căn khung, để hai điểm không bị thanh trên / bảng trượt che.
   final EdgeInsets fitPadding;
 
@@ -36,6 +39,7 @@ class StationMap extends StatefulWidget {
     required this.satellite,
     this.route,
     this.inside = false,
+    this.ringColor,
     this.fitPadding = const EdgeInsets.all(56),
   });
 
@@ -99,7 +103,7 @@ class StationMapState extends State<StationMap> {
         PulsingRadius(
           center: widget.station,
           radiusMeters: widget.radiusMeters.toDouble(),
-          color: widget.inside ? AppCultureColors.heritageJade : AppCultureColors.oceanBlue,
+          color: widget.ringColor ?? (widget.inside ? AppCultureColors.heritageJade : AppCultureColors.oceanBlue),
         ),
         if (user != null && route != null) ...[
           PolylineLayer(polylines: [

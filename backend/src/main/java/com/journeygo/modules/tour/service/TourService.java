@@ -31,7 +31,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -44,6 +47,7 @@ public class TourService {
     private final TourModerationService moderationService;
     private final TourPricingService pricingService;
     private final TourDetailMapper detailMapper;
+    private final TourAvailabilityService availabilityService;
     private final com.journeygo.modules.providerprofile.service.ProviderProfileService providerProfileService;
 
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of(
@@ -108,6 +112,62 @@ public class TourService {
         Page<TourResponse> page = new PageImpl<>(responses.subList(from, to),
                 PageRequest.of(paging.getPageNumber(), paging.getPageSize()), responses.size());
         return PageResponse.from(page);
+    }
+
+    /** Khoảng xem lịch khởi hành tối đa (ngày) — đủ cho ~3 tháng, tránh truy vấn quá lớn. */
+    static final int MAX_DEPARTURE_RANGE_DAYS = 92;
+
+    /** Khoảng mặc định khi không truyền {@code to}. */
+    static final int DEFAULT_DEPARTURE_RANGE_DAYS = 60;
+
+    /**
+     * Lịch khởi hành của các tour đã xuất bản, gom theo ngày, cho màn "Xem tour theo ngày".
+     *
+     * <p>{@code from} mặc định hôm nay (ngày quá khứ bị kẹp về hôm nay); {@code to} mặc định
+     * {@code from + 60} ngày và không vượt {@code from + 92} ngày. Mỗi ngày: tour còn chỗ trước,
+     * hết chỗ sau, rồi theo tên. Chỉ trả những ngày có ít nhất một tour.
+     */
+    @Transactional(readOnly = true)
+    public TourDeparturesResponse departures(LocalDate from, LocalDate to) {
+        LocalDate today = LocalDate.now(TourSubmissionValidator.ZONE);
+        LocalDate start = from == null || from.isBefore(today) ? today : from;
+        LocalDate maxEnd = start.plusDays(MAX_DEPARTURE_RANGE_DAYS);
+        LocalDate end = to == null ? start.plusDays(DEFAULT_DEPARTURE_RANGE_DAYS) : to;
+        if (end.isAfter(maxEnd)) end = maxEnd;
+        if (end.isBefore(start)) {
+            return TourDeparturesResponse.builder().from(start).to(end).days(List.of()).build();
+        }
+
+        List<Tour> tours = tourRepository.findAll(publishedSpec(TourSearchFilter.none()));
+        Map<Long, List<TourSlotAvailabilityResponse.DateAvailability>> byTour =
+                availabilityService.availabilityBetween(tours, start, end);
+        Function<Tour, TourResponse> mapper = pricingService.mapperFor(tours);
+
+        Map<LocalDate, List<TourDeparturesResponse.DepartureTour>> byDate = new TreeMap<>();
+        for (Tour tour : tours) {
+            List<TourSlotAvailabilityResponse.DateAvailability> dates = byTour.get(tour.getTourId());
+            if (dates == null || dates.isEmpty()) continue;
+            TourResponse card = mapper.apply(tour);
+            for (TourSlotAvailabilityResponse.DateAvailability d : dates) {
+                byDate.computeIfAbsent(d.date(), k -> new ArrayList<>()).add(TourDeparturesResponse.DepartureTour.builder()
+                        .tour(card)
+                        .capacity(d.capacity())
+                        .remaining(d.remaining())
+                        .available(d.available())
+                        .build());
+            }
+        }
+
+        Comparator<TourDeparturesResponse.DepartureTour> order = Comparator
+                .comparing((TourDeparturesResponse.DepartureTour t) -> !t.available())
+                .thenComparing(t -> t.tour().title() == null ? "" : t.tour().title());
+        List<TourDeparturesResponse.DepartureDay> days = byDate.entrySet().stream()
+                .map(e -> TourDeparturesResponse.DepartureDay.builder()
+                        .date(e.getKey())
+                        .tours(e.getValue().stream().sorted(order).toList())
+                        .build())
+                .toList();
+        return TourDeparturesResponse.builder().from(start).to(end).days(days).build();
     }
 
     /** Chi tiết tour công khai cho du khách (chỉ tour đã duyệt). */

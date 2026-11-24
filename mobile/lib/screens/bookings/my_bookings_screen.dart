@@ -9,6 +9,7 @@ import '../../core/services/journey_service.dart';
 import '../../core/services/payment_service.dart';
 import '../../core/services/refund_service.dart';
 import '../booking/booking_detail_screen.dart';
+import '../common/no_clip.dart';
 import '../journey/journey_screen.dart';
 import '../tours/tour_detail_opener.dart';
 import 'booking_checkout_screen.dart';
@@ -252,32 +253,29 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           title: const Text('Đơn đặt tour',
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
           iconTheme: const IconThemeData(color: AppCultureColors.textDark),
-          bottom: TabBar(
-            labelColor: AppCultureColors.jadeDark,
-            indicatorColor: AppCultureColors.heritageJade,
-            unselectedLabelColor: AppCultureColors.textMuted,
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            tabs: [
-              Tab(text: 'Tất cả (${all.length})'),
-              Tab(text: 'Đã mua (${purchased.length})'),
-              Tab(text: 'Chờ thanh toán (${pending.length})'),
-              Tab(text: 'Đang trải nghiệm (${experiencing.length})'),
-              Tab(text: 'Đã hoàn thành (${completed.length})'),
-              Tab(text: 'Đang hoàn tiền (${refunding.length})'),
-              Tab(text: 'Đã hoàn tiền (${refunded.length})'),
-              Tab(text: 'Đã hủy/Hết hạn (${closed.length})'),
-            ],
-          ),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator(color: AppCultureColors.heritageJade))
             : Column(
                 children: [
+                  // 8 nhóm đơn dạng chip tự xuống hàng — thay thanh tab cuộn ngang bị cắt ở mép
+                  TabChipWrap(
+                    labels: [
+                      'Tất cả (${all.length})',
+                      'Đã mua (${purchased.length})',
+                      'Chờ thanh toán (${pending.length})',
+                      'Đang trải nghiệm (${experiencing.length})',
+                      'Đã hoàn thành (${completed.length})',
+                      'Đang hoàn tiền (${refunding.length})',
+                      'Đã hoàn tiền (${refunded.length})',
+                      'Đã hủy/Hết hạn (${closed.length})',
+                    ],
+                  ),
+                  const Divider(height: 1),
                   if (_error != null)
                     Container(
                       width: double.infinity,
-                      color: const Color(0xFFFEE2E2),
+                      color: AppCultureColors.lacquer100,
                       padding: const EdgeInsets.all(10),
                       child: Text(_error!, style: const TextStyle(color: AppCultureColors.error, fontSize: 12)),
                     ),
@@ -494,7 +492,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: cancelled ? const Color(0xFFFEE2E2) : AppCultureColors.surfaceSubtle,
+                  color: cancelled ? AppCultureColors.lacquer100 : AppCultureColors.surfaceSubtle,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
