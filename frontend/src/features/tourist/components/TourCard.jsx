@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { isPlainClick, transitionNavigate } from "../navigation";
 import { Clock, MapPin, CalendarDays, ImageOff } from "lucide-react";
 import { durationLabel, shortDate, vnd } from "../utils";
+import { useI18n } from "@/i18n";
 
 /** Tên chuyển trang của ảnh bìa: trùng với ảnh lớn ở trang chi tiết ⇒ ảnh "phóng" sang trang mới. */
 export const tourCoverTransition = (tourId) => `tour-cover-${tourId}`;
@@ -38,6 +39,7 @@ function ChipRow({ region, theme }) {
  * Hiệu ứng: rê chuột nổi lên + ảnh phóng chậm; bấm lún nhẹ; chuyển trang trượt tới + ảnh phóng thành ảnh lớn.
  */
 export default function TourCard({ tour, badge }) {
+  const { t, locale } = useI18n();
   const href = `/tours/${tour.tourId}`;
   const cover = tour.coverImageUrl || tour.tourCoverImageUrl;
   const router = useRouter();
@@ -48,7 +50,7 @@ export default function TourCard({ tour, badge }) {
     transitionNavigate(router, href, { type: "forward", morphEl: imgRef.current, morphName: tourCoverTransition(tour.tourId) });
   };
   // Ô trên ảnh: thời lượng + số điểm dừng (vd. "5 giờ · 3 điểm dừng").
-  const durationLine = tour.stopCount > 0 ? `${durationLabel(tour)} · ${tour.stopCount} điểm dừng` : durationLabel(tour);
+  const durationLine = tour.stopCount > 0 ? `${durationLabel(t, tour)} · ${t("tourCard.stops", { count: tour.stopCount })}` : durationLabel(t, tour);
 
   return (
     <article className="group grid h-full min-w-0 grid-cols-[112px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-300 ease-out hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(16,32,29,0.12)] active:translate-y-0 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:flex sm:flex-col">
@@ -70,19 +72,19 @@ export default function TourCard({ tour, badge }) {
         </h3>
         {/* Điện thoại: một dòng tóm tắt thay cho các nhãn */}
         <p className="flex min-w-0 items-center gap-1 text-xs text-slate-500 sm:hidden">
-          <Clock size={11} className="shrink-0" /><span className="shrink-0">{durationLabel(tour)}</span>
+          <Clock size={11} className="shrink-0" /><span className="shrink-0">{durationLabel(t, tour)}</span>
           {tour.regionName && <><span aria-hidden="true">·</span><span className="truncate">{tour.regionName}</span></>}
         </p>
         <div className="hidden sm:block"><ChipRow region={tour.regionName} theme={tour.themeName} /></div>
         <div className="mt-auto flex items-end justify-between gap-2 sm:border-t sm:border-dashed sm:border-slate-200 sm:pt-3">
           <div className="min-w-0">
-            <span className="hidden text-[11.5px] font-semibold text-slate-500 sm:block">Người lớn từ</span>
+            <span className="hidden text-[11.5px] font-semibold text-slate-500 sm:block">{t("tourCard.adultFrom")}</span>
             <span className="block truncate whitespace-nowrap text-[15px] font-extrabold tabular-nums text-slate-900 sm:text-[17px]">{vnd(tour.price)}</span>
           </div>
           {tour.nextDepartureDate && (
             <div className="shrink-0 text-right text-xs text-slate-500">
-              <span className="flex items-center justify-end gap-1 whitespace-nowrap text-[12.5px] font-bold text-teal-800 sm:text-[13px]"><CalendarDays size={13} />{shortDate(tour.nextDepartureDate)}</span>
-              <span className="hidden whitespace-nowrap sm:inline">Khởi hành gần nhất</span>
+              <span className="flex items-center justify-end gap-1 whitespace-nowrap text-[12.5px] font-bold text-teal-800 sm:text-[13px]"><CalendarDays size={13} />{shortDate(tour.nextDepartureDate, locale)}</span>
+              <span className="hidden whitespace-nowrap sm:inline">{t("tourCard.nextDeparture")}</span>
             </div>
           )}
         </div>

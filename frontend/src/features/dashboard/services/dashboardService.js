@@ -3,6 +3,7 @@
  *
  * Endpoint tích hợp:
  *  - GET /api/v1/dashboard/admin                         : ADMIN
+ *  - GET /api/v1/dashboard/admin/revenue?months=12       : ADMIN (doanh thu theo tháng)
  *  - GET /api/v1/dashboard/provider?range=today|week|month : PROVIDER (số liệu của chính đối tác)
  *  - GET /api/v1/dashboard/moderator                     : MODERATOR / ADMIN
  */
@@ -12,6 +13,7 @@ const ENDPOINTS = {
   ADMIN: "/dashboard/admin",
   ADMIN_OPERATIONS: "/dashboard/admin/operations",
   ADMIN_OPERATION_BADGES: "/dashboard/admin/operations/badges",
+  ADMIN_REVENUE: "/dashboard/admin/revenue",
   PROVIDER: "/dashboard/provider",
   MODERATOR: "/dashboard/moderator",
 };
@@ -40,6 +42,17 @@ export async function getAdminOperations(range = "month", custom = {}) {
 }
 
 /**
+ * Doanh thu nền tảng theo tháng dương lịch — KHÔNG phụ thuộc bộ lọc kỳ của trang.
+ * Gồm: tháng này vs cùng kỳ tháng trước, chuỗi N tháng, lũy kế theo ngày,
+ * phân bổ giá trị đơn và doanh thu theo đối tác của tháng hiện tại.
+ *
+ * @param {number} months số tháng của chuỗi (3–24, mặc định 12)
+ */
+export async function getAdminRevenue(months = 12) {
+  return unwrap(await apiClient.get(`${ENDPOINTS.ADMIN_REVENUE}?months=${months}`));
+}
+
+/**
  * Số lượng việc đang chờ theo mô-đun — dùng cho badge trên Sidebar Admin.
  *
  * @returns {Promise<Record<string, number>>} map moduleId -> số lượng đang chờ
@@ -49,7 +62,8 @@ export async function getAdminOperationBadges() {
   return result || {};
 }
 
-export async function getProviderDashboard(range = "month") {  return unwrap(await apiClient.get(`${ENDPOINTS.PROVIDER}?range=${encodeURIComponent(range)}`));
+export async function getProviderDashboard(range = "month") {
+  return unwrap(await apiClient.get(`${ENDPOINTS.PROVIDER}?range=${encodeURIComponent(range)}`));
 }
 
 export async function getModeratorDashboard() {
@@ -68,6 +82,7 @@ const dashboardService = {
   getAdmin: getAdminDashboard,
   getAdminOperations,
   getAdminOperationBadges,
+  getAdminRevenue,
   getProvider: getProviderDashboard,
   getModerator: getModeratorDashboard,
 };

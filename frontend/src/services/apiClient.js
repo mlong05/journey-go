@@ -22,6 +22,9 @@ export class ApiError extends Error {
   }
 }
 
+import { redirectToLogin } from "./authRedirect";
+import { getLocale } from "@/i18n/core";
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8088/api/v1";
 
 const AUTH_ENDPOINTS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"];
@@ -60,7 +63,7 @@ class ApiClient {
     try {
       const res = await fetch(`${this.baseUrl}/auth/refresh`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Accept-Language": getLocale() },
         body: JSON.stringify({ refreshToken }),
       });
       const data = await res.json().catch(() => null);
@@ -119,6 +122,8 @@ class ApiClient {
     const headers = {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // Ngôn ngữ người dùng chọn (không dùng Accept-Language mặc định của trình duyệt) ⇒ lỗi backend đúng ngôn ngữ.
+      "Accept-Language": getLocale(),
       ...options.headers,
     };
 
@@ -146,8 +151,15 @@ class ApiClient {
       if (newToken) {
         return this.request(endpoint, options, true);
       }
+      // Có token mà vẫn 401 ⇒ phiên đã hết hạn: xóa phiên, đưa về trang đăng nhập kèm
+      // callbackUrl để đăng nhập xong quay lại đúng trang này.
+      // Không có token (khách vãng lai ở trang công khai) ⇒ chỉ báo lỗi, không chuyển trang.
+      const hadSession = Boolean(token);
       this.clearSession();
-      throw new ApiError(data?.message || "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.", {
+      if (hadSession && !options.silentAuth) redirectToLogin("expired");
+      throw new ApiError(hadSession
+        ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục."
+        : "Vui lòng đăng nhập để sử dụng chức năng này.", {
         code: data?.code ?? null,
         status: 401,
         payload: data,

@@ -13,6 +13,10 @@ const nextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   reactCompiler: true,
+  // Trang "Tất cả tour" đã gộp vào trang chủ: link cũ /tours?... chuyển về / (query giữ nguyên).
+  async redirects() {
+    return [{ source: "/tours", destination: "/", permanent: false }];
+  },
     turbopack: {
     rules: {
       "*.css": {

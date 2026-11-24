@@ -1,210 +1,251 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- ảnh tour/vùng miền đến từ nhiều nguồn (Cloudinary, Wikimedia) */
+/* eslint-disable @next/next/no-img-element -- ảnh tour đến từ nhiều nguồn (Cloudinary, Wikimedia) do đối tác nhập */
 
+/**
+ * Trang chủ (/): banner + cột bộ lọc trái + thanh tìm kiếm ngang + danh sách tour dạng thẻ ngang
+ * (khung bố cục kiểu trang danh sách tour của các hãng lữ hành; màu sắc, chữ và thành phần theo JourneyGo).
+ * Bộ lọc chạy ở phía trình duyệt trên danh sách tour đang bán (tối đa 200 tour).
+ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, MapPin, ArrowRight, CalendarDays, Users, AlertTriangle, Heart, MessageCircle, Loader2 } from "lucide-react";
-import { ROUTES } from "@/constants/routes";
+import {
+  Search, MapPin, CalendarDays, Clock, SlidersHorizontal, ChevronLeft, ChevronRight, ChevronDown,
+  LayoutGrid, List, Route, Ticket, Tag, AlertTriangle, ImageOff, Flag, Users, ArrowRight,
+} from "lucide-react";
 import TouristShell from "./TouristShell";
-import TourCard, { TourCardSkeleton } from "./TourCard";
-import Reveal from "./Reveal";
+import TourCard, { TourCardSkeleton, tourCoverTransition } from "./TourCard";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { usePurchasedTourIds } from "../hooks/usePurchasedTourIds";
-import { longDate, todayIso } from "../utils";
+import { isPlainClick, transitionNavigate } from "../navigation";
+import { ROUTES } from "@/constants/routes";
+import { durationLabel, longDate, normalize, todayIso, vnd } from "../utils";
+import { INTL_LOCALE, useI18n, useT } from "@/i18n";
 
-/**
- * Ảnh thật (Wikimedia Commons, đã kiểm tra nguồn khi tạo dữ liệu tour) thay cho icon trang trí.
- * Tác giả: Greenknight dv (CC BY-SA 4.0), Christophe95 (CC BY-SA 4.0), Isabell Schulz (CC BY-SA 2.0), "Meridian Gate, Hue (I)" (CC BY 4.0).
- */
-const WIKI = "https://upload.wikimedia.org/wikipedia/commons/thumb";
-const PHOTO = {
-  potter: `${WIKI}/0/05/B%C3%A1t_Tr%C3%A0ng_DSC_0098.JPG/960px-B%C3%A1t_Tr%C3%A0ng_DSC_0098.JPG`,
-  vanMieu: `${WIKI}/7/77/Constellation_of_Literature_pavilion_%28Temple_of_Literature%2C_Hanoi%29.jpg/960px-Constellation_of_Literature_pavilion_%28Temple_of_Literature%2C_Hanoi%29.jpg`,
-  caiRang: `${WIKI}/6/63/Cai_Rang_Floating_Market_5.jpg/960px-Cai_Rang_Floating_Market_5.jpg`,
-  noodle: `${WIKI}/1/1d/Rice_noodle_factory%2C_Can_Tho_%2845387552894%29.jpg/960px-Rice_noodle_factory%2C_Can_Tho_%2845387552894%29.jpg`,
-  ngoMon: `${WIKI}/a/ab/Meridian_Gate%2C_Hue_%28I%29.jpg/960px-Meridian_Gate%2C_Hue_%28I%29.jpg`,
-};
-const WHY = [
-  { img: PHOTO.potter, place: "Gốm Bát Tràng", title: "Người địa phương dẫn đường", text: "Thợ gốm, người trong phố cổ, người làm nghề kể chuyện nơi họ sống." },
-  { img: PHOTO.vanMieu, place: "Văn Miếu, Hà Nội", title: "Tour được kiểm duyệt", text: "Mỗi tour qua 5 tiêu chí trước khi mở bán, không lồng điểm mua sắm đại trà." },
-  { img: PHOTO.caiRang, place: "Chợ nổi Cái Răng", title: "Check-in và quiz tại chỗ", text: "Đến đúng điểm dừng, app mở câu chuyện và quiz để bạn hiểu sâu hơn." },
-  { img: PHOTO.noodle, place: "Lò hủ tiếu, Cần Thơ", title: "Tự tay trải nghiệm, tích điểm", text: "Mỗi quiz đúng và hoạt động hoàn thành đều được cộng điểm thưởng." },
+const ORDERS = [
+  ["DEPARTURE", "home.sort.DEPARTURE"],
+  ["PRICE_ASC", "home.sort.PRICE_ASC"],
+  ["PRICE_DESC", "home.sort.PRICE_DESC"],
+  ["NEWEST", "home.sort.NEWEST"],
 ];
-const APP_STEPS = [
-  ["Đặt trên web", "Chọn tour, ngày đi và thanh toán qua VNPay. Vé có ngay trong tài khoản."],
-  ["Mở app ngày đi tour", "Đăng nhập app JourneyGo bằng cùng tài khoản, app dẫn đường tới điểm hẹn."],
-  ["Check-in và làm quiz", "Đến từng điểm dừng, quét mã QR để mở câu chuyện, trả lời quiz nhận điểm."],
+const FORMATS = [["DAY_TRIP", "duration.dayTrip"], ["MULTI_DAY", "home.format.MULTI_DAY"]];
+const PRICES = [
+  ["lt500", "home.price.lt500", (p) => p < 500_000],
+  ["500-1m", "home.price.500_1m", (p) => p >= 500_000 && p < 1_000_000],
+  ["1-3m", "home.price.1_3m", (p) => p >= 1_000_000 && p < 3_000_000],
+  ["gt3m", "home.price.gt3m", (p) => p >= 3_000_000],
 ];
+const PAGE = 8;
+const DOW_INDEXES = [1, 2, 3, 4, 5, 6, 0];
+const pad = (n) => String(n).padStart(2, "0");
+const isoOf = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+const dm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+const isMultiDay = (t) => t.tourFormat === "MULTI_DAY" || (!t.durationMinutes && t.durationDays > 1);
 
-/** Giới hạn số mục mỗi phần ở trang chủ (phần dư dẫn sang /tours). */
-const LIMIT = { soonest: 4, moreTours: 8, regions: 6, themes: 8 };
-/**
- * Số cột (máy tính) cho lưới ô chủ đề sao cho hàng cuối ít ô trống nhất — tránh 1 ô nằm lẻ một mình
- * (vd. 5 ô ⇒ 5 cột, 6 ô ⇒ 3 cột, 7–8 ô ⇒ 4 cột). Class viết sẵn để Tailwind nhận ra.
- */
-const LG_COLS = { 3: "lg:grid-cols-3", 4: "lg:grid-cols-4", 5: "lg:grid-cols-5" };
-function lgColsFor(n) {
-  if (n <= 5) return LG_COLS[Math.max(3, n)] || LG_COLS[4];
-  const empty = (c) => (n % c === 0 ? 0 : c - (n % c));
-  return LG_COLS[[4, 5, 3].reduce((best, c) => (empty(c) < empty(best) ? c : best), 4)];
-}
-/** Lưới thẻ tour cố định số cột theo màn hình (1 / 2 / 4) để tính được "đủ hàng". */
-const CARD_GRID = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4";
-
-/**
- * Trạng thái đơn ⇒ tour đã "mua" (đã thanh toán) ⇒ không hiển thị lại trên trang chủ.
- *
- * `PENDING_PAYMENT` chưa hoàn tất thanh toán nên tour vẫn còn mở bán cho người khác.
- */
-
-/**
- * Lấy tối đa `limit` ô cho vùng / chủ đề có tour, nhiều tour nhất trước.
- * Nếu còn dư, chừa ô cuối cho "xem thêm" ⇒ trả về { items, rest, total }.
- */
-function topByCount(list, tours, key, limit) {
-  const withCount = list.map((x) => ({ ...x, count: tours.filter((t) => t[key] === x.id).length }))
-    .filter((x) => x.count > 0)
-    .sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name), "vi"));
-  const items = withCount.length > limit ? withCount.slice(0, limit - 1) : withCount;
-  return { items, rest: withCount.length - items.length, total: withCount.length };
+/** Ngày khởi hành từ hôm nay trở đi, tăng dần (fallback: ngày gần nhất). */
+function upcoming(t, today) {
+  const list = (t.departureDates || []).map(String).filter((d) => d >= today).sort();
+  return list.length ? list : t.nextDepartureDate ? [String(t.nextDepartureDate)] : [];
 }
 
-function SectionHead({ id, title, sub, href, linkLabel = "Xem tất cả", eyebrow }) {
+/* ───────────────────────────── Bộ lọc (cột trái) ───────────────────────────── */
+
+/** Lịch tháng: mỗi ngày ghi số tour khởi hành; bấm để lọc theo ngày. */
+function DepartureCalendar({ counts, value, onChange, today }) {
+  const t = useT();
+  const first = value || today;
+  const [view, setView] = useState({ y: Number(first.slice(0, 4)), m: Number(first.slice(5, 7)) - 1 });
+  const minView = { y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) - 1 };
+  const atMin = view.y === minView.y && view.m === minView.m;
+  const days = new Date(view.y, view.m + 1, 0).getDate();
+  const lead = (new Date(view.y, view.m, 1).getDay() + 6) % 7; // T2 đứng đầu tuần
+  const shift = (k) => setView(({ y, m }) => { const d = new Date(y, m + k, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const monthName = new Intl.DateTimeFormat("en-US", { month: "long" }).format(new Date(view.y, view.m, 1));
+
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        {eyebrow && <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-orange-600">{eyebrow}</p>}
-        <h2 id={id} className="text-[22px] font-extrabold tracking-tight text-slate-900 text-balance">{title}</h2>
-        {sub && <p className="mt-0.5 text-sm text-slate-500">{sub}</p>}
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <button type="button" onClick={() => shift(-1)} disabled={atMin} aria-label={t("home.cal.prevMonth")}
+          className="grid h-7 w-7 place-items-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"><ChevronLeft size={16} /></button>
+        <span className="text-sm font-bold text-slate-800">{t("home.cal.monthYear", { month: view.m + 1, year: view.y, monthName })}</span>
+        <button type="button" onClick={() => shift(1)} aria-label={t("home.cal.nextMonth")}
+          className="grid h-7 w-7 place-items-center rounded-full text-slate-500 hover:bg-slate-100"><ChevronRight size={16} /></button>
       </div>
-      {href && <Link href={href} className="group/link inline-flex items-center gap-1 text-sm font-bold text-teal-700 transition-colors hover:text-teal-900">{linkLabel}<ArrowRight size={15} className="transition-transform duration-200 group-hover/link:translate-x-1 motion-reduce:transition-none" /></Link>}
+      <div className="grid grid-cols-7 gap-y-1 text-center">
+        {DOW_INDEXES.map((d) => <span key={d} className={`text-[11px] font-bold ${d === 0 ? "text-orange-600" : "text-slate-400"}`}>{t(`weekday.short.${d}`)}</span>)}
+        {Array.from({ length: lead }, (_, i) => <span key={`e${i}`} />)}
+        {Array.from({ length: days }, (_, i) => {
+          const iso = isoOf(view.y, view.m, i + 1);
+          const n = counts.get(iso) || 0;
+          const past = iso < today;
+          const on = iso === value;
+          return (
+            <button key={iso} type="button" disabled={past || !n} onClick={() => onChange(on ? "" : iso)}
+              aria-pressed={on} aria-label={t("home.cal.dayAria", { date: dm(iso), count: n })}
+              className={`jg-press mx-auto flex h-9 w-8 flex-col items-center justify-center rounded-lg text-[13px] leading-none ${
+                on ? "bg-teal-700 font-bold text-white"
+                  : n && !past ? "font-bold text-slate-800 hover:bg-teal-50"
+                    : "text-slate-300"}`}>
+              {i + 1}
+              <span className={`mt-0.5 h-3 text-[9.5px] font-semibold ${on ? "text-teal-100" : "text-teal-700"}`}>{n && !past ? t("home.cal.dayCount", { count: n }) : ""}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-[11.5px] text-slate-500">{t("home.cal.hint")}</p>
     </div>
   );
 }
 
-function Hero({ tours, regions }) {
+/** Nhóm có thể thu gọn. */
+function FilterGroup({ title, children, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="border-t border-slate-100 pt-4">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+        className="flex w-full items-center justify-between text-sm font-bold text-slate-800">
+        {title}<ChevronDown size={16} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="mt-3 space-y-2">{children}</div>}
+    </section>
+  );
+}
+
+function CheckRow({ checked, onChange, label, count }) {
+  return (
+    <label className="jg-press flex origin-left cursor-pointer items-center gap-2.5 rounded-md text-sm text-slate-600 hover:text-slate-900 active:scale-[0.98]">
+      <input type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 shrink-0 cursor-pointer rounded accent-teal-700" />
+      <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
+      {count != null && <span className="shrink-0 text-xs text-slate-400">{count}</span>}
+    </label>
+  );
+}
+
+const toggle = (arr, v) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
+
+function FilterPanel({ f, set, reset, activeCount, dateCounts, regionOpts, themeOpts, formatCounts, priceCounts, today }) {
+  const t = useT();
+  return (
+    <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-base font-extrabold text-slate-900"><SlidersHorizontal size={17} />{t("home.filter.title")}</h2>
+        <button type="button" onClick={reset} disabled={!activeCount}
+          className="jg-press text-sm font-bold text-teal-700 hover:text-teal-900 disabled:text-slate-300">{t("home.filter.reset")}</button>
+      </div>
+      <section>
+        <h3 className="mb-2 text-sm font-bold text-slate-800">{t("home.filter.departureDate")}</h3>
+        <DepartureCalendar counts={dateCounts} value={f.date} onChange={(date) => set({ date })} today={today} />
+      </section>
+      {regionOpts.length > 0 && (
+        <FilterGroup title={t("home.filter.region")}>
+          {regionOpts.map((o) => <CheckRow key={o.id} label={o.name} count={o.count} checked={f.regions.includes(o.id)} onChange={() => set({ regions: toggle(f.regions, o.id) })} />)}
+        </FilterGroup>
+      )}
+      {themeOpts.length > 0 && (
+        <FilterGroup title={t("home.filter.theme")}>
+          {themeOpts.map((o) => <CheckRow key={o.id} label={o.name} count={o.count} checked={f.themes.includes(o.id)} onChange={() => set({ themes: toggle(f.themes, o.id) })} />)}
+        </FilterGroup>
+      )}
+      <FilterGroup title={t("home.filter.duration")}>
+        {FORMATS.map(([v, key]) => <CheckRow key={v} label={t(key)} count={formatCounts[v]} checked={f.formats.includes(v)} onChange={() => set({ formats: toggle(f.formats, v) })} />)}
+      </FilterGroup>
+      <FilterGroup title={t("home.filter.price")}>
+        {PRICES.map(([v, key]) => <CheckRow key={v} label={t(key)} count={priceCounts[v]} checked={f.prices.includes(v)} onChange={() => set({ prices: toggle(f.prices, v) })} />)}
+      </FilterGroup>
+    </div>
+  );
+}
+
+/* ───────────────────────────── Thẻ tour dạng ngang ───────────────────────────── */
+
+function TourRow({ tour, today }) {
+  const t = useT();
+  const href = `/tours/${tour.tourId}`;
+  const cover = tour.coverImageUrl || tour.tourCoverImageUrl;
   const router = useRouter();
-  const { isTourist, user } = useTouristSession();
-  const [q, setQ] = useState("");
-  const [regionId, setRegionId] = useState("");
-  const [searching, setSearching] = useState(false);
-  const stackRef = useRef(null);
-  const stack = tours.filter((t) => t.coverImageUrl).slice(0, 3);
-
-  // Chồng ảnh nghiêng nhẹ theo con trỏ (chỉ máy có chuột, bỏ qua khi giảm chuyển động).
-  const tilt = (e) => {
-    const el = stackRef.current;
-    if (!el || !window.matchMedia("(hover: hover) and (prefers-reduced-motion: no-preference)").matches) return;
-    const r = el.getBoundingClientRect();
-    el.style.setProperty("--tx", ((e.clientX - r.left) / r.width - 0.5).toFixed(3));
-    el.style.setProperty("--ty", ((e.clientY - r.top) / r.height - 0.5).toFixed(3));
-  };
-  const untilt = () => { stackRef.current?.style.setProperty("--tx", 0); stackRef.current?.style.setProperty("--ty", 0); };
-
-  const submit = (e) => {
+  const imgRef = useRef(null);
+  const open = (e) => {
+    if (!isPlainClick(e)) return;
     e.preventDefault();
-    const p = new URLSearchParams();
-    if (q.trim()) p.set("q", q.trim());
-    if (regionId) p.set("regionId", regionId);
-    setSearching(true);
-    router.push(`${ROUTES.TOURS}${p.toString() ? `?${p}` : ""}`);
+    transitionNavigate(router, href, { type: "forward", morphEl: imgRef.current, morphName: tourCoverTransition(tour.tourId) });
   };
+  const dates = upcoming(tour, today);
+  const shown = dates.slice(0, 7);
+  const stops = (tour.destinations || []).map((d) => d.name || d.destinationName || d.title).filter(Boolean);
 
   return (
-    <section className="relative overflow-hidden bg-[linear-gradient(160deg,#0b5d56_0%,#0f766e_60%,#138a7f_100%)] text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_380px_at_90%_-10%,rgba(234,106,18,0.25),transparent_60%)]" />
-      <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="min-w-0 space-y-5">
-          <p className="jg-rise font-script text-3xl leading-none text-orange-200" style={{ "--d": 0 }}>
-            {isTourist ? `Xin chào, ${String(user?.fullName || "").trim().split(/\s+/).pop() || "bạn"}` : "Xin chào bạn"}
+    <article className="group relative grid min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white transition duration-300 hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(16,32,29,0.10)] sm:grid-cols-[minmax(0,36%)_minmax(0,1fr)]">
+      <Link href={href} onClick={open} tabIndex={-1} aria-hidden="true" className="relative block aspect-[16/10] overflow-hidden bg-slate-100 sm:aspect-auto sm:min-h-[200px]">
+        {cover
+          ? <img ref={imgRef} src={cover} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.05] motion-reduce:transition-none" />
+          : <span className="absolute inset-0 grid place-items-center text-slate-300"><ImageOff size={30} /></span>}
+        {tour.themeName && <span className="absolute left-3 top-3 max-w-[70%] truncate rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-orange-700">{tour.themeName}</span>}
+        {(tour.stopCount > 0 || tour.taskCount > 0) && (
+          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
+            {tour.stopCount > 0 && <><Flag size={12} />{t("tourCard.stops", { count: tour.stopCount })}</>}
+            {tour.stopCount > 0 && tour.taskCount > 0 && <span aria-hidden="true">·</span>}
+            {tour.taskCount > 0 && <>{t("home.tour.tasks", { count: tour.taskCount })}</>}
+          </span>
+        )}
+      </Link>
+
+      <div className="flex min-w-0 flex-col gap-2.5 p-4 pb-16 sm:pb-4">
+        <h3 className="line-clamp-2 text-base font-extrabold leading-snug text-slate-900" title={tour.title}>
+          <Link href={href} onClick={open} className="transition-colors hover:text-teal-800">{tour.title}</Link>
+        </h3>
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-[13px] text-slate-600 sm:grid-cols-2">
+          <div className="flex min-w-0 items-center gap-1.5"><Ticket size={14} className="shrink-0 text-slate-400" /><dt>{t("home.tour.code")}</dt><dd className="font-semibold text-slate-800">JG{String(tour.tourId).padStart(5, "0")}</dd></div>
+          <div className="flex min-w-0 items-center gap-1.5"><MapPin size={14} className="shrink-0 text-slate-400" /><dt>{t("home.tour.region")}</dt><dd className="truncate font-semibold text-slate-800">{tour.regionName || "—"}</dd></div>
+          <div className="flex min-w-0 items-center gap-1.5"><Clock size={14} className="shrink-0 text-slate-400" /><dt>{t("home.tour.duration")}</dt><dd className="font-semibold text-slate-800">{durationLabel(t, tour)}</dd></div>
+          <div className="flex min-w-0 items-center gap-1.5"><Tag size={14} className="shrink-0 text-slate-400" /><dt>{t("home.tour.theme")}</dt><dd className="truncate font-semibold text-slate-800">{tour.themeName || "—"}</dd></div>
+        </dl>
+        {stops.length > 0 && (
+          <p className="flex min-w-0 items-center gap-1.5 text-[13px] text-slate-600">
+            <Route size={14} className="shrink-0 text-slate-400" />
+            <span className="truncate" title={stops.join(" → ")}>{stops.join(" → ")}</span>
           </p>
-          <h1 className="jg-rise max-w-[17ch] text-[clamp(28px,4vw,46px)] font-extrabold leading-[1.1] tracking-tight text-balance" style={{ "--d": 1 }}>
-            Đi để hiểu, không chỉ để ngắm
-          </h1>
-          <p className="jg-rise max-w-[54ch] text-teal-50/85" style={{ "--d": 2 }}>
-            Ngồi bên bàn xoay cùng thợ gốm, bước qua những cây cầu trăm tuổi, nghe người địa phương kể chuyện
-            nơi họ lớn lên. Mỗi chuyến đi là một câu chuyện bạn mang theo về.
-          </p>
-          <form onSubmit={submit} role="search" style={{ "--d": 3 }} className="jg-rise flex flex-wrap gap-2 rounded-2xl bg-white p-2 text-slate-900 shadow-[0_12px_32px_rgba(0,0,0,0.18)] transition-shadow duration-300 focus-within:shadow-[0_16px_40px_rgba(0,0,0,0.26)]">
-            <label className="flex min-w-0 flex-[1_1_220px] items-center gap-2.5 px-3 py-1.5">
-              <Search size={19} className="shrink-0 text-slate-400" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">Tìm kiếm</span>
-                <input id="home-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Bát Tràng, Hội An, chợ nổi…"
-                  className="w-full bg-transparent font-semibold outline-none placeholder:font-normal placeholder:text-slate-400" />
-              </span>
-            </label>
-            <label className="flex min-w-0 flex-[1_1_180px] items-center gap-2.5 border-slate-200 px-3 py-1.5 sm:border-l">
-              <MapPin size={19} className="shrink-0 text-slate-400" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">Vùng miền</span>
-                <select id="home-region" value={regionId} onChange={(e) => setRegionId(e.target.value)} className="w-full bg-transparent font-semibold outline-none">
-                  <option value="">Tất cả vùng</option>
-                  {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
-              </span>
-            </label>
-            <button type="submit" disabled={searching}
-              className="group/btn inline-flex flex-[1_1_100%] items-center justify-center gap-1.5 rounded-xl bg-orange-600 px-6 py-3 text-sm font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.35)] transition duration-200 hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-[0_10px_22px_rgba(234,88,12,0.4)] active:translate-y-0 active:scale-[0.97] disabled:opacity-80 motion-reduce:transition-none sm:flex-none cursor-pointer">
-              {searching ? <Loader2 size={16} className="animate-spin" /> : null}Tìm tour
-              {!searching && <ArrowRight size={16} className="transition-transform duration-200 group-hover/btn:translate-x-0.5 motion-reduce:transition-none" />}
-            </button>
-          </form>
-        </div>
-        <div ref={stackRef} onPointerMove={tilt} onPointerLeave={untilt} className="jg-tilt relative hidden h-[340px] min-w-0 sm:block" aria-hidden="true">
-          {stack.map((t, i) => (
-            <figure key={t.tourId} style={{ "--rot": ["2.5deg", "-4deg", "-1deg"][i], "--d": i }}
-              className={`jg-drop absolute m-0 overflow-hidden rounded-2xl border-4 border-white/90 bg-teal-900 shadow-[0_18px_40px_rgba(0,0,0,0.3)] ${[
-                "right-0 top-0 h-[64%] w-[62%]",
-                "left-0 top-[22%] z-10 h-[52%] w-[52%]",
-                "bottom-0 right-[8%] z-20 h-[46%] w-1/2",
-              ][i]}`}>
-              <img src={t.coverImageUrl} alt="" className="h-full w-full object-cover" />
-              <figcaption className="absolute bottom-2 left-2 max-w-[90%] truncate rounded-full bg-slate-900/75 px-2.5 py-1 text-[11.5px] font-bold">{t.regionName || t.title}</figcaption>
-            </figure>
-          ))}
+        )}
+        {shown.length > 0 && (
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[13px] text-slate-600">
+            <span className="mr-0.5 inline-flex items-center gap-1.5"><CalendarDays size={14} className="text-slate-400" />{t("home.tour.departure")}</span>
+            {shown.map((d) => <span key={d} className="rounded-md border border-orange-300 px-1.5 py-0.5 text-xs font-bold tabular-nums text-orange-700">{dm(d)}</span>)}
+            {dates.length > shown.length && <span className="text-xs font-semibold text-slate-400">{t("home.tour.moreDates", { count: dates.length - shown.length })}</span>}
+          </div>
+        )}
+        <div className="mt-auto pt-1">
+          <span className="block text-xs font-semibold text-slate-500">{t("home.tour.priceFrom")}</span>
+          <span className="text-xl font-extrabold tabular-nums text-teal-800">{vnd(tour.price)}</span>
         </div>
       </div>
-    </section>
+      <Link href={href} onClick={open}
+        className="jg-press jg-press-ring absolute bottom-0 right-0 origin-bottom-right rounded-tl-2xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-700">
+        {t("home.tour.viewDetail")}
+      </Link>
+    </article>
   );
 }
 
-/** Số bài cộng đồng tối thiểu để hiện mục (tránh mục trống / toàn bài thử). */
-const COMMUNITY_MIN_POSTS = 3;
-
-/** Bài cộng đồng mới nhất đã duyệt (chỉ đọc). Ẩn khi chưa đủ bài. */
-function CommunityHighlights() {
-  const [posts, setPosts] = useState([]);
-  useEffect(() => {
-    let alive = true;
-    touristService.communityPosts({ size: 3 }).then((p) => alive && setPosts(p)).catch(() => {});
-    return () => { alive = false; };
-  }, []);
-  if (posts.length < COMMUNITY_MIN_POSTS) return null;
+function TourRowSkeleton() {
   return (
-    <section aria-labelledby="h-community">
-      <SectionHead id="h-community" title="Từ cộng đồng du khách" sub="Chia sẻ thật sau mỗi chuyến đi, đã được kiểm duyệt" />
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {posts.map((p) => (
-          <li key={p.id} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="truncate text-sm font-bold text-slate-900">{p.authorName}</p>
-            {p.tourId && p.tourTitle && <Link href={ROUTES.TOUR_DETAIL(p.tourId)} className="block truncate text-xs text-teal-700 hover:underline">{p.tourTitle}</Link>}
-            {p.title && <p className="mt-2 font-bold leading-snug text-slate-900">{p.title}</p>}
-            <p className="mt-1 line-clamp-3 text-sm text-slate-600">{p.content}</p>
-            <p className="mt-2 flex gap-3 text-xs text-slate-400">
-              <span className="inline-flex items-center gap-1"><Heart size={12} />{p.likesCount || 0}</span>
-              <span className="inline-flex items-center gap-1"><MessageCircle size={12} />{p.commentsCount || 0}</span>
-            </p>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <div className="grid overflow-hidden rounded-3xl border border-slate-200 bg-white sm:grid-cols-[36%_1fr]" aria-hidden="true">
+      <div className="jg-shimmer aspect-[16/10] sm:aspect-auto sm:min-h-[200px]" />
+      <div className="space-y-3 p-5">
+        <div className="jg-shimmer h-5 w-4/5 rounded" />
+        <div className="jg-shimmer h-4 w-3/5 rounded" />
+        <div className="jg-shimmer h-4 w-2/3 rounded" />
+        <div className="jg-shimmer h-6 w-1/2 rounded" />
+        <div className="jg-shimmer mt-6 h-8 w-32 rounded" />
+      </div>
+    </div>
   );
 }
 
+/* ───────────────────────────── Chuyến đi sắp tới ───────────────────────────── */
+
+/** Vé đã xác nhận gần nhất từ hôm nay của du khách (ẩn khi chưa đăng nhập hoặc không có chuyến). */
 function UpcomingTrip({ tours }) {
+  const { t, locale } = useI18n();
   const { isTourist } = useTouristSession();
   const [trip, setTrip] = useState(null);
   useEffect(() => {
@@ -219,255 +260,317 @@ function UpcomingTrip({ tours }) {
     return () => { alive = false; };
   }, [isTourist]);
   if (!isTourist || !trip) return null;
-  const cover = tours.find((t) => t.tourId === trip.tourId)?.coverImageUrl;
+  const cover = tours.find((tour) => tour.tourId === trip.tourId)?.coverImageUrl;
   return (
-    <section aria-labelledby="h-trip">
-      <SectionHead id="h-trip" eyebrow="Chuyến đi sắp tới của bạn" title={trip.daysUntilExperience > 0 ? `Còn ${trip.daysUntilExperience} ngày nữa là lên đường` : "Hôm nay bạn đi tour"} href={ROUTES.TRIPS} linkLabel="Tất cả chuyến đi" />
-      <article className="grid items-center gap-5 rounded-3xl border border-slate-200 bg-white p-3.5 shadow-[0_8px_22px_rgba(16,32,29,0.08)] sm:grid-cols-[200px_minmax(0,1fr)_auto]">
+    <section aria-labelledby="h-trip" className="jg-card-in">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-orange-600">{t("home.upcoming.eyebrow")}</p>
+          <h2 id="h-trip" className="text-xl font-extrabold tracking-tight text-slate-900">
+            {trip.daysUntilExperience > 0 ? t("home.upcoming.daysLeft", { count: trip.daysUntilExperience }) : t("home.upcoming.today")}
+          </h2>
+        </div>
+        <Link href={ROUTES.TRIPS} className="group/link inline-flex items-center gap-1 text-sm font-bold text-teal-700 hover:text-teal-900">
+          {t("home.upcoming.allTrips")}<ArrowRight size={15} className="transition-transform group-hover/link:translate-x-1" />
+        </Link>
+      </div>
+      <article className="grid items-center gap-4 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_8px_22px_rgba(16,32,29,0.08)] sm:grid-cols-[180px_minmax(0,1fr)_auto]">
         <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100">{cover && <img src={cover} alt="" className="h-full w-full object-cover" />}</div>
         <div className="min-w-0">
           <h3 className="text-lg font-extrabold text-slate-900">{trip.tourTitle}</h3>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[13.5px] text-slate-500">
-            <span className="inline-flex items-center gap-1"><CalendarDays size={14} />{longDate(trip.experienceDate)}</span>
-            <span className="inline-flex items-center gap-1"><Users size={14} />{trip.activePassengerCount || trip.passengerCount} hành khách · Mã {trip.bookingCode}</span>
+            <span className="inline-flex items-center gap-1"><CalendarDays size={14} />{longDate(trip.experienceDate, locale)}</span>
+            <span className="inline-flex items-center gap-1"><Users size={14} />{t("home.upcoming.meta", { count: trip.activePassengerCount || trip.passengerCount, code: trip.bookingCode })}</span>
           </div>
-          <p className="mt-2 text-[13px] text-slate-500">Ngày đi tour, mở app JourneyGo tại điểm hẹn để check-in và mở câu chuyện của điểm dừng đầu tiên.</p>
+          <p className="mt-2 text-[13px] text-slate-500">{t("home.upcoming.hint")}</p>
         </div>
-        <Link href={ROUTES.TRIP_DETAIL(trip.id)} className="inline-flex justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:border-teal-300">Xem vé</Link>
+        <Link href={ROUTES.TRIP_DETAIL(trip.id)} className="jg-press inline-flex justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:border-teal-300 sm:mr-2">{t("home.upcoming.viewTicket")}</Link>
       </article>
     </section>
   );
 }
 
+/* ───────────────────────────── Thanh tìm kiếm ngang ───────────────────────────── */
+
+/**
+ * Dùng 2 chỗ: thẻ tìm kiếm trong trang và thanh dính trên cùng khi đã cuộn qua (compact).
+ * Cả hai dùng chung state `bar` nên giá trị luôn khớp nhau.
+ */
+function SearchBar({ bar, setBar, regions, today, onSubmit, compact = false }) {
+  const t = useT();
+  const field = `flex min-w-0 items-center gap-2.5 px-3 ${compact ? "py-1" : "py-1.5"}`;
+  return (
+    <form onSubmit={onSubmit} role="search"
+      className={`grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center ${compact ? "" : "rounded-3xl border border-slate-200 bg-white p-2 shadow-[0_8px_24px_rgba(16,32,29,0.06)]"}`}>
+      <label className={field}>
+        <Search size={18} className="shrink-0 text-teal-700" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("home.search.whereLabel")}</span>
+          <input value={bar.q} onChange={(e) => setBar((b) => ({ ...b, q: e.target.value }))} placeholder={t("home.search.wherePlaceholder")}
+            className="w-full bg-transparent text-sm font-semibold text-teal-800 outline-none placeholder:font-normal placeholder:text-slate-400" />
+        </span>
+      </label>
+      <label className={`${field} border-slate-200 md:border-l`}>
+        <MapPin size={18} className="shrink-0 text-teal-700" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("home.filter.region")}</span>
+          <select value={bar.region} onChange={(e) => setBar((b) => ({ ...b, region: e.target.value }))} className="w-full bg-transparent text-sm font-semibold text-teal-800 outline-none">
+            <option value="">{t("home.search.allRegions")}</option>
+            {regions.map((r) => <option key={r.id} value={String(r.id)}>{r.name}</option>)}
+          </select>
+        </span>
+      </label>
+      <label className={`${field} border-slate-200 md:border-l`}>
+        <CalendarDays size={18} className="shrink-0 text-teal-700" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("home.search.dateLabel")}</span>
+          <input type="date" min={today} value={bar.date} onChange={(e) => setBar((b) => ({ ...b, date: e.target.value }))}
+            className="w-full bg-transparent text-sm font-semibold text-teal-800 outline-none" />
+        </span>
+      </label>
+      <button type="submit" className={`jg-press jg-press-ring inline-flex items-center justify-center gap-1.5 rounded-2xl bg-orange-600 px-6 text-sm font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-[0_10px_22px_rgba(234,88,12,0.38)] ${compact ? "py-2.5" : "py-3"}`}>
+        <Search size={16} />{compact ? t("home.search.change") : t("home.search.submit")}
+      </button>
+    </form>
+  );
+}
+
+/* ───────────────────────────── Trang ───────────────────────────── */
+
+const EMPTY = { q: "", date: "", regions: [], themes: [], formats: [], prices: [] };
+
 export default function HomePage() {
-  const { isTourist } = useTouristSession();
-  const [tours, setTours] = useState([]);
-  const [regions, setRegions] = useState([]);
-  const [themes, setThemes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  /**
-   * Tour du khách đã mua ⇒ không hiển thị lại trên trang chủ.
-   * ⚠️ Hook dùng chung với trang "Tất cả tour" để hai nơi luôn ẩn giống nhau.
-   */
-  const { ids: purchasedTourIds, loading: purchasedLoading } = usePurchasedTourIds();
+  const { t, locale } = useI18n();
+  const { isTourist, user } = useTouristSession();
+  const today = useMemo(() => todayIso(), []);
+  const [data, setData] = useState({ loading: true, tours: [], regions: [], themes: [], error: "", loadFailed: false });
+  const [f, setF] = useState(EMPTY);
+  const [bar, setBar] = useState({ q: "", region: "", date: "" });
+  const [order, setOrder] = useState("DEPARTURE");
+  const [view, setView] = useState("list");
+  const [limit, setLimit] = useState(PAGE);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const { ids: purchasedIds } = usePurchasedTourIds();
 
   useEffect(() => {
     let alive = true;
     Promise.all([
-      touristService.publishedTours({ size: 60 }),
+      touristService.publishedTours({ size: 200 }),
       touristService.regions().catch(() => []),
       touristService.themes().catch(() => []),
-    ]).then(([t, r, th]) => {
-      if (!alive) return;
-      setTours(t.items);
-      setRegions(r);
-      setThemes(th);
-    }).catch((err) => alive && setError(err?.message || "Không tải được danh sách tour."))
-      .finally(() => alive && setLoading(false));
+    ])
+      .then(([{ items }, regions, themes]) => alive && setData({ loading: false, tours: items, regions, themes, error: "", loadFailed: false }))
+      .catch((err) => alive && setData((d) => ({ ...d, loading: false, error: err?.message || "", loadFailed: true })));
     return () => { alive = false; };
   }, []);
 
-  /** Chưa xác định được tour đã mua ⇒ chưa hiện tour (để không nháy tour đã mua). */
-  const bookingsLoading = purchasedLoading;
+  const set = (patch) => { setF((p) => ({ ...p, ...patch })); setLimit(PAGE); };
+  const reset = () => { setF(EMPTY); setBar({ q: "", region: "", date: "" }); setLimit(PAGE); };
+  const resultsRef = useRef(null);
+  const barAnchorRef = useRef(null);
+  /** Đã cuộn qua thẻ tìm kiếm ⇒ hiện thanh tìm kiếm dính dưới header. */
+  const [pinned, setPinned] = useState(false);
+  useEffect(() => {
+    const el = barAnchorRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return undefined;
+    const io = new IntersectionObserver(([e]) => setPinned(!e.isIntersecting && e.boundingClientRect.top < 64), { rootMargin: "-64px 0px 0px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
-  const visibleTours = useMemo(
-    () => (purchasedTourIds.size ? tours.filter((t) => !purchasedTourIds.has(Number(t.tourId))) : tours),
-    [tours, purchasedTourIds],
+  // Link cũ /tours?q=&regionId=&themeId=&format= (đã chuyển về trang chủ) ⇒ áp sẵn bộ lọc tương ứng.
+  useEffect(() => {
+    const u = new URLSearchParams(window.location.search);
+    const q = u.get("q") || "";
+    const regionId = u.get("regionId") || "";
+    const themeId = u.get("themeId") || "";
+    const format = u.get("format") || "";
+    if (!q && !regionId && !themeId && !format) return;
+    queueMicrotask(() => {
+      setF((p) => ({ ...p, q, regions: regionId ? [regionId] : [], themes: themeId ? [themeId] : [], formats: format ? [format] : [] }));
+      setBar((b) => ({ ...b, q, region: regionId }));
+    });
+  }, []);
+  const submitBar = (e) => {
+    e.preventDefault();
+    set({ q: bar.q.trim(), date: bar.date, regions: bar.region ? [bar.region] : [] });
+    scrollToResults();
+  };
+  /** Cuộn mượt tới phần kết quả (chừa chỗ cho header + thanh tìm kiếm dính). */
+  function scrollToResults() {
+    const el = resultsRef.current;
+    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - (window.innerWidth >= 768 ? 156 : 88), behavior: "smooth" });
+  }
+
+  /** Tour có thể đặt (bỏ tour đã mua). */
+  const pool = useMemo(
+    () => data.tours.filter((tour) => !purchasedIds.has(Number(tour.tourId))),
+    [data.tours, purchasedIds],
   );
 
-  // ── Mỗi phần có giới hạn cố định: trang chủ không dài ra theo lượng dữ liệu; danh sách đầy đủ ở /tours ──
-  const soonest = useMemo(() => [...visibleTours].filter((t) => t.nextDepartureDate)
-    .sort((a, b) => a.nextDepartureDate.localeCompare(b.nextDepartureDate) || (b.stopCount || 0) - (a.stopCount || 0))
-    .slice(0, LIMIT.soonest), [visibleTours]);
-  // Tour chưa xuất hiện ở "Khởi hành sớm nhất"; lấy đủ hàng (4 cột) để không có thẻ nằm lẻ.
-  const moreTours = useMemo(() => {
-    const shown = new Set(soonest.map((t) => t.tourId));
-    const rest = visibleTours.filter((t) => !shown.has(t.tourId)).sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
-    const n = Math.min(rest.length, LIMIT.moreTours);
-    return rest.slice(0, n >= 4 ? n - (n % 4) : n);
-  }, [visibleTours, soonest]);
-  const regionCards = useMemo(() => topByCount(regions, visibleTours, "regionId", LIMIT.regions), [regions, visibleTours]);
-  const themeCards = useMemo(() => topByCount(themes, visibleTours, "themeId", LIMIT.themes), [themes, visibleTours]);
-  // Ảnh nền cho ô chủ đề: ảnh bìa của một tour thuộc chủ đề (khác nhau giữa các ô nếu có thể).
-  const themeCover = useMemo(() => {
-    const used = new Set(); const map = {};
-    themeCards.items.forEach((th) => {
-      const list = visibleTours.filter((t) => t.themeId === th.id && t.coverImageUrl);
-      const pick = list.find((t) => !used.has(t.coverImageUrl)) || list[0];
-      if (pick) { used.add(pick.coverImageUrl); map[th.id] = pick.coverImageUrl; }
-    });
-    return map;
-  }, [themeCards, visibleTours]);
+  const match = (tour, skip) => {
+    if (f.q && !normalize(`${tour.title} ${tour.regionName || ""} ${tour.themeName || ""}`).includes(normalize(f.q))) return false;
+    if (skip !== "date" && f.date && !upcoming(tour, today).includes(f.date)) return false;
+    if (skip !== "regions" && f.regions.length && !f.regions.includes(String(tour.regionId))) return false;
+    if (skip !== "themes" && f.themes.length && !f.themes.includes(String(tour.themeId))) return false;
+    if (skip !== "formats" && f.formats.length && !f.formats.includes(isMultiDay(tour) ? "MULTI_DAY" : "DAY_TRIP")) return false;
+    if (skip !== "prices" && f.prices.length && !PRICES.some(([v, , fn]) => f.prices.includes(v) && fn(Number(tour.price || 0)))) return false;
+    return true;
+  };
+
+  const results = useMemo(() => {
+    const list = pool.filter((tour) => match(tour));
+    const first = (tour) => upcoming(tour, today)[0] || "9999";
+    const by = {
+      DEPARTURE: (a, b) => first(a).localeCompare(first(b)),
+      PRICE_ASC: (a, b) => Number(a.price) - Number(b.price),
+      PRICE_DESC: (a, b) => Number(b.price) - Number(a.price),
+      NEWEST: (a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")),
+    };
+    return [...list].sort(by[order]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- match đọc f/today
+  }, [pool, f, order, today]);
+
+  // Số đếm mỗi mục tính trên các bộ lọc KHÁC (kiểu "faceted"), để biết chọn thêm thì còn bao nhiêu tour.
+  /* eslint-disable react-hooks/exhaustive-deps -- match đọc f/today */
+  const facets = useMemo(() => {
+    const countBy = (skip, keyOf) => {
+      const m = new Map();
+      pool.filter((tour) => match(tour, skip)).forEach((tour) => [].concat(keyOf(tour)).forEach((k) => k != null && m.set(k, (m.get(k) || 0) + 1)));
+      return m;
+    };
+    const dates = countBy("date", (tour) => upcoming(tour, today));
+    const reg = countBy("regions", (tour) => (tour.regionId != null ? String(tour.regionId) : null));
+    const th = countBy("themes", (tour) => (tour.themeId != null ? String(tour.themeId) : null));
+    const fm = countBy("formats", (tour) => (isMultiDay(tour) ? "MULTI_DAY" : "DAY_TRIP"));
+    const pr = countBy("prices", (tour) => PRICES.filter(([, , fn]) => fn(Number(tour.price || 0))).map(([v]) => v));
+    const opts = (list, m, sel) => list
+      .map((x) => ({ id: String(x.id), name: x.name, count: m.get(String(x.id)) || 0 }))
+      .filter((x) => x.count > 0 || sel.includes(x.id))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, INTL_LOCALE[locale] || locale));
+    return {
+      dates,
+      regions: opts(data.regions, reg, f.regions),
+      themes: opts(data.themes, th, f.themes),
+      formats: Object.fromEntries(FORMATS.map(([v]) => [v, fm.get(v) || 0])),
+      prices: Object.fromEntries(PRICES.map(([v]) => [v, pr.get(v) || 0])),
+    };
+  }, [pool, f, today, data.regions, data.themes, locale]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  const departures = useMemo(() => results.reduce((n, tour) => n + upcoming(tour, today).length, 0), [results, today]);
+  const activeCount = (f.q ? 1 : 0) + (f.date ? 1 : 0) + f.regions.length + f.themes.length + f.formats.length + f.prices.length;
+  const firstName = String(user?.fullName || "").trim().split(/\s+/).pop();
+  const loading = data.loading;
+  const resultsKey = JSON.stringify([f, order, view]);
+
+  const panel = (
+    <FilterPanel f={f} set={set} reset={reset} activeCount={activeCount} today={today}
+      dateCounts={facets.dates} regionOpts={facets.regions} themeOpts={facets.themes}
+      formatCounts={facets.formats} priceCounts={facets.prices} />
+  );
 
   return (
     <TouristShell>
-      <Hero tours={visibleTours} regions={regions} />
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-4 py-10 sm:gap-14 sm:px-6 sm:py-12 [&>*]:min-w-0">
-        {error && (
-          <p role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
-            <AlertTriangle size={16} /> {error}
-          </p>
-        )}
-
-        <UpcomingTrip tours={tours} />
-
-        <section aria-labelledby="h-soon">
-          <SectionHead id="h-soon" title="Khởi hành sớm nhất" sub="Các tour còn chỗ trong những ngày tới" href={ROUTES.TOURS} linkLabel={visibleTours.length > soonest.length ? `Xem tất cả ${visibleTours.length} tour` : "Xem tất cả"} />
-          {loading || bookingsLoading ? (
-            <div className={CARD_GRID}>{[0, 1, 2, 3].map((i) => <TourCardSkeleton key={i} />)}</div>
-          ) : soonest.length ? (
-            <Reveal className={CARD_GRID}>{soonest.map((t, i) => <div key={t.tourId} className="jg-item min-w-0" style={{ "--i": i }}><TourCard tour={t} /></div>)}</Reveal>
-          ) : (
-            <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">Chưa có tour nào mở bán. Quay lại sau nhé.</p>
-          )}
-        </section>
-
-        {themeCards.items.length > 0 && (
-          <section aria-labelledby="h-theme">
-            <SectionHead id="h-theme" title="Khám phá theo chủ đề" sub="Chọn kiểu trải nghiệm bạn thích" />
-            <Reveal className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${lgColsFor(themeCards.items.length + (themeCards.rest > 0 ? 1 : 0))}`}>
-              {themeCards.items.map((th, i) => {
-                const cover = themeCover[th.id];
-                const tiles = themeCards.items.length + (themeCards.rest > 0 ? 1 : 0);
-                // Điện thoại 2 cột: số ô lẻ ⇒ ô cuối trải rộng hết hàng, không nằm lẻ một mình.
-                const spanLast = tiles % 2 === 1 && i === tiles - 1 ? "col-span-2 sm:col-span-1" : "";
-                return (
-                  <Link key={th.id} href={`${ROUTES.TOURS}?themeId=${th.id}`} title={th.name} style={{ "--i": i }}
-                    className={`jg-item group relative flex min-h-[104px] min-w-0 flex-col justify-end overflow-hidden rounded-2xl p-3 transition duration-300 active:scale-[0.98] motion-reduce:transition-none sm:min-h-[120px] sm:p-3.5 ${spanLast} ${cover ? "bg-teal-900 text-white" : "border border-slate-200 bg-white text-slate-900 hover:border-teal-400"}`}>
-                    {cover && <>
-                      <img src={cover} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.07] motion-reduce:transition-none" />
-                      <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/5 transition-opacity duration-300 group-hover:from-black/80" />
-                    </>}
-                    <span className="relative min-w-0">
-                      <span className="line-clamp-2 text-sm font-extrabold leading-snug sm:text-[15px]">{th.name}</span>
-                      <span className={`flex items-center gap-1 text-xs ${cover ? "text-white/85" : "text-slate-500"}`}>
-                        {th.count} tour
-                        <span className="inline-flex translate-x-[-4px] items-center gap-0.5 opacity-0 transition duration-300 group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:transition-none">· Xem tour<ArrowRight size={12} /></span>
-                      </span>
-                    </span>
-                  </Link>
-                );
-              })}
-              {themeCards.rest > 0 && (
-                <Link href={ROUTES.TOURS} style={{ "--i": themeCards.items.length }}
-                  className={`jg-item flex min-h-[104px] min-w-0 items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50 p-3 text-center text-sm font-bold text-teal-800 transition hover:border-teal-500 active:scale-[0.98] sm:min-h-[120px] ${(themeCards.items.length + 1) % 2 === 1 ? "col-span-2 sm:col-span-1" : ""}`}>
-                  + {themeCards.rest} chủ đề khác<ArrowRight size={15} />
-                </Link>
-              )}
-            </Reveal>
-          </section>
-        )}
-
-        {regionCards.items.length > 0 && (
-          <section aria-labelledby="h-region">
-            <SectionHead id="h-region" title="Điểm đến theo vùng miền" sub={`${regionCards.total} vùng đang có tour mở bán`} />
-            <Reveal className="grid grid-cols-2 gap-2.5 sm:gap-3.5 lg:grid-cols-3">
-              {regionCards.items.map((r, i) => (
-                <Link key={r.id} href={`${ROUTES.TOURS}?regionId=${r.id}`} title={r.name} style={{ "--i": i }}
-                  className="jg-item group relative flex min-h-[132px] min-w-0 flex-col justify-end overflow-hidden rounded-2xl bg-teal-900 p-3 text-white transition active:scale-[0.98] motion-reduce:transition-none sm:min-h-[200px] sm:rounded-3xl sm:p-4">
-                  {r.imageUrl && <img src={r.imageUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.06] motion-reduce:transition-none" />}
-                  <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                  <span className="relative min-w-0">
-                    <span className="block truncate text-base font-extrabold sm:text-xl">{r.name}</span>
-                    <span className="flex items-center gap-1 text-xs text-white/90 sm:text-sm">{r.count} tour
-                      <span className="inline-flex translate-x-[-4px] items-center gap-0.5 opacity-0 transition duration-300 group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:transition-none">· Xem tour<ArrowRight size={13} /></span>
-                    </span>
-                  </span>
-                </Link>
-              ))}
-              {regionCards.rest > 0 && (
-                <Link href={ROUTES.TOURS} style={{ "--i": regionCards.items.length }}
-                  className="jg-item flex min-h-[132px] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50 p-3 text-center text-teal-800 hover:border-teal-500 sm:min-h-[200px] sm:rounded-3xl">
-                  <span className="text-2xl font-extrabold tabular-nums sm:text-3xl">+{regionCards.rest}</span>
-                  <span className="inline-flex items-center gap-1 text-sm font-bold">Xem tất cả {regionCards.total} vùng<ArrowRight size={15} /></span>
-                </Link>
-              )}
-            </Reveal>
-          </section>
-        )}
-
-        {moreTours.length > 0 && (
-          <section aria-labelledby="h-all">
-            <SectionHead id="h-all" title="Tour khác đang mở bán" sub="Giá từ thấp đến cao" href={ROUTES.TOURS} linkLabel={`Xem tất cả ${visibleTours.length} tour`} />
-            {/* Điện thoại chỉ hiện 4 thẻ đầu; phần còn lại xem ở /tours */}
-            <Reveal className={CARD_GRID}>
-              {moreTours.map((t, i) => (
-                <div key={t.tourId} className={`jg-item min-w-0 ${i >= 4 ? "hidden sm:block" : ""}`} style={{ "--i": i % 4 }}><TourCard tour={t} /></div>
-              ))}
-            </Reveal>
-          </section>
-        )}
-
-        <CommunityHighlights />
-
-        <section id="vi-sao" aria-labelledby="h-why" className="scroll-mt-24">
-          <SectionHead id="h-why" title="Vì sao chọn JourneyGo" />
-          <Reveal className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
-            {WHY.map((w, i) => (
-              <figure key={w.title} style={{ "--i": i }} className="jg-item group m-0 min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
-                  <img src={w.img} alt={w.place} loading="lazy" className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.05] motion-reduce:transition-none" />
-                  <span className="absolute bottom-2 left-2 rounded-full bg-slate-900/70 px-2 py-0.5 text-[10.5px] font-semibold text-white sm:text-[11px]">{w.place}</span>
-                </div>
-                <figcaption className="p-3 sm:p-4">
-                  <h3 className="text-sm font-bold leading-snug text-slate-900 sm:text-[15px]">{w.title}</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500 sm:text-[13.5px]">{w.text}</p>
-                </figcaption>
-              </figure>
-            ))}
-          </Reveal>
-        </section>
-
-        <Reveal as="section" id="tai-app" aria-labelledby="h-app" className="grid scroll-mt-24 overflow-hidden rounded-3xl bg-slate-900 text-white lg:grid-cols-[1.25fr_0.75fr]">
-          <div className="p-6 sm:p-8">
-            <p className="text-xs font-bold uppercase tracking-[0.08em] text-teal-300">Ứng dụng JourneyGo</p>
-            <h2 id="h-app" className="mt-1 text-2xl font-extrabold tracking-tight">Đặt trên web, đi tour bằng app</h2>
-            <ol className="mt-6 grid gap-5 sm:grid-cols-3 sm:gap-4">
-              {APP_STEPS.map(([title, text], i) => (
-                <li key={title} style={{ "--i": i + 1 }} className="jg-item min-w-0">
-                  <span className="block text-4xl font-extrabold leading-none tabular-nums text-orange-400">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="mt-2 block font-bold">{title}</span>
-                  <span className="mt-1 block text-sm leading-relaxed text-white/70">{text}</span>
-                </li>
-              ))}
-            </ol>
+      {/* Thanh tìm kiếm dính dưới header khi đã cuộn qua thẻ tìm kiếm (từ máy tính bảng trở lên) */}
+      <div aria-hidden={!pinned} inert={!pinned}
+        className={`fixed inset-x-0 top-16 z-30 hidden border-b border-slate-200 bg-white/98 shadow-[0_10px_24px_rgba(16,32,29,0.10)] backdrop-blur transition duration-300 ease-out md:block ${pinned ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-3 opacity-0"}`}>
+        <div className="mx-auto max-w-page px-4 py-2 sm:px-6 lg:px-8">
+          <SearchBar compact bar={bar} setBar={setBar} regions={data.regions} today={today} onSubmit={submitBar} />
+        </div>
+      </div>
+      {/* Banner */}
+      <section className="relative isolate overflow-hidden text-white">
+        <img src="/image/hero/mucangchai-terraces.jpg" alt="" className="absolute inset-0 -z-10 h-full w-full object-cover object-[50%_60%]" fetchPriority="high" />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(6,40,37,0.55)_0%,rgba(6,40,37,0.72)_100%)]" />
+        <div className="mx-auto max-w-page px-4 pb-12 pt-8 sm:px-6 lg:px-8">
+          <nav aria-label={t("common.breadcrumb")} className="text-sm text-white/80">
+            <span>{t("home.breadcrumb.home")}</span><span className="mx-1.5">/</span><span className="font-semibold text-orange-200">{t("home.breadcrumb.tours")}</span>
+          </nav>
+          <div className="mx-auto mt-8 max-w-3xl text-center">
+            <p className="font-script text-3xl leading-none text-orange-200">{isTourist && firstName ? t("home.hero.greetingUser", { name: firstName }) : t("home.hero.greetingGuest")}</p>
+            <h1 className="mt-3 text-[clamp(26px,3.2vw,40px)] font-extrabold leading-tight tracking-tight text-balance">{t("home.hero.title")}</h1>
+            <p className="mx-auto mt-3 max-w-[60ch] text-white/85">
+              {t("home.hero.subtitle")}
+            </p>
           </div>
-          <div className="relative hidden min-h-[240px] lg:block">
-            <img src={PHOTO.ngoMon} alt="Ngọ Môn, Đại Nội Huế" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-            <span className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/20 to-transparent" />
-          </div>
-        </Reveal>
+        </div>
+      </section>
 
-        {/* Du khách đã đăng nhập không cần lời mời làm đối tác */}
-        {!isTourist && (
-        <Reveal as="section" id="doi-tac" aria-labelledby="h-host" className="grid scroll-mt-24 items-center gap-7 rounded-3xl border border-orange-200 bg-orange-50 p-6 sm:p-8 lg:grid-cols-[1.2fr_1fr]">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-orange-600">Dành cho nghệ nhân, hộ dân và đơn vị lữ hành</p>
-            <h2 id="h-host" className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">Mở tour trải nghiệm của bạn trên JourneyGo</h2>
-            <p className="mt-2 max-w-[54ch] text-slate-600">Bạn có nghề truyền thống, khu vườn, căn bếp hay câu chuyện của làng mình? Đăng ký làm đối tác để tự thiết kế tour, nhận khách đặt và theo dõi doanh thu ngay trên web.</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {["Không mất phí đăng ký", "Tự đặt giá và lịch khởi hành", "Tất toán định kỳ về ví"].map((p) => (
-                <span key={p} className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-orange-700">{p}</span>
-              ))}
+      <div className="mx-auto grid max-w-page grid-cols-1 items-start gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[264px_minmax(0,1fr)] 2xl:grid-cols-[288px_minmax(0,1fr)] lg:px-8">
+        {/* Chuyến đi sắp tới (du khách có vé) — trải ngang trên bộ lọc + danh sách tour */}
+        <div className="empty:hidden lg:col-span-2"><UpcomingTrip tours={data.tours} /></div>
+
+        {/* Cột trái: bộ lọc (máy tính), dính khi cuộn — lùi xuống dưới thanh tìm kiếm dính khi nó hiện */}
+        <aside className={`hidden transition-[top] duration-300 lg:sticky lg:block lg:overflow-y-auto lg:[scrollbar-width:thin] ${pinned ? "lg:top-[10rem] lg:max-h-[calc(100dvh-11rem)]" : "lg:top-20 lg:max-h-[calc(100dvh-6rem)]"}`}>{panel}</aside>
+
+        <div className="min-w-0 space-y-5">
+          {/* Thanh tìm kiếm ngang */}
+          <div ref={barAnchorRef}>
+            <SearchBar bar={bar} setBar={setBar} regions={data.regions} today={today} onSubmit={submitBar} />
+          </div>
+
+          {/* Kết quả + sắp xếp + kiểu xem */}
+          <div ref={resultsRef} className="flex flex-wrap items-center gap-3 border-b border-slate-200 pb-4">
+            <div className="min-w-0" aria-live="polite">
+              <p className="text-[15px] text-slate-700">{t("home.results.label")} <b className="text-teal-800">{loading ? t("home.results.loading") : t("home.results.count", { count: results.length })}</b></p>
+              {!loading && <p className="text-xs italic text-slate-500">{t("home.results.departures", { count: departures })}</p>}
             </div>
-            <Link href={ROUTES.PARTNER_REGISTER} className="group/btn mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-orange-600 px-6 py-3 text-[15px] font-bold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-[0_10px_22px_rgba(234,88,12,0.35)] active:translate-y-0 active:scale-[0.97] motion-reduce:transition-none sm:w-auto">Đăng ký làm đối tác<ArrowRight size={16} className="transition-transform duration-200 group-hover/btn:translate-x-0.5" /></Link>
+            <button type="button" onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}
+              className="jg-press inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 lg:hidden">
+              <SlidersHorizontal size={15} />{t("home.filter.title")}{activeCount > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-teal-700 px-1 text-[11px] text-white">{activeCount}</span>}
+            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <label htmlFor="home-order" className="hidden text-sm text-slate-500 sm:block">{t("home.sort.label")}</label>
+              <select id="home-order" value={order} onChange={(e) => setOrder(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-teal-800">
+                {ORDERS.map(([v, key]) => <option key={v} value={v}>{t(key)}</option>)}
+              </select>
+              <div className="hidden rounded-xl border border-slate-200 bg-white p-1 sm:flex" role="group" aria-label={t("home.view.label")}>
+                <button type="button" onClick={() => setView("grid")} aria-pressed={view === "grid"} aria-label={t("home.view.grid")}
+                  className={`jg-press grid h-8 w-8 place-items-center rounded-lg ${view === "grid" ? "bg-teal-700 text-white" : "text-slate-500 hover:bg-slate-100"}`}><LayoutGrid size={16} /></button>
+                <button type="button" onClick={() => setView("list")} aria-pressed={view === "list"} aria-label={t("home.view.list")}
+                  className={`jg-press grid h-8 w-8 place-items-center rounded-lg ${view === "list" ? "bg-teal-700 text-white" : "text-slate-500 hover:bg-slate-100"}`}><List size={16} /></button>
+              </div>
+            </div>
           </div>
-          <ol className="grid gap-2.5" aria-label="Các bước trở thành đối tác">
-            {[
-              ["Gửi hồ sơ đăng ký", "Thông tin cá nhân hoặc doanh nghiệp, giấy tờ và tài khoản nhận tiền."],
-              ["Admin xét duyệt", "Nhận email kích hoạt và đặt mật khẩu lần đầu khi hồ sơ được duyệt."],
-              ["Tạo tour 5 bước", "Thông tin, giá vé, điểm đến, lịch trình, lịch khởi hành rồi gửi kiểm duyệt."],
-              ["Mở bán và nhận khách", "Tour được duyệt sẽ hiện trên trang này và trong app du khách."],
-            ].map(([t, d], i) => (
-              <li key={t} className="flex gap-3 rounded-2xl bg-white p-3 text-[13.5px]">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-orange-600 text-sm font-extrabold text-white">{i + 1}</span>
-                <span><b className="block text-sm text-slate-900">{t}</b><span className="text-slate-500">{d}</span></span>
-              </li>
-            ))}
-          </ol>
-        </Reveal>
-        )}
+
+          {/* Điện thoại / máy tính bảng: bộ lọc mở ngay dưới thanh kết quả */}
+          {filtersOpen && <div className="lg:hidden">{panel}</div>}
+
+          {data.loadFailed ? (
+            <p role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"><AlertTriangle size={16} />{data.error || t("home.error.loadTours")}</p>
+          ) : loading ? (
+            view === "list"
+              ? <div className="space-y-4">{[0, 1, 2].map((i) => <TourRowSkeleton key={i} />)}</div>
+              : <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">{[0, 1, 2, 3, 4, 5].map((i) => <TourCardSkeleton key={i} />)}</div>
+          ) : results.length ? (
+            <>
+              {/* key đổi theo bộ lọc ⇒ thẻ chạy lại hiệu ứng xuất hiện; "Xem thêm" chỉ thẻ mới chạy (độ trễ tính từ thẻ mới đầu tiên) */}
+              <div key={resultsKey} className={view === "list" ? "space-y-4" : "grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4"}>
+                {results.slice(0, limit).map((tour, i) => (
+                  <div key={tour.tourId} className="jg-card-in min-w-0" style={{ "--i": Math.max(0, i - (limit - PAGE)) }}>
+                    {view === "list" ? <TourRow tour={tour} today={today} /> : <TourCard tour={tour} />}
+                  </div>
+                ))}
+              </div>
+              {results.length > limit && (
+                <div className="text-center">
+                  <button type="button" onClick={() => setLimit((n) => n + PAGE)}
+                    className="jg-press rounded-2xl border border-teal-700 bg-white px-6 py-2.5 text-sm font-bold text-teal-800 hover:bg-teal-700 hover:text-white">
+                    {t("home.results.loadMore", { count: Math.min(PAGE, results.length - limit) })}
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
+              <p className="font-bold text-slate-800">{t("home.empty.title")}</p>
+              <p className="mt-1 text-sm text-slate-500">{t("home.empty.desc")}</p>
+              {activeCount > 0 && <button type="button" onClick={reset} className="mt-3 text-sm font-bold text-teal-700">{t("home.empty.reset")}</button>}
+            </div>
+          )}
+        </div>
       </div>
     </TouristShell>
   );

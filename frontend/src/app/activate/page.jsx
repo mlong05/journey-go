@@ -19,10 +19,13 @@ import {
 } from "lucide-react";
 import { activateAccount } from "@/features/partnerapplication/services/partnerApplicationService";
 import { ROUTES } from "@/constants/routes";
+import { useT } from "@/i18n";
+import LanguageSwitcher from "@/components/common/LanguageSwitcher";
 
 function ActivateForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useT();
   const token = searchParams.get("token") || "";
 
   const [password, setPassword] = useState("");
@@ -36,11 +39,11 @@ function ActivateForm() {
     setError("");
 
     if (password.length < 8) {
-      setError("Mật khẩu phải có ít nhất 8 ký tự.");
+      setError(t("misc.activate.errPasswordLength"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Mật khẩu xác nhận không khớp.");
+      setError(t("misc.activate.errPasswordMismatch"));
       return;
     }
 
@@ -52,8 +55,8 @@ function ActivateForm() {
     } catch (err) {
       setError(
         err?.message ||
-          err?.response?.data?.message ||
-          "Không thể thiết lập mật khẩu. Link có thể đã hết hạn hoặc đã được sử dụng.",
+        err?.response?.data?.message ||
+        t("misc.activate.errGeneric"),
       );
     } finally {
       setLoading(false);
@@ -66,16 +69,15 @@ function ActivateForm() {
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-rose-50 text-rose-600 ring-8 ring-rose-100">
           <AlertTriangle size={28} />
         </div>
-        <h1 className="text-lg font-bold text-slate-900">Link không hợp lệ</h1>
+        <h1 className="text-lg font-bold text-slate-900">{t("misc.activate.invalidLinkTitle")}</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Không tìm thấy mã thiết lập mật khẩu trong đường dẫn. Vui lòng mở lại link trong
-          email thông báo phê duyệt.
+          {t("misc.activate.invalidLinkDesc")}
         </p>
         <Link
           href={ROUTES.HOME}
           className="mt-6 inline-flex items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
         >
-          Về trang chủ
+          {t("misc.activate.backHome")}
         </Link>
       </div>
     );
@@ -88,10 +90,10 @@ function ActivateForm() {
           <CheckCircle2 size={28} />
         </div>
         <h1 className="text-lg font-bold text-slate-900">
-          Thiết lập mật khẩu thành công
+          {t("misc.activate.successTitle")}
         </h1>
         <p className="mt-2 text-sm text-slate-500">
-          Tài khoản đối tác của bạn đã sẵn sàng. Đang chuyển tới màn hình đăng nhập...
+          {t("misc.activate.successDesc")}
         </p>
       </div>
     );
@@ -104,17 +106,17 @@ function ActivateForm() {
           <KeyRound size={24} />
         </div>
         <h1 className="text-lg font-bold text-slate-900">
-          Thiết lập mật khẩu tài khoản đối tác
+          {t("misc.activate.title")}
         </h1>
         <p className="mt-1 text-xs text-slate-500">
-          Hồ sơ của bạn đã được phê duyệt. Hãy đặt mật khẩu để bắt đầu đăng ký nội dung.
+          {t("misc.activate.subtitle")}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
           <span className="mb-1.5 block text-xs font-semibold text-slate-700">
-            Mật khẩu mới
+            {t("misc.activate.newPasswordLabel")}
           </span>
           <div className="relative">
             <Lock
@@ -126,7 +128,7 @@ function ActivateForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
-              placeholder="Tối thiểu 8 ký tự"
+              placeholder={t("misc.activate.newPasswordPlaceholder")}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 py-2.5 text-sm outline-none transition focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-200/60"
             />
           </div>
@@ -134,7 +136,7 @@ function ActivateForm() {
 
         <label className="block">
           <span className="mb-1.5 block text-xs font-semibold text-slate-700">
-            Xác nhận mật khẩu
+            {t("misc.activate.confirmPasswordLabel")}
           </span>
           <div className="relative">
             <ShieldCheck
@@ -146,7 +148,7 @@ function ActivateForm() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               autoComplete="new-password"
-              placeholder="Nhập lại mật khẩu"
+              placeholder={t("misc.activate.confirmPasswordPlaceholder")}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 py-2.5 text-sm outline-none transition focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-200/60"
             />
           </div>
@@ -164,7 +166,7 @@ function ActivateForm() {
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-teal-700 disabled:opacity-60 cursor-pointer"
         >
           {loading && <Loader2 size={16} className="animate-spin" />}
-          Thiết lập mật khẩu
+          {t("misc.activate.submit")}
         </button>
       </form>
     </div>
@@ -173,7 +175,10 @@ function ActivateForm() {
 
 export default function ActivatePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
+    <div className="relative flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
+      <div className="absolute right-4 top-4 z-10">
+        <LanguageSwitcher />
+      </div>
       <Suspense fallback={null}>
         <ActivateForm />
       </Suspense>

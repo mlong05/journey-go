@@ -6,8 +6,11 @@
  */
 import React, { useEffect } from "react";
 import { X } from "lucide-react";
+import { useT } from "@/i18n";
 
 export default function LegalDocumentModal({ open, title, sections, onClose }) {
+  const t = useT();
+
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
@@ -44,7 +47,7 @@ export default function LegalDocumentModal({ open, title, sections, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            aria-label="Đóng"
+            aria-label={t("common.close")}
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
           >
             <X size={17} />
@@ -54,7 +57,7 @@ export default function LegalDocumentModal({ open, title, sections, onClose }) {
         {/* Nội dung */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
           <p className="mb-4 text-[11px] italic text-slate-500">
-            Văn bản dành riêng cho Đối tác của JourneyGo · Cập nhật lần cuối: 07/11/2026
+            {t("home.pr.legal.meta")}
           </p>
           {sections.map((section) => (
             <section key={section.heading} className="mb-5 last:mb-0">
@@ -80,14 +83,14 @@ export default function LegalDocumentModal({ open, title, sections, onClose }) {
             onClick={onClose}
             className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
           >
-            Đã hiểu
+            {t("home.pr.legal.understood")}
           </button>
           <button
             type="button"
             onClick={onClose}
             className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-5 py-2 text-xs font-bold text-white transition hover:bg-emerald-800"
           >
-            Đóng
+            {t("common.close")}
           </button>
         </div>
       </div>

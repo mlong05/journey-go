@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Tooltip from "@/components/ui/Tooltip";
 import { LimitedField } from "@/components/ui/LimitedField";
+import { translate } from "@/i18n";
 
 /* ── Nhãn ─────────────────────────────────────────────────────────────── */
 
@@ -204,7 +205,9 @@ export function FileField({
   onSelect,
   onClear,
   error,
+  t,
 }) {
+  const tr = t || ((key) => translate("vi", key));
   return (
     <Field label={label} required={required} error={error} htmlFor={field}>
       {value ? (
@@ -224,7 +227,7 @@ export function FileField({
             type="button"
             onClick={onClear}
             className="shrink-0 rounded-lg p-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-            aria-label="Xoá tệp"
+            aria-label={tr("home.pr.file.removeAria")}
           >
             <X size={14} />
           </button>
@@ -243,7 +246,7 @@ export function FileField({
             <Upload size={16} className="shrink-0 text-emerald-600" />
           )}
           <span className="text-xs font-semibold text-slate-600">
-            {uploading ? "Đang tải lên…" : "Tải lên tệp (PNG, JPG, PDF)"}
+            {uploading ? tr("home.pr.file.uploading") : tr("home.pr.file.uploadPrompt")}
           </span>
           <input
             type="file"

@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useSyncExternalStore } from "react";
+import { useT } from "@/i18n";
 
 const AuthScreen = dynamic(
   () => import("@/features/auth").then((m) => m.AuthScreen),
@@ -26,6 +27,7 @@ function LoadingFallback({ message }) {
 }
 
 export default function RegisterPage() {
+  const t = useT();
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -33,7 +35,7 @@ export default function RegisterPage() {
   );
 
   if (!mounted) {
-    return <LoadingFallback message="Đang tải cổng đăng ký…" />;
+    return <LoadingFallback message={t("misc.register.loading")} />;
   }
 
   return <AuthScreen initialTab="register" />;

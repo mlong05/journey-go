@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 /**
  * Biểu mẫu đăng ký trở thành đối tác của JourneyGo — 4 giai đoạn theo đặc tả.
@@ -56,40 +56,39 @@ import {
   buttonCls,
 } from "@/features/partnerapplication/components/PartnerFormKit";
 import {
-  PARTNER_TERMS_SECTIONS,
-  PARTNER_TERMS_TITLE,
-  PRIVACY_POLICY_SECTIONS,
-  PRIVACY_POLICY_TITLE,
+  getPartnerTerms,
+  getPrivacyPolicy,
 } from "@/features/partnerapplication/constants/legalDocuments";
 import { BANKS } from "@/constants/banks";
+import { useT } from "@/i18n";
 
 const STEPS = [
-  { id: 1, label: "Thông tin người đại diện", icon: UserRound },
-  { id: 2, label: "Hồ sơ doanh nghiệp", icon: Building2 },
-  { id: 3, label: "Thiết lập thanh toán", icon: Wallet },
-  { id: 4, label: "Xác nhận & đồng ý", icon: ShieldCheck },
+  { id: 1, labelKey: "home.pr.step.1", icon: UserRound },
+  { id: 2, labelKey: "home.pr.step.2", icon: Building2 },
+  { id: 3, labelKey: "home.pr.step.3", icon: Wallet },
+  { id: 4, labelKey: "home.pr.step.4", icon: ShieldCheck },
 ];
 
 const PARTNER_TYPES = [
   {
     value: "TRAVEL_AGENCY",
-    label: "Công ty Lữ hành",
-    hint: "Yêu cầu Giấy phép lữ hành Quốc tế/Nội địa.",
+    labelKey: "home.pr.type.TRAVEL_AGENCY.label",
+    hintKey: "home.pr.type.TRAVEL_AGENCY.hint",
   },
   {
     value: "EXPERIENCE_PROVIDER",
-    label: "Đơn vị cung cấp Trải nghiệm / Điểm đến",
-    hint: "Yêu cầu GPKD / Hộ kinh doanh.",
+    labelKey: "home.pr.type.EXPERIENCE_PROVIDER.label",
+    hintKey: "home.pr.type.EXPERIENCE_PROVIDER.hint",
   },
 ];
 
 const POSITIONS = [
-  { value: "OWNER", label: "Chủ doanh nghiệp" },
-  { value: "DIRECTOR", label: "Giám đốc" },
-  { value: "MANAGER", label: "Quản lý" },
-  { value: "LEGAL_REPRESENTATIVE", label: "Người đại diện pháp luật" },
-  { value: "AUTHORIZED_EMPLOYEE", label: "Nhân viên được ủy quyền" },
-  { value: "OTHER", label: "Khác" },
+  { value: "OWNER", labelKey: "home.pr.pos.OWNER" },
+  { value: "DIRECTOR", labelKey: "home.pr.pos.DIRECTOR" },
+  { value: "MANAGER", labelKey: "home.pr.pos.MANAGER" },
+  { value: "LEGAL_REPRESENTATIVE", labelKey: "home.pr.pos.LEGAL_REPRESENTATIVE" },
+  { value: "AUTHORIZED_EMPLOYEE", labelKey: "home.pr.pos.AUTHORIZED_EMPLOYEE" },
+  { value: "OTHER", labelKey: "home.pr.pos.OTHER" },
 ];
 
 const EMPTY_FORM = {
@@ -119,82 +118,83 @@ const EMPTY_FORM = {
 };
 
 /** Kiểm tra hợp lệ theo giai đoạn — trả về map field → lỗi. */
-function validateStep(step, form) {
+function validateStep(step, form, t) {
   const errors = {};
 
   if (step === 1) {
-    if (!form.email.trim()) errors.email = "Email không được để trống";
+    if (!form.email.trim()) errors.email = t("home.pr.err.emailRequired");
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
-      errors.email = "Email không hợp lệ";
-    if (!form.phone.trim()) errors.phone = "Số điện thoại không được để trống";
+      errors.email = t("home.pr.err.emailInvalid");
+    if (!form.phone.trim()) errors.phone = t("home.pr.err.phoneRequired");
     else if (!/^0\d{9,10}$/.test(form.phone.trim()))
-      errors.phone = "Số điện thoại không hợp lệ (10-11 chữ số, bắt đầu bằng 0)";
+      errors.phone = t("home.pr.err.phoneInvalid");
     if (!form.representativeName.trim())
-      errors.representativeName = "Họ tên người đại diện không được để trống";
+      errors.representativeName = t("home.pr.err.repNameRequired");
     if (!form.representativePosition)
-      errors.representativePosition = "Vui lòng chọn chức vụ";
+      errors.representativePosition = t("home.pr.err.repPosRequired");
   }
 
   if (step === 2) {
     if (!form.businessName.trim())
-      errors.businessName = "Tên doanh nghiệp / cơ sở không được để trống";
-    if (!form.partnerType) errors.partnerType = "Vui lòng chọn loại hình đối tác";
-    if (!form.taxCode.trim()) errors.taxCode = "Mã số thuế không được để trống";
+      errors.businessName = t("home.pr.err.businessNameRequired");
+    if (!form.partnerType) errors.partnerType = t("home.pr.err.partnerTypeRequired");
+    if (!form.taxCode.trim()) errors.taxCode = t("home.pr.err.taxCodeRequired");
     else if (!/^\d{10}$/.test(form.taxCode.trim()))
-      errors.taxCode = "Mã số thuế phải gồm đúng 10 chữ số";
+      errors.taxCode = t("home.pr.err.taxCodeInvalid");
     if (!form.businessRegistrationInfo.trim())
-      errors.businessRegistrationInfo = "Thông tin đăng ký kinh doanh không được để trống";
+      errors.businessRegistrationInfo = t("home.pr.err.bizRegInfoRequired");
     if (!form.operationLicenseUrl)
-      errors.operationLicenseUrl = "Giấy phép hoạt động là bắt buộc";
+      errors.operationLicenseUrl = t("home.pr.err.opLicenseRequired");
     if (!form.businessRegistrationUrl)
-      errors.businessRegistrationUrl = "Giấy đăng ký kinh doanh / GPKD là bắt buộc";
+      errors.businessRegistrationUrl = t("home.pr.err.bizRegDocRequired");
     if (form.partnerType === "TRAVEL_AGENCY") {
       if (!form.travelScope)
-        errors.travelScope = "Vui lòng chọn Giấy phép lữ hành Quốc tế hoặc Nội địa";
+        errors.travelScope = t("home.pr.err.travelScopeRequired");
       if (!form.travelLicenseUrl)
-        errors.travelLicenseUrl = "Giấy phép lữ hành là bắt buộc với Công ty Lữ hành";
+        errors.travelLicenseUrl = t("home.pr.err.travelLicenseRequired");
       if (!form.signatureDocumentUrl)
-        errors.signatureDocumentUrl = "Giấy ký quỹ là bắt buộc với Công ty Lữ hành";
+        errors.signatureDocumentUrl = t("home.pr.err.signatureDocRequired");
     }
-    if (!form.province.trim()) errors.province = "Vui lòng chọn Tỉnh/Thành phố";
-    if (!form.ward.trim()) errors.ward = "Vui lòng chọn Phường/Xã";
+    if (!form.province.trim()) errors.province = t("home.pr.err.provinceRequired");
+    if (!form.ward.trim()) errors.ward = t("home.pr.err.wardRequired");
     if (!form.addressDetail.trim())
-      errors.addressDetail = "Địa chỉ trụ sở không được để trống";
+      errors.addressDetail = t("home.pr.err.addressDetailRequired");
     if (!form.businessScope.trim())
-      errors.businessScope = "Phạm vi hoạt động không được để trống";
+      errors.businessScope = t("home.pr.err.businessScopeRequired");
   }
 
   if (step === 3) {
-    if (!form.bankName) errors.bankName = "Vui lòng chọn ngân hàng thụ hưởng";
+    if (!form.bankName) errors.bankName = t("home.pr.err.bankNameRequired");
     if (!form.bankAccountNumber.trim())
-      errors.bankAccountNumber = "Số tài khoản không được để trống";
+      errors.bankAccountNumber = t("home.pr.err.bankAccRequired");
     else if (!/^[0-9A-Z]{6,20}$/.test(form.bankAccountNumber.trim()))
-      errors.bankAccountNumber = "Số tài khoản không hợp lệ";
+      errors.bankAccountNumber = t("home.pr.err.bankAccInvalid");
     if (!form.bankAccountHolder.trim())
-      errors.bankAccountHolder = "Tên chủ tài khoản không được để trống";
+      errors.bankAccountHolder = t("home.pr.err.bankHolderRequired");
   }
 
   if (step === 4) {
     if (!form.confirmedAuthority)
-      errors.confirmedAuthority = "Vui lòng xác nhận thẩm quyền đại diện";
+      errors.confirmedAuthority = t("home.pr.err.confirmedAuthority");
     if (!form.agreedPartnerTerms)
-      errors.agreedPartnerTerms = "Vui lòng đồng ý với Điều khoản hợp tác";
+      errors.agreedPartnerTerms = t("home.pr.err.agreedPartnerTerms");
     if (!form.agreedPrivacyPolicy)
-      errors.agreedPrivacyPolicy = "Vui lòng đồng ý với Chính sách bảo vệ dữ liệu cá nhân";
+      errors.agreedPrivacyPolicy = t("home.pr.err.agreedPrivacyPolicy");
   }
 
   return errors;
 }
 
 /** Kiểm tra hợp lệ toàn bộ 4 giai đoạn. */
-function validateAll(form) {
+function validateAll(form, t) {
   return [1, 2, 3, 4].reduce(
-    (acc, step) => ({ ...acc, ...validateStep(step, form) }),
+    (acc, step) => ({ ...acc, ...validateStep(step, form, t) }),
     {}
   );
 }
 
 export default function PartnerRegisterPage() {
+  const t = useT();
   const router = useRouter();
 
   const [step, setStep] = useState(1);
@@ -215,11 +215,10 @@ export default function PartnerRegisterPage() {
   const [otpError, setOtpError] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [verificationToken, setVerificationToken] = useState("");
-  const [emailExists, setEmailExists] = useState(false);
+  const [, setEmailExists] = useState(false);
 
   const dirtyRef = useRef(false);
   const lastSavedRef = useRef("");
-  const hydratedRef = useRef(false);
 
   const showToast = useCallback((type, message) => {
     setToast({ type, message });
@@ -282,17 +281,17 @@ export default function PartnerRegisterPage() {
         await saveDraft(buildPayload());
         lastSavedRef.current = payload;
         dirtyRef.current = false;
-        if (!silent) showToast("success", "Đã lưu nháp hồ sơ đăng ký đối tác.");
+        if (!silent) showToast("success", t("home.pr.toast.draftSaved"));
         return true;
       } catch (err) {
         if (!silent)
-          showToast("error", err?.message || "Không thể lưu nháp hồ sơ.");
+          showToast("error", err?.message || t("home.pr.toast.draftFailed"));
         return false;
       } finally {
         setSavingDraft(false);
       }
     },
-    [buildPayload, form.email, showToast, verificationToken]
+    [buildPayload, form.email, showToast, t, verificationToken]
   );
 
   // Cảnh báo khi rời trang mà còn thay đổi chưa lưu.
@@ -311,11 +310,11 @@ export default function PartnerRegisterPage() {
   const handleSendOtp = async () => {
     const email = form.email.trim();
     if (!email) {
-      setErrors((p) => ({ ...p, email: "Email không được để trống" }));
+      setErrors((p) => ({ ...p, email: t("home.pr.err.emailRequired") }));
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setErrors((p) => ({ ...p, email: "Email không hợp lệ" }));
+      setErrors((p) => ({ ...p, email: t("home.pr.err.emailInvalid") }));
       return;
     }
 
@@ -325,9 +324,9 @@ export default function PartnerRegisterPage() {
       await sendOtp(email);
       setOtpSent(true);
       setOtpCode("");
-      showToast("success", "Mã xác thực 6 chữ số đã được gửi tới email của bạn.");
+      showToast("success", t("home.pr.toast.otpSent"));
     } catch (err) {
-      setOtpError(err?.message || "Không thể gửi mã xác thực. Vui lòng thử lại.");
+      setOtpError(err?.message || t("home.pr.err.otpSendFailed"));
     } finally {
       setOtpLoading(false);
     }
@@ -335,7 +334,7 @@ export default function PartnerRegisterPage() {
 
   const handleVerifyOtp = async () => {
     if (!/^\d{6}$/.test(otpCode.trim())) {
-      setOtpError("Mã OTP phải gồm đúng 6 chữ số.");
+      setOtpError(t("home.pr.err.otpFormat"));
       return;
     }
     setOtpLoading(true);
@@ -347,17 +346,13 @@ export default function PartnerRegisterPage() {
       dirtyRef.current = true;
 
       if (res?.accountExists) {
-        showToast(
-          "info",
-          "Xác thực thành công. Email của bạn đã có tài khoản trên hệ thống. " +
-            "Hệ thống đã tự động chuyển bạn sang màn hình Đăng nhập/Khôi phục mật khẩu."
-        );
+        showToast("info", t("home.pr.toast.otpVerifiedExists"));
         setTimeout(() => router.push("/login"), 3500);
       } else {
-        showToast("success", "Xác thực thành công. Vui lòng tiếp tục điền thông tin doanh nghiệp.");
+        showToast("success", t("home.pr.toast.otpVerified"));
       }
     } catch (err) {
-      setOtpError(err?.message || "Mã xác thực không đúng hoặc đã hết hạn.");
+      setOtpError(err?.message || t("home.pr.err.otpInvalid"));
     } finally {
       setOtpLoading(false);
     }
@@ -367,21 +362,21 @@ export default function PartnerRegisterPage() {
   const handleUpload = async (field, file) => {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
-      showToast("error", "Dung lượng tệp tối đa cho phép là 10MB.");
+      showToast("error", t("home.pr.toast.fileTooLarge"));
       return;
     }
     if (!verificationToken) {
-      showToast("error", "Vui lòng xác minh email bằng mã OTP trước khi tải lên giấy tờ.");
+      showToast("error", t("home.pr.toast.verifyBeforeUpload"));
       return;
     }
     setUploadingField(field);
     try {
       const url = await uploadDocument(file, form.email.trim(), verificationToken);
-      if (!url) throw new Error("Máy chủ không trả về đường dẫn tệp.");
+      if (!url) throw new Error(t("home.pr.err.uploadNoUrl"));
       setField(field, url);
-      showToast("success", "Đã tải lên giấy tờ thành công.");
+      showToast("success", t("home.pr.toast.uploadSuccess"));
     } catch (err) {
-      showToast("error", err?.message || "Không thể tải lên tệp. Vui lòng thử lại.");
+      showToast("error", err?.message || t("home.pr.toast.uploadFailed"));
     } finally {
       setUploadingField("");
     }
@@ -389,15 +384,15 @@ export default function PartnerRegisterPage() {
 
   // ── Điều hướng giữa các giai đoạn ─────────────────────────────────────────
   const goNext = async () => {
-    const stepErrors = validateStep(step, form);
+    const stepErrors = validateStep(step, form, t);
     if (Object.keys(stepErrors).length > 0) {
       setErrors((p) => ({ ...p, ...stepErrors }));
-      showToast("error", "Vui lòng hoàn thiện các trường bắt buộc ở giai đoạn này.");
+      showToast("error", t("home.pr.toast.stepIncomplete"));
       return;
     }
     if (step === 1 && !verificationToken) {
-      setOtpError("Vui lòng xác minh email trước khi tiếp tục.");
-      showToast("error", "Vui lòng xác minh email bằng mã OTP trước khi tiếp tục.");
+      setOtpError(t("home.pr.err.verifyEmailFirst"));
+      showToast("error", t("home.pr.toast.verifyEmailFirst"));
       return;
     }
 
@@ -414,17 +409,17 @@ export default function PartnerRegisterPage() {
 
   // ── Gửi đơn ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    const allErrors = validateAll(form);
+    const allErrors = validateAll(form, t);
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors);
-      const firstStep = [1, 2, 3, 4].find((s) => Object.keys(validateStep(s, form)).length > 0);
+      const firstStep = [1, 2, 3, 4].find((s) => Object.keys(validateStep(s, form, t)).length > 0);
       if (firstStep) setStep(firstStep);
-      showToast("error", "Hồ sơ chưa đầy đủ. Vui lòng kiểm tra lại các trường được đánh dấu.");
+      showToast("error", t("home.pr.toast.formIncomplete"));
       return;
     }
     if (!verificationToken) {
       setStep(1);
-      showToast("error", "Email chưa được xác minh. Vui lòng xác minh lại.");
+      showToast("error", t("home.pr.toast.emailNotVerified"));
       return;
     }
 
@@ -433,11 +428,11 @@ export default function PartnerRegisterPage() {
       const result = await submitApplication(buildPayload());
       dirtyRef.current = false;
       setSubmitted(true);
-      showToast("success", "Đã gửi đơn đăng ký đối tác. Hồ sơ đang chờ quản trị viên xét duyệt.");
+      showToast("success", t("home.pr.toast.submitSuccess"));
       setTimeout(() => router.push("/partner-register/success"), 2500);
       return result;
     } catch (err) {
-      showToast("error", err?.message || "Không thể gửi đơn. Vui lòng thử lại.");
+      showToast("error", err?.message || t("home.pr.toast.submitFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -450,6 +445,9 @@ export default function PartnerRegisterPage() {
    */
 
   const stepProgress = useMemo(() => ((step - 1) / 3) * 100, [step]);
+  const partnerTermsDoc = useMemo(() => getPartnerTerms(t), [t]);
+  const privacyPolicyDoc = useMemo(() => getPrivacyPolicy(t), [t]);
+  const selectedPartnerType = PARTNER_TYPES.find((item) => item.value === form.partnerType);
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-slate-50 text-slate-800">
@@ -459,11 +457,11 @@ export default function PartnerRegisterPage() {
           <BrandLogo compact />
           <div className="flex items-center gap-3">
             <span className="hidden text-xs font-bold uppercase tracking-wider text-emerald-700 sm:inline">
-              Đăng ký đối tác
+              {t("home.pr.header.badge")}
             </span>
             <Link href={ROUTES.PARTNER_PROGRAM} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-700 hover:border-teal-300">
               <ArrowLeft size={15} className="text-slate-400" />
-              Trang đối tác
+              {t("home.pr.header.backPartner")}
             </Link>
           </div>
         </div>
@@ -482,11 +480,10 @@ export default function PartnerRegisterPage() {
           </div>
           <div className="min-w-0">
             <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-              Trở thành đối tác của JourneyGo
+              {t("home.pr.hero.title")}
             </h1>
             <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-              Đồng hành cùng chúng tôi — đưa những giá trị lịch sử, văn hóa truyền thống đến gần
-              hơn với du khách thông qua các trải nghiệm thực tế.
+              {t("home.pr.hero.desc")}
             </p>
           </div>
         </div>
@@ -526,7 +523,7 @@ export default function PartnerRegisterPage() {
                         : "text-slate-400"
                     }`}
                   >
-                    {s.label}
+                    {t(s.labelKey)}
                   </span>
                 </li>
               );
@@ -555,25 +552,25 @@ export default function PartnerRegisterPage() {
             <section className="space-y-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900">
-                  Giai đoạn 1 — Thông tin người đại diện
+                  {t("home.pr.s1.title")}
                 </h2>
                 <p className="mt-0.5 text-[11px] text-slate-500">
-                  Email phải được xác minh bằng mã OTP 6 chữ số trước khi tiếp tục.
+                  {t("home.pr.s1.desc")}
                 </p>
               </div>
 
               {/* Email + OTP */}
-              <Field label="Email" required htmlFor="email" error={errors.email}>
+              <Field label={t("home.pr.s1.email")} required htmlFor="email" error={errors.email}>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="flex-1">
                     <TextInput
                       id="email"
-                  limit={150} counter="never"
+                      limit={150} counter="never"
                       type="email"
                       value={form.email}
                       onChange={(e) => setField("email", e.target.value)}
                       disabled={otpSent}
-                      placeholder="doanhnghiep@example.com"
+                      placeholder={t("home.pr.s1.emailPlaceholder")}
                       error={errors.email}
                     />
                   </div>
@@ -588,14 +585,14 @@ export default function PartnerRegisterPage() {
                     ) : (
                       <Mail size={15} />
                     )}
-                    {otpSent ? "Đã gửi mã" : "Gửi mã OTP"}
+                    {otpSent ? t("home.pr.s1.otpSentBtn") : t("home.pr.s1.sendOtpBtn")}
                   </button>
                 </div>
               </Field>
 
               {otpSent && (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
-                  <Field label="Mã xác thực 6 chữ số" required htmlFor="otp">
+                  <Field label={t("home.pr.s1.otpLabel")} required htmlFor="otp">
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <TextInput
                         id="otp"
@@ -617,13 +614,12 @@ export default function PartnerRegisterPage() {
                         ) : (
                           <ShieldCheck size={15} />
                         )}
-                        Xác minh
+                        {t("home.pr.s1.verifyBtn")}
                       </button>
                     </div>
                   </Field>
                   <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-                    Mã có hiệu lực 5 phút. Tối đa 3 lần gửi / ngày · 5 lần nhập sai. Mã mới sẽ
-                    làm mã cũ mất hiệu lực.
+                    {t("home.pr.s1.otpHint")}
                   </p>
                 </div>
               )}
@@ -640,12 +636,12 @@ export default function PartnerRegisterPage() {
               {verificationToken && (
                 <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800">
                   <CheckCircle2 size={16} className="shrink-0" />
-                  Email đã được xác minh thành công.
+                  {t("home.pr.s1.emailVerified")}
                 </div>
               )}
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Số điện thoại" required htmlFor="phone" error={errors.phone}>
+                <Field label={t("home.pr.s1.phone")} required htmlFor="phone" error={errors.phone}>
                   <div className="relative">
                     <Phone
                       size={15}
@@ -653,7 +649,7 @@ export default function PartnerRegisterPage() {
                     />
                     <TextInput
                       id="phone"
-                  limit={20} counter="never"
+                      limit={20} counter="never"
                       value={form.phone}
                       onChange={(e) => setField("phone", e.target.value)}
                       placeholder="0901234567"
@@ -664,24 +660,24 @@ export default function PartnerRegisterPage() {
                 </Field>
 
                 <Field
-                  label="Họ tên người đại diện"
+                  label={t("home.pr.s1.repName")}
                   required
                   htmlFor="representativeName"
                   error={errors.representativeName}
                 >
                   <TextInput
                     id="representativeName"
-                  limit={150}
+                    limit={150}
                     value={form.representativeName}
                     onChange={(e) => setField("representativeName", e.target.value)}
-                    placeholder="Nguyễn Văn A"
+                    placeholder={t("home.pr.s1.repNamePlaceholder")}
                     error={errors.representativeName}
                   />
                 </Field>
               </div>
 
               <Field
-                label="Chức vụ"
+                label={t("home.pr.s1.position")}
                 required
                 htmlFor="representativePosition"
                 error={errors.representativePosition}
@@ -692,10 +688,10 @@ export default function PartnerRegisterPage() {
                   onChange={(e) => setField("representativePosition", e.target.value)}
                   error={errors.representativePosition}
                 >
-                  <option value="">-- Chọn chức vụ --</option>
+                  <option value="">{t("home.pr.s1.positionPlaceholder")}</option>
                   {POSITIONS.map((p) => (
                     <option key={p.value} value={p.value}>
-                      {p.label}
+                      {t(p.labelKey)}
                     </option>
                   ))}
                 </Select>
@@ -708,15 +704,15 @@ export default function PartnerRegisterPage() {
             <section className="space-y-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900">
-                  Giai đoạn 2 — Xác minh hồ sơ doanh nghiệp
+                  {t("home.pr.s2.title")}
                 </h2>
                 <p className="mt-0.5 text-[11px] text-slate-500">
-                  Tài liệu bắt buộc sẽ thay đổi theo loại hình đối tác bạn chọn.
+                  {t("home.pr.s2.desc")}
                 </p>
               </div>
 
               <Field
-                label="Tên doanh nghiệp / cơ sở"
+                label={t("home.pr.s2.businessName")}
                 required
                 htmlFor="businessName"
                 error={errors.businessName}
@@ -726,20 +722,20 @@ export default function PartnerRegisterPage() {
                   limit={200}
                   value={form.businessName}
                   onChange={(e) => setField("businessName", e.target.value)}
-                  placeholder="Công ty TNHH Du lịch & Nghỉ dưỡng ABC"
+                  placeholder={t("home.pr.s2.businessNamePlaceholder")}
                   error={errors.businessName}
                 />
               </Field>
 
-              <Field label="Loại hình đối tác" required error={errors.partnerType}>
+              <Field label={t("home.pr.s2.partnerType")} required error={errors.partnerType}>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {PARTNER_TYPES.map((t) => (
+                  {PARTNER_TYPES.map((item) => (
                     <OptionCard
-                      key={t.value}
-                      selected={form.partnerType === t.value}
-                      onClick={() => setField("partnerType", t.value)}
-                      title={t.label}
-                      hint={t.hint}
+                      key={item.value}
+                      selected={form.partnerType === item.value}
+                      onClick={() => setField("partnerType", item.value)}
+                      title={t(item.labelKey)}
+                      hint={t(item.hintKey)}
                     />
                   ))}
                 </div>
@@ -748,31 +744,28 @@ export default function PartnerRegisterPage() {
               {form.partnerType === "TRAVEL_AGENCY" && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
                   <Field
-                    label="Loại giấy phép lữ hành"
+                    label={t("home.pr.s2.travelScope")}
                     required
                     error={errors.travelScope}
                   >
                     <div className="flex flex-wrap gap-4">
-                      {[
-                        { value: "INTERNATIONAL", label: "Quốc tế" },
-                        { value: "DOMESTIC", label: "Nội địa" },
-                      ].map((s) => (
+                      {["INTERNATIONAL", "DOMESTIC"].map((scopeVal) => (
                         <label
-                          key={s.value}
+                          key={scopeVal}
                           className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700"
                         >
                           <input
                             type="checkbox"
-                            checked={form.travelScope === s.value}
+                            checked={form.travelScope === scopeVal}
                             onChange={() =>
                               setField(
                                 "travelScope",
-                                form.travelScope === s.value ? "" : s.value
+                                form.travelScope === scopeVal ? "" : scopeVal
                               )
                             }
                             className="h-4 w-4 accent-emerald-600"
                           />
-                          Giấy phép lữ hành {s.label}
+                          {t(`home.pr.s2.travelScope.${scopeVal}`)}
                         </label>
                       ))}
                     </div>
@@ -781,10 +774,10 @@ export default function PartnerRegisterPage() {
               )}
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Mã số thuế" required htmlFor="taxCode" error={errors.taxCode}>
+                <Field label={t("home.pr.s2.taxCode")} required htmlFor="taxCode" error={errors.taxCode}>
                   <TextInput
                     id="taxCode"
-                  limit={10} counter="never"
+                    limit={10} counter="never"
                     value={form.taxCode}
                     onChange={(e) => setField("taxCode", e.target.value)}
                     placeholder="0101234567"
@@ -793,17 +786,17 @@ export default function PartnerRegisterPage() {
                   />
                 </Field>
                 <Field
-                  label="Thông tin đăng ký kinh doanh"
+                  label={t("home.pr.s2.bizRegInfo")}
                   required
                   htmlFor="businessRegistrationInfo"
                   error={errors.businessRegistrationInfo}
                 >
                   <TextInput
                     id="businessRegistrationInfo"
-                  limit={500}
+                    limit={500}
                     value={form.businessRegistrationInfo}
                     onChange={(e) => setField("businessRegistrationInfo", e.target.value)}
-                    placeholder="Số GPKD / hộ kinh doanh, ngày cấp..."
+                    placeholder={t("home.pr.s2.bizRegInfoPlaceholder")}
                     error={errors.businessRegistrationInfo}
                   />
                 </Field>
@@ -811,7 +804,8 @@ export default function PartnerRegisterPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <FileField
-                  label="Giấy phép hoạt động"
+                  t={t}
+                  label={t("home.pr.s2.opLicense")}
                   required
                   field="operationLicenseUrl"
                   value={form.operationLicenseUrl}
@@ -826,7 +820,8 @@ export default function PartnerRegisterPage() {
                   error={errors.operationLicenseUrl}
                 />
                 <FileField
-                  label="Giấy đăng ký kinh doanh / GPKD / Hộ kinh doanh"
+                  t={t}
+                  label={t("home.pr.s2.bizRegDoc")}
                   required
                   field="businessRegistrationUrl"
                   value={form.businessRegistrationUrl}
@@ -845,7 +840,8 @@ export default function PartnerRegisterPage() {
               {form.partnerType === "TRAVEL_AGENCY" && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FileField
-                    label="Giấy phép lữ hành"
+                    t={t}
+                    label={t("home.pr.s2.travelLicense")}
                     required
                     field="travelLicenseUrl"
                     value={form.travelLicenseUrl}
@@ -858,7 +854,8 @@ export default function PartnerRegisterPage() {
                     error={errors.travelLicenseUrl}
                   />
                   <FileField
-                    label="Giấy ký quỹ"
+                    t={t}
+                    label={t("home.pr.s2.signatureDoc")}
                     required
                     field="signatureDocumentUrl"
                     value={form.signatureDocumentUrl}
@@ -877,6 +874,7 @@ export default function PartnerRegisterPage() {
 
               {/* Địa chỉ */}
               <PartnerAddressFields
+                t={t}
                 accent="emerald"
                 value={{
                   province: form.province,
@@ -890,13 +888,13 @@ export default function PartnerRegisterPage() {
               />
 
               <Field
-                label="Chi tiết địa chỉ trụ sở"
+                label={t("home.pr.s2.addressDetail")}
                 required
                 htmlFor="addressDetail"
                 error={errors.addressDetail}
                 hint={
                   <span className="flex items-center gap-1">
-                    <MapPin size={11} /> Địa chỉ gồm 3 cấp hành chính và chi tiết trụ sở.
+                    <MapPin size={11} /> {t("home.pr.s2.addressDetailHint")}
                   </span>
                 }
               >
@@ -905,13 +903,13 @@ export default function PartnerRegisterPage() {
                   limit={255}
                   value={form.addressDetail}
                   onChange={(e) => setField("addressDetail", e.target.value)}
-                  placeholder="Số nhà, tên đường, tòa nhà..."
+                  placeholder={t("home.pr.s2.addressDetailPlaceholder")}
                   error={errors.addressDetail}
                 />
               </Field>
 
               <Field
-                label="Phạm vi hoạt động"
+                label={t("home.pr.s2.businessScope")}
                 required
                 htmlFor="businessScope"
                 error={errors.businessScope}
@@ -922,7 +920,7 @@ export default function PartnerRegisterPage() {
                   rows={3}
                   value={form.businessScope}
                   onChange={(e) => setField("businessScope", e.target.value)}
-                  placeholder="Mô tả phạm vi hoạt động, loại hình trải nghiệm / tuyến tour cung cấp..."
+                  placeholder={t("home.pr.s2.businessScopePlaceholder")}
                   error={errors.businessScope}
                   className="resize-none"
                 />
@@ -935,15 +933,15 @@ export default function PartnerRegisterPage() {
             <section className="space-y-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900">
-                  Giai đoạn 3 — Thiết lập thanh toán
+                  {t("home.pr.s3.title")}
                 </h2>
                 <p className="mt-0.5 text-[11px] text-slate-500">
-                  Thông tin tài khoản nhận hoàn tiền từ nền tảng.
+                  {t("home.pr.s3.desc")}
                 </p>
               </div>
 
               <Field
-                label="Ngân hàng thụ hưởng"
+                label={t("home.pr.s3.bankName")}
                 required
                 htmlFor="bankName"
                 error={errors.bankName}
@@ -954,7 +952,7 @@ export default function PartnerRegisterPage() {
                   onChange={(e) => setField("bankName", e.target.value)}
                   error={errors.bankName}
                 >
-                  <option value="">-- Chọn ngân hàng --</option>
+                  <option value="">{t("home.pr.s3.bankPlaceholder")}</option>
                   {BANKS.map((b) => (
                     <option key={b} value={b}>
                       {b}
@@ -965,14 +963,14 @@ export default function PartnerRegisterPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
-                  label="Số tài khoản"
+                  label={t("home.pr.s3.bankAccount")}
                   required
                   htmlFor="bankAccountNumber"
                   error={errors.bankAccountNumber}
                 >
                   <TextInput
                     id="bankAccountNumber"
-                  limit={20} counter="never"
+                    limit={20} counter="never"
                     value={form.bankAccountNumber}
                     onChange={(e) => setField("bankAccountNumber", e.target.value)}
                     placeholder="0123456789"
@@ -981,14 +979,14 @@ export default function PartnerRegisterPage() {
                   />
                 </Field>
                 <Field
-                  label="Tên chủ tài khoản"
+                  label={t("home.pr.s3.bankHolder")}
                   required
                   htmlFor="bankAccountHolder"
                   error={errors.bankAccountHolder}
                 >
                   <TextInput
                     id="bankAccountHolder"
-                  limit={150}
+                    limit={150}
                     value={form.bankAccountHolder}
                     onChange={(e) => setField("bankAccountHolder", e.target.value)}
                     placeholder="NGUYEN VAN A"
@@ -1000,9 +998,7 @@ export default function PartnerRegisterPage() {
               <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
                 <Landmark size={18} className="mt-0.5 shrink-0 text-emerald-600" />
                 <p className="text-xs leading-relaxed text-slate-600">
-                  Thông tin tài khoản ngân hàng sẽ được dùng để chuyển khoản doanh thu khi
-                  nền tảng tất toán. Bạn có thể cập nhật lại trong Dashboard Đối tác sau khi
-                  được duyệt.
+                  {t("home.pr.s3.bankNote")}
                 </p>
               </div>
             </section>
@@ -1013,29 +1009,29 @@ export default function PartnerRegisterPage() {
             <section className="space-y-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900">
-                  Giai đoạn 4 — Xác nhận và đồng ý
+                  {t("home.pr.s4.title")}
                 </h2>
                 <p className="mt-0.5 text-[11px] text-slate-500">
-                  Vui lòng kiểm tra lại thông tin trước khi gửi đơn.
+                  {t("home.pr.s4.desc")}
                 </p>
               </div>
 
               {/* Tóm tắt */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Tóm tắt hồ sơ
+                  {t("home.pr.s4.summaryTitle")}
                 </p>
                 <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
                   {[
-                    ["Email", form.email],
-                    ["Người đại diện", form.representativeName],
-                    ["Doanh nghiệp", form.businessName],
+                    [t("home.pr.s4.summary.email"), form.email],
+                    [t("home.pr.s4.summary.rep"), form.representativeName],
+                    [t("home.pr.s4.summary.business"), form.businessName],
                     [
-                      "Loại hình",
-                      PARTNER_TYPES.find((t) => t.value === form.partnerType)?.label || "—",
+                      t("home.pr.s4.summary.type"),
+                      selectedPartnerType ? t(selectedPartnerType.labelKey) : "—",
                     ],
-                    ["Mã số thuế", form.taxCode],
-                    ["Ngân hàng", form.bankName],
+                    [t("home.pr.s4.summary.taxCode"), form.taxCode],
+                    [t("home.pr.s4.summary.bank"), form.bankName],
                   ].map(([k, v]) => (
                     <div key={k} className="flex items-baseline justify-between gap-3 border-b border-slate-200/70 py-1.5">
                       <dt className="shrink-0 text-[11px] font-semibold text-slate-500">{k}</dt>
@@ -1054,14 +1050,13 @@ export default function PartnerRegisterPage() {
               {[
                 {
                   field: "confirmedAuthority",
-                  label:
-                    "Tôi xác nhận mình có thẩm quyền đại diện cho doanh nghiệp/cơ sở kinh doanh và các thông tin, tài liệu cung cấp là chính xác, hợp pháp.",
+                  label: t("home.pr.s4.confirmAuthority"),
                 },
                 {
                   field: "agreedPartnerTerms",
                   label: (
                     <>
-                      Tôi đã đọc, hiểu và đồng ý với{" "}
+                      {t("home.pr.s4.agreeTermsBefore")}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1071,9 +1066,9 @@ export default function PartnerRegisterPage() {
                         }}
                         className="font-bold text-emerald-700 underline decoration-2 underline-offset-2 transition hover:text-emerald-900"
                       >
-                        Điều khoản hợp tác Đối tác của JourneyGo
+                        {t("home.pr.s4.agreeTermsLink")}
                       </button>
-                      .
+                      {t("home.pr.s4.agreeTermsAfter")}
                     </>
                   ),
                 },
@@ -1081,7 +1076,7 @@ export default function PartnerRegisterPage() {
                   field: "agreedPrivacyPolicy",
                   label: (
                     <>
-                      Tôi đã được thông báo về loại dữ liệu cá nhân được thu thập, mục đích xử lý, đơn vị xử lý và quyền của mình; đồng ý cho JourneyGo xử lý dữ liệu cá nhân theo{" "}
+                      {t("home.pr.s4.agreePrivacyBefore")}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1091,9 +1086,9 @@ export default function PartnerRegisterPage() {
                         }}
                         className="font-bold text-emerald-700 underline decoration-2 underline-offset-2 transition hover:text-emerald-900"
                       >
-                        Chính sách bảo vệ dữ liệu cá nhân
+                        {t("home.pr.s4.agreePrivacyLink")}
                       </button>
-                      .
+                      {t("home.pr.s4.agreePrivacyAfter")}
                     </>
                   ),
                 },
@@ -1125,24 +1120,23 @@ export default function PartnerRegisterPage() {
                 <CheckCircle2 size={26} />
               </div>
               <h2 className="text-base font-bold text-slate-900">
-                Đã gửi đơn đăng ký đối tác
+                {t("home.pr.submitted.title")}
               </h2>
               <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500">
-                Hồ sơ của bạn đang chờ quản trị viên xét duyệt. Chúng tôi sẽ gửi email thông báo
-                kết quả ngay khi có quyết định.
+                {t("home.pr.submitted.desc")}
               </p>
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/"
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
                 >
-                  <ArrowLeft size={15} /> Về trang chủ
+                  <ArrowLeft size={15} /> {t("home.pr.submitted.backHome")}
                 </Link>
                 <Link
                   href="/login"
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 text-xs font-bold text-white transition hover:bg-emerald-800"
                 >
-                  Đăng nhập
+                  {t("common.login")}
                 </Link>
               </div>
             </div>
@@ -1154,19 +1148,19 @@ export default function PartnerRegisterPage() {
             <div className="flex items-center gap-3">
               {step > 1 && (
                 <button type="button" onClick={goBack} className={buttonCls("outline")}>
-                  <ArrowLeft size={15} /> Quay lại
+                  <ArrowLeft size={15} /> {t("home.pr.nav.back")}
                 </button>
               )}
               {savingDraft && (
                 <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
-                  <Loader2 size={12} className="animate-spin" /> Đang lưu nháp…
+                  <Loader2 size={12} className="animate-spin" /> {t("home.pr.nav.savingDraft")}
                 </span>
               )}
             </div>
 
             {step < 4 ? (
               <button type="button" onClick={goNext} className={buttonCls("primary")}>
-                Tiếp tục <ArrowRight size={15} />
+                {t("home.pr.nav.next")} <ArrowRight size={15} />
               </button>
             ) : (
               <button
@@ -1180,7 +1174,7 @@ export default function PartnerRegisterPage() {
                 ) : (
                   <FileText size={15} />
                 )}
-                {submitting ? "Đang gửi đơn…" : "Gửi đơn đăng ký"}
+                {submitting ? t("home.pr.nav.submitting") : t("home.pr.nav.submit")}
               </button>
             )}
           </div>
@@ -1189,13 +1183,13 @@ export default function PartnerRegisterPage() {
 
         {/* Link hỗ trợ */}
         <p className="mt-2.5 shrink-0 text-center text-[11px] text-slate-400">
-          Đã có tài khoản?{" "}
+          {t("home.pr.footer.haveAccount")}{" "}
           <Link href="/login" className="font-bold text-emerald-700 underline">
-            Đăng nhập
+            {t("common.login")}
           </Link>{" "}
-          · Khôi phục mật khẩu?{" "}
+          · {t("home.pr.footer.recoverPassword")}{" "}
           <Link href="/login" className="font-bold text-emerald-700 underline">
-            Quên mật khẩu
+            {t("home.pr.footer.forgotPassword")}
           </Link>
         </p>
       </main>
@@ -1203,14 +1197,14 @@ export default function PartnerRegisterPage() {
       {/* Modal văn bản pháp lý — Điều khoản hợp tác & Chính sách bảo vệ dữ liệu cá nhân */}
       <LegalDocumentModal
         open={legalDoc === "terms"}
-        title={PARTNER_TERMS_TITLE}
-        sections={PARTNER_TERMS_SECTIONS}
+        title={partnerTermsDoc.title}
+        sections={partnerTermsDoc.sections}
         onClose={() => setLegalDoc(null)}
       />
       <LegalDocumentModal
         open={legalDoc === "privacy"}
-        title={PRIVACY_POLICY_TITLE}
-        sections={PRIVACY_POLICY_SECTIONS}
+        title={privacyPolicyDoc.title}
+        sections={privacyPolicyDoc.sections}
         onClose={() => setLegalDoc(null)}
       />
 

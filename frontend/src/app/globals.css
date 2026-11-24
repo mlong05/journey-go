@@ -11,6 +11,13 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /*
+   * Bề rộng khung trang du khách, co theo màn hình để luôn chừa lề hai bên (kiểu trang lữ hành):
+   * màn < ~1180px dùng hết bề ngang; rộng hơn thì chiếm ~84% màn hình, tối đa 1360px (cộng đồng 1280px).
+   * Dùng: max-w-page (trang chủ, danh sách, chi tiết, checkout), max-w-wide (cộng đồng).
+   */
+  --container-page: min(85rem, max(84vw, min(100%, 73.75rem)));
+  --container-wide: min(80rem, max(84vw, min(100%, 73.75rem)));
 }
 
 /*

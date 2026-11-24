@@ -9,6 +9,7 @@ import TouristShell from "./TouristShell";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { loginHref } from "../utils";
+import { useT, translate, getLocale } from "@/i18n";
 
 /**
  * Trang /invitations/[token] — xác nhận lời mời tham gia tour (deep link từ email).
@@ -28,6 +29,7 @@ export default function InvitationAcceptScreen({ token }) {
 }
 
 function InvitationAcceptContent({ token }) {
+  const t = useT();
   const router = useRouter();
   const { ready, isTourist } = useTouristSession();
   const [state, setState] = useState({ loading: true, invitation: null, error: "" });
@@ -44,7 +46,7 @@ function InvitationAcceptContent({ token }) {
       .then((inv) => alive && setState({ loading: false, invitation: inv, error: "" }))
       .catch((err) => alive && setState({
         loading: false, invitation: null,
-        error: err?.message || "Lời mời không hợp lệ hoặc đã hết hạn.",
+        error: err?.message || translate(getLocale(), "trips.invAcceptInvalid"),
       }));
     return () => { alive = false; };
   }, [token, ready, isTourist]);
@@ -55,7 +57,7 @@ function InvitationAcceptContent({ token }) {
       await touristService.acceptInvitation(token);
       setDone(true);
     } catch (err) {
-      setActionError(err?.message || "Không xác nhận được lời mời.");
+      setActionError(err?.message || t("trips.invErrConfirm"));
     } finally {
       setBusy(false);
     }
@@ -64,7 +66,7 @@ function InvitationAcceptContent({ token }) {
   if (!ready || state.loading) {
     return (
       <p className="flex justify-center gap-2 py-24 text-sm text-slate-500">
-        <Loader2 size={18} className="animate-spin" />Đang tải…
+        <Loader2 size={18} className="animate-spin" />{t("common.loading")}
       </p>
     );
   }
@@ -76,15 +78,15 @@ function InvitationAcceptContent({ token }) {
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-teal-50 text-teal-700">
           <LogIn size={24} />
         </span>
-        <h1 className="mt-4 text-xl font-extrabold text-slate-900">Bạn cần đăng nhập</h1>
+        <h1 className="mt-4 text-xl font-extrabold text-slate-900">{t("trips.invLoginTitle")}</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Lời mời này dành cho tài khoản có email đã được mời. Đăng nhập để xác nhận tham gia tour.
+          {t("trips.invLoginDesc")}
         </p>
         <Link
           href={`${loginHref(ROUTES.INVITATION(token))}?next=${encodeURIComponent(ROUTES.INVITATION(token))}`}
           className="mt-5 inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-800"
         >
-          <LogIn size={16} />Đăng nhập để xác nhận
+          <LogIn size={16} />{t("trips.invLoginBtn")}
         </Link>
       </div>
     );
@@ -96,13 +98,13 @@ function InvitationAcceptContent({ token }) {
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-rose-50 text-rose-600">
           <AlertTriangle size={24} />
         </span>
-        <h1 className="mt-4 text-xl font-extrabold text-slate-900">Không thể mở lời mời</h1>
+        <h1 className="mt-4 text-xl font-extrabold text-slate-900">{t("trips.invCannotOpen")}</h1>
         <p className="mt-2 text-sm text-slate-600">{state.error}</p>
         <Link
           href={ROUTES.TRIPS}
           className="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:border-teal-300"
         >
-          <Ticket size={16} />Xem chuyến đi của tôi
+          <Ticket size={16} />{t("trips.viewMyTrips")}
         </Link>
       </div>
     );
@@ -114,16 +116,16 @@ function InvitationAcceptContent({ token }) {
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-emerald-600">
           <CheckCircle2 size={26} />
         </span>
-        <h1 className="mt-4 text-xl font-extrabold text-slate-900">Đã xác nhận tham gia tour</h1>
+        <h1 className="mt-4 text-xl font-extrabold text-slate-900">{t("trips.invAcceptedTitle")}</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Bạn đã được thêm vào đơn. Ngày đi tour, hãy mở app JourneyGo bằng cùng tài khoản để check-in.
+          {t("trips.invAcceptedDesc")}
         </p>
         <button
           type="button"
           onClick={() => router.push(ROUTES.TRIPS)}
           className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-800"
         >
-          <Ticket size={16} />Xem chuyến đi của tôi
+          <Ticket size={16} />{t("trips.viewMyTrips")}
         </button>
       </div>
     );
@@ -137,9 +139,9 @@ function InvitationAcceptContent({ token }) {
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-teal-50 text-teal-700">
           <Ticket size={24} />
         </span>
-        <h1 className="mt-4 text-xl font-extrabold text-slate-900">Lời mời tham gia tour</h1>
+        <h1 className="mt-4 text-xl font-extrabold text-slate-900">{t("account.invitations")}</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Bạn được mời tham gia tour dưới tên <b className="text-slate-900">{inv?.passengerName || "hành khách"}</b>.
+          {t("trips.invAcceptSubtitleBefore")}<b className="text-slate-900">{inv?.passengerName || t("trips.invDefaultPassenger")}</b>{t("trips.invAcceptSubtitleAfter")}
         </p>
 
         {inv?.usable ? (
@@ -156,12 +158,12 @@ function InvitationAcceptContent({ token }) {
               className="mt-5 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-60"
             >
               {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-              Xác nhận tham gia tour
+              {t("trips.invConfirmTourBtn")}
             </button>
           </>
         ) : (
           <p className="mt-4 rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-600">
-            Lời mời này đã hết hạn hoặc không còn hiệu lực.
+            {t("trips.invUnusable")}
           </p>
         )}
       </div>

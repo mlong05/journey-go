@@ -2,8 +2,10 @@
 
 import { useEffect } from "react";
 import Button from "@/components/ui/Button";
+import { useT } from "@/i18n";
 
 export default function Error({ error, reset }) {
+  const t = useT();
   useEffect(() => {
     console.error("Global error caught:", error);
   }, [error]);
@@ -11,14 +13,14 @@ export default function Error({ error, reset }) {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center text-center px-4">
       <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-        Đã có lỗi xảy ra!
+        {t("home.errorPage.title")}
       </h2>
       <p className="mt-2 text-sm text-gray-500 max-w-sm">
-        {error?.message || "Hệ thống gặp sự cố không mong muốn. Vui lòng thử lại."}
+        {error?.message || t("home.errorPage.defaultMessage")}
       </p>
       <div className="mt-6">
         <Button onClick={() => reset()}>
-          Thử lại
+          {t("home.errorPage.retry")}
         </Button>
       </div>
     </div>

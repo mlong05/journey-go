@@ -17,6 +17,7 @@ import {
   Check,
   Sparkles,
 } from "lucide-react";
+import { useT } from "@/i18n";
 
 /**
  * Cấu hình API Base URL từ biến môi trường
@@ -46,6 +47,7 @@ export default function ForgotPasswordFlow({
   onBackToLogin,
   onResetSuccess,
 }) {
+  const t = useT();
   // Trạng thái bước hiện tại: 'forgot_email' | 'verify_otp' | 'reset_password'
   const [step, setStep] = useState("forgot_email");
 
@@ -105,13 +107,13 @@ export default function ForgotPasswordFlow({
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setErrorMsg("Vui lòng nhập địa chỉ email tài khoản của bạn.");
+      setErrorMsg(t("misc.forgot.errEmailEmpty"));
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      setErrorMsg("Định dạng email không hợp lệ. Vui lòng kiểm tra lại.");
+      setErrorMsg(t("misc.forgot.errEmailInvalid"));
       return;
     }
 
@@ -131,12 +133,12 @@ export default function ForgotPasswordFlow({
 
       if (!response.ok) {
         if (response.status === 404 || data?.message?.includes("USER_NOT_EXISTED")) {
-          throw new Error("Email này chưa được đăng ký trong hệ thống JourneyGo.");
+          throw new Error(t("misc.forgot.errEmailNotRegistered"));
         }
-        throw new Error(data?.message || `Yêu cầu thất bại (Mã lỗi: ${response.status})`);
+        throw new Error(data?.message || t("misc.forgot.errRequestFailed", { status: response.status }));
       }
 
-      setSuccessMsg("Đã gửi mã OTP 6 chữ số đến email của bạn!");
+      setSuccessMsg(t("misc.forgot.otpSent"));
       setCountdown(60);
       setOtp(["", "", "", "", "", ""]);
       setStep("verify_otp");
@@ -147,7 +149,7 @@ export default function ForgotPasswordFlow({
       }, 150);
     } catch (err) {
       console.error("[Forgot Password Error]", err);
-      setErrorMsg(err.message || "Không thể kết nối đến máy chủ. Vui lòng thử lại sau.");
+      setErrorMsg(err.message || t("misc.forgot.errServerConnect"));
     } finally {
       setLoading(false);
     }
@@ -227,15 +229,15 @@ export default function ForgotPasswordFlow({
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data?.message || "Không thể gửi lại mã OTP lúc này.");
+        throw new Error(data?.message || t("misc.forgot.errResendFailed"));
       }
 
-      setSuccessMsg("Mã OTP mới đã được gửi lại vào email của bạn!");
+      setSuccessMsg(t("misc.forgot.otpResent"));
       setCountdown(60);
       setOtp(["", "", "", "", "", ""]);
       otpInputRefs.current[0]?.focus();
     } catch (err) {
-      setErrorMsg(err.message || "Gửi lại mã thất bại.");
+      setErrorMsg(err.message || t("misc.forgot.errResendGeneric"));
     } finally {
       setResending(false);
     }
@@ -248,7 +250,7 @@ export default function ForgotPasswordFlow({
 
     const otpCode = otp.join("");
     if (otpCode.length !== 6) {
-      setErrorMsg("Vui lòng nhập đủ 6 chữ số mã OTP.");
+      setErrorMsg(t("misc.forgot.errOtpIncomplete"));
       setOtpError(true);
       return;
     }
@@ -273,16 +275,16 @@ export default function ForgotPasswordFlow({
       if (!response.ok) {
         setOtpError(true);
         throw new Error(
-          data?.message || "Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại."
+          data?.message || t("misc.forgot.errOtpInvalid")
         );
       }
 
       setVerifiedOtp(otpCode);
-      setSuccessMsg("Xác thực OTP thành công! Vui lòng thiết lập mật khẩu mới.");
+      setSuccessMsg(t("misc.forgot.otpVerified"));
       setStep("reset_password");
     } catch (err) {
       console.error("[Verify OTP Error]", err);
-      setErrorMsg(err.message || "Xác thực OTP không thành công.");
+      setErrorMsg(err.message || t("misc.forgot.errOtpVerifyFailed"));
       setOtpError(true);
     } finally {
       setLoading(false);
@@ -302,19 +304,19 @@ export default function ForgotPasswordFlow({
     clearAlerts();
 
     if (!newPassword) {
-      setErrorMsg("Vui lòng nhập mật khẩu mới.");
+      setErrorMsg(t("misc.forgot.errNewPassEmpty"));
       return;
     }
     if (newPassword.length < 8) {
-      setErrorMsg("Mật khẩu mới phải có tối thiểu 8 ký tự.");
+      setErrorMsg(t("misc.forgot.errNewPassLength"));
       return;
     }
     if (!hasUpperLower || !hasNumberOrSpecial) {
-      setErrorMsg("Mật khẩu mới cần bao gồm cả chữ hoa, chữ thường, số và ký tự đặc biệt.");
+      setErrorMsg(t("misc.forgot.errNewPassComplex"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setErrorMsg("Xác nhận mật khẩu mới không trùng khớp hoàn toàn.");
+      setErrorMsg(t("misc.forgot.errConfirmMismatch"));
       return;
     }
 
@@ -338,7 +340,7 @@ export default function ForgotPasswordFlow({
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data?.message || "Đặt lại mật khẩu thất bại. Vui lòng thử lại.");
+        throw new Error(data?.message || t("misc.forgot.errResetFailed"));
       }
 
       setIsCompleted(true);
@@ -353,7 +355,7 @@ export default function ForgotPasswordFlow({
       }, 1500);
     } catch (err) {
       console.error("[Reset Password Error]", err);
-      setErrorMsg(err.message || "Không thể đặt lại mật khẩu. Vui lòng thử lại.");
+      setErrorMsg(err.message || t("misc.forgot.errResetGeneric"));
     } finally {
       setLoading(false);
     }
@@ -370,12 +372,12 @@ export default function ForgotPasswordFlow({
         </div>
         <div className="space-y-1.5">
           <h3 className="text-xl font-black text-slate-900 tracking-tight">
-            Đặt Lại Mật Khẩu Thành Công!
+            {t("misc.forgot.doneTitle")}
           </h3>
           <p className="text-xs text-slate-600 max-w-sm leading-relaxed">
-            Mật khẩu mới đã được kích hoạt cho tài khoản{" "}
-            <span className="font-bold text-emerald-800">{email}</span>. Đang tự động chuyển về
-            màn hình đăng nhập...
+            {t("misc.forgot.doneDescBefore")}
+            <span className="font-bold text-emerald-800">{email}</span>
+            {t("misc.forgot.doneDescAfter")}
           </p>
         </div>
         <div className="w-full max-w-xs h-2 bg-emerald-200/60 rounded-full overflow-hidden">
@@ -396,13 +398,13 @@ export default function ForgotPasswordFlow({
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:-translate-x-0.5 transition-all cursor-pointer select-none"
           >
             <ArrowLeft className="w-4 h-4 text-slate-500" />
-            <span>Quay lại đăng nhập</span>
+            <span>{t("misc.forgot.backToLogin")}</span>
           </button>
 
           <span className="text-[11px] font-bold tracking-wider text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-            {step === "forgot_email" && "Bước 1/3: Nhập Email"}
-            {step === "verify_otp" && "Bước 2/3: Xác thực OTP"}
-            {step === "reset_password" && "Bước 3/3: Đổi mật khẩu"}
+            {step === "forgot_email" && t("misc.forgot.step1Badge")}
+            {step === "verify_otp" && t("misc.forgot.step2Badge")}
+            {step === "reset_password" && t("misc.forgot.step3Badge")}
           </span>
         </div>
 
@@ -446,16 +448,16 @@ export default function ForgotPasswordFlow({
         <form onSubmit={handleRequestOtp} className="space-y-4">
           <div className="space-y-1">
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              Khôi Phục Mật Khẩu
+              {t("misc.forgot.step1Title")}
             </h2>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Nhập địa chỉ email liên kết với tài khoản của bạn để nhận mã xác thực OTP gồm 6 chữ số.
+              {t("misc.forgot.step1Desc")}
             </p>
           </div>
 
           <div className="space-y-1.5 w-full">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Địa chỉ Email tài khoản
+              {t("misc.forgot.emailLabel")}
             </label>
             <div className="relative w-full">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -484,11 +486,11 @@ export default function ForgotPasswordFlow({
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>Đang gửi mã xác thực...</span>
+                <span>{t("misc.forgot.sendingOtp")}</span>
               </>
             ) : (
               <>
-                <span>Gửi mã xác thực OTP</span>
+                <span>{t("misc.forgot.sendOtp")}</span>
                 <ArrowRight className="w-4 h-4 text-white" />
               </>
             )}
@@ -504,7 +506,7 @@ export default function ForgotPasswordFlow({
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Xác Thực Mã Bảo Mật OTP
+                {t("misc.forgot.step2Title")}
               </h2>
               <button
                 type="button"
@@ -514,11 +516,11 @@ export default function ForgotPasswordFlow({
                 }}
                 className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 underline cursor-pointer"
               >
-                Đổi email
+                {t("misc.forgot.changeEmail")}
               </button>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Vui lòng nhập mã OTP 6 chữ số vừa được gửi tới hộp thư{" "}
+              {t("misc.forgot.step2DescBefore")}
               <span className="font-semibold text-emerald-800">{email}</span>.
             </p>
           </div>
@@ -526,7 +528,7 @@ export default function ForgotPasswordFlow({
           {/* BỘ 6 Ô NHẬP OTP CHUYÊN NGHIỆP */}
           <div className="space-y-2">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">
-              Nhập mã 6 chữ số
+              {t("misc.forgot.otpInputLabel")}
             </label>
             <div
               className="flex items-center justify-center gap-2 sm:gap-3"
@@ -558,7 +560,7 @@ export default function ForgotPasswordFlow({
           <div className="flex items-center justify-center pt-1 text-xs">
             {countdown > 0 ? (
               <span className="text-slate-400 font-medium">
-                Gửi lại mã sau{" "}
+                {t("misc.forgot.resendIn")}
                 <span className="font-bold text-slate-600">
                   {countdown < 10 ? `0${countdown}` : countdown}s
                 </span>
@@ -573,12 +575,12 @@ export default function ForgotPasswordFlow({
                 {resending ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Đang gửi lại...</span>
+                    <span>{t("misc.forgot.resending")}</span>
                   </>
                 ) : (
                   <>
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Gửi lại mã OTP</span>
+                    <span>{t("misc.forgot.resendBtn")}</span>
                   </>
                 )}
               </button>
@@ -593,11 +595,11 @@ export default function ForgotPasswordFlow({
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>Đang kiểm tra mã OTP...</span>
+                <span>{t("misc.forgot.verifyingOtp")}</span>
               </>
             ) : (
               <>
-                <span>Xác thực mã OTP</span>
+                <span>{t("misc.forgot.verifyOtpBtn")}</span>
                 <ArrowRight className="w-4 h-4 text-white" />
               </>
             )}
@@ -612,10 +614,10 @@ export default function ForgotPasswordFlow({
         <form onSubmit={handleResetPassword} className="space-y-3.5">
           <div className="space-y-1">
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              Thiết Lập Mật Khẩu Mới
+              {t("misc.forgot.step3Title")}
             </h2>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Tạo mật khẩu mới có độ bảo mật cao cho tài khoản{" "}
+              {t("misc.forgot.step3DescBefore")}
               <span className="font-semibold text-emerald-800">{email}</span>.
             </p>
           </div>
@@ -623,7 +625,7 @@ export default function ForgotPasswordFlow({
           {/* MẬT KHẨU MỚI */}
           <div className="space-y-1 w-full">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Mật khẩu mới
+              {t("misc.activate.newPasswordLabel")}
             </label>
             <div className="relative w-full">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -665,7 +667,7 @@ export default function ForgotPasswordFlow({
               >
                 ✓
               </div>
-              <span>Tối thiểu 8 ký tự</span>
+              <span>{t("misc.forgot.ruleLength")}</span>
             </div>
             <div
               className={`flex items-center gap-1.5 ${
@@ -679,7 +681,7 @@ export default function ForgotPasswordFlow({
               >
                 ✓
               </div>
-              <span>Chữ hoa &amp; thường</span>
+              <span>{t("misc.forgot.ruleCase")}</span>
             </div>
             <div
               className={`flex items-center gap-1.5 col-span-2 ${
@@ -693,7 +695,7 @@ export default function ForgotPasswordFlow({
               >
                 ✓
               </div>
-              <span>Có số &amp; ký tự đặc biệt (@, #, $, ...)</span>
+              <span>{t("misc.forgot.ruleSpecial")}</span>
             </div>
           </div>
 
@@ -701,7 +703,7 @@ export default function ForgotPasswordFlow({
           <div className="space-y-1 w-full">
             <div className="flex items-center justify-between">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Xác nhận mật khẩu mới
+                {t("misc.forgot.confirmNewPassLabel")}
               </label>
               {confirmPassword.length > 0 && (
                 <span
@@ -709,7 +711,7 @@ export default function ForgotPasswordFlow({
                     isMatch ? "text-emerald-600" : "text-rose-600"
                   }`}
                 >
-                  {isMatch ? "✓ Khớp mật khẩu" : "✕ Chưa trùng khớp"}
+                  {isMatch ? t("misc.forgot.passMatch") : t("misc.forgot.passMismatch")}
                 </span>
               )}
             </div>
@@ -750,11 +752,11 @@ export default function ForgotPasswordFlow({
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>Đang đặt lại mật khẩu...</span>
+                <span>{t("misc.forgot.resetting")}</span>
               </>
             ) : (
               <>
-                <span>Hoàn tất đặt lại mật khẩu</span>
+                <span>{t("misc.forgot.resetSubmit")}</span>
                 <Check className="w-4 h-4 text-white" />
               </>
             )}

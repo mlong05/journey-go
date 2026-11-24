@@ -3,12 +3,14 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "lucide-react";
+import { useT } from "@/i18n";
 
 /**
  * Hộp thông báo đăng nhập / đăng ký thành công: chỉ dấu tích + một dòng "Đăng nhập thành công"
  * (hoặc "Đăng ký thành công") + thanh tiến trình trong lúc chuyển trang.
  */
 export default function AuthFeedbackModal({ feedbackModal }) {
+  const t = useT();
   if (!feedbackModal?.isOpen) return null;
 
   const isRegister = feedbackModal.type === "register";
@@ -73,7 +75,7 @@ export default function AuthFeedbackModal({ feedbackModal }) {
 
             {/* Chỉ một dòng thông báo */}
             <h3 role="status" className="relative z-10 text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
-              {isRegister ? "Đăng ký thành công" : "Đăng nhập thành công"}
+              {isRegister ? t("misc.feedback.registerSuccess") : t("misc.feedback.loginSuccess")}
             </h3>
 
             {/* Thanh tiến trình trong lúc chuyển trang */}

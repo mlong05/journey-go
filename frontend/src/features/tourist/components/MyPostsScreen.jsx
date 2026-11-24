@@ -6,10 +6,11 @@ import {
   Loader2, AlertTriangle, MessageCircle, PenLine, Trash2, Send, CheckCircle2,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import { useT, translate, getLocale } from "@/i18n";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import AccountLayout from "./AccountLayout";
 import { touristService } from "../services/touristService";
-import { PostCard, PostComposer, POST_STATUS } from "./CommunityScreen";
+import { PostCard, PostComposer } from "./CommunityScreen";
 
 const TITLE_MAX = 200;
 const CONTENT_MAX = 5000;
@@ -28,6 +29,7 @@ const CONTENT_MAX = 5000;
 
 /** Hộp thoại sửa bài viết (tiêu đề + nội dung + danh sách ảnh giữ nguyên). */
 function EditPostDialog({ post, onClose, onSaved }) {
+  const t = useT();
   const [title, setTitle] = useState(post?.title || "");
   const [content, setContent] = useState(post?.content || "");
   const [busy, setBusy] = useState(false);
@@ -37,21 +39,21 @@ function EditPostDialog({ post, onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    const t = title.trim();
-    const c = content.trim();
-    if (!t) { setError("Vui lòng nhập tiêu đề bài viết."); return; }
-    if (!c) { setError("Vui lòng nhập nội dung bài viết."); return; }
+    const trimmedTitle = title.trim();
+    const trimmedContent = content.trim();
+    if (!trimmedTitle) { setError(t("community.errorNoTitle")); return; }
+    if (!trimmedContent) { setError(t("community.errorNoContent")); return; }
     setBusy(true); setError("");
     try {
       const mediaUrls = (post.mediaList || []).map((m) => m.mediaUrl).filter(Boolean);
       await touristService.updateCommunityPost(post.id, {
-        title: t,
-        content: c,
+        title: trimmedTitle,
+        content: trimmedContent,
         mediaUrls: mediaUrls.length ? mediaUrls : null,
       });
       onSaved?.();
     } catch (err) {
-      setError(err?.message || "Không lưu được bài viết.");
+      setError(err?.message || t("community.errorSavePost"));
     } finally {
       setBusy(false);
     }
@@ -65,20 +67,20 @@ function EditPostDialog({ post, onClose, onSaved }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Sửa bài viết"
+        aria-label={t("community.editPostTitle")}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl"
       >
         <form onSubmit={submit}>
           <div className="px-6 pt-6 pb-4">
-            <h3 className="text-base font-semibold tracking-tight text-slate-900">Sửa bài viết</h3>
+            <h3 className="text-base font-semibold tracking-tight text-slate-900">{t("community.editPostTitle")}</h3>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              Nếu bài đã được đăng, sau khi sửa bài sẽ quay lại trạng thái chờ kiểm duyệt.
+              {t("community.editPostSubtitle")}
             </p>
 
             <div className="mt-4 space-y-3">
               <div>
-                <label htmlFor="edit-title" className="mb-1 block text-sm font-bold text-slate-800">Tiêu đề</label>
+                <label htmlFor="edit-title" className="mb-1 block text-sm font-bold text-slate-800">{t("community.fieldTitle")}</label>
                 <input
                   id="edit-title"
                   maxLength={TITLE_MAX}
@@ -88,7 +90,7 @@ function EditPostDialog({ post, onClose, onSaved }) {
                 />
               </div>
               <div>
-                <label htmlFor="edit-content" className="mb-1 block text-sm font-bold text-slate-800">Nội dung</label>
+                <label htmlFor="edit-content" className="mb-1 block text-sm font-bold text-slate-800">{t("community.fieldContent")}</label>
                 <textarea
                   id="edit-content"
                   rows={6}
@@ -115,7 +117,7 @@ function EditPostDialog({ post, onClose, onSaved }) {
               disabled={busy}
               className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50"
             >
-              Huỷ bỏ
+              {t("community.cancel")}
             </button>
             <button
               type="submit"
@@ -123,7 +125,7 @@ function EditPostDialog({ post, onClose, onSaved }) {
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-teal-700 px-5 py-2.5 text-xs font-medium text-white transition-colors hover:bg-teal-800 disabled:opacity-50"
             >
               {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-              {busy ? "Đang lưu..." : "Lưu thay đổi"}
+              {busy ? t("community.saving") : t("community.saveChanges")}
             </button>
           </div>
         </form>
@@ -134,6 +136,7 @@ function EditPostDialog({ post, onClose, onSaved }) {
 
 export default function MyPostsScreen() {
   const router = useRouter();
+  const t = useT();
   const { confirm, confirmDialog } = useConfirm();
   const [state, setState] = useState({ loading: true, items: [], error: "" });
   const [composing, setComposing] = useState(false);
@@ -143,7 +146,7 @@ export default function MyPostsScreen() {
 
   const load = useCallback(() => touristService.myCommunityPosts()
     .then((items) => setState({ loading: false, items, error: "" }))
-    .catch((err) => setState({ loading: false, items: [], error: err?.message || "Không tải được bài viết của bạn." })), []);
+    .catch((err) => setState({ loading: false, items: [], error: err?.message || translate(getLocale(), "community.errorLoadMyPosts") })), []);
   useEffect(() => { load(); }, [load]);
 
   const items = state.items;
@@ -159,10 +162,10 @@ export default function MyPostsScreen() {
     setBusyId(post.id);
     try {
       await touristService.submitCommunityPost(post.id);
-      setNotice(`Đã gửi bài "${post.title}" để kiểm duyệt.`);
+      setNotice(t("community.submitReviewSuccess", { title: post.title }));
       load();
     } catch (err) {
-      setNotice(err?.message || "Không gửi được bài để duyệt.");
+      setNotice(err?.message || t("community.errorSubmitReview"));
     } finally {
       setBusyId(null);
     }
@@ -172,19 +175,20 @@ export default function MyPostsScreen() {
     const ok = await confirm({
       tone: "danger",
       icon: "reject",
-      title: "Xoá bài viết?",
+      title: t("community.deletePostConfirmTitle"),
       subject: post.title,
-      description: "Bài viết sẽ bị xoá khỏi trang của bạn. Hành động này không thể hoàn tác.",
-      confirmLabel: "Xoá bài viết",
+      description: t("community.deletePostConfirmDesc"),
+      confirmLabel: t("community.deletePostConfirmBtn"),
+      cancelLabel: t("community.cancel"),
     });
     if (!ok) return;
     setBusyId(post.id);
     try {
       await touristService.deleteCommunityPost(post.id);
-      setNotice("Đã xoá bài viết.");
+      setNotice(t("community.deletePostSuccess"));
       load();
     } catch (err) {
-      setNotice(err?.message || "Không xoá được bài viết.");
+      setNotice(err?.message || t("community.errorDeletePost"));
     } finally {
       setBusyId(null);
     }
@@ -194,16 +198,16 @@ export default function MyPostsScreen() {
   const canSubmit = (post) => ["DRAFT", "REJECTED", "NEEDS_REVISION"].includes(post.status);
 
   return (
-    <AccountLayout title="Bài viết của tôi" description="Theo dõi trạng thái kiểm duyệt của các bài bạn đã đăng trong cộng đồng.">
+    <AccountLayout title={t("account.myPosts")} description={t("community.myPostsDesc")}>
       {confirmDialog}
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-semibold text-slate-600">Tổng {counts.total}</span>
-          <span className="rounded-lg bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">Đã đăng {counts.published}</span>
-          <span className="rounded-lg bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">Chờ duyệt {counts.pending}</span>
+          <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-semibold text-slate-600">{t("community.countTotal", { count: counts.total })}</span>
+          <span className="rounded-lg bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">{t("community.countPublished", { count: counts.published })}</span>
+          <span className="rounded-lg bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">{t("community.countPending", { count: counts.pending })}</span>
           {counts.rejected > 0 && (
-            <span className="rounded-lg bg-rose-50 px-2.5 py-1 font-semibold text-rose-700">Bị từ chối {counts.rejected}</span>
+            <span className="rounded-lg bg-rose-50 px-2.5 py-1 font-semibold text-rose-700">{t("community.countRejected", { count: counts.rejected })}</span>
           )}
         </div>
         <button
@@ -211,7 +215,7 @@ export default function MyPostsScreen() {
           onClick={() => setComposing((v) => !v)}
           className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-700"
         >
-          <PenLine size={15} />Viết bài mới
+          <PenLine size={15} />{t("community.newPost")}
         </button>
       </div>
 
@@ -227,7 +231,7 @@ export default function MyPostsScreen() {
             onCancel={() => setComposing(false)}
             onCreated={() => {
               setComposing(false);
-              setNotice("Bài viết đã được gửi kiểm duyệt.");
+              setNotice(t("community.postSubmittedShort"));
               load();
             }}
           />
@@ -235,7 +239,7 @@ export default function MyPostsScreen() {
       )}
 
       {state.loading ? (
-        <p className="flex gap-2 py-10 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />Đang tải…</p>
+        <p className="flex gap-2 py-10 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />{t("common.loading")}</p>
       ) : state.error ? (
         <p role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
           <AlertTriangle size={16} />{state.error}
@@ -252,7 +256,7 @@ export default function MyPostsScreen() {
                   disabled={busyId === p.id}
                   className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                 >
-                  <PenLine size={13} />Sửa
+                  <PenLine size={13} />{t("community.edit")}
                 </button>
                 {canSubmit(p) && (
                   <button
@@ -262,7 +266,7 @@ export default function MyPostsScreen() {
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal-800 disabled:opacity-50"
                   >
                     {busyId === p.id ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                    Gửi duyệt
+                    {t("community.submitForReview")}
                   </button>
                 )}
                 {p.status === "PUBLISHED" && (
@@ -271,7 +275,7 @@ export default function MyPostsScreen() {
                     onClick={() => router.push(ROUTES.COMMUNITY_POST(p.id))}
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    <MessageCircle size={13} />Xem bài
+                    <MessageCircle size={13} />{t("community.viewPost")}
                   </button>
                 )}
                 <button
@@ -280,7 +284,7 @@ export default function MyPostsScreen() {
                   disabled={busyId === p.id}
                   className="ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:opacity-50"
                 >
-                  <Trash2 size={13} />Xoá
+                  <Trash2 size={13} />{t("community.delete")}
                 </button>
               </div>
             </li>
@@ -289,14 +293,14 @@ export default function MyPostsScreen() {
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <MessageCircle size={30} className="mx-auto text-teal-600" />
-          <p className="mt-2 font-bold text-slate-800">Bạn chưa viết bài nào</p>
-          <p className="mt-1 text-sm text-slate-500">Chia sẻ trải nghiệm tour của bạn với cộng đồng.</p>
+          <p className="mt-2 font-bold text-slate-800">{t("community.myPostsEmptyTitle")}</p>
+          <p className="mt-1 text-sm text-slate-500">{t("community.myPostsEmptyDesc")}</p>
           <button
             type="button"
             onClick={() => setComposing(true)}
             className="mt-4 cursor-pointer rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700"
           >
-            Viết bài ngay
+            {t("community.writePostNow")}
           </button>
         </div>
       )}
@@ -307,7 +311,7 @@ export default function MyPostsScreen() {
         onClose={() => setEditing(null)}
         onSaved={() => {
           setEditing(null);
-          setNotice("Đã lưu thay đổi. Bài viết sẽ được kiểm duyệt lại nếu đã đăng.");
+          setNotice(t("community.editPostSuccess"));
           load();
         }}
       />

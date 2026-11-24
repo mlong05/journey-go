@@ -25,46 +25,47 @@ import AccountLayout, { refreshAccountSummary } from "./AccountLayout";
 import ClaimRewardModal from "./ClaimRewardModal";
 import { touristService } from "../services/touristService";
 import { shortDate } from "../utils";
+import { useT, useI18n, translate, getLocale, INTL_LOCALE } from "@/i18n";
 
 const CATEGORIES = [
   {
     key: "TOUR",
-    label: "Hành trình khám phá",
-    shortLabel: "Hành trình",
-    description: "Chinh phục các chuyến đi & vùng đất mới",
-    unit: "tour",
+    labelKey: "account.ach.cat.TOUR.label",
+    shortLabelKey: "account.ach.cat.TOUR.short",
+    descriptionKey: "account.ach.cat.TOUR.desc",
+    unitKey: "account.ach.cat.TOUR.unit",
     Icon: Compass,
   },
   {
     key: "CHECKIN",
-    label: "Dấu chân điểm đến",
-    shortLabel: "Check-in",
-    description: "Check-in GPS tại các tọa độ di sản",
-    unit: "điểm đến",
+    labelKey: "account.ach.cat.CHECKIN.label",
+    shortLabelKey: "account.ach.cat.CHECKIN.short",
+    descriptionKey: "account.ach.cat.CHECKIN.desc",
+    unitKey: "account.ach.cat.CHECKIN.unit",
     Icon: MapPin,
   },
   {
     key: "CULTURE_QUIZ",
-    label: "Văn hóa & Tri thức",
-    shortLabel: "Văn hóa",
-    description: "Khám phá câu chuyện di sản & giải đố",
-    unit: "bài",
+    labelKey: "account.ach.cat.CULTURE_QUIZ.label",
+    shortLabelKey: "account.ach.cat.CULTURE_QUIZ.short",
+    descriptionKey: "account.ach.cat.CULTURE_QUIZ.desc",
+    unitKey: "account.ach.cat.CULTURE_QUIZ.unit",
     Icon: BookOpen,
   },
   {
     key: "EXPERIENCE",
-    label: "Thử thách trải nghiệm",
-    shortLabel: "Trải nghiệm",
-    description: "Vượt qua nhiệm vụ thực tế tại điểm dừng",
-    unit: "nhiệm vụ",
+    labelKey: "account.ach.cat.EXPERIENCE.label",
+    shortLabelKey: "account.ach.cat.EXPERIENCE.short",
+    descriptionKey: "account.ach.cat.EXPERIENCE.desc",
+    unitKey: "account.ach.cat.EXPERIENCE.unit",
     Icon: Sparkles,
   },
   {
     key: "STREAK_LOYALTY",
-    label: "Kiên định & Gắn bó",
-    shortLabel: "Gắn bó",
-    description: "Duy trì ngọn lửa đam mê cùng JourneyGo",
-    unit: "mốc",
+    labelKey: "account.ach.cat.STREAK_LOYALTY.label",
+    shortLabelKey: "account.ach.cat.STREAK_LOYALTY.short",
+    descriptionKey: "account.ach.cat.STREAK_LOYALTY.desc",
+    unitKey: "account.ach.cat.STREAK_LOYALTY.unit",
     Icon: Flame,
   },
 ];
@@ -73,25 +74,25 @@ const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map((c) => [c.key, c]));
 
 const TIER_META = {
   BRONZE: {
-    label: "Đồng",
+    labelKey: "account.ach.tier.BRONZE",
     pillCls: "border-orange-200 bg-orange-50 text-orange-800",
     ringCls: "border-orange-300 bg-[linear-gradient(145deg,#fff7ed,#fed7aa)]",
     iconCls: "text-orange-700",
   },
   SILVER: {
-    label: "Bạc",
+    labelKey: "account.ach.tier.SILVER",
     pillCls: "border-slate-300 bg-slate-100 text-slate-700",
     ringCls: "border-slate-300 bg-[linear-gradient(145deg,#f8fafc,#e2e8f0)]",
     iconCls: "text-slate-700",
   },
   GOLD: {
-    label: "Vàng",
+    labelKey: "account.ach.tier.GOLD",
     pillCls: "border-amber-300 bg-amber-50 text-amber-800",
     ringCls: "border-amber-400 bg-[linear-gradient(145deg,#fef9c3,#fcd34d)]",
     iconCls: "text-amber-900",
   },
   LEGENDARY: {
-    label: "Huyền thoại",
+    labelKey: "account.ach.tier.LEGENDARY",
     pillCls: "border-purple-300 bg-[linear-gradient(135deg,#faf5ff,#fef3c7)] text-purple-900",
     ringCls: "border-amber-400 bg-[linear-gradient(145deg,#f3e8ff,#fde68a)] ring-2 ring-purple-300/60",
     iconCls: "text-purple-800",
@@ -118,13 +119,14 @@ function sortAchievements(items) {
   });
 }
 
-function progressUnitFor(achievement, categoryMeta) {
+function progressUnitFor(achievement, categoryMeta, t) {
   if (achievement?.code === "TEN_THOUSAND_POINTS_EARNED") return "JP";
-  if (achievement?.code?.includes("STREAK")) return "ngày";
-  return categoryMeta?.unit || "mục";
+  if (achievement?.code?.includes("STREAK")) return t("account.ach.unit.days");
+  return categoryMeta?.unitKey ? t(categoryMeta.unitKey) : t("account.ach.unit.items");
 }
 
 function BadgeThumb({ achievement, tierMeta }) {
+  const t = useT();
   const [failedSrc, setFailedSrc] = useState(null);
   const locked = achievement.status === "LOCKED";
   const src = achievement.badgeIcon;
@@ -162,19 +164,21 @@ function BadgeThumb({ achievement, tierMeta }) {
       <span
         className={`rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${tierMeta.pillCls}`}
       >
-        {tierMeta.label}
+        {t(tierMeta.labelKey)}
       </span>
     </div>
   );
 }
 
 function AchievementCard({ item, categoryMeta, claiming, onClaim }) {
+  const { t, locale } = useI18n();
+  const numLocale = INTL_LOCALE[locale];
   const tierMeta = TIER_META[item.tier] || TIER_META.BRONZE;
   const target = Math.max(1, Number(item.targetValue) || 1);
   const rawProgress = Number(item.currentProgress) || 0;
   const displayProgress = item.status === "LOCKED" ? Math.min(rawProgress, target) : target;
   const pct = Math.min(100, Math.round((displayProgress / target) * 100));
-  const unit = progressUnitFor(item, categoryMeta);
+  const unit = progressUnitFor(item, categoryMeta, t);
 
   const isClaimable = item.status === "CLAIMABLE";
   const isClaimed = item.status === "CLAIMED";
@@ -209,7 +213,7 @@ function AchievementCard({ item, categoryMeta, claiming, onClaim }) {
           <h3 className="text-base font-extrabold text-slate-900">{item.name}</h3>
           {isClaimable && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
-              Sẵn sàng nhận
+              {t("account.ach.readyToClaim")}
             </span>
           )}
         </div>
@@ -220,9 +224,9 @@ function AchievementCard({ item, categoryMeta, claiming, onClaim }) {
         <div className="mt-3">
           <div className="mb-1 flex items-center justify-between text-xs font-semibold">
             <span className={isClaimable ? "text-amber-800" : isClaimed ? "text-emerald-700" : "text-slate-500"}>
-              Tiến độ:{" "}
+              {t("account.ach.progress")}{" "}
               <strong className="font-extrabold tabular-nums">
-                {displayProgress.toLocaleString("vi-VN")}/{target.toLocaleString("vi-VN")}
+                {displayProgress.toLocaleString(numLocale)}/{target.toLocaleString(numLocale)}
               </strong>{" "}
               {unit}
             </span>
@@ -248,7 +252,7 @@ function AchievementCard({ item, categoryMeta, claiming, onClaim }) {
         <div className="min-w-0 text-left sm:text-right">
           <p className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-0.5 text-sm font-black tabular-nums text-amber-700">
             <Sparkles size={13} className="shrink-0 text-amber-500" />
-            +{(item.pointsReward ?? 0).toLocaleString("vi-VN")} JP
+            +{(item.pointsReward ?? 0).toLocaleString(numLocale)} JP
           </p>
           {item.badgeName && (
             <p className="mt-1 flex items-center gap-1 truncate text-[11px] font-semibold text-slate-500 sm:justify-end" title={item.badgeName}>
@@ -274,12 +278,12 @@ function AchievementCard({ item, categoryMeta, claiming, onClaim }) {
             {claiming ? (
               <>
                 <Loader2 size={14} className="animate-spin" />
-                Đang nhận…
+                {t("account.ach.claiming")}
               </>
             ) : (
               <>
                 <Gift size={14} />
-                Nhận thưởng
+                {t("account.ach.claimReward")}
               </>
             )}
           </button>
@@ -289,11 +293,11 @@ function AchievementCard({ item, categoryMeta, claiming, onClaim }) {
           <div className="text-right">
             <span className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700">
               <CheckCircle2 size={14} />
-              Đã nhận
+              {t("account.ach.claimed")}
             </span>
             {item.claimedAt && (
               <p className="mt-1 text-[10px] font-medium text-slate-400">
-                {shortDate(item.claimedAt)}
+                {shortDate(item.claimedAt, locale)}
               </p>
             )}
           </div>
@@ -302,7 +306,7 @@ function AchievementCard({ item, categoryMeta, claiming, onClaim }) {
         {isLocked && (
           <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500">
             <Lock size={12} />
-            {displayProgress.toLocaleString("vi-VN")}/{target.toLocaleString("vi-VN")}
+            {displayProgress.toLocaleString(numLocale)}/{target.toLocaleString(numLocale)}
           </span>
         )}
       </div>
@@ -314,6 +318,7 @@ function AchievementCard({ item, categoryMeta, claiming, onClaim }) {
  * Trang Thành tựu & Huy hiệu (/account/achievements) — lấy cảm hứng từ hệ thống Thành tựu Genshin Impact.
  */
 export default function AchievementsScreen() {
+  const { t, locale } = useI18n();
   const prefersReduced = useReducedMotion();
   const [achievements, setAchievements] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -355,7 +360,7 @@ export default function AchievementsScreen() {
         if (active) applyLoadedData(res);
       })
       .catch((err) => {
-        if (active) setError(err?.message || "Không thể tải danh sách thành tựu. Vui lòng thử lại.");
+        if (active) setError(err?.message || translate(getLocale(), "account.ach.loadError"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -372,7 +377,7 @@ export default function AchievementsScreen() {
       const res = await fetchAchievements();
       applyLoadedData(res);
     } catch (err) {
-      setError(err?.message || "Không thể tải danh sách thành tựu. Vui lòng thử lại.");
+      setError(err?.message || translate(getLocale(), "account.ach.loadError"));
     } finally {
       setLoading(false);
     }
@@ -473,20 +478,20 @@ export default function AchievementsScreen() {
       refreshAccountSummary().catch(() => {});
       setRewardModal({ open: true, reward: res, achievement });
     } catch (err) {
-      setClaimError(err?.message || "Không thể nhận thưởng lúc này. Vui lòng thử lại.");
+      setClaimError(err?.message || translate(getLocale(), "account.ach.claimError"));
     } finally {
       setClaimingId(null);
     }
   }
 
   const filterPills = [
-    { key: "ALL", label: "Tất cả", count: stats.totalCount },
-    { key: "UNLOCKED", label: "Đã mở khóa", count: stats.totalAchieved },
-    { key: "CLAIMABLE", label: "Chờ nhận thưởng", count: stats.unclaimedCount, dot: stats.unclaimedCount > 0 },
+    { key: "ALL", label: t("common.all"), count: stats.totalCount },
+    { key: "UNLOCKED", label: t("account.ach.filterUnlocked"), count: stats.totalAchieved },
+    { key: "CLAIMABLE", label: t("account.ach.filterClaimable"), count: stats.unclaimedCount, dot: stats.unclaimedCount > 0 },
   ];
 
   return (
-    <AccountLayout title="Thành tựu & Huy hiệu" wide>
+    <AccountLayout title={t("account.achievements")} wide>
       <ClaimRewardModal
         open={rewardModal.open}
         reward={rewardModal.reward}
@@ -519,14 +524,14 @@ export default function AchievementsScreen() {
             onClick={handleRetry}
             className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 cursor-pointer"
           >
-            <RefreshCw size={14} /> Thử lại
+            <RefreshCw size={14} /> {t("account.ach.retry")}
           </button>
         </div>
       ) : (
         <div className="space-y-5">
           {/* 1. Thanh Header / Thống kê phong cách Genshin Impact */}
           <section
-            aria-label="Thống kê thành tựu"
+            aria-label={t("account.ach.statsAria")}
             className="relative overflow-hidden rounded-3xl border border-teal-800/40 bg-[linear-gradient(140deg,#093b37,#0d5c55,#134e4a)] p-5 text-white shadow-lg sm:p-6"
           >
             <BronzeDrumMotif
@@ -539,7 +544,7 @@ export default function AchievementsScreen() {
                   <div className="flex items-center justify-between text-xs font-semibold text-teal-100/85">
                     <span className="flex items-center gap-1.5">
                       <Trophy size={14} className="text-amber-300" />
-                      Thành tựu đã đạt
+                      {t("account.ach.achievedTitle")}
                     </span>
                     <span className="tabular-nums font-bold text-amber-200">{stats.overallPct}%</span>
                   </div>
@@ -559,14 +564,14 @@ export default function AchievementsScreen() {
                 <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-xs">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-teal-100/85">
                     <Sparkles size={14} className="text-amber-300" />
-                    Điểm nhận từ thành tựu
+                    {t("account.ach.pointsFromAch")}
                   </p>
                   <p className="mt-1.5 text-2xl font-black tabular-nums text-amber-300 sm:text-3xl">
-                    +{stats.totalPointsEarned.toLocaleString("vi-VN")}
+                    +{stats.totalPointsEarned.toLocaleString(INTL_LOCALE[locale])}
                     <span className="ml-1 text-sm font-bold text-amber-200/90">JP</span>
                   </p>
                   <p className="mt-2 text-xs text-teal-100/75">
-                    Đã nhận {stats.totalClaimed} huy hiệu vinh danh
+                    {t("account.ach.claimedBadgesCount", { count: stats.totalClaimed })}
                   </p>
                 </div>
 
@@ -574,28 +579,28 @@ export default function AchievementsScreen() {
                 <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-xs">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-teal-100/85">
                     <Gift size={14} className="text-amber-300" />
-                    Phần thưởng đang chờ
+                    {t("account.ach.pendingRewards")}
                   </p>
                   <div className="mt-1.5 flex items-center gap-2.5">
                     <p className="text-2xl font-black tabular-nums sm:text-3xl">{stats.unclaimedCount}</p>
                     {stats.unclaimedCount > 0 ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/90 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-xs">
                         <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
-                        Chờ nhận
+                        {t("account.ach.pendingBadge")}
                       </span>
                     ) : (
-                      <span className="text-xs font-medium text-teal-100/75">Đã nhận hết</span>
+                      <span className="text-xs font-medium text-teal-100/75">{t("account.ach.allClaimed")}</span>
                     )}
                   </div>
                   <p className="mt-2 text-xs text-teal-100/75">
-                    Hoàn thành hành trình để mở khóa thêm
+                    {t("account.ach.completeToUnlock")}
                   </p>
                 </div>
               </div>
 
               {/* Bộ lọc nhanh theo trạng thái */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3.5">
-                <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Lọc theo trạng thái">
+                <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("account.ach.filterByStatusAria")}>
                   {filterPills.map((pill) => {
                     const active = statusFilter === pill.key;
                     return (
@@ -625,7 +630,7 @@ export default function AchievementsScreen() {
                   })}
                 </div>
                 <p className="text-xs text-teal-100/80">
-                  Chọn danh mục bên trái để xem chi tiết từng thành tựu
+                  {t("account.ach.selectCategoryHint")}
                 </p>
               </div>
             </div>
@@ -645,7 +650,7 @@ export default function AchievementsScreen() {
                 onClick={() => setClaimError("")}
                 className="text-xs font-bold text-rose-700 underline cursor-pointer"
               >
-                Đóng
+                {t("common.close")}
               </button>
             </div>
           )}
@@ -653,7 +658,7 @@ export default function AchievementsScreen() {
           {/* 2. Bố cục 2 cột Master - Detail */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[270px_minmax(0,1fr)] lg:items-start">
             {/* Cột trái (Master): Danh sách 5 danh mục */}
-            <aside aria-label="Danh mục thành tựu">
+            <aside aria-label={t("account.ach.categoriesAria")}>
               {/* Mobile horizontal strip */}
               <div className="flex gap-2.5 overflow-x-auto pb-1 lg:hidden">
                 {CATEGORIES.map((cat) => {
@@ -672,14 +677,14 @@ export default function AchievementsScreen() {
                     >
                       <cat.Icon size={16} className={active ? "text-amber-300" : "text-teal-700"} />
                       <div>
-                        <p className="whitespace-nowrap text-xs font-extrabold">{cat.shortLabel}</p>
+                        <p className="whitespace-nowrap text-xs font-extrabold">{t(cat.shortLabelKey)}</p>
                         <p className={`text-[11px] tabular-nums ${active ? "text-teal-100" : "text-slate-400"}`}>
                           {st.achieved}/{st.total} ({st.pct}%)
                         </p>
                       </div>
                       {st.claimable > 0 && (
                         <span
-                          aria-label={`${st.claimable} chờ nhận`}
+                          aria-label={t("account.ach.claimableShortAria", { count: st.claimable })}
                           className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white"
                         >
                           {st.claimable}
@@ -710,7 +715,7 @@ export default function AchievementsScreen() {
                       {/* Red dot badge nếu có thành tựu CLAIMABLE */}
                       {st.claimable > 0 && (
                         <span
-                          aria-label={`${st.claimable} thành tựu chờ nhận thưởng`}
+                          aria-label={t("account.unclaimed", { count: st.claimable })}
                           className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white shadow-xs"
                         >
                           <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
@@ -729,13 +734,13 @@ export default function AchievementsScreen() {
                           <cat.Icon size={19} />
                         </span>
                         <div className="min-w-0 flex-1 pr-6">
-                          <p className="truncate text-sm font-extrabold">{cat.label}</p>
+                          <p className="truncate text-sm font-extrabold">{t(cat.labelKey)}</p>
                           <p
                             className={`mt-0.5 text-xs tabular-nums ${
                               active ? "text-teal-100/90" : "text-slate-500"
                             }`}
                           >
-                            {st.achieved}/{st.total} thành tựu · {st.pct}%
+                            {t("account.ach.categoryCountPct", { achieved: st.achieved, total: st.total, pct: st.pct })}
                           </p>
                         </div>
                       </div>
@@ -770,7 +775,7 @@ export default function AchievementsScreen() {
             </aside>
 
             {/* Cột phải (Detail): Danh sách thẻ thành tựu của danh mục được chọn */}
-            <section aria-label={activeCategoryMeta.label} className="min-w-0 space-y-3.5">
+            <section aria-label={t(activeCategoryMeta.labelKey)} className="min-w-0 space-y-3.5">
               {/* Tiêu đề danh mục */}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 sm:px-5">
                 <div className="flex items-center gap-3 min-w-0">
@@ -779,14 +784,18 @@ export default function AchievementsScreen() {
                   </span>
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-extrabold text-slate-900">
-                      {activeCategoryMeta.label}
+                      {t(activeCategoryMeta.labelKey)}
                     </h2>
-                    <p className="truncate text-xs text-slate-500">{activeCategoryMeta.description}</p>
+                    <p className="truncate text-xs text-slate-500">{t(activeCategoryMeta.descriptionKey)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="rounded-xl bg-slate-100 px-3 py-1 text-xs font-bold tabular-nums text-slate-700">
-                    Hoàn thành {activeCategoryStat.achieved}/{activeCategoryStat.total} ({activeCategoryStat.pct}%)
+                    {t("account.ach.categoryDonePct", {
+                      achieved: activeCategoryStat.achieved,
+                      total: activeCategoryStat.total,
+                      pct: activeCategoryStat.pct,
+                    })}
                   </span>
                 </div>
               </div>
@@ -815,10 +824,10 @@ export default function AchievementsScreen() {
                     <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
                       <Trophy size={32} className="mx-auto text-slate-300" />
                       <p className="mt-2 text-sm font-bold text-slate-700">
-                        Không có thành tựu nào khớp bộ lọc trong danh mục này
+                        {t("account.ach.emptyTitle")}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        Thử chuyển sang bộ lọc &ldquo;Tất cả&rdquo; hoặc chọn danh mục khác để tiếp tục theo dõi tiến độ.
+                        {t("account.ach.emptyDesc")}
                       </p>
                       {statusFilter !== "ALL" && (
                         <button
@@ -826,7 +835,7 @@ export default function AchievementsScreen() {
                           onClick={() => setStatusFilter("ALL")}
                           className="mt-4 rounded-xl bg-teal-700 px-4 py-2 text-xs font-bold text-white hover:bg-teal-800 cursor-pointer"
                         >
-                          Xem tất cả trong mục này
+                          {t("account.ach.showAllInCategory")}
                         </button>
                       )}
                     </div>

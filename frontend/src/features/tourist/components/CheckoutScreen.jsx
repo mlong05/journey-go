@@ -18,8 +18,9 @@ import { PaymentCountdown, usePendingBooking } from "./PendingBooking";
 import { GUEST_TYPES, ageAt, durationLabel, longDate, vnd } from "../utils";
 import { LimitedField } from "@/components/ui/LimitedField";
 import { useGuestTypes } from "@/lib/guestTypes";
+import { getLocale, translate, useI18n } from "@/i18n";
 
-const GENDERS = [["MALE", "Nam"], ["FEMALE", "Nữ"], ["OTHER", "Khác"]];
+const GENDER_CODES = ["MALE", "FEMALE", "OTHER"];
 /** Giới tính mặc định khi tạo hành khách — luôn là "Nam" (MALE). */
 const DEFAULT_GENDER = "MALE";
 const input = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 aria-[invalid=true]:border-rose-400";
@@ -36,32 +37,33 @@ function buildPassengers(params, user) {
   return list;
 }
 
-function validate(passengers, date, guestTypes) {
+function validate(passengers, date, guestTypes, t) {
   const errors = passengers.map(() => ({}));
   const seen = new Map();
   passengers.forEach((p, i) => {
     const e = errors[i];
     const meta = guestTypes.find((g) => g.type === p.guestType);
-    if (!p.fullName.trim()) e.fullName = "Nhập họ và tên";
-    if (!p.gender) e.gender = "Chọn giới tính";
-    if (!p.birthDate) e.birthDate = "Nhập ngày sinh";
+    if (!p.fullName.trim()) e.fullName = t("checkout.errFullName");
+    if (!p.gender) e.gender = t("checkout.errGender");
+    if (!p.birthDate) e.birthDate = t("checkout.errBirthDate");
     else {
       const age = ageAt(p.birthDate, date);
-      if (age === null || age < 0) e.birthDate = "Ngày sinh không hợp lệ";
-      else if (age < meta.min || age > meta.max) e.birthDate = `${meta.label} phải ${meta.age} vào ngày đi tour (hiện ${age} tuổi)`;
+      if (age === null || age < 0) e.birthDate = t("checkout.errBirthDateInvalid");
+      else if (age < meta.min || age > meta.max) e.birthDate = t("checkout.errBirthDateAge", { label: meta.label, ageRange: meta.age, age });
     }
     // Chỉ người lớn có ô email; trẻ em/trẻ nhỏ/em bé không cần nên bỏ qua kiểm tra.
     if (p.guestType !== "ADULT") return;
     const email = p.email.trim().toLowerCase();
-    if (!email) e.email = "Người lớn cần email để nhận vé";
-    else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Email không hợp lệ";
-    else if (email && seen.has(email)) e.email = `Trùng email với hành khách ${seen.get(email) + 1}`;
+    if (!email) e.email = t("checkout.errEmailRequired");
+    else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = t("checkout.errEmailInvalid");
+    else if (email && seen.has(email)) e.email = t("checkout.errEmailDuplicate", { index: seen.get(email) + 1 });
     if (email) seen.set(email, i);
   });
   return errors;
 }
 
 function CheckoutForm({ tourId }) {
+  const { t, locale } = useI18n();
   const params = useSearchParams();
   const guestTypes = useGuestTypes();
   const { user } = useTouristSession();
@@ -98,10 +100,10 @@ function CheckoutForm({ tourId }) {
     setError("");
     try {
       const payment = await touristService.initPayment(held.id);
-      if (!payment?.paymentUrl) throw new Error("Không nhận được đường dẫn thanh toán từ VNPay.");
+      if (!payment?.paymentUrl) throw new Error(t("checkout.errNoPaymentUrl"));
       window.location.href = payment.paymentUrl;
     } catch (err) {
-      setError(err?.message || "Không mở được trang thanh toán. Vui lòng thử lại.");
+      setError(err?.message || t("checkout.errOpenPayment"));
       setHeldBusy("");
     }
   };
@@ -111,10 +113,10 @@ function CheckoutForm({ tourId }) {
     setHeldBusy("cancel");
     setError("");
     try {
-      await touristService.cancelBooking(held.id, "Khách hủy để đặt lại");
+      await touristService.cancelBooking(held.id, t("checkout.cancelHeldReason"));
       clearHeld();
     } catch (err) {
-      setError(err?.message || "Không hủy được đơn cũ. Vui lòng thử lại.");
+      setError(err?.message || t("checkout.errCancelHeld"));
       reloadHeld();
     } finally {
       setHeldBusy("");
@@ -123,8 +125,8 @@ function CheckoutForm({ tourId }) {
 
   useEffect(() => {
     let alive = true;
-    touristService.tourDetail(tourId).then((t) => alive && setTour(t))
-      .catch((err) => alive && setLoadError(err?.message || "Không tải được tour."));
+    touristService.tourDetail(tourId).then((data) => alive && setTour(data))
+      .catch((err) => alive && setLoadError(err?.message || translate(getLocale(), "checkout.errLoadTour")));
     return () => { alive = false; };
   }, [tourId]);
 
@@ -159,12 +161,12 @@ function CheckoutForm({ tourId }) {
   const handleValidateVoucher = async (codeToValidate) => {
     const code = (codeToValidate || voucherInput).trim();
     if (!code) {
-      setVoucherError("Vui lòng nhập mã voucher.");
+      setVoucherError(t("checkout.voucherErrEmpty"));
       setVoucherResult(null);
       return;
     }
     if (total <= 0) {
-      setVoucherError("Vui lòng chọn ít nhất một hành khách để kiểm tra voucher.");
+      setVoucherError(t("checkout.voucherErrNoPassengers"));
       return;
     }
     setValidatingVoucher(true);
@@ -181,11 +183,11 @@ function CheckoutForm({ tourId }) {
         setVoucherInput(res.voucherCode || code);
       } else {
         setVoucherResult(null);
-        setVoucherError(res?.errorMessage || "Mã voucher không hợp lệ hoặc không đủ điều kiện áp dụng.");
+        setVoucherError(res?.errorMessage || t("checkout.voucherErrInvalid"));
       }
     } catch (err) {
       setVoucherResult(null);
-      setVoucherError(err?.message || "Không thể kiểm tra mã voucher. Vui lòng thử lại.");
+      setVoucherError(err?.message || t("checkout.voucherErrCheckFailed"));
     } finally {
       setValidatingVoucher(false);
     }
@@ -196,7 +198,7 @@ function CheckoutForm({ tourId }) {
     setVoucherError("");
     setVoucherInput("");
   };
-  const errors = useMemo(() => validate(passengers, date, guestTypes), [passengers, date, guestTypes]);
+  const errors = useMemo(() => validate(passengers, date, guestTypes, t), [passengers, date, guestTypes, t]);
   const hasErrors = errors.some((e) => Object.keys(e).length);
   const set = (i, patch) => setPassengers((list) => list.map((p, j) => (j === i ? { ...p, ...patch } : p)));
 
@@ -205,7 +207,7 @@ function CheckoutForm({ tourId }) {
     setTouched(true);
     setError("");
     if (purchased) {
-      setError("Bạn đã mua tour này rồi — không thể đặt lại.");
+      setError(t("checkout.errAlreadyPurchased"));
       return;
     }
     if (held) {
@@ -218,7 +220,7 @@ function CheckoutForm({ tourId }) {
     }
     // Phải xác nhận đã đọc quy định mang theo CCCD/Hộ chiếu/VNeID trước khi thanh toán.
     if (!docsAcknowledged) {
-      setError("Vui lòng tick vào ô xác nhận đã đọc thông báo về giấy tờ tùy thân.");
+      setError(t("checkout.errDocsAckRequired"));
       document.getElementById("docs-ack")?.focus();
       return;
     }
@@ -236,7 +238,7 @@ function CheckoutForm({ tourId }) {
       });
       setPendingBooking(booking);
       const payment = await touristService.initPayment(booking.id);
-      if (!payment?.paymentUrl) throw new Error("Không nhận được đường dẫn thanh toán từ VNPay.");
+      if (!payment?.paymentUrl) throw new Error(t("checkout.errNoPaymentUrl"));
       window.location.href = payment.paymentUrl;
     } catch (err) {
       setBusy(false);
@@ -245,7 +247,7 @@ function CheckoutForm({ tourId }) {
         document.getElementById("held-booking")?.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
-      setError(err?.message || "Không đặt được tour. Vui lòng thử lại.");
+      setError(err?.message || t("checkout.errCreateBooking"));
     }
   };
 
@@ -253,13 +255,13 @@ function CheckoutForm({ tourId }) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <AlertTriangle size={32} className="mx-auto text-amber-500" />
-        <p className="mt-3 font-bold text-slate-900">Thiếu ngày khởi hành hoặc số khách</p>
-        <Link href={ROUTES.TOUR_DETAIL(tourId)} className="mt-5 inline-flex rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white">Chọn lại ở trang tour</Link>
+        <p className="mt-3 font-bold text-slate-900">{t("checkout.missingParams")}</p>
+        <Link href={ROUTES.TOUR_DETAIL(tourId)} className="mt-5 inline-flex rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white">{t("checkout.backToTour")}</Link>
       </div>
     );
   }
   if (loadError) return <p role="alert" className="mx-auto max-w-md px-4 py-20 text-center font-bold text-rose-600">{loadError}</p>;
-  if (!tour) return <div className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />Đang tải…</div>;
+  if (!tour) return <div className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />{t("common.loading")}</div>;
 
   /*
     ⚠️ TOUR ĐÃ MUA ⇒ KHÔNG THỂ ĐẶT LẠI.
@@ -270,51 +272,50 @@ function CheckoutForm({ tourId }) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <CheckCircle2 size={36} className="mx-auto text-emerald-600" />
-        <p className="mt-3 text-lg font-extrabold text-slate-900">Bạn đã mua tour này rồi</p>
+        <p className="mt-3 text-lg font-extrabold text-slate-900">{t("checkout.purchasedTitle")}</p>
         <p className="mt-2 text-sm text-slate-600">
-          Đơn <b className="font-mono">{purchased.bookingCode}</b> · ngày khởi hành{" "}
-          <b>{longDate(purchased.experienceDate)}</b>. Mỗi tour chỉ được đặt một lần.
+          {t("checkout.purchasedDescBefore")}<b className="font-mono">{purchased.bookingCode}</b>{t("checkout.purchasedDescMid")}
+          <b>{longDate(purchased.experienceDate, locale)}</b>{t("checkout.purchasedDescAfter")}
         </p>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <Link href={ROUTES.TRIP_DETAIL(purchased.id)} className="inline-flex items-center justify-center rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white">
-            Xem chuyến đi của tôi
+            {t("checkout.viewMyTrips")}
           </Link>
           <Link href={`${ROUTES.TOUR_DETAIL(tourId)}?bookingId=${purchased.id}`} className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700">
-            Xem chi tiết tour
+            {t("checkout.viewTourDetail")}
           </Link>
         </div>
       </div>
     );
   }
   if (purchasedLoading) {
-    return <div className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />Đang kiểm tra…</div>;
+    return <div className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />{t("checkout.checking")}</div>;
   }
 
   const typeIndex = {};
   return (
-    <form onSubmit={submit} noValidate className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:pt-0">
+    <form onSubmit={submit} noValidate className="mx-auto max-w-page px-4 py-6 sm:px-6 lg:px-8 lg:pt-0">
       {/* Breadcrumb cách header ~10px (pt-1) để không bị dính sát mép trên. */}
       <div className="pt-1">
-        <Breadcrumbs fallback={ROUTES.TOUR_DETAIL(tourId)} items={[{ label: "Khám phá", href: ROUTES.HOME }, { label: tour.title, href: ROUTES.TOUR_DETAIL(tourId) }, { label: "Thông tin hành khách" }]} />
+        <Breadcrumbs fallback={ROUTES.TOUR_DETAIL(tourId)} items={[{ label: t("nav.explore"), href: ROUTES.HOME }, { label: tour.title, href: ROUTES.TOUR_DETAIL(tourId) }, { label: t("checkout.passengerInfo") }]} />
       </div>
 
       {held && (
         <section id="held-booking" role="alert" className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-5">
           <p className="flex items-center gap-2 font-extrabold text-amber-900">
-            <Timer size={18} />Bạn đang có đơn giữ chỗ · còn <PaymentCountdown deadline={held.paymentDeadline} onExpire={clearHeld} />
+            <Timer size={18} />{t("checkout.heldTitleBefore")}<PaymentCountdown deadline={held.paymentDeadline} onExpire={clearHeld} />{t("checkout.heldTitleAfter")}
           </p>
           <p className="mt-1.5 text-sm text-amber-900/80">
-            Đơn <b className="font-mono">{held.bookingCode}</b> cho ngày <b>{longDate(held.experienceDate)}</b> ({vnd(held.totalAmount)}) đang giữ chỗ.
-            Mỗi tour chỉ giữ được một đơn chưa thanh toán — hãy tiếp tục đơn này, hoặc hủy để đặt lại theo thông tin bên dưới.
+            {t("checkout.heldDescBefore")}<b className="font-mono">{held.bookingCode}</b>{t("checkout.heldDescDate")}<b>{longDate(held.experienceDate, locale)}</b> ({vnd(held.totalAmount)}){t("checkout.heldDescAfter")}
           </p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <button type="button" onClick={resumeHeld} disabled={Boolean(heldBusy)}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-60 cursor-pointer disabled:cursor-wait">
-              {heldBusy === "resume" ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}Tiếp tục thanh toán đơn này
+              {heldBusy === "resume" ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}{t("checkout.resumeHeld")}
             </button>
             <button type="button" onClick={cancelHeld} disabled={Boolean(heldBusy)}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-5 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-60 cursor-pointer disabled:cursor-wait">
-              {heldBusy === "cancel" && <Loader2 size={16} className="animate-spin" />}Hủy đơn cũ và đặt lại
+              {heldBusy === "cancel" && <Loader2 size={16} className="animate-spin" />}{t("checkout.cancelHeld")}
             </button>
           </div>
         </section>
@@ -322,15 +323,15 @@ function CheckoutForm({ tourId }) {
 
       {/* Bố cục 2 cột: cột trái = thông tin hành khách (dọc, dài tự nhiên),
           cột phải = ô thông tin thanh toán (dính theo khung nhìn, rộng để chữ không chật chội).
-          `max-w-[1600px]` tận dụng khoảng trống hai bên trên màn hình rộng.
+          `max-w-page` (1600px) tận dụng khoảng trống hai bên trên màn hình rộng.
           Ô thanh toán bắt đầu ngang với tiêu đề "Thông tin hành khách" (cùng đường cơ sở
           của hàng grid) ⇒ hai khối thẳng hàng nhau.
           `lg:self-start` trên ô thanh toán ⇒ grid không kéo giãn nó, nên ô dính giữ nguyên
           vị trí và luôn hiển thị trọn vẹn khi cuộn từ đầu đến cuối trang. */}
       <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(520px,42%)] xl:grid-cols-[minmax(0,1fr)_minmax(640px,44%)]">
         <div className="min-w-0">
-          <h1 className="text-[26px] font-extrabold tracking-tight text-slate-900">Thông tin hành khách</h1>
-          <p className="mt-1 text-sm text-slate-500">Ngày sinh dùng để xác định loại vé theo ngày đi tour. Người lớn cần email để nhận vé và mở tour trong app.</p>
+          <h1 className="text-[26px] font-extrabold tracking-tight text-slate-900">{t("checkout.passengerInfo")}</h1>
+          <p className="mt-1 text-sm text-slate-500">{t("checkout.passengerInfoDesc")}</p>
           {/* Danh sách hành khách giữ nguyên thứ tự từ trên xuống dưới; khối này dài tự nhiên
               theo số khách, không bị cắt — mỗi ô nhập luôn hiển thị trọn vẹn. */}
           <div className="mt-4 space-y-4">
@@ -341,30 +342,30 @@ function CheckoutForm({ tourId }) {
             const id = (f) => `p${i}-${f}`;
             return (
               <fieldset key={i} className="rounded-3xl border border-slate-200 bg-white p-5">
-                <legend className="sr-only">Hành khách {i + 1}</legend>
+                <legend className="sr-only">{t("checkout.passengerLegend", { index: i + 1 })}</legend>
                 <div className="mb-4 flex flex-wrap items-center gap-2">
                   <span className="grid h-8 w-8 place-items-center rounded-full bg-teal-50 text-teal-700"><UserRound size={16} /></span>
                   <p className="font-bold text-slate-900">{meta.label} {typeIndex[p.guestType]}</p>
                   <span className="text-xs text-slate-500">· {meta.age}</span>
-                  {p.isBooker && <span className="ml-auto rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-bold text-orange-700">Người đặt tour</span>}
+                  {p.isBooker && <span className="ml-auto rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-bold text-orange-700">{t("checkout.bookerBadge")}</span>}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <label htmlFor={id("name")} className="mb-1 block text-xs font-bold text-slate-600">Họ và tên</label>
+                    <label htmlFor={id("name")} className="mb-1 block text-xs font-bold text-slate-600">{t("checkout.fullName")}</label>
                     <LimitedField as="input" limit={200} id={id("name")} className={input} value={p.fullName} onChange={(e) => set(i, { fullName: e.target.value })} aria-invalid={Boolean(err.fullName)} autoComplete={p.isBooker ? "name" : "off"} />
                     {err.fullName && <p className="mt-1 text-xs font-semibold text-rose-600">{err.fullName}</p>}
                   </div>
                   <div>
-                    <label htmlFor={id("birth")} className="mb-1 block text-xs font-bold text-slate-600">Ngày sinh</label>
+                    <label htmlFor={id("birth")} className="mb-1 block text-xs font-bold text-slate-600">{t("checkout.birthDate")}</label>
                     <input id={id("birth")} type="date" className={input} value={p.birthDate} max={date} onChange={(e) => set(i, { birthDate: e.target.value })} aria-invalid={Boolean(err.birthDate)} />
                     {err.birthDate && <p className="mt-1 text-xs font-semibold text-rose-600">{err.birthDate}</p>}
                   </div>
                   <div>
-                    <span id={id("gender")} className="mb-1 block text-xs font-bold text-slate-600">Giới tính</span>
+                    <span id={id("gender")} className="mb-1 block text-xs font-bold text-slate-600">{t("checkout.genderLabel")}</span>
                     <div className="flex gap-2" role="radiogroup" aria-labelledby={id("gender")} aria-invalid={Boolean(err.gender)}>
-                      {GENDERS.map(([v, l]) => (
+                      {GENDER_CODES.map((v) => (
                         <label key={v} className={`flex-1 cursor-pointer rounded-xl border px-3 py-2.5 text-center text-sm font-semibold ${p.gender === v ? "border-teal-700 bg-teal-700 text-white" : "border-slate-200 text-slate-700"}`}>
-                          <input type="radio" name={id("gender")} value={v} checked={p.gender === v} onChange={() => set(i, { gender: v })} className="sr-only" />{l}
+                          <input type="radio" name={id("gender")} value={v} checked={p.gender === v} onChange={() => set(i, { gender: v })} className="sr-only" />{t(`checkout.gender.${v}`)}
                         </label>
                       ))}
                     </div>
@@ -372,7 +373,7 @@ function CheckoutForm({ tourId }) {
                   </div>
                   {p.guestType === "ADULT" && (
                     <div className="sm:col-span-2">
-                      <label htmlFor={id("email")} className="mb-1 block text-xs font-bold text-slate-600">Email</label>
+                      <label htmlFor={id("email")} className="mb-1 block text-xs font-bold text-slate-600">{t("checkout.email")}</label>
                       <input id={id("email")} type="email" className={input} value={p.email} onChange={(e) => set(i, { email: e.target.value })} aria-invalid={Boolean(err.email)} autoComplete={p.isBooker ? "email" : "off"} />
                       {err.email && <p className="mt-1 text-xs font-semibold text-rose-600">{err.email}</p>}
                     </div>
@@ -382,8 +383,8 @@ function CheckoutForm({ tourId }) {
             );
           })}
           <div className="rounded-3xl border border-slate-200 bg-white p-5">
-            <label htmlFor="booking-note" className="mb-1 block text-sm font-bold text-slate-800">Ghi chú cho đối tác <span className="font-normal text-slate-400">(không bắt buộc)</span></label>
-            <LimitedField as="textarea" limit={1000} id="booking-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ví dụ: nhóm có người lớn tuổi, cần đi chậm"
+            <label htmlFor="booking-note" className="mb-1 block text-sm font-bold text-slate-800">{t("checkout.noteLabel")}<span className="font-normal text-slate-400">{t("checkout.optional")}</span></label>
+            <LimitedField as="textarea" limit={1000} id="booking-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("checkout.notePlaceholder")}
               className={`${input} resize-none`} />
           </div>
           </div>
@@ -407,7 +408,7 @@ function CheckoutForm({ tourId }) {
                 )}
                 <div className="min-w-0">
                   <h2 className="font-bold leading-snug text-slate-900">{tour.title}</h2>
-                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-600"><CalendarDays size={14} />{longDate(date)} · {durationLabel(tour)}</p>
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-600"><CalendarDays size={14} />{longDate(date, locale)} · {durationLabel(t, tour)}</p>
                 </div>
               </div>
               {/* Danh sách vé xếp 2 cột trên màn rộng ⇒ thông tin không bị chật chội, chiều cao ngắn lại. */}
@@ -425,11 +426,11 @@ function CheckoutForm({ tourId }) {
                 <div className="flex items-center justify-between mb-1.5">
                   <label htmlFor="voucher-code-input" className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                     <Ticket size={14} className="text-teal-700" />
-                    Mã ưu đãi / Voucher
+                    {t("checkout.voucherLabel")}
                   </label>
                   {myVouchersList.length > 0 && !voucherResult && (
                     <span className="text-[11px] font-medium text-teal-700">
-                      Có {myVouchersList.length} voucher khả dụng
+                      {t("checkout.voucherAvailableCount", { count: myVouchersList.length })}
                     </span>
                   )}
                 </div>
@@ -440,7 +441,7 @@ function CheckoutForm({ tourId }) {
                       <input
                         id="voucher-code-input"
                         type="text"
-                        placeholder="Nhập mã voucher"
+                        placeholder={t("checkout.voucherPlaceholder")}
                         value={voucherInput}
                         onChange={(e) => {
                           setVoucherInput(e.target.value.toUpperCase());
@@ -460,14 +461,14 @@ function CheckoutForm({ tourId }) {
                         disabled={validatingVoucher || !voucherInput.trim()}
                         className="inline-flex items-center justify-center rounded-xl bg-teal-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
                       >
-                        {validatingVoucher ? <Loader2 size={13} className="animate-spin" /> : "Áp dụng"}
+                        {validatingVoucher ? <Loader2 size={13} className="animate-spin" /> : t("checkout.voucherApply")}
                       </button>
                     </div>
 
                     {/* Gợi ý voucher trong ví */}
                     {myVouchersList.length > 0 && (
                       <div className="mt-2 space-y-1">
-                        <p className="text-[11px] text-slate-500">Hoặc chọn từ ví của bạn:</p>
+                        <p className="text-[11px] text-slate-500">{t("checkout.voucherFromWallet")}</p>
                         <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
                           {myVouchersList.map((v) => (
                             <button
@@ -499,13 +500,13 @@ function CheckoutForm({ tourId }) {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
                         <Check size={14} className="text-emerald-600" />
-                        <span>Đã áp dụng: <span className="font-mono">{activeVoucher.voucherCode || voucherInput}</span></span>
+                        <span>{t("checkout.voucherApplied")}<span className="font-mono">{activeVoucher.voucherCode || voucherInput}</span></span>
                       </div>
                       <button
                         type="button"
                         onClick={handleRemoveVoucher}
                         className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                        title="Bỏ chọn voucher"
+                        title={t("checkout.voucherRemove")}
                       >
                         <X size={14} />
                       </button>
@@ -514,7 +515,7 @@ function CheckoutForm({ tourId }) {
                       <p className="mt-0.5 text-xs text-emerald-700">{activeVoucher.title}</p>
                     )}
                     <p className="mt-1 text-xs font-semibold text-emerald-700">
-                      Giảm: -{vnd(discountAmount)}
+                      {t("checkout.voucherDiscountAmount", { amount: vnd(discountAmount) })}
                     </p>
                   </div>
                 )}
@@ -522,13 +523,13 @@ function CheckoutForm({ tourId }) {
 
               {discountAmount > 0 && (
                 <div className="mt-3 flex items-center justify-between text-sm text-emerald-700 font-semibold border-t border-slate-100 pt-2">
-                  <span>Giảm giá voucher</span>
+                  <span>{t("checkout.voucherDiscountLabel")}</span>
                   <span className="tabular-nums">-{vnd(discountAmount)}</span>
                 </div>
               )}
 
               <div className="mt-3 flex items-end justify-between border-t border-slate-200 pt-3">
-                <span className="text-sm font-bold text-slate-800">Tổng thanh toán</span>
+                <span className="text-sm font-bold text-slate-800">{t("checkout.totalPayment")}</span>
                 <div className="text-right">
                   {discountAmount > 0 && (
                     <div className="text-xs text-slate-400 line-through tabular-nums">
@@ -542,7 +543,7 @@ function CheckoutForm({ tourId }) {
                 <div role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700">
                   <p className="flex items-start gap-1.5"><AlertTriangle size={13} className="mt-px shrink-0" />{error}</p>
                   {pendingBooking && (
-                    <p className="mt-1.5 font-normal text-rose-700">Đơn <b>{pendingBooking.bookingCode}</b> đang giữ chỗ. Bạn có thể thử thanh toán lại hoặc xem đơn trong <Link className="underline" href={ROUTES.TRIP_DETAIL(pendingBooking.id)}>Chuyến đi của tôi</Link>.</p>
+                    <p className="mt-1.5 font-normal text-rose-700">{t("checkout.pendingErrorBefore")}<b>{pendingBooking.bookingCode}</b>{t("checkout.pendingErrorMid")}<Link className="underline" href={ROUTES.TRIP_DETAIL(pendingBooking.id)}>{t("nav.myTrips")}</Link>{t("checkout.pendingErrorAfter")}</p>
                   )}
                 </div>
               )}
@@ -551,7 +552,7 @@ function CheckoutForm({ tourId }) {
                 <p className="flex items-start gap-2 text-xs font-semibold leading-relaxed text-amber-900">
                   <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600" />
                   <span>
-                    Vui lòng mang theo <b>CCCD/Hộ chiếu/VNeID</b> (hoặc ảnh chụp <b>Giấy khai sinh</b> đối với trẻ em) để đối chiếu khi check-in. Nếu độ tuổi thực tế không khớp với loại vé đã mua, hành khách cần thanh toán phần chênh lệch tại điểm tập trung.
+                    {t("checkout.docsNoticeBefore")}<b>{t("checkout.docsNoticeId")}</b>{t("checkout.docsNoticeMid")}<b>{t("checkout.docsNoticeBirthCert")}</b>{t("checkout.docsNoticeAfter")}
                   </span>
                 </p>
                 <label htmlFor="docs-ack"
@@ -563,7 +564,7 @@ function CheckoutForm({ tourId }) {
                     onChange={(e) => setDocsAcknowledged(e.target.checked)}
                     className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-amber-600"
                   />
-                  <span>Tôi đã đọc và đồng ý mang theo giấy tờ tùy thân theo thông báo trên.</span>
+                  <span>{t("checkout.docsAckLabel")}</span>
                 </label>
               </div>
               </div>
@@ -572,10 +573,10 @@ function CheckoutForm({ tourId }) {
               <button type="submit" disabled={busy || Boolean(held) || !docsAcknowledged || (touched && hasErrors)}
                 className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 text-[15px] font-bold text-white shadow-[0_6px_16px_rgba(234,88,12,0.3)] hover:bg-orange-700 disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none transition duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none cursor-pointer disabled:cursor-not-allowed">
                 {busy ? <Loader2 size={17} className="animate-spin" /> : <CreditCard size={17} />}
-                {pendingBooking ? "Thử thanh toán lại" : "Xác nhận và thanh toán"}
+                {pendingBooking ? t("checkout.retryPayment") : t("checkout.confirmAndPay")}
               </button>
-              <p className="mt-2.5 flex items-start gap-1.5 text-xs text-slate-500"><Timer size={13} className="mt-px shrink-0 text-orange-600" />Sau khi xác nhận, chỗ được giữ trong 10 phút để bạn thanh toán.</p>
-              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-slate-500"><Lock size={13} className="mt-px shrink-0 text-teal-700" />Thanh toán an toàn qua cổng VNPay (thẻ ATM, QR ngân hàng, thẻ quốc tế).</p>
+              <p className="mt-2.5 flex items-start gap-1.5 text-xs text-slate-500"><Timer size={13} className="mt-px shrink-0 text-orange-600" />{t("checkout.holdTimerNote")}</p>
+              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-slate-500"><Lock size={13} className="mt-px shrink-0 text-teal-700" />{t("checkout.vnpayNote")}</p>
               </div>
             </div>
           </div>

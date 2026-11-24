@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { User, Phone, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { LimitedField } from "@/components/ui/LimitedField";
+import { getLocale, translate, useT } from "@/i18n";
 
 /** Giới hạn khớp cột DB (users: full_name 150, email 100, phone 20) — giao diện chặt hơn một chút. */
 export const REGISTER_LIMITS = { fullName: 100, email: 100, phone: 10, password: 64 };
@@ -24,27 +25,28 @@ export function normalizePhone(raw) {
 }
 
 /** Kiểm tra cả form — trả { field: "thông báo lỗi" } (rỗng = hợp lệ). Dùng chung cho form và nút đăng ký. */
-export function validateRegister(f) {
+export function validateRegister(f, t) {
+  const tr = t || ((k) => translate(getLocale(), k));
   const e = {};
   const name = f.fullName.trim().replace(/\s+/g, " ");
-  if (!name) e.fullName = "Vui lòng nhập họ và tên";
-  else if (name.length < 2) e.fullName = "Họ và tên quá ngắn";
-  else if (!NAME_RE.test(name)) e.fullName = "Họ và tên chỉ gồm chữ cái và khoảng trắng";
+  if (!name) e.fullName = tr("misc.reg.errNameRequired");
+  else if (name.length < 2) e.fullName = tr("misc.reg.errNameShort");
+  else if (!NAME_RE.test(name)) e.fullName = tr("misc.reg.errNameInvalid");
 
-  if (!f.phone) e.phone = "Vui lòng nhập số điện thoại";
-  else if (!f.phone.startsWith("0")) e.phone = "Số điện thoại phải bắt đầu bằng số 0";
-  else if (f.phone.length !== 10) e.phone = "Số điện thoại gồm đúng 10 chữ số";
-  else if (!PHONE_RE.test(f.phone)) e.phone = "Đầu số không hợp lệ (03, 05, 07, 08, 09)";
+  if (!f.phone) e.phone = tr("misc.reg.errPhoneRequired");
+  else if (!f.phone.startsWith("0")) e.phone = tr("misc.reg.errPhonePrefix");
+  else if (f.phone.length !== 10) e.phone = tr("misc.reg.errPhoneLength");
+  else if (!PHONE_RE.test(f.phone)) e.phone = tr("misc.reg.errPhoneInvalid");
 
   const email = f.email.trim();
-  if (!email) e.email = "Vui lòng nhập email";
-  else if (!EMAIL_RE.test(email)) e.email = "Email không đúng định dạng";
+  if (!email) e.email = tr("misc.reg.errEmailRequired");
+  else if (!EMAIL_RE.test(email)) e.email = tr("misc.reg.errEmailInvalid");
 
-  if (!f.password) e.password = "Vui lòng nhập mật khẩu";
-  else if (f.password.length < 6) e.password = "Mật khẩu tối thiểu 6 ký tự";
+  if (!f.password) e.password = tr("misc.reg.errPassRequired");
+  else if (f.password.length < 6) e.password = tr("misc.reg.errPassShort");
 
-  if (!f.confirmPassword) e.confirmPassword = "Vui lòng nhập lại mật khẩu";
-  else if (f.confirmPassword !== f.password) e.confirmPassword = "Mật khẩu xác nhận không khớp";
+  if (!f.confirmPassword) e.confirmPassword = tr("misc.reg.errConfirmRequired");
+  else if (f.confirmPassword !== f.password) e.confirmPassword = tr("misc.reg.errConfirmMismatch");
   return e;
 }
 
@@ -77,11 +79,12 @@ export default function RegisterForm({
   loading,
   onSubmit,
 }) {
+  const t = useT();
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
-  const errors = validateRegister(registerForm);
+  const errors = validateRegister(registerForm, t);
   const err = (k) => ((touched[k] || submitted) ? errors[k] : "");
-  const blur = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
+  const blur = (k) => () => setTouched((prev) => ({ ...prev, [k]: true }));
   const set = (k, v) => setRegisterForm((prev) => ({ ...prev, [k]: v }));
 
   const submit = (e) => {
@@ -96,7 +99,7 @@ export default function RegisterForm({
         <div>
           <div className={boxCls(err("fullName"))}>
             <label htmlFor="reg-name" className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-emerald-800 tracking-wide select-none z-10">
-              Họ và tên
+              {t("misc.reg.fullNameLabel")}
             </label>
             <div className="flex items-center px-3 h-11">
               <User className="w-4 h-4 text-slate-700 mr-2 shrink-0 stroke-[1.8]" />
@@ -106,7 +109,7 @@ export default function RegisterForm({
                 value={registerForm.fullName}
                 onChange={(e) => set("fullName", e.target.value.replace(/^\s+/, "").replace(/\s{2,}/g, " "))}
                 onBlur={blur("fullName")}
-                placeholder="Nguyễn Văn A"
+                placeholder={t("misc.reg.fullNamePlaceholder")}
                 className={inputCls} />
             </div>
           </div>
@@ -117,7 +120,7 @@ export default function RegisterForm({
         <div>
           <div className={boxCls(err("phone"))}>
             <label htmlFor="reg-phone" className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-emerald-800 tracking-wide select-none z-10">
-              Số điện thoại
+              {t("misc.reg.phoneLabel")}
             </label>
             <div className="flex items-center px-3 h-11">
               <Phone className="w-4 h-4 text-slate-700 mr-2 shrink-0 stroke-[1.8]" />
@@ -152,7 +155,7 @@ export default function RegisterForm({
       <div>
         <div className={boxCls(err("email"))}>
           <label htmlFor="reg-email" className="absolute -top-2.5 left-4 bg-white px-2 text-[10px] font-bold text-emerald-800 tracking-wide select-none z-10">
-            Email đăng ký
+            {t("misc.reg.emailLabel")}
           </label>
           <div className="flex items-center px-3.5 h-11">
             <Mail className="w-4 h-4 text-slate-700 mr-2.5 shrink-0 stroke-[1.8]" />
@@ -174,7 +177,7 @@ export default function RegisterForm({
         <div>
           <div className={boxCls(err("password"))}>
             <label htmlFor="reg-pass" className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-emerald-800 tracking-wide select-none z-10">
-              Mật khẩu
+              {t("misc.login.passwordLabel")}
             </label>
             <div className="flex items-center px-3 h-11">
               <Lock className="w-4 h-4 text-slate-700 mr-2 shrink-0 stroke-[1.8]" />
@@ -184,13 +187,13 @@ export default function RegisterForm({
                 value={registerForm.password}
                 onChange={(e) => set("password", e.target.value)}
                 onBlur={blur("password")}
-                placeholder="Tối thiểu 6 ký tự"
+                placeholder={t("misc.reg.passPlaceholder")}
                 className={inputCls} />
               {setShowPassword && (
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  aria-label={showPassword ? t("misc.login.hidePassword") : t("misc.login.showPassword")}
                   className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
                 >
                   {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -204,7 +207,7 @@ export default function RegisterForm({
         <div>
           <div className={boxCls(err("confirmPassword"))}>
             <label htmlFor="reg-confirm" className="absolute -top-2.5 left-3.5 bg-white px-1.5 text-[10px] font-bold text-emerald-800 tracking-wide select-none z-10">
-              Xác nhận
+              {t("misc.reg.confirmLabel")}
             </label>
             <div className="flex items-center px-3 h-11">
               <Lock className="w-4 h-4 text-slate-700 mr-2 shrink-0 stroke-[1.8]" />
@@ -214,13 +217,13 @@ export default function RegisterForm({
                 value={registerForm.confirmPassword}
                 onChange={(e) => set("confirmPassword", e.target.value)}
                 onBlur={blur("confirmPassword")}
-                placeholder="Nhập lại mật khẩu"
+                placeholder={t("misc.activate.confirmPasswordPlaceholder")}
                 className={inputCls} />
               {setShowConfirmPassword && (
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  aria-label={showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  aria-label={showConfirmPassword ? t("misc.login.hidePassword") : t("misc.login.showPassword")}
                   className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
                 >
                   {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -247,9 +250,9 @@ export default function RegisterForm({
             className="w-4 h-4 text-emerald-800 rounded border-slate-300 focus:ring-emerald-600 cursor-pointer accent-emerald-700"
           />
           <span className="text-[11px] text-slate-600">
-            Tôi đồng ý với{" "}
+            {t("misc.reg.agreePrefix")}{" "}
             <span className="text-emerald-800 font-semibold underline">
-              Điều khoản dịch vụ &amp; Quy chế di sản
+              {t("misc.reg.termsLink")}
             </span>
           </span>
         </label>
@@ -264,10 +267,10 @@ export default function RegisterForm({
         {loading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin text-white" />
-            <span>Đang khởi tạo tài khoản...</span>
+            <span>{t("misc.reg.submitting")}</span>
           </>
         ) : (
-          <span>Hoàn tất đăng ký</span>
+          <span>{t("misc.reg.submit")}</span>
         )}
       </button>
     </form>

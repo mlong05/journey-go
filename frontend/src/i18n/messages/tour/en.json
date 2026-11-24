@@ -1,0 +1,79 @@
+{
+  "tour.viewCover": "View cover photo",
+  "tour.galleryLabel": "Tour photos",
+  "tour.photoAlt": "Tour photo {index}",
+  "tour.noAvailableDates": "No departure dates with available seats yet.",
+  "tour.minOneAdult": "At least 1 adult is required.",
+  "tour.onlySeatsLeft": {
+    "one": "Only {count} seat left on {date}.",
+    "other": "Only {count} seats left on {date}."
+  },
+  "tour.alreadyPurchased": "You have already booked this tour",
+  "tour.orderPrefix": "Booking ",
+  "tour.purchasedOrderLocked": " · departure date and guest count are locked and cannot be changed.",
+  "tour.selectDate": "Select departure date",
+  "tour.selectedDate": "Selected date",
+  "tour.seatsLeftShort": "{count} left",
+  "tour.noOpenDates": "No open dates yet.",
+  "tour.collapseDates": "Show less",
+  "tour.showMoreDates": {
+    "one": "Show {count} more date",
+    "other": "Show {count} more dates"
+  },
+  "tour.departureLabel": "Departure",
+  "tour.meetingLabel": "Meeting point",
+  "tour.viewDepartureDetails": "View departure details",
+  "tour.guestsLabel": "Guests",
+  "tour.notCountedTowardSlot": " · not counted toward seats",
+  "tour.decreaseGuest": "Decrease {label}",
+  "tour.increaseGuest": "Increase {label}",
+  "tour.subtotalGuests": {
+    "one": "Subtotal · {count} guest",
+    "other": "Subtotal · {count} guests"
+  },
+  "tour.paid": "Paid",
+  "tour.paidNote": "A booked tour cannot be booked again. You can view your booking in My trips.",
+  "tour.viewMyTrips": "View my trips",
+  "tour.staffCannotBook": "You are signed in with an admin or partner account. Use a traveler account to book tours.",
+  "tour.holdingSeatBefore": "Seat on hold · ",
+  "tour.holdingSeatAfter": " left",
+  "tour.changeOrderHint": "Need to change date or guests? Cancel the old booking and rebook",
+  "tour.bookNow": "Book tour",
+  "tour.loginToBookTitle": "Sign in to book",
+  "tour.loginToBookMessage": "You need to sign in with a traveler account to book this tour.",
+  "tour.chatOpenError": "Could not open the conversation.",
+  "tour.providerFallback": "the tour operator",
+  "tour.askProviderTooltip": "Ask {provider} about pickup times, dress code, parking…",
+  "tour.askProviderButton": "Have questions? Message the tour operator",
+  "tour.loginToChatTitle": "Sign in to message",
+  "tour.loginToChatMessage": "Sign in to ask {provider} about pickup times, dress code, parking… before booking.",
+  "tour.communityTitle": "What travelers say about this tour",
+  "tour.communityFootnote": "Posts shared by travelers in the JourneyGo app after their trip and reviewed by moderators.",
+  "tour.notFound": "Tour not found.",
+  "tour.browseOtherTours": "Browse other tours",
+  "tour.detailTitle": "Tour details",
+  "tour.loading": "Loading tour…",
+  "tour.maxRewardPoints": {
+    "one": "Up to {count} reward point",
+    "other": "Up to {count} reward points"
+  },
+  "tour.overview": "Overview",
+  "tour.itinerary": "Itinerary",
+  "tour.dayPrefix": "Day {day}: ",
+  "tour.stopsTitle": {
+    "one": "{count} stop",
+    "other": "{count} stops"
+  },
+  "tour.storyUnlockBadge": "Story unlocks on check-in",
+  "tour.quizCount": {
+    "one": "{count} quiz question",
+    "other": "{count} quiz questions"
+  },
+  "tour.included": "Included",
+  "tour.excluded": "Not included",
+  "tour.policies": "Policies",
+  "tour.policyCancellation": "Cancellation",
+  "tour.policyRefund": "Refunds",
+  "tour.policyForceMajeure": "Force majeure",
+  "tour.policyContact": "Contact"
+}
