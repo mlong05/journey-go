@@ -1036,7 +1036,7 @@
       }
     }
   },
-  "mbTabClosed": "Đã hủy/Hết hạn ({count})",
+  "mbTabClosed": "Đã hủy / Hết hạn ({count})",
   "@mbTabClosed": {
     "placeholders": {
       "count": {

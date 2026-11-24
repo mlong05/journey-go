@@ -2,11 +2,13 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "adb reverse 8088",
-      "detail": "Chuyển cổng 8088 trên điện thoại cắm USB về backend trên máy tính (mất khi rút cáp / khởi động lại adb)",
-      "type": "process",
-      "command": "adb",
-      "args": ["reverse", "tcp:8088", "tcp:8088"],
+      "label": "adb reverse (USB)",
+      "detail": "Chuyển cổng 8088 (backend mvnw) và 8080 (Docker) trên MỌI thiết bị Android đang cắm về máy tính. Mất khi rút cáp / khởi động lại adb ⇒ chạy lại (F5 tự chạy).",
+      "type": "shell",
+      "command": "foreach ($d in (adb devices | Select-String \"`tdevice$\" | ForEach-Object { ($_ -split \"`t\")[0] })) { foreach ($p in 8088, 8080) { adb -s $d reverse tcp:$p tcp:$p | Out-Null }; Write-Host \"adb reverse 8088, 8080 -> $d\" }; exit 0",
+      "options": {
+        "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] }
+      },
       "presentation": { "reveal": "silent", "panel": "shared" },
       "problemMatcher": []
     }

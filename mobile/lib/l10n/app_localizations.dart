@@ -2538,7 +2538,7 @@ abstract class AppLocalizations {
   /// No description provided for @mbTabClosed.
   ///
   /// In vi, this message translates to:
-  /// **'Đã hủy/Hết hạn ({count})'**
+  /// **'Đã hủy / Hết hạn ({count})'**
   String mbTabClosed(int count);
 
   /// No description provided for @mbEmptyAll.

@@ -1613,7 +1613,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String mbTabClosed(int count) {
-    return 'Cancelled/Expired ($count)';
+    return 'Cancelled / Expired ($count)';
   }
 
   @override

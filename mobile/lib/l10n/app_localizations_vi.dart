@@ -1450,7 +1450,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String mbTabClosed(int count) {
-    return 'Đã hủy/Hết hạn ($count)';
+    return 'Đã hủy / Hết hạn ($count)';
   }
 
   @override

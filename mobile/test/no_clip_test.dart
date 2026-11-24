@@ -23,7 +23,7 @@ const _bookingTabs = [
   'Đã hoàn thành (6)',
   'Đang hoàn tiền (1)',
   'Đã hoàn tiền (1)',
-  'Đã hủy/Hết hạn (0)',
+  'Đã hủy / Hết hạn (0)',
 ];
 
 Future<void> _pump(WidgetTester tester, Widget body, {double textScale = 1}) async {

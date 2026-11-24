@@ -1395,7 +1395,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String mbTabRefunding(int count) {
-    return '返金中（$count）';
+    return '返金処理中（$count）';
   }
 
   @override
