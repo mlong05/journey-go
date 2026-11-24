@@ -1,15 +1,26 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, BadgeDollarSign, CheckCircle2, TrendingUp, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  BadgeDollarSign,
+  CheckCircle2,
+  Percent,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { dashboardService } from "@/features/dashboard";
+import { regionService } from "@/features/destination";
 import { useQueueRefresh } from "@/context/NotificationContext";
-import { formatDateTimeVN } from "@/lib/money";
+import { formatDateTimeVN, formatVNDNumber } from "@/lib/money";
 
 import OverviewHeader from "./overview/OverviewHeader";
 import { KpiCard } from "./overview/KpiCard";
-import PendingStrip from "./overview/PendingStrip";
-import PlatformRevenueSection from "./overview/revenue/PlatformRevenueSection";
+import Hint from "./overview/Hint";
+import ActionCenter from "./overview/ActionCenter";
+import TrendComparisonChart from "./overview/TrendComparisonChart";
+import BookingFunnel from "./overview/BookingFunnel";
+import RegionBreakdown from "./overview/RegionBreakdown";
 import BookingStatusChart from "./overview/BookingStatusChart";
 import {
   TopToursCard,
@@ -19,30 +30,49 @@ import {
 import { GRID } from "./overview.tokens";
 import { KPI_HINTS } from "./overview/glossary";
 
+
 /**
  * Trang Tổng quan vận hành (Operations Overview) — JourneyGo Admin.
  *
- * Chỉ giữ những gì CHƯA có trang riêng:
- *  1. Dải việc cần xử lý (chip → trang xử lý).
- *  2. 4 KPI của kỳ đang lọc.
- *  3. Doanh thu nền tảng theo tháng (không theo bộ lọc kỳ): so sánh tháng, lũy kế theo ngày,
- *     12 tháng, phân bổ giá trị đơn, doanh thu theo đối tác.
- *  4. Vận hành trong kỳ: trạng thái booking, top tour, trải nghiệm, địa điểm.
+ * ⚠️ NGUYÊN TẮC BỐ CỤC (sắp theo mức độ quan trọng, trên xuống + trái sang phải):
+ *   Tầng 1 — KPI cốt lõi: 6 thẻ, mỗi thẻ có delta so với mốc + drill-down.
+ *   Tầng 2 — Hành động: Action Center (việc chờ + tiền đang đứng).
+ *   Tầng 3 — Diễn biến: 2 biểu đồ đường chồng (kỳ này vs mốc so sánh).
+ *   Tầng 4 — Chẩn đoán: phễu chuyển đổi + trạng thái booking.
+ *   Tầng 5 — Phân rã: khu vực + top tour + trải nghiệm + địa điểm.
  *
- * Đã chuyển đi: tài chính & dòng tiền → /admin/finance · quyết toán → /admin/settlements ·
- * nhật ký → /admin/audit-logs · khách du lịch → /admin/users · đối tác → /admin/partners.
+ * Khung so sánh chỉ hiện 01 tại một thời điểm (tab ở header) để trang không bị
+ * nhồi 3 lớp số liệu cạnh tranh với nhau.
  */
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
-  // Tăng để khối doanh thu (tải riêng) nạp lại cùng lúc với phần còn lại.
-  const [revenueRefreshKey, setRevenueRefreshKey] = useState(0);
 
-  // Bộ lọc thời gian — "30 ngày qua" là mặc định.
-  const [range, setRange] = useState("month");
+  // Khung so sánh: weekly | monthly | yearly | custom. Default = weekly.
+  const [mode, setMode] = useState("weekly");
   const [customRange, setCustomRange] = useState({ from: "", to: "" });
+
+  // Lọc theo khu vực của TOUR (null = toàn sàn).
+  const [regions, setRegions] = useState([]);
+  const [regionId, setRegionId] = useState(null);
+
+  // Danh sách khu vực — tải 1 lần, dùng cho dropdown.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await regionService.getAll();
+        if (!cancelled) setRegions(list || []);
+      } catch {
+        // Không tải được khu vực ⇒ ẩn bộ lọc, trang vẫn dùng được (toàn sàn).
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadDashboard = useCallback(
     async (silent = false) => {
@@ -53,7 +83,11 @@ export default function AdminDashboardPage() {
       }
       setError("");
       try {
-        const result = await dashboardService.getAdminOperations(range, customRange);
+        const result = await dashboardService.getAdminOperations(
+          mode,
+          customRange,
+          regionId,
+        );
         setData(result);
       } catch (err) {
         console.error("Lỗi tải dữ liệu tổng quan vận hành:", err);
@@ -63,7 +97,7 @@ export default function AdminDashboardPage() {
         setIsRefreshing(false);
       }
     },
-    [range, customRange],
+    [mode, customRange, regionId],
   );
 
   useEffect(() => {
@@ -73,7 +107,6 @@ export default function AdminDashboardPage() {
 
   const refreshAll = useCallback(() => {
     loadDashboard(true);
-    setRevenueRefreshKey((k) => k + 1);
   }, [loadDashboard]);
 
   // Tự cập nhật khi có yêu cầu mới trong hàng đợi (hoàn tiền, booking, quyết toán…).
@@ -82,11 +115,13 @@ export default function AdminDashboardPage() {
     refreshAll,
   );
 
+
   const kpis = data?.kpis;
   const previousKpis = data?.previousKpis;
   const breakdown = data?.bookingBreakdown;
+  const period = data?.period;
 
-  /** % thay đổi so với kỳ trước; null = không so sánh được (kỳ trước bằng 0). */
+  /** % thay đổi so với mốc so sánh; null = không so sánh được (mốc bằng 0). */
   const percentChange = (current, previous) => {
     const cur = Number(current) || 0;
     const prev = Number(previous) || 0;
@@ -102,28 +137,70 @@ export default function AdminDashboardPage() {
     return { revenue, gmv, successes };
   }, [data]);
 
+  // Nhãn mốc so sánh — hiển thị rõ để không ai phải suy nghĩ "so với cái gì".
+  const currentLabel = period?.currentLabel || "kỳ này";
+  const baselineLabel = period?.baselineLabel || "kỳ trước";
+  const baselineText = `So với ${baselineLabel}`;
+  
+  // Kiểm tra xem tháng có khác biệt ngày không
+  let monthDayNote = "";
+  if (mode === "monthly" && currentLabel && baselineLabel) {
+    const currLastDay = parseInt(currentLabel.split(' – ')[1]?.split('/')[0]) || 0;
+    const baseLastDay = parseInt(baselineLabel.split(' – ')[1]?.split('/')[0]) || 0;
+    if (currLastDay !== baseLastDay) {
+      monthDayNote = ` (tháng này ${currLastDay} ngày, so với ${baseLastDay} ngày)`;
+    }
+  }
+  
+  // Subtitle chi tiết cho trend charts — phụ thuộc khung so sánh
+  const trendSubtitle = `So sánh giữa ${
+    mode === "weekly" ? "tuần" : mode === "monthly" ? "tháng" : mode === "yearly" ? "năm" : "khoảng thời gian"
+  }: ${currentLabel} với ${baselineLabel}${monthDayNote}`;
+
   const kpiCards = [
     {
       id: "revenue",
       label: "Doanh thu nền tảng",
       tooltip: KPI_HINTS.revenue,
-      value: (kpis?.platformRevenue ?? 0).toLocaleString("vi-VN"),
+      value: formatVNDNumber(kpis?.platformRevenue ?? 0),
       unit: "đ",
       change: percentChange(kpis?.platformRevenue, previousKpis?.platformRevenue),
+      baseline: `${formatVNDNumber(previousKpis?.platformRevenue ?? 0)} đ`,
+      baselineLabel,
       sparkline: sparks.revenue,
       icon: TrendingUp,
       tone: "indigo",
+      href: "/admin/finance",
+      hrefLabel: "Xem tài chính",
     },
     {
       id: "gmv",
       label: "Giá trị giao dịch (GMV)",
       tooltip: KPI_HINTS.gmv,
-      value: (kpis?.gmv ?? 0).toLocaleString("vi-VN"),
+      value: formatVNDNumber(kpis?.gmv ?? 0),
       unit: "đ",
       change: percentChange(kpis?.gmv, previousKpis?.gmv),
+      baseline: `${formatVNDNumber(previousKpis?.gmv ?? 0)} đ`,
+      baselineLabel,
       sparkline: sparks.gmv,
       icon: BadgeDollarSign,
       tone: "sky",
+      href: "/admin/finance",
+      hrefLabel: "Xem tài chính",
+    },
+    {
+      id: "refund",
+      label: "Hoàn tiền",
+      tooltip: KPI_HINTS.refundRate,
+      value: formatVNDNumber(kpis?.refundAmount ?? 0),
+      unit: `đ · ${(Number(kpis?.refundRate) || 0).toFixed(1)}% GMV`,
+      change: percentChange(kpis?.refundAmount, previousKpis?.refundAmount),
+      baseline: `${formatVNDNumber(previousKpis?.refundAmount ?? 0)} đ`,
+      baselineLabel,
+      icon: Percent,
+      tone: "rose",
+      href: "/admin/refunds",
+      hrefLabel: "Xem hoàn tiền",
     },
     {
       id: "success",
@@ -134,21 +211,40 @@ export default function AdminDashboardPage() {
         ? `/ ${breakdown.total.toLocaleString("vi-VN")} lượt · ${Number(breakdown.successRatio || 0).toFixed(0)}%`
         : "lượt",
       change: percentChange(kpis?.successfulBookings, previousKpis?.successfulBookings),
+      baseline: `${(previousKpis?.successfulBookings ?? 0).toLocaleString("vi-VN")} lượt`,
+      baselineLabel,
       sparkline: sparks.successes,
       icon: CheckCircle2,
       tone: "emerald",
     },
     {
+      id: "avg",
+      label: "Giá trị đơn trung bình",
+      tooltip: KPI_HINTS.avgBookingValue,
+      value: formatVNDNumber(kpis?.avgBookingValue ?? 0),
+      unit: "đ",
+      change: percentChange(kpis?.avgBookingValue, previousKpis?.avgBookingValue),
+      baseline: `${formatVNDNumber(previousKpis?.avgBookingValue ?? 0)} đ`,
+      baselineLabel,
+      icon: BadgeDollarSign,
+      tone: "sky",
+    },
+    {
       id: "tourists",
-      label: "Khách hàng hoạt động",
+      label: "Đối tác đang hoạt động",
       tooltip: KPI_HINTS.tourists,
       value: (kpis?.activeTourists ?? 0).toLocaleString("vi-VN"),
       unit: "khách",
       change: percentChange(kpis?.activeTourists, previousKpis?.activeTourists),
+      baseline: `${(previousKpis?.activeTourists ?? 0).toLocaleString("vi-VN")} khách`,
+      baselineLabel,
       icon: Users,
-      tone: "sky",
+      tone: "slate",
+      href: "/admin/partners",
+      hrefLabel: "Xem đối tác",
     },
   ];
+
 
   const lastUpdated = data?.updatedAt
     ? formatDateTimeVN(data.updatedAt)
@@ -156,20 +252,23 @@ export default function AdminDashboardPage() {
 
   const handleApplyCustom = (next) => {
     setCustomRange(next);
-    setRange("custom");
+    setMode("custom");
   };
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ── Sticky header + bộ lọc thời gian ── */}
+      {/* ── Sticky header: tab khung so sánh + lọc khu vực ── */}
       <OverviewHeader
-        range={range}
-        onRangeChange={(next) => {
-          setRange(next);
+        mode={mode}
+        onModeChange={(next) => {
+          setMode(next);
           if (next !== "custom") setCustomRange({ from: "", to: "" });
         }}
         customRange={customRange}
         onApplyCustom={handleApplyCustom}
+        regions={regions}
+        regionId={regionId}
+        onRegionChange={setRegionId}
         lastUpdated={lastUpdated}
         onRefresh={refreshAll}
         isRefreshing={isRefreshing}
@@ -183,36 +282,89 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── Việc cần xử lý (chip gọn) ── */}
-      <PendingStrip actions={data?.pendingActions} isLoading={isLoading} />
-
-      {/* ── 4 KPI của kỳ đang lọc ── */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      {/* ══ Tầng 1 — KPI CỐT LÕI ══ */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-3">
         {kpiCards.map((card) => (
           <KpiCard key={card.id} {...card} loading={isLoading && !data} />
         ))}
       </section>
 
-      {/* ── Doanh thu nền tảng theo tháng ── */}
-      <PlatformRevenueSection refreshKey={revenueRefreshKey} />
+      {/* ══ Tầng 2 — HÀNH ĐỘNG ══ */}
+      <ActionCenter actions={data?.pendingActions} isLoading={isLoading} />
 
-      {/* ── Vận hành trong kỳ ── */}
+      {/* ══ Tầng 3 — DIỄN BIẾN (kỳ này vs mốc so sánh) ══ */}
       <div className="px-1 pt-1">
-        <h2 className="text-[15px] font-bold text-slate-900 tracking-tight">Vận hành trong kỳ</h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Theo bộ lọc kỳ ở đầu trang{data?.period?.label ? ` · ${data.period.label}` : ""}
-        </p>
+        <h2 className="text-[15px] font-bold text-slate-900 tracking-tight">
+          Diễn biến {period?.label ? `— ${period.label}` : ""}
+        </h2>
+        <p className="text-xs text-slate-500 mt-0.5">{baselineText}</p>
       </div>
 
       <section className={GRID.row}>
+        <div className={GRID.col6}>
+          <TrendComparisonChart
+            key={`revenue-${baselineLabel}`}
+            title="Doanh thu nền tảng"
+            titleHint="Tiền hoa hồng mà nền tảng nhận được từ các booking thành công"
+            subtitle={trendSubtitle}
+            current={data?.revenueTrend}
+            baseline={data?.previousRevenueTrend}
+            baselineLabel={baselineLabel}
+            currentLabel={currentLabel}
+            period={data?.period}
+            periodKey={mode}
+            isLoading={isLoading}
+          />
+        </div>
+        <div className={GRID.col6}>
+          <TrendComparisonChart
+            key={`gmv-${baselineLabel}`}
+            title="Giá trị giao dịch (GMV)"
+            titleHint="Tổng giá trị của tất cả các giao dịch booking (bao gồm cả booking chưa hoàn thành)"
+            subtitle={trendSubtitle}
+            current={data?.gmvTrend}
+            baseline={data?.previousGmvTrend}
+            baselineLabel={baselineLabel}
+            currentLabel={currentLabel}
+            period={data?.period}
+            periodKey={mode}
+            isLoading={isLoading}
+          />
+        </div>
+      </section>
+
+      {/* ══ Tầng 4 — CHẨN ĐOÁN ══ */}
+      <section className={GRID.row}>
         <div className={GRID.col5}>
+          <BookingFunnel funnel={data?.funnel} isLoading={isLoading} />
+        </div>
+        <div className={GRID.col7}>
           <BookingStatusChart
             breakdown={data?.bookingBreakdown}
             trend={data?.bookingTrend}
             isLoading={isLoading}
           />
         </div>
-        <div className={GRID.col7}>
+      </section>
+
+      {/* ══ Tầng 5 — PHÂN RÃ ══ */}
+      <div className="px-1 pt-1">
+        <h2 className="text-[15px] font-bold text-slate-900 tracking-tight">
+          Phân rã trong kỳ
+        </h2>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {period?.label ? `${period.label}` : ""}
+          {regionId
+            ? ` · ${regions.find((r) => r.id === regionId)?.name || "Khu vực đã chọn"}`
+            : " · Toàn sàn"}
+        </p>
+      </div>
+
+      <section className={GRID.row}>
+        <div className={GRID.col6}>
+          <RegionBreakdown regions={data?.regions} isLoading={isLoading} />
+        </div>
+        <div className={GRID.col6}>
           <TopToursCard tours={data?.topTours} isLoading={isLoading} />
         </div>
       </section>
