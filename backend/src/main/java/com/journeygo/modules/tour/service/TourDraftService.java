@@ -321,6 +321,10 @@ public class TourDraftService {
                 tour.getDepartureDates().add(TourDepartureDate.builder().tour(tour).departureDate(date).build());
             }
         }
+        // null = giữ nguyên (import Excel cũ chỉ có ngày); chuỗi rỗng = xoá.
+        if (request.departureTime() != null) tour.setDepartureTime(trimToNull(request.departureTime()));
+        if (request.meetingPoint() != null) tour.setMeetingPoint(trimToNull(request.meetingPoint()));
+        if (request.pickupInfo() != null) tour.setPickupInfo(trimToNull(request.pickupInfo()));
         TourDetailResponse response = save(tour);
         if (isLive(tour)) slotService.syncSlots(tour);
         return response;
@@ -375,6 +379,9 @@ public class TourDraftService {
                 .coverImageUrl(source.getCoverImageUrl())
                 .cancellationPolicy(source.getCancellationPolicy())
                 .maxGuestsPerSlot(source.getMaxGuestsPerSlot())
+                .departureTime(source.getDepartureTime())
+                .meetingPoint(source.getMeetingPoint())
+                .pickupInfo(source.getPickupInfo())
                 .status(TourStatus.DRAFT)
                 .approved(false)
                 .deleted(false)

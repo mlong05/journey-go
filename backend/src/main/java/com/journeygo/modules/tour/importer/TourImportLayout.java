@@ -57,7 +57,10 @@ final class TourImportLayout {
         PRICE_EXCLUDES("Giá tour không bao gồm", ""),
         FORCE_MAJEURE("Trường hợp bất khả kháng", ""),
         REFUND_POLICY("Chính sách hỗ trợ hoàn tiền", ""),
-        CONTACT("Liên hệ", "Số điện thoại / email hỗ trợ khách.");
+        CONTACT("Liên hệ", "Số điện thoại / email hỗ trợ khách."),
+        DEPARTURE_TIME("Giờ khởi hành", "Ghi tự do, ví dụ \"07:00 sáng\". Áp dụng cho mọi ngày khởi hành."),
+        MEETING_POINT("Địa điểm tập trung", "Địa chỉ cụ thể, nên ghi có mặt trước bao nhiêu phút."),
+        PICKUP_INFO("Giờ đón và điểm đón", "Không bắt buộc. Để trống nếu không đón tận nơi.");
 
         final String label;
         final String note;

@@ -58,8 +58,10 @@ class TourExcelParserTest {
             assertEquals(1L, basic.regionId());
             assertEquals(7L, basic.themeId());
             assertEquals(3, basic.highlights().size());
+            // Mẫu có 6 dòng: dòng đánh "Có" là ảnh bìa riêng, 5 dòng còn lại là ảnh tour.
             assertEquals(5, basic.images().size());
-            assertEquals(basic.images().get(0), basic.coverImageUrl());
+            assertNotNull(basic.coverImageUrl());
+            assertFalse(basic.images().contains(basic.coverImageUrl()));
             assertEquals(1, basic.itinerary().size());
 
             assertEquals(4, r.pricing.prices().size());

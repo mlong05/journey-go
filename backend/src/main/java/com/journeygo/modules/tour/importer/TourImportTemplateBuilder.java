@@ -128,7 +128,7 @@ final class TourImportTemplateBuilder {
                 "",
                 "CÁC SHEET",
                 "• " + SHEET_GENERAL + ": tên, hình thức, thời lượng, khu vực, chủ đề, mô tả, điểm nổi bật, số chỗ, các chính sách.",
-                "• " + SHEET_IMAGES + ": mỗi dòng 1 đường dẫn ảnh https. Đánh \"Có\" ở cột Ảnh bìa cho 1 ảnh (bỏ trống = ảnh đầu tiên).",
+                "• " + SHEET_IMAGES + ": mỗi dòng 1 đường dẫn ảnh https: 1 ảnh bìa (đánh \"Có\" ở cột Ảnh bìa; bỏ trống = dòng đầu tiên) + đúng 5 ảnh tour.",
                 "• " + SHEET_PRICES + ": giá cho từng loại khách. Em bé luôn miễn phí.",
                 "• " + SHEET_ITINERARY + ": mỗi dòng 1 ngày, theo thứ tự 1, 2, 3… Tour trong ngày chỉ cần 1 dòng.",
                 "• " + SHEET_STOPS + ": mỗi dòng 1 điểm đến, thứ tự dòng = thứ tự tham quan. Tự đặt Mã điểm đến (D1, D2…).",
@@ -143,7 +143,7 @@ final class TourImportTemplateBuilder {
                         + "Nên kiểm tra lại vị trí trên bản đồ trong màn hình tạo tour.",
                 "",
                 "ĐIỀU KIỆN ĐỂ GỬI DUYỆT (thiếu vẫn nhập được, hệ thống sẽ liệt kê mục cần bổ sung)",
-                "• Ít nhất 5 ảnh https, 3–5 điểm nổi bật, đã chọn khu vực và chủ đề, có mô tả.",
+                "• 1 ảnh bìa + đúng 5 ảnh tour (https), 3–5 điểm nổi bật, đã chọn khu vực và chủ đề, có mô tả.",
                 "• Có giá cho cả 4 loại khách, ít nhất 1 loại khách tính vào số chỗ, có số chỗ tối đa và chính sách hủy.",
                 "• Ít nhất 1 điểm đến; mỗi điểm đến có mô tả ngắn, nội dung văn hóa, 1–4 câu quiz (đủ 4 đáp án, 1 đáp án đúng) "
                         + "và 1–5 trải nghiệm (có tọa độ, thời gian, câu hỏi và đáp án).",
@@ -193,7 +193,7 @@ final class TourImportTemplateBuilder {
         header(sheet, IMAGE_COLUMNS, new int[]{80, 24});
         explicitDropdown(sheet, 1, DROPDOWN_LAST_ROW, 1, YES);
         if (!sample) return;
-        for (int i = 1; i <= 5; i++) {
+        for (int i = 1; i <= 6; i++) { // dòng 1 = ảnh bìa, 5 dòng sau = ảnh tour
             rowOf(sheet, i, "https://picsum.photos/seed/journeygo-hoian-" + i + "/1200/800", i == 1 ? YES : null);
         }
     }
@@ -362,6 +362,9 @@ final class TourImportTemplateBuilder {
             case FORCE_MAJEURE -> "Tour có thể đổi lịch khi thời tiết xấu.";
             case REFUND_POLICY -> "Hoàn tiền trong 7 ngày làm việc.";
             case CONTACT -> "0900 000 000 — hotro@example.com";
+            case DEPARTURE_TIME -> "08:00 sáng";
+            case MEETING_POINT -> "Hội quán Phúc Kiến, 46 Trần Phú, Hội An. Có mặt trước 15 phút.";
+            case PICKUP_INFO -> "07:15 – 07:40: đón tại khách sạn trong bán kính 3 km quanh phố cổ.";
             default -> null;
         };
     }

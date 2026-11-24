@@ -47,6 +47,10 @@ public class User {
     @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl;
 
+    @Column(name = "preferred_language", nullable = false, length = 5)
+    @Builder.Default
+    private String preferredLanguage = "vi";
+
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;

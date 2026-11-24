@@ -63,6 +63,9 @@ public record TourDetailResponse(
         // Bước 4
         List<LocalDate> departureDates,
         @Schema(description = "Slot đã sinh (sau khi duyệt)") List<Slot> slots,
+        @Schema(description = "Giờ khởi hành (chữ tự do)") String departureTime,
+        @Schema(description = "Địa điểm tập trung") String meetingPoint,
+        @Schema(description = "Giờ đón và điểm đón") String pickupInfo,
 
         // Bước 5
         boolean contentRightsConfirmed,

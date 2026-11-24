@@ -122,6 +122,25 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin thành công", UserResponse.fromEntity(user)));
     }
 
+    @PatchMapping("/me/language")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Cập nhật ngôn ngữ ưa thích", description = "Lưu ngôn ngữ hiển thị (vi, en, ja) gắn với tài khoản đang đăng nhập để đồng bộ giữa Web và App")
+    public ResponseEntity<ApiResponse<UserResponse>> updatePreferredLanguage(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestBody UpdateLanguageRequest request) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error(401, "Người dùng chưa đăng nhập"));
+        }
+
+        User user = userRepository.findById(userPrincipal.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        user.setPreferredLanguage(request.preferredLanguage().trim().toLowerCase());
+        user = userRepository.save(user);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật ngôn ngữ thành công", UserResponse.fromEntity(user)));
+    }
+
     @PostMapping(value = "/profile/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(summary = "Tải ảnh đại diện lên Cloudinary cho tài khoản hiện tại")

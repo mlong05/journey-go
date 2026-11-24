@@ -49,6 +49,9 @@ public record TourPublicDetailResponse(
         @Schema(description = "Bảng giá theo loại khách — chỉ để hiển thị") List<Price> prices,
         Integer maxGuestsPerSlot,
         @Schema(description = "Ngày khởi hành từ hôm nay trở đi") List<LocalDate> upcomingDepartureDates,
+        @Schema(description = "Giờ khởi hành (chữ tự do) — dùng chung cho mọi ngày") String departureTime,
+        @Schema(description = "Địa điểm tập trung") String meetingPoint,
+        @Schema(description = "Giờ đón và điểm đón") String pickupInfo,
         List<Stop> stops,
         @Schema(description = "Tổng số nhiệm vụ (câu quiz + hoạt động thực địa)") int taskCount,
         @Schema(description = "Tổng điểm thưởng tối đa") int totalPoints
@@ -116,6 +119,9 @@ public record TourPublicDetailResponse(
                         .toList())
                 .maxGuestsPerSlot(d.maxGuestsPerSlot())
                 .upcomingDepartureDates(d.departureDates().stream().filter(day -> !day.isBefore(today)).toList())
+                .departureTime(d.departureTime())
+                .meetingPoint(d.meetingPoint())
+                .pickupInfo(d.pickupInfo())
                 .stops(stops)
                 .taskCount(taskCount)
                 .totalPoints(stops.stream().mapToInt(Stop::maxPoints).sum())
