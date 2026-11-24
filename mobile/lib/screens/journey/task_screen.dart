@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_compass/flutter_compass.dart';
@@ -13,9 +12,11 @@ import '../../core/services/journey_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/notification_alerts.dart';
 import '../../core/services/route_service.dart';
+import 'activity_timer_bubble.dart';
 import 'activity_timer_store.dart';
 import '../chat/ai_guide_chat_screen.dart';
 import 'journey_widgets.dart';
+import '../common/photo.dart';
 import 'qr_scan_screen.dart';
 import 'map_kit.dart' show MapRoundButton, MapAttributionText, formatDistance;
 import 'navigation.dart' show formatDuration;
@@ -102,6 +103,31 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
   final Map<int, int> _choices = {};
   final Map<int, TextEditingController> _texts = {};
 
+  /// Câu xếp thứ tự: id các mục theo thứ tự du khách đang xếp.
+  final Map<int, List<int>> _orders = {};
+
+  /// Câu đoán số: giá trị đã chọn (chưa chạm thanh trượt thì chưa có).
+  final Map<int, int> _numbers = {};
+
+  /// Câu nối cột: questionId → { leftId (cột A): rightKey (cột B) }.
+  final Map<int, Map<int, int>> _matches = {};
+
+  /// Mục cột A đang chọn để nối sang cột B (null = chưa chọn).
+  int? _selectedMatchLeft;
+
+  /// Câu đố trả lời từng câu: kết quả câu vừa trả lời (đang hiện đáp án + giải thích), null = chưa trả lời.
+  TaskSubmitResult? _reveal;
+
+  /// Câu đố trả lời từng câu: các câu đã trả lời trong lần mở này (cho màn tổng kết "Xem lại đáp án").
+  final List<QuestionReview> _answeredReviews = [];
+
+  /// Câu đố trả lời từng câu: làm tiếp từ câu nào (0 = làm từ đầu) ⇒ màn tổng kết ghi chú các câu trước.
+  int _resumedFrom = 0;
+
+  /// Câu đố chấm theo từng câu (tour 5 bước): trả lời xong câu nào thấy ngay đáp án + giải thích câu đó.
+  bool get _perQuestionMode =>
+      _content != null && _task.perQuestionPoints && !_task.sequential && !_task.requiresLocation;
+
   // Hoạt động thực địa: đếm ngược trước khi được quét QR.
   // Tính theo mốc kết thúc (không trừ dần từng giây) để ẩn app / thoát ra vào lại vẫn đúng giờ.
   Timer? _activityTimer;
@@ -125,6 +151,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Đang ở màn nhiệm vụ này ⇒ ẩn bong bóng đồng hồ nổi của chính nó
+    ActiveActivityTimer.instance.openTaskId.value = widget.taskId;
     _load();
   }
 
@@ -139,6 +167,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    final open = ActiveActivityTimer.instance.openTaskId;
+    if (open.value == widget.taskId) open.value = null;
     _activityTimer?.cancel();
     _positionSub?.cancel();
     _compassSub?.cancel();
@@ -322,6 +352,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
         }
       });
       if (resumeAt != null) {
+        _publishActivity(resumeAt);
         _runActivityTimer();
       } else {
         _refreshIntroDistance();
@@ -470,12 +501,30 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
       questionIndex: _task.questionIndex,
       endsAt: endsAt,
     );
+    _publishActivity(endsAt);
     _scheduleTimeUpReminder(endsAt);
     _runActivityTimer();
+    // Lần đầu: xin quyền hiện ô đồng hồ nổi trên màn hình chính khi rời app
+    ActiveActivityTimer.instance.askOverlayPermissionOnce(context);
   }
 
-  /// Id thông báo hẹn giờ của hoạt động này (cố định theo hành trình + nhiệm vụ để hẹn lại / huỷ đúng cái).
-  int get _reminderId => Object.hash('activity-timer', widget.journeyId, widget.taskId) & 0x7fffffff;
+  /// Báo cho bong bóng đồng hồ nổi: rời màn này vẫn thấy thời gian còn lại, chạm để quay lại.
+  void _publishActivity(DateTime endsAt) {
+    final task = _content;
+    ActiveActivityTimer.instance.start(ActiveActivity(
+      journeyId: widget.journeyId,
+      taskId: widget.taskId,
+      destinationId: widget.destinationId,
+      taskName: task?.name ?? widget.fallbackName,
+      destinationName: task?.station?.name ?? widget.destinationName,
+      endsAt: endsAt,
+      totalSeconds: task?.durationSeconds ?? 0,
+    ));
+  }
+
+  /// Id thông báo hẹn giờ của hoạt động này (cố định theo hành trình + nhiệm vụ, ổn định giữa các lần mở
+  /// app ⇒ hẹn lại / huỷ đúng cái; `Object.hash` đổi theo từng lần chạy nên không dùng).
+  int get _reminderId => NotificationAlerts.activityReminderId(widget.journeyId, widget.taskId);
 
   /// Hẹn thông báo hệ thống lúc hết giờ: du khách cất điện thoại đi tham quan vẫn được nhắc quay lại quét QR.
   void _scheduleTimeUpReminder(DateTime endsAt) {
@@ -485,6 +534,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
       at: endsAt,
       title: appL10n.tkTimeUpTitle(task?.name ?? widget.fallbackName),
       body: appL10n.tkTimeUpBody(task?.station?.name ?? widget.destinationName),
+      // Chạm vào thông báo ⇒ mở thẳng màn nhiệm vụ này để quét QR
+      payload: NotificationAlerts.activityPayload(widget.journeyId, widget.taskId),
     );
   }
 
@@ -509,10 +560,8 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
     if (finished) {
       _activityTimer?.cancel();
       _activityTimer = null;
-      // Đang mở app lúc hết giờ ⇒ hiệu ứng trên màn là đủ, bỏ thông báo hệ thống đã hẹn.
-      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        NotificationAlerts.instance.cancelReminder(_reminderId);
-      }
+      // Âm thanh + rung lúc hết giờ do ActiveActivityTimer phát (thông báo "Hết giờ" có chuông) — KHÔNG huỷ
+      // thông báo ở đây, nếu không thì đang mở màn này sẽ chỉ rung mà không có tiếng.
       HapticFeedback.heavyImpact();
       showPointsBurst(context, text: appL10n.tkTimeUp, icon: Icons.alarm_on_rounded);
     }
@@ -525,11 +574,24 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
       return null;
     }
     if (!content.qrRequired || content.unlocked || (content.durationSeconds ?? 0) <= 0) return null;
-    return ActivityTimerStore.load(
+    final saved = await ActivityTimerStore.load(
       journeyId: widget.journeyId,
       taskId: widget.taskId,
       questionIndex: content.questionIndex,
     );
+    if (saved == null) return null;
+    // Đối tác rút ngắn thời lượng (vd. 30 phút → 1 phút) khi du khách đang đếm dở:
+    // không bắt chờ hết mốc cũ, cắt theo thời lượng mới tính từ bây giờ.
+    final latest = DateTime.now().add(Duration(seconds: content.durationSeconds!));
+    if (!saved.isAfter(latest)) return saved;
+    // ⚠️ Phải LƯU mốc đã cắt: không lưu thì lần mở sau lại cắt từ mốc cũ ⇒ đồng hồ luôn đếm lại từ đầu.
+    await ActivityTimerStore.save(
+      journeyId: widget.journeyId,
+      taskId: widget.taskId,
+      questionIndex: content.questionIndex,
+      endsAt: latest,
+    );
+    return latest;
   }
 
   /// Bỏ trạng thái hoạt động (xong trạm / xong nhiệm vụ / sang trạm mới).
@@ -540,40 +602,118 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
     _activityEndsAt = null;
     _activityDone = false;
     ActivityTimerStore.clear(journeyId: widget.journeyId, taskId: widget.taskId);
-  }
-
-  /// CHỈ BẢN DEBUG: bỏ qua đếm ngược để thử nhanh.
-  void _skipCountdown() {
-    _activityTimer?.cancel();
-    _activityTimer = null;
-    NotificationAlerts.instance.cancelReminder(_reminderId);
-    final now = DateTime.now();
-    setState(() {
-      _activityEndsAt = now;
-      _activityDone = true;
-    });
-    ActivityTimerStore.save(
-      journeyId: widget.journeyId,
-      taskId: widget.taskId,
-      questionIndex: _task.questionIndex,
-      endsAt: now,
-    );
+    ActiveActivityTimer.instance.clear(journeyId: widget.journeyId, taskId: widget.taskId);
   }
 
   void _start() {
     if (_task.requiresLocation) {
       _locateAndOpen();
     } else {
+      final count = _task.questions.length;
       setState(() {
         _phase = _Phase.quiz;
-        _index = 0;
+        _reveal = null;
+        _answeredReviews.clear();
+        // Câu đố trả lời từng câu: mở lại thì làm tiếp từ câu đang dở.
+        _index = _perQuestionMode && count > 0 ? _task.questionIndex.clamp(0, count - 1) : 0;
+        _resumedFrom = _index;
       });
     }
   }
 
-  bool _isAnswered(TaskQuestion q) => q.isText
-      ? (_texts[q.id]?.text.trim().isNotEmpty ?? false)
-      : _choices.containsKey(q.id);
+  bool _isAnswered(TaskQuestion q) {
+    if (q.isUnsupported) return false;
+    if (q.isText) return _texts[q.id]?.text.trim().isNotEmpty ?? false;
+    if (q.isOrdering) return q.options.length > 1; // thứ tự hiện tại cũng là một câu trả lời
+    if (q.isNumber) return _numbers.containsKey(q.id);
+    if (q.isMatching) return (_matches[q.id]?.length ?? 0) == q.options.length;
+    return _choices.containsKey(q.id);
+  }
+
+  List<int> _orderOf(TaskQuestion q) => _orders[q.id] ?? [for (final o in q.options) o.id];
+
+  AnswerDraft _draftFor(TaskQuestion q) {
+    if (q.isText) return AnswerDraft(questionId: q.id, text: _texts[q.id]?.text.trim());
+    if (q.isOrdering) return AnswerDraft(questionId: q.id, answerIds: _orderOf(q));
+    if (q.isNumber) return AnswerDraft(questionId: q.id, numberValue: _numbers[q.id]);
+    if (q.isMatching) {
+      final map = _matches[q.id] ?? const {};
+      return AnswerDraft(
+        questionId: q.id,
+        matches: [for (final e in map.entries) MatchPair(leftId: e.key, rightKey: e.value)],
+      );
+    }
+    return AnswerDraft(questionId: q.id, answerId: _choices[q.id]);
+  }
+
+  void _clearAnswers() {
+    _choices.clear();
+    _orders.clear();
+    _numbers.clear();
+    _matches.clear();
+    _selectedMatchLeft = null;
+    for (final c in _texts.values) {
+      c.clear();
+    }
+    _reveal = null;
+  }
+
+  /// Trả lời câu hiện tại (chế độ từng câu): hiện ngay đúng/sai + đáp án + giải thích.
+  Future<void> _answerCurrent(TaskQuestion q) async {
+    setState(() => _busy = true);
+    try {
+      final result = await _service.answerQuestion(
+        journeyId: widget.journeyId,
+        taskId: widget.taskId,
+        answer: _draftFor(q),
+      );
+      if (!mounted) return;
+      _changed = true;
+      if (result.lastAnswerCorrect == true) {
+        HapticFeedback.lightImpact();
+      } else {
+        HapticFeedback.heavyImpact();
+      }
+      setState(() {
+        _reveal = result;
+        _answeredReviews.addAll(result.review);
+      });
+    } on ApiException catch (e) {
+      if (mounted) _snack(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Sau khi xem đáp án: sang câu tiếp, hoặc màn tổng kết khi đã trả lời câu cuối.
+  void _afterReveal() {
+    final r = _reveal;
+    if (r == null) return;
+    if (!r.completed) {
+      setState(() {
+        _reveal = null;
+        _index += 1;
+      });
+      return;
+    }
+    setState(() {
+      _result = TaskSubmitResult(
+        status: r.status,
+        pointsEarned: r.pointsEarned,
+        attempts: r.attempts,
+        maxAttempts: r.maxAttempts,
+        attemptsRemaining: r.attemptsRemaining,
+        totalQuestions: r.totalQuestions,
+        correctCount: r.correctCount,
+        questionIndex: r.questionIndex,
+        lastAnswerCorrect: r.lastAnswerCorrect,
+        review: List.of(_answeredReviews),
+      );
+      _reveal = null;
+      _phase = _Phase.result;
+    });
+    if (r.pointsEarned > 0) showPointsBurst(context, text: appL10n.tkPlusPoints(r.pointsEarned));
+  }
 
   TextEditingController _controllerFor(int questionId) =>
       _texts.putIfAbsent(questionId, () => TextEditingController());
@@ -594,12 +734,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
           // dùng tọa độ cũ
         }
       }
-      final answers = [
-        for (final q in task.questions)
-          q.isText
-              ? AnswerDraft(questionId: q.id, text: _texts[q.id]?.text.trim())
-              : AnswerDraft(questionId: q.id, answerId: _choices[q.id]),
-      ];
+      final answers = [for (final q in task.questions) _draftFor(q)];
       final result = await _service.submitTask(
         journeyId: widget.journeyId,
         taskId: widget.taskId,
@@ -639,10 +774,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
   }
 
   void _retry() {
-    _choices.clear();
-    for (final c in _texts.values) {
-      c.clear();
-    }
+    _clearAnswers();
     _result = null;
     _qr = null;
     _index = 0;
@@ -655,10 +787,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _continueNextStation() async {
-    _choices.clear();
-    for (final c in _texts.values) {
-      c.clear();
-    }
+    _clearAnswers();
     _result = null;
     _qr = null;
     _checkedIn = false; // trạm mới: phải tới nơi và check-in lại
@@ -731,12 +860,37 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Thoát giữa chừng thì hỏi lại (tránh vuốt / bấm quay lại nhầm):
+  /// - đang trả lời câu đố từng câu (tiến độ lưu theo từng câu trên máy chủ);
+  /// - đang ở bước hoạt động thực địa (đang đếm ngược, hoặc hết giờ mà chưa quét QR).
+  bool get _confirmBeforeExit => (_phase == _Phase.quiz && _perQuestionMode) || _phase == _Phase.activity;
+
+  /// Rời màn nhiệm vụ; đang làm dở thì hỏi "Thoát nhiệm vụ?" trước.
+  Future<void> _leave() async {
+    if (_confirmBeforeExit) {
+      final leave = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(appL10n.tkExitConfirmTitle),
+          // Hoạt động thực địa: thời gian vẫn đếm (bong bóng / ô nổi / thông báo); câu đố: tiến độ đã lưu
+          content: Text(_phase == _Phase.activity ? appL10n.tkExitActivityBody : appL10n.tkExitConfirmBody),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(appL10n.tkStay)),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(appL10n.tkExit)),
+          ],
+        ),
+      );
+      if (leave != true || !mounted) return;
+    }
+    Navigator.of(context).pop(_changed);
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) Navigator.of(context).pop(_changed);
+        if (!didPop) _leave();
       },
       child: Scaffold(
         backgroundColor: AppCultureColors.background,
@@ -752,7 +906,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                 ),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                  onPressed: () => Navigator.of(context).pop(_changed),
+                  onPressed: _leave,
                 ),
                 title: Column(
                   children: [
@@ -880,6 +1034,57 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Ô "Đang làm dở": thanh tiến độ + "Đã trả lời 2/3 câu · đúng 2 · +20 điểm".
+  Widget _buildInProgress(TaskContent task) {
+    final answered = task.questionIndex;
+    final total = task.totalQuestions;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppCultureColors.jadeTint,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTone.jade.soft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.history_rounded, size: 18, color: AppCultureColors.heritageJade),
+              const SizedBox(width: 6),
+              Text(
+                appL10n.tkInProgressTitle,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppCultureColors.heritageJade),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (var i = 0; i < total; i++) ...[
+                if (i > 0) const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: i < answered ? AppCultureColors.heritageJade : Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            appL10n.tkInProgressSummary(answered, total, task.correctCount ?? 0, task.pointsSoFar ?? 0),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildIntro() {
     final task = _task;
     final stations = task.requiresLocation ? _stations : const <TaskStation>[];
@@ -959,6 +1164,11 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 14),
+        // Câu đố đang làm dở (đã trả lời ≥ 1 câu): hiện tiến độ đã lưu để du khách biết sẽ làm tiếp
+        if (task.isInProgressQuiz) ...[
+          _buildInProgress(task),
+          const SizedBox(height: 14),
+        ],
         if (stations.isNotEmpty) ...[
           _buildStationList(task, stations, distance: distance, radius: radius),
           const SizedBox(height: 14),
@@ -1043,9 +1253,11 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                 child: PrimaryButton(
                   label: needsTravel
                       ? appL10n.tkDirectionsToStop
-                      : (task.attempts > 0
-                            ? appL10n.tkRetryMission
-                            : appL10n.tkStartMission),
+                      : task.isInProgressQuiz
+                          ? appL10n.tkContinueFromQuestion(task.questionIndex + 1)
+                          : (task.attempts > 0
+                                ? appL10n.tkRetryMission
+                                : appL10n.tkStartMission),
                   icon: needsTravel
                       ? Icons.near_me_rounded
                       : Icons.play_arrow_rounded,
@@ -2044,14 +2256,6 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
           loading: _busy,
           onPressed: _activityDone ? _scanQr : null,
         ),
-        if (kDebugMode && !_activityDone)
-          Center(
-            child: TextButton.icon(
-              onPressed: _skipCountdown,
-              icon: const Icon(Icons.fast_forward_rounded, size: 18),
-              label: Text(appL10n.tkSkipCountdownDev),
-            ),
-          ),
       ],
     );
   }
@@ -2181,10 +2385,11 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                   ),
                 ),
                 const SizedBox(height: 14),
-                if (question.isText)
-                  _buildTextAnswer(question)
-                else
-                  ..._buildOptions(question),
+                ..._buildAnswerInput(question),
+                if (_reveal != null) ...[
+                  const SizedBox(height: 6),
+                  _revealPanel(question, _reveal!),
+                ],
               ],
             ),
           ),
@@ -2199,7 +2404,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
             top: false,
             child: Row(
               children: [
-                if (!task.sequential && index > 0) ...[
+                if (!task.sequential && !_perQuestionMode && index > 0) ...[
                   OutlinedButton(
                     onPressed: _busy
                         ? null
@@ -2214,6 +2419,20 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                   ),
                   const SizedBox(width: 10),
                 ],
+                if (_perQuestionMode)
+                  Expanded(
+                    child: PrimaryButton(
+                      label: _reveal == null
+                          ? appL10n.tkAnswer
+                          : (_reveal!.completed ? appL10n.tkSeeResult : appL10n.tkNextQuestion),
+                      icon: _reveal == null ? Icons.check_rounded : Icons.arrow_forward_rounded,
+                      loading: _busy,
+                      onPressed: _reveal == null
+                          ? (_isAnswered(question) ? () => _answerCurrent(question) : null)
+                          : _afterReveal,
+                    ),
+                  )
+                else
                 Expanded(
                   child: PrimaryButton(
                     label: task.sequential
@@ -2240,33 +2459,416 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
     );
   }
 
-  List<Widget> _buildOptions(TaskQuestion question) {
+  /// Đang hiện đáp án (chế độ từng câu) hoặc đang gửi: không cho đổi câu trả lời.
+  bool get _answerLocked => _busy || _reveal != null;
+
+  List<Widget> _buildAnswerInput(TaskQuestion q) {
+    final review = _reveal?.review.where((r) => r.questionId == q.id).firstOrNull;
+    if (q.isUnsupported) return [_unsupportedBox()];
+    if (q.isText) return [_buildTextAnswer(q)];
+    if (q.isImageChoice) return [_buildImageOptions(q, review)];
+    if (q.isOrdering) return [_buildOrdering(q, review)];
+    if (q.isNumber) return [_buildNumber(q, review)];
+    if (q.isMatching) return [_buildMatching(q, review)];
+    return _buildOptions(q, review: review);
+  }
+
+  static const _matchColors = [
+    Color(0xFF0F766E), // teal
+    Color(0xFF2563EB), // blue
+    Color(0xFFD97706), // amber
+    Color(0xFF9333EA), // purple
+    Color(0xFFE11D48), // rose
+  ];
+
+  void _showZoomImage(String url, String caption) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 4,
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => const SizedBox(
+                          width: 240,
+                          height: 180,
+                          child: Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (caption.trim().isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                    child: Text(
+                      caption,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: IconButton.styleFrom(backgroundColor: Colors.black54, foregroundColor: Colors.white),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMatching(TaskQuestion q, QuestionReview? review) {
+    final current = _matches[q.id] ?? const <int, int>{};
+    final expectedByLeft = review == null
+        ? const <int, int>{}
+        : {for (final p in review.correctMatches) p.leftId: p.rightKey};
+    final hasAnyImage = q.options.any((o) => o.imageUrl != null);
+
+    // Map rightKey → index (0..N-1) của mục cột A đang nối với nó để tô cùng màu & số thứ tự.
+    final rightToLeftIdx = <int, int>{};
+    for (var i = 0; i < q.options.length; i++) {
+      final rk = current[q.options[i].id];
+      if (rk != null) rightToLeftIdx[rk] = i;
+    }
+
+    void tapLeft(int leftId) {
+      if (_answerLocked) return;
+      setState(() {
+        if (_selectedMatchLeft == leftId) {
+          _selectedMatchLeft = null;
+        } else {
+          _selectedMatchLeft = leftId;
+        }
+      });
+    }
+
+    void tapRight(int rightKey) {
+      if (_answerLocked) return;
+      setState(() {
+        final next = Map<int, int>.from(_matches[q.id] ?? const {});
+        final leftId = _selectedMatchLeft;
+        if (leftId != null) {
+          // Bỏ liên kết cũ nếu rightKey đã gắn cho mục A khác
+          next.removeWhere((_, v) => v == rightKey);
+          next[leftId] = rightKey;
+          _matches[q.id] = next;
+          // Tự chuyển sang mục cột A chưa nối tiếp theo cho tiện thao tác
+          final nextUnpaired = q.options.where((o) => !next.containsKey(o.id)).firstOrNull;
+          _selectedMatchLeft = nextUnpaired?.id;
+        } else {
+          // Chưa chọn cột A mà chạm mục cột B đang nối ⇒ bỏ nối cặp đó
+          final existingLeft = next.entries.where((e) => e.value == rightKey).firstOrNull?.key;
+          if (existingLeft != null) {
+            next.remove(existingLeft);
+            _matches[q.id] = next;
+          }
+        }
+      });
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          appL10n.tkMatchingHint,
+          style: const TextStyle(fontSize: 13, height: 1.4, color: AppCultureColors.textMuted),
+        ),
+        if (hasAnyImage) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.zoom_in_rounded, size: 14, color: AppCultureColors.textMuted),
+              const SizedBox(width: 4),
+              Text(
+                appL10n.tkMatchingTapZoom,
+                style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                appL10n.tkMatchingColA,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppCultureColors.textMuted),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                appL10n.tkMatchingColB,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppCultureColors.textMuted),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Cột A (có thể kèm ảnh nhỏ, chạm ảnh để phóng to) ──
+            Expanded(
+              child: Column(
+                children: [
+                  for (var i = 0; i < q.options.length; i++)
+                    Builder(builder: (_) {
+                      final opt = q.options[i];
+                      final isSelected = _selectedMatchLeft == opt.id && !_answerLocked;
+                      final linkedRight = current[opt.id];
+                      final pairColor = _matchColors[i % _matchColors.length];
+                      final bool? pairOk = review == null || expectedByLeft.isEmpty
+                          ? null
+                          : linkedRight != null && expectedByLeft[opt.id] == linkedRight;
+                      final Color borderColor = pairOk != null
+                          ? (pairOk ? AppCultureColors.heritageJade : AppCultureColors.error)
+                          : isSelected
+                              ? AppCultureColors.heritageJade
+                              : linkedRight != null
+                                  ? pairColor
+                                  : AppCultureColors.border;
+                      final Color bgColor = pairOk != null
+                          ? borderColor.withValues(alpha: 0.08)
+                          : isSelected
+                              ? AppCultureColors.heritageJade.withValues(alpha: 0.12)
+                              : linkedRight != null
+                                  ? pairColor.withValues(alpha: 0.08)
+                                  : Colors.white;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: _answerLocked ? null : () => tapLeft(opt.id),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: borderColor,
+                                width: isSelected || linkedRight != null || pairOk != null ? 2 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: pairOk != null
+                                        ? borderColor
+                                        : (linkedRight != null || isSelected ? pairColor : AppCultureColors.surfaceSubtle),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    '${i + 1}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: (linkedRight != null || isSelected || pairOk != null)
+                                          ? Colors.white
+                                          : AppCultureColors.textMuted,
+                                    ),
+                                  ),
+                                ),
+                                if (opt.imageUrl != null) ...[
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () => _showZoomImage(opt.imageUrl!, opt.content),
+                                    child: Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(
+                                            opt.imageUrl!,
+                                            width: 44,
+                                            height: 44,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, _, _) => Container(
+                                              width: 44,
+                                              height: 44,
+                                              color: AppCultureColors.surfaceSubtle,
+                                              child: const Icon(Icons.image_not_supported_outlined, size: 18),
+                                            ),
+                                          ),
+                                        ),
+                                        Positioned(
+                                          right: 2,
+                                          bottom: 2,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black54,
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: const Icon(Icons.zoom_in_rounded, size: 11, color: Colors.white),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                if (opt.content.isNotEmpty) ...[
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      opt.content,
+                                      style: const TextStyle(fontSize: 13, height: 1.35, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            // ── Cột B (đã xáo trộn từ backend) ──
+            Expanded(
+              child: Column(
+                children: [
+                  for (final mo in q.matchOptions)
+                    Builder(builder: (_) {
+                      final leftIdx = rightToLeftIdx[mo.key];
+                      final pairColor = leftIdx != null ? _matchColors[leftIdx % _matchColors.length] : null;
+                      final bool? pairOk = review == null || expectedByLeft.isEmpty || leftIdx == null
+                          ? null
+                          : expectedByLeft[q.options[leftIdx].id] == mo.key;
+                      final Color borderColor = pairOk != null
+                          ? (pairOk ? AppCultureColors.heritageJade : AppCultureColors.error)
+                          : pairColor ?? (_selectedMatchLeft != null ? AppCultureColors.heritageJade.withValues(alpha: 0.4) : AppCultureColors.border);
+                      final Color bgColor = pairOk != null
+                          ? borderColor.withValues(alpha: 0.08)
+                          : pairColor != null
+                              ? pairColor.withValues(alpha: 0.08)
+                              : Colors.white;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: _answerLocked ? null : () => tapRight(mo.key),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: borderColor,
+                                width: pairColor != null || pairOk != null ? 2 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                if (leftIdx != null) ...[
+                                  Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: pairOk != null ? borderColor : pairColor,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      '${leftIdx + 1}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    mo.content,
+                                    style: const TextStyle(fontSize: 13, height: 1.35, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Màu viền một lựa chọn: khi hiện đáp án, đáp án đúng xanh, lựa chọn sai đỏ.
+  Color? _optionTone(int optionId, bool selected, QuestionReview? review) {
+    if (review == null) return selected ? AppCultureColors.heritageJade : null;
+    if (optionId == review.correctAnswerId) return AppCultureColors.heritageJade;
+    return selected ? AppCultureColors.error : null;
+  }
+
+  List<Widget> _buildOptions(TaskQuestion question, {QuestionReview? review}) {
     const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
     final selected = _choices[question.id];
     return [
       for (var i = 0; i < question.options.length; i++)
-        Padding(
+        Builder(builder: (_) {
+          final option = question.options[i];
+          final isSel = selected == option.id;
+          final tone = _optionTone(option.id, isSel, review);
+          final showCheck = review != null ? option.id == review.correctAnswerId : isSel;
+          final showCross = review != null && isSel && option.id != review.correctAnswerId;
+          return Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: InkWell(
             borderRadius: BorderRadius.circular(18),
-            onTap: _busy
+            onTap: _answerLocked
                 ? null
                 : () => setState(
-                    () => _choices[question.id] = question.options[i].id,
+                    () => _choices[question.id] = option.id,
                   ),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: selected == question.options[i].id
-                    ? AppCultureColors.jadeLight
-                    : Colors.white,
+                color: tone == null ? Colors.white : tone.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: selected == question.options[i].id
-                      ? AppCultureColors.heritageJade
-                      : AppCultureColors.border,
-                  width: selected == question.options[i].id ? 2 : 1,
+                  color: tone ?? AppCultureColors.border,
+                  width: tone != null ? 2 : 1,
                 ),
               ),
               child: Row(
@@ -2276,14 +2878,12 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                     height: 34,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: selected == question.options[i].id
-                          ? AppCultureColors.heritageJade
-                          : AppCultureColors.surfaceSubtle,
+                      color: tone ?? AppCultureColors.surfaceSubtle,
                     ),
                     child: Center(
-                      child: selected == question.options[i].id
-                          ? const Icon(
-                              Icons.check_rounded,
+                      child: showCheck || showCross
+                          ? Icon(
+                              showCross ? Icons.close_rounded : Icons.check_rounded,
                               color: Colors.white,
                               size: 19,
                             )
@@ -2299,7 +2899,7 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      question.options[i].content,
+                      option.content,
                       style: const TextStyle(
                         fontSize: 15,
                         height: 1.35,
@@ -2311,15 +2911,385 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
-        ),
+        );
+        }),
     ];
+  }
+
+  Widget _unsupportedBox() {
+    return SoftCard(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: [
+          const Icon(Icons.system_update_rounded, color: AppCultureColors.amberDark),
+          const SizedBox(width: 10),
+          Expanded(child: Text(appL10n.tkUnsupportedQuestion, style: const TextStyle(height: 1.4))),
+        ],
+      ),
+    );
+  }
+
+  /// Câu chọn ảnh: lưới 2×2, chạm để chọn.
+  Widget _buildImageOptions(TaskQuestion q, QuestionReview? review) {
+    final selected = _choices[q.id];
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 0.9,
+      children: [
+        for (var i = 0; i < q.options.length; i++)
+          Builder(builder: (_) {
+            final o = q.options[i];
+            final isSel = selected == o.id;
+            final tone = _optionTone(o.id, isSel, review);
+            final letter = String.fromCharCode(65 + i);
+            final showCross = review != null && isSel && o.id != review.correctAnswerId;
+            final showCheck = review != null ? o.id == review.correctAnswerId : isSel;
+            return Semantics(
+              button: true,
+              selected: isSel,
+              label: o.content.isNotEmpty ? o.content : appL10n.tkImageOption(letter),
+              child: GestureDetector(
+                onTap: _answerLocked ? null : () => setState(() => _choices[q.id] = o.id),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: tone ?? AppCultureColors.border, width: tone != null ? 3 : 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Photo(url: o.imageUrl, width: 240),
+                            Positioned(
+                              top: 6,
+                              left: 6,
+                              child: Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: tone ?? Colors.white.withValues(alpha: 0.92),
+                                ),
+                                alignment: Alignment.center,
+                                child: showCheck || showCross
+                                    ? Icon(showCross ? Icons.close_rounded : Icons.check_rounded, size: 17, color: Colors.white)
+                                    : Text(letter, style: const TextStyle(fontWeight: FontWeight.w800, color: AppCultureColors.textDark)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (o.content.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                          child: Text(o.content, maxLines: 2, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12.5, height: 1.3)),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  /// Câu xếp thứ tự: kéo thả (giữ cả thẻ hoặc kéo tay nắm) để sắp xếp từ trên xuống.
+  Widget _buildOrdering(TaskQuestion q, QuestionReview? review) {
+    final order = _orderOf(q);
+    final byId = {for (final o in q.options) o.id: o};
+    final locked = _answerLocked;
+
+    Widget tile(int i, int id) {
+      final bool? ok = review == null || review.correctOrder.isEmpty
+          ? null
+          : i < review.correctOrder.length && review.correctOrder[i] == id;
+      final color = ok == null ? AppCultureColors.border : (ok ? AppCultureColors.heritageJade : AppCultureColors.error);
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
+        decoration: BoxDecoration(
+          color: ok == null ? Colors.white : color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color, width: ok == null ? 1 : 2),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppCultureColors.surfaceSubtle),
+              child: Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.w800)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(byId[id]?.content ?? '', style: const TextStyle(fontSize: 15, height: 1.35)),
+            ),
+            if (ok != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(ok ? Icons.check_rounded : Icons.close_rounded, color: color),
+              )
+            else if (!locked)
+              ReorderableDragStartListener(
+                index: i,
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(Icons.drag_indicator_rounded, color: AppCultureColors.textMuted),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!locked)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(appL10n.tkOrderingHint, style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted)),
+          ),
+        if (locked)
+          Column(children: [for (var i = 0; i < order.length; i++) tile(i, order[i])])
+        else
+          ReorderableListView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            onReorderItem: (from, to) {
+              setState(() {
+                final list = List.of(order);
+                list.insert(to, list.removeAt(from));
+                _orders[q.id] = list;
+              });
+              HapticFeedback.selectionClick();
+            },
+            children: [
+              for (var i = 0; i < order.length; i++)
+                ReorderableDelayedDragStartListener(key: ValueKey(order[i]), index: i, child: tile(i, order[i])),
+            ],
+          ),
+      ],
+    );
+  }
+
+  /// Câu đoán số: số lớn + thanh trượt + nút −/+ để chỉnh từng đơn vị.
+  Widget _buildNumber(TaskQuestion q, QuestionReview? review) {
+    final min = q.numberMin!;
+    final max = q.numberMax!;
+    final chosen = _numbers[q.id];
+    final value = (chosen ?? ((min + max) / 2).round()).clamp(min, max);
+    final locked = _answerLocked;
+    void set(int v) {
+      setState(() => _numbers[q.id] = v.clamp(min, max));
+      HapticFeedback.selectionClick();
+    }
+
+    final toneColor = review == null
+        ? AppCultureColors.heritageJade
+        : (review.correct ? AppCultureColors.heritageJade : AppCultureColors.error);
+    return SoftCard(
+      padding: const EdgeInsets.fromLTRB(12, 20, 12, 14),
+      child: Column(
+        children: [
+          Text(
+            chosen == null ? appL10n.tkNumberNotChosen : '$value',
+            style: TextStyle(
+              fontSize: chosen == null ? 22 : 44,
+              fontWeight: FontWeight.w800,
+              color: chosen == null ? AppCultureColors.textMuted : toneColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              IconButton.filledTonal(
+                tooltip: '−1',
+                onPressed: locked ? null : () => set(value - 1),
+                icon: const Icon(Icons.remove_rounded),
+              ),
+              Expanded(
+                child: Slider(
+                  value: value.toDouble(),
+                  min: min.toDouble(),
+                  max: max.toDouble(),
+                  divisions: max - min,
+                  label: '$value',
+                  activeColor: toneColor,
+                  onChanged: locked ? null : (v) => set(v.round()),
+                ),
+              ),
+              IconButton.filledTonal(
+                tooltip: '+1',
+                onPressed: locked ? null : () => set(value + 1),
+                icon: const Icon(Icons.add_rounded),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 52),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('$min', style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
+                Text('$max', style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
+              ],
+            ),
+          ),
+          if (!locked) ...[
+            const SizedBox(height: 8),
+            Text(appL10n.tkNumberHint, style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Tên hiển thị của một lựa chọn (câu chọn ảnh không có chữ thì "Ảnh A").
+  String? _optionLabel(TaskQuestion q, int? id) {
+    if (id == null) return null;
+    final o = q.options.where((o) => o.id == id).firstOrNull;
+    if (o == null) return null;
+    if (o.content.isNotEmpty) return o.content;
+    return appL10n.tkImageOption(String.fromCharCode(65 + q.options.indexOf(o)));
+  }
+
+  String? _matchLabel(TaskQuestion q, int rightKey) =>
+      q.matchOptions.where((m) => m.key == rightKey).firstOrNull?.content;
+
+  String? _givenText(TaskQuestion q) {
+    if (q.isText) return _texts[q.id]?.text.trim();
+    if (q.isNumber) return _numbers[q.id]?.toString();
+    if (q.isOrdering) return [for (final id in _orderOf(q)) ?_optionLabel(q, id)].join(' → ');
+    if (q.isMatching) {
+      final map = _matches[q.id] ?? const <int, int>{};
+      final pairs = [
+        for (final o in q.options)
+          if (map.containsKey(o.id)) '${_optionLabel(q, o.id) ?? ''} ↔ ${_matchLabel(q, map[o.id]!) ?? ''}',
+      ];
+      return pairs.isEmpty ? null : pairs.join(' · ');
+    }
+    return _optionLabel(q, _choices[q.id]);
+  }
+
+  String? _correctText(TaskQuestion q, QuestionReview r) {
+    if (q.isText) return r.correctText;
+    if (q.isNumber) return r.correctNumber?.toString();
+    if (q.isOrdering) {
+      final names = [for (final id in r.correctOrder) ?_optionLabel(q, id)];
+      return names.isEmpty ? null : names.join(' → ');
+    }
+    if (q.isMatching) {
+      final pairs = [
+        for (final p in r.correctMatches) '${_optionLabel(q, p.leftId) ?? ''} ↔ ${_matchLabel(q, p.rightKey) ?? ''}',
+      ];
+      return pairs.isEmpty ? null : pairs.join(' · ');
+    }
+    return _optionLabel(q, r.correctAnswerId);
+  }
+
+  Widget _explanationBox(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: AppCultureColors.rewardBg, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.lightbulb_outline_rounded, size: 16, color: AppCultureColors.rewardText),
+              const SizedBox(width: 4),
+              Text(
+                appL10n.tkReviewWhy,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppCultureColors.rewardText),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(text, style: const TextStyle(fontSize: 14, height: 1.5)),
+        ],
+      ),
+    );
+  }
+
+  /// Khung hiện ngay sau khi trả lời một câu (chế độ từng câu): đúng/sai, đáp án đúng, giải thích.
+  Widget _revealPanel(TaskQuestion q, TaskSubmitResult r) {
+    final review = r.review.where((x) => x.questionId == q.id).firstOrNull;
+    final ok = review?.correct ?? (r.lastAnswerCorrect == true);
+    final tone = ok ? AppCultureColors.heritageJade : AppCultureColors.error;
+    final correct = review == null || ok ? null : _correctText(q, review);
+    final chosenNumber = _numbers[q.id];
+    final diff = q.isNumber && review?.correctNumber != null && chosenNumber != null
+        ? (chosenNumber - review!.correctNumber!).abs()
+        : 0;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      builder: (_, v, child) => Opacity(opacity: v, child: Transform.translate(offset: Offset(0, 16 * (1 - v)), child: child)),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: tone.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: tone.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(ok ? Icons.check_circle_rounded : Icons.cancel_rounded, color: tone, size: 24),
+                const SizedBox(width: 8),
+                Text(ok ? appL10n.tkRevealCorrect : appL10n.tkRevealWrong,
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: tone)),
+                if (diff > 0) ...[
+                  const Spacer(),
+                  Text(appL10n.tkNumberOff(diff), style: const TextStyle(fontSize: 13, color: AppCultureColors.textMuted)),
+                ],
+              ],
+            ),
+            if (correct != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                q.isOrdering
+                    ? '${appL10n.tkCorrectOrder}: $correct'
+                    : q.isMatching
+                        ? '${appL10n.tkMatchingCorrectPairs}: $correct'
+                        : appL10n.tkReviewCorrectAnswer(correct),
+                style: const TextStyle(fontSize: 14, height: 1.4, fontWeight: FontWeight.w700, color: AppCultureColors.heritageJade),
+              ),
+            ],
+            if (review?.explanation != null) ...[
+              const SizedBox(height: 12),
+              _explanationBox(review!.explanation!),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildTextAnswer(TaskQuestion question) {
     return TextField(
       controller: _controllerFor(question.id),
       onChanged: (_) => setState(() {}),
-      enabled: !_busy,
+      enabled: !_answerLocked,
       minLines: 3,
       maxLines: 6,
       textCapitalization: TextCapitalization.sentences,
@@ -2440,6 +3410,10 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
             ),
           ),
         ],
+        if (result.review.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          _reviewSection(result.review),
+        ],
         const SizedBox(height: 32),
         if (stepCorrect)
           PrimaryButton(
@@ -2465,6 +3439,98 @@ class _TaskScreenState extends State<TaskScreen> with WidgetsBindingObserver {
           ),
           child: Text(appL10n.tkBackToJourney),
         ),
+      ],
+    );
+  }
+
+  /// "Xem lại đáp án": từng câu đúng/sai, câu trả lời của khách, đáp án đúng và giải thích.
+  Widget _reviewSection(List<QuestionReview> review) {
+    final byId = {for (final q in _task.questions) q.id: q};
+    final items = [
+      for (final r in review)
+        if (byId[r.questionId] != null) (r, byId[r.questionId]!),
+    ];
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    Widget card(int number, QuestionReview r, TaskQuestion q) {
+      final tone = r.correct ? AppCultureColors.heritageJade : AppCultureColors.error;
+      final given = _givenText(q);
+      final correct = _correctText(q, r);
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: tone.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(r.correct ? Icons.check_circle_rounded : Icons.cancel_rounded, size: 20, color: tone),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '$number. ${q.content}',
+                    style: const TextStyle(fontSize: 14.5, height: 1.4, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appL10n.tkReviewYourAnswer(
+                      (given == null || given.isEmpty) ? appL10n.tkReviewNoAnswer : given,
+                    ),
+                    style: TextStyle(fontSize: 13, height: 1.4, color: r.correct ? tone : AppCultureColors.textMuted),
+                  ),
+                  if (!r.correct && correct != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      appL10n.tkReviewCorrectAnswer(correct),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        fontWeight: FontWeight.w700,
+                        color: AppCultureColors.heritageJade,
+                      ),
+                    ),
+                  ],
+                  if (r.explanation != null) ...[
+                    const SizedBox(height: 10),
+                    _explanationBox(r.explanation!),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(appL10n.tkReviewTitle, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        // Làm tiếp sau khi thoát giữa chừng: các câu trước không có trong lần mở này
+        if (_resumedFrom > 0) ...[
+          const SizedBox(height: 4),
+          Text(
+            appL10n.tkEarlierAnswered,
+            style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
+          ),
+        ],
+        const SizedBox(height: 12),
+        for (var i = 0; i < items.length; i++)
+          card(_task.questions.indexOf(items[i].$2) + 1, items[i].$1, items[i].$2),
       ],
     );
   }

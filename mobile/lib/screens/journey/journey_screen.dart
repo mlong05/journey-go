@@ -165,7 +165,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      // Tour chưa tới ngày trải nghiệm (HTTP 409 BOOKING_TOUR_LOCKED):
+      // Tour chưa tới ngày trải nghiệm (HTTP 409 BOOKING_TOUR_LOCKED) hoặc đã quá thời gian
+      // tour (BOOKING_EXPERIENCE_EXPIRED — "Đã quá ngày trải nghiệm ..."):
       // KHÔNG hiện màn lỗi "Thử lại / Quay lại" ⇒ chuyển thẳng sang màn chi tiết
       // tour để du khách xem được thông tin tour đã mua.
       if (_isTourLockedError(e)) {
@@ -325,7 +326,6 @@ class _JourneyScreenState extends State<JourneyScreen> {
         destinationId: dest.destinationId,
         order: dest.orderIndex,
         name: dest.name,
-        coverImage: _imageOf(dest),
         wizard: _isWizard,
         hasExperience: dest.tasks.isNotEmpty,
       ),
@@ -668,6 +668,14 @@ class _JourneyScreenState extends State<JourneyScreen> {
   /// Coi là "đã tới" khi vào trong bán kính check-in, chừa 20 m sai số GPS (tối thiểu 30 m).
   int _arrivalRadiusOf(JourneyDestination dest) => math.max(30, _checkInRadiusOf(dest) - 20);
 
+  /// Du khách đang đứng trong bán kính check-in của [dest] (theo GPS của app) ⇒ thẻ trạm mới hiện nút
+  /// "Check-in trạm". Ngoài bán kính / chưa có vị trí / trạm không có toạ độ ⇒ chỉ "Chỉ đường" + "Quét QR".
+  /// (Máy chủ vẫn kiểm tra lại khoảng cách khi check-in.)
+  bool _inCheckInRange(JourneyDestination dest) {
+    final point = _coords[dest.destinationId];
+    return point != null && _user != null && distanceMeters(_user!, point) <= _arrivalRadiusOf(dest);
+  }
+
   /// 0: còn xa, 1: dưới 500 m, 2: dưới 150 m, 3: đã tới (trong [arrival] mét như [_arrived]).
   static int _milestoneFor(int? d, int arrival) => d == null
       ? 0
@@ -981,11 +989,11 @@ class _JourneyScreenState extends State<JourneyScreen> {
               children: [for (var i = 0; i < dests.length; i++) _timelineItem(dests[i], isLast: i == dests.length - 1)],
             ),
           ),
+          // Chưa xong: mục tiêu "đi trọn tour" nằm trên thẻ "Dấu ấn di sản" ở đầu màn.
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-              child: journey.isCompleted ? _completedCard(journey) : _rewardHint(journey),
-            ),
+            child: journey.isCompleted
+                ? Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), child: _completedCard(journey))
+                : const SizedBox(height: 24),
           ),
         ],
       ),
@@ -1126,6 +1134,57 @@ class _JourneyScreenState extends State<JourneyScreen> {
                   ],
                 ),
             ],
+          ),
+          if (!journey.isCompleted) ...[
+            const SizedBox(height: 12),
+            _goalLine(journey),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Mục tiêu "đi trọn tour" ngay trên đầu màn (trước đây nằm cuối danh sách, dễ bị bỏ qua).
+  Widget _goalLine(TourJourney journey) {
+    final lost = journey.skippedCount > 0;
+    final remaining = (journey.totalDestinations - journey.doneCount).clamp(0, journey.totalDestinations);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: lost ? AppInk.soft : AppCultureColors.rewardBg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            lost ? Icons.info_outline_rounded : Icons.flag_rounded,
+            size: 18,
+            color: lost ? AppInk.muted : AppCultureColors.rewardText,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lost ? appL10n.jsGoalLost : appL10n.jsGoalRemaining(remaining),
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                    color: lost ? AppInk.muted : AppCultureColors.rewardText,
+                  ),
+                ),
+                if (!lost) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    appL10n.jsCompleteAllHint,
+                    style: TextStyle(fontSize: 12, height: 1.4, color: AppInk.muted),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -1441,7 +1500,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
           Expanded(
             child: _UnlockTile(
               title: appL10n.jsCultureTitle,
-              icon: Icons.auto_stories_outlined,
+              // Đền chùa / di sản — tách hẳn khỏi biểu tượng ✦ của AI
+              icon: Icons.temple_buddhist_outlined,
               info: cultureParts.isEmpty ? appL10n.jsCultureFallback : cultureParts.join(' · '),
               unlocked: unlocked,
               badge: unlocked ? (read ? appL10n.jsRead : appL10n.jsNew) : null,
@@ -1454,7 +1514,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
           Expanded(
             child: _UnlockTile(
               title: appL10n.jsExperienceTitle,
-              icon: Icons.explore_outlined,
+              // Cúp — thử thách & điểm thưởng (không dùng la bàn, dễ lẫn với biểu tượng AI)
+              icon: Icons.emoji_events_outlined,
               info: experienceInfo.isEmpty ? appL10n.jsExperienceFallback : experienceInfo,
               unlocked: unlocked,
               progress: unlocked && total > 0 ? doneTasks / total : null,
@@ -1470,7 +1531,6 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
   Widget _checkInActions(JourneyDestination dest) {
     final busy = _busyDestinationId == dest.destinationId;
-    final canRoute = _coords[dest.destinationId] != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1481,37 +1541,13 @@ class _JourneyScreenState extends State<JourneyScreen> {
           style: const TextStyle(fontSize: 12.5, height: 1.45, color: AppInk.muted),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            if (canRoute) ...[
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: busy ? null : () => _openDirections(dest),
-                  style: _outlineStyle(),
-                  child: Text(appL10n.jsDirections),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
-            Expanded(
-              child: FilledButton(
-                onPressed: busy ? null : () => _checkIn(dest),
-                style: _filledStyle(),
-                child: busy
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-                      )
-                    : Text(_isWizard ? appL10n.jsCheckInStop : appL10n.jsCheckInGps),
-              ),
-            ),
-          ],
-        ),
-        TextButton(
+        // Nút chính của trạm hiện tại (Chỉ đường, hoặc Check-in khi đã trong bán kính) nằm ở thanh
+        // "Trạm kế tiếp" dưới cùng — không lặp lại trên thẻ. Thẻ chỉ giữ đường dự phòng: quét mã QR tại điểm.
+        OutlinedButton.icon(
           onPressed: busy ? null : () => _checkInQr(dest),
-          style: TextButton.styleFrom(foregroundColor: AppInk.ink),
-          child: Text(appL10n.jsScanQr, style: const TextStyle(fontWeight: FontWeight.w700)),
+          style: _outlineStyle(),
+          icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+          label: Text(appL10n.jsScanQr),
         ),
         TextButton(
           onPressed: busy ? null : () => _skip(dest),
@@ -1537,28 +1573,6 @@ class _JourneyScreenState extends State<JourneyScreen> {
     shape: const StadiumBorder(),
     textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
   );
-
-
-  Widget _rewardHint(TourJourney journey) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppInk.soft, borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            appL10n.jsCompleteAll(journey.totalDestinations),
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppInk.ink),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            appL10n.jsCompleteAllHint,
-            style: TextStyle(fontSize: 13, height: 1.45, color: AppInk.muted),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Thẻ thống kê khi đã đi xong: hạng hoàn thành + 3 chỉ số. Không có nút — hành động duy nhất
   /// "Xem tổng kết" nằm ở thanh dưới, tránh hai nút trùng nhau.
@@ -1661,12 +1675,16 @@ class _JourneyScreenState extends State<JourneyScreen> {
       if (!cur.checkedIn) {
         label = appL10n.jsNextStop;
         title = cur.name;
-        if (_coords[cur.destinationId] != null) {
+        // Đang trong bán kính ⇒ check-in luôn; ở xa ⇒ chỉ đường; trạm không có toạ độ ⇒ chỉ quét QR tại điểm
+        if (_inCheckInRange(cur)) {
+          button = appL10n.jsCheckInStop;
+          action = () => _checkIn(cur);
+        } else if (_coords[cur.destinationId] != null) {
           button = appL10n.jsDirections;
           action = () => _openDirections(cur);
         } else {
-          button = 'Check-in';
-          action = () => _checkIn(cur);
+          button = appL10n.jsScanQrShort;
+          action = () => _checkInQr(cur);
         }
       } else if (!_cultureRead.contains(cur.destinationId)) {
         label = appL10n.jsUnlockedCulture;
@@ -1860,7 +1878,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
                 vehicle: _vehicle,
                 loading: _routeLoading,
                 active: _navActive,
-                arrived: _navActive && _arrived,
+                // Vào trong bán kính là hiện thẻ "Đã tới nơi" + nút Check-in (kể cả khi chưa bấm Bắt đầu dẫn đường)
+                arrived: _arrived,
                 error: _routeError,
                 onVehicleChanged: (v) {
                   setState(() => _vehicle = v);
@@ -1874,6 +1893,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                 },
                 onClose: _endNavigation,
                 onCheckIn: () => _checkIn(_navDestination!),
+                onScanQr: () => _checkInQr(_navDestination!),
                 onRetry: () => _fetchRoute(fit: true),
               ),
             )
@@ -1989,24 +2009,40 @@ class _JourneyScreenState extends State<JourneyScreen> {
           ),
           if (dest.isCurrent) ...[
             const SizedBox(height: 12),
-            Row(
-              children: [
-                if (!dest.checkedIn && point != null) ...[
+            if (!dest.checkedIn)
+              // Chưa check-in: trong bán kính ⇒ "Check-in"; ở xa ⇒ "Chỉ đường"; luôn kèm "Quét QR" (dự phòng)
+              Row(
+                children: [
+                  if (_inCheckInRange(dest) || point != null)
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: busy
+                            ? null
+                            : _inCheckInRange(dest)
+                            ? () => _checkIn(dest)
+                            : () => _openDirections(dest),
+                        style: _filledStyle().copyWith(minimumSize: const WidgetStatePropertyAll(Size(0, 44))),
+                        child: Text(_inCheckInRange(dest) ? appL10n.jsCheckInStop : appL10n.jsDirections),
+                      ),
+                    ),
+                  if (_inCheckInRange(dest) || point != null) const SizedBox(width: 8),
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: busy ? null : () => _openDirections(dest),
+                    child: OutlinedButton.icon(
+                      onPressed: busy ? null : () => _checkInQr(dest),
                       style: _outlineStyle().copyWith(minimumSize: const WidgetStatePropertyAll(Size(0, 44))),
-                      child: Text(appL10n.jsDirections),
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                      label: Text(appL10n.jsScanQrShort),
                     ),
                   ),
-                  const SizedBox(width: 8),
                 ],
+              )
+            else
+            Row(
+              children: [
                 Expanded(
                   child: FilledButton(
                     onPressed: busy
                         ? null
-                        : !dest.checkedIn
-                        ? () => _checkIn(dest)
                         : !_cultureRead.contains(dest.destinationId)
                         ? () => _openCulture(dest)
                         : openTask != null
@@ -2014,9 +2050,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                         : _leaveMap,
                     style: _filledStyle().copyWith(minimumSize: const WidgetStatePropertyAll(Size(0, 44))),
                     child: Text(
-                      !dest.checkedIn
-                          ? 'Check-in'
-                          : !_cultureRead.contains(dest.destinationId)
+                      !_cultureRead.contains(dest.destinationId)
                           ? appL10n.jsReadStory
                           : openTask != null
                           ? appL10n.jsExperienceTitle

@@ -423,6 +423,9 @@ class NavigationPanel extends StatelessWidget {
   final VoidCallback onExternal;
   final VoidCallback onClose;
   final VoidCallback onCheckIn;
+
+  /// Đã tới nơi mà GPS lệch / check-in bị từ chối ⇒ quét mã QR dán tại điểm để xác nhận đã tới.
+  final VoidCallback? onScanQr;
   final VoidCallback onRetry;
 
   const NavigationPanel({
@@ -444,6 +447,7 @@ class NavigationPanel extends StatelessWidget {
     required this.onExternal,
     required this.onClose,
     required this.onCheckIn,
+    this.onScanQr,
     required this.onRetry,
   });
 
@@ -775,6 +779,24 @@ class NavigationPanel extends StatelessWidget {
                 label: Text(appL10n.navCheckInNow, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
               ),
             ),
+            // GPS lệch / check-in không được ⇒ quét mã QR dán tại điểm để xác nhận đã tới
+            if (onScanQr != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: onScanQr,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppCultureColors.textDark,
+                    side: const BorderSide(color: AppCultureColors.textDark),
+                    shape: const StadiumBorder(),
+                  ),
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  label: Text(appL10n.jsScanQr, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
           ],
         ),
       ),

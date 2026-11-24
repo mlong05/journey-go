@@ -38,11 +38,33 @@ public record TaskQuestionsResponse(
         // true: câu hỏi chỉ mở khi quét đúng mã QR tại điểm (GPS không đủ)
         boolean qrRequired,
         // true: nộp một lần, đúng câu nào cộng điểm câu đó
-        boolean perQuestionPoints
+        boolean perQuestionPoints,
+        // Câu đố trả lời từng câu đang làm dở: số câu đã đúng + điểm tạm tính tới câu đã trả lời
+        // (app hiện "Đã trả lời 2/3 câu · đúng 2 · +20 điểm" và nút "Tiếp tục từ câu 3")
+        Integer correctCount,
+        Integer pointsSoFar
 ) {
     public record Station(String name, BigDecimal latitude, BigDecimal longitude, Integer radiusMeters) {}
 
-    public record Question(Long id, String content, String questionType, Integer orderIndex, List<Option> options) {}
+    /**
+     * @param numberMin    câu NUMBER: giá trị nhỏ nhất của thanh trượt (không bao giờ kèm đáp án đúng)
+     * @param matchOptions câu MATCHING: các mục cột B đã xáo trộn, mỗi mục có key riêng (không lộ cặp đúng);
+     *                     {@code options} là cột A theo thứ tự đối tác nhập
+     */
+    public record Question(Long id, String content, String questionType, Integer orderIndex, List<Option> options,
+                           Integer numberMin, Integer numberMax, List<MatchOption> matchOptions) {
+        public Question(Long id, String content, String questionType, Integer orderIndex, List<Option> options) {
+            this(id, content, questionType, orderIndex, options, null, null, null);
+        }
+    }
 
-    public record Option(Long id, String content, Integer orderIndex) {}
+    /** Một mục cột B của câu nối cột. */
+    public record MatchOption(Integer key, String content) {}
+
+    /** Câu xếp thứ tự: các mục đã xáo trộn và orderIndex = null (không lộ thứ tự đúng). */
+    public record Option(Long id, String content, Integer orderIndex, String imageUrl) {
+        public Option(Long id, String content, Integer orderIndex) {
+            this(id, content, orderIndex, null);
+        }
+    }
 }
