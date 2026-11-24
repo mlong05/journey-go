@@ -1,0 +1,15 @@
+{
+  "merge.nav.aiGuide": "Hướng dẫn viên AI",
+  "merge.chat.loadingHistory": "Đang tải lịch sử…",
+  "merge.chat.loadOlder": "Xem tin nhắn cũ hơn",
+  "merge.chat.endOfHistory": "Bạn đã xem hết lịch sử tin nhắn",
+  "merge.chat.loadingOlder": "Đang tải tin nhắn cũ…",
+  "merge.chat.customerFallback": "Khách hàng",
+  "merge.refund.tierEarly": "Từ 7 ngày trở lên",
+  "merge.refund.tierMid": "Từ 3 đến 6 ngày (72 giờ – 6 ngày)",
+  "merge.refund.tierLate": "Dưới 72 giờ (3 ngày)",
+  "merge.refund.rateLabel": "Hoàn {rate}",
+  "merge.refund.guideRatesDesc": "Huỷ từ 7 ngày trở lên: hoàn 80%. Huỷ từ 3 đến 6 ngày (72 giờ – 6 ngày): hoàn 50%. Dưới 72 giờ (3 ngày): không hoàn. Lỗi từ nền tảng hoặc nhà tour: hoàn 100% sau khi quản trị viên xác minh.",
+  "merge.trips.rebookThisTour": "Đặt lại tour này",
+  "merge.trips.unitTrip": "chuyến đi"
+}

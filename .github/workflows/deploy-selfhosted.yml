@@ -43,6 +43,61 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
+    # AiProdConfigBindingTest la test @SpringBootTest duy nhat trong bo test: no
+    # FULL application context voi @ActiveProfiles("prod"), nen Spring se khoi
+    # dong datasource + Flyway + JPA. CI bat buoc can PostgreSQL that.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: journeygo_db
+          POSTGRES_USER: journeygo
+          POSTGRES_PASSWORD: journeygo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U journeygo -d journeygo_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Point the prod profile at the CI service containers instead of the
+      # Docker hostnames ("postgres" / "redis") that only exist inside a
+      # compose network.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/journeygo_db
+      SPRING_DATASOURCE_USERNAME: journeygo
+      SPRING_DATASOURCE_PASSWORD: journeygo
+      SPRING_DATA_REDIS_HOST: localhost
+      SPRING_DATA_REDIS_PORT: 6379
+
+      # application-prod.yml declares these WITHOUT a default so production
+      # fails fast when a secret is missing. CI has no .env file, so the same
+      # variables must be supplied here or the Spring context cannot start
+      # (jwt.secret is @Value("${jwt.secret}") -> JwtTokenProvider ->
+      # JwtAuthenticationFilter -> SecurityConfig all fail to load).
+      # These are throwaway CI values - never reused in production.
+      JWT_SECRET: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+      SPRING_MAIL_USERNAME: ci@example.com
+      SPRING_MAIL_PASSWORD: ci-password
+      GOOGLE_CLIENT_ID: ci-google-client-id
+      GOOGLE_CLIENT_SECRET: ci-google-client-secret
+      VNPAY_TMN_CODE: DEMOV210
+      VNPAY_HASH_SECRET: ci-vnpay-hash-secret
+      VNPAY_IPN_URL: http://localhost/api/v1/payments/ipn
+      VNPAY_RETURN_URL: http://localhost/api/v1/payments/return
+      VNPAY_WEB_RETURN_URL: http://localhost/payments/result
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -58,9 +113,7 @@ jobs:
 
       - name: Backend — compile & unit test
         working-directory: backend
-        run: |
-          chmod +x mvnw
-          ./mvnw -B -ntp clean test
+        run: mvn -B -ntp clean test
 
       # ── Frontend ──
       - name: Set up Node.js

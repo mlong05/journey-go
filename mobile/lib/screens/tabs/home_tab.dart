@@ -19,6 +19,7 @@ import '../../core/services/location_service.dart';
 import '../../core/services/progress_service.dart';
 import '../../core/services/tour_service.dart';
 import '../../l10n/locale_controller.dart';
+import '../chat/ai_guide_chat_screen.dart';
 import '../journey/journey_launcher.dart';
 import '../journey/task_screen.dart';
 import '../modals/notification_dialog.dart';
@@ -192,12 +193,15 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
     _loadPending();
   }
 
-  /// Id các tour du khách đã mua (đã thanh toán) ⇒ loại khỏi danh sách hiển thị.
+  /// Id các tour du khách đã mua và CÒN CHẶN đặt lại ⇒ loại khỏi danh sách hiển thị.
+  ///
+  /// ⚠️ Chỉ đơn `CONFIRMED` còn hiệu lực mới chặn. Đơn `COMPLETED` (đã đi xong) hoặc
+  /// `CONFIRMED` có ngày đi đã qua ⇒ tour hiện lại, du khách đặt tiếp được.
   ///
   /// ⚠️ `size: 200` để không bỏ sót tour đã mua khi du khách có nhiều đơn.
   Future<Set<int>> _loadOwnedTourIds() async {
     final bookings = await _bookingService.getMine(size: 200);
-    return {for (final b in bookings) if (b.isPaid) b.tourId};
+    return {for (final b in bookings) if (b.blocksRebook) b.tourId};
   }
 
   /// Ảnh cho thẻ hành trình: ảnh điểm dừng đang mở (tour 5 bước) → ảnh bìa tour.
@@ -301,6 +305,10 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
   }
 
   Future<void> _openMission(JourneyMission mission) async {
+    final destId = _journey?.destinations
+        .where((d) => d.tasks.any((t) => t.taskId == mission.taskId))
+        .firstOrNull
+        ?.destinationId;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => TaskScreen(
@@ -308,10 +316,20 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
           taskId: mission.taskId,
           fallbackName: mission.title,
           destinationName: mission.siteName,
+          destinationId: destId,
         ),
       ),
     );
     if (mounted) _loadAllData();
+  }
+
+  void _openAiGuide() {
+    final currentDest = _journey?.destinations.where((d) => d.isCurrent).firstOrNull;
+    AiGuideChatScreen.open(
+      context,
+      destinationId: currentDest?.destinationId,
+      destinationName: currentDest?.name,
+    );
   }
 
   // ── Điều hướng ─────────────────────────────────────────────────────────────
@@ -394,6 +412,7 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
             ),
           ),
         ),
+      block(_buildAiGuideEntryCard()),
       if (_toursError != null && _tours.isEmpty)
         block(_buildToursError())
       else if (_tours.isEmpty)
@@ -664,6 +683,55 @@ class _HomeTabState extends State<HomeTab> with RefreshOnTabReturn, RouteAware, 
           onTap: _openVoucherShop,
         ),
       ],
+    );
+  }
+
+  Widget _buildAiGuideEntryCard() {
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Pressable(
+        onTap: _openAiGuide,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppCultureColors.jadeLight.withValues(alpha: 0.65),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppCultureColors.heritageJade.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppCultureColors.heritageJade,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.homeAiGuideTitle,
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.homeAiGuideSubtitle,
+                      style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppCultureColors.heritageJade),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

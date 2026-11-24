@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogOut, LayoutDashboard, ChevronDown, UserRound, MessageCircle, Gift } from "lucide-react";
+import { Menu, X, LogOut, LayoutDashboard, ChevronDown, UserRound, MessageCircle, Gift, Sparkles } from "lucide-react";
 import BrandLogo from "@/components/brand/BrandLogo";
 import { LogoutModal, useLogout } from "@/features/auth";
+import { AiGuideFloatingWidget } from "@/features/aiguide";
 import { ROUTES } from "@/constants/routes";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { touristService } from "../services/touristService";
@@ -34,6 +35,7 @@ const initials = (name) =>
  */
 const TOURIST_MENU = [
   [ROUTES.ACCOUNT, "nav.myAccount", UserRound],
+  [ROUTES.ACCOUNT_AI_GUIDE, "merge.nav.aiGuide", Sparkles],
   [ROUTES.ACCOUNT_MESSAGES, "nav.messages", MessageCircle, "unread"],
   [ROUTES.ACCOUNT_REWARDS, "nav.rewards", Gift],
 ];
@@ -259,6 +261,7 @@ export default function TouristShell({ children, desktopFixed = false }) {
         {/* Vùng nội dung có tên riêng ⇒ trượt khi chuyển trang, header & footer đứng yên */}
         <main className="flex-1" style={{ viewTransitionName: "jg-page" }}>{children}</main>
         {desktopFixed ? <div className="lg:hidden"><TouristFooter /></div> : <TouristFooter />}
+        <AiGuideFloatingWidget />
       </TouristNotificationProvider>
     </div>
   );

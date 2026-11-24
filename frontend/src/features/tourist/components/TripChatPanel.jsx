@@ -1,15 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, AlertTriangle, Send, MessagesSquare, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
+import { useChatHistory, CHAT_PAGE_SIZE } from "@/hooks/useChatHistory";
 import { touristService } from "../services/touristService";
 import { ROUTES } from "@/constants/routes";
-import { dateTime } from "../utils";
-import { useT, translate, getLocale } from "@/i18n";
-
-const POLL_MS = 8000;
+import { useT } from "@/i18n";
+import ChatBubble from "@/components/ui/ChatBubble";
 
 /**
  * Khung chat hỗ trợ gắn với MỘT đơn đặt tour (khách ↔ nhà tour).
@@ -28,17 +27,34 @@ const POLL_MS = 8000;
 export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) {
   const t = useT();
   const [open, setOpen] = useState(defaultOpen);
-  const [messages, setMessages] = useState(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   /** ID hội thoại thống nhất (du khách ↔ nhà tour) của đơn này. */
   const [conversationId, setConversationId] = useState(null);
-  const endRef = useRef(null);
 
-  const load = useCallback(() => touristService.bookingMessages(bookingId)
-    .then((m) => { setMessages(m); setError(""); })
-    .catch((e) => setError(e?.message || translate(getLocale(), "trips.chatErrLoad"))), [bookingId]);
+  // ⚠️ PHÂN TRANG KIỂU "CUỘN LÊN ĐỂ LOAD THÊM":
+  //  • Mở khung ⇒ chỉ tải 10 tin MỚI NHẤT, tự cuộn xuống cuối (thấy ngay tin mới).
+  //  • Cuộn lên gần đầu ⇒ tự nối thêm tin CŨ hơn.
+  const fetchPage = useCallback(
+    (cursor) => touristService.bookingMessagesPage(bookingId, CHAT_PAGE_SIZE, cursor),
+    [bookingId],
+  );
+
+  const {
+    messages,
+    loading,
+    loadingMore,
+    hasMore,
+    error: loadError,
+    containerRef,
+    handleScroll,
+    appendMessage,
+    loadMore,
+  } = useChatHistory(fetchPage, {
+    enabled: open && Boolean(bookingId),
+    resetKey: String(bookingId),
+  });
 
   // Lấy hội thoại thống nhất để có link "mở trong Tin nhắn với nhà tour".
   useEffect(() => {
@@ -48,15 +64,6 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
       .catch(() => { if (alive) setConversationId(null); });
     return () => { alive = false; };
   }, [bookingId]);
-
-  // Chỉ poll khi khung đang mở — tránh gọi API liên tục ở trang đang xem.
-  useEffect(() => {
-    if (!open) return undefined;
-    load();
-    const timer = setInterval(load, POLL_MS);
-    return () => clearInterval(timer);
-  }, [open, load]);
-
   // Tin nhắn mới ⇒ thêm vào danh sách ngay (không cần chờ poll).
   // Nhận cả hai scope vì kênh đã gộp: `BOOKING_CHAT` (cũ) và `PROVIDER_CHAT` (mới).
   useRealtimeMessages(useCallback((payload) => {
@@ -65,16 +72,8 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
     if (scope === "BOOKING_CHAT" && Number(payload.bookingId) !== Number(bookingId)) return;
     if (scope === "PROVIDER_CHAT" && conversationId != null
       && Number(payload.conversationId) !== Number(conversationId)) return;
-    const incoming = payload.message;
-    if (!incoming) return;
-    setMessages((list) => {
-      if (!list) return list;
-      if (list.some((m) => Number(m.id) === Number(incoming.id))) return list;
-      return [...list, incoming];
-    });
-  }, [bookingId, conversationId]));
-
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages?.length, open]);
+    appendMessage(payload.message);
+  }, [bookingId, conversationId, appendMessage]));
 
   const send = async (e) => {
     e.preventDefault();
@@ -83,11 +82,7 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
     setBusy(true);
     try {
       const m = await touristService.sendBookingMessage(bookingId, body);
-      setMessages((list) => {
-        const base = list || [];
-        if (base.some((x) => Number(x.id) === Number(m.id))) return base;
-        return [...base, m];
-      });
+      appendMessage(m);
       setText("");
     } catch (err) {
       setError(err?.message || t("trips.chatErrSend"));
@@ -95,6 +90,8 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
       setBusy(false);
     }
   };
+
+  const shownError = error || loadError;
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white" aria-labelledby={`trip-chat-${bookingId}`}>
@@ -106,9 +103,6 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
       >
         <MessagesSquare size={17} className="text-teal-700" />
         <span id={`trip-chat-${bookingId}`} className="font-extrabold text-slate-900">{t("trips.chatTitle")}</span>
-        {messages?.length > 0 && (
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{messages.length}</span>
-        )}
         <span className="ml-auto text-slate-400">{open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}</span>
       </button>
 
@@ -129,33 +123,69 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
             )}
           </p>
 
-          <div className="max-h-80 space-y-2 overflow-y-auto px-4 py-4 [scrollbar-width:thin]" aria-live="polite">
-            {messages === null ? (
+          <div
+            ref={containerRef}
+            onScroll={handleScroll}
+            className="max-h-80 space-y-2 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-width:thin]"
+            aria-live="polite"
+          >
+            {loading ? (
               <p className="flex justify-center gap-2 py-8 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />{t("common.loading")}</p>
             ) : messages.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-500">
                 {t("trips.chatEmpty")}
               </p>
-            ) : messages.map((m) => {
-              const mine = myId != null && String(m.senderId) === String(myId);
-              return (
-                <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm ${mine ? "rounded-br-md bg-teal-700 text-white" : "rounded-bl-md bg-slate-100 text-slate-800"}`}>
-                    {!mine && m.senderName && (
-                      <p className="mb-0.5 text-[11px] font-bold text-slate-500">{m.senderName}</p>
-                    )}
-                    <p className="whitespace-pre-line break-words">{m.body}</p>
-                    <p className={`mt-0.5 text-[10.5px] ${mine ? "text-teal-100" : "text-slate-400"}`}>{dateTime(m.createdAt)}</p>
+            ) : (
+              <>
+                {/* Đầu danh sách: nút load thêm lịch sử cũ / dòng "đã xem hết". */}
+                {hasMore ? (
+                  <div className="flex justify-center pb-1">
+                    <button
+                      type="button"
+                      onClick={loadMore}
+                      disabled={loadingMore}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <Loader2 size={11} className="animate-spin" /> {t("merge.chat.loadingHistory")}
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown size={11} /> {t("merge.chat.loadOlder")}
+                        </>
+                      )}
+                    </button>
                   </div>
-                </div>
-              );
-            })}
-            <div ref={endRef} />
+                ) : (
+                  <p className="pb-1 text-center text-[11px] text-slate-400">
+                    {t("merge.chat.endOfHistory")}
+                  </p>
+                )}
+
+                {messages.map((m) => (
+                  <ChatBubble
+                    key={m.id}
+                    mine={myId != null && String(m.senderId) === String(myId)}
+                    body={m.body}
+                    createdAt={m.createdAt}
+                    author={m.senderName ?? t("account.msg.tourProvider")}
+                    t={t}
+                  />
+                ))}
+
+                {loadingMore && (
+                  <p className="flex items-center justify-center gap-2 py-2 text-[11px] text-slate-400">
+                    <Loader2 size={11} className="animate-spin" /> {t("merge.chat.loadingOlder")}
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
-          {error && (
+          {shownError && (
             <p role="alert" className="flex items-center gap-1.5 px-4 pb-1 text-xs font-semibold text-rose-600">
-              <AlertTriangle size={13} />{error}
+              <AlertTriangle size={13} />{shownError}
             </p>
           )}
 

@@ -26,6 +26,10 @@ class RefundReasonGroupModel {
   /// Tỷ lệ hoàn trong cửa sổ no-show (thường 0 = 0%).
   final double? noShowRefundRate;
 
+  /// Các bậc tỷ lệ hoàn theo thời điểm hủy (chỉ nhóm cá nhân có 3 bậc:
+  /// 80% / 50% / 0%). Rỗng = nhóm chỉ có 1 tỷ lệ (`refundRate`).
+  final List<RefundTierModel> refundTiers;
+
   const RefundReasonGroupModel({
     required this.id,
     required this.code,
@@ -37,6 +41,7 @@ class RefundReasonGroupModel {
     required this.reasonCodes,
     this.noShowWindowHours,
     this.noShowRefundRate,
+    this.refundTiers = const [],
   });
 
   factory RefundReasonGroupModel.fromJson(Map<String, dynamic> json) {
@@ -52,6 +57,12 @@ class RefundReasonGroupModel {
           ? null
           : _toInt(json['noShowWindowHours']),
       noShowRefundRate: (json['noShowRefundRate'] as num?)?.toDouble(),
+      refundTiers: (json['refundTiers'] is List)
+          ? (json['refundTiers'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(RefundTierModel.fromJson)
+              .toList()
+          : const [],
       reasonCodes: (json['reasonCodes'] is List)
           ? (json['reasonCodes'] as List)
               .whereType<Map<String, dynamic>>()
@@ -77,6 +88,40 @@ class RefundReasonGroupModel {
 
   /// Nhóm này không hoàn tiền (bất khả kháng) hay không.
   bool get isZeroRefund => refundRate <= 0;
+}
+
+/// Một bậc tỷ lệ hoàn theo thời điểm hủy (chỉ nhóm cá nhân có nhiều bậc).
+class RefundTierModel {
+  /// Mã bậc (EARLY | MID | LATE).
+  final String code;
+
+  /// Điều kiện hiển thị cho khách.
+  final String conditionLabel;
+
+  /// Tỷ lệ hoàn (0.8 = 80%).
+  final double refundRate;
+
+  /// Số ngày tối thiểu trước khởi hành để thuộc bậc này.
+  final int minDays;
+
+  const RefundTierModel({
+    required this.code,
+    required this.conditionLabel,
+    required this.refundRate,
+    required this.minDays,
+  });
+
+  factory RefundTierModel.fromJson(Map<String, dynamic> json) {
+    return RefundTierModel(
+      code: json['code']?.toString() ?? '',
+      conditionLabel: json['conditionLabel']?.toString() ?? '',
+      refundRate: (json['refundRate'] as num?)?.toDouble() ?? 0,
+      minDays: (json['minDays'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  /// Tỷ lệ hoàn dạng phần trăm (VD: 80).
+  int get refundRatePercent => (refundRate * 100).round();
 }
 
 /// Mã lý do hoàn tiền chi tiết (VD: Bị bệnh hoặc gặp vấn đề sức khỏe).

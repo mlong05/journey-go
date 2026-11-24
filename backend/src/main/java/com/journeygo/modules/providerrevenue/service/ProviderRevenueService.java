@@ -28,6 +28,7 @@ import com.journeygo.modules.refund.entity.RefundRequest;
 import com.journeygo.modules.refund.entity.enums.RefundStatus;
 import com.journeygo.modules.refund.event.RefundCompletedEvent;
 import com.journeygo.modules.refund.repository.RefundRequestRepository;
+import com.journeygo.modules.settlement.entity.SettlementPeriod;
 import com.journeygo.modules.settlement.entity.enums.FinancialAdjustmentStatus;
 import com.journeygo.modules.settlement.repository.FinancialAdjustmentRepository;
 import com.journeygo.modules.user.entity.User;
@@ -44,7 +45,6 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -240,6 +240,24 @@ public class ProviderRevenueService {
         ProviderRevenue revenue = revenueRepository.findById(revenueId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_REVENUE_NOT_FOUND));
         requireFinanceAccess(revenue);
+        return evaluate(revenue, EvaluationMode.CANDIDATE, null);
+    }
+
+    /**
+     * Đánh giá điều kiện ứng viên mà KHÔNG kiểm tra quyền sở hữu.
+     *
+     * <p>Dành cho luồng nội bộ (tác vụ nền tự động tạo đợt tất toán) — chạy ngoài phạm vi
+     * HTTP ⇒ không có {@code SecurityContext} ⇒ {@link #requireFinanceAccess} sẽ ném lỗi
+     * "không có quyền xem dữ liệu tài chính". Ở đây ta bỏ qua guard vì dữ liệu đang được
+     * xử lý ở tầng hệ thống (không phải hành động của một user cụ thể), và kết quả vẫn
+     * được Admin kiểm tra lại khi duyệt đợt.
+     *
+     * @param revenueId khoản doanh thu cần đánh giá
+     */
+    @Transactional(readOnly = true)
+    public EligibilityEvaluationResponse evaluateEligibilityInternal(Long revenueId) {
+        ProviderRevenue revenue = revenueRepository.findById(revenueId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROVIDER_REVENUE_NOT_FOUND));
         return evaluate(revenue, EvaluationMode.CANDIDATE, null);
     }
 
@@ -556,12 +574,14 @@ public class ProviderRevenueService {
     /**
      * Kỳ doanh thu đã kết thúc hay chưa.
      *
-     * <p>Một kỳ {@code YYYY-MM} được coi là đã đóng khi kỳ đó <b>trước</b> tháng hiện tại.
-     * Ví dụ: hôm nay 30/10/2026 ⇒ kỳ {@code 2026-09} đã đóng, kỳ {@code 2026-10} và
-     * {@code 2026-11} chưa đóng.
+     * <p>Kỳ tất toán chia tháng thành các CHU KỲ 10 NGÀY (1-10, 11-20, 21-cuối tháng).
+     * Một kỳ chỉ coi là đã đóng khi đã qua NGÀY CUỐI của kỳ.
+     *
+     * <p>Ví dụ: hôm nay 12/10/2026 ⇒ kỳ {@code 2026-10-1} (01→10/10) đã đóng;
+     * kỳ {@code 2026-10-2} (11→20/10) chưa đóng.
      *
      * <p>Nếu cấu hình {@code app.finance.allow-open-period-settlement = true} thì kỳ hiện tại
-     * cũng được coi là đã đóng (cho phép tất toán sớm). Kỳ TƯƠNG LAI (sau tháng hiện tại)
+     * cũng được coi là đã đóng (cho phép tất toán sớm). Kỳ TƯƠNG LAI (sau kỳ hiện tại)
      * <b>luôn</b> chưa đóng — không bao giờ tất toán trước khi kỳ đó thực sự kết thúc.
      *
      * <p>Kỳ chưa đóng ⇒ không được tất toán. Điều này ngăn việc doanh thu kỳ tương lai bị
@@ -571,18 +591,19 @@ public class ProviderRevenueService {
         if (revenuePeriod == null || revenuePeriod.isBlank()) {
             return false;
         }
-        try {
-            YearMonth period = YearMonth.parse(revenuePeriod.trim());
-            YearMonth current = YearMonth.now(VIETNAM_ZONE);
-            if (period.isBefore(current)) {
-                return true;
-            }
-            // Kỳ hiện tại — chỉ đóng khi Admin cho phép tất toán kỳ chưa kết thúc.
-            return period.equals(current) && financeProperties.isAllowOpenPeriodSettlement();
-        } catch (Exception e) {
+        SettlementPeriod period = SettlementPeriod.parseOrNull(revenuePeriod);
+        if (period == null) {
             log.warn("[ProviderRevenue] Không đọc được kỳ doanh thu '{}' — coi như chưa đóng", revenuePeriod);
             return false;
         }
+        LocalDate today = LocalDate.now(VIETNAM_ZONE);
+
+        // Kỳ đã qua hoàn toàn ⇒ luôn đóng.
+        if (period.getEnd().isBefore(today)) {
+            return true;
+        }
+        // Kỳ hiện tại — chỉ đóng khi Admin cho phép tất toán kỳ chưa kết thúc.
+        return period.getEnd().equals(today) && financeProperties.isAllowOpenPeriodSettlement();
     }
 
     /**

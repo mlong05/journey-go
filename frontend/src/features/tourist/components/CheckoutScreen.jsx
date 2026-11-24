@@ -67,7 +67,8 @@ function CheckoutForm({ tourId }) {
   const params = useSearchParams();
   const guestTypes = useGuestTypes();
   const { user } = useTouristSession();
-  // Tour đã mua ⇒ không thể đặt lại (chặn ngay ở bước nhập hành khách).
+  // Tour đã mua và CÒN HIỆU LỰC ⇒ không thể đặt lại (chặn ngay ở bước nhập hành khách).
+  // ⚠️ Đơn `COMPLETED` (tour đã đi xong) KHÔNG chặn ⇒ du khách đặt tiếp được.
   const { booking: purchased, loading: purchasedLoading } = usePurchasedBooking(tourId);
   const date = params.get("date") || "";
   const [tour, setTour] = useState(null);
@@ -264,9 +265,10 @@ function CheckoutForm({ tourId }) {
   if (!tour) return <div className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />{t("common.loading")}</div>;
 
   /*
-    ⚠️ TOUR ĐÃ MUA ⇒ KHÔNG THỂ ĐẶT LẠI.
+    ⚠️ TOUR ĐÃ MUA (còn hiệu lực) ⇒ KHÔNG THỂ ĐẶT LẠI.
     Chặn ngay ở bước thanh toán (backend cũng chặn với lỗi 409
     `BOOKING_TOUR_ALREADY_PURCHASED` — frontend chỉ để trải nghiệm tốt hơn).
+    ⚠️ Đơn `COMPLETED` (tour đã đi xong) KHÔNG bị chặn ở đây.
   */
   if (purchased) {
     return (
@@ -390,14 +392,15 @@ function CheckoutForm({ tourId }) {
           </div>
         </div>
 
-        {/* Ô thông tin thanh toán: sticky ngay dưới header dính (lg:top-16 = 4rem),
+        {/* Ô thông tin thanh toán: sticky dính ngay dưới header dính (navbar h-16 = 4rem),
+            cộng thêm 10px khoảng cách ⇒ lg:top-[4.625rem] (4rem + 10px).
             chiều cao ôm sát nội dung (không kéo dài theo viewport) ⇒ không có khoảng
             trống thừa trước nút "Xác nhận và thanh toán".
             `lg:self-start` ⇒ grid không kéo giãn ô, nên nó dính đúng chỗ và hiển thị
             trọn vẹn khi cuộn từ đầu đến cuối trang.
             Khối nội dung cuộn nhỏ bên trong khi màn hình thấp (không cuộn cả trang). */}
-        <aside className="lg:sticky lg:top-16 lg:self-start">
-          <div className="flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(16,32,29,0.08)] lg:max-h-[calc(100vh-5rem)]">
+        <aside className="lg:sticky lg:top-[4.625rem] lg:self-start">
+          <div className="flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(16,32,29,0.08)] lg:max-h-[calc(100vh-5.625rem)]">
             <div className="flex min-h-0 flex-col p-4 sm:p-5 lg:p-6">
               {/* Vùng nội dung cuộn riêng khi màn hình thấp (không cuộn trang). */}
               <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">

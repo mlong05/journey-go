@@ -16,6 +16,14 @@ public interface UserRepository
     boolean existsByEmail(String email);
 
     /**
+     * Tài khoản ADMIN đầu tiên trong hệ thống (theo id tăng dần).
+     *
+     * <p>Dùng làm "người tạo" cho các đợt tất toán TỰ ĐỘNG (scheduler) — đợt vẫn do
+     * Admin thật sự xem xét & duyệt, nhưng cần một tài khoản hợp lệ để ghi audit.
+     */
+    Optional<User> findFirstByRoleNameOrderByIdAsc(String roleName);
+
+    /**
      * Tìm kiếm người dùng theo từ khóa / role / active.
      *
      * Lưu ý: dùng JpaSpecificationExecutor (xem {@link UserSpecifications})

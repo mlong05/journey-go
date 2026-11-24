@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -41,6 +42,10 @@ public interface AiChatMessageRepository extends JpaRepository<AiChatMessage, UU
             @Param("sessionId") UUID sessionId,
             @Param("limit") int limit
     );
+
+    Optional<AiChatMessage> findFirstBySessionIdOrderByCreatedAtDesc(UUID sessionId);
+
+    long countBySessionId(UUID sessionId);
 
     /**
      * Xóa tất cả tin nhắn của một session.

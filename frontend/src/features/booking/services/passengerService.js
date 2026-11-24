@@ -99,6 +99,26 @@ export async function getBookingMessages(bookingId) {
   return res?.data ?? res;
 }
 
+/**
+ * Trang tin nhắn MỚI NHẤT của booking — dùng cho phân trang "cuộn lên để load thêm".
+ *
+ * @param {number} bookingId
+ * @param {number} limit        số tin mỗi trang (mặc định 10)
+ * @param {number|null} cursor  id tin cũ nhất đã tải — lấy tin có id nhỏ hơn
+ */
+export async function getBookingMessagesPage(bookingId, limit = 10, cursor = null) {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (cursor != null) query.set("beforeId", String(cursor));
+  const res = await apiClient.get(`${ENDPOINT}/${bookingId}/messages/page?${query.toString()}`);
+  const payload = res?.data ?? res;
+  return {
+    items: Array.isArray(payload?.items) ? payload.items : (payload?.items?.content ?? []),
+    hasMore: Boolean(payload?.hasMore),
+    nextCursor: payload?.nextCursor ?? null,
+    totalCount: Number(payload?.totalCount ?? 0),
+  };
+}
+
 /** Gửi tin nhắn hỗ trợ. */
 export async function sendBookingMessage(bookingId, body) {
   const res = await apiClient.post(`${ENDPOINT}/${bookingId}/messages`, { body });

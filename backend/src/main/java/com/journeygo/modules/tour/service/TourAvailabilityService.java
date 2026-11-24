@@ -2,6 +2,7 @@ package com.journeygo.modules.tour.service;
 
 import com.journeygo.common.exception.AppException;
 import com.journeygo.common.exception.ErrorCode;
+import com.journeygo.modules.experience.entity.Experience;
 import com.journeygo.modules.experience.entity.ExperienceSlot;
 import com.journeygo.modules.experience.repository.ExperienceRepository;
 import com.journeygo.modules.experience.repository.ExperienceSlotRepository;
@@ -191,4 +192,125 @@ public class TourAvailabilityService {
         result.sort((a, b) -> a.date().compareTo(b.date()));
         return result;
     }
+
+    /**
+     * Ngày khởi hành gần nhất CÓ THỂ ĐẶT của nhiều tour (tính từ hôm nay).
+     *
+     * <p>Áp dụng cho CẢ HAI luồng tạo tour:
+     * <ul>
+     *   <li>Tour luồng 5 bước: ngày đầu tiên trong {@link TourSlot} còn mở và còn chỗ;</li>
+     *   <li>Tour luồng cũ: ngày đầu tiên mà các {@link ExperienceSlot} của tour
+     *       còn chỗ (cùng logic với {@link #legacyAvailability}).</li>
+     * </ul>
+     *
+     * <p>⚠️ Trước đây {@code nextDepartureDate} CHỈ được tính cho tour luồng 5 bước ⇒ tour luồng cũ
+     * luôn có {@code nextDepartureDate = null} và bị ẩn khỏi danh sách "Tất cả tour" của du khách
+     * (frontend lọc {@code t.nextDepartureDate}), dù tour vẫn còn ngày đi trong tương lai.
+     *
+     * @return tourId → ngày khởi hành gần nhất (bỏ qua tour không còn ngày nào đặt được)
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, LocalDate> nextDepartureDates(Collection<Tour> tours) {
+        Map<Long, LocalDate> result = new HashMap<>();
+        if (tours == null || tours.isEmpty()) {
+            return result;
+        }
+        LocalDate today = LocalDate.now(TourSubmissionValidator.ZONE);
+
+        // Tour luồng 5 bước: một truy vấn duy nhất cho mọi tour.
+        List<Long> wizardIds = tours.stream().filter(Tour::isWizardTour).map(Tour::getTourId).toList();
+        if (!wizardIds.isEmpty()) {
+            for (TourSlot slot : tourSlotRepository.findByTourIdsBetween(wizardIds, today, today.plusDays(MAX_LOOKAHEAD_DAYS))) {
+                if (slot.getStatus() != TourSlotStatus.OPEN) continue;
+                int capacity = slot.getCapacity() == null ? 0 : slot.getCapacity();
+                int booked = slot.getBookedCount() == null ? 0 : slot.getBookedCount();
+                if (capacity - booked <= 0) continue;
+                result.merge(slot.getTour().getTourId(), slot.getSlotDate(),
+                        (a, b) -> a.isBefore(b) ? a : b);
+            }
+        }
+
+        // Tour luồng cũ: gom slot của TẤT CẢ trải nghiệm của các tour luồng cũ trong 1 lần truy vấn
+        // ⇒ không N+1 (mỗi tour cần 1 ngày ⇒ không cần danh sách đầy đủ).
+        List<Tour> legacyTours = tours.stream()
+                .filter(t -> !t.isWizardTour() && !result.containsKey(t.getTourId()))
+                .toList();
+        if (!legacyTours.isEmpty()) {
+            // tourId → các destinationId của tour.
+            Map<Long, List<Long>> tourDestinationIds = new LinkedHashMap<>();
+            for (Tour tour : legacyTours) {
+                List<Long> destinationIds = tour.getTourDestinations() == null
+                        ? List.of()
+                        : tour.getTourDestinations().stream()
+                                .map(td -> td.getDestination())
+                                .filter(d -> d != null)
+                                .map(d -> d.getId())
+                                .toList();
+                if (!destinationIds.isEmpty()) {
+                    tourDestinationIds.put(tour.getTourId(), destinationIds);
+                }
+            }
+            if (!tourDestinationIds.isEmpty()) {
+                List<Long> allDestinationIds = tourDestinationIds.values().stream()
+                        .flatMap(List::stream).distinct().toList();
+                // destinationId → experienceIds (1 truy vấn cho mọi tour luồng cũ).
+                Map<Long, List<Long>> experiencesByDestination = new LinkedHashMap<>();
+                for (Experience e : experienceRepository.findByDestination_IdInOrderById(allDestinationIds)) {
+                    Long destinationId = e.getDestinationId();
+                    if (destinationId == null) continue;
+                    experiencesByDestination
+                            .computeIfAbsent(destinationId, id -> new ArrayList<>())
+                            .add(e.getId());
+                }
+                // tourId → experienceIds của tour đó.
+                Map<Long, List<Long>> tourExperienceIds = new LinkedHashMap<>();
+                for (Map.Entry<Long, List<Long>> entry : tourDestinationIds.entrySet()) {
+                    List<Long> expIds = entry.getValue().stream()
+                            .flatMap(destId -> experiencesByDestination.getOrDefault(destId, List.of()).stream())
+                            .distinct().toList();
+                    if (!expIds.isEmpty()) {
+                        tourExperienceIds.put(entry.getKey(), expIds);
+                    }
+                }
+                if (!tourExperienceIds.isEmpty()) {
+                    List<Long> allExperienceIds = tourExperienceIds.values().stream()
+                            .flatMap(List::stream).distinct().toList();
+                    // experienceId → các tourId chứa trải nghiệm đó.
+                    Map<Long, List<Long>> toursByExperience = new LinkedHashMap<>();
+                    for (Map.Entry<Long, List<Long>> entry : tourExperienceIds.entrySet()) {
+                        for (Long experienceId : entry.getValue()) {
+                            toursByExperience.computeIfAbsent(experienceId, id -> new ArrayList<>())
+                                    .add(entry.getKey());
+                        }
+                    }
+                    // Ngày → tourId → MIN(remaining) (giống logic legacyAvailability).
+                    Map<LocalDate, Map<Long, Integer>> remainingByDate = new LinkedHashMap<>();
+                    for (ExperienceSlot slot : experienceSlotRepository.findByExperienceIds(allExperienceIds)) {
+                        if (slot.getSlotDate().isBefore(today)) {
+                            continue;
+                        }
+                        int remaining = Math.max(0,
+                                (slot.getMaxTourPerDay() == null ? 0 : slot.getMaxTourPerDay())
+                                        - (slot.getBookedTourCount() == null ? 0 : slot.getBookedTourCount()));
+                        for (Long tourId : toursByExperience.getOrDefault(slot.getExperience().getId(), List.of())) {
+                            remainingByDate
+                                    .computeIfAbsent(slot.getSlotDate(), d -> new LinkedHashMap<>())
+                                    .merge(tourId, remaining, Math::min);
+                        }
+                    }
+                    for (Map.Entry<LocalDate, Map<Long, Integer>> entry : remainingByDate.entrySet()) {
+                        for (Map.Entry<Long, Integer> perTour : entry.getValue().entrySet()) {
+                            if (perTour.getValue() <= 0) continue;
+                            result.merge(perTour.getKey(), entry.getKey(),
+                                    (a, b) -> a.isBefore(b) ? a : b);
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    /** Số ngày nhìn về phía trước khi tìm ngày khởi hành gần nhất (an toàn cho truy vấn). */
+    private static final int MAX_LOOKAHEAD_DAYS = 120;
 }

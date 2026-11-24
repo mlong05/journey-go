@@ -72,7 +72,29 @@ public class RefundReasonConfigService {
                         g,
                         codesByGroup.getOrDefault(g.getId(), List.of()),
                         noShowWindowHoursOf(g.getCode()),
-                        noShowRefundRateOf(g.getCode())))
+                        noShowRefundRateOf(g.getCode()),
+                        refundTiersOf(g.getCode())))
+                .toList();
+    }
+
+    /**
+     * Các bậc tỷ lệ hoàn theo thời điểm hủy của nhóm.
+     *
+     * <p>Chỉ nhóm cá nhân (PERSONAL) có 3 bậc (80% / 50% / 0%) — xem
+     * {@link PersonalRefundPolicy}. Các nhóm khác chỉ có 1 tỷ lệ ⇒ trả danh sách
+     * rỗng (web/mobile tự hiển thị theo {@code refundRate}).
+     */
+    private List<RefundReasonGroupResponse.RefundTierResponse> refundTiersOf(String groupCode) {
+        if (!RefundReason.PERSONAL.name().equals(groupCode)) {
+            return List.of();
+        }
+        return PersonalRefundPolicy.tiers().stream()
+                .map(tier -> RefundReasonGroupResponse.RefundTierResponse.builder()
+                        .code(tier.name())
+                        .conditionLabel(tier.getConditionLabel())
+                        .refundRate(tier.getRate())
+                        .minDays(tier.getMinDays())
+                        .build())
                 .toList();
     }
 

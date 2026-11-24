@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, XCircle, Clock3, Loader2 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
+import { notifyPaymentCompleted } from "./PendingBooking";
 import { touristService } from "../services/touristService";
 import { vnd } from "../utils";
 import { useT } from "@/i18n";
@@ -16,10 +17,52 @@ const VIEW = {
   PENDING: { Icon: Clock3, tone: "bg-amber-50 text-amber-600 ring-amber-50", titleKey: "home.payment.PENDING.title", textKey: "home.payment.PENDING.text" },
 };
 
+/**
+ * Trạng thái Payment mà backend trả về ⇒ màn hình tương ứng.
+ *
+ * ⚠️ `SUPERSEDED` (giao dịch bị thay thế) = đơn ĐÃ được giao dịch khác thanh toán
+ * thành công ⇒ vẫn là "đã thanh toán" ⇒ KHÔNG được rơi về PENDING. Trước đây nó
+ * rơi về PENDING ⇒ khách đã trả tiền vẫn thấy "đang chờ thanh toán" mãi mãi.
+ */
+function viewKeyFor(status) {
+  if (status === "SUCCESS" || status === "SUPERSEDED") return "SUCCESS";
+  if (status === "CANCELLED") return "CANCELLED";
+  if (status === "FAILED" || status === "EXPIRED") return "FAILED";
+  return "PENDING";
+}
+
+/** Trạng thái Booking đã được xác nhận ⇒ đơn KHÔNG còn chờ thanh toán. */
+const PAID_BOOKING_STATUSES = ["CONFIRMED", "COMPLETED"];
+
 /** Trang /payment/result — VNPay chuyển trình duyệt về đây kèm tham số vnp_* đã ký. */
 export default function PaymentResultScreen() {
   const t = useT();
   const [state, setState] = useState({ loading: true, result: null, error: "", errorKey: "" });
+
+  /**
+   * Đồng bộ lại trạng thái đơn từ server.
+   *
+   * ⚠️ VÌ SAO CẦN bước này?
+   * Lần gọi `verifyReturn` đầu tiên có thể chưa phản ánh trạng thái mới nhất:
+   *   • IPN từ VNPay có thể tới SAU ⇒ lúc đó Booking vẫn `PENDING_PAYMENT`.
+   *   • Backend xử lý `Return` trong lúc Booking đã được giao dịch khác xác nhận.
+   * ⇒ Lấy Booking làm nguồn sự thật ⇒ đơn đã trả tiền phải hiện "thành công"
+   * và thanh nhắc "Bạn có đơn chờ thanh toán" phải BIẾN MẤT.
+   */
+  const syncBooking = async (result) => {
+    if (!result?.bookingId) return result;
+    try {
+      const booking = await touristService.booking(result.bookingId);
+      if (booking && PAID_BOOKING_STATUSES.includes(booking.status)) {
+        return { ...result, status: "SUCCESS", bookingStatus: booking.status };
+      }
+      // Booking vẫn chờ thanh toán ⇒ giao dịch chưa được ghi nhận ⇒ giữ nguyên.
+      return { ...result, bookingStatus: booking.status };
+    } catch {
+      // Không đọc được Booking ⇒ giữ kết quả giao dịch đã có, không làm hỏng UI.
+      return result;
+    }
+  };
 
   useEffect(() => {
     const search = window.location.search;
@@ -27,15 +70,53 @@ export default function PaymentResultScreen() {
       queueMicrotask(() => setState({ loading: false, result: null, error: "", errorKey: "home.payment.noParams" }));
       return;
     }
+    let cancelled = false;
     touristService.verifyReturn(search)
-      .then((result) => setState({ loading: false, result, error: "", errorKey: "" }))
-      .catch((err) => setState({ loading: false, result: null, error: err?.message || "", errorKey: "home.payment.verifyError" }));
+      .then((result) => syncBooking(result))
+      .then((result) => {
+        if (cancelled) return;
+        setState({ loading: false, result, error: "", errorKey: "" });
+        // Đơn đã thanh toán ⇒ báo để thanh nhắc "đơn chờ thanh toán" biến mất ngay.
+        if (viewKeyFor(result?.status) === "SUCCESS") notifyPaymentCompleted();
+      })
+      .catch((err) => {
+        if (!cancelled) setState({ loading: false, result: null, error: err?.message || "", errorKey: "home.payment.verifyError" });
+      });
+    return () => { cancelled = true; };
   }, []);
+
+  /**
+   * Tự cập nhật khi còn đang chờ.
+   *
+   * ⚠️ Return URL chỉ chạy MỘT LẦN ⇒ nếu lúc đó backend chưa kịp ghi nhận
+   * (IPN tới muộn, giao dịch chờ xử lý) thì trang bị kẹt ở "Đang chờ xác nhận"
+   * vĩnh viễn dù tiền ĐÃ trừ. ⇒ Poll lại mỗi vài giây, dừng ngay khi có kết quả.
+   */
+  useEffect(() => {
+    const { loading, result, error, errorKey } = state;
+    if (loading || error || errorKey || !result) return;
+    if (viewKeyFor(result.status) !== "PENDING") return;
+
+    const timer = setInterval(() => {
+      touristService.verifyReturn(window.location.search)
+        .then(syncBooking)
+        .then((next) => {
+          setState((prev) => ({ ...prev, result: next }));
+          if (viewKeyFor(next.status) !== "PENDING") {
+            clearInterval(timer);
+            // Vừa xác nhận được thành công ⇒ báo để thanh nhắc đơn chờ biến mất.
+            if (viewKeyFor(next.status) === "SUCCESS") notifyPaymentCompleted();
+          }
+        })
+        .catch(() => { /* giữ nguyên, lần poll sau thử lại */ });
+    }, 5000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.loading, state.error, state.errorKey, state.result?.status, state.result?.bookingId]);
 
   const { loading, result, error, errorKey } = state;
   const errorText = error || (errorKey ? t(errorKey) : "");
-  const key = result?.status === "SUCCESS" ? "SUCCESS" : result?.status === "CANCELLED" ? "CANCELLED"
-    : ["FAILED", "EXPIRED"].includes(result?.status) ? "FAILED" : "PENDING";
+  const key = viewKeyFor(result?.status);
   const view = VIEW[key];
 
   return (

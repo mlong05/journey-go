@@ -20,7 +20,7 @@ public record ProviderRevenueResponse(
         @Schema(description = "Mã đơn") String bookingCode,
         @Schema(description = "ID payment") Long paymentId,
         @Schema(description = "Mã giao dịch thanh toán") String txnRef,
-        @Schema(description = "Kỳ doanh thu (yyyy-MM) — theo tháng hoàn thành trải nghiệm") String revenuePeriod,
+        @Schema(description = "Kỳ doanh thu — chu kỳ 10 ngày (yyyy-MM-D), VD: 2026-10-1 = 01/10 → 10/10/2026") String revenuePeriod,
         @Schema(description = "Ngày hoàn thành trải nghiệm") java.time.LocalDate completedDate,
         @Schema(description = "Số tiền thanh toán thành công ban đầu") BigDecimal grossAmount,
         @Schema(description = "Tổng refund đã hoàn thành thành công") BigDecimal refundAmount,

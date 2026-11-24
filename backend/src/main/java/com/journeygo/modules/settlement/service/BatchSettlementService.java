@@ -15,9 +15,11 @@ import com.journeygo.modules.providerrevenue.repository.ProviderRevenueRepositor
 import com.journeygo.modules.providerrevenue.service.ProviderRevenueService;
 import com.journeygo.modules.settlement.dto.request.CreateBatchSettlementRequest;
 import com.journeygo.modules.settlement.dto.response.BatchSettlementCandidatesResponse;
+import com.journeygo.modules.settlement.dto.response.SettlementHeldResponse;
 import com.journeygo.modules.settlement.dto.response.SettlementResponse;
 import com.journeygo.modules.settlement.entity.Settlement;
 import com.journeygo.modules.settlement.entity.SettlementDetail;
+import com.journeygo.modules.settlement.entity.SettlementPeriod;
 import com.journeygo.modules.settlement.entity.enums.SettlementScope;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
 import com.journeygo.modules.settlement.repository.SettlementDetailRepository;
@@ -35,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,8 +56,10 @@ import java.util.UUID;
  *   <li>Chỉ khoản <b>đủ điều kiện</b> mới vào đợt — đánh giá lại 9 điều kiện tại thời điểm gọi,
  *       y hệt luồng của một đối tác.</li>
  *   <li>Khoản <b>bị giữ lại</b> (chưa đủ điều kiện) KHÔNG vào đợt — vẫn nằm trong danh sách
- *       riêng kèm lý do, được xét lại ở kỳ sau.</li>
- *   <li>Kỳ đóng + doanh thu chuyển tiếp từ kỳ trước — giữ nguyên cơ chế hiện có.</li>
+ *       riêng kèm lý do, được xét lại ở kỳ của chính nó.</li>
+ *   <li><b>Chỉ khoản thuộc ĐÚNG kỳ của đợt</b> — mỗi đợt chỉ gom giao dịch phát sinh
+ *       trong chu kỳ 10 ngày tương ứng (VD đợt "Kỳ 2 — 11/11 → 20/11/2026" chỉ gom giao
+ *       dịch có ngày hoàn thành trong khoảng 11–20/11/2026).</li>
  * </ul>
  *
  * <p><b>Duyệt đợt tổng:</b> tiền được cộng vào ví của TỪNG đối tác theo đúng số tiền của họ
@@ -87,7 +90,42 @@ public class BatchSettlementService {
      */
     @Transactional(readOnly = true)
     public BatchSettlementCandidatesResponse getBatchCandidates(String revenuePeriod) {
-        YearMonth period = parsePeriod(revenuePeriod);
+        return collectBatchCandidates(revenuePeriod, false);
+    }
+
+    /**
+     * Ứng viên tất toán TỔNG — dùng nội bộ (tác vụ nền tự động tạo đợt).
+     *
+     * <p>Khác {@link #getBatchCandidates(String)} ở chỗ BỎ qua kiểm tra quyền sở hữu
+     * dữ liệu tài chính: tác vụ nền chạy ngoài phạm vi HTTP nên không có
+     * {@code SecurityContext}. Kết quả vẫn được Admin kiểm tra lại khi duyệt đợt.
+     */
+    @Transactional(readOnly = true)
+    public BatchSettlementCandidatesResponse getBatchCandidatesInternal(String revenuePeriod) {
+        return collectBatchCandidates(revenuePeriod, true);
+    }
+
+    /**
+     * Thu thập ứng viên tất toán tổng của kỳ.
+     *
+     * @param internal {@code true} ⇒ bỏ qua guard quyền sở hữu (dùng nội bộ / tác vụ nền)
+     */
+    private BatchSettlementCandidatesResponse collectBatchCandidates(String revenuePeriod,
+                                                                    boolean internal) {
+        return collectBatchCandidates(revenuePeriod, internal, true);
+    }
+
+    /**
+     * Thu thập ứng viên tất toán tổng của kỳ.
+     *
+     * @param internal          {@code true} ⇒ bỏ qua guard quyền sở hữu (nội bộ / tác vụ nền)
+     * @param includeCarriedOver có lấy thêm khoản CHƯA ĐỦ ĐIỀU KIỆN của kỳ trước (được
+     *                          đẩy sang kỳ này khi đã đủ điều kiện) hay không
+     */
+    private BatchSettlementCandidatesResponse collectBatchCandidates(String revenuePeriod,
+                                                                    boolean internal,
+                                                                    boolean includeCarriedOver) {
+        SettlementPeriod period = parsePeriod(revenuePeriod);
 
         List<ProviderRevenue> eligible = new ArrayList<>();
         List<BatchSettlementCandidatesResponse.HeldItem> held = new ArrayList<>();
@@ -103,14 +141,16 @@ public class BatchSettlementService {
         // Số đối tác khác nhau có khoản đủ điều kiện — dùng cho "N đối tác".
         java.util.Set<Long> partnerIds = new java.util.LinkedHashSet<>();
 
-        for (ProviderRevenue revenue : collectCandidates(revenuePeriod)) {
+        for (ProviderRevenue revenue : collectCandidates(revenuePeriod, includeCarriedOver)) {
             if (revenue.getStatus() == ProviderRevenueStatus.SETTLED
                     || revenue.getStatus() == ProviderRevenueStatus.IN_SETTLEMENT) {
                 // Đã thuộc đợt khác — không đưa vào ứng viên.
                 continue;
             }
 
-            EligibilityEvaluationResponse evaluation = revenueService.evaluateEligibility(revenue.getId());
+            EligibilityEvaluationResponse evaluation = internal
+                    ? revenueService.evaluateEligibilityInternal(revenue.getId())
+                    : revenueService.evaluateEligibility(revenue.getId());
 
             if (evaluation.eligible()) {
                 eligible.add(revenue);
@@ -135,6 +175,18 @@ public class BatchSettlementService {
                     }
                 }
             } else {
+                // ⚠️ Danh sách "BỊ GIỮ LẠI" gồm 2 nhóm:
+                //
+                //  1. Khoản thuộc ĐÚNG kỳ đang xem, chưa đủ điều kiện.
+                //  2. Khoản thuộc KỲ TRƯỚC, đã được đẩy sang kỳ này để xét lại
+                //     (cơ chế carry-forward) nhưng VẪN chưa đủ điều kiện ⇒ tiếp tục
+                //     chờ. Đây chính là "khoản bị đọng" mà Admin cần thấy.
+                //
+                // ⚠️ KHÔNG được lấy khoản thuộc kỳ VỀ SAU — như vậy mở đợt kỳ 09/2026
+                // lại thấy khoản của 11/2026 nằm trong danh sách giữ lại của kỳ 09 ⇒
+                // Admin tưởng kỳ 09 đang nợ trong khi thực ra đó là kỳ 11.
+                // (Đã chặn ở `collectCandidates` bằng `origin.isBefore(current)`.)
+                boolean carriedOver = !revenuePeriod.equals(revenue.getRevenuePeriod());
                 held.add(BatchSettlementCandidatesResponse.HeldItem.builder()
                         .revenueId(revenue.getId())
                         .providerProfileId(revenue.getProviderProfile() != null
@@ -146,6 +198,7 @@ public class BatchSettlementService {
                         .revenuePeriod(revenue.getRevenuePeriod())
                         .providerNetAmount(revenue.getProviderNetAmount())
                         .deferredReason(evaluation.deferredReason())
+                        .carriedOver(carriedOver)
                         .build());
             }
         }
@@ -156,11 +209,15 @@ public class BatchSettlementService {
         // Đợt tổng ĐANG CHỜ DUYỆT của kỳ này (nếu có) — khi đợt này tồn tại, các khoản
         // doanh thu đã chuyển sang IN_SETTLEMENT nên `eligible` sẽ rỗng ⇒ UI cần
         // thông báo này để giải thích cho Admin.
+        //
+        // ⚠️ Duyệt danh sách (không dùng findFirst) — sau khi từ chối, kỳ có thể có
+        // nhiều đợt (đợt cũ REJECTED + đợt mới DRAFT) ⇒ chỉ lấy đợt đang MỞ.
         BatchSettlementCandidatesResponse.OpenSettlement openSettlement = null;
-        Settlement existingBatch = settlementRepository
-                .findFirstByScopeAndRevenuePeriod(SettlementScope.BATCH, revenuePeriod)
-                .orElse(null);
-        if (existingBatch != null && existingBatch.getStatus().isOpen()) {
+        for (Settlement existingBatch : settlementRepository
+                .findByScopeAndRevenuePeriod(SettlementScope.BATCH, revenuePeriod)) {
+            if (!existingBatch.getStatus().isOpen()) {
+                continue;
+            }
             openSettlement = BatchSettlementCandidatesResponse.OpenSettlement.builder()
                     .id(existingBatch.getId())
                     .settlementCode(existingBatch.getSettlementCode())
@@ -170,10 +227,12 @@ public class BatchSettlementService {
                 .detailCount(detailRepository.findBySettlementIdWithRevenue(existingBatch.getId()).size())
                     .createdAt(existingBatch.getCreatedAt())
                     .build();
+            break;
         }
 
         return BatchSettlementCandidatesResponse.builder()
                 .revenuePeriod(revenuePeriod)
+                .periodLabel(period != null ? period.toDisplayLabel() : revenuePeriod)
                 .eligible(eligible.stream().map(ProviderRevenueResponse::fromEntity).toList())
                 .held(held)
                 .totals(BatchSettlementCandidatesResponse.Totals.builder()
@@ -190,6 +249,81 @@ public class BatchSettlementService {
                 .build();
     }
 
+    // ── Khoản bị giữ lại (chưa đủ điều kiện) ──────────────────────────────────
+
+    /**
+     * Xem các khoản doanh thu BỊ GIỮ LẠI của một kỳ — chưa đủ điều kiện nên không
+     * vào đợt tất toán.
+     *
+     * <p><b>Vì sao cần?</b> Khi đợt được TỰ ĐỘNG tạo, Admin mở đợt ra chỉ thấy các khoản
+     * ĐỦ ĐIỀU KIỆN (đã vào đợt) ⇒ không thấy được những gì đang bị đọng trong chính kỳ đó.
+     * Hàm này bổ sung phần "Bị giữ lại" cho modal chi tiết đợt.
+     *
+     * <p><b>Vòng đời:</b> khoản chưa đủ điều kiện ở kỳ K sẽ được XÉT LẠI ở kỳ K+1
+     * (xem {@link #autoCreateBatchSettlements(int)}) — nếu đủ điều kiện thì vào đợt K+1
+     * và được trả tiền; nếu chưa thì giữ lại và tiếp tục chờ kỳ sau.
+     *
+     * @param revenuePeriod kỳ doanh thu cần xem (VD {@code 2026-10-1})
+     */
+    @Transactional(readOnly = true)
+    public SettlementHeldResponse getHeldItems(String revenuePeriod) {
+        SettlementPeriod period = parsePeriod(revenuePeriod);
+
+        List<SettlementHeldResponse.HeldItem> held = new ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+        java.util.Set<Long> partnerIds = new java.util.LinkedHashSet<>();
+
+        for (ProviderRevenue revenue : collectCandidates(revenuePeriod, true)) {
+            // Đã thuộc đợt nào (đang mở / đã duyệt / đã tất toán) ⇒ không còn "bị giữ".
+            if (revenue.getSettlementId() != null
+                    || revenue.getStatus() == ProviderRevenueStatus.IN_SETTLEMENT
+                    || revenue.getStatus() == ProviderRevenueStatus.SETTLED) {
+                continue;
+            }
+
+            EligibilityEvaluationResponse evaluation = revenueService.evaluateEligibilityInternal(revenue.getId());
+            if (evaluation.eligible()) {
+                // Đã đủ điều kiện ⇒ không phải "bị giữ" (chỉ xảy ra khi đợt đã bị từ chối
+                // nên khoản được giải phóng nhưng chưa kịp vào đợt mới).
+                continue;
+            }
+
+            if (revenue.getProviderProfile() != null) {
+                partnerIds.add(revenue.getProviderProfile().getId());
+            }
+            total = total.add(nz(revenue.getProviderNetAmount()));
+
+            held.add(SettlementHeldResponse.HeldItem.builder()
+                    .revenueId(revenue.getId())
+                    .providerProfileId(revenue.getProviderProfile() != null
+                            ? revenue.getProviderProfile().getId() : null)
+                    .providerName(revenue.getProviderProfile() != null
+                            ? revenue.getProviderProfile().getProviderName() : null)
+                    .bookingId(revenue.getBooking() != null ? revenue.getBooking().getId() : null)
+                    .bookingCode(revenue.getBooking() != null ? revenue.getBooking().getBookingCode() : null)
+                    .revenuePeriod(revenue.getRevenuePeriod())
+                    .grossAmount(nz(revenue.getGrossAmount()))
+                    .providerNetAmount(nz(revenue.getProviderNetAmount()))
+                    .deferredReason(evaluation.deferredReason())
+                    .failedChecks(evaluation.checks() == null ? List.of() : evaluation.checks().stream()
+                            .filter(c -> !c.passed())
+                            .map(c -> c.description() + " — " + (c.detail() != null ? c.detail() : ""))
+                            .toList())
+                    .carriedOver(!revenuePeriod.equals(revenue.getRevenuePeriod()))
+                    .build());
+        }
+
+        return SettlementHeldResponse.builder()
+                .revenuePeriod(revenuePeriod)
+                .periodLabel(period != null ? period.toDisplayLabel() : revenuePeriod)
+                .held(held)
+                .totalAmount(total)
+                .partnerCount(partnerIds.size())
+                // Kỳ kế tiếp là nơi các khoản này sẽ được xét lại khi kỳ đó đóng.
+                .carriedTo(period != null ? period.plusCycles(1).toPeriodString() : null)
+                .build();
+    }
+
     // ── Tạo bản nháp ───────────────────────────────────────────────────────────
 
     /**
@@ -197,17 +331,27 @@ public class BatchSettlementService {
      */
     @Transactional
     public SettlementResponse createBatchSettlement(CreateBatchSettlementRequest request, Long adminId) {
-        YearMonth period = parsePeriod(request.revenuePeriod());
+        SettlementPeriod period = parsePeriod(request.revenuePeriod());
         validatePeriodClosed(period);
 
-        // Chỉ MỘT đợt tổng cho mỗi kỳ — chặn tạo trùng.
-        Settlement existingBatch = settlementRepository
-                .findFirstByScopeAndRevenuePeriod(SettlementScope.BATCH, request.revenuePeriod())
-                .orElse(null);
-        if (existingBatch != null && existingBatch.getStatus().isOpen()) {
+        // Chỉ MỘT đợt tổng "còn sống" cho mỗi kỳ — chặn tạo trùng.
+        //
+        // Đợt đã TỪ CHỐI / HỦY không còn chiếm chỗ ⇒ Admin từ chối xong vẫn tạo lại
+        // thủ công cho cùng kỳ được (đúng luồng nghiệp vụ: từ chối → qua tab
+        // "Tạo đợt tất toán" → chọn lại kỳ → bấm tạo).
+        //
+        // ⚠️ Dùng `findByScopeAndRevenuePeriod` (danh sách) chứ không phải
+        // `findFirstBy...` — sau khi từ chối, kỳ có THỂ có nhiều đợt (đợt cũ REJECTED
+        // + đợt mới DRAFT) ⇒ "findFirst" có thể trả về nhầm đợt cũ và bỏ sót việc
+        // chặn trùng.
+        boolean hasOpenBatch = settlementRepository
+                .findByScopeAndRevenuePeriod(SettlementScope.BATCH, request.revenuePeriod())
+                .stream()
+                .anyMatch(s -> s.getStatus().isOpen());
+        if (hasOpenBatch) {
             throw new AppException(ErrorCode.SETTLEMENT_ALREADY_EXISTS,
                     "Đã có đợt tất toán tổng đang chờ xử lý cho kỳ doanh thu " + request.revenuePeriod()
-                            + " (mã " + existingBatch.getSettlementCode() + ")");
+                            + " — vui lòng duyệt hoặc từ chối đợt đó trước");
         }
 
         User admin = userRepository.findById(adminId)
@@ -219,16 +363,97 @@ public class BatchSettlementService {
                     "Không có khoản doanh thu nào đủ điều kiện để tất toán cho kỳ " + request.revenuePeriod());
         }
 
+        Settlement saved = buildBatchDraft(period, candidates, admin, request.note());
+
+        log.info("[Settlement] Đã tạo bản nháp settlement TỔNG {} kỳ {} — {} đối tác, tổng {}",
+                saved.getSettlementCode(), request.revenuePeriod(), candidates.partnerCount(),
+                saved.getSettlementAmount());
+
+        return SettlementResponse.fromEntity(saved);
+    }
+
+    /**
+     * Tự động tạo bản nháp đợt tất toán TỔNG cho các kỳ ĐÃ ĐÓNG mà chưa có đợt nào.
+     *
+     * <p>Được gọi bởi {@code SettlementAutoCreateScheduler} — Admin chỉ việc XEM XÉT rồi DUYỆT,
+     * không phải tự tạo đợt.
+     *
+     * <p><b>Quy tắc:</b>
+     * <ul>
+     *   <li>Chỉ xét các kỳ 10 ngày ĐÃ kết thúc (đã qua ngày cuối của kỳ).</li>
+     *   <li>Bỏ qua kỳ đã có đợt tổng (đang mở hoặc đã xử lý) ⇒ không tạo trùng.</li>
+     *   <li>Kỳ không có khoản doanh thu đủ điều kiện ⇒ bỏ qua (không tạo đợt rỗng).</li>
+     * </ul>
+     *
+     * @param maxPeriods số kỳ tối đa xét lùi (mới nhất trước)
+     * @return số đợt đã tạo
+     */
+    @Transactional
+    public int autoCreateBatchSettlements(int maxPeriods) {
+        if (maxPeriods <= 0) {
+            return 0;
+        }
+        User system = resolveSystemUser();
+        LocalDate today = LocalDate.now();
+        int created = 0;
+
+        // Duyệt lùi từ kỳ gần nhất ⇒ kỳ mới tạo trước (tiền về đối tác sớm hơn).
+        for (int i = 0; i < maxPeriods; i++) {
+            SettlementPeriod period = resolvePeriodByOffset(today, -i);
+            if (period == null || !period.isClosed(today)) {
+                continue;
+            }
+            String periodKey = period.toPeriodString();
+
+            // Đã có đợt tổng "còn sống" cho kỳ này (đang mở hoặc đã duyệt) ⇒ bỏ qua.
+            //
+            // Đợt đã TỪ CHỐI / HỦY không chặn ⇒ tác vụ nền có thể tạo lại đợt cho kỳ
+            // mà Admin đã từ chối (tiền về đối tác sớm hơn, không cần Admin bấm tay).
+            boolean hasLiveBatch = settlementRepository
+                    .findByScopeAndRevenuePeriod(SettlementScope.BATCH, periodKey)
+                    .stream()
+                    .anyMatch(s -> s.getStatus().isOpen() || s.getStatus().isApproved());
+            if (hasLiveBatch) {
+                continue;
+            }
+
+            BatchSettlementCandidatesResponse candidates = getBatchCandidatesInternal(periodKey);
+            if (candidates.eligible() == null || candidates.eligible().isEmpty()) {
+                log.debug("[Settlement] Kỳ {} không có khoản doanh thu đủ điều kiện — bỏ qua", periodKey);
+                continue;
+            }
+
+            Settlement saved = buildBatchDraft(period, candidates, system,
+                    "Tự động tạo từ kỳ tất toán " + period.toDisplayLabel());
+            created++;
+            log.info("[Settlement] Đã TỰ ĐỘNG tạo bản nháp settlement TỔNG {} kỳ {} — {} đối tác, tổng {}",
+                    saved.getSettlementCode(), periodKey, candidates.partnerCount(),
+                    saved.getSettlementAmount());
+        }
+
+        if (created > 0) {
+            notifications.queueChanged(Role.ADMIN, NotificationPublisher.Queue.SETTLEMENTS);
+        }
+        return created;
+    }
+
+    /**
+     * Dựng bản nháp đợt tất toán tổng từ danh sách ứng viên — gắn khoản doanh thu vào đợt.
+     */
+    private Settlement buildBatchDraft(SettlementPeriod period,
+                                       BatchSettlementCandidatesResponse candidates,
+                                       User createdBy,
+                                       String note) {
         Settlement settlement = Settlement.builder()
                 .settlementCode(generateSettlementCode())
                 .scope(SettlementScope.BATCH)
                 // providerProfile = NULL ⇒ đợt tổng cho cả sàn.
-                .revenuePeriod(request.revenuePeriod())
-                .periodStart(period.atDay(1))
-                .periodEnd(period.atEndOfMonth())
+                .revenuePeriod(period.toPeriodString())
+                .periodStart(period.getStart())
+                .periodEnd(period.getEnd())
                 .status(SettlementStatus.DRAFT)
-                .createdBy(admin)
-                .note(request.note())
+                .createdBy(createdBy)
+                .note(note)
                 .partnerCount(candidates.partnerCount())
                 .build();
 
@@ -286,12 +511,27 @@ public class BatchSettlementService {
         saved.setCommissionAmount(commission);
         saved.setAdjustmentAmount(adjustment);
         saved.setSettlementAmount(net);
-        settlementRepository.save(saved);
+        return settlementRepository.save(saved);
+    }
 
-        log.info("[Settlement] Đã tạo bản nháp settlement TỔNG {} kỳ {} — {} đối tác, tổng {}",
-                saved.getSettlementCode(), request.revenuePeriod(), candidates.partnerCount(), net);
+    /**
+     * Kỳ chứa ngày {@code today}, lùi về {@code offsetCycles} chu kỳ trước.
+     *
+     * <p>Mỗi bước lùi nhảy đúng 1 chu kỳ 10 ngày (không phải lùi N ngày) ⇒ duyệt lùi
+     * danh sách kỳ đã đóng sẽ không bị bỏ sót kỳ ở giữa tháng.
+     */
+    private SettlementPeriod resolvePeriodByOffset(LocalDate today, int offsetCycles) {
+        return SettlementPeriod.of(today).minusCycles(Math.abs(offsetCycles));
+    }
 
-        return SettlementResponse.fromEntity(saved);
+    /**
+     * Tài khoản hệ thống dùng làm người tạo cho đợt tự động.
+     *
+     * <p>Ưu tiên tài khoản ADMIN đầu tiên trong hệ thống; không có thì tạo đợt với
+     * {@code createdBy = null} (cột cho phép null) — việc duyệt vẫn do Admin thực hiện.
+     */
+    private User resolveSystemUser() {
+        return userRepository.findFirstByRoleNameOrderByIdAsc(Role.ADMIN).orElse(null);
     }
 
     // ── Duyệt đợt tổng ─────────────────────────────────────────────────────────
@@ -467,30 +707,84 @@ public class BatchSettlementService {
     /**
      * Gom mọi khoản doanh thu CẦN XÉT cho kỳ — của TẤT CẢ đối tác.
      *
-     * <p>Gồm 2 nguồn (giữ nguyên cơ chế của luồng một đối tác):
-     * <ul>
-     *   <li>Khoản thuộc đúng kỳ đang lập đợt.</li>
-     *   <li>Khoản CHƯA được tất toán từ KỲ TRƯỚC (doanh thu chuyển tiếp) — kỳ quá khứ
-     *       mới được mang sang; kỳ tương lai không phải chuyển tiếp mà là doanh thu chưa tới hạn.</li>
-     * </ul>
+     * <p><b>NGUYÊN TẮC: chỉ khoản thuộc ĐÚNG kỳ đang lập đợt.</b>
+     *
+     * <p>Yêu cầu nghiệp vụ: "Một đợt tất toán chỉ bao gồm những giao dịch đủ điều kiện
+     * mà thôi — ví dụ đợt 01/10/2026 → 10/10/2026 thì chỉ lấy giao dịch trong khoảng
+     * thời gian đó". ⇒ KHÔNG gom khoản của kỳ khác vào đợt.
+     *
+     * <p>⚠️ Trước đây hàm này còn gom thêm "doanh thu chuyển tiếp" — mọi khoản CHƯA
+     * tất toán của TẤT CẢ kỳ trước. Đó là nguyên nhân khiến đợt "Kỳ 2 (11–20/11/2026)"
+     * lại chứa dữ liệu của cả tháng và các tháng trước.
+     *
+     * <p><b>DUY NHẤT ngoại lệ — "khoản chưa đủ điều kiện được đẩy sang kỳ sau":</b>
+     * khoản thuộc kỳ cũ mà BỊ GIỮ LẠI (chưa đủ điều kiện, trạng thái {@code PENDING})
+     * sẽ được xét lại ở kỳ kế tiếp — và CHỈ khi đã đủ điều kiện thì mới vào đợt.
+     * Đây không phải "gom kỳ khác vào đợt" một cách tùy tiện mà là chu kỳ đóng hàng của
+     * khoản thu: mỗi khoản sẽ được tất toán ở đúng một đợt, và đợt đó là đợt của kỳ mà
+     * nó ĐÃ ĐỦ ĐIỀU KIỆN.
+     *
+     * <p>⚠️ Chỉ khoản {@code PENDING} (chưa đủ điều kiện) mới được đẩy. Khoản
+     * {@code ELIGIBLE} (đã đủ điều kiện) của kỳ cũ KHÔNG được kéo sang — nó thuộc về
+     * đợt của chính kỳ đó, và nếu kỳ đó chưa có đợt thì đợt đó sẽ được tạo riêng khi
+     * kỳ đó đóng (xem {@link #autoCreateBatchSettlements(int)}).
+     *
+     * <p>⚠️ Vì sao quét TẤT CẢ kỳ trước chứ không chỉ kỳ liền kề? Vì khoản bị giữ
+     * phải được xét lại ở MỘT kỳ nào đó đã đóng. Nếu chỉ lấy kỳ liền kề mà kỳ đó
+     * đã có đợt rồi (hoặc kỳ đó không có khoản nào đủ điều kiện nên không tạo đợt),
+     * khoản sẽ bị BỎ SÓT mãi mãi. Quét tất cả kỳ trước đã đóng ⇒ khoản luôn tìm
+     * được chỗ để đẩy tới, đúng như bạn mong đợi ("sẽ bị đẩy qua kỳ sau").
+     *
+     * <p>Giới hạn an toàn: chỉ khoản {@code PENDING} mới được đẩy ⇒ đợt KHÔNG BAO
+     * GIỜ gom đè dữ liệu của kỳ khác vào (đúng lỗi Admin đã báo trước đó).
+     *
+     * @param revenuePeriod      kỳ đang lập đợt
+     * @param includeCarriedOver có lấy thêm khoản BỊ GIỮ LẠI của các kỳ TRƯỚC hay không
      */
-    private List<ProviderRevenue> collectCandidates(String revenuePeriod) {
-        List<ProviderRevenue> combined = new ArrayList<>();
+    private List<ProviderRevenue> collectCandidates(String revenuePeriod, boolean includeCarriedOver) {
+        // Chỉ khoản thuộc ĐÚNG kỳ này — mọi đối tác.
+        List<ProviderRevenue> candidates = new ArrayList<>(revenueRepository.findByRevenuePeriod(revenuePeriod));
+        if (!includeCarriedOver) {
+            return candidates;
+        }
 
-        // Khoản thuộc đúng kỳ — mọi đối tác.
-        combined.addAll(revenueRepository.findByRevenuePeriod(revenuePeriod));
+        // Khoản BỊ GIỮ LẠI từ các kỳ TRƯỚC: trạng thái PENDING (chưa đủ điều kiện),
+        // chưa thuộc đợt nào, và kỳ gốc đã KẾT THÚC.
+        SettlementPeriod current = SettlementPeriod.parseOrNull(revenuePeriod);
+        if (current == null) {
+            return candidates;
+        }
 
-        // Doanh thu chuyển tiếp — khoản chưa tất toán của kỳ TRƯỚC.
         for (ProviderRevenue revenue : revenueRepository.findUnsettledByAllProviders()) {
+            // Chỉ khoản CHƯA ĐỦ ĐIỀU KIỆN (PENDING) mới được đẩy sang.
+            if (revenue.getStatus() != ProviderRevenueStatus.PENDING) {
+                continue;
+            }
+            // Đã thuộc đợt nào / đã tất toán ⇒ không đẩy.
+            if (revenue.getSettlementId() != null
+                    || revenue.getStatus() == ProviderRevenueStatus.IN_SETTLEMENT
+                    || revenue.getStatus() == ProviderRevenueStatus.SETTLED) {
+                continue;
+            }
+            // Khoản của chính kỳ đang lập đợt ⇒ đã nằm trong danh sách ứng viên.
             if (revenuePeriod.equals(revenue.getRevenuePeriod())) {
                 continue;
             }
-            if (isPeriodBefore(revenue.getRevenuePeriod(), revenuePeriod)) {
-                combined.add(revenue);
+            // Kỳ gốc CHƯA kết thúc ⇒ khoản vẫn đang ở kỳ hiện tại, chưa phải "chuyển tiếp".
+            SettlementPeriod origin = SettlementPeriod.parseOrNull(revenue.getRevenuePeriod());
+            if (origin == null || !origin.isClosed(LocalDate.now())) {
+                continue;
             }
+            // ⚠️ Kỳ gốc phải ĐỨNG TRƯỚC kỳ đang lập đợt. Nếu không kiểm tra, khoản của
+            // kỳ VỀ SAU (VD khoản của 11/2026 khi mở đợt cho kỳ 09/2026) cũng bị kéo
+            // vào ⇒ danh sách "bị giữ lại" của kỳ 09 hiện khoản của kỳ 11 ⇒ Admin
+            // tưởng kỳ 09 đang nợ 4 khoản trong khi thực ra đó là kỳ 11.
+            if (!origin.isBefore(current)) {
+                continue;
+            }
+            candidates.add(revenue);
         }
-
-        return combined;
+        return candidates;
     }
 
     /**
@@ -510,50 +804,30 @@ public class BatchSettlementService {
     }
 
     /**
-     * Kỳ doanh thu {@code candidate} có nằm TRƯỚC kỳ {@code reference} hay không.
+     * Kiểm tra kỳ doanh thu đã kết thúc.
+     *
+     * <p>Kỳ tất toán chia tháng thành các CHU KỲ 10 NGÀY (1-10, 11-20, 21-cuối tháng).
+     * Chỉ tạo được đợt cho kỳ đã qua NGÀY CUỐI của kỳ.
      */
-    private boolean isPeriodBefore(String candidate, String reference) {
-        if (candidate == null || candidate.isBlank() || reference == null || reference.isBlank()) {
-            return false;
-        }
-        try {
-            return YearMonth.parse(candidate.trim()).isBefore(YearMonth.parse(reference.trim()));
-        } catch (Exception e) {
-            log.warn("[Settlement] Không đọc được kỳ doanh thu '{}' / '{}' — bỏ qua", candidate, reference);
-            return false;
-        }
-    }
-
-    /**
-     * Kiểm tra kỳ doanh thu đã kết thúc (Mục 7.1).
-     */
-    private void validatePeriodClosed(YearMonth period) {
-        YearMonth current = YearMonth.now();
-        if (!period.isBefore(current) && !financeProperties.isAllowOpenPeriodSettlement()) {
+    private void validatePeriodClosed(SettlementPeriod period) {
+        LocalDate today = LocalDate.now();
+        if (!period.isClosed(today) && !financeProperties.isAllowOpenPeriodSettlement()) {
             throw new AppException(ErrorCode.SETTLEMENT_PERIOD_NOT_CLOSED,
-                    "Chỉ cho phép tạo đợt tất toán cho kỳ doanh thu đã kết thúc. Kỳ " + period
-                            + " chưa kết thúc.");
+                    "Chỉ cho phép tạo đợt tất toán cho kỳ doanh thu đã kết thúc. Kỳ "
+                            + period.toDisplayLabel() + " chưa kết thúc.");
         }
         if (financeProperties.getSettlementGraceMinutes() > 0) {
-            java.time.LocalDateTime earliest = period.plusMonths(1).atDay(1).atStartOfDay()
+            java.time.LocalDateTime earliest = period.getEnd().plusDays(1).atStartOfDay()
                     .plusMinutes(financeProperties.getSettlementGraceMinutes());
             if (java.time.LocalDateTime.now().isBefore(earliest)) {
                 throw new AppException(ErrorCode.SETTLEMENT_PERIOD_NOT_CLOSED,
-                        "Chưa đến thời điểm cho phép tạo đợt tất toán cho kỳ " + period);
+                        "Chưa đến thời điểm cho phép tạo đợt tất toán cho kỳ " + period.toDisplayLabel());
             }
         }
     }
 
-    private YearMonth parsePeriod(String period) {
-        if (period == null || period.isBlank()) {
-            throw new AppException(ErrorCode.VALIDATION_ERROR, "Kỳ doanh thu không được để trống");
-        }
-        try {
-            return YearMonth.parse(period.trim());
-        } catch (Exception e) {
-            throw new AppException(ErrorCode.VALIDATION_ERROR,
-                    "Kỳ doanh thu không hợp lệ (kỳ vòng dương lịch yyyy-MM): " + period);
-        }
+    private SettlementPeriod parsePeriod(String period) {
+        return SettlementPeriod.parse(period);
     }
 
     private static BigDecimal nz(BigDecimal value) {
