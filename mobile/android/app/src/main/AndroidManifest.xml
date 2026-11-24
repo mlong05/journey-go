@@ -10,6 +10,12 @@
     <!-- Thông báo mới: hiện thông báo hệ thống có âm thanh (Android 13+ cần xin quyền) và rung -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Hết giờ hoạt động thực địa: báo đúng giờ kể cả khi máy khoá (không có quyền thì tự dùng lịch "không chính xác") -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <!-- flutter_overlay_window: ô đồng hồ đếm ngược nổi trên màn hình chính khi rời app -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
 
     <application
         android:label="mobile"
@@ -61,6 +67,13 @@
         </activity>
         <!-- flutter_local_notifications: hiện thông báo đã hẹn giờ (hết giờ đếm ngược hoạt động thực địa) -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <!-- flutter_overlay_window: dịch vụ giữ ô đồng hồ đếm ngược nổi trên các app khác -->
+        <service android:name="flutter.overlay.window.flutter_overlay_window.OverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Hiện đồng hồ đếm ngược của hoạt động thực địa đang diễn ra khi du khách rời ứng dụng"/>
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

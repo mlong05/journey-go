@@ -18,8 +18,18 @@ import 'l10n/locale_controller.dart';
 import 'screens/booking/invitation_deep_link_host.dart';
 import 'core/services/app_route_observer.dart';
 import 'screens/booking/pending_payment_host.dart';
+import 'screens/journey/activity_overlay.dart';
+import 'screens/journey/activity_timer_bubble.dart';
 import 'screens/tourist_home_screen.dart';
 import 'tourist_auth_screen.dart';
+
+/// Entry point của ô đồng hồ đếm ngược nổi trên màn hình chính (flutter_overlay_window chạy hàm này
+/// trong một Flutter engine riêng — tên hàm phải đúng `overlayMain` và nằm ở `main.dart`).
+@pragma('vm:entry-point')
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ActivityOverlayApp());
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -229,7 +239,11 @@ class _JourneyGoTouristAppState extends State<JourneyGoTouristApp> with WidgetsB
       builder: (context, child) => InvitationDeepLinkHost(
         navigatorKey: _navigatorKey,
         scaffoldMessengerKey: _scaffoldMessengerKey,
-        child: child ?? const SizedBox.shrink(),
+        // Bong bóng đồng hồ đếm ngược của hoạt động thực địa: nổi trên mọi màn khi rời màn nhiệm vụ
+        child: ActivityTimerBubbleHost(
+          navigatorKey: _navigatorKey,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
       home: PendingPaymentHost(
         // ⚠️ `PendingPaymentHost` bọc TOÀN BỘ app (kể cả màn đăng nhập) vì deep
