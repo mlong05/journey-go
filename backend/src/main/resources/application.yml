@@ -61,6 +61,7 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
     validate-on-migrate: true
+    out-of-order: true
     # Không tự động sửa schema lệch — để dev phát hiện sai lệch.
     repair: false
 
