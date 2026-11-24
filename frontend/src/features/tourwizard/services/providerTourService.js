@@ -19,9 +19,15 @@ export const providerTourService = {
   async get(tourId) {
     return data(await apiClient.get(`${ROOT}/${tourId}`));
   },
-  /** Tạo bản nháp; tên không bắt buộc (điền ở bước 1). */
-  async create(title = null) {
-    return data(await apiClient.post(ROOT, { title }));
+  /** Tạo bản nháp; tên không bắt buộc (điền ở bước 1). Hỗ trợ visibility, specificUserEmail, tourRequestId */
+  async create(titleOrData = null) {
+    let body = {};
+    if (typeof titleOrData === "string") {
+      body = { title: titleOrData };
+    } else if (titleOrData && typeof titleOrData === "object") {
+      body = titleOrData;
+    }
+    return data(await apiClient.post(ROOT, body));
   },
   async saveBasicInfo(tourId, body) {
     return data(await apiClient.put(`${ROOT}/${tourId}/basic-info`, body));
@@ -49,6 +55,24 @@ export const providerTourService = {
   },
   async remove(tourId) {
     return data(await apiClient.delete(`${ROOT}/${tourId}`));
+  },
+
+  // ── Nhận và xử lý yêu cầu tạo tour riêng của khách ──────────────────────
+  /** Danh sách yêu cầu tour đang mở (OPEN) chờ đối tác nhận */
+  async listOpenRequests({ page = 0, size = 10 } = {}) {
+    return data(await apiClient.get(`/provider/tour-requests?page=${page}&size=${size}`));
+  },
+  /** Danh sách yêu cầu tour mà đối tác hiện tại đã bấm nhận */
+  async listMyAcceptedRequests({ page = 0, size = 10 } = {}) {
+    return data(await apiClient.get(`/provider/tour-requests/my-accepted?page=${page}&size=${size}`));
+  },
+  /** Chi tiết một yêu cầu tour */
+  async getRequestDetail(requestId) {
+    return data(await apiClient.get(`/provider/tour-requests/${requestId}`));
+  },
+  /** Bấm nhận yêu cầu tour để bắt đầu lên tour riêng cho khách */
+  async acceptRequest(requestId) {
+    return data(await apiClient.post(`/provider/tour-requests/${requestId}/accept`, {}));
   },
 };
 

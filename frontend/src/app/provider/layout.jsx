@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Route,
+  Sparkles,
   Users,
   Headphones,
   Wallet,
@@ -34,6 +35,14 @@ const PROVIDER_NAV_ITEMS = [
     label: "Quản lý Tour Du Lịch",
     href: "/provider/tours",
     icon: Route,
+    group: "Vận hành",
+    badge: null,
+  },
+  {
+    id: "tour-requests",
+    label: "Yêu cầu tour theo nhu cầu",
+    href: "/provider/requests",
+    icon: Sparkles,
     group: "Vận hành",
     badge: null,
   },

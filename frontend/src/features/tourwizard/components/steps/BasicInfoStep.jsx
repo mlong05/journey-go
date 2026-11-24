@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Trash2, Sun, CalendarRange } from "lucide-react";
+import { Plus, Trash2, Sun, CalendarRange, Globe, Lock, Mail, Sparkles } from "lucide-react";
 import { Field, TextInput, TextArea, Select, NumberInput, ImageGallery } from "../FormKit";
 import { issueFor } from "../../hooks/useTourDraft";
 import { LIMITS, BANNED_TITLE_WORDS, NOTICE_SECTIONS } from "../../constants";
@@ -21,6 +21,9 @@ export function titleError(title) {
 
 const fromTour = (tour) => ({
   title: tour.title || "",
+  visibility: tour.visibility || "ALL",
+  specificUserEmail: tour.specificUserEmail || "",
+  tourRequestId: tour.tourRequestId ?? null,
   tourFormat: tour.tourFormat || "DAY_TRIP",
   durationMinutes: tour.durationMinutes ?? null,
   durationDays: tour.durationDays ?? null,
@@ -36,6 +39,9 @@ const fromTour = (tour) => ({
 
 const toBody = (f) => ({
   title: f.title.trim() || undefined,
+  visibility: f.visibility || "ALL",
+  specificUserEmail: f.visibility === "SPECIFIC_USER" ? (f.specificUserEmail?.trim() || null) : null,
+  tourRequestId: f.tourRequestId ? Number(f.tourRequestId) : null,
   tourFormat: f.tourFormat,
   durationMinutes: f.tourFormat === "DAY_TRIP" ? f.durationMinutes : null,
   durationDays: f.tourFormat === "MULTI_DAY" ? f.durationDays : null,
@@ -92,6 +98,78 @@ export default function BasicInfoStep({ tour, regions, themes, issues, readOnly,
             placeholder="Ví dụ: Theo chân thợ mộc khám phá kiến trúc gỗ Hội An"
             onChange={(e) => update({ title: e.target.value })} error={localTitleError || err("title")} />
         </Field>
+
+        {/* Quyền hiển thị & Tour riêng theo yêu cầu */}
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Sparkles size={14} className="text-teal-600" /> Quyền xem và mua tour
+            </span>
+            {form.tourRequestId && (
+              <span className="rounded-md bg-teal-100 px-2 py-0.5 text-[11px] font-bold text-teal-800">
+                Gắn với yêu cầu #{form.tourRequestId}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {[
+              {
+                key: "ALL",
+                label: "Công khai (Tất cả)",
+                desc: "Tour hiển thị công khai trên website cho mọi du khách tìm kiếm và đặt chỗ",
+                Icon: Globe,
+              },
+              {
+                key: "SPECIFIC_USER",
+                label: "Tour riêng theo yêu cầu (Chỉ định khách)",
+                desc: "Chỉ hiển thị và cho phép duy nhất khách hàng được chỉ định xem và thanh toán",
+                Icon: Lock,
+              },
+            ].map(({ key, label, desc, Icon }) => (
+              <button
+                key={key}
+                type="button"
+                disabled={readOnly}
+                onClick={() => update({ visibility: key })}
+                className={`p-3 rounded-xl border text-left flex items-start gap-2.5 cursor-pointer disabled:cursor-default transition ${
+                  form.visibility === key
+                    ? "border-teal-600 bg-teal-50/80 ring-2 ring-teal-600/15"
+                    : "border-slate-200 bg-white hover:bg-slate-50"
+                }`}
+              >
+                <Icon size={18} className={form.visibility === key ? "text-teal-700 mt-0.5" : "text-slate-400 mt-0.5"} />
+                <span>
+                  <span className="block text-sm font-bold text-slate-800">{label}</span>
+                  <span className="block text-[11px] text-slate-500 mt-0.5 leading-snug">{desc}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {form.visibility === "SPECIFIC_USER" && (
+            <div className="pt-2">
+              <Field
+                label="Email của khách hàng yêu cầu"
+                required
+                hint="Khi tour được duyệt, hệ thống sẽ gửi thông báo và mở quyền mua tour độc quyền cho tài khoản có email này."
+                error={err("specificUserEmail")}
+              >
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3.5 top-3 text-slate-400" />
+                  <input
+                    type="email"
+                    disabled={readOnly}
+                    value={form.specificUserEmail || ""}
+                    placeholder="VD: tourist@example.com"
+                    onChange={(e) => update({ specificUserEmail: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 pl-10 pr-3.5 py-2.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-teal-500 focus:outline-none disabled:bg-slate-100"
+                  />
+                </div>
+              </Field>
+            </div>
+          )}
+        </div>
 
         <Field label="Hình thức tour" required error={err("tourFormat")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
