@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -205,6 +206,7 @@ public class AchievementService {
         }
 
         List<AdminAchievementResponse> list = all.stream()
+                .sorted(Comparator.comparing(Achievement::getId, Comparator.nullsLast(Long::compareTo)))
                 .map(a -> {
                     long achievedCount = userAchievementRepository.countByAchievementIdAndStatus(a.getId(), AchievementStatus.CLAIMABLE);
                     long claimedCount = userAchievementRepository.countByAchievementIdAndStatus(a.getId(), AchievementStatus.CLAIMED);
@@ -287,10 +289,13 @@ public class AchievementService {
             a.setCode(newCode);
         }
 
-        Badge badge = a.getBadge();
         if (request.badgeId() != null) {
-            badge = badgeRepository.findById(request.badgeId()).orElse(null);
-            a.setBadge(badge);
+            if (request.badgeId() <= 0) {
+                a.setBadge(null);
+            } else {
+                Badge badge = badgeRepository.findById(request.badgeId()).orElse(null);
+                a.setBadge(badge);
+            }
         }
 
         a.setName(request.name().trim());
@@ -299,8 +304,14 @@ public class AchievementService {
         a.setTier(request.tier());
         a.setTargetValue(request.targetValue());
         a.setPointsReward(request.pointsReward());
-        if (request.badgeName() != null) a.setBadgeName(request.badgeName().trim());
-        if (request.badgeIcon() != null) a.setBadgeIcon(request.badgeIcon().trim());
+        if (request.badgeName() != null) {
+            String trimmedName = request.badgeName().trim();
+            a.setBadgeName(trimmedName.isEmpty() ? null : trimmedName);
+        }
+        if (request.badgeIcon() != null) {
+            String trimmedIcon = request.badgeIcon().trim();
+            a.setBadgeIcon(trimmedIcon.isEmpty() ? null : trimmedIcon);
+        }
         if (request.active() != null) a.setActive(request.active());
 
         Achievement saved = achievementRepository.save(a);

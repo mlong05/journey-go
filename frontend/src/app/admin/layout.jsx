@@ -252,6 +252,7 @@ export default function AdminLayout({ children }) {
     pathname?.startsWith("/admin/themes") ||
     pathname?.startsWith("/admin/commission-policies") ||
     pathname?.startsWith("/admin/finance") ||
+    pathname?.startsWith("/admin/badge-config") ||
     pathname?.startsWith("/admin/vouchers") ||
     pathname?.startsWith("/admin/refunds") ||
     pathname?.startsWith("/admin/settlements");
