@@ -173,6 +173,7 @@ public enum ErrorCode {
     BOOKING_INVITATION_ALREADY_PENDING("Hành khách này đang có một lời mời chờ xác nhận", HttpStatus.CONFLICT),
     BOOKING_MESSAGE_EMPTY("Nội dung tin nhắn không được để trống", HttpStatus.BAD_REQUEST),
     BOOKING_TOUR_LOCKED("Tour chỉ mở từ ngày trải nghiệm — chưa thể bắt đầu hành trình", HttpStatus.CONFLICT),
+    BOOKING_EXPERIENCE_EXPIRED("Đã quá ngày trải nghiệm — không thể bắt đầu hành trình", HttpStatus.CONFLICT),
     PROVIDER_CHAT_CONVERSATION_NOT_FOUND("Cuộc trò chuyện không tồn tại", HttpStatus.NOT_FOUND),
     PROVIDER_CHAT_TARGET_REQUIRED("Cần chọn tour hoặc nhà tour để bắt đầu trò chuyện", HttpStatus.BAD_REQUEST),
     PROVIDER_CHAT_NO_PROVIDER("Tour này chưa có nhà tour liên hệ", HttpStatus.BAD_REQUEST),

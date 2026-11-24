@@ -271,6 +271,9 @@ class BookingModel {
   /// Ngày trải nghiệm — backend trả `LocalDate` (`YYYY-MM-DD`).
   /// Parse thành `DateTime` (không có phần giờ) để các màn hình hiển thị nhất quán.
   final DateTime? experienceDate;
+
+  /// Ngày cuối còn được BẮT ĐẦU hành trình (ngày khởi hành + số ngày tour − 1) — backend tính sẵn.
+  final DateTime? experienceEndDate;
   final num totalAmount;
   final String currency;
   final String status;
@@ -314,6 +317,7 @@ class BookingModel {
     this.meetingPoint,
     this.pickupInfo,
     this.experienceDate,
+    this.experienceEndDate,
     required this.totalAmount,
     this.currency = 'VND',
     required this.status,
@@ -344,6 +348,7 @@ class BookingModel {
         meetingPoint: _blankToNull(json['meetingPoint']),
         pickupInfo: _blankToNull(json['pickupInfo']),
         experienceDate: _asLocalDate(json['experienceDate']),
+        experienceEndDate: _asLocalDate(json['experienceEndDate']),
         totalAmount: _asNum(json['totalAmount']),
         currency: json['currency']?.toString() ?? 'VND',
         status: json['status']?.toString() ?? '',
@@ -504,10 +509,40 @@ class BookingModel {
     return daysUntilExperience < 0 ? 0 : daysUntilExperience;
   }
 
+  /// Ngày cuối được bắt đầu hành trình; backend cũ chưa trả ⇒ coi như tour 1 ngày.
+  DateTime? get lastStartDate => experienceEndDate ?? experienceDate;
+
+  /// Đã qua thời gian tour (sau ngày cuối, giờ Việt Nam) ⇒ KHÔNG bắt đầu hành trình MỚI được nữa.
+  /// Khớp `BookingService.assertJourneyAllowed`. Đơn đã đi xong (COMPLETED) không tính —
+  /// vẫn mở lại để xem hành trình. Hành trình đang dở vẫn tiếp tục được (màn hình tự xét).
+  bool get isExperienceExpired {
+    final end = lastStartDate;
+    if (end == null || isCompleted) return false;
+    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+    final today = DateTime(now.year, now.month, now.day);
+    return today.isAfter(DateTime(end.year, end.month, end.day));
+  }
+
+  /// "25/11" hoặc "25/11 – 27/11" (tour nhiều ngày) — thời gian được bắt đầu trải nghiệm.
+  String get experienceWindowLabel {
+    final start = experienceDate;
+    final end = lastStartDate;
+    if (start == null) return '';
+    String dm(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+    if (end == null || (start.year == end.year && start.month == end.month && start.day == end.day)) {
+      return dm(start);
+    }
+    return '${dm(start)} – ${dm(end)}';
+  }
+
   /// Nhãn nút hành động khi mở tour đã mua:
-  /// "12 ngày nữa lên đường!" khi còn ngày, "Bắt đầu trải nghiệm" khi đã tới ngày.
-  String get startJourneyLabel =>
-      isTourLocked ? appL10n.tripCountdown(daysUntilStart) : appL10n.tdStartExperience;
+  /// "12 ngày nữa lên đường!" khi còn ngày, "Bắt đầu trải nghiệm" khi đã tới ngày,
+  /// "Đã quá ngày trải nghiệm" khi đã qua thời gian tour.
+  String get startJourneyLabel => isTourLocked
+      ? appL10n.tripCountdown(daysUntilStart)
+      : isExperienceExpired
+          ? appL10n.tdExperienceExpired
+          : appL10n.tdStartExperience;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -522,6 +557,9 @@ class BookingModel {
         'experienceDate': experienceDate == null
             ? null
             : formatLocalDateString(experienceDate!.toIso8601String()),
+        'experienceEndDate': experienceEndDate == null
+            ? null
+            : formatLocalDateString(experienceEndDate!.toIso8601String()),
         'totalAmount': totalAmount,
         'currency': currency,
         'status': status,
