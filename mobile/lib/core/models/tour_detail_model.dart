@@ -133,6 +133,7 @@ class StopCulture {
   final String? culturalContent;
   final List<String> culturalImages;
   final List<TourArtifact> artifacts;
+  final List<ThenNowPair> thenNow;
 
   const StopCulture({
     required this.stopId,
@@ -144,6 +145,7 @@ class StopCulture {
     this.culturalContent,
     this.culturalImages = const [],
     this.artifacts = const [],
+    this.thenNow = const [],
   });
 
   factory StopCulture.fromJson(Map<String, dynamic> json) => StopCulture(
@@ -156,9 +158,42 @@ class StopCulture {
         culturalContent: _text(json['culturalContent']),
         culturalImages: _urls(json['culturalImages']),
         artifacts: _maps(json['artifacts']).map(TourArtifact.fromJson).toList(),
+        thenNow: _maps(json['thenNow']).map(ThenNowPair.fromJson).nonNulls.toList(),
       );
 
-  bool get isEmpty => culturalContent == null && culturalImages.isEmpty && artifacts.isEmpty && videoUrl == null;
+  bool get isEmpty =>
+      culturalContent == null && culturalImages.isEmpty && artifacts.isEmpty && videoUrl == null && thenNow.isEmpty;
+}
+
+/// Cặp ảnh "xưa và nay" của điểm dừng (kéo thanh trượt để so sánh).
+class ThenNowPair {
+  final String thenImageUrl;
+  final String nowImageUrl;
+  final String? thenLabel;
+  final String? caption;
+  final String? credit;
+
+  const ThenNowPair({
+    required this.thenImageUrl,
+    required this.nowImageUrl,
+    this.thenLabel,
+    this.caption,
+    this.credit,
+  });
+
+  /// Thiếu một trong hai ảnh thì không so sánh được ⇒ bỏ qua.
+  static ThenNowPair? fromJson(Map<String, dynamic> json) {
+    final then = _url(json['thenImageUrl']);
+    final now = _url(json['nowImageUrl']);
+    if (then == null || now == null) return null;
+    return ThenNowPair(
+      thenImageUrl: then,
+      nowImageUrl: now,
+      thenLabel: _text(json['thenLabel']),
+      caption: _text(json['caption']),
+      credit: _text(json['credit']),
+    );
+  }
 }
 
 /// Hoạt động thực địa tại điểm dừng (tên, thời lượng, điểm).
