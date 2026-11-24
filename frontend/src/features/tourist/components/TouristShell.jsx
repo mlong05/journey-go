@@ -22,6 +22,8 @@ const NAV = [
   { href: ROUTES.COMMUNITY, label: "Cộng đồng", match: (p) => p.startsWith("/community") },
   { href: ROUTES.TRIPS, label: "Chuyến đi của tôi", match: (p) => p.startsWith("/trips"), touristOnly: true },
   { href: ROUTES.PARTNER_PROGRAM, label: "Dành cho đối tác", match: (p) => p.startsWith("/partner"), hideForTourist: true },
+  // Custom tour request for tourists
+  { href: ROUTES.CUSTOM_TOUR_REQUEST, label: "Yêu cầu tour tùy chỉnh", match: (p) => p.startsWith("/tourist/custom-request") },
 ];
 
 const initials = (name) =>

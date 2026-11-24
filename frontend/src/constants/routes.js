@@ -35,6 +35,8 @@ export const ROUTES = {
   ACCOUNT_POSTS: "/account/posts",
   /** Lời mời tham gia tour đang chờ tôi xác nhận: /account/invitations */
   ACCOUNT_INVITATIONS: "/account/invitations",
+  // Custom tour request page for tourists
+  CUSTOM_TOUR_REQUEST: "/tourist/custom-request",
 
   // ── Cộng đồng ─────────────────────────────────────────────────────────────
   /** Bảng tin cộng đồng: /community */
