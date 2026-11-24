@@ -4,12 +4,14 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.journey.dto.*;
 import com.journeygo.modules.journey.entity.enums.JourneyStatus;
 import com.journeygo.modules.journey.service.JourneyService;
+import com.journeygo.modules.journey.service.JourneyTranslationService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,6 +30,7 @@ import java.util.List;
 public class JourneyController {
 
     private final JourneyService journeyService;
+    private final JourneyTranslationService journeyTranslationService;
 
     @PostMapping
     @Operation(summary = "Bắt đầu chuyến đi mới", description = "Khởi tạo phiên hành trình thực tế cho du khách từ đơn đặt tour")
@@ -91,7 +94,9 @@ public class JourneyController {
             @PathVariable Long taskId,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        PuzzleClueResponse response = journeyService.getPuzzleClue(id, taskId, userPrincipal.getId());
+        PuzzleClueResponse response = journeyTranslationService.localizePuzzleClue(
+                journeyService.getPuzzleClue(id, taskId, userPrincipal.getId()),
+                LocaleContextHolder.getLocale());
         return ResponseEntity.ok(ApiResponse.success("Lấy manh mối câu đố thành công", response));
     }
 
@@ -106,7 +111,9 @@ public class JourneyController {
             @RequestParam(required = false) String qrValue,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        TaskQuestionsResponse response = journeyService.getTaskQuestions(id, taskId, userPrincipal.getId(), latitude, longitude, qrValue);
+        TaskQuestionsResponse response = journeyTranslationService.localizeTaskQuestions(
+                journeyService.getTaskQuestions(id, taskId, userPrincipal.getId(), latitude, longitude, qrValue),
+                LocaleContextHolder.getLocale());
         String msg = response.unlocked()
                 ? "Lấy câu hỏi nhiệm vụ thành công"
                 : "Hãy đến đúng địa điểm hoặc quét mã QR để mở câu hỏi";
@@ -149,8 +156,10 @@ public class JourneyController {
             @PathVariable Long destinationId,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return ResponseEntity.ok(ApiResponse.success(
-                journeyService.getDestinationCulture(id, destinationId, userPrincipal.getId())));
+        var culture = journeyTranslationService.localizeStopCulture(
+                journeyService.getDestinationCulture(id, destinationId, userPrincipal.getId()),
+                LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success(culture));
     }
 
     @PatchMapping("/{id}/destinations/{destinationId}/skip")

@@ -58,8 +58,10 @@ public class TourController {
             @RequestParam(required = false) TourSearchFilter.Order order,
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         TourSearchFilter filter = new TourSearchFilter(q, regionId, themeId, format, order);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tour đã xuất bản thành công",
-                tourService.searchPublished(filter, pageable)));
+        PageResponse<TourResponse> page = tourService.searchPublished(filter, pageable);
+        PageResponse<TourResponse> localized = tourTranslationService.localizePublishedTours(
+                page, LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tour đã xuất bản thành công", localized));
     }
 
     @GetMapping("/{tourId}/public-detail")
