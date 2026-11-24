@@ -41,13 +41,14 @@ public class DashboardController {
 
     @GetMapping("/admin/operations")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Trang tổng quan vận hành (kỳ động: hôm nay / 7 ngày / 30 ngày / tháng này / tháng trước / tùy chỉnh)")
+    @Operation(summary = "Trang tổng quan vận hành theo khung so sánh")
     public ResponseEntity<ApiResponse<OperationsOverviewResponse>> operations(
-            @RequestParam(defaultValue = "month") String range,
+            @RequestParam(defaultValue = "rolling") String range,
             @RequestParam(required = false) String from,
-            @RequestParam(required = false) String to) {
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Long regionId) {
         return ResponseEntity.ok(ApiResponse.success("Lấy số liệu tổng quan vận hành thành công",
-                operationsOverviewService.overview(range, from, to)));
+                operationsOverviewService.overview(range, from, to, regionId)));
     }
 
     @GetMapping("/admin/revenue")

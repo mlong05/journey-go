@@ -2,6 +2,9 @@ package com.journeygo.modules.dashboard.service;
 
 import com.journeygo.modules.booking.entity.enums.BookingStatus;
 import com.journeygo.modules.dashboard.dto.OperationsOverviewResponse;
+import com.journeygo.modules.dashboard.dto.OperationsOverviewResponse.BookingFunnel;
+import com.journeygo.modules.dashboard.dto.OperationsOverviewResponse.PendingAction;
+import com.journeygo.modules.dashboard.dto.OperationsOverviewResponse.RegionRow;
 import com.journeygo.modules.journey.entity.enums.JourneyStatus;
 import com.journeygo.modules.partnerapplication.entity.enums.PartnerApplicationStatus;
 import com.journeygo.modules.partnerprofileupdate.entity.enums.PartnerProfileUpdateStatus;
@@ -21,8 +24,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,18 +39,27 @@ import java.util.Map;
  *   <li><b>Doanh thu nền tảng</b> = tổng {@code ProviderRevenue.commissionAmount}
  *       (hoa hồng JourneyGo thu được) — KHÔNG phải toàn bộ tiền khách trả.</li>
  *   <li><b>Hoàn tiền</b> luôn hiển thị riêng, không gộp vào doanh thu.</li>
- *   <li>Mọi số liệu đều có "kỳ trước" cùng độ dài để so sánh tăng trưởng.</li>
  * </ul>
  *
- * <p>⚠️ <b>Tab "Tình hình tài chính &amp; Thanh toán" cố ý TÁCH 3 lớp số liệu</b>
- * (xem {@link #buildFinance}) vì chúng khác nhau cả về mốc thời gian lẫn bản chất tiền:
+ * <p><b>⚠️ Kiến trúc tải dữ liệu: "LÁT CẮT RỒI GOM TRONG BỘ NHỚ".</b>
+ * Trước đây mỗi chỉ số một truy vấn JPQL riêng (~30 truy vấn cho một lần tải trang).
+ * Nay chỉ cần <b>4 truy vấn</b> lấy dữ liệu thô trong khoảng [kỳ hiện tại ∪ kỳ baseline],
+ * rồi gom trong bộ nhớ thành mọi chỉ số, mọi chuỗi xu hướng, mọi phân rã khu vực.
+ * Lợi ích:
+ * <ul>
+ *   <li>Nhanh hơn rõ rệt (ít round-trip hơn, không phải query lại cho từng KPI).</li>
+ *   <li>Dễ mở rộng thêm chiều lọc / thêm khung so sánh mà không nhân số truy vấn.</li>
+ *   <li>Tính tỷ lệ (take rate, tỷ lệ hoàn, tỷ lệ thành công) CHÍNH XÁC vì cùng một
+ *       tập dữ liệu, không lo lệch số liệu giữa các KPI (tiêu chí "dữ liệu nhất quán").</li>
+ * </ul>
+ *
+ * <p><b>⚠️ Ba lớp số liệu có 3 mốc thời gian khác nhau</b> — phải phân biệt rõ khi
+ * đọc số liệu, nếu không sẽ hiểu nhầm:
  * <ol>
- *   <li><b>Dòng tiền khách hàng</b> — theo kỳ đang xem ({@code paid_at} / thời điểm hoàn tiền).</li>
- *   <li><b>Quyết toán</b> — theo đợt tất toán ({@code revenue_period} yyyy-MM-D).</li>
- *   <li><b>Doanh thu ghi nhận</b> — từ {@code ProviderRevenue}, chỉ gồm tour có đối tác gán.</li>
+ *   <li><b>Dòng tiền khách hàng</b> — theo {@code Booking.paidAt} (lúc khách thanh toán).</li>
+ *   <li><b>Lượt đặt tour</b> — theo {@code Booking.createdAt} (lúc tạo đơn).</li>
+ *   <li><b>Quyết toán</b> — theo {@code ProviderRevenue.revenuePeriod} (kỳ 10 ngày).</li>
  * </ol>
- * Trộn 3 lớp này vào cùng một danh sách ô số khiến Admin hiểu nhầm (VD: tưởng
- * "tiền đã quyết toán" là tiền của riêng một đối tác, trong khi đợt BATCH gom N đối tác).
  *
  * <p>Trang này là <b>giao diện giám sát (read-only)</b> — không có thao tác ghi dữ liệu.
  */
@@ -64,8 +74,10 @@ public class OperationsOverviewService {
     private static final List<BookingStatus> PAID_BOOKINGS =
             List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED);
 
-
     private static final int TOP_LIMIT = 5;
+
+    /** Ngưỡng "việc chờ quá lâu" (giờ) — dùng để cảnh báo tồn đọng. */
+    private static final long STALE_THRESHOLD_HOURS = 24;
 
     private final EntityManager em;
 
@@ -79,7 +91,8 @@ public class OperationsOverviewService {
      * nên không gắn badge điều hướng cho Admin.
      *
      * @return map {@code moduleId -> số lượng đang chờ}
-     */    public java.util.Map<String, Long> sidebarBadges() {
+     */
+    public java.util.Map<String, Long> sidebarBadges() {
         java.util.Map<String, Long> badges = new java.util.LinkedHashMap<>();
         badges.put("partners", count("select count(a) from PartnerApplication a where a.status = ?1",
                 PartnerApplicationStatus.PENDING));
@@ -95,125 +108,328 @@ public class OperationsOverviewService {
         return badges;
     }
 
-    public OperationsOverviewResponse overview(String range, String fromParam, String toParam) {
-        Period period = Period.resolve(range, fromParam, toParam);
+    /**
+     * Số liệu tổng quan vận hành theo khung so sánh đang chọn.
+     *
+     * @param range    rolling | monthly | yearly | custom
+     * @param from     ngày bắt đầu (chỉ dùng khi range = custom)
+     * @param to       ngày kết thúc (chỉ dùng khi range = custom)
+     * @param regionId lọc theo khu vực của TOUR (null = toàn sàn)
+     */
+    public OperationsOverviewResponse overview(String range, String fromParam, String toParam,
+            Long regionId) {
+        ComparisonPeriod.Frame period = ComparisonPeriod.resolve(range, fromParam, toParam);
 
-        var kpis = buildKpis(period);
-        var previousKpis = buildKpis(period.previous());
+        // ── 1. Tải dữ liệu thô 1 lần cho cả kỳ hiện tại lẫn kỳ baseline ──
+        Slice slice = loadSlice(period, regionId);
 
-        List<OperationsOverviewResponse.SparkPoint> revenueTrend = buildTrend(period, "commission");
-        List<OperationsOverviewResponse.SparkPoint> gmvTrend = buildTrend(period, "gmv");
-        List<OperationsOverviewResponse.BookingTrendPoint> bookingTrend = buildBookingTrend(period);
+        // ── 2. Gom thành KPI của kỳ hiện tại ──
+        var kpis = buildKpis(slice, period.currentFrom(), period.currentTo());
+        
+        // ── KPI của baseline — dùng CÙNG SỐ NGÀY ĐÃ QUA để tính % công bằng ──
+        // Nếu kỳ hiện tại = 01/11 00:00 – 26/11 00:00 (25 ngày data)
+        // Thì baseline = 01/10 00:00 – 26/10 00:00 (cùng 25 ngày), không phải 01/10 – 31/10
+        Duration currentDuration = Duration.between(period.currentFrom(), period.currentTo());
+        // Duration đã include ngày cuối (vì [from, to) và to là exclusive)
+        // Nên trừ 1 ngày để lấy được ngày cuối inclusive
+        Duration currentDurationExclusive = currentDuration.minusDays(1);
+        Instant baselineToForCurrentDays = period.baselineFrom().plus(currentDurationExclusive).plus(Duration.ofDays(1));
+        var previousKpis = buildKpis(slice, period.baselineFrom(), baselineToForCurrentDays);
 
-        var bookingBreakdown = buildBookingBreakdown(period);
+        // ── 3. Chuỗi xu hướng (đường hiện tại + đường baseline, cùng số điểm) ──
+        var revenueTrend = buildTrend(slice, period, true, true);
+        var previousRevenueTrend = buildTrend(slice, period, false, true);
+        var gmvTrend = buildTrend(slice, period, true, false);
+        var previousGmvTrend = buildTrend(slice, period, false, false);
+
+        // ── 4. Thành phần vận hành ──
+        var bookingBreakdown = buildBookingBreakdown(slice, period.currentFrom(), period.currentTo());
+        var bookingTrend = buildBookingTrend(slice, period);
+        var funnel = buildFunnel(slice, period.currentFrom(), period.currentTo());
+
+        // ── 5. Hành động + phân rã ──
         var pendingActions = buildPendingActions();
-        var topTours = buildTopTours(period);
-        var experience = buildExperienceStats(period);
-        var topDestinations = buildTopDestinations(period);
+        var regions = buildRegions(slice, period.currentFrom(), period.currentTo());
+        var topTours = buildTopTours(slice, period.currentFrom(), period.currentTo());
+        var experience = buildExperienceStats(period.currentFrom(), period.currentTo());
+        var topDestinations = buildTopDestinations(period.currentFrom(), period.currentTo());
 
         long critical = pendingActions.stream().filter(a -> "URGENT".equals(a.severity()))
-                .mapToLong(OperationsOverviewResponse.PendingAction::count).sum();
+                .mapToLong(PendingAction::count).sum();
         long pendingTotal = pendingActions.stream()
-                .mapToLong(OperationsOverviewResponse.PendingAction::count).sum();
+                .mapToLong(PendingAction::count).sum();
         var health = new OperationsOverviewResponse.SystemHealth(
                 critical > 0 ? "DEGRADED" : "STABLE",
                 critical > 0 ? "Có việc khẩn cấp" : "Hệ thống ổn định",
                 critical > 0, critical, pendingTotal);
 
         return new OperationsOverviewResponse(
-                new OperationsOverviewResponse.PeriodInfo(period.key, period.label, period.from, period.to,
-                        period.previousFrom, period.previousTo, period.days()),
+                new OperationsOverviewResponse.PeriodInfo(
+                        period.key().name().toLowerCase(), period.label(), period.currentLabel(), period.baselineLabel(),
+                        period.currentFrom(), period.currentTo(),
+                        period.baselineFrom(), period.baselineTo(),
+                        period.currentDays(), period.baselineDays(),
+                        getBaselineLabelForCurrentDays(period, baselineToForCurrentDays)),
                 health, kpis, previousKpis,
-                revenueTrend, gmvTrend,
+                revenueTrend, previousRevenueTrend,
+                gmvTrend, previousGmvTrend,
                 bookingBreakdown, bookingTrend,
-                pendingActions,
+                funnel,
+                pendingActions, regions,
                 topTours, experience, topDestinations,
                 Instant.now());
     }
 
-    // ───────────────────────── KPI ─────────────────────────
-
-    private OperationsOverviewResponse.KpiSummary buildKpis(Period p) {
-        BigDecimal gmv = sum("select sum(b.totalAmount) from Booking b where b.status in ?1 "
-                + "and b.paidAt >= ?2 and b.paidAt < ?3", PAID_BOOKINGS, p.from, p.to);
-
-        BigDecimal commission = sum("select sum(r.commissionAmount) from ProviderRevenue r "
-                + "where r.booking.paidAt >= ?1 and r.booking.paidAt < ?2", p.from, p.to);
-
-        // ⚠️ Số lượng booking dùng MỐC TẠO BOOKING (createdAt) và phân loại theo
-        // trạng thái HIỆN TẠI ⇒ tổng luôn khớp với "Tổng lượt đặt tour" và với
-        // biểu đồ trạng thái booking (cùng một cửa sổ thời gian, cùng một cách đếm).
-        long totalBookings = count("select count(b) from Booking b where b.createdAt >= ?1 and b.createdAt < ?2",
-                p.from, p.to);
-        long successfulBookings = count("select count(b) from Booking b where b.status in ?1 "
-                + "and b.createdAt >= ?2 and b.createdAt < ?3", PAID_BOOKINGS, p.from, p.to);
-        long activeTourists = count("select count(distinct b.tourist.id) from Booking b "
-                + "where b.createdAt >= ?1 and b.createdAt < ?2", p.from, p.to);
-        long activeProviders = count("select count(distinct t.createdBy.id) from Tour t "
-                + "where t.deleted = false and t.status = ?1 and t.publishedAt >= ?2 and t.publishedAt < ?3",
-                TourStatus.PUBLISHED, p.from, p.to);
-
-        return new OperationsOverviewResponse.KpiSummary(
-                commission, gmv, totalBookings, successfulBookings, activeTourists, activeProviders);
-    }
-
-    // ───────────────────────── Xu hướng ─────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Tải lát cắt — 4 truy vấn, gom trong bộ nhớ
+    // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * Chuỗi điểm theo ngày (hoặc theo giờ/tháng tùy kỳ) cho biểu đồ xu hướng.
+     * Một dòng booking đã gom sẵn các trường cần dùng.
      *
-     * @param metric "commission" (doanh thu nền tảng) | "gmv" (giá trị giao dịch)
+     * @param tourId      tour đặt (dùng gom "top tour")
+     * @param tourTitle   tên tour (dùng gom "top tour" — tránh truy vấn phụ)
+     * @param providerName tên đối tác của tour
      */
-    private List<OperationsOverviewResponse.SparkPoint> buildTrend(Period p, String metric) {
-        Map<String, BigDecimal> commissionByBucket = new LinkedHashMap<>();
-        Map<String, BigDecimal> gmvByBucket = new LinkedHashMap<>();
+    private record BookingRow(Instant createdAt, Instant paidAt, Instant completedAt,
+            BookingStatus status, BigDecimal amount, BigDecimal discountAmount,
+            Long touristId, Long tourId, String tourTitle, String providerName,
+            Long regionId, String regionName) {}
 
-        // Gom doanh thu nền tảng theo vị trí bucket.
-        List<Object[]> commissionRows = query(
-                "select r.booking.paidAt, r.commissionAmount from ProviderRevenue r "
-                        + "where r.booking.paidAt >= ?1 and r.booking.paidAt < ?2", Object[].class, p.from, p.to)
-                .getResultList();
-        for (Object[] row : commissionRows) {
-            if (row[0] == null) continue;
-            int index = p.bucketIndex((Instant) row[0]);
-            if (index < 0) continue;
-            commissionByBucket.merge(String.valueOf(index), toDecimal(row[1]), BigDecimal::add);
+    /** Một dòng doanh thu nền tảng. */
+    private record RevenueRow(Instant paidAt, BigDecimal commission, BigDecimal refund,
+            Long regionId, String regionName) {}
+
+    /** Toàn bộ dữ liệu thô của 2 kỳ (hiện tại + baseline). */
+    private record Slice(List<BookingRow> bookings, List<RevenueRow> revenues) {}
+
+    /**
+     * Tải dữ liệu thô của CẢ kỳ hiện tại lẫn kỳ baseline trong 1 lần.
+     *
+     * <p>Khoảng tải = [min(baselineFrom, currentFrom) .. max(currentTo, baselineTo)].
+     * Với khung "Năm" thì đây là ~2 năm dữ liệu — chấp nhận được vì chỉ 2 truy vấn.
+     */
+    private Slice loadSlice(ComparisonPeriod.Frame period, Long regionId) {
+        Instant from = period.baselineFrom().isBefore(period.currentFrom())
+                ? period.baselineFrom() : period.currentFrom();
+        Instant to = period.currentTo().isAfter(period.baselineTo())
+                ? period.currentTo() : period.baselineTo();
+
+        // ⚠️ Lọc khu vực: dựng câu truy vấn RIÊNG cho có lọc / không lọc.
+        // Cách này tránh việc truyền tham số null cho điều kiện không dùng tới
+        // (Hibernate sẽ ném lỗi khi bind tham số không tồn tại trong câu truy vấn).
+        String bookingSelect = "select b.createdAt, b.paidAt, b.completedAt, b.status, b.totalAmount, "
+                + "b.discountAmount, b.tourist.id, t.id, t.title, t.createdBy.fullName, "
+                + "t.region.id, r.name "
+                + "from Booking b join b.tour t left join t.region r "
+                + "where ((b.createdAt >= :from and b.createdAt < :to) "
+                + "   or (b.paidAt >= :from and b.paidAt < :to) "
+                + "   or (b.completedAt >= :from and b.completedAt < :to))";
+
+        TypedQuery<Object[]> bookingQ = em.createQuery(
+                regionId == null ? bookingSelect : bookingSelect + " and t.region.id = :regionId",
+                Object[].class);
+        bookingQ.setParameter("from", from);
+        bookingQ.setParameter("to", to);
+        if (regionId != null) {
+            bookingQ.setParameter("regionId", regionId);
+        }
+        List<Object[]> bookingRows = bookingQ.getResultList();
+
+        List<BookingRow> bookings = new ArrayList<>(bookingRows.size());
+        for (Object[] row : bookingRows) {
+            bookings.add(new BookingRow(
+                    (Instant) row[0], (Instant) row[1], (Instant) row[2],
+                    (BookingStatus) row[3], toDecimal(row[4]), toDecimal(row[5]),
+                    (Long) row[6], (Long) row[7], (String) row[8], (String) row[9],
+                    (Long) row[10], (String) row[11]));
         }
 
-        // Gom GMV theo vị trí bucket.
-        List<Object[]> gmvRows = query(
-                "select b.paidAt, b.totalAmount from Booking b where b.status in ?1 "
-                        + "and b.paidAt >= ?2 and b.paidAt < ?3", Object[].class, PAID_BOOKINGS, p.from, p.to)
-                .getResultList();
-        for (Object[] row : gmvRows) {
-            if (row[0] == null) continue;
-            int index = p.bucketIndex((Instant) row[0]);
-            if (index < 0) continue;
-            gmvByBucket.merge(String.valueOf(index), toDecimal(row[1]), BigDecimal::add);
+        // Doanh thu gắn với tour ⇒ cùng bộ lọc khu vực.
+        String revenueSelect = "select pr.booking.paidAt, pr.commissionAmount, pr.refundAmount, "
+                + "pr.booking.tour.region.id, r.name "
+                + "from ProviderRevenue pr join pr.booking b join b.tour t left join t.region r "
+                + "where pr.booking.paidAt >= :from and pr.booking.paidAt < :to";
+
+        TypedQuery<Object[]> revenueQ = em.createQuery(
+                regionId == null ? revenueSelect : revenueSelect + " and t.region.id = :regionId",
+                Object[].class);
+        revenueQ.setParameter("from", from);
+        revenueQ.setParameter("to", to);
+        if (regionId != null) {
+            revenueQ.setParameter("regionId", regionId);
+        }
+        List<Object[]> revenueRows = revenueQ.getResultList();
+
+        List<RevenueRow> revenues = new ArrayList<>(revenueRows.size());
+        for (Object[] row : revenueRows) {
+            revenues.add(new RevenueRow(
+                    (Instant) row[0], toDecimal(row[1]), toDecimal(row[2]),
+                    (Long) row[3], (String) row[4]));
         }
 
-        Map<String, BigDecimal> source = "gmv".equals(metric) ? gmvByBucket : commissionByBucket;
-        List<OperationsOverviewResponse.SparkPoint> points = new ArrayList<>();
-        for (int index = 0; index < p.bucketCount(); index++) {
-            points.add(new OperationsOverviewResponse.SparkPoint(
-                    p.bucketLabel(index), source.getOrDefault(String.valueOf(index), BigDecimal.ZERO)));
+        return new Slice(bookings, revenues);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  KPI
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Gom KPI của MỘT khoảng thời gian từ dữ liệu thô đã tải.
+     *
+     * @param from mốc bắt đầu (inclusive)
+     * @param to   mốc kết thúc (exclusive)
+     */
+    private OperationsOverviewResponse.KpiSummary buildKpis(Slice slice, Instant from, Instant to) {
+        BigDecimal gmv = BigDecimal.ZERO;
+        BigDecimal commission = BigDecimal.ZERO;
+        BigDecimal refund = BigDecimal.ZERO;
+        long totalBookings = 0;
+        long successfulBookings = 0;
+        long completedBookings = 0;
+        long paidBookingCount = 0;
+        java.util.Set<Long> tourists = new java.util.HashSet<>();
+        java.util.Set<Long> providers = new java.util.HashSet<>();
+
+        for (BookingRow b : slice.bookings()) {
+            // ⚠️ Số lượng booking dùng MỐC TẠO BOOKING (createdAt) và phân loại theo
+            // trạng thái HIỆN TẠI ⇒ tổng luôn khớp với "Tổng lượt đặt tour" và với
+            // biểu đồ trạng thái booking (cùng một cửa sổ thời gian, cùng một cách đếm).
+            if (within(b.createdAt(), from, to)) {
+                totalBookings++;
+                if (b.touristId() != null) {
+                    tourists.add(b.touristId());
+                }
+                // ⚠️ "Booking thành công" phải dùng CÙNG cơ sở với `breakdown`
+                // (mốc createdAt) — nếu lấy theo paidAt thì tử số và mẫu số của
+                // thẻ KPI lệch nhau ⇒ hiển thị "24 / 54 · 56%" (24/54 = 44%, sai).
+                if (b.status() == BookingStatus.CONFIRMED || b.status() == BookingStatus.COMPLETED) {
+                    successfulBookings++;
+                }
+                if (b.status() == BookingStatus.COMPLETED) {
+                    completedBookings++;
+                }
+            }
+            // GMV & doanh thu dùng MỐC THANH TOÁN (paidAt) — đây là dòng tiền thật.
+            if (b.paidAt() != null && within(b.paidAt(), from, to)
+                    && PAID_BOOKINGS.contains(b.status())) {
+                gmv = gmv.add(b.amount());
+                paidBookingCount++;
+                if (b.touristId() != null) {
+                    tourists.add(b.touristId());
+                }
+            }
+        }
+
+        for (RevenueRow r : slice.revenues()) {
+            if (within(r.paidAt(), from, to)) {
+                commission = commission.add(r.commission());
+                refund = refund.add(r.refund());
+            }
+        }
+
+        // Số đối tác có tour đang publish trong kỳ — dùng truy vấn riêng vì Tour không
+        // nằm trong lát cắt booking (một tour có thể chưa có booking nào).
+        long activeProviders = count(
+                "select count(distinct t.createdBy.id) from Tour t "
+                        + "where t.deleted = false and t.status = ?1 and t.publishedAt >= ?2 and t.publishedAt < ?3",
+                TourStatus.PUBLISHED, from, to);
+
+        double refundRate = gmv.signum() == 0 ? 0
+                : refund.multiply(BigDecimal.valueOf(100)).divide(gmv, 2, RoundingMode.HALF_UP).doubleValue();
+        double successRate = totalBookings == 0 ? 0
+                : round2(successfulBookings * 100.0 / totalBookings);
+        // ⚠️ "Giá trị đơn trung bình" = GMV ÷ SỐ ĐƠN ĐÃ THANH TOÁN (cùng cơ sở paidAt
+        // với GMV). Không dùng `successfulBookings` (cơ sở createdAt) ở đây, nếu không
+        // trung bình sẽ bị lệch.
+        BigDecimal avgBookingValue = paidBookingCount == 0 ? BigDecimal.ZERO
+                : gmv.divide(BigDecimal.valueOf(paidBookingCount), 0, RoundingMode.HALF_UP);
+
+        return new OperationsOverviewResponse.KpiSummary(
+                commission, gmv, totalBookings, successfulBookings,
+                tourists.size(), activeProviders,
+                refund, refundRate, successRate, avgBookingValue);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Xu hướng
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Chuỗi điểm theo bucket thời gian (ngày hoặc tháng) cho biểu đồ xu hướng.
+     *
+     * @param isCurrent   true = lấy dữ liệu kỳ hiện tại, false = kỳ baseline
+     * @param isRevenue   true = doanh thu nền tảng, false = GMV
+     */
+    private List<OperationsOverviewResponse.SparkPoint> buildTrend(Slice slice,
+            ComparisonPeriod.Frame period, boolean isCurrent, boolean isRevenue) {
+        BigDecimal[] buckets = new BigDecimal[period.bucketCount()];
+        java.util.Arrays.fill(buckets, BigDecimal.ZERO);
+
+        if (isRevenue) {
+            for (RevenueRow r : slice.revenues()) {
+                int index = isCurrent
+                        ? period.bucketIndex(r.paidAt())
+                        : period.baselineBucketIndex(r.paidAt());
+                if (index < 0) continue;
+                buckets[index] = buckets[index].add(r.commission());
+            }
+        } else {
+            for (BookingRow b : slice.bookings()) {
+                if (b.paidAt() == null || !PAID_BOOKINGS.contains(b.status())) continue;
+                int index = isCurrent
+                        ? period.bucketIndex(b.paidAt())
+                        : period.baselineBucketIndex(b.paidAt());
+                if (index < 0) continue;
+                buckets[index] = buckets[index].add(b.amount());
+            }
+        }
+
+        List<OperationsOverviewResponse.SparkPoint> points = new ArrayList<>(buckets.length);
+        
+        // ⚠️ Khi isCurrent=true (kỳ hiện tại): các bucket sau "hôm nay" nên là NULL
+        // để biểu đồ không vẽ 0 ở các ngày chưa diễn ra.
+        Instant now = Instant.now();
+        boolean isYearly = period.key() == ComparisonPeriod.FrameKey.YEARLY;
+        int currentMonth = isYearly ? java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).getMonthValue() : -1;
+        
+        for (int index = 0; index < buckets.length; index++) {
+            BigDecimal value = buckets[index];
+            
+            // Nếu là kỳ hiện tại yearly và index ≥ tháng hiện tại → gán null
+            if (isCurrent && isYearly && index >= currentMonth) {
+                points.add(new OperationsOverviewResponse.SparkPoint(
+                        period.bucketLabel(index), null));
+            }
+            // Nếu là kỳ hiện tại (rolling/monthly) và bucket này ở sau hôm nay → gán null
+            else if (isCurrent && !isYearly) {
+                Instant bucketStart = period.currentFrom().plus(
+                        java.time.Duration.ofDays(index));
+                if (bucketStart.isAfter(now)) {
+                    points.add(new OperationsOverviewResponse.SparkPoint(
+                            period.bucketLabel(index), null));
+                } else {
+                    points.add(new OperationsOverviewResponse.SparkPoint(
+                            period.bucketLabel(index), value));
+                }
+            } else {
+                points.add(new OperationsOverviewResponse.SparkPoint(
+                        period.bucketLabel(index), value));
+            }
         }
         return points;
     }
 
-    /** Chuỗi trạng thái booking theo mốc thời gian (cho biểu đồ cột chồng). */
-    private List<OperationsOverviewResponse.BookingTrendPoint> buildBookingTrend(Period p) {
-        long[][] buckets = new long[p.bucketCount()][4];
+    /** Chuỗi trạng thái booking theo bucket thời gian (cho biểu đồ cột chồng). */
+    private List<OperationsOverviewResponse.BookingTrendPoint> buildBookingTrend(
+            Slice slice, ComparisonPeriod.Frame period) {
+        long[][] buckets = new long[period.bucketCount()][4];
 
-        List<Object[]> rows = query(
-                "select b.createdAt, b.status from Booking b where b.createdAt >= ?1 and b.createdAt < ?2",
-                Object[].class, p.from, p.to).getResultList();
-        for (Object[] row : rows) {
-            if (row[0] == null || row[1] == null) continue;
-            int index = p.bucketIndex((Instant) row[0]);
-            if (index < 0) continue;
-            BookingStatus status = (BookingStatus) row[1];
-            switch (status) {
+        for (BookingRow b : slice.bookings()) {
+            int index = period.bucketIndex(b.createdAt());
+            if (index < 0 || b.status() == null) continue;
+            switch (b.status()) {
                 case CONFIRMED, COMPLETED -> buckets[index][0]++;
                 case PENDING_PAYMENT -> buckets[index][1]++;
                 case CANCELLED -> buckets[index][2]++;
@@ -226,7 +442,7 @@ public class OperationsOverviewService {
         for (int index = 0; index < buckets.length; index++) {
             long[] slot = buckets[index];
             points.add(new OperationsOverviewResponse.BookingTrendPoint(
-                    p.bucketLabel(index), slot[0], slot[1], slot[2], slot[3]));
+                    period.bucketLabel(index), slot[0], slot[1], slot[2], slot[3]));
         }
         return points;
     }
@@ -240,22 +456,110 @@ public class OperationsOverviewService {
      *
      * <p>"Thất bại" = booking {@code EXPIRED} (quá hạn thanh toán 10 phút).
      */
-    private OperationsOverviewResponse.BookingBreakdown buildBookingBreakdown(Period p) {
-        long success = count("select count(b) from Booking b where b.status in ?1 "
-                + "and b.createdAt >= ?2 and b.createdAt < ?3", PAID_BOOKINGS, p.from, p.to);
-        long pending = count("select count(b) from Booking b where b.status = ?1 "
-                + "and b.createdAt >= ?2 and b.createdAt < ?3", BookingStatus.PENDING_PAYMENT, p.from, p.to);
-        long cancelled = count("select count(b) from Booking b where b.status = ?1 "
-                + "and b.createdAt >= ?2 and b.createdAt < ?3", BookingStatus.CANCELLED, p.from, p.to);
-        long failed = count("select count(b) from Booking b where b.status = ?1 "
-                + "and b.createdAt >= ?2 and b.createdAt < ?3", BookingStatus.EXPIRED, p.from, p.to);
+    private OperationsOverviewResponse.BookingBreakdown buildBookingBreakdown(
+            Slice slice, Instant from, Instant to) {
+        long success = 0;
+        long pending = 0;
+        long cancelled = 0;
+        long failed = 0;
+
+        for (BookingRow b : slice.bookings()) {
+            if (!within(b.createdAt(), from, to) || b.status() == null) continue;
+            switch (b.status()) {
+                case CONFIRMED, COMPLETED -> success++;
+                case PENDING_PAYMENT -> pending++;
+                case CANCELLED -> cancelled++;
+                case EXPIRED -> failed++;
+                default -> failed++;
+            }
+        }
 
         long total = success + pending + cancelled + failed;
         double ratio = total == 0 ? 0 : round2(success * 100.0 / total);
-        return new OperationsOverviewResponse.BookingBreakdown(success, pending, cancelled, failed, total, ratio);
+        return new OperationsOverviewResponse.BookingBreakdown(
+                success, pending, cancelled, failed, total, ratio);
     }
 
-    // ───────────────────────── Action Center ─────────────────────────
+    /**
+     * Phễu chuyển đổi booking — 3 bậc: đã tạo → đã thanh toán → đã trải nghiệm xong.
+     *
+     * <p>⚠️ Mỗi bậc dùng MỐC RIÊNG (createdAt cho bậc 1, paidAt cho bậc 2, completedAt
+     * cho bậc 3) vì bản chất của 3 mốc khác nhau: tạo đơn / trả tiền / đi xong.
+     * Cùng một cửa sổ thời gian cho cả 3 bậc để so sánh được.
+     */
+    private BookingFunnel buildFunnel(Slice slice, Instant from, Instant to) {
+        long created = 0;
+        long paid = 0;
+        long completed = 0;
+
+        for (BookingRow b : slice.bookings()) {
+            if (within(b.createdAt(), from, to)) {
+                created++;
+            }
+            if (b.paidAt() != null && within(b.paidAt(), from, to)
+                    && PAID_BOOKINGS.contains(b.status())) {
+                paid++;
+            }
+            if (b.completedAt() != null && within(b.completedAt(), from, to)
+                    && b.status() == BookingStatus.COMPLETED) {
+                completed++;
+            }
+        }
+
+        double paidRate = created == 0 ? 0 : round2(paid * 100.0 / created);
+        double completedRate = created == 0 ? 0 : round2(completed * 100.0 / created);
+        return new BookingFunnel(created, paid, completed, paidRate, completedRate);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Phân rã theo khu vực
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Doanh thu & lượt đặt theo KHU VỰC CỦA TOUR.
+     *
+     * <p>⚠️ Tour chưa gán khu vực vẫn được tính vào nhóm "Chưa gán khu vực" ⇒ tổng
+     * luôn khớp với KPI tổng, không "thất lạc" tiền.
+     */
+    private List<RegionRow> buildRegions(Slice slice, Instant from, Instant to) {
+        Map<Long, long[]> counts = new LinkedHashMap<>();
+        Map<Long, BigDecimal> revenue = new LinkedHashMap<>();
+        Map<Long, String> names = new LinkedHashMap<>();
+        Map<Long, java.util.Set<Long>> tourists = new LinkedHashMap<>();
+
+        // Khóa null cho "chưa gán khu vực" — dùng 0L làm khoá thay thế.
+        for (BookingRow b : slice.bookings()) {
+            if (b.paidAt() == null || !PAID_BOOKINGS.contains(b.status())) continue;
+            if (!within(b.paidAt(), from, to)) continue;
+            long key = b.regionId() == null ? 0L : b.regionId();
+            counts.computeIfAbsent(key, k -> new long[1])[0]++;
+            revenue.merge(key, b.amount(), BigDecimal::add);
+            names.putIfAbsent(key, b.regionName());
+            if (b.touristId() != null) {
+                tourists.computeIfAbsent(key, k -> new java.util.HashSet<>()).add(b.touristId());
+            }
+        }
+
+        List<RegionRow> rows = new ArrayList<>();
+        for (Map.Entry<Long, long[]> entry : counts.entrySet()) {
+            Long key = entry.getKey();
+            String name = (key == 0L) ? "Chưa gán khu vực" : names.getOrDefault(key, "Khu vực " + key);
+            rows.add(new RegionRow(
+                    key == 0L ? null : key,
+                    name,
+                    entry.getValue()[0],
+                    revenue.getOrDefault(key, BigDecimal.ZERO),
+                    tourists.getOrDefault(key, java.util.Set.of()).size()));
+        }
+
+        // Sắp xếp theo doanh thu giảm dần — đưa khu vực lớn nhất lên đầu.
+        rows.sort((a, b) -> b.revenue().compareTo(a.revenue()));
+        return rows;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Action Center
+    // ═══════════════════════════════════════════════════════════════════════
 
     /**
      * Action Center — chỉ gồm việc thuộc phạm vi quản trị của Admin.
@@ -264,9 +568,12 @@ public class OperationsOverviewService {
      * duyệt điều chỉnh tài chính, duyệt yêu cầu đổi thông tin đối tác.
      * Việc thẩm định tour/bài viết thuộc vai trò Kiểm duyệt viên nên ở đây chỉ hiển thị
      * SỐ LƯỢNG chờ để Admin nắm quy mô tải việc, không điều hướng tới mô-đun của role khác.
+     *
+     * <p>⚠️ Mỗi việc kèm <b>tuổi chờ</b> (giờ) và <b>số tiền đang đứng</b> ⇒ Admin biết
+     * việc nào cần làm TRƯỚC, không chỉ biết việc nào nhiều nhất.
      */
-    private List<OperationsOverviewResponse.PendingAction> buildPendingActions() {
-        List<OperationsOverviewResponse.PendingAction> actions = new ArrayList<>();
+    private List<PendingAction> buildPendingActions() {
+        List<PendingAction> actions = new ArrayList<>();
 
         // ── Khẩn cấp (đỏ) ──
         // ⚠️ Khiếu nại bài viết thuộc phạm vi Kiểm duyệt viên ⇒ Admin chỉ nắm quy mô
@@ -274,116 +581,183 @@ public class OperationsOverviewService {
         long disputes = count("select count(r) from PostReport r where r.status = ?1",
                 com.journeygo.modules.community.entity.enums.ReportStatus.PENDING);
         if (disputes > 0) {
-            actions.add(new OperationsOverviewResponse.PendingAction("DISPUTES",
+            actions.add(new PendingAction("DISPUTES",
                     "Khiếu nại chưa xử lý", "Kiểm duyệt viên đang xử lý", "URGENT", disputes,
-                    null, "Kiểm duyệt"));
+                    null, "Kiểm duyệt", 0, null));
         }
 
+        // Yêu cầu hoàn tiền — kèm số tiền đang "đứng" và tuổi chờ của việc cũ nhất.
         long refundPending = count("select count(r) from RefundRequest r where r.status = ?1",
                 RefundStatus.PENDING_REVIEW);
         if (refundPending > 0) {
-            actions.add(new OperationsOverviewResponse.PendingAction("REFUNDS",
+            BigDecimal refundAtStake = sum(
+                    "select coalesce(sum(r.proposedAmount), 0.0) from RefundRequest r where r.status = ?1",
+                    RefundStatus.PENDING_REVIEW);
+            long oldest = oldestWaitingHours(
+                    "select min(r.createdAt) from RefundRequest r where r.status = ?1",
+                    RefundStatus.PENDING_REVIEW);
+            actions.add(new PendingAction("REFUNDS",
                     "Yêu cầu hoàn tiền chờ duyệt", "Cần quyết định hoàn hay từ chối", "URGENT", refundPending,
-                    "/admin/refunds", "Xử lý"));
+                    "/admin/refunds", "Xử lý", oldest, refundAtStake));
         }
 
         // ── Xử lý sớm (cam) ──
         long settlementPending = count("select count(s) from Settlement s where s.status = ?1",
                 SettlementStatus.DRAFT);
         if (settlementPending > 0) {
-            actions.add(new OperationsOverviewResponse.PendingAction("SETTLEMENTS",
+            BigDecimal amountAtStake = sum(
+                    "select coalesce(sum(s.settlementAmount), 0.0) from Settlement s where s.status = ?1",
+                    SettlementStatus.DRAFT);
+            long oldest = oldestWaitingHours(
+                    "select min(s.createdAt) from Settlement s where s.status = ?1",
+                    SettlementStatus.DRAFT);
+            actions.add(new PendingAction("SETTLEMENTS",
                     "Quyết toán chờ phê duyệt", "Đợt tất toán của đối tác", "SOON", settlementPending,
-                    "/admin/settlements", "Phê duyệt"));
+                    "/admin/settlements", "Phê duyệt", oldest, amountAtStake));
         }
 
         long adjustmentsPending = count("select count(a) from FinancialAdjustment a where a.status = ?1",
                 FinancialAdjustmentStatus.PENDING);
         if (adjustmentsPending > 0) {
-            actions.add(new OperationsOverviewResponse.PendingAction("ADJUSTMENTS",
+            long oldest = oldestWaitingHours(
+                    "select min(a.createdAt) from FinancialAdjustment a where a.status = ?1",
+                    FinancialAdjustmentStatus.PENDING);
+            actions.add(new PendingAction("ADJUSTMENTS",
                     "Điều chỉnh tài chính chờ duyệt", "Khoản điều chỉnh có căn cứ", "SOON", adjustmentsPending,
-                    "/admin/finance", "Phê duyệt"));
+                    "/admin/finance", "Phê duyệt", oldest, null));
         }
 
         // ── Bình thường (xanh) ──
         long partnerPending = count("select count(a) from PartnerApplication a where a.status = ?1",
                 PartnerApplicationStatus.PENDING);
         if (partnerPending > 0) {
-            actions.add(new OperationsOverviewResponse.PendingAction("PARTNERS",
+            long oldest = oldestWaitingHours(
+                    "select min(a.createdAt) from PartnerApplication a where a.status = ?1",
+                    PartnerApplicationStatus.PENDING);
+            actions.add(new PendingAction("PARTNERS",
                     "Đối tác đăng ký chờ xét duyệt", "Hồ sơ đối tác mới", "NORMAL", partnerPending,
-                    "/admin/partners", "Xem hồ sơ"));
+                    "/admin/partners", "Xem hồ sơ", oldest, null));
         }
 
         long profileUpdatePending = count("select count(u) from PartnerProfileUpdateRequest u where u.status = ?1",
                 PartnerProfileUpdateStatus.PENDING);
         if (profileUpdatePending > 0) {
-            actions.add(new OperationsOverviewResponse.PendingAction("PROFILE_UPDATES",
+            long oldest = oldestWaitingHours(
+                    "select min(u.createdAt) from PartnerProfileUpdateRequest u where u.status = ?1",
+                    PartnerProfileUpdateStatus.PENDING);
+            actions.add(new PendingAction("PROFILE_UPDATES",
                     "Yêu cầu đổi thông tin đối tác", "Chờ phê duyệt cập nhật hồ sơ", "NORMAL", profileUpdatePending,
-                    "/admin/partner-profile-updates", "Xem hồ sơ"));
+                    "/admin/partner-profile-updates", "Xem hồ sơ", oldest, null));
         }
 
         // Tải việc thuộc vai trò Kiểm duyệt viên — hiển thị số lượng, không điều hướng.
         long toursPending = count("select count(t) from Tour t where t.deleted = false and t.status = ?1",
                 TourStatus.PENDING_REVIEW);
         if (toursPending > 0) {
-            actions.add(new OperationsOverviewResponse.PendingAction("TOUR_REVIEWS",
+            actions.add(new PendingAction("TOUR_REVIEWS",
                     "Tour chờ kiểm duyệt", "Kiểm duyệt viên đang xử lý", "NORMAL", toursPending,
-                    null, "Theo dõi"));
+                    null, "Theo dõi", 0, null));
         }
 
         return actions;
     }
 
-    // ───────────────────────── Tour & Experience ─────────────────────────
+    /**
+     * Số giờ chờ của việc CŨ NHẤT trong nhóm — giúp Admin ưu tiên việc bị bỏ quên.
+     *
+     * @return số giờ (0 nếu không có việc nào hoặc không lấy được mốc thời gian)
+     */
+    private long oldestWaitingHours(String jpql, Object... params) {
+        // `select min(...)` luôn trả về ĐÚNG 1 hàng (null nếu không có bản ghi) —
+        // nhưng dùng getResultList cho chắc chắn, tránh NoResultException.
+        List<Instant> rows = query(jpql, Instant.class, params).getResultList();
+        if (rows.isEmpty() || rows.get(0) == null) {
+            return 0;
+        }
+        Instant oldest = rows.get(0);
+        return Math.max(0, Duration.between(oldest, Instant.now()).toHours());
+    }
 
-    private List<OperationsOverviewResponse.TopTourRow> buildTopTours(Period p) {
-        // Booking giữ ManyToOne tới Tour (Tour KHÔNG có collection bookings) ⇒ join ngược từ Booking.
-        List<Object[]> rows = query(
-                "select t.id, t.title, t.createdBy.fullName, count(b.id), sum(b.totalAmount) "
-                        + "from Booking b join b.tour t "
-                        + "where b.status in ?1 and b.paidAt >= ?2 and b.paidAt < ?3 "
-                        + "and t.deleted = false "
-                        + "group by t.id, t.title, t.createdBy.fullName "
-                        + "order by count(b.id) desc, sum(b.totalAmount) desc", Object[].class,
-                PAID_BOOKINGS, p.from, p.to).setMaxResults(TOP_LIMIT).getResultList();
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Tour & Experience
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private List<OperationsOverviewResponse.TopTourRow> buildTopTours(
+            Slice slice, Instant from, Instant to) {
+        // Gom trong bộ nhớ từ lát cắt đã tải (tourId / title / provider đã có sẵn).
+        record TourAgg(Long tourId, String title, String provider, long bookings, BigDecimal revenue,
+                long completed) {}
+
+        Map<Long, long[]> counters = new LinkedHashMap<>();
+        Map<Long, BigDecimal> sums = new LinkedHashMap<>();
+        Map<Long, String> titles = new LinkedHashMap<>();
+        Map<Long, String> providers = new LinkedHashMap<>();
+
+        for (BookingRow b : slice.bookings()) {
+            if (b.paidAt() == null || !PAID_BOOKINGS.contains(b.status())) continue;
+            if (!within(b.paidAt(), from, to)) continue;
+            Long tourId = b.tourId();
+            if (tourId == null) continue;
+            counters.computeIfAbsent(tourId, k -> new long[2])[0]++;
+            sums.merge(tourId, b.amount(), BigDecimal::add);
+            if (b.completedAt() != null && b.status() == BookingStatus.COMPLETED) {
+                counters.get(tourId)[1]++;
+            }
+            titles.putIfAbsent(tourId, b.tourTitle());
+            providers.putIfAbsent(tourId, b.providerName());
+        }
+
+        if (counters.isEmpty()) {
+            return List.of();
+        }
+
+        List<TourAgg> sorted = new ArrayList<>();
+        for (Map.Entry<Long, long[]> entry : counters.entrySet()) {
+            long[] slot = entry.getValue();
+            BigDecimal revenue = sums.getOrDefault(entry.getKey(), BigDecimal.ZERO);
+            sorted.add(new TourAgg(entry.getKey(),
+                    titles.getOrDefault(entry.getKey(), "Tour đã xoá"),
+                    providers.getOrDefault(entry.getKey(), "—"),
+                    slot[0], revenue, slot[1]));
+        }
+        // Xếp hạng theo lượt đặt, tie-break theo doanh thu — đúng như bảng "Top tour".
+        sorted.sort((a, b) -> {
+            int byBookings = Long.compare(b.bookings(), a.bookings());
+            return byBookings != 0 ? byBookings : b.revenue().compareTo(a.revenue());
+        });
 
         List<OperationsOverviewResponse.TopTourRow> result = new ArrayList<>();
         int rank = 1;
-        for (Object[] row : rows) {
-            Long tourId = (Long) row[0];
-            long bookings = toLong(row[3]);
-            BigDecimal revenue = toDecimal(row[4]);
-
-            // Tỷ lệ hoàn thành: booking đã hoàn thành trải nghiệm / tổng booking đã thanh toán.
-            long completed = count("select count(b) from Booking b where b.tour.id = ?1 "
-                    + "and b.status = ?2 and b.paidAt >= ?3 and b.paidAt < ?4",
-                    tourId, BookingStatus.COMPLETED, p.from, p.to);
-            double completionRate = bookings == 0 ? 0 : round2(completed * 100.0 / bookings);
-
+        for (TourAgg t : sorted) {
+            if (rank > TOP_LIMIT) break;
+            double completionRate = t.bookings() == 0 ? 0 : round2(t.completed() * 100.0 / t.bookings());
             result.add(new OperationsOverviewResponse.TopTourRow(
-                    rank++, tourId, (String) row[1], (String) row[2], bookings, revenue, completionRate));
+                    rank++, t.tourId(), t.title(), t.provider(),
+                    t.bookings(), t.revenue(), completionRate));
         }
         return result;
     }
 
-    private OperationsOverviewResponse.ExperienceStats buildExperienceStats(Period p) {
+    private OperationsOverviewResponse.ExperienceStats buildExperienceStats(Instant from, Instant to) {
         long unlocks = count("select count(j) from Journey j where j.createdAt >= ?1 and j.createdAt < ?2",
-                p.from, p.to);
+                from, to);
         long checkIns = count("select count(c) from UserCheckInPoint c where c.isValid = true "
-                + "and c.checkedInAt >= ?1 and c.checkedInAt < ?2", p.from, p.to);
+                + "and c.checkedInAt >= ?1 and c.checkedInAt < ?2", from, to);
         long completed = count("select count(j) from Journey j where j.status = ?1 "
-                + "and j.completedAt >= ?2 and j.completedAt < ?3", JourneyStatus.COMPLETED, p.from, p.to);
+                + "and j.completedAt >= ?2 and j.completedAt < ?3", JourneyStatus.COMPLETED, from, to);
         double rate = unlocks == 0 ? 0 : round2(completed * 100.0 / unlocks);
         return new OperationsOverviewResponse.ExperienceStats(unlocks, checkIns, completed, rate);
     }
 
-    private List<OperationsOverviewResponse.DestinationVisitRow> buildTopDestinations(Period p) {
+    private List<OperationsOverviewResponse.DestinationVisitRow> buildTopDestinations(
+            Instant from, Instant to) {
         List<Object[]> rows = query(
                 "select c.experience.destination.id, c.experience.destination.name, count(c.id) "
                         + "from UserCheckInPoint c where c.isValid = true "
                         + "and c.checkedInAt >= ?1 and c.checkedInAt < ?2 "
                         + "group by c.experience.destination.id, c.experience.destination.name "
-                        + "order by count(c.id) desc", Object[].class, p.from, p.to)
-                .setMaxResults(TOP_LIMIT).getResultList();
+                        + "order by count(c.id) desc",
+                Object[].class, from, to).setMaxResults(TOP_LIMIT).getResultList();
 
         List<OperationsOverviewResponse.DestinationVisitRow> result = new ArrayList<>();
         for (Object[] row : rows) {
@@ -393,7 +767,7 @@ public class OperationsOverviewService {
                     + "where d.destinationId = ?1 and d.status = ?2 and d.completedAt >= ?3 and d.completedAt < ?4",
                     destinationId,
                     com.journeygo.modules.journey.entity.enums.DestinationProgressStatus.COMPLETED,
-                    p.from, p.to);
+                    from, to);
             double rate = checkIns == 0 ? 0 : round2(completions * 100.0 / checkIns);
             result.add(new OperationsOverviewResponse.DestinationVisitRow(
                     destinationId, (String) row[1], checkIns, completions, rate));
@@ -401,22 +775,57 @@ public class OperationsOverviewService {
         return result;
     }
 
-    // ───────────────────────── Helpers ─────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Helpers
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private static String getBaselineLabelForCurrentDays(ComparisonPeriod.Frame period, Instant baselineToForCurrentDays) {
+        LocalDate fromDate = period.baselineFrom().atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate();
+        LocalDate toDate = baselineToForCurrentDays.atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate().minusDays(1);
+        
+        // Nếu yearly, thêm năm vào
+        if (period.key() == ComparisonPeriod.FrameKey.YEARLY) {
+            return String.format("%02d/%02d/%d – %02d/%02d/%d",
+                    fromDate.getDayOfMonth(), fromDate.getMonthValue(), fromDate.getYear(),
+                    toDate.getDayOfMonth(), toDate.getMonthValue(), toDate.getYear());
+        }
+        
+        // Monthly, rolling, custom: không thêm năm (đã có trong baselineLabel)
+        return String.format("%02d/%02d – %02d/%02d",
+                fromDate.getDayOfMonth(), fromDate.getMonthValue(),
+                toDate.getDayOfMonth(), toDate.getMonthValue());
+    }
 
     private long count(String jpql, Object... params) {
-        Long value = query(jpql, Long.class, params).getSingleResult();
-        return value == null ? 0L : value;
+        List<Long> rows = query(jpql, Long.class, params).getResultList();
+        return rows.isEmpty() || rows.get(0) == null ? 0L : rows.get(0);
     }
 
     private BigDecimal sum(String jpql, Object... params) {
-        BigDecimal value = query(jpql, BigDecimal.class, params).getSingleResult();
-        return value == null ? BigDecimal.ZERO : value;
+        List<BigDecimal> rows = query(jpql, BigDecimal.class, params).getResultList();
+        return rows.isEmpty() || rows.get(0) == null ? BigDecimal.ZERO : rows.get(0);
     }
 
     private <T> TypedQuery<T> query(String jpql, Class<T> type, Object... params) {
         TypedQuery<T> q = em.createQuery(jpql, type);
-        for (int i = 0; i < params.length; i++) q.setParameter(i + 1, params[i]);
+        for (int i = 0; i < params.length; i++) {
+            q.setParameter(i + 1, params[i]);
+        }
         return q;
+    }
+
+    /** Kiểm tra thời điểm có nằm trong [from, to) hay không. */
+    private static boolean within(Instant at, Instant from, Instant to) {
+        return at != null && !at.isBefore(from) && at.isBefore(to);
+    }
+
+    /** Format "01/10 – 24/10" từ [from, to) range. */
+    private static String dateRange(Instant from, Instant to) {
+        java.time.LocalDate fromDate = from.atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate();
+        java.time.LocalDate toDate = to.atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate().minusDays(1);
+        return String.format("%02d/%02d – %02d/%02d",
+                fromDate.getDayOfMonth(), fromDate.getMonthValue(),
+                toDate.getDayOfMonth(), toDate.getMonthValue());
     }
 
     private static BigDecimal toDecimal(Object value) {
@@ -434,145 +843,5 @@ public class OperationsOverviewService {
 
     private static double round2(double value) {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
-    }
-
-    // ───────────────────────── Kỳ thời gian ─────────────────────────
-
-    /**
-     * Khoảng thời gian đang xem + khoảng liền trước có CÙNG đỘ DÀI để so sánh tăng trưởng.
-     *
-     * <p>Hỗ trợ: today · week (7 ngày) · month (30 ngày) · prevMonth (tháng trước) ·
-     * custom (from/to dạng yyyy-MM-dd).
-     */
-    private record Period(String key, String label, Instant from, Instant to, Instant previousFrom,
-            Instant previousTo, int bucketCount) {
-
-        static Period resolve(String range, String fromParam, String toParam) {
-            ZonedDateTime now = ZonedDateTime.now(VN_ZONE);
-            ZonedDateTime today = now.toLocalDate().atStartOfDay(VN_ZONE);
-
-            String key = range == null || range.isBlank() ? "month" : range;
-            return switch (key) {
-                case "today" -> {
-                    Instant from = today.toInstant();
-                    Instant to = now.toInstant();
-                    yield new Period("today", "Hôm nay", from, to,
-                            today.minusDays(1).toInstant(), today.toInstant(), 6);
-                }
-                case "week" -> {
-                    Instant from = now.minusDays(7).toInstant();
-                    Instant to = now.toInstant();
-                    yield new Period("week", "7 ngày qua", from, to,
-                            now.minusDays(14).toInstant(), now.minusDays(7).toInstant(), 7);
-                }
-                case "thisMonth" -> {
-                    ZonedDateTime start = today.withDayOfMonth(1);
-                    Instant from = start.toInstant();
-                    Instant to = now.toInstant();
-                    long days = Math.max(1, Duration.between(from, to).toDays());
-                    yield new Period("thisMonth", "Tháng này", from, to,
-                            start.minus(Duration.ofDays(days)).toInstant(), from, (int) days);
-                }
-                case "prevMonth" -> {
-                    ZonedDateTime start = today.withDayOfMonth(1).minusMonths(1);
-                    ZonedDateTime end = today.withDayOfMonth(1);
-                    // ⚠️ Số ngày thực tế của tháng trước (28/29/30/31) ⇒ bucketCount
-                    // dùng CHUNG cho cả kỳ hiện tại & kỳ trước để 2 đường biểu đồ
-                    // luôn cùng số điểm và so sánh đúng theo vị trí.
-                    int days = (int) Duration.between(start.toInstant(), end.toInstant()).toDays();
-                    yield new Period("prevMonth", "Tháng trước", start.toInstant(), end.toInstant(),
-                            start.minusMonths(1).toInstant(), start.toInstant(), days);
-                }
-                case "custom" -> {
-                    Instant from = parseDate(fromParam, today.minusDays(29));
-                    // "Đến ngày" là ngày CUỐI ⇒ mốc kết thúc exclusive = ngày đó + 1 ngày.
-                    Instant to = parseDate(toParam, now).plus(Duration.ofDays(1));
-                    long days = Math.max(1, Duration.between(from, to).toDays());
-                    yield new Period("custom", "Tùy chỉnh", from, to,
-                            from.minus(Duration.ofDays(days)), from,
-                            days > 62 ? 12 : (int) days);
-                }
-                default -> {
-                    // "month" = 30 ngày gần nhất (đặc tả: "30 ngày qua" là mặc định).
-                    Instant from = now.minusDays(30).toInstant();
-                    Instant to = now.toInstant();
-                    yield new Period("month", "30 ngày qua", from, to,
-                            now.minusDays(60).toInstant(), now.minusDays(30).toInstant(), 30);
-                }
-            };
-        }
-
-        private static Instant parseDate(String value, ZonedDateTime fallback) {
-            if (value == null || value.isBlank()) return fallback.toInstant();
-            try {
-                LocalDate date = LocalDate.parse(value.trim().substring(0, Math.min(10, value.trim().length())));
-                return date.atStartOfDay(VN_ZONE).toInstant();
-            } catch (RuntimeException ex) {
-                return fallback.toInstant();
-            }
-        }
-
-        /**
-         * Khoảng liền trước — CÙNG hình dạng (bucket) với kỳ hiện tại để 2 đường
-         * trên biểu đồ so sánh được.
-         *
-         * <p>Giữ nguyên `key` để cơ chế chia nhóm (giờ / ngày / tháng) không đổi.
-         */
-        Period previous() {
-            return new Period(key, label, previousFrom, previousTo, previousFrom, previousTo, bucketCount);
-        }
-
-        /** Số ngày của kỳ (dùng cho nhãn & chia nhóm theo ngày). */
-        int days() {
-            return (int) Math.max(1, Duration.between(from, to).toDays());
-        }
-
-
-        /** Kỳ "Hôm nay" ⇒ chia theo giờ. */
-        boolean isHourly() {
-            return "today".equals(key);
-        }
-
-        /** Kỳ tùy chỉnh dài (> 62 ngày) ⇒ chia theo tháng. */
-        boolean isMonthly() {
-            return days() > 62;
-        }
-
-        /**
-         * Vị trí bucket của một thời điểm bất kỳ trong kỳ.
-         *
-         * <p>Dùng VỊ TRÍ (index) thay vì chuỗi khoá ⇒ 2 kỳ (hiện tại & liền trước)
-         * luôn có cùng số điểm và cùng vị trí ⇒ biểu đồ so sánh được chính xác.
-         *
-         * @return index bucket, hoặc -1 nếu nằm ngoài kỳ.
-         */
-        int bucketIndex(Instant instant) {
-            ZonedDateTime zoned = instant.atZone(VN_ZONE);
-            if (isHourly()) {
-                int index = zoned.getHour() / 4;
-                return index >= 0 && index < 6 ? index : -1;
-            }
-            if (isMonthly()) {
-                ZonedDateTime start = from.atZone(VN_ZONE);
-                int index = (zoned.getYear() - start.getYear()) * 12 + (zoned.getMonthValue() - start.getMonthValue());
-                return index >= 0 && index < bucketCount() ? index : -1;
-            }
-            LocalDate startDate = from.atZone(VN_ZONE).toLocalDate();
-            long index = ChronoUnit.DAYS.between(startDate, zoned.toLocalDate());
-            return index >= 0 && index < bucketCount() ? (int) index : -1;
-        }
-
-        /** Nhãn hiển thị cho bucket thứ {@code index}. */
-        String bucketLabel(int index) {
-            if (isHourly()) {
-                return String.format("%02d:00", index * 4);
-            }
-            if (isMonthly()) {
-                ZonedDateTime m = from.atZone(VN_ZONE).plusMonths(index);
-                return String.format("T%02d/%02d", m.getMonthValue(), m.getYear() % 100);
-            }
-            LocalDate date = from.atZone(VN_ZONE).toLocalDate().plusDays(index);
-            return String.format("%02d/%02d", date.getDayOfMonth(), date.getMonthValue());
-        }
     }
 }
