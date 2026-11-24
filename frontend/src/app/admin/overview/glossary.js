@@ -19,17 +19,38 @@ export const KPI_HINTS = {
   gmv: GLOSSARY.gmv,
   success: "Booking đã thanh toán và được xác nhận (đã xác minh giao dịch thành công).",
   tourists: "Số khách du lịch có đặt tour trong kỳ (đếm theo khách duy nhất).",
+  refundRate: "Tiền đã hoàn khách chia cho GMV của kỳ. Tỷ lệ cao bất thường ⇒ kiểm tra chất lượng tour hoặc chính sách hoàn.",
+  avgBookingValue: "GMV chia cho số booking thành công — giá trị trung bình mỗi đơn trong kỳ.",
+  successRate: "Tỷ lệ booking thành công trên tổng số booking phát sinh trong kỳ.",
 };
+
 
 /** Giải thích cho các thẻ bộ lọc thời gian. */
 export const RANGE_HINTS = {
   today: "Toàn bộ số liệu tính trong ngày hôm nay (0h00 đến lúc hiện tại).",
   week: "Số liệu trong 7 ngày gần nhất tính từ thời điểm hiện tại.",
-  month: "Số liệu trong 30 ngày gần nhất tính từ thời điểm hiện tại. Kỳ trước tương ứng là 30 ngày liền trước đó.",
+  month: "Số liệu trong 30 ngày gần nhất tính từ thời điểm hiện tại.",
   thisMonth: "Số liệu từ đầu tháng hiện tại đến thời điểm hiện tại.",
   prevMonth: "Số liệu của tháng trước. Dùng để so sánh với 'Tháng này'.",
   custom: "Tự chọn khoảng thời gian. Kỳ trước sẽ tự động là khoảng liền trước cùng độ dài.",
 };
+
+/** Giải thích cho các bậc của phễu chuyển đổi đặt tour. */
+export const FUNNEL_HINTS = {
+  created: "Số booking được tạo trong kỳ (kể cả chưa thanh toán).",
+  paid: "Số booking đã thanh toán thành công trong kỳ.",
+  completed: "Số booking đã hoàn thành trải nghiệm trong kỳ.",
+  drop:
+    "Số khách rơi ra khỏi phễu ở bậc này. Bậc 'đã thanh toán → đã trải nghiệm' thấp ⇒ kiểm tra chất lượng tour hoặc vấn đề check-in.",
+};
+
+/** Giải thích cho khối "Doanh thu theo khu vực". */
+export const REGION_HINTS = {
+  basis: "Khu vực lấy theo tour",
+  share: "Tỷ trọng doanh thu của khu vực so với tổng doanh thu trong kỳ.",
+  unassigned: "Tour chưa được gán khu vực — vẫn tính vào tổng để số liệu không bị thiếu.",
+};
+
 
 /** Giải thích cho các trạng thái booking. */
 export const BOOKING_STATE_HINTS = {
