@@ -19,10 +19,15 @@ class TourWizardDetailBody extends StatefulWidget {
   /// Bấm nút "Chat với bên `Tên đối tác`" — mở màn chat hỗ trợ TRƯỚC khi mua tour.
   final VoidCallback? onChatProvider;
 
+  /// Du khách đã mua tour (đơn còn hiệu lực) ⇒ ẩn bảng giá + các ngày khởi hành;
+  /// giờ khởi hành / điểm tập trung / điểm đón chuyển xuống mục "Lưu ý".
+  final bool owned;
+
   const TourWizardDetailBody({
     super.key,
     required this.detail,
     this.onChatProvider,
+    this.owned = false,
   });
 
   @override
@@ -35,7 +40,7 @@ class _TourWizardDetailBodyState extends State<TourWizardDetailBody> {
   final ScrollController _scroll = ScrollController();
 
   /// Chiều cao ảnh đầu trang khi mở rộng (không tính thanh trạng thái).
-  static const double _heroHeight = 330;
+  static const double _heroHeight = 230;
   static const double _tabsHeight = 50;
 
   /// true khi ảnh đầu trang đã cuộn khuất ⇒ thanh trên nền trắng, hiện tên tour.
@@ -49,11 +54,8 @@ class _TourWizardDetailBodyState extends State<TourWizardDetailBody> {
   // Máy chủ ghép ảnh bìa vào đầu `images`; album gồm tối đa 5 ảnh tour riêng (bỏ ảnh bìa).
   List<String> get _album => d.images.where((u) => u != d.coverImageUrl).take(5).toList();
 
-  /// Ảnh trượt ở đầu trang: ảnh bìa + album.
-  List<String> get _heroImages => [
-        if (d.coverImageUrl != null && d.coverImageUrl!.isNotEmpty) d.coverImageUrl!,
-        ..._album,
-      ];
+  /// Ảnh đầu trang: chỉ ảnh bìa provider đã chọn (album vẫn hiện ở mục Giới thiệu).
+  String? get _coverUrl => (d.coverImageUrl?.isNotEmpty ?? false) ? d.coverImageUrl : null;
 
   /// Các mục có nội dung ⇒ các tab trên thanh dính.
   List<(String, String)> get _sections {
@@ -62,8 +64,9 @@ class _TourWizardDetailBodyState extends State<TourWizardDetailBody> {
       if (d.highlights.isNotEmpty || _album.isNotEmpty || d.description != null) ('intro', l10n.tdTabIntro),
       if (d.itinerary.isNotEmpty) ('itinerary', l10n.tdTabItinerary),
       if (d.stops.isNotEmpty) ('stops', l10n.tdTabStops),
-      if (d.prices.isNotEmpty || d.upcomingDepartureDates.isNotEmpty || d.hasDepartureInfo) ('prices', l10n.tdTabPrices),
-      if (d.hasPolicies || d.contactInfo != null) ('notes', l10n.tdTabNotes),
+      if (!widget.owned && (d.prices.isNotEmpty || d.upcomingDepartureDates.isNotEmpty || d.hasDepartureInfo))
+        ('prices', l10n.tdTabPrices),
+      if (d.hasPolicies || d.contactInfo != null || (widget.owned && d.hasDepartureInfo)) ('notes', l10n.tdTabNotes),
     ];
   }
 
@@ -167,7 +170,7 @@ class _TourWizardDetailBodyState extends State<TourWizardDetailBody> {
             background: Stack(
               fit: StackFit.expand,
               children: [
-                _HeroGallery(images: _heroImages),
+                _HeroCover(url: _coverUrl),
                 // Mép bo tròn của phần nội dung đè lên ảnh
                 Positioned(
                   left: 0,
@@ -276,6 +279,54 @@ class _TourWizardDetailBodyState extends State<TourWizardDetailBody> {
             ),
         ],
         if (_sections.any((s) => s.$1 == 'prices')) _anchor('prices'),
+        if (!widget.owned) ..._pricesAndDepartures(),
+        if (_sections.any((s) => s.$1 == 'notes')) _anchor('notes'),
+        // Đã mua: chỉ giữ thông tin cần để đi đúng giờ, đúng chỗ
+        if (widget.owned && d.hasDepartureInfo) ...[
+          _SectionTitle(l10n.tdDepartureInfo),
+          _card(DepartureInfoList(
+            departureTime: d.departureTime,
+            meetingPoint: d.meetingPoint,
+            pickupInfo: d.pickupInfo,
+          )),
+        ],
+        if (d.hasPolicies) ...[
+          _SectionTitle(l10n.tdNotes),
+          _card(Column(
+            children: [
+              if (d.priceIncludes != null)
+                _PolicyTile(icon: Icons.add_task_rounded, title: l10n.tdPriceIncludes, text: d.priceIncludes!),
+              if (d.priceExcludes != null)
+                _PolicyTile(icon: Icons.remove_circle_outline_rounded, title: l10n.tdPriceExcludes, text: d.priceExcludes!),
+              if (d.cancellationPolicy != null)
+                _PolicyTile(icon: Icons.event_busy_rounded, title: l10n.tdCancellationPolicy, text: d.cancellationPolicy!),
+              if (d.refundPolicy != null)
+                _PolicyTile(icon: Icons.currency_exchange_rounded, title: l10n.tdRefundPolicy, text: d.refundPolicy!),
+              if (d.forceMajeure != null)
+                _PolicyTile(icon: Icons.thunderstorm_rounded, title: l10n.tdForceMajeure, text: d.forceMajeure!),
+            ],
+          ), padding: const EdgeInsets.symmetric(vertical: 4)),
+        ],
+        if (d.contactInfo != null) ...[
+          _SectionTitle(l10n.tdContact),
+          _card(Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.support_agent_rounded, color: AppCultureColors.oceanBlue),
+              const SizedBox(width: 10),
+              Expanded(child: SelectableText(d.contactInfo!, style: _body)),
+            ],
+          )),
+        ],
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  /// Bảng giá + lịch khởi hành (giờ/điểm tập trung + các ngày) — chỉ cho khách CHƯA mua.
+  List<Widget> _pricesAndDepartures() {
+    final l10n = context.l10n;
+    return [
         if (d.prices.isNotEmpty) ...[
           _SectionTitle(l10n.tdPriceTable),
           _card(Column(
@@ -334,38 +385,7 @@ class _TourWizardDetailBodyState extends State<TourWizardDetailBody> {
             ),
           ),
         ],
-        if (_sections.any((s) => s.$1 == 'notes')) _anchor('notes'),
-        if (d.hasPolicies) ...[
-          _SectionTitle(l10n.tdNotes),
-          _card(Column(
-            children: [
-              if (d.priceIncludes != null)
-                _PolicyTile(icon: Icons.add_task_rounded, title: l10n.tdPriceIncludes, text: d.priceIncludes!),
-              if (d.priceExcludes != null)
-                _PolicyTile(icon: Icons.remove_circle_outline_rounded, title: l10n.tdPriceExcludes, text: d.priceExcludes!),
-              if (d.cancellationPolicy != null)
-                _PolicyTile(icon: Icons.event_busy_rounded, title: l10n.tdCancellationPolicy, text: d.cancellationPolicy!),
-              if (d.refundPolicy != null)
-                _PolicyTile(icon: Icons.currency_exchange_rounded, title: l10n.tdRefundPolicy, text: d.refundPolicy!),
-              if (d.forceMajeure != null)
-                _PolicyTile(icon: Icons.thunderstorm_rounded, title: l10n.tdForceMajeure, text: d.forceMajeure!),
-            ],
-          ), padding: const EdgeInsets.symmetric(vertical: 4)),
-        ],
-        if (d.contactInfo != null) ...[
-          _SectionTitle(l10n.tdContact),
-          _card(Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.support_agent_rounded, color: AppCultureColors.oceanBlue),
-              const SizedBox(width: 10),
-              Expanded(child: SelectableText(d.contactInfo!, style: _body)),
-            ],
-          )),
-        ],
-        const SizedBox(height: 32),
-      ],
-    );
+    ];
   }
 
   Widget _card(Widget child, {EdgeInsetsGeometry padding = const EdgeInsets.all(14)}) {
@@ -417,23 +437,16 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-/// Ảnh đầu trang tràn viền: ảnh bìa + album vuốt ngang, bộ đếm "1/6"; bấm để xem toàn màn hình.
-/// Không có ảnh nào thì nền gradient xanh ngọc kèm biểu tượng.
-class _HeroGallery extends StatefulWidget {
-  final List<String> images;
-  const _HeroGallery({required this.images});
-
-  @override
-  State<_HeroGallery> createState() => _HeroGalleryState();
-}
-
-class _HeroGalleryState extends State<_HeroGallery> {
-  int _index = 0;
+/// Ảnh đầu trang tràn viền: chỉ ảnh bìa của tour; bấm để xem toàn màn hình.
+/// Không có ảnh bìa thì nền gradient xanh ngọc kèm biểu tượng.
+class _HeroCover extends StatelessWidget {
+  final String? url;
+  const _HeroCover({required this.url});
 
   @override
   Widget build(BuildContext context) {
-    final images = widget.images;
-    if (images.isEmpty) {
+    final cover = url;
+    if (cover == null) {
       final style = TourStyle.of('CULTURAL');
       return DecoratedBox(
         decoration: const BoxDecoration(
@@ -449,16 +462,12 @@ class _HeroGalleryState extends State<_HeroGallery> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        PageView.builder(
-          itemCount: images.length,
-          onPageChanged: (i) => setState(() => _index = i),
-          itemBuilder: (_, i) => GestureDetector(
-            onTap: () => _openPhotoViewer(context, images, i),
-            child: Image.network(
-              images[i],
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const ColoredBox(color: AppCultureColors.surfaceSubtle),
-            ),
+        GestureDetector(
+          onTap: () => _openPhotoViewer(context, [cover], 0),
+          child: Image.network(
+            cover,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => const ColoredBox(color: AppCultureColors.surfaceSubtle),
           ),
         ),
         // Phủ tối nhẹ phía trên để nút quay lại và giờ hệ thống luôn rõ
@@ -474,28 +483,6 @@ class _HeroGalleryState extends State<_HeroGallery> {
             ),
           ),
         ),
-        if (images.length > 1)
-          Positioned(
-            right: 14,
-            bottom: 38,
-            child: IgnorePointer(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: const Color(0x99000000), borderRadius: BorderRadius.circular(12)),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.photo_library_rounded, size: 13, color: Colors.white),
-                    const SizedBox(width: 5),
-                    Text(
-                      '${_index + 1}/${images.length}',
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }

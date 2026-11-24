@@ -84,6 +84,14 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       _bookedRefundState != null &&
       _bookedRefundState != RefundSummaryState.none;
 
+  /// Đã mua tour bằng đơn còn hiệu lực (không hủy/hết hạn, không hoàn tiền)
+  /// ⇒ trang chi tiết ẩn bảng giá + các ngày khởi hành. Đơn đã hủy/hoàn tiền
+  /// vẫn thấy giá & lịch để có thể mua lại.
+  bool get _ownsActiveBooking {
+    final booked = widget.bookedBooking;
+    return booked != null && !_isClosedBooking(booked) && !_bookedHasRefund;
+  }
+
   // ── Chọn ngày trải nghiệm còn chỗ ────────────────────────────────────────
   List<TourAvailableDate> _availableDates = [];
   String? _selectedDate;
@@ -655,6 +663,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       return TourWizardDetailBody(
         detail: detail,
         onChatProvider: () => _openProviderChat(detail),
+        owned: _ownsActiveBooking,
       );
     }
     return ListView(
@@ -1071,6 +1080,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
     // Đã mua tour ⇒ hiện vé (không cho đặt lại ⇒ tránh mua trùng).
     if (booked != null && !active) {
+      // Qua thời gian tour mà chưa từng bắt đầu ⇒ không bắt đầu được nữa (backend cũng chặn).
+      // Đã có hành trình (đi xong) thì vẫn cho mở lại để xem.
+      final expired = booked.isExperienceExpired && progress == null;
       return SafeArea(
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -1111,7 +1123,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                     Text(
                       booked.isTourLocked
                           ? context.l10n.tdDaysUntilStart(booked.daysUntilStart)
-                          : context.l10n.tdExperienceDate(formatLocalDateString(booked.experienceDate?.toIso8601String())),
+                          : expired
+                              ? context.l10n.tdExperienceWindow(booked.experienceWindowLabel)
+                              : context.l10n.tdExperienceDate(formatLocalDateString(booked.experienceDate?.toIso8601String())),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppCultureColors.textMuted,
@@ -1120,7 +1134,24 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   ],
                 ),
               ),
-              if (!booked.isTourLocked) ...[
+              if (!booked.isTourLocked && expired) ...[
+                const SizedBox(width: 10),
+                FilledButton.icon(
+                  onPressed: null,
+                  icon: const Icon(Icons.event_busy_rounded, size: 18),
+                  label: Text(
+                    context.l10n.tdExperienceExpired,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ],
+              if (!booked.isTourLocked && !expired) ...[
                 const SizedBox(width: 10),
                 FilledButton.icon(
                   onPressed: () => Navigator.of(context).push(

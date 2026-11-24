@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import '../../core/models/booking_model.dart';
 import '../../core/models/refund_model.dart';
 import '../../core/models/tour_journey_model.dart';
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
+import '../../core/services/booking_service.dart';
 import '../../core/services/progress_service.dart';
 import '../../core/services/refund_service.dart';
 import '../../core/services/tour_service.dart';
 import '../booking/booking_detail_screen.dart';
+import '../bookings/pending_booking_prompt.dart' show PendingBookingBanner, openPendingBooking;
 import '../common/heritage_motion.dart';
 import '../journey/journey_screen.dart';
 import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeletonList;
@@ -30,6 +31,7 @@ abstract final class TripsPalette {
   static const accent = Color(0xFF0B7F7E);
   static const accentBright = Color(0xFF2DD4BF);
   static const accentInk = Color(0xFF042F2E);
+  static const accentSoft = Color(0xFFE0F2F1);
   static const night = Color(0xFF0F172A);
   static const nightRaised = Color(0xFF1E293B);
   static const nightTrack = Color(0xFF334155);
@@ -79,6 +81,10 @@ class _MyTour {
     return j.destinations.isNotEmpty ? j.doneCount : (j.currentOrder - 1).clamp(0, j.totalDestinations);
   }
 
+  /// Trạm đang mở mà du khách đã check-in (đang đứng tại trạm, chưa xong) — null nếu không có.
+  JourneyDestination? get checkedInStop =>
+      journey?.destinations.where((d) => d.isCurrent && d.checkedIn).firstOrNull;
+
   int get points => journey?.totalPoints ?? 0;
 
   int get guests {
@@ -95,6 +101,29 @@ class _MyTour {
 
   /// Đơn đã hoàn thành trải nghiệm (không còn hành trình đang chạy).
   bool get isExperienceDone => stage == _Stage.done;
+
+  /// Ngày của chuyến: ngày đi tour trên vé, không có vé thì ngày bắt đầu hành trình.
+  DateTime? get tripDate => booking?.experienceDate ?? journey?.startedAt;
+
+  /// Đã tới ngày đi (trong thời gian tour) nhưng chưa bấm "Bắt đầu" ⇒ nằm ở "Đang diễn ra", thẻ vé có nút Bắt đầu.
+  bool get awaitingStart => stage == _Stage.active && journey == null;
+
+  /// Vé quá thời gian tour mà không đi ⇒ nằm ở "Đã kết thúc" với nhãn "Đã quá ngày trải nghiệm".
+  bool get missed =>
+      stage == _Stage.done && journey == null && (booking?.isExperienceExpired ?? false);
+
+  /// Hành trình còn IN_PROGRESS nhưng ngày đi tour đã qua ⇒ "Chưa hoàn tất", không phải "Trực tiếp".
+  bool get isStale {
+    final d = tripDate;
+    if (stage != _Stage.active || journey == null || d == null) return false;
+    return DateTime(d.year, d.month, d.day).isBefore(_vnToday());
+  }
+}
+
+/// Hôm nay theo giờ Việt Nam (giống backend), chỉ phần ngày.
+DateTime _vnToday() {
+  final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+  return DateTime(now.year, now.month, now.day);
 }
 
 /// "Chuyến đi của tôi": các tour đã mua, chia theo đang trải nghiệm / sắp khởi hành / đã hoàn thành.
@@ -113,10 +142,16 @@ class MyToursView extends StatefulWidget {
 
 class _MyToursViewState extends State<MyToursView> {
   final ProgressService _progress = ProgressService();
+  final BookingService _bookingService = BookingService();
   final TourService _tourService = TourService();
   final RefundService _refundService = RefundService();
 
   List<_MyTour> _items = const [];
+
+  /// Khối "Cần bạn xử lý": đơn đang giữ chỗ (còn hạn) và đơn đã trả tiền nhưng bị hủy/hết hạn
+  /// mà chưa gửi yêu cầu hoàn tiền. Các đơn này không nằm trong danh sách vé bên dưới.
+  List<BookingModel> _pending = const [];
+  List<BookingModel> _refundNeeded = const [];
   bool _loading = true;
   String? _error;
   _Filter _filter = _Filter.all;
@@ -145,7 +180,8 @@ class _MyToursViewState extends State<MyToursView> {
 
     try {
       final results = await Future.wait<Object>([
-        _progress.getTickets(),
+        // Tất cả đơn của tôi: vé (đã thanh toán) + đơn cần xử lý (giữ chỗ / cần hoàn tiền).
+        _bookingService.getMine(),
         safe<List<TourJourney>>(_progress.getJourneys, const []),
         safe<List<TourModel>>(_tourService.getPublishedTours, const []),
         // Yêu cầu hoàn tiền của tôi — dùng để thay nhãn đếm ngược và bật nút
@@ -158,9 +194,14 @@ class _MyToursViewState extends State<MyToursView> {
       if (!mounted) return;
       final refundIndex =
           RefundStateIndex.fromRefunds(results[3] as List<RefundModel>);
+      final bookings = results[0] as List<BookingModel>;
       setState(() {
+        _pending = bookings.where((b) => b.isPendingPayment && b.isPaymentWindowOpen).toList();
+        _refundNeeded = bookings
+            .where((b) => (b.isCancelled || b.isExpired) && b.paidAt != null && !refundIndex.hasRefund(b.id))
+            .toList();
         _items = _combine(
-          results[0] as List<BookingModel>,
+          bookings.where((b) => b.isPaid).toList(),
           results[1] as List<TourJourney>,
           results[2] as List<TourModel>,
           refundIndex,
@@ -199,11 +240,15 @@ class _MyToursViewState extends State<MyToursView> {
       final journey = mine.where((j) => j.status == ProgressStatus.inProgress).firstOrNull ??
           mine.where((j) => j.isCompleted).firstOrNull;
       if (journey != null) usedJourneys.add(journey.id);
+      // Chưa có hành trình ⇒ xếp theo ngày (giờ VN): chưa tới ngày ⇒ Sắp khởi hành;
+      // trong thời gian tour ⇒ Đang diễn ra (chờ bấm "Bắt đầu"); quá ngày cuối ⇒ Đã kết thúc.
       final stage = journey?.status == ProgressStatus.inProgress
           ? _Stage.active
-          : (journey?.isCompleted ?? false) || b.status == BookingStatus.completed
+          : (journey?.isCompleted ?? false) || b.status == BookingStatus.completed || b.isExperienceExpired
               ? _Stage.done
-              : _Stage.ready;
+              : b.isTourLocked
+                  ? _Stage.ready
+                  : _Stage.active;
       items.add(_MyTour(
         booking: b,
         journey: journey,
@@ -237,7 +282,8 @@ class _MyToursViewState extends State<MyToursView> {
       case _Stage.done:
         list.sort((a, b) => (b.journey?.completedAt ?? DateTime(0)).compareTo(a.journey?.completedAt ?? DateTime(0)));
       case _Stage.active:
-        break;
+        // Việc của hôm nay (đang đi / tới ngày chờ bắt đầu) lên trước; hành trình cũ chưa xong xuống sau
+        list.sort((a, b) => (a.isStale ? 1 : 0).compareTo(b.isStale ? 1 : 0));
     }
     return list;
   }
@@ -248,7 +294,8 @@ class _MyToursViewState extends State<MyToursView> {
 
     // Tour đã mua nhưng ngày trải nghiệm còn ở tương lai ⇒ mở màn CHI TIẾT TOUR
     // (giống hệt lúc chưa mua) thay vì màn hành trình (backend sẽ khoá tour).
-    if (journey == null && booking != null && booking.isTourLocked) {
+    // Đã qua thời gian tour mà chưa bắt đầu ⇒ cũng mở chi tiết tour (thanh dưới báo "Đã quá ngày trải nghiệm").
+    if (journey == null && booking != null && (booking.isTourLocked || booking.isExperienceExpired)) {
       await openTourDetailScreen(
         context,
         tourId: item.tourId,
@@ -313,6 +360,8 @@ class _MyToursViewState extends State<MyToursView> {
         // Chừa chỗ cho thanh điều hướng và nút CHECK-IN nổi
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
         children: [
+          if (_pending.isNotEmpty || _refundNeeded.isNotEmpty)
+            Reveal(order: 0, child: _buildActionCenter()),
           if (_items.isEmpty)
             Reveal(order: 1, child: _buildEmpty())
           else ...[
@@ -339,28 +388,66 @@ class _MyToursViewState extends State<MyToursView> {
                 ),
               ),
             for (final (stage, list) in visible) ...[
-              Reveal(order: order++, child: _sectionTitle(stage, list.length)),
+              Reveal(
+                order: order++,
+                child: _sectionTitle(stage, list.length),
+              ),
               for (final item in list)
                 Reveal(
                   order: order < 6 ? order++ : order,
-                  child: switch (stage) {
-                    _Stage.active => _ActiveCard(item: item, onJourney: () => _openJourney(item)),
-                    _Stage.ready => _ReadyCard(
-                        item: item,
-                        onJourney: () => _openJourney(item),
-                        onDetail: item.booking == null ? null : () => _openBooking(item.booking!),
-                        onRebook: item.tour == null ? null : () => _openTour(item.tour!),
-                      ),
-                    _Stage.done => _DoneCard(
-                        item: item,
-                        // Vé đã xong nhưng không còn hành trình thì không mở lại (tránh tạo hành trình mới)
-                        onJourney: item.journey == null ? null : () => _openJourney(item),
-                        onRebook: item.tour == null ? null : () => _openTour(item.tour!),
-                      ),
-                  },
+                  child: _TripCard(
+                    item: item,
+                    // Vé đã kết thúc mà không còn hành trình thì không mở lại (tránh tạo hành trình mới)
+                    onJourney: stage == _Stage.done && item.journey == null ? null : () => _openJourney(item),
+                    onDetail: item.booking == null ? null : () => _openBooking(item.booking!),
+                    onRebook: item.tour == null ? null : () => _openTour(item.tour!),
+                  ),
                 ),
             ],
           ],
+        ],
+      ),
+    );
+  }
+
+  /// Khối "Cần bạn xử lý": giữ chỗ (đếm ngược, chạm để thanh toán) và đơn cần gửi hoàn tiền.
+  Widget _buildActionCenter() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, size: 17, color: TripsPalette.orangeInk),
+                const SizedBox(width: 6),
+                Text(
+                  context.l10n.tripsActionTitle,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: TripsPalette.orangeInk),
+                ),
+              ],
+            ),
+          ),
+          for (final b in _pending)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: PendingBookingBanner(
+                booking: b,
+                showTourTitle: true,
+                onTap: () async {
+                  await openPendingBooking(context, b);
+                  if (mounted) _load();
+                },
+                onExpired: _load,
+              ),
+            ),
+          for (final b in _refundNeeded)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _RefundNeededTile(booking: b, onTap: () => _openBooking(b)),
+            ),
         ],
       ),
     );
@@ -370,25 +457,43 @@ class _MyToursViewState extends State<MyToursView> {
     final label = switch (stage) {
       _Stage.active => context.l10n.tripsStageActive,
       _Stage.ready => context.l10n.tripsStageReady,
-      _Stage.done => context.l10n.statusCompleted,
+      _Stage.done => context.l10n.tripsStageEnded,
     };
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 22, 2, 12),
       child: Row(
         children: [
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.2, color: TripsPalette.ink)),
-          const SizedBox(width: 8),
+          // Mỗi nhóm một biểu tượng + màu; "Đang diễn ra" nổi bật nhất (ô xanh ngọc đặc, chữ to, màu nhấn)
           if (stage == _Stage.active)
-            _Pill(
-              background: TripsPalette.successSoft,
-              foreground: TripsPalette.successInk,
-              leading: _LiveDot(color: TripsPalette.success),
-              label: context.l10n.tripsLive,
+            Container(
+              width: 30,
+              height: 30,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(color: TripsPalette.accent, borderRadius: BorderRadius.circular(10)),
+              // Người đang đi bộ (không dùng la bàn — dễ lẫn với biểu tượng AI)
+              child: const Icon(Icons.directions_walk_rounded, size: 19, color: Colors.white),
             )
           else
-            _Pill(background: TripsPalette.track, foreground: TripsPalette.slate, label: '$count'),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Icon(
+                stage == _Stage.ready ? Icons.event_rounded : Icons.flag_rounded,
+                size: 20,
+                color: TripsPalette.muted,
+              ),
+            ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: stage == _Stage.active ? 20 : 17,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+              color: stage == _Stage.active ? TripsPalette.accent : TripsPalette.ink,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Bỏ nhãn "Trực tiếp" cạnh "Đang diễn ra" (trùng ý) — mọi nhóm chỉ hiện số chuyến
+          _Pill(background: TripsPalette.track, foreground: TripsPalette.slate, label: '$count'),
         ],
       ),
     );
@@ -523,140 +628,416 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-// ── Thẻ "Đang diễn ra": nền tối, ảnh lồng bo góc, tiến độ chia theo trạm ─────────
+// ── Thẻ chuyến đi: MỘT khung gọn dùng chung cho mọi nhóm (cùng chiều cao) ─────────
+//
+// ┌──────────────────────────────────────┐
+// │ [ảnh 92]  [nhãn] [nhãn]              │
+// │           Tên tour (luôn giữ 2 dòng) │
+// │           N điểm đến                 │
+// │ dòng trạng thái (tiến độ / đếm ngược)│
+// │ [ nút chính                ] [ 🎫 ]  │
+// └──────────────────────────────────────┘
+// Hành trình đang đi dở ⇒ nền tối để nổi bật; còn lại nền trắng. Không hiện mã vé
+// (xem trong "Chi tiết vé" — nút 🎫).
 
-class _ActiveCard extends StatelessWidget {
+class _TripCard extends StatelessWidget {
   final _MyTour item;
-  final VoidCallback onJourney;
 
-  const _ActiveCard({required this.item, required this.onJourney});
+  /// Mở hành trình / chi tiết tour (nút chính + chạm thẻ). Null ⇒ không mở hành trình được.
+  final VoidCallback? onJourney;
+
+  /// Mở chi tiết vé (nút 🎫). Null khi không có vé (hành trình tour miễn phí).
+  final VoidCallback? onDetail;
+
+  /// Đặt lại tour (vé bỏ lỡ / đã hoàn tiền).
+  final VoidCallback? onRebook;
+
+  const _TripCard({required this.item, this.onJourney, this.onDetail, this.onRebook});
+
+  static const double _cover = 92;
+  static const double _titleSize = 15;
+  static const double _titleLineHeight = 1.3;
+
+  /// Hành trình đã bấm Bắt đầu và chưa xong.
+  bool get _inProgress => item.stage == _Stage.active && item.journey != null;
+
+  /// Mỗi loại thẻ một tông nền RẤT nhạt + viền cùng tông (nền, viền, độ đậm viền).
+  /// Việc của HÔM NAY (tới ngày chờ bắt đầu / đang đi) viền đậm hơn; hành trình cũ chưa xong
+  /// ("Đi tiếp nhé") không được nổi hơn tour cần làm hôm nay.
+  (Color, Color, double) get _tone {
+    if (_inProgress) {
+      return item.isStale
+          ? (const Color(0xFFFFF8EC), const Color(0xFFF6D9A8), 1) // Đi tiếp nhé — vàng hổ phách
+          : (const Color(0xFFF0FBF4), const Color(0xFF86D9A5), 1.5); // Đang trải nghiệm — xanh lá
+    }
+    return switch (item.stage) {
+      _Stage.active => (const Color(0xFFEFF9F8), const Color(0xFF7CC7C3), 1.5), // Hôm nay — xanh ngọc
+      _Stage.ready => (const Color(0xFFF3F7FF), const Color(0xFFD3E0FB), 1), // Sắp khởi hành — xanh dương
+      _Stage.done => item.missed
+          ? (const Color(0xFFF4F5F7), const Color(0xFFE2E5EA), 1) // Bỏ lỡ — xám
+          : (const Color(0xFFF6F4FE), const Color(0xFFDDD6FA), 1), // Đã hoàn thành — tím nhạt
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     final tour = item.tour;
     final style = TourStyle.of(tour?.tourType ?? '');
-    final booking = item.booking;
-    final total = item.total;
-    final current = total == 0 ? 0 : (item.done + 1).clamp(1, total);
-    final meta = [
-      if (booking?.experienceDate != null) _date(booking!.experienceDate!),
-      if (item.guests > 0) context.l10n.coGuestCount(item.guests),
-      if (total > 0) context.l10n.tourCheckpointCount(total),
-    ].join(' · ');
+    const titleColor = TripsPalette.ink;
+    const mutedColor = TripsPalette.muted;
+    final meta = item.total > 0 ? context.l10n.tripsDestinations(item.total) : '';
+    // Tên tour luôn chiếm chỗ đúng 2 dòng ⇒ mọi thẻ cao bằng nhau (kể cả khi phóng to chữ)
+    final titleBox = MediaQuery.textScalerOf(context).scale(_titleSize) * _titleLineHeight * 2 + 1;
+    final primary = _primary(context);
+    final (tint, borderColor, borderWidth) = _tone;
 
     return Pressable(
-      onTap: onJourney,
+      onTap: onJourney ?? onDetail,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        clipBehavior: Clip.antiAlias,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: TripsPalette.night,
-          borderRadius: BorderRadius.circular(28),
+          color: tint,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: borderColor, width: borderWidth),
           boxShadow: [
-            BoxShadow(color: TripsPalette.night.withValues(alpha: 0.28), blurRadius: 30, offset: const Offset(0, 14)),
+            BoxShadow(color: TripsPalette.ink.withValues(alpha: 0.06), blurRadius: 22, offset: const Offset(0, 8)),
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: TourCover(
-                height: 172,
-                imageUrl: tour?.coverImageUrl,
-                colors: style.colors,
-                borderRadius: BorderRadius.circular(20),
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _Pill(
-                      background: Color(0x990F172A),
-                      foreground: Colors.white,
-                      leading: _LiveDot(color: TripsPalette.accentBright),
-                      label: context.l10n.tripsExperiencing,
-                      height: 30,
-                    ),
-                    if (total > 0)
-                      _Pill(
-                        background: Colors.white.withValues(alpha: 0.94),
-                        foreground: TripsPalette.ink,
-                        label: context.l10n.tripsStopProgress(current, total),
-                        height: 30,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 19,
-                      height: 1.3,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                    ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: _cover,
+                  height: _cover,
+                  child: TourCover(
+                    imageUrl: tour?.coverImageUrl,
+                    colors: style.colors,
+                    height: _cover,
+                    borderRadius: BorderRadius.circular(16),
+                    padding: EdgeInsets.zero,
+                    child: tour?.coverImageUrl == null
+                        ? Center(child: Icon(style.icon, size: 34, color: Colors.white.withValues(alpha: 0.55)))
+                        : const SizedBox.shrink(),
                   ),
-                  if (meta.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(meta, style: const TextStyle(fontSize: 12.5, color: TripsPalette.nightMuted)),
-                  ],
-                  if (total > 0) ...[
-                    const SizedBox(height: 16),
-                    _StationProgress(done: item.done, total: total),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text.rich(
-                            TextSpan(children: [
-                              TextSpan(
-                                text: '${item.done}/$total',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-                              ),
-                              TextSpan(text: context.l10n.tripsStopsCheckedIn),
-                            ]),
-                            style: const TextStyle(fontSize: 12.5, color: TripsPalette.nightMuted),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        height: 24,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: EdgeInsets.zero,
+                          children: [
+                            for (final (i, chip) in _chips(context).indexed) ...[
+                              if (i > 0) const SizedBox(width: 6),
+                              chip,
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        height: titleBox,
+                        child: Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: _titleSize,
+                            height: _titleLineHeight,
+                            fontWeight: FontWeight.w800,
+                            color: titleColor,
                           ),
                         ),
-                        Text(
-                          context.l10n.rewardPlusPoints('${item.points}'),
-                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: TripsPalette.gold),
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        meta,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12.5, color: mutedColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(height: 20, child: _statusRow(context, mutedColor)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
                     child: FilledButton.icon(
-                      onPressed: onJourney,
-                      icon: const Icon(Icons.navigation_rounded, size: 19),
-                      label: Text(context.l10n.tdContinueJourney, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                      onPressed: primary.onPressed,
+                      icon: Icon(primary.icon, size: 18),
+                      label: Text(
+                        primary.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
                       style: FilledButton.styleFrom(
-                        backgroundColor: TripsPalette.accentBright,
-                        foregroundColor: TripsPalette.accentInk,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        backgroundColor: primary.background,
+                        foregroundColor: primary.foreground,
+                        disabledBackgroundColor: Colors.white,
+                        disabledForegroundColor: mutedColor,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                ),
+                if (onDetail != null) ...[
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: context.l10n.tripsTicketDetails,
+                    child: Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: onDetail,
+                        child: const SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Icon(Icons.confirmation_number_outlined, size: 20, color: TripsPalette.ink),
+                        ),
                       ),
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Nhãn trên cùng: trạng thái + ngày.
+  List<Widget> _chips(BuildContext context) {
+    final date = item.tripDate;
+    final l10n = context.l10n;
+    // Ngày: đậm cho chuyến sắp tới / hôm nay; xám nhạt khi đã qua (đi dở hoặc đã kết thúc)
+    final pastDate = item.stage == _Stage.done || item.isStale;
+    final dateChip = date == null
+        ? null
+        : _Pill(
+            background: pastDate ? TripsPalette.track : TripsPalette.ink,
+            foreground: pastDate ? TripsPalette.slate : Colors.white,
+            label: _weekdayDate(date),
+            radius: 8,
+            height: 24,
+          );
+    if (_inProgress) {
+      return [
+        // Nhãn màu NHẠT (cùng tông với các thẻ khác) — không tô đậm cả thẻ
+        item.isStale
+            ? _Pill(
+                background: TripsPalette.goldSoft,
+                foreground: TripsPalette.goldInk,
+                leading: const Icon(Icons.play_arrow_rounded, size: 14, color: TripsPalette.goldInk),
+                label: l10n.tripsUnfinished,
+                radius: 8,
+                height: 24,
+              )
+            : _Pill(
+                background: TripsPalette.successSoft,
+                foreground: TripsPalette.successInk,
+                leading: _LiveDot(color: TripsPalette.success),
+                label: l10n.tripsExperiencing,
+                radius: 8,
+                height: 24,
+              ),
+        ?dateChip,
+      ];
+    }
+    if (item.stage == _Stage.done) {
+      return [
+        ?dateChip,
+        item.missed
+            ? _Pill(
+                background: TripsPalette.track,
+                foreground: TripsPalette.slate,
+                label: l10n.tdExperienceExpired,
+                radius: 8,
+                height: 24,
+              )
+            : _Pill(
+                background: TripsPalette.successSoft,
+                foreground: TripsPalette.successInk,
+                leading: const Icon(Icons.check_rounded, size: 13, color: TripsPalette.successInk),
+                label: l10n.statusCompleted,
+                radius: 8,
+                height: 24,
+              ),
+      ];
+    }
+    final countdown = _countdownLabel(item.booking?.experienceDate);
+    return [
+      ?dateChip,
+      if (countdown != null)
+        _Pill(
+          // "Hôm nay" (tới ngày) ⇒ xanh ngọc như nút Bắt đầu; "Ngày mai / Còn N ngày" ⇒ xanh dương như thẻ sắp khởi hành
+          background: item.stage == _Stage.active ? TripsPalette.accentSoft : const Color(0xFFDCE7FD),
+          foreground: item.stage == _Stage.active ? TripsPalette.accent : const Color(0xFF1D4ED8),
+          label: countdown,
+          radius: 8,
+          height: 24,
+        ),
+    ];
+  }
+
+  /// Dòng trạng thái (luôn có, cao cố định): tiến độ trạm, đếm ngược, hoặc lời nhắn.
+  Widget _statusRow(BuildContext context, Color mutedColor) {
+    final l10n = context.l10n;
+    final total = item.total;
+
+    Widget note(IconData icon, String text) => Row(
+          children: [
+            Icon(icon, size: 15, color: mutedColor),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: mutedColor),
+              ),
+            ),
+          ],
+        );
+
+    // Chưa tới ngày ⇒ đếm ngược
+    if (item.stage == _Stage.ready) {
+      return note(Icons.schedule_rounded, _countdownLabel(item.booking?.experienceDate) ?? l10n.tripsStageReady);
+    }
+    // Vé bỏ lỡ
+    if (item.missed) return note(Icons.event_busy_rounded, l10n.tripsNotJoined);
+    // Vé đã xong nhưng không còn hành trình (không có số liệu trạm)
+    if (item.stage == _Stage.done && item.journey == null) {
+      return note(Icons.check_circle_outline_rounded, l10n.statusCompleted);
+    }
+    if (total == 0) return note(Icons.flag_outlined, l10n.rewardPlusPoints('${item.points}'));
+
+    // Có hành trình (hoặc tới ngày chờ bắt đầu) ⇒ thanh trạm + "x/y · +điểm"
+    return Row(
+      children: [
+        Expanded(child: _StationProgress(done: item.done, total: total)),
+        const SizedBox(width: 10),
+        Text.rich(
+          TextSpan(children: [
+            TextSpan(
+              text: '${item.done}/$total',
+              style: const TextStyle(fontWeight: FontWeight.w800, color: TripsPalette.ink),
+            ),
+            const TextSpan(text: ' · '),
+            TextSpan(
+              text: l10n.rewardPlusPoints('${item.points}'),
+              style: const TextStyle(fontWeight: FontWeight.w800, color: TripsPalette.goldInk),
+            ),
+          ]),
+          style: TextStyle(fontSize: 12.5, color: mutedColor),
+        ),
+      ],
+    );
+  }
+
+  /// Nút chính theo trạng thái thẻ.
+  ///
+  /// ⚠️ Màn "Chuyến đi" chỉ hiển thị tour đã thanh toán và còn trải nghiệm được (không dính
+  /// hoàn tiền) ⇒ các nhánh "đang/có hoàn tiền" chỉ là lưới an toàn (đơn vừa gửi yêu cầu
+  /// hoàn tiền nhưng danh sách chưa kịp tải lại).
+  ({IconData icon, String label, VoidCallback? onPressed, Color background, Color foreground}) _primary(
+    BuildContext context,
+  ) {
+    final l10n = context.l10n;
+    const white = Colors.white;
+    if (item.isRefunding) {
+      return (
+        icon: Icons.pending_actions_rounded,
+        label: l10n.refundStatusProcessing,
+        onPressed: onDetail,
+        background: TripsPalette.orangeInk,
+        foreground: white,
+      );
+    }
+    if (item.isRefundResolved) {
+      return (
+        icon: Icons.replay_rounded,
+        label: l10n.mbRebook,
+        onPressed: onRebook,
+        background: TripsPalette.accent,
+        foreground: white,
+      );
+    }
+    if (_inProgress) {
+      // Đang đi trong thời gian tour ⇒ nút đặc (hành động chính);
+      // hành trình cũ chưa xong ⇒ nút nhạt, nhường ưu tiên cho việc hôm nay.
+      return (
+        icon: Icons.navigation_rounded,
+        label: l10n.tdContinueJourney,
+        onPressed: onJourney,
+        background: item.isStale ? TripsPalette.accentSoft : TripsPalette.accent,
+        foreground: item.isStale ? TripsPalette.accent : white,
+      );
+    }
+    switch (item.stage) {
+      case _Stage.ready:
+        return (
+          icon: Icons.map_outlined,
+          label: l10n.tripsViewItinerary,
+          onPressed: onJourney,
+          background: TripsPalette.accent,
+          foreground: white,
+        );
+      case _Stage.active:
+        return (
+          icon: Icons.play_arrow_rounded,
+          label: l10n.tripsStart,
+          onPressed: onJourney,
+          background: TripsPalette.accent,
+          foreground: white,
+        );
+      case _Stage.done:
+        if (item.journey != null) {
+          return (
+            icon: Icons.history_rounded,
+            label: l10n.sumReview,
+            onPressed: onJourney,
+            background: Colors.white,
+            foreground: TripsPalette.ink,
+          );
+        }
+        return (
+          icon: Icons.replay_rounded,
+          label: l10n.mbRebook,
+          onPressed: onRebook,
+          background: TripsPalette.accent,
+          foreground: white,
+        );
+    }
+  }
+
+  /// "Hôm nay" / "Ngày mai" / "Còn N ngày" (theo giờ Việt Nam — khớp cách backend tính).
+  /// Đơn đang/có hoàn tiền ⇒ không đếm ngược.
+  String? _countdownLabel(DateTime? d) {
+    if (d == null || item.isRefunding || item.isRefundResolved) return null;
+    final days = DateUtils.dateOnly(d).difference(_vnToday()).inDays;
+    if (days < 0) return null;
+    if (days == 0) return appL10n.tripsToday;
+    if (days == 1) return appL10n.tripsTomorrow;
+    return appL10n.tripsDaysLeft(days);
   }
 }
 
@@ -669,21 +1050,25 @@ class _StationProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const track = TripsPalette.track;
+    const fill = TripsPalette.accent;
     if (total > 8) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(999),
-        child: LinearProgressIndicator(
-          value: done / total,
-          minHeight: 6,
-          backgroundColor: TripsPalette.nightTrack,
-          valueColor: const AlwaysStoppedAnimation(TripsPalette.accentBright),
+      return Center(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: done / total,
+            minHeight: 6,
+            backgroundColor: track,
+            valueColor: AlwaysStoppedAnimation(fill),
+          ),
         ),
       );
     }
     return Row(
       children: [
         for (var i = 0; i < total; i++) ...[
-          if (i > 0) const SizedBox(width: 6),
+          if (i > 0) const SizedBox(width: 4),
           Expanded(
             child: TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: i < done ? 1 : 0),
@@ -693,7 +1078,7 @@ class _StationProgress extends StatelessWidget {
                 height: 6,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(999),
-                  color: Color.lerp(TripsPalette.nightTrack, TripsPalette.accentBright, v),
+                  color: Color.lerp(track, fill, v),
                 ),
               ),
             ),
@@ -704,444 +1089,56 @@ class _StationProgress extends StatelessWidget {
   }
 }
 
-// ── Thẻ "Sắp khởi hành": kiểu vé, mã vé hiện đầy đủ, chạm để sao chép ─────────
-
-class _ReadyCard extends StatelessWidget {
-  final _MyTour item;
-  final VoidCallback onJourney;
-  final VoidCallback? onDetail;
-  final VoidCallback? onRebook;
-
-  const _ReadyCard({required this.item, required this.onJourney, required this.onDetail, required this.onRebook});
-
-  @override
-  Widget build(BuildContext context) {
-    final tour = item.tour;
-    final style = TourStyle.of(tour?.tourType ?? '');
-    final booking = item.booking;
-    final date = booking?.experienceDate;
-    final countdown = _countdownLabel(date);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(color: TripsPalette.ink.withValues(alpha: 0.07), blurRadius: 30, offset: const Offset(0, 10)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Pressable(
-            onTap: onJourney,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 100,
-                    height: 116,
-                    child: TourCover(
-                      imageUrl: tour?.coverImageUrl,
-                      colors: style.colors,
-                      height: 116,
-                      borderRadius: BorderRadius.circular(18),
-                      padding: EdgeInsets.zero,
-                      child: tour?.coverImageUrl == null
-                          ? Center(child: Icon(style.icon, size: 40, color: Colors.white.withValues(alpha: 0.5)))
-                          : const SizedBox.shrink(),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            if (date != null)
-                              _Pill(background: TripsPalette.ink, foreground: Colors.white, label: _weekdayDate(date), radius: 8),
-                            if (countdown != null)
-                              _Pill(
-                                background: TripsPalette.orangeSoft,
-                                foreground: TripsPalette.orangeInk,
-                                label: countdown,
-                                radius: 8,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          item.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 15.5,
-                            height: 1.35,
-                            fontWeight: FontWeight.w800,
-                            color: TripsPalette.ink,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 4,
-                          children: [
-                            if (item.guests > 0) _Meta(icon: Icons.group_outlined, text: context.l10n.coGuestCount(item.guests)),
-                            if (item.total > 0) _Meta(icon: Icons.place_outlined, text: context.l10n.tripsDestinations(item.total)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const _TicketPerforation(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-            child: Column(
-              children: [
-                if (booking != null && booking.bookingCode.isNotEmpty) ...[
-                  _CodeBox(code: booking.bookingCode),
-                  const SizedBox(height: 10),
-                ],
-                Row(
-                  children: [
-                    Expanded(child: _primaryButton()),
-                    if (onDetail != null) ...[
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: SizedBox(
-                          height: 46,
-                          child: TextButton(
-                            onPressed: onDetail,
-                            style: TextButton.styleFrom(
-                              backgroundColor: TripsPalette.surfaceSoft,
-                              foregroundColor: TripsPalette.ink,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                            child: Text(context.l10n.tripsTicketDetails, style: const TextStyle(fontWeight: FontWeight.w700)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                // ⚠️ "Đặt lại tour" KHÔNG hiện khi đơn ĐANG trong quá trình hoàn
-                // tiền (chưa chốt được kết quả ⇒ chưa nên đặt lại). Chỉ hiện khi
-                // đã xử lý xong (đã hoàn / bị từ chối / lỗi).
-                if (onRebook != null && item.isRefundResolved) ...[
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 46,
-                    child: OutlinedButton.icon(
-                      onPressed: onRebook,
-                      icon: const Icon(Icons.replay_rounded, size: 18),
-                      label: Text(context.l10n.mbRebook, style: const TextStyle(fontWeight: FontWeight.w700)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: TripsPalette.accent,
-                        side: const BorderSide(color: TripsPalette.accent),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Nút chính: chưa tới ngày ⇒ xem lịch trình tour (đếm ngược nằm ở chip phía trên); tới ngày ⇒ bắt đầu.
-  ///
-  /// ⚠️ Màn "Chuyến đi" CHỈ hiển thị tour đã thanh toán và còn trải nghiệm được (không dính
-  /// vào hoàn tiền) ⇒ các nhánh "đang/có hoàn tiền" chỉ là lưới an toàn (đơn vừa gửi yêu cầu
-  /// hoàn tiền nhưng danh sách chưa kịp tải lại).
-  Widget _primaryButton() {
-    final locked = item.booking?.isTourLocked ?? false;
-    final refunding = item.isRefunding;
-    final resolved = item.isRefundResolved;
-    final (IconData icon, String label, Color color) = refunding
-        ? (Icons.pending_actions_rounded, appL10n.refundStatusProcessing, TripsPalette.orangeInk)
-        : resolved
-            ? (Icons.verified_rounded, appL10n.refundToneRefunded, TripsPalette.slate)
-            : locked
-                ? (Icons.map_outlined, appL10n.tripsViewItinerary, TripsPalette.accent)
-                : (Icons.explore_rounded, appL10n.tripsStart, TripsPalette.accent);
-    return SizedBox(
-      height: 46,
-      child: FilledButton.icon(
-        onPressed: onJourney,
-        icon: Icon(icon, size: 18),
-        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
-        style: FilledButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-      ),
-    );
-  }
-
-  /// "Hôm nay" / "Ngày mai" / "Còn N ngày" (theo giờ Việt Nam — khớp cách backend tính).
-  /// Đơn đang/có hoàn tiền ⇒ không đếm ngược.
-  String? _countdownLabel(DateTime? d) {
-    if (d == null || item.isRefunding || item.isRefundResolved) return null;
-    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
-    final days = DateUtils.dateOnly(d).difference(DateUtils.dateOnly(now)).inDays;
-    if (days < 0) return null;
-    if (days == 0) return appL10n.tripsToday;
-    if (days == 1) return appL10n.tripsTomorrow;
-    return appL10n.tripsDaysLeft(days);
-  }
-}
-
-/// Mã vé hiện đầy đủ (chữ đơn cách, tự xuống dòng nếu màn hẹp); chạm để sao chép.
-class _CodeBox extends StatelessWidget {
-  final String code;
-  const _CodeBox({required this.code});
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: context.l10n.tripsCodeSemantics(code),
-      excludeSemantics: true,
-      child: Material(
-        color: const Color(0xFFF8FAFC),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: Color(0xFFCBD5E1)),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () {
-            Clipboard.setData(ClipboardData(text: code));
-            ScaffoldMessenger.of(context)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(SnackBar(content: Text(context.l10n.tripsCodeCopied(code)), behavior: SnackBarBehavior.floating));
-          },
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(context.l10n.tripsTicketCode,
-                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: TripsPalette.muted)),
-                      const SizedBox(height: 1),
-                      Text(
-                        code,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                          color: TripsPalette.ink,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.copy_rounded, size: 18, color: TripsPalette.slate),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Thẻ "Đã hoàn thành": gọn một dòng ────────────────────────────────────────
-
-class _DoneCard extends StatelessWidget {
-  final _MyTour item;
-  final VoidCallback? onJourney;
-  final VoidCallback? onRebook;
-
-  const _DoneCard({required this.item, required this.onJourney, required this.onRebook});
-
-  @override
-  Widget build(BuildContext context) {
-    final tour = item.tour;
-    final style = TourStyle.of(tour?.tourType ?? '');
-    final finished = item.journey?.completedAt ?? item.booking?.experienceDate;
-
-    return Pressable(
-      onTap: onJourney,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(color: TripsPalette.ink.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 6)),
-          ],
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 70,
-              height: 70,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned.fill(
-                    child: TourCover(
-                      imageUrl: tour?.coverImageUrl,
-                      colors: style.colors,
-                      height: 70,
-                      borderRadius: BorderRadius.circular(16),
-                      padding: EdgeInsets.zero,
-                      child: tour?.coverImageUrl == null
-                          ? Center(child: Icon(style.icon, size: 28, color: Colors.white.withValues(alpha: 0.55)))
-                          : const SizedBox.shrink(),
-                    ),
-                  ),
-                  Positioned(
-                    right: 4,
-                    bottom: 4,
-                    child: Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: TripsPalette.success,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Icon(Icons.check_rounded, size: 13, color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      height: 1.3,
-                      fontWeight: FontWeight.w800,
-                      color: TripsPalette.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      if (finished != null)
-                        Text(_date(finished), style: const TextStyle(fontSize: 12, color: TripsPalette.muted)),
-                      if (item.points > 0)
-                        _Pill(
-                          background: TripsPalette.goldSoft,
-                          foreground: TripsPalette.goldInk,
-                          label: context.l10n.rewardPlusPoints('${item.points}'),
-                          height: 22,
-                          radius: 6,
-                        ),
-                      if (item.total > 0)
-                        _Pill(
-                          background: TripsPalette.successSoft,
-                          foreground: TripsPalette.successInk,
-                          label: '${item.done}/${context.l10n.tourCheckpointCount(item.total)}',
-                          height: 22,
-                          radius: 6,
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (onRebook != null) ...[
-              const SizedBox(width: 8),
-              Tooltip(
-                message: context.l10n.mbRebook,
-                child: Material(
-                  color: TripsPalette.surfaceSoft,
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: onRebook,
-                    child: const SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Icon(Icons.replay_rounded, size: 20, color: TripsPalette.ink),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ── Thành phần dùng chung ────────────────────────────────────────────────────
 
-/// Đường xé vé: hai khuyết tròn (màu nền trang) ở mép và hàng gạch đứt ở giữa.
-class _TicketPerforation extends StatelessWidget {
-  const _TicketPerforation();
+/// Đơn đã trả tiền nhưng bị hủy/hết hạn, chưa gửi hoàn tiền ⇒ chạm để mở chi tiết đơn và gửi yêu cầu.
+class _RefundNeededTile extends StatelessWidget {
+  final BookingModel booking;
+  final VoidCallback onTap;
+
+  const _RefundNeededTile({required this.booking, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 22,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: LayoutBuilder(
-              builder: (_, box) {
-                final count = (box.maxWidth / 10).floor();
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    for (var i = 0; i < count; i++)
-                      Container(width: 5, height: 2, color: TripsPalette.line),
-                  ],
-                );
-              },
-            ),
+    return Material(
+      color: TripsPalette.orangeSoft,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: TripsPalette.orange.withValues(alpha: 0.35)),
           ),
-          for (final side in [Alignment.centerLeft, Alignment.centerRight])
-            Align(
-              alignment: side,
-              child: FractionalTranslation(
-                translation: Offset(side == Alignment.centerLeft ? -0.5 : 0.5, 0),
-                child: Container(
-                  width: 22,
-                  height: 22,
-                  decoration: const BoxDecoration(color: TripsPalette.background, shape: BoxShape.circle),
+          child: Row(
+            children: [
+              const Icon(Icons.undo_rounded, color: TripsPalette.orange, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      context.l10n.tripsRefundNeededTitle,
+                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: TripsPalette.orangeInk),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${booking.tourTitle} · ${booking.formattedTotal}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: TripsPalette.muted),
+                    ),
+                  ],
                 ),
               ),
-            ),
-        ],
+              const Icon(Icons.chevron_right_rounded, color: TripsPalette.orangeInk),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1208,35 +1205,6 @@ class _LiveDotState extends State<_LiveDot> with SingleTickerProviderStateMixin 
     );
   }
 }
-
-class _Meta extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _Meta({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: TripsPalette.muted),
-        const SizedBox(width: 5),
-        Flexible(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12.5, color: TripsPalette.muted),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-String _date(DateTime d) =>
-    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
 /// "T4 · 25/11", "CN · 30/11".
 String _weekdayDate(DateTime d) {
