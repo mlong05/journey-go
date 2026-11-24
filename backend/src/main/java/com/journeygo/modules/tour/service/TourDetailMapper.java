@@ -85,6 +85,9 @@ public class TourDetailMapper {
                         .map(s -> new TourDetailResponse.Slot(s.getId(), s.getSlotDate(), s.getCapacity(),
                                 s.getBookedCount(), s.getStatus()))
                         .toList())
+                .departureTime(tour.getDepartureTime())
+                .meetingPoint(tour.getMeetingPoint())
+                .pickupInfo(tour.getPickupInfo())
                 .contentRightsConfirmed(tour.isContentRightsConfirmed())
                 .latestReview(reviewRepository.findByTour_TourId(tour.getTourId()).map(this::toLatestReview).orElse(null))
                 .build();

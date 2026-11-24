@@ -5,17 +5,11 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Dữ liệu tổng quan vận hành cho trang Admin (read-only).
+ * Dữ liệu tổng quan vận hành cho trang Admin (read-only), theo kỳ đang xem.
  *
- * <p>⚠️ Ba lớp số liệu tài chính được TÁCH BIỆT có chủ đích
- * (xem {@code OperationsOverviewService#buildFinance}):
- * <ol>
- *   <li><b>Dòng tiền khách hàng</b> — theo kỳ đang xem ({@code Booking.paidAt}).</li>
- *   <li><b>Quyết toán</b> — theo đợt tất toán ({@code Settlement.revenuePeriod} yyyy-MM).</li>
- *   <li><b>Doanh thu ghi nhận</b> — từ {@code ProviderRevenue}.</li>
- * </ol>
- * Trộn 3 lớp này khiến Admin hiểu nhầm (VD: tưởng "tiền đã quyết toán" là tiền của
- * riêng một đối tác, trong khi đợt BATCH gom N đối tác).
+ * <p>Chỉ gồm số liệu vận hành chưa có trang riêng. Tài chính chi tiết nằm ở
+ * {@code /admin/finance}, quyết toán ở {@code /admin/settlements}, người dùng/đối tác ở trang quản lý
+ * tương ứng. Doanh thu theo tháng: xem {@link PlatformRevenueReportResponse}.
  */
 public record OperationsOverviewResponse(
         PeriodInfo period,
@@ -23,20 +17,13 @@ public record OperationsOverviewResponse(
         KpiSummary kpis,
         KpiSummary previousKpis,
         List<SparkPoint> revenueTrend,
-        List<SparkPoint> previousRevenueTrend,
         List<SparkPoint> gmvTrend,
-        List<SparkPoint> previousGmvTrend,
         BookingBreakdown bookingBreakdown,
         List<BookingTrendPoint> bookingTrend,
         List<PendingAction> pendingActions,
-        FinanceSnapshot finance,
         List<TopTourRow> topTours,
         ExperienceStats experience,
         List<DestinationVisitRow> topDestinations,
-        TouristStats tourists,
-        PartnerStats partners,
-        List<SettlementRow> recentSettlements,
-        List<ActivityRow> recentActivities,
         Instant updatedAt) {
 
     /** Khoảng thời gian đang xem + khoảng liền trước (cùng độ dài) để so sánh tăng trưởng. */
@@ -72,49 +59,6 @@ public record OperationsOverviewResponse(
     public record PendingAction(String id, String title, String note, String severity, long count,
             String href, String actionLabel) {}
 
-    /**
-     * Số liệu tài chính — TÁCH 3 LỚP, không trộn lẫn.
-     *
-     * <p><b>Lớp 1 — dòng tiền khách hàng (theo kỳ đang xem).</b>
-     * <ul>
-     *   <li>{@code grossPaid} — tổng tiền khách thực trả (GMV của kỳ).</li>
-     *   <li>{@code voucherDiscount} — tổng tiền voucher giảm (vẫn nằm trong tiền khách trả).</li>
-     *   <li>{@code refundAmount} — tổng tiền đã hoàn (theo thời điểm hoàn tiền hoàn tất).</li>
-     *   <li>{@code netCollected} = {@code grossPaid − refundAmount} (khớp /admin/finance).</li>
-     * </ul>
-     *
-     * <p><b>Lớp 2 — quyết toán (theo đợt tất toán, KHÔNG lọc theo kỳ đang xem).</b>
-     * <ul>
-     *   <li>{@code settledAmount} — tổng tiền đã quyết toán cho đối tác.</li>
-     *   <li>{@code settledPartnerCount} — SỐ ĐỐI TÁC thực sự nhận tiền (đợt BATCH gom N đối tác).</li>
-     *   <li>{@code settledPeriod} — kỳ doanh thu (yyyy-MM) của đợt tất toán mới nhất.</li>
-     * </ul>
-     *
-     * <p><b>Lớp 3 — doanh thu ghi nhận (từ {@code ProviderRevenue}).</b>
-     * Chỉ gồm tour có đối tác được gán đều đức trải nghiệm ⇒ có thể nhỏ hơn nhiều so với GMV.
-     */
-    public record FinanceSnapshot(
-            // ── Lớp 1: dòng tiền khách hàng (theo kỳ) ──
-            BigDecimal grossPaid,
-            BigDecimal voucherDiscount,
-            BigDecimal refundAmount,
-            BigDecimal netCollected,
-            long paidTransactionCount,
-            // ── Lớp 2: quyết toán (theo đợt tất toán) ──
-            BigDecimal settledAmount,
-            long settledSettlementCount,
-            long settledPartnerCount,
-            String settledPeriod,
-            BigDecimal pendingSettleAmount,
-            BigDecimal eligibleRevenueAmount,
-            long eligibleRevenueCount,
-            long draftSettlementCount,
-            BigDecimal draftSettlementAmount,
-            // ── Doanh thu ghi nhận (theo kỳ, từ ProviderRevenue) ──
-            BigDecimal accruedCommission,
-            BigDecimal accruedPartnerNet,
-            long accruedRevenueCount) {}
-
     /** Dòng bảng "Top tour phổ biến". */
     public record TopTourRow(int rank, Long tourId, String tourTitle, String providerName,
             long bookings, BigDecimal revenue, double completionRate) {}
@@ -126,18 +70,4 @@ public record OperationsOverviewResponse(
     public record DestinationVisitRow(Long destinationId, String name, long checkIns, long completions,
             double completionRate) {}
 
-    /** Thống kê khách du lịch. */
-    public record TouristStats(long total, long newInPeriod, long active, long completedAtLeastOne,
-            double returningRate, double returningRateDelta) {}
-
-    /** Thống kê đối tác — "Tổng" luôn = "Đang hoạt động" + "Không hoạt động". */
-    public record PartnerStats(long total, long active, long withPublishedTours, long newInPeriod,
-            long inactive, long pendingApproval) {}
-
-    /** Dòng bảng "Quyết toán gần đây". */
-    public record SettlementRow(Long id, String code, String providerName, String revenuePeriod,
-            BigDecimal totalAmount, String status, String scope, Integer partnerCount) {}
-
-    /** Dòng nhật ký hoạt động gần đây. */
-    public record ActivityRow(Instant timestamp, String type, String actor, String action, String target) {}
 }

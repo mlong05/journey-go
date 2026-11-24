@@ -69,12 +69,24 @@ class TourSubmissionValidatorTest {
     }
 
     @Test
-    @DisplayName("Thiếu ảnh, thiếu điểm nổi bật, ảnh bìa không thuộc bộ ảnh")
+    @DisplayName("Ảnh tour phải đúng 5 ảnh: 6 ảnh cũng báo lỗi; thiếu ảnh bìa báo lỗi")
+    void exactlyFiveImagesAndSeparateCover() {
+        Tour tour = validTour();
+        tour.getImages().add("https://cdn/anh-6.jpg");
+        assertTrue(hasIssue(validator.validate(tour), "BASIC_INFO", "images"));
+
+        Tour noCover = validTour();
+        noCover.setCoverImageUrl(null);
+        assertTrue(hasIssue(validator.validate(noCover), "BASIC_INFO", "coverImageUrl"));
+    }
+
+    @Test
+    @DisplayName("Thiếu ảnh tour, thiếu điểm nổi bật, ảnh bìa trùng với ảnh tour")
     void basicInfoRules() {
         Tour tour = validTour();
         tour.getImages().subList(0, 2).clear();
         tour.getHighlights().subList(0, 1).clear();
-        tour.setCoverImageUrl("https://cdn/khac.jpg");
+        tour.setCoverImageUrl(tour.getImages().get(0));
         List<TourValidationIssue> issues = validator.validate(tour);
         assertTrue(hasIssue(issues, "BASIC_INFO", "images"));
         assertTrue(hasIssue(issues, "BASIC_INFO", "highlights"));
@@ -215,6 +227,18 @@ class TourSubmissionValidatorTest {
     }
 
     @Test
+    @DisplayName("Thiếu giờ khởi hành hoặc địa điểm tập trung thì bị báo lỗi; giờ đón không bắt buộc")
+    void needsDepartureTimeAndMeetingPoint() {
+        Tour tour = validTour();
+        tour.setDepartureTime("  ");
+        tour.setMeetingPoint(null);
+        List<TourValidationIssue> issues = validator.validate(tour);
+        assertTrue(hasIssue(issues, "SCHEDULE", "departureTime"));
+        assertTrue(hasIssue(issues, "SCHEDULE", "meetingPoint"));
+        assertFalse(hasIssue(issues, "SCHEDULE", "pickupInfo"));
+    }
+
+    @Test
     @DisplayName("Chưa tích ô cam kết thì bị báo lỗi")
     void requiresContentRightsConfirmation() {
         Tour tour = validTour();
@@ -251,12 +275,14 @@ class TourSubmissionValidatorTest {
                 .description("Theo chân nghệ nhân. Trải nghiệm đục gỗ.")
                 .cancellationPolicy("Hủy trước 24 giờ hoàn 100%")
                 .maxGuestsPerSlot(20)
+                .departureTime("08:00 sáng")
+                .meetingPoint("Hội quán Phúc Kiến, 46 Trần Phú, Hội An")
                 .contentRightsConfirmed(true)
                 .createdBy(owner)
                 .build();
         tour.getHighlights().addAll(List.of("Gặp nghệ nhân", "Tự tay đục gỗ", "Thăm nhà cổ"));
         for (int i = 1; i <= 5; i++) tour.getImages().add("https://cdn/anh-" + i + ".jpg");
-        tour.setCoverImageUrl("https://cdn/anh-1.jpg");
+        tour.setCoverImageUrl("https://cdn/anh-bia.jpg");
         for (GuestType type : GuestType.values()) {
             tour.getPrices().add(TourPrice.builder().tour(tour).guestType(type)
                     .price(type == GuestType.INFANT ? BigDecimal.ZERO : BigDecimal.valueOf(300000))

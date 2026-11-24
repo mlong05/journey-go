@@ -44,9 +44,9 @@ public final class TourWizardRequests {
             @Size(max = 10000) String description,
             @Schema(description = "3–5 điểm nổi bật")
             @Size(max = 5, message = "Tối đa 5 điểm nổi bật") List<@Size(max = 300) String> highlights,
-            @Schema(description = "Ảnh của tour (ít nhất 5 ảnh khi gửi duyệt)")
+            @Schema(description = "5 ảnh tour (không gồm ảnh bìa) — cần đúng 5 ảnh khi gửi duyệt")
             @Size(max = 30, message = "Tối đa 30 ảnh") List<@Size(max = 1000) String> images,
-            @Schema(description = "Ảnh bìa — phải là một trong các ảnh ở trên")
+            @Schema(description = "Ảnh bìa riêng — không trùng với 5 ảnh tour")
             @Size(max = 1000) String coverImageUrl,
             @Schema(description = "Lịch trình theo ngày (tour trong ngày: 1 mục)")
             @Valid @Size(max = 60, message = "Tối đa 60 ngày") List<ItineraryDayItem> itinerary,
@@ -164,11 +164,22 @@ public final class TourWizardRequests {
             @Valid @Size(max = 30, message = "Tối đa 30 điểm đến") List<StopItem> stops
     ) {}
 
-    @Schema(description = "Bước 4 — Các ngày khởi hành được chọn trên lịch")
+    @Schema(description = "Lịch khởi hành — ngày mở bán + thông tin khởi hành dùng chung cho mọi ngày")
     public record Schedule(
             @NotNull(message = "Danh sách ngày không được để trống")
-            @Size(max = 400, message = "Tối đa 400 ngày khởi hành") List<@NotNull LocalDate> departureDates
-    ) {}
+            @Size(max = 400, message = "Tối đa 400 ngày khởi hành") List<@NotNull LocalDate> departureDates,
+            @Schema(description = "Giờ khởi hành (chữ tự do), ví dụ \"08:00 sáng\". null = giữ nguyên")
+            @Size(max = 100, message = "Giờ khởi hành tối đa 100 ký tự") String departureTime,
+            @Schema(description = "Địa điểm tập trung. null = giữ nguyên")
+            @Size(max = 500, message = "Địa điểm tập trung tối đa 500 ký tự") String meetingPoint,
+            @Schema(description = "Giờ đón và điểm đón (không bắt buộc). null = giữ nguyên")
+            @Size(max = 1000, message = "Giờ đón tối đa 1000 ký tự") String pickupInfo
+    ) {
+        /** Chỉ có danh sách ngày (import Excel) — giữ nguyên thông tin khởi hành. */
+        public Schedule(List<LocalDate> departureDates) {
+            this(departureDates, null, null, null);
+        }
+    }
 
     @Schema(description = "Bước 5 — Gửi duyệt")
     public record Submit(

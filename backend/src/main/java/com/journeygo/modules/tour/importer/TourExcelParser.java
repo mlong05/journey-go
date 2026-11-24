@@ -169,7 +169,11 @@ final class TourExcelParser {
                 readText(general, fieldRows, Field.CANCELLATION, "pricing.cancellationPolicy"));
 
         result.stops = new TourWizardRequests.Stops(readStops(workbook));
-        result.schedule = new TourWizardRequests.Schedule(readDates(workbook.getSheet(SHEET_DATES)));
+        result.schedule = new TourWizardRequests.Schedule(
+                readDates(workbook.getSheet(SHEET_DATES)),
+                readText(general, fieldRows, Field.DEPARTURE_TIME, "schedule.departureTime"),
+                readText(general, fieldRows, Field.MEETING_POINT, "schedule.meetingPoint"),
+                readText(general, fieldRows, Field.PICKUP_INFO, "schedule.pickupInfo"));
         return result;
     }
 
@@ -279,7 +283,11 @@ final class TourExcelParser {
 
     // ── Ảnh tour ────────────────────────────────────────────────────────────
 
-    /** @return ảnh bìa (ô "Có" đầu tiên; không đánh dấu thì lấy ảnh đầu tiên) */
+    /**
+     * Dòng đánh "Có" = ảnh bìa (riêng, không tính vào ảnh tour); các dòng còn lại = 5 ảnh tour.
+     * Không đánh dấu dòng nào thì dòng đầu tiên là ảnh bìa.
+     * @return ảnh bìa
+     */
     private String readImages(Sheet sheet, List<String> images) {
         result.locator.put("basic.images", SHEET_IMAGES, null, IMAGE_COLUMNS[0]);
         result.locator.put("basic.coverImageUrl", SHEET_IMAGES, null, IMAGE_COLUMNS[1]);
@@ -291,18 +299,23 @@ final class TourExcelParser {
                 result.errors.add(issue(SHEET_IMAGES, r, IMAGE_COLUMNS[0], "Thiếu đường dẫn ảnh"));
                 return;
             }
-            result.locator.put("basic.images[" + images.size() + "]", SHEET_IMAGES, r, IMAGE_COLUMNS[0]);
-            images.add(url);
             if (Boolean.TRUE.equals(isCover)) {
                 if (cover[0] != null) {
                     result.errors.add(issue(SHEET_IMAGES, r, IMAGE_COLUMNS[1], "Chỉ chọn 1 ảnh làm ảnh bìa"));
                 } else {
                     cover[0] = url;
                     result.locator.put("basic.coverImageUrl", SHEET_IMAGES, r, IMAGE_COLUMNS[1]);
+                    return;
                 }
             }
+            result.locator.put("basic.images[" + images.size() + "]", SHEET_IMAGES, r, IMAGE_COLUMNS[0]);
+            images.add(url);
         });
-        return cover[0] != null ? cover[0] : (images.isEmpty() ? null : images.get(0));
+        if (cover[0] == null && !images.isEmpty()) {
+            // Không đánh dấu ảnh bìa ⇒ dòng đầu tiên làm ảnh bìa, các dòng sau là ảnh tour.
+            return images.remove(0);
+        }
+        return cover[0];
     }
 
     // ── Giá vé ──────────────────────────────────────────────────────────────

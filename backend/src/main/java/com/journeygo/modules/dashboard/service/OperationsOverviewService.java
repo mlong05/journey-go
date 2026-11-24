@@ -2,16 +2,13 @@ package com.journeygo.modules.dashboard.service;
 
 import com.journeygo.modules.booking.entity.enums.BookingStatus;
 import com.journeygo.modules.dashboard.dto.OperationsOverviewResponse;
-import com.journeygo.modules.destination.entity.enums.DestinationStatus;
 import com.journeygo.modules.journey.entity.enums.JourneyStatus;
 import com.journeygo.modules.partnerapplication.entity.enums.PartnerApplicationStatus;
 import com.journeygo.modules.partnerprofileupdate.entity.enums.PartnerProfileUpdateStatus;
-import com.journeygo.modules.providerrevenue.entity.enums.ProviderRevenueStatus;
 import com.journeygo.modules.refund.entity.enums.RefundStatus;
 import com.journeygo.modules.settlement.entity.enums.FinancialAdjustmentStatus;
 import com.journeygo.modules.settlement.entity.enums.SettlementStatus;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
-import com.journeygo.modules.user.entity.Role;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +24,6 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,12 +64,8 @@ public class OperationsOverviewService {
     private static final List<BookingStatus> PAID_BOOKINGS =
             List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED);
 
-    /** Refund đã hoàn thành ⇒ tính vào "Tổng tiền hoàn". */
-    private static final List<RefundStatus> REFUNDED_STATUSES = List.of(RefundStatus.REFUNDED);
 
     private static final int TOP_LIMIT = 5;
-    private static final int SETTLEMENT_LIMIT = 6;
-    private static final int ACTIVITY_LIMIT = 12;
 
     private final EntityManager em;
 
@@ -110,21 +102,14 @@ public class OperationsOverviewService {
         var previousKpis = buildKpis(period.previous());
 
         List<OperationsOverviewResponse.SparkPoint> revenueTrend = buildTrend(period, "commission");
-        List<OperationsOverviewResponse.SparkPoint> previousRevenueTrend = buildTrend(period.previous(), "commission");
         List<OperationsOverviewResponse.SparkPoint> gmvTrend = buildTrend(period, "gmv");
-        List<OperationsOverviewResponse.SparkPoint> previousGmvTrend = buildTrend(period.previous(), "gmv");
         List<OperationsOverviewResponse.BookingTrendPoint> bookingTrend = buildBookingTrend(period);
 
         var bookingBreakdown = buildBookingBreakdown(period);
         var pendingActions = buildPendingActions();
-        var finance = buildFinance(period);
         var topTours = buildTopTours(period);
         var experience = buildExperienceStats(period);
         var topDestinations = buildTopDestinations(period);
-        var tourists = buildTouristStats(period);
-        var partners = buildPartnerStats(period);
-        var recentSettlements = buildRecentSettlements();
-        var recentActivities = buildRecentActivities();
 
         long critical = pendingActions.stream().filter(a -> "URGENT".equals(a.severity()))
                 .mapToLong(OperationsOverviewResponse.PendingAction::count).sum();
@@ -139,12 +124,10 @@ public class OperationsOverviewService {
                 new OperationsOverviewResponse.PeriodInfo(period.key, period.label, period.from, period.to,
                         period.previousFrom, period.previousTo, period.days()),
                 health, kpis, previousKpis,
-                revenueTrend, previousRevenueTrend, gmvTrend, previousGmvTrend,
+                revenueTrend, gmvTrend,
                 bookingBreakdown, bookingTrend,
-                pendingActions, finance,
+                pendingActions,
                 topTours, experience, topDestinations,
-                tourists, partners,
-                recentSettlements, recentActivities,
                 Instant.now());
     }
 
@@ -350,86 +333,6 @@ public class OperationsOverviewService {
         return actions;
     }
 
-    // ───────────────────────── Tài chính ─────────────────────────
-
-    private OperationsOverviewResponse.FinanceSnapshot buildFinance(Period p) {
-        // LỚP 1 — DÒNG TIỀN KHÁCH HÀNG (theo kỳ đang xem).
-        // Tổng tiền khách thực trả = Booking.totalAmount (sau voucher).
-        BigDecimal grossPaid = sum("select sum(b.totalAmount) from Booking b where b.status in ?1 "
-                + "and b.paidAt >= ?2 and b.paidAt < ?3", PAID_BOOKINGS, p.from, p.to);
-
-        long paidCount = count("select count(b) from Booking b where b.status in ?1 "
-                + "and b.paidAt >= ?2 and b.paidAt < ?3", PAID_BOOKINGS, p.from, p.to);
-
-        BigDecimal voucherDiscount = sum("select sum(b.discountAmount) from Booking b "
-                + "where b.status in ?1 and b.paidAt >= ?2 and b.paidAt < ?3",
-                PAID_BOOKINGS, p.from, p.to);
-
-        // Hoàn tiền: gắn theo thời điểm HOÀN TIỀN HOÀN TẤT (vnpResolvedAt) — đúng thời điểm
-        // tiền thực sự chảy ngược ra khách, không dùng updatedAt (bị đổi mỗi lần sửa).
-        // Dùng coalesce(vnpResolvedAt, updatedAt) cho các bản ghi cũ chưa có vnpResolvedAt.
-        BigDecimal refundAmount = sum("select sum(r.refundedAmount) from RefundRequest r "
-                + "where r.status in ?1 and coalesce(r.vnpResolvedAt, r.updatedAt) >= ?2 "
-                + "and coalesce(r.vnpResolvedAt, r.updatedAt) < ?3",
-                REFUNDED_STATUSES, p.from, p.to);
-
-        // Thực thu = tiền khách trả − tiền đã hoàn. KHÔNG trừ phần chia đối tác
-        // (đó là chi phí vận hành, thuộc LỚP 2) ⇒ khớp với /admin/finance.
-        BigDecimal netCollected = grossPaid.subtract(refundAmount);
-
-        // LỚP 2 — QUYẾT TOÁN (theo đợt tất toán, KHÔNG lọc theo kỳ đang xem).
-        List<Object[]> settledRows = query(
-                "select s.settlementAmount, s.partnerCount, s.revenuePeriod from Settlement s "
-                        + "where s.status = ?1 order by s.approvedAt desc",
-                Object[].class, SettlementStatus.APPROVED).getResultList();
-        BigDecimal settledAmount = BigDecimal.ZERO;
-        long settledPartnerCount = 0;
-        String settledPeriod = null;
-        for (Object[] row : settledRows) {
-            settledAmount = settledAmount.add(toDecimal(row[0]));
-            // Đợt BATCH gom N đối tác ⇒ partnerCount là số đối tác thực sự nhận tiền.
-            settledPartnerCount += Math.max(1L, toLong(row[1]));
-            if (settledPeriod == null && row[2] != null) {
-                settledPeriod = String.valueOf(row[2]);
-            }
-        }
-        long settledSettlementCount = settledRows.size();
-
-        // Tiền đối tác đã đủ điều kiện nhưng CHƯA vào đợt tất toán nào (trong kỳ).
-        BigDecimal pendingSettleAmount = sum("select sum(r.providerNetAmount) from ProviderRevenue r "
-                + "where r.status = ?1 and r.booking.paidAt >= ?2 and r.booking.paidAt < ?3",
-                ProviderRevenueStatus.ELIGIBLE, p.from, p.to);
-
-        // Tổng bộ khoản đủ điều kiện chưa gom vào đợt — TOÀN HỆ THỐNG.
-        BigDecimal eligibleRevenueAmount = sum("select sum(r.providerNetAmount) from ProviderRevenue r "
-                + "where r.status = ?1", ProviderRevenueStatus.ELIGIBLE);
-        long eligibleRevenueCount = count("select count(r) from ProviderRevenue r where r.status = ?1",
-                ProviderRevenueStatus.ELIGIBLE);
-
-        // Đợt tất toán nháp (DRAFT) — Admin chưa duyệt ⇒ tiền CHƯA về ví đối tác.
-        long draftSettlementCount = count("select count(s) from Settlement s where s.status = ?1",
-                SettlementStatus.DRAFT);
-        BigDecimal draftSettlementAmount = sum("select sum(s.settlementAmount) from Settlement s "
-                + "where s.status = ?1", SettlementStatus.DRAFT);
-
-        // LỚP 3 — DOANH THU GHI NHẬN (từ ProviderRevenue).
-        // ⚠️ Chỉ gồm những tour có đối tác được gán đều đức trải nghiệm ⇒ có thể nhỏ hơn
-        // nhiều so với GMV. Tối thiểu phải nêu rõ số khoản để Admin tự đối chiếu.
-        BigDecimal accruedCommission = sum("select sum(r.commissionAmount) from ProviderRevenue r "
-                + "where r.booking.paidAt >= ?1 and r.booking.paidAt < ?2", p.from, p.to);
-        BigDecimal accruedPartnerNet = sum("select sum(r.providerNetAmount) from ProviderRevenue r "
-                + "where r.booking.paidAt >= ?1 and r.booking.paidAt < ?2", p.from, p.to);
-        long accruedRevenueCount = count("select count(r) from ProviderRevenue r "
-                + "where r.booking.paidAt >= ?1 and r.booking.paidAt < ?2", p.from, p.to);
-
-        return new OperationsOverviewResponse.FinanceSnapshot(
-                grossPaid, voucherDiscount, refundAmount, netCollected, paidCount,
-                settledAmount, settledSettlementCount, settledPartnerCount, settledPeriod,
-                pendingSettleAmount, eligibleRevenueAmount, eligibleRevenueCount,
-                draftSettlementCount, draftSettlementAmount,
-                accruedCommission, accruedPartnerNet, accruedRevenueCount);
-    }
-
     // ───────────────────────── Tour & Experience ─────────────────────────
 
     private List<OperationsOverviewResponse.TopTourRow> buildTopTours(Period p) {
@@ -498,143 +401,7 @@ public class OperationsOverviewService {
         return result;
     }
 
-    // ───────────────────────── Khách & Đối tác ─────────────────────────
-
-    private OperationsOverviewResponse.TouristStats buildTouristStats(Period p) {
-        long total = countUsersByRole(Role.TOURIST);
-        long newInPeriod = count("select count(u) from User u where u.role.name = ?1 "
-                + "and u.createdAt >= ?2 and u.createdAt < ?3", Role.TOURIST, p.from, p.to);
-        long active = count("select count(distinct b.tourist.id) from Booking b "
-                + "where b.createdAt >= ?1 and b.createdAt < ?2", p.from, p.to);
-        long completedOne = count("select count(distinct b.tourist.id) from Booking b "
-                + "where b.status = ?1 and b.completedAt >= ?2 and b.completedAt < ?3",
-                BookingStatus.COMPLETED, p.from, p.to);
-
-        // Tỷ lệ khách quay lại: khách đặt ≥2 lần trong kỳ / tổng khách có đặt trong kỳ.
-        long repeat = count("select count(t.userId) from (select b.tourist.id as userId from Booking b "
-                + "where b.createdAt >= ?1 and b.createdAt < ?2 group by b.tourist.id "
-                + "having count(b.id) > 1) t", p.from, p.to);
-        double returningRate = active == 0 ? 0 : round2(repeat * 100.0 / active);
-
-        long repeatPrev = count("select count(t.userId) from (select b.tourist.id as userId from Booking b "
-                + "where b.createdAt >= ?1 and b.createdAt < ?2 group by b.tourist.id "
-                + "having count(b.id) > 1) t", p.previousFrom, p.previousTo);
-        long activePrev = count("select count(distinct b.tourist.id) from Booking b "
-                + "where b.createdAt >= ?1 and b.createdAt < ?2", p.previousFrom, p.previousTo);
-        double returningPrev = activePrev == 0 ? 0 : round2(repeatPrev * 100.0 / activePrev);
-
-        return new OperationsOverviewResponse.TouristStats(total, newInPeriod, active, completedOne,
-                returningRate, round2(returningRate - returningPrev));
-    }
-
-    /**
-     * Thống kê đối tác.
-     *
-     * <p>⚠️ Tất cả chỉ số lấy từ cùng một nguồn {@code ProviderProfile} ⇒
-     * "Tổng đối tác" luôn = "Đang hoạt động" + "Không hoạt động" (không lệch nhau).
-     */
-    private OperationsOverviewResponse.PartnerStats buildPartnerStats(Period p) {
-        long total = count("select count(pp) from ProviderProfile pp");
-        long active = count("select count(pp) from ProviderProfile pp where pp.active = true");
-        long inactive = count("select count(pp) from ProviderProfile pp where pp.active = false");
-        long withPublished = count("select count(distinct t.createdBy.id) from Tour t "
-                + "where t.deleted = false and t.status = ?1", TourStatus.PUBLISHED);
-        long newInPeriod = count("select count(pp) from ProviderProfile pp "
-                + "where pp.createdAt >= ?1 and pp.createdAt < ?2", p.from, p.to);
-        long pendingApproval = count("select count(a) from PartnerApplication a where a.status = ?1",
-                PartnerApplicationStatus.PENDING);
-
-        return new OperationsOverviewResponse.PartnerStats(total, active, withPublished, newInPeriod,
-                inactive, pendingApproval);
-    }
-
-    // ───────────────────────── Quyết toán & Nhật ký ─────────────────────────
-
-    /**
-     * Bảng "Quyết toán gần đây" — đợt tất toán mới nhất (mọi trạng thái).
-     *
-     * <p>⚠️ Bắt buộc dùng {@code LEFT JOIN} tường minh cho {@code providerProfile}:
-     * đợt TỔNG (scope = BATCH) có {@code provider_profile_id = NULL} (gom tiền của
-     * NHIỀU đối tác). Nếu dùng {@code s.providerProfile.providerName} trực tiếp trong
-     * SELECT, JPA sinh {@code INNER JOIN} ⇒ các đợt tổng bị LOẠI KHỎI kết quả im lặng,
-     * khiến bảng trống dù nhật ký hoạt động vẫn ghi nhận "đã phê duyệt quyết toán".
-     */
-    private List<OperationsOverviewResponse.SettlementRow> buildRecentSettlements() {
-        List<Object[]> rows = query(
-                "select s.id, s.settlementCode, pp.providerName, s.revenuePeriod, "
-                        + "s.settlementAmount, s.status, s.scope, s.partnerCount "
-                        + "from Settlement s left join s.providerProfile pp "
-                        + "order by s.createdAt desc",
-                Object[].class).setMaxResults(SETTLEMENT_LIMIT).getResultList();
-
-        List<OperationsOverviewResponse.SettlementRow> result = new ArrayList<>();
-        for (Object[] row : rows) {
-            Integer partnerCount = row[7] == null ? null : (int) toLong(row[7]);
-            result.add(new OperationsOverviewResponse.SettlementRow(
-                    (Long) row[0], (String) row[1], (String) row[2], (String) row[3],
-                    toDecimal(row[4]), name(row[5]), name(row[6]), partnerCount));
-        }
-        return result;
-    }
-
-    /**
-     * Nhật ký hoạt động gần đây — gom từ nhiều nguồn rồi sắp xếp theo thời gian giảm dần.
-     *
-     * <p>Chỉ hiển thị sự kiện liên quan vận hành nền tảng, không phải log kỹ thuật.
-     */
-    private List<OperationsOverviewResponse.ActivityRow> buildRecentActivities() {
-        List<OperationsOverviewResponse.ActivityRow> rows = new ArrayList<>();
-
-        // Đối tác gửi tour mới.
-        query("select t.submittedAt, t.createdBy.fullName, t.title from Tour t "
-                        + "where t.deleted = false and t.submittedAt is not null "
-                        + "order by t.submittedAt desc", Object[].class)
-                .setMaxResults(4).getResultList()
-                .forEach(r -> rows.add(new OperationsOverviewResponse.ActivityRow(
-                        (Instant) r[0], "TOUR_SUBMITTED", (String) r[1], "đã gửi tour", (String) r[2])));
-
-        // Khách thanh toán booking.
-        query("select b.paidAt, b.tourist.fullName, b.bookingCode from Booking b "
-                        + "where b.paidAt is not null order by b.paidAt desc", Object[].class)
-                .setMaxResults(4).getResultList()
-                .forEach(r -> rows.add(new OperationsOverviewResponse.ActivityRow(
-                        (Instant) r[0], "BOOKING_PAID", (String) r[1], "đã thanh toán booking", (String) r[2])));
-
-        // Yêu cầu hoàn tiền mới.
-        query("select r.createdAt, r.tourist.fullName, r.refundCode from RefundRequest r "
-                        + "order by r.createdAt desc", Object[].class)
-                .setMaxResults(4).getResultList()
-                .forEach(r -> rows.add(new OperationsOverviewResponse.ActivityRow(
-                        (Instant) r[0], "REFUND_REQUESTED", (String) r[1], "đã gửi yêu cầu hoàn tiền",
-                        (String) r[2])));
-
-        // Quyết toán được phê duyệt (dùng LEFT JOIN để không rơi dòng nếu approvedBy = null).
-        query("select s.approvedAt, u.fullName, s.settlementCode from Settlement s "
-                        + "left join s.approvedBy u "
-                        + "where s.approvedAt is not null order by s.approvedAt desc", Object[].class)
-                .setMaxResults(4).getResultList()
-                .forEach(r -> rows.add(new OperationsOverviewResponse.ActivityRow(
-                        (Instant) r[0], "SETTLEMENT_APPROVED", (String) r[1], "đã phê duyệt quyết toán",
-                        (String) r[2])));
-
-        // Đối tác đăng ký mới.
-        query("select a.submittedAt, a.businessName, a.email from PartnerApplication a "
-                        + "where a.submittedAt is not null order by a.submittedAt desc", Object[].class)
-                .setMaxResults(4).getResultList()
-                .forEach(r -> rows.add(new OperationsOverviewResponse.ActivityRow(
-                        (Instant) r[0], "PARTNER_REGISTERED", (String) r[1], "đã gửi hồ sơ đối tác",
-                        (String) r[2])));
-
-        rows.sort(Comparator.comparing(OperationsOverviewResponse.ActivityRow::timestamp,
-                Comparator.nullsLast(Comparator.reverseOrder())));
-        return rows.stream().limit(ACTIVITY_LIMIT).toList();
-    }
-
     // ───────────────────────── Helpers ─────────────────────────
-
-    private long countUsersByRole(String role) {
-        return count("select count(u) from User u where u.role.name = ?1", role);
-    }
 
     private long count(String jpql, Object... params) {
         Long value = query(jpql, Long.class, params).getSingleResult();
@@ -650,10 +417,6 @@ public class OperationsOverviewService {
         TypedQuery<T> q = em.createQuery(jpql, type);
         for (int i = 0; i < params.length; i++) q.setParameter(i + 1, params[i]);
         return q;
-    }
-
-    private static String name(Object enumValue) {
-        return enumValue == null ? null : ((Enum<?>) enumValue).name();
     }
 
     private static BigDecimal toDecimal(Object value) {

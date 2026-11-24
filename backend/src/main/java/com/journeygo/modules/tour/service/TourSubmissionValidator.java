@@ -31,7 +31,9 @@ public class TourSubmissionValidator {
     public static final int TITLE_MAX = 80;
     public static final int HIGHLIGHTS_MIN = 3;
     public static final int HIGHLIGHTS_MAX = 5;
+    /** Ảnh tour (ngoài ảnh bìa): đúng 5 ảnh. */
     public static final int IMAGES_MIN = 5;
+    public static final int IMAGES_MAX = 5;
     /** Tour trong ngày phải dưới 24 giờ (tối đa 23 giờ 59 phút). */
     public static final int DAY_TRIP_MAX_MINUTES = 24 * 60;
     public static final int QUIZ_MIN = 1;
@@ -141,16 +143,18 @@ public class TourSubmissionValidator {
         }
 
         List<String> images = tour.getImages();
-        if (images.size() < IMAGES_MIN) {
-            issues.add(TourValidationIssue.of(step, "images", "Cần ít nhất " + IMAGES_MIN + " ảnh thật của tour"));
+        if (images.size() != IMAGES_MIN) {
+            issues.add(TourValidationIssue.of(step, "images", "Cần đúng " + IMAGES_MIN + " ảnh tour (hiện có " + images.size() + " ảnh)"));
         }
         if (images.stream().anyMatch(url -> !isHttps(url))) {
             issues.add(TourValidationIssue.of(step, "images", "Ảnh tour phải là đường dẫn https hợp lệ"));
         }
         if (isBlank(tour.getCoverImageUrl())) {
-            issues.add(TourValidationIssue.of(step, "coverImageUrl", "Vui lòng chọn 1 ảnh làm ảnh bìa"));
-        } else if (!images.contains(tour.getCoverImageUrl())) {
-            issues.add(TourValidationIssue.of(step, "coverImageUrl", "Ảnh bìa phải là một trong các ảnh của tour"));
+            issues.add(TourValidationIssue.of(step, "coverImageUrl", "Vui lòng tải lên 1 ảnh bìa"));
+        } else if (!isHttps(tour.getCoverImageUrl())) {
+            issues.add(TourValidationIssue.of(step, "coverImageUrl", "Ảnh bìa phải là đường dẫn https hợp lệ"));
+        } else if (images.contains(tour.getCoverImageUrl())) {
+            issues.add(TourValidationIssue.of(step, "coverImageUrl", "Ảnh bìa là ảnh riêng, không trùng với 5 ảnh tour"));
         }
     }
 
@@ -323,6 +327,12 @@ public class TourSubmissionValidator {
         boolean hasFuture = tour.getDepartureDates().stream().anyMatch(d -> d.getDepartureDate().isAfter(today));
         if (!hasFuture) {
             issues.add(TourValidationIssue.of("SCHEDULE", "departureDates", "Cần ít nhất 1 ngày mở bán ở tương lai"));
+        }
+        if (isBlank(tour.getDepartureTime())) {
+            issues.add(TourValidationIssue.of("SCHEDULE", "departureTime", "Vui lòng nhập giờ khởi hành"));
+        }
+        if (isBlank(tour.getMeetingPoint())) {
+            issues.add(TourValidationIssue.of("SCHEDULE", "meetingPoint", "Vui lòng nhập địa điểm tập trung"));
         }
     }
 

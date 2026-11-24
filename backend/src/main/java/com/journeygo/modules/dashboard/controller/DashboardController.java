@@ -4,9 +4,11 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.dashboard.dto.AdminDashboardResponse;
 import com.journeygo.modules.dashboard.dto.ModeratorDashboardResponse;
 import com.journeygo.modules.dashboard.dto.OperationsOverviewResponse;
+import com.journeygo.modules.dashboard.dto.PlatformRevenueReportResponse;
 import com.journeygo.modules.dashboard.dto.ProviderDashboardResponse;
 import com.journeygo.modules.dashboard.service.DashboardService;
 import com.journeygo.modules.dashboard.service.OperationsOverviewService;
+import com.journeygo.modules.dashboard.service.PlatformRevenueReportService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DashboardController {
     private final DashboardService dashboardService;
     private final OperationsOverviewService operationsOverviewService;
+    private final PlatformRevenueReportService platformRevenueReportService;
 
     @GetMapping("/admin")
     @PreAuthorize("hasRole('ADMIN')")
@@ -45,6 +48,15 @@ public class DashboardController {
             @RequestParam(required = false) String to) {
         return ResponseEntity.ok(ApiResponse.success("Lấy số liệu tổng quan vận hành thành công",
                 operationsOverviewService.overview(range, from, to)));
+    }
+
+    @GetMapping("/admin/revenue")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Doanh thu nền tảng theo tháng: tháng này vs tháng trước, chuỗi N tháng (mặc định 12)")
+    public ResponseEntity<ApiResponse<PlatformRevenueReportResponse>> revenue(
+            @RequestParam(defaultValue = "12") int months) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy báo cáo doanh thu nền tảng thành công",
+                platformRevenueReportService.report(months)));
     }
 
     @GetMapping("/admin/operations/badges")
