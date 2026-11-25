@@ -21,7 +21,7 @@ import NotificationToaster from "@/components/notifications/NotificationToaster"
 const MODERATOR_NAV_ITEMS = [
   {
     id: "overview",
-    label: "Bàn làm việc tổng quan",
+    label: "Tổng quan",
     href: "/moderator",
     icon: LayoutDashboard,
     group: "Vận hành",
@@ -92,7 +92,7 @@ export default function ModeratorLayout({ children }) {
       .find((i) => {
         const p = i.href.split("#")[0];
         return p === "/moderator" ? pathname === "/moderator" : pathname?.startsWith(p);
-      })?.label || "Bàn làm việc tổng quan";
+      })?.label || "Tổng quan";
 
   return (
     <NotificationProvider>
