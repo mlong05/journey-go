@@ -18,6 +18,8 @@ import {
   XCircle,
 } from "lucide-react";
 import AccountLayout from "./AccountLayout";
+import PaginationBar from "@/components/ui/PaginationBar";
+import { PAGE_SIZE } from "@/lib/pagination";
 import { touristService } from "../services/touristService";
 import { ROUTES } from "@/constants/routes";
 import { vnd, shortDate } from "../utils";
@@ -54,14 +56,17 @@ export default function TourRequestsScreen() {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(0);
   const [error, setError] = useState(null);
 
   const fetchRequests = useCallback((p = 0) => {
-    return touristService.myTourRequests({ page: p, size: 10 })
+    return touristService.myTourRequests({ page: p, size: PAGE_SIZE })
       .then((res) => {
+        const totalElements = res?.totalElements || 0;
         setRequests(res?.content || []);
-        setTotal(res?.totalElements || 0);
+        setTotal(totalElements);
+        setTotalPages(res?.totalPages || Math.max(1, Math.ceil(totalElements / PAGE_SIZE)));
         setPage(p);
         setError(null);
       })
@@ -76,6 +81,12 @@ export default function TourRequestsScreen() {
   useEffect(() => {
     fetchRequests(0);
   }, [fetchRequests]);
+
+  const handlePageChange = (nextPage) => {
+    setLoading(true);
+    fetchRequests(nextPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <AccountLayout>
@@ -236,6 +247,17 @@ export default function TourRequestsScreen() {
                 </div>
               );
             })}
+            {totalPages > 1 && (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <PaginationBar
+                  page={page}
+                  totalPages={totalPages}
+                  totalElements={total}
+                  unit="yêu cầu"
+                  onChange={handlePageChange}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
