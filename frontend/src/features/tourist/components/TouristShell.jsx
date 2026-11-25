@@ -37,7 +37,7 @@ const initials = (name) =>
  */
 const TOURIST_MENU = [
   [ROUTES.ACCOUNT, "nav.myAccount", UserRound],
-  [ROUTES.ACCOUNT_TOUR_REQUESTS, "Tour theo nhu cầu", Sparkles],
+  [ROUTES.ACCOUNT_TOUR_REQUESTS, "nav.tourRequests", Sparkles],
   [ROUTES.ACCOUNT_AI_GUIDE, "merge.nav.aiGuide", Sparkles],
   [ROUTES.ACCOUNT_MESSAGES, "nav.messages", MessageCircle, "unread"],
   [ROUTES.ACCOUNT_REWARDS, "nav.rewards", Gift],
