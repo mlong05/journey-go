@@ -11,7 +11,6 @@ class CreateTourRequestScreen extends StatefulWidget {
 
 class _CreateTourRequestScreenState extends State<CreateTourRequestScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _titleCtrl = TextEditingKey();
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _destController = TextEditingController();
@@ -54,7 +53,7 @@ class _CreateTourRequestScreenState extends State<CreateTourRequestScreen> {
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
-            primary: AppCultureColors.primaryTeal,
+            primary: AppCultureColors.heritageJade,
             onPrimary: Colors.white,
             onSurface: AppCultureColors.textDark,
           ),
@@ -219,7 +218,7 @@ class _CreateTourRequestScreenState extends State<CreateTourRequestScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.calendar_today_rounded, size: 16, color: AppCultureColors.primaryTeal),
+                              const Icon(Icons.calendar_today_rounded, size: 16, color: AppCultureColors.heritageJade),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -253,7 +252,7 @@ class _CreateTourRequestScreenState extends State<CreateTourRequestScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.calendar_month_rounded, size: 16, color: AppCultureColors.primaryTeal),
+                              const Icon(Icons.calendar_month_rounded, size: 16, color: AppCultureColors.heritageJade),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -355,7 +354,7 @@ class _CreateTourRequestScreenState extends State<CreateTourRequestScreen> {
                   child: ElevatedButton(
                     onPressed: _loading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppCultureColors.primaryTeal,
+                      backgroundColor: AppCultureColors.heritageJade,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -421,7 +420,7 @@ class _CreateTourRequestScreenState extends State<CreateTourRequestScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppCultureColors.primaryTeal, width: 1.5),
+        borderSide: const BorderSide(color: AppCultureColors.heritageJade, width: 1.5),
       ),
     );
   }
