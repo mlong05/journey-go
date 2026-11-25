@@ -1,6 +1,8 @@
 {
   "common.language": "Language",
   "nav.explore": "Explore",
+  "nav.tours": "All Tours",
+  "nav.tourRequests": "Custom Tour Requests",
   "nav.community": "Community",
   "nav.myTrips": "My trips",
   "nav.forPartners": "For partners",
