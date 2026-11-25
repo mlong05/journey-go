@@ -59,7 +59,7 @@ export default function BookingStatusChart({ breakdown, trend, isLoading }) {
   }));
 
   return (
-    <section className={CARD.shell + " flex flex-col"}>
+    <section className={CARD.shell + " flex flex-col h-full"}>
       <CardHeader
         icon={CheckCircle2}
         tone="emerald"
@@ -115,7 +115,9 @@ export default function BookingStatusChart({ breakdown, trend, isLoading }) {
             <Skeleton className="h-full w-full rounded-xl bg-slate-50" />
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={230}>
+          // ⚠️ height="100%": biểu đồ co giãn theo chiều cao thực của card ⇒ 2 ô
+          // trong cùng hàng luôn cao bằng nhau, không để lại khoảng trống.
+          <ResponsiveContainer width="100%" height="100%" minHeight={230}>
             <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
               <XAxis
