@@ -23,11 +23,13 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -191,6 +193,20 @@ class TourRequestServiceTest {
         when(userRepository.findById(2L)).thenReturn(Optional.of(provider));
         when(tourRequestRepository.findById(100L)).thenReturn(Optional.of(tr));
         when(tourRequestRepository.save(any(TourRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // ⚠️ `acceptRequest` dùng UPDATE hàng loạt (`acceptIfOpen`) để tránh race
+        // condition "2 đối tác cùng nhận 1 yêu cầu" ⇒ mock mặc định trả 0 ⇒ service
+        // ném TOUR_REQUEST_ALREADY_ACCEPTED. Phải stub trả 1 (cập nhật thành công).
+        // `acceptIfOpen` là @Modifying ⇒ KHÔNG tự cập nhật entity trong bộ nhớ ⇒
+        // mock phải tự set trạng thái để phần assert bên dưới đọc được.
+        when(tourRequestRepository.acceptIfOpen(anyLong(), any(User.class), any(Instant.class),
+                any(TourRequestStatus.class), any(TourRequestStatus.class)))
+                .thenAnswer(invocation -> {
+                    tr.setStatus(TourRequestStatus.ACCEPTED);
+                    tr.setAcceptedBy(provider);
+                    tr.setAcceptedAt(invocation.getArgument(2));
+                    return 1;
+                });
 
         TourRequestResponse response = tourRequestService.acceptRequest(100L, 2L);
 
