@@ -22,13 +22,16 @@ export const CARD = {
 
 /** Lưới 12 cột tiêu chuẩn của trang. */
 export const GRID = {
-  row: "grid grid-cols-1 lg:grid-cols-12 gap-4",
-  col8: "lg:col-span-8",
-  col7: "lg:col-span-7",
-  col6: "lg:col-span-6",
-  col5: "lg:col-span-5",
-  col4: "lg:col-span-4",
-  col12: "lg:col-span-12",
+  // ⚠️ "items-stretch" (mặc định của grid) + "h-full" ở các wrapper ⇒ mọi ô trong
+  // cùng hàng có CHIỀU CAO BẰNG NHAU. Nếu không, ô thấp hơn sẽ để lại khoảng
+  // trắng lệch nhau giữa các hàng ⇒ trang nhìn rối.
+  row: "grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch",
+  col8: "lg:col-span-8 h-full",
+  col7: "lg:col-span-7 h-full",
+  col6: "lg:col-span-6 h-full",
+  col5: "lg:col-span-5 h-full",
+  col4: "lg:col-span-4 h-full",
+  col12: "lg:col-span-12 h-full",
 };
 
 /** Bảng bên trong card — cuộn ngang mượt trên mobile. */

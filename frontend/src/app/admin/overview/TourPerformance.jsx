@@ -111,7 +111,7 @@ export function ExperienceStatsCard({ experience, isLoading }) {
   const stats = experience || {};
 
   return (
-    <section className={CARD.shell + " flex flex-col"}>
+    <section className={CARD.shell + " flex flex-col h-full"}>
       <CardHeader
         icon={Sparkles}
         tone="emerald"
@@ -123,7 +123,7 @@ export function ExperienceStatsCard({ experience, isLoading }) {
         </span>
       </CardHeader>
 
-      <div className="p-4 grid grid-cols-2 gap-2.5">
+      <div className="p-4 grid grid-cols-2 gap-2.5 flex-1 content-start">
         {[
           { label: "Lượt mở khóa", value: stats.unlocks, tone: "indigo", hint: EXPERIENCE_HINTS.unlocks },
           { label: "Lượt check-in", value: stats.checkIns, tone: "sky", hint: EXPERIENCE_HINTS.checkIns },
@@ -161,7 +161,7 @@ export function TopDestinationsCard({ destinations, isLoading }) {
   const rows = destinations || [];
 
   return (
-    <section className={CARD.shell + " flex flex-col"}>
+    <section className={CARD.shell + " flex flex-col h-full"}>
       <CardHeader
         icon={MapPin}
         tone="rose"
@@ -169,7 +169,7 @@ export function TopDestinationsCard({ destinations, isLoading }) {
         subtitle="Xếp hạng theo số lượt check-in"
       />
 
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3 flex-1">
         {isLoading && rows.length === 0 ? (
           <p className="py-8 text-center text-xs text-slate-400">Đang tải…</p>
         ) : rows.length === 0 ? (

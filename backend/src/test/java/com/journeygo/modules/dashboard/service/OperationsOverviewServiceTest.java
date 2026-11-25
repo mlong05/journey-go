@@ -75,6 +75,38 @@ class OperationsOverviewServiceTest {
         assertTrue(filtered.kpis().gmv().compareTo(all.kpis().gmv()) <= 0);
         assertEquals(0, filtered.kpis().totalBookings());
     }
+
+    @Test
+    @DisplayName("Khung 'Tất cả': điểm đầu BÁM theo bản ghi đầu tiên trong DB, KHÔNG hard-code")
+    void all_startsFromActualEarliestBookingRow() {
+        // Đọc trực tiếp bản ghi đầu tiên từ DB (không qua service) ⇒ nguồn sự thật.
+        var earliestRow = service.earliestBookingDateForTest();
+        OperationsOverviewResponse res = service.overview("all", null, null, null);
+
+        assertNotNull(earliestRow, "DB phải có ít nhất 1 booking");
+        java.time.ZoneId vn = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        java.time.LocalDate earliestDay = earliestRow.atZone(vn).toLocalDate();
+        java.time.LocalDate actualStart = res.period().from().atZone(vn).toLocalDate();
+
+        // Điểm đầu = ĐẦU THÁNG chứa bản ghi đầu tiên (lùi về đầu tháng cho gọn trục ngang).
+        assertEquals(earliestDay.withDayOfMonth(1), actualStart,
+                "Điểm đầu kỳ 'Tất cả' phải bám theo dữ liệu thật, không phải ngày cố định");
+
+        // Điểm cuối = hôm nay.
+        java.time.LocalDate today = java.time.LocalDate.now(vn);
+        assertEquals(today, res.period().to().atZone(vn).toLocalDate().minusDays(1));
+
+        // Không có mốc so sánh ⇒ không có chuỗi "kỳ trước" (không có năm 2013).
+        assertTrue(res.previousRevenueTrend().isEmpty());
+        assertTrue(res.previousGmvTrend().isEmpty());
+        assertTrue(res.period().baselineLabel() == null || res.period().baselineLabel().isEmpty());
+
+        // Số điểm = số tháng từ mốc đầu tới tháng hiện tại.
+        int expected = (int) java.time.temporal.ChronoUnit.MONTHS.between(
+                java.time.YearMonth.from(earliestDay.withDayOfMonth(1)),
+                java.time.YearMonth.from(today)) + 1;
+        assertEquals(expected, res.revenueTrend().size());
+    }
 }
 
 
