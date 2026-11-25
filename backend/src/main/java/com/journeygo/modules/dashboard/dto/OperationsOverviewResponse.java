@@ -70,8 +70,16 @@ public record OperationsOverviewResponse(
             BigDecimal refundAmount, double refundRate, double successRate,
             BigDecimal avgBookingValue) {}
 
-    /** Một điểm của chuỗi xu hướng (doanh thu / GMV theo bucket thời gian). */
-    public record SparkPoint(String label, BigDecimal value) {}
+    /**
+     * Một điểm của chuỗi xu hướng (doanh thu / GMV theo bucket thời gian).
+     *
+     * @param label     nhãn bucket của kỳ này (VD: "01/11"). RỖNG nếu ô đó không tồn
+     *                  tại trong kỳ này (VD: ô 31 khi tháng 11 chỉ có 30 ngày).
+     * @param value     giá trị tại ô đó; null = chưa diễn ra / không có dữ liệu
+     * @param noSuchDay true nếu ô này KHÔNG có ngày tương ứng trong kỳ này
+     *                  (VD: tháng 11 không có ngày 31) ⇒ UI hiển thị "-" thay vì null
+     */
+    public record SparkPoint(String label, BigDecimal value, boolean noSuchDay) {}
 
     /** Trạng thái booking theo bucket thời gian (dùng cho biểu đồ cột chồng). */
     public record BookingTrendPoint(String label, long success, long pendingPayment,
