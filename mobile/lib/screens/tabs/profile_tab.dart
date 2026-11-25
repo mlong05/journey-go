@@ -34,6 +34,7 @@ import '../rewards/wallet_screen.dart';
 import '../bookings/my_bookings_screen.dart';
 import '../chat/provider_chat_list_screen.dart';
 import '../refunds_screen.dart';
+import '../tours/tour_requests_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   final UserModel currentUser;
@@ -1028,6 +1029,19 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
         _sectionTitle('Vé & hỗ trợ'),
         const SizedBox(height: 12),
         _groupCard([
+          _buildSettingTile(
+            icon: Icons.auto_awesome_rounded,
+            iconColor: AppCultureColors.heritageJade,
+            iconBg: AppCultureColors.jadeLight,
+            title: 'Tour theo nhu cầu',
+            subtitle: 'Đăng yêu cầu & đặt tour thiết kế riêng cho bạn',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TourRequestsScreen()),
+              );
+            },
+          ),
+          _tileDivider(),
           _buildSettingTile(
             icon: Icons.receipt_long_rounded,
             iconColor: AppCultureColors.oceanBlue,
