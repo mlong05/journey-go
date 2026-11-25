@@ -25,6 +25,8 @@ import com.journeygo.modules.tour.entity.TourStopExperience;
 import com.journeygo.modules.tour.entity.TourStopQuestion;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
 import com.journeygo.modules.tour.entity.enums.TourVisibility;
+import com.journeygo.modules.tourrequest.entity.enums.TourRequestStatus;
+import com.journeygo.modules.tourrequest.repository.TourRequestRepository;
 import com.journeygo.modules.tour.exception.TourValidationException;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.tour.service.TourDetailMapper;
@@ -63,6 +65,7 @@ public class TourModerationService {
 
     private final TourRepository tourRepository;
     private final TourReviewRepository reviewRepository;
+    private final TourRequestRepository tourRequestRepository;
     private final TourPricingService pricingService;
     private final TourReviewHistoryRepository historyRepository;
     private final UserRepository userRepository;
@@ -230,18 +233,27 @@ public class TourModerationService {
                 .queue(NotificationPublisher.Queue.MY_CONTENT)
                 .publish();
 
-        // Nếu là tour riêng dành cho một khách cụ thể: gửi thông báo trực tiếp cho khách đó
-        if (tour.getVisibility() == TourVisibility.SPECIFIC_USER && tour.getSpecificUserEmail() != null) {
-            userRepository.findByEmail(tour.getSpecificUserEmail()).ifPresent(customer -> {
-                notifications.send(NotificationType.CUSTOM_TOUR_READY)
-                        .to(customer.getId())
-                        .title("Tour thiết kế riêng của bạn đã sẵn sàng!")
-                        .body("Tour " + NotificationPublisher.quote(tour.getTitle())
-                                + " đã được phê duyệt và mở bán. Bạn có thể xem chi tiết và đặt tour ngay bây giờ!")
-                        .link("/tours/" + tour.getTourId())
-                        .ref("TOUR", tour.getTourId())
-                        .publish();
-            });
+        // Nếu là tour riêng dành cho một khách cụ thể: đánh dấu yêu cầu FULFILLED và gửi thông báo cho khách đó
+        if (tour.getVisibility() == TourVisibility.SPECIFIC_USER) {
+            if (tour.getTourRequestId() != null) {
+                tourRequestRepository.findById(tour.getTourRequestId()).ifPresent(tr -> {
+                    tr.setFulfilledTour(tour);
+                    tr.setStatus(TourRequestStatus.FULFILLED);
+                    tourRequestRepository.save(tr);
+                });
+            }
+            if (tour.getSpecificUserEmail() != null) {
+                userRepository.findByEmail(tour.getSpecificUserEmail()).ifPresent(customer -> {
+                    notifications.send(NotificationType.CUSTOM_TOUR_READY)
+                            .to(customer.getId())
+                            .title("Tour thiết kế riêng của bạn đã sẵn sàng!")
+                            .body("Tour " + NotificationPublisher.quote(tour.getTitle())
+                                    + " đã được phê duyệt và mở bán. Bạn có thể xem chi tiết và đặt tour ngay bây giờ!")
+                            .link("/tours/" + tour.getTourId())
+                            .ref("TOUR", tour.getTourId())
+                            .publish();
+                });
+            }
         }
         notifications.queueChanged(Role.CONTENT_MODERATOR, NotificationPublisher.Queue.TOUR_REVIEW);
         if (tour.isWizardTour()) mailer.sendApproved(tour);
