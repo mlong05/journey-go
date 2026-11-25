@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -106,10 +107,79 @@ class ComparisonPeriodTest {
     }
 
     @Test
-    @DisplayName("Range lạ ⇒ mặc định an toàn (tuần)")
-    void unknownRangeFallsBackToWeekly() {
+    @DisplayName("Khung 'Tất cả': chia theo tháng và KHÔNG có mốc so sánh")
+    void all_hasMonthlyBucketsAndNoBaseline() {
+        Frame frame = ComparisonPeriod.resolve("all", null, null);
+        assertEquals(FrameKey.ALL, frame.key());
+        assertTrue(frame.isMonthlyBucket());
+        // ⚠️ "Tất cả" KHÔNG có kỳ trước ⇒ không vẽ mốc so sánh (không có năm 2013).
+        assertFalse(frame.hasBaseline());
+        assertTrue(frame.baselineLabel() == null || frame.baselineLabel().isEmpty(),
+                "Khung 'Tất cả' không được có nhãn mốc so sánh: " + frame.baselineLabel());
+        // Bucket theo tháng ⇒ số bucket = số tháng từ tháng đầu tới nay.
+        assertTrue(frame.bucketCount() >= 12, "Phải có ít nhất 12 tháng: " + frame.bucketCount());
+    }
+
+    @Test
+    @DisplayName("Khung 'Tất cả': bắt đầu từ tháng có dữ liệu đầu tiên trong DB")
+    void all_startsFromEarliestData() {
+        LocalDate earliest = LocalDate.of(2026, 1, 15);
+        Frame frame = ComparisonPeriod.resolve("all", null, null, earliest);
+        // Mốc bắt đầu = ĐẦU THÁNG có dữ liệu đầu tiên (lùi về đầu tháng cho gọn).
+        assertEquals(LocalDate.of(2026, 1, 1), frame.currentFrom().atZone(VN).toLocalDate());
+        // Không có mốc so sánh ⇒ lát cắt dữ liệu KHÔNG mở rộng về trước.
+        assertEquals(frame.currentFrom(), frame.baselineFrom());
+    }
+
+    @Test
+    @DisplayName("Khung 'Tất cả': điểm đầu BÁM theo dữ liệu, KHÔNG hard-code 1/1/2026")
+    void all_startFollowsDataNotHardCodedDate() {
+        // 3 ngày dữ liệu đầu tiên nằm ở các tháng/năm khác nhau ⇒ mốc bắt đầu
+        // phải dịch theo, không được cố định vào một ngày bất kỳ.
+        LocalDate earliest2023 = LocalDate.of(2023, 5, 17);
+        Frame f2023 = ComparisonPeriod.resolve("all", null, null, earliest2023);
+        assertEquals(LocalDate.of(2023, 5, 1), f2023.currentFrom().atZone(VN).toLocalDate());
+
+        LocalDate earliest2025 = LocalDate.of(2025, 9, 2);
+        Frame f2025 = ComparisonPeriod.resolve("all", null, null, earliest2025);
+        assertEquals(LocalDate.of(2025, 9, 1), f2025.currentFrom().atZone(VN).toLocalDate());
+
+        // Mỗi ngày dữ liệu đầu tiên khác nhau ⇒ mốc bắt đầu khác nhau
+        // ⇒ KHÔNG thể là một ngày hard-code.
+        assertNotEquals(f2023.currentFrom(), f2025.currentFrom());
+
+        // Điểm cuối LUÔN là hôm nay (khoảng hiện tại), không phụ thuộc dữ liệu.
+        LocalDate today = LocalDate.now(VN);
+        assertEquals(today, f2023.currentTo().atZone(VN).toLocalDate().minusDays(1));
+        assertEquals(today, f2025.currentTo().atZone(VN).toLocalDate().minusDays(1));
+
+        // Số bucket = số tháng từ mốc bắt đầu tới tháng hiện tại.
+        int expectedMonths = (int) java.time.temporal.ChronoUnit.MONTHS.between(
+                java.time.YearMonth.of(2025, 9), java.time.YearMonth.from(today)) + 1;
+        assertEquals(expectedMonths, f2025.bucketCount());
+    }
+
+    @Test
+    @DisplayName("Khung 'Tất cả': DB rỗng ⇒ lùi về mốc dự phòng, KHÔNG lỗi")
+    void all_emptyDataFallsBackToDefault() {
+        Frame frame = ComparisonPeriod.resolve("all", null, null, null);
+        assertEquals(FrameKey.ALL, frame.key());
+        assertEquals(LocalDate.of(2020, 1, 1), frame.currentFrom().atZone(VN).toLocalDate());
+        assertFalse(frame.hasBaseline());
+    }
+
+    @Test
+    @DisplayName("Range lạ ⇒ mặc định an toàn ('Tất cả')")
+    void unknownRangeFallsBackToAll() {
         Frame frame = ComparisonPeriod.resolve("khong-ton-tai", null, null);
-        assertEquals(FrameKey.WEEKLY, frame.key());
+        assertEquals(FrameKey.ALL, frame.key());
+    }
+
+    @Test
+    @DisplayName("Range rỗng ⇒ mặc định 'Tất cả'")
+    void blankRangeFallsBackToAll() {
+        Frame frame = ComparisonPeriod.resolve(null, null, null);
+        assertEquals(FrameKey.ALL, frame.key());
     }
 }
 
