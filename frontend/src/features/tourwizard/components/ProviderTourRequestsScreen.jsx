@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -44,29 +44,28 @@ export default function ProviderTourRequestsScreen() {
   // Modal chi tiết
   const [selectedRequest, setSelectedRequest] = useState(null);
 
-  const fetchList = async (tab = activeTab, p = 0) => {
-    try {
-      setLoading(true);
-      setError(null);
-      let res;
-      if (tab === "OPEN") {
-        res = await providerTourService.listOpenRequests({ page: p, size: 10 });
-      } else {
-        res = await providerTourService.listMyAcceptedRequests({ page: p, size: 10 });
-      }
-      setRequests(res?.content || []);
-      setTotal(res?.totalElements || 0);
-      setPage(p);
-    } catch (err) {
-      setError(err?.message || "Không thể tải danh sách yêu cầu.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchList = useCallback((tab, p = 0) => {
+    const request = tab === "OPEN"
+      ? providerTourService.listOpenRequests({ page: p, size: 10 })
+      : providerTourService.listMyAcceptedRequests({ page: p, size: 10 });
+    return request
+      .then((res) => {
+        setRequests(res?.content || []);
+        setTotal(res?.totalElements || 0);
+        setPage(p);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err?.message || "Không thể tải danh sách yêu cầu.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     fetchList(activeTab, 0);
-  }, [activeTab]);
+  }, [activeTab, fetchList]);
 
   // Hành động Đối tác bấm nhận yêu cầu
   const handleAccept = async (requestId) => {
