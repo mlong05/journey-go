@@ -118,29 +118,49 @@ public class OperationsOverviewService {
      */
     public OperationsOverviewResponse overview(String range, String fromParam, String toParam,
             Long regionId) {
-        ComparisonPeriod.Frame period = ComparisonPeriod.resolve(range, fromParam, toParam);
+        // ⚠️ Khung "Tất cả" bắt đầu từ bản ghi CŨ NHẤT có thật trong DB (không cố định
+        // 2020-01-01) ⇒ chuỗi chỉ chứa dữ liệu thật, không có khoảng trống "ảo".
+        ComparisonPeriod.Frame period = ComparisonPeriod.resolve(range, fromParam, toParam,
+                earliestDataDate());
 
         // ── 1. Tải dữ liệu thô 1 lần cho cả kỳ hiện tại lẫn kỳ baseline ──
         Slice slice = loadSlice(period, regionId);
 
         // ── 2. Gom thành KPI của kỳ hiện tại ──
         var kpis = buildKpis(slice, period.currentFrom(), period.currentTo());
-        
+
         // ── KPI của baseline — dùng CÙNG SỐ NGÀY ĐÃ QUA để tính % công bằng ──
         // Nếu kỳ hiện tại = 01/11 00:00 – 26/11 00:00 (25 ngày data)
         // Thì baseline = 01/10 00:00 – 26/10 00:00 (cùng 25 ngày), không phải 01/10 – 31/10
-        Duration currentDuration = Duration.between(period.currentFrom(), period.currentTo());
-        // Duration đã include ngày cuối (vì [from, to) và to là exclusive)
-        // Nên trừ 1 ngày để lấy được ngày cuối inclusive
-        Duration currentDurationExclusive = currentDuration.minusDays(1);
-        Instant baselineToForCurrentDays = period.baselineFrom().plus(currentDurationExclusive).plus(Duration.ofDays(1));
-        var previousKpis = buildKpis(slice, period.baselineFrom(), baselineToForCurrentDays);
+        //
+        // ⚠️ Khung "Hôm nay" (bucket theo GIỜ) dùng công thức riêng: baseline đã được
+        // dựng sẵn trong ComparisonPeriod là "hôm qua 00:00 → cùng giờ hiện tại"
+        // ⇒ 2 kỳ dài bằng nhau, công bằng tuyệt đối.
+        //
+        // ⚠️ Khung "Tất cả" KHÔNG có mốc so sánh ⇒ không tính KPI/chuỗi baseline,
+        // frontend sẽ hiển thị MỘT chuỗi liên tục (không badge %, không đường nét đứt).
+        boolean hasBaseline = period.hasBaseline();
+        Instant baselineToForCurrentDays = period.baselineTo();
+        var previousKpis = kpis;
+        if (hasBaseline) {
+            if (!period.isHourlyBucket()) {
+                Duration currentDuration = Duration.between(period.currentFrom(), period.currentTo());
+                // Duration đã include ngày cuối (vì [from, to) và to là exclusive)
+                // Nên trừ 1 ngày để lấy được ngày cuối inclusive
+                Duration currentDurationExclusive = currentDuration.minusDays(1);
+                baselineToForCurrentDays = period.baselineFrom()
+                        .plus(currentDurationExclusive).plus(Duration.ofDays(1));
+            }
+            previousKpis = buildKpis(slice, period.baselineFrom(), baselineToForCurrentDays);
+        }
 
         // ── 3. Chuỗi xu hướng (đường hiện tại + đường baseline, cùng số điểm) ──
         var revenueTrend = buildTrend(slice, period, true, true);
-        var previousRevenueTrend = buildTrend(slice, period, false, true);
+        var previousRevenueTrend = hasBaseline ? buildTrend(slice, period, false, true)
+                : List.<OperationsOverviewResponse.SparkPoint>of();
         var gmvTrend = buildTrend(slice, period, true, false);
-        var previousGmvTrend = buildTrend(slice, period, false, false);
+        var previousGmvTrend = hasBaseline ? buildTrend(slice, period, false, false)
+                : List.<OperationsOverviewResponse.SparkPoint>of();
 
         // ── 4. Thành phần vận hành ──
         var bookingBreakdown = buildBookingBreakdown(slice, period.currentFrom(), period.currentTo());
@@ -168,8 +188,8 @@ public class OperationsOverviewService {
                         period.key().name().toLowerCase(), period.label(), period.currentLabel(), period.baselineLabel(),
                         period.currentFrom(), period.currentTo(),
                         period.baselineFrom(), period.baselineTo(),
-                        period.currentDays(), period.baselineDays(),
-                        getBaselineLabelForCurrentDays(period, baselineToForCurrentDays)),
+                        period.currentDays(), hasBaseline ? period.baselineDays() : 0,
+                        hasBaseline ? getBaselineLabelForCurrentDays(period, baselineToForCurrentDays) : ""),
                 health, kpis, previousKpis,
                 revenueTrend, previousRevenueTrend,
                 gmvTrend, previousGmvTrend,
@@ -214,6 +234,20 @@ public class OperationsOverviewService {
                 ? period.baselineFrom() : period.currentFrom();
         Instant to = period.currentTo().isAfter(period.baselineTo())
                 ? period.currentTo() : period.baselineTo();
+
+        // ⚠️ Khung "Tháng": cần dữ liệu của CẢ THÁNG TRƯỚC (không chỉ tới "cùng ngày")
+        // để đường nét đứt vẽ tới hết tháng trước (VD: 31/10 trong khi tháng 11 chỉ
+        // có 30 ngày). Mở rộng mốc cuối về hết tháng trước ⇒ thêm tối đa 1-2 ngày
+        // dữ liệu, không tốn kém gì.
+        if (period.key() == ComparisonPeriod.FrameKey.MONTHLY) {
+            LocalDate prevMonthEnd = period.baselineFrom().atZone(VN_ZONE).toLocalDate()
+                    .withDayOfMonth(period.baselineFrom().atZone(VN_ZONE).toLocalDate()
+                            .lengthOfMonth());
+            Instant prevMonthEndExclusive = prevMonthEnd.plusDays(1).atStartOfDay(VN_ZONE).toInstant();
+            if (to.isBefore(prevMonthEndExclusive)) {
+                to = prevMonthEndExclusive;
+            }
+        }
 
         // ⚠️ Lọc khu vực: dựng câu truy vấn RIÊNG cho có lọc / không lọc.
         // Cách này tránh việc truyền tham số null cho điều kiện không dùng tới
@@ -396,26 +430,54 @@ public class OperationsOverviewService {
         
         for (int index = 0; index < buckets.length; index++) {
             BigDecimal value = buckets[index];
-            
+            // ⚠️ Nhãn của 2 đường KHÁC NHAU: kỳ hiện tại và baseline nằm ở 2 khoảng
+            // thời gian khác nhau (VD: tháng 11 vs tháng 10) ⇒ cùng vị trí trục ngang
+            // là 2 ngày khác nhau. Dùng chung nhãn sẽ khiến tooltip báo nhầm.
+            String label = isCurrent ? period.bucketLabel(index) : period.baselineBucketLabel(index);
+            // ⚠️ Ô này KHÔNG có ngày tương ứng trong kỳ của mình
+            // (VD: ô 31 — tháng 11 không có ngày 31) ⇒ UI hiển thị "-" thay vì null.
+            boolean noSuchDay = isCurrent
+                    ? !period.currentBucketExists(index)
+                    : !period.baselineBucketExists(index);
+
             // Nếu là kỳ hiện tại yearly và index ≥ tháng hiện tại → gán null
             if (isCurrent && isYearly && index >= currentMonth) {
-                points.add(new OperationsOverviewResponse.SparkPoint(
-                        period.bucketLabel(index), null));
+                points.add(new OperationsOverviewResponse.SparkPoint(label, null, false));
             }
-            // Nếu là kỳ hiện tại (rolling/monthly) và bucket này ở sau hôm nay → gán null
+            // ⚠️ Khung "Tháng": ô KHÔNG TỒN TẠI trong tháng hiện tại (VD: ô 31 khi
+            // tháng 11 chỉ có 30 ngày) ⇒ không có dữ liệu kỳ này ⇒ null.
+            // Đường nét liền sẽ tự dừng ở ô trước đó, còn đường nét đứt vẫn vẽ tới
+            // ô 31 (31/10) ⇒ người đọc thấy rõ tháng trước dài hơn tháng này.
+            else if (isCurrent && !period.currentBucketExists(index)) {
+                points.add(new OperationsOverviewResponse.SparkPoint(label, null, true));
+            }
+            // Nếu là kỳ hiện tại (rolling/monthly/today) và bucket này ở sau hôm nay → gán null
             else if (isCurrent && !isYearly) {
-                Instant bucketStart = period.currentFrom().plus(
-                        java.time.Duration.ofDays(index));
+                Instant bucketStart = period.bucketStart(index);
                 if (bucketStart.isAfter(now)) {
-                    points.add(new OperationsOverviewResponse.SparkPoint(
-                            period.bucketLabel(index), null));
+                    points.add(new OperationsOverviewResponse.SparkPoint(label, null, false));
                 } else {
-                    points.add(new OperationsOverviewResponse.SparkPoint(
-                            period.bucketLabel(index), value));
+                    points.add(new OperationsOverviewResponse.SparkPoint(label, value, false));
                 }
-            } else {
-                points.add(new OperationsOverviewResponse.SparkPoint(
-                        period.bucketLabel(index), value));
+            }
+            // ⚠️ Khung "Hôm nay": giờ thứ i của HÔM QUA chỉ tồn tại trong lát cắt
+            // tới baselineTo (= hôm qua 00:00 + thời gian đã trôi qua của hôm nay)
+            // ⇒ các giờ chưa "đã qua" vẽ null cho CẢ 2 đường để 2 đường bám nhau.
+            else if (!isCurrent && period.isHourlyBucket()
+                    && !period.baselineBucketStart(index).isBefore(period.baselineTo())) {
+                points.add(new OperationsOverviewResponse.SparkPoint(label, null, false));
+            }
+            // ⚠️ Khung "Tháng": ô KHÔNG TỒN TẠI trong tháng trước (VD: ô 31 khi
+            // tháng 10 chỉ có 30 ngày) ⇒ không có dữ liệu mốc so sánh ⇒ null.
+            else if (!isCurrent && !period.baselineBucketExists(index)) {
+                points.add(new OperationsOverviewResponse.SparkPoint(label, null, true));
+            }
+            // ⚠️ Khung "Tháng": baseline (tháng trước) có THÊM ngày mà tháng hiện tại
+            // không có (VD: 31/10 trong khi tháng 11 chỉ có 30 ngày).
+            // ⇒ ĐỂ NGUYÊN giá trị của baseline ở các ô này để đường nét đứt vẽ
+            // tới 31/10, còn đường nét liền dừng ở 30/11 (ô đó current = null).
+            else {
+                points.add(new OperationsOverviewResponse.SparkPoint(label, value, false));
             }
         }
         return points;
@@ -779,6 +841,34 @@ public class OperationsOverviewService {
     //  Helpers
     // ═══════════════════════════════════════════════════════════════════════
 
+    /**
+     * Ngày có dữ liệu ĐẦU TIÊN trong DB — dùng cho khung "Tất cả".
+     *
+     * <p>⚠️ Lấy theo MỐC TẠO BOOKING (createdAt) — mốc sớm nhất mà hệ thống ghi
+     * nhận. Nhờ vậy chuỗi "Tất cả" bắt đầu đúng chỗ có dữ liệu thật, không phải
+     * một mốc cố định (2020) khiến biểu đồ có hàng loạt tháng trống rỗng.
+     *
+     * @return ngày đầu tiên, null nếu DB chưa có booking nào
+     */
+    private LocalDate earliestDataDate() {
+        List<Instant> rows = query("select min(b.createdAt) from Booking b", Instant.class)
+                .getResultList();
+        if (rows.isEmpty() || rows.get(0) == null) {
+            return null;
+        }
+        return rows.get(0).atZone(VN_ZONE).toLocalDate();
+    }
+
+    /**
+     * Bản ghi đầu tiên trong DB — chỉ dùng cho kiểm thử (đối chiếu điểm đầu
+     * khung "Tất cả" với dữ liệu thật, chứng minh KHÔNG hard-code).
+     */
+    public Instant earliestBookingDateForTest() {
+        List<Instant> rows = query("select min(b.createdAt) from Booking b", Instant.class)
+                .getResultList();
+        return (rows.isEmpty() ? null : rows.get(0));
+    }
+
     private static String getBaselineLabelForCurrentDays(ComparisonPeriod.Frame period, Instant baselineToForCurrentDays) {
         LocalDate fromDate = period.baselineFrom().atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate();
         LocalDate toDate = baselineToForCurrentDays.atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate().minusDays(1);
@@ -789,8 +879,23 @@ public class OperationsOverviewService {
                     fromDate.getDayOfMonth(), fromDate.getMonthValue(), fromDate.getYear(),
                     toDate.getDayOfMonth(), toDate.getMonthValue(), toDate.getYear());
         }
+
+        // Khung "Hôm nay": baseline là "hôm qua" ⇒ ghi rõ giờ để so sánh được.
+        if (period.isHourlyBucket()) {
+            java.time.LocalDateTime baseStart = period.baselineFrom()
+                    .atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDateTime();
+            java.time.LocalDateTime baseEnd = baselineToForCurrentDays
+                    .atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDateTime();
+            return String.format("%02d/%02d %02d:%02d – %02d/%02d %02d:%02d",
+                    baseStart.getDayOfMonth(), baseStart.getMonthValue(), baseStart.getHour(), baseStart.getMinute(),
+                    baseEnd.getDayOfMonth(), baseEnd.getMonthValue(), baseEnd.getHour(), baseEnd.getMinute());
+        }
         
         // Monthly, rolling, custom: không thêm năm (đã có trong baselineLabel)
+        // ⚠️ Khoảng 1 ngày ⇒ hiển thị 1 ngày thay vì "25/11 – 25/11".
+        if (fromDate.equals(toDate)) {
+            return String.format("%02d/%02d", fromDate.getDayOfMonth(), fromDate.getMonthValue());
+        }
         return String.format("%02d/%02d – %02d/%02d",
                 fromDate.getDayOfMonth(), fromDate.getMonthValue(),
                 toDate.getDayOfMonth(), toDate.getMonthValue());

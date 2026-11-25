@@ -50,8 +50,8 @@ export default function AdminDashboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  // Khung so sánh: weekly | monthly | yearly | custom. Default = weekly.
-  const [mode, setMode] = useState("weekly");
+  // Khung so sánh: all | today | weekly | monthly | yearly | custom. Mặc định = all (Tất cả).
+  const [mode, setMode] = useState("all");
   const [customRange, setCustomRange] = useState({ from: "", to: "" });
 
   // Lọc theo khu vực của TOUR (null = toàn sàn).
@@ -121,8 +121,15 @@ export default function AdminDashboardPage() {
   const breakdown = data?.bookingBreakdown;
   const period = data?.period;
 
+  // ⚠️ Khung "Tất cả" KHÔNG có mốc so sánh (không có "hôm qua" tương ứng với
+  // "toàn bộ lịch sử") ⇒ chỉ hiển thị MỘT chuỗi liên tục, KHÔNG badge % và
+  // KHÔNG đường nét đứt (trước đây nó lùi về 2013 — dữ liệu không tồn tại).
+  const isAllRange = mode === "all";
+
   /** % thay đổi so với mốc so sánh; null = không so sánh được (mốc bằng 0). */
   const percentChange = (current, previous) => {
+    // Khung "Tất cả": không có mốc so sánh ⇒ không hiển thị badge %.
+    if (isAllRange) return null;
     const cur = Number(current) || 0;
     const prev = Number(previous) || 0;
     if (prev === 0) return null;
@@ -140,8 +147,11 @@ export default function AdminDashboardPage() {
   // Nhãn mốc so sánh — hiển thị rõ để không ai phải suy nghĩ "so với cái gì".
   const currentLabel = period?.currentLabel || "kỳ này";
   const baselineLabel = period?.baselineLabel || "kỳ trước";
-  const baselineText = `So với ${baselineLabel}`;
-  
+
+  const baselineText = isAllRange
+    ? `Toàn bộ dữ liệu · ${currentLabel}`
+    : `So với ${baselineLabel}`;
+
   // Kiểm tra xem tháng có khác biệt ngày không
   let monthDayNote = "";
   if (mode === "monthly" && currentLabel && baselineLabel) {
@@ -151,11 +161,22 @@ export default function AdminDashboardPage() {
       monthDayNote = ` (tháng này ${currLastDay} ngày, so với ${baseLastDay} ngày)`;
     }
   }
-  
+
   // Subtitle chi tiết cho trend charts — phụ thuộc khung so sánh
-  const trendSubtitle = `So sánh giữa ${
-    mode === "weekly" ? "tuần" : mode === "monthly" ? "tháng" : mode === "yearly" ? "năm" : "khoảng thời gian"
-  }: ${currentLabel} với ${baselineLabel}${monthDayNote}`;
+  const trendSubtitle =
+    mode === "today"
+      ? `So sánh theo từng giờ: hôm nay với hôm qua${monthDayNote}`
+      : isAllRange
+        ? `Toàn bộ dữ liệu từ cái cũ nhất tới nay: ${currentLabel}`
+        : `So sánh giữa ${
+          mode === "weekly"
+            ? "tuần"
+            : mode === "monthly"
+              ? "tháng"
+              : mode === "yearly"
+                ? "năm"
+                : "khoảng thời gian"
+        }: ${currentLabel} với ${baselineLabel}${monthDayNote}`;
 
   const kpiCards = [
     {

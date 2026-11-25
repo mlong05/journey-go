@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, Loader2, X } from "lucide-react";
 import BronzeDrumMotif from "@/components/ui/BronzeDrumMotif";
@@ -12,6 +13,10 @@ import { metaOf, timeAgo } from "@/components/notifications/notificationMeta";
  * Dữ liệu và luồng thời gian thực lấy từ {@link NotificationProvider} trong layout.
  *
  * `openLinks = false`: bấm vào thông báo chỉ đánh dấu đã đọc, không chuyển trang (dùng cho moderator).
+ *
+ * ⚠️ Bảng thông báo render qua `createPortal` ra `document.body`: nút chuông nằm trong
+ * `<header class="z-30">` (DashboardHeader) — header tạo stacking context ⇒ `z-50` bên
+ * trong KHÔNG vượt được header dính `z-30` của trang nội dung ⇒ bảng bị che.
  */
 export default function NotificationBell({
   hint = "Kết quả duyệt và các việc cần xử lý sẽ hiện ở đây.",
@@ -23,12 +28,61 @@ export default function NotificationBell({
   const [tab, setTab] = useState("all");
   const [loadingMore, setLoadingMore] = useState(false);
   const boxRef = useRef(null);
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+  // false khi SSR, true trên client: tránh lệch hydration khi dùng createPortal
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+  // Vị trí bảng thông báo theo viewport (để neo ngay dưới nút chuông).
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
+
+  const PANEL_W = 380;
+  const PANEL_H = 560; // chiều cao ước lượng (danh sách cuộn bên trong)
+
+  /** Neo bảng theo vị trí nút chuông, canh trong viewport. */
+  const computePanelPos = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el || typeof window === "undefined") return { top: 0, left: 0 };
+    const r = el.getBoundingClientRect();
+    const left = Math.max(8, Math.min(r.right - PANEL_W, window.innerWidth - PANEL_W - 8));
+    const spaceBelow = window.innerHeight - r.bottom;
+    let top = spaceBelow < PANEL_H && r.top > PANEL_H ? r.top - 8 : r.bottom + 8;
+    top = Math.max(8, Math.min(top, window.innerHeight - 120 - 8));
+    return { top, left };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const update = () => setPanelPos(computePanelPos());
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, computePanelPos]);
+
+  /** Mở/đóng bảng — luôn tính vị trí TRƯỚC khi mở để không nháy ở góc (0,0). */
+  const togglePanel = useCallback(() => {
+    setOpen((v) => {
+      if (!v) setPanelPos(computePanelPos());
+      return !v;
+    });
+  }, [computePanelPos]);
 
   // Bấm ra ngoài hoặc Esc để đóng
   useEffect(() => {
     if (!open) return;
     const onDown = (e) => {
-      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+      if (boxRef.current && boxRef.current.contains(e.target)) return;
+      // Bảng render qua portal ra document.body ⇒ kiểm tra thêm phần bảng,
+      // nếu không thì bấm vào trong bảng sẽ bị đóng nhầm.
+      if (panelRef.current && panelRef.current.contains(e.target)) return;
+      setOpen(false);
     };
     const onKey = (e) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDown);
@@ -65,8 +119,9 @@ export default function NotificationBell({
   return (
     <div ref={boxRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={togglePanel}
         aria-expanded={open}
         aria-label={unread ? `Thông báo, ${unread} chưa đọc` : "Thông báo"}
         title="Thông báo"
@@ -84,8 +139,12 @@ export default function NotificationBell({
         )}
       </button>
 
-      {open && (
-        <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-[380px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+      {open && mounted && typeof document !== "undefined" && createPortal(
+        <div
+          ref={panelRef}
+          style={{ top: panelPos.top, left: panelPos.left }}
+          className="fixed z-[90] w-[calc(100vw-2rem)] max-w-[380px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-200"
+        >
           {/* Đầu bảng */}
           <div className="px-4 pt-3 pb-2 border-b border-slate-100">
             <div className="flex items-center justify-between gap-2">
@@ -181,7 +240,8 @@ export default function NotificationBell({
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
