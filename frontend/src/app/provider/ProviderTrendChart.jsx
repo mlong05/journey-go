@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { TrendingUp, Table2, LineChart as LineChartIcon } from "lucide-react";
 import { percentChange } from "@/features/dashboard";
+import YearAxisTick, { PlainAxisTick } from "@/components/charts/YearAxisTick";
 
 /**
  * Biểu đồ "Diễn biến theo thời gian" — kỳ này (đường liền) đặt cạnh kỳ trước (đường đứt) trên
@@ -20,6 +21,7 @@ const COLOR_PREVIOUS = "#94a3b8";
 const METRICS = {
   revenue: { label: "Doanh thu", cur: "revenue", prev: "prevRevenue", money: true },
   bookings: { label: "Lượt đặt", cur: "bookings", prev: "prevBookings", unit: "đơn" },
+  tourists: { label: "Khách", cur: "uniqueTourists", prev: "prevUniqueTourists", unit: "khách" },
   checkIns: { label: "Check-in", cur: "checkIns", prev: "prevCheckIns", unit: "lượt" },
 };
 
@@ -45,27 +47,37 @@ function formatPoint(iso, unit, long = false) {
     const day = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", timeZone: VN_TZ }).format(d);
     return `${hour}h, ${day}`;
   }
+  if (unit === "month") {
+    const m = new Intl.DateTimeFormat("vi-VN", { month: "2-digit", timeZone: VN_TZ }).format(d);
+    if (!long) return `T${m}`;
+    return `Th${m}/${new Intl.DateTimeFormat("vi-VN", { year: "numeric", timeZone: VN_TZ }).format(d)}`;
+  }
   return new Intl.DateTimeFormat("vi-VN", long
     ? { weekday: "short", day: "2-digit", month: "2-digit", timeZone: VN_TZ }
     : { day: "2-digit", month: "2-digit", timeZone: VN_TZ }).format(d);
 }
 
-function TrendTooltip({ active, payload, metric, unit, previousLabel }) {
+function TrendTooltip({ active, payload, metric, unit, previousLabel, hasBaseline = true }) {
   if (!active || !payload?.length) return null;
   const row = payload[0]?.payload || {};
   const m = METRICS[metric];
   const fmt = (v) => (v == null ? "—" : m.money ? fmtMoney(v) : `${fmtInt(v)} ${m.unit}`);
-  const pct = row.prev == null ? null : percentChange(row.cur, row.prev);
+  const pct = hasBaseline && row.prev == null ? null : percentChange(row.cur, row.prev);
+  // ⚠️ Khung "Tất cả": trục ngang CHỈ hiện NĂM ⇒ tooltip là nơi DUY NHẤT hiện
+  // tháng ⇒ dùng `axisLabel` (bản ĐẦY ĐỦ "Th09/2025") để không mất thông tin.
+  const pointLabel = row.axisLabel || formatPoint(row.start, unit, true);
   return (
     <div className="min-w-[210px] rounded-xl border border-slate-700/50 bg-slate-900 px-3 py-2 shadow-xl">
       <p className="flex items-center gap-2 text-[11.5px] font-bold text-white">
         <span className="h-0.5 w-4 rounded-full" style={{ background: COLOR_CURRENT }} aria-hidden="true" />
-        {formatPoint(row.start, unit, true)}: {fmt(row.cur)}
+        {pointLabel}: {fmt(row.cur)}
       </p>
-      <p className="mt-0.5 flex items-center gap-2 text-[11px] font-semibold text-slate-300">
-        <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: COLOR_PREVIOUS }} aria-hidden="true" />
-        {row.prevStart ? `${formatPoint(row.prevStart, unit, true)}: ${fmt(row.prev)}` : `${previousLabel}: không có mốc tương ứng`}
-      </p>
+      {hasBaseline && (
+        <p className="mt-0.5 flex items-center gap-2 text-[11px] font-semibold text-slate-300">
+          <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: COLOR_PREVIOUS }} aria-hidden="true" />
+          {row.prevStart ? `${formatPoint(row.prevStart, unit, true)}: ${fmt(row.prev)}` : `${previousLabel}: không có mốc tương ứng`}
+        </p>
+      )}
       {pct !== null && (
         <p className="mt-1 text-[10.5px] font-semibold text-slate-400">
           {pct >= 0 ? "▲" : "▼"} {Math.abs(pct).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}% so với kỳ trước
@@ -75,7 +87,7 @@ function TrendTooltip({ active, payload, metric, unit, previousLabel }) {
   );
 }
 
-export default function ProviderTrendChart({ series, unit = "day", rangeLabel, previousLabel, loading }) {
+export default function ProviderTrendChart({ series, unit = "day", rangeLabel, previousLabel, loading, hasBaseline = true }) {
   const [metric, setMetric] = useState("revenue");
   const [asTable, setAsTable] = useState(false);
   const m = METRICS[metric];
@@ -88,14 +100,58 @@ export default function ProviderTrendChart({ series, unit = "day", rangeLabel, p
     prev: p[m.prev] == null ? null : Number(p[m.prev]) || 0,
   })), [series, unit, m]);
 
+  /**
+   * Nhãn trục ngang — khung theo THÁNG chỉ hiện **NĂM**; các khung khác giữ nguyên.
+   *
+   * ⚠️ Vì sao chỉ hiện NĂM?
+   * Khung "Tất cả" trải qua nhiều năm (VD: 01/2024 → 11/2026 = 35 tháng). Nếu hiện
+   * từng tháng ("Th01/2026") thì Recharts co trục lại ⇒ TỰ ẨN nhãn (đo thực tế:
+   * 35 tháng chỉ còn 7 nhãn ⇒ mất "T10/2026", người đọc tưởng THIẾU dữ liệu
+   * tháng 10). Ép vẽ đủ 35 nhãn thì mỗi nhãn chỉ được ~8px ⇒ chồng lấn toàn bộ.
+   *
+   * ⇒ Chỉ hiện NĂM ("2024", "2025", "2026") ⇒ 3 nhãn, vừa khít, KHÔNG chồng lấn,
+   *   KHÔNG cần xoay. Tháng cụ thể xem khi rê chuột — tooltip hiện ĐẦY ĐỦ
+   *   ("Th09/2025") ⇒ không mất thông tin nào.
+   *
+   * ⚠️ Tooltip dùng nhãn ĐẦY ĐỦ (`axisLabel`) ⇒ giữ nguyên, không rút gọn.
+   */
+  const isMonthUnit = unit === "month";
+
+  const chartRows = useMemo(() => {
+    if (!isMonthUnit) return rows;
+    // Giữ nguyên nhãn ĐẦY ĐỦ ("Th09/2025") cho TOOLTIP; trục ngang tự rút ra
+    // năm qua `YearAxisTick`.
+    //
+    // ⚠️ `label` (viết tắt "T09") KHÔNG chứa năm ⇒ `YearAxisTick` không lấy được
+    // năm từ nó. ⇒ Đặt `axisLabel` làm nguồn cho TRỤC NGANG (dataKey), còn
+    // `label` giữ nguyên cho các mục đích khác.
+    return rows.map((r) => ({ ...r, axisLabel: formatPoint(r.start, unit, true) }));
+  }, [rows, unit, isMonthUnit]);
+
   const totals = useMemo(() => rows.reduce(
     (acc, r) => ({ cur: acc.cur + r.cur, prev: acc.prev + (r.prev || 0) }), { cur: 0, prev: 0 }), [rows]);
-  const pct = percentChange(totals.cur, totals.prev);
+  // ⚠️ Khung "Tất cả" không có kỳ trước ⇒ không hiển thị badge % so sánh.
+  const pct = hasBaseline ? percentChange(totals.cur, totals.prev) : null;
   const isEmpty = rows.every((r) => !r.cur && !r.prev);
   const fmtTotal = (v) => (m.money ? fmtMoney(v) : `${fmtInt(v)} ${m.unit}`);
 
+  /**
+   * Tick trục ngang.
+   *
+   * ⚠️ Khung theo THÁNG: dùng `YearAxisTick` ⇒ chỉ hiện NĂM, nằm ngang, không xoay.
+   *   Các khung khác (giờ / ngày) dùng nhãn nằm ngang như cũ.
+   */
+  const xAxisTick = useMemo(() => {
+    if (!isMonthUnit) return { fontSize: 11, fill: "#64748b" };
+    // ⚠️ Đặt TÊN hàm để ESLint `react/display-name` không báo lỗi.
+    function YearTick(props) {
+      return <YearAxisTick {...props} fontSize={11} fill="#64748b" />;
+    }
+    return YearTick;
+  }, [isMonthUnit]);
+
   return (
-    <section className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white shadow-xs" aria-labelledby="trend-title">
+    <section className="flex h-full min-w-0 flex-col rounded-xl border border-slate-200 bg-white shadow-xs" aria-labelledby="trend-title">
       <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
@@ -103,7 +159,9 @@ export default function ProviderTrendChart({ series, unit = "day", rangeLabel, p
           </span>
           <div className="min-w-0">
             <h2 id="trend-title" className="truncate text-sm font-bold text-slate-900">Diễn biến theo thời gian</h2>
-            <p className="truncate text-[11px] text-slate-500">{rangeLabel} so với {previousLabel}</p>
+            <p className="truncate text-[11px] text-slate-500">
+              {hasBaseline ? `${rangeLabel} so với ${previousLabel}` : `${rangeLabel} · toàn bộ dữ liệu`}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -137,20 +195,24 @@ export default function ProviderTrendChart({ series, unit = "day", rangeLabel, p
                 {pct >= 0 ? "▲" : "▼"} {Math.abs(pct).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%
               </span>
             )}
-            {!loading && <span className="text-[11px] text-slate-400">kỳ trước {fmtTotal(totals.prev)}</span>}
+            {!loading && hasBaseline && <span className="text-[11px] text-slate-400">kỳ trước {fmtTotal(totals.prev)}</span>}
           </p>
         </div>
         <ul className="flex items-center gap-4 text-[11px] font-semibold text-slate-600" aria-label="Chú thích">
           <li className="flex items-center gap-1.5">
             <span className="h-0.5 w-5 rounded-full" style={{ background: COLOR_CURRENT }} aria-hidden="true" />{rangeLabel}
           </li>
-          <li className="flex items-center gap-1.5">
-            <span className="h-0 w-5 border-t-2 border-dashed" style={{ borderColor: COLOR_PREVIOUS }} aria-hidden="true" />Kỳ trước
-          </li>
+          {hasBaseline && (
+            <li className="flex items-center gap-1.5">
+              <span className="h-0 w-5 border-t-2 border-dashed" style={{ borderColor: COLOR_PREVIOUS }} aria-hidden="true" />Kỳ trước
+            </li>
+          )}
         </ul>
       </div>
 
-      <div className="h-[240px] px-2 pb-3 pt-2">
+      {/* ⚠️ flex-1: vùng biểu đồ co giãn theo chiều cao card ⇒ 2 ô trong cùng hàng
+          luôn cao bằng nhau, không để lại khoảng trống. */}
+      <div className="min-h-[240px] flex-1 px-2 pb-3 pt-2">
         {loading ? (
           <div className="jg-shimmer h-full rounded-lg" />
         ) : isEmpty ? (
@@ -163,9 +225,9 @@ export default function ProviderTrendChart({ series, unit = "day", rangeLabel, p
             <table className="w-full text-left text-xs">
               <thead className="sticky top-0 bg-white">
                 <tr className="border-b border-slate-200 text-[11px] font-semibold text-slate-500">
-                  <th className="px-3 py-2">{unit === "hour" ? "Giờ" : "Ngày"}</th>
+                  <th className="px-3 py-2">{unit === "hour" ? "Giờ" : unit === "month" ? "Tháng" : "Ngày"}</th>
                   <th className="px-3 py-2 text-right">{rangeLabel}</th>
-                  <th className="px-3 py-2 text-right">Kỳ trước</th>
+                  {hasBaseline && <th className="px-3 py-2 text-right">Kỳ trước</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 tabular-nums">
@@ -173,7 +235,9 @@ export default function ProviderTrendChart({ series, unit = "day", rangeLabel, p
                   <tr key={r.start}>
                     <td className="px-3 py-1.5 text-slate-600">{formatPoint(r.start, unit, true)}</td>
                     <td className="px-3 py-1.5 text-right font-semibold text-slate-900">{m.money ? fmtMoney(r.cur) : fmtInt(r.cur)}</td>
-                    <td className="px-3 py-1.5 text-right text-slate-500">{r.prev == null ? "—" : m.money ? fmtMoney(r.prev) : fmtInt(r.prev)}</td>
+                    {hasBaseline && (
+                      <td className="px-3 py-1.5 text-right text-slate-500">{r.prev == null ? "—" : m.money ? fmtMoney(r.prev) : fmtInt(r.prev)}</td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -181,18 +245,28 @@ export default function ProviderTrendChart({ series, unit = "day", rangeLabel, p
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={rows} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+            <LineChart data={chartRows} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
               <CartesianGrid vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#e2e8f0" }} tick={{ fontSize: 11, fill: "#64748b" }}
-                minTickGap={16} interval="preserveStartEnd" />
+              <XAxis
+                // ⚠️ Khung theo THÁNG: dùng `axisLabel` ("Th09/2025") làm nguồn để
+                //   `YearAxisTick` rút ra năm. Các khung khác dùng `label`.
+                dataKey={isMonthUnit ? "axisLabel" : "label"}
+                tickLine={false}
+                axisLine={{ stroke: "#e2e8f0" }}
+                tick={xAxisTick}
+                minTickGap={isMonthUnit ? 0 : 16}
+                interval={isMonthUnit ? 0 : "preserveStartEnd"}
+              />
               <YAxis width={52} tickLine={false} axisLine={false} allowDecimals={false} tick={{ fontSize: 11, fill: "#64748b" }}
                 tickFormatter={(v) => (m.money ? compactMoney(v) : fmtInt(v))} />
               <Tooltip cursor={{ stroke: "#cbd5e1", strokeWidth: 1 }}
-                content={<TrendTooltip metric={metric} unit={unit} previousLabel={previousLabel} />} />
-              <Line type="monotone" dataKey="prev" name="Kỳ trước" stroke={COLOR_PREVIOUS} strokeWidth={2} strokeDasharray="5 4"
-                dot={false} activeDot={{ r: 4, stroke: "#fff", strokeWidth: 2 }} connectNulls={false} isAnimationActive={false} />
+                content={<TrendTooltip metric={metric} unit={unit} previousLabel={previousLabel} hasBaseline={hasBaseline} />} />
+              {hasBaseline && (
+                <Line type="monotone" dataKey="prev" name="Kỳ trước" stroke={COLOR_PREVIOUS} strokeWidth={2} strokeDasharray="5 4"
+                  dot={false} activeDot={{ r: 4, stroke: "#fff", strokeWidth: 2 }} connectNulls={false} isAnimationActive={false} />
+              )}
               <Line type="monotone" dataKey="cur" name={rangeLabel} stroke={COLOR_CURRENT} strokeWidth={2}
-                dot={rows.length <= 8 ? { r: 4, fill: COLOR_CURRENT, stroke: "#fff", strokeWidth: 2 } : false}
+                dot={chartRows.length <= 8 ? { r: 4, fill: COLOR_CURRENT, stroke: "#fff", strokeWidth: 2 } : false}
                 activeDot={{ r: 5, fill: COLOR_CURRENT, stroke: "#fff", strokeWidth: 2 }} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
