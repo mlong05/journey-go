@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -66,7 +66,8 @@ export default function TourRequestDetailScreen({ requestId }) {
   const [cancelling, setCancelling] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
-  const fetchDetail = async () => {
+  const fetchDetail = useCallback(async () => {
+    if (!requestId) return;
     try {
       setLoading(true);
       setError(null);
@@ -77,13 +78,11 @@ export default function TourRequestDetailScreen({ requestId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [requestId]);
 
   useEffect(() => {
-    if (requestId) {
-      fetchDetail();
-    }
-  }, [requestId]);
+    fetchDetail();
+  }, [fetchDetail]);
 
   const handleCancel = async () => {
     try {
