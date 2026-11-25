@@ -18,7 +18,7 @@ export default function RegionBreakdown({ regions, isLoading }) {
   const total = rows.reduce((sum, r) => sum + (Number(r.revenue) || 0), 0);
 
   return (
-    <section className={CARD.shell + " flex flex-col"}>
+    <section className={CARD.shell + " flex flex-col h-full"}>
       <CardHeader
         icon={MapPinned}
         tone="sky"
