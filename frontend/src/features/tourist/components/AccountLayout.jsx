@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserRound, Ticket, MessageCircle, Gift, Trophy, ChevronDown, Check, Sparkles } from "lucide-react";
+import { UserRound, Ticket, MessageCircle, Gift, Trophy, Sparkles, ChevronDown, Check } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import TouristShell from "./TouristShell";
 import RequireTourist from "./RequireTourist";
@@ -27,6 +27,11 @@ export const ACCOUNT_GROUPS = [
     { href: ROUTES.ACCOUNT_AI_GUIDE, labelKey: "merge.nav.aiGuide", Icon: Sparkles, match: (p) => p.startsWith("/account/ai-guide") },
     { href: ROUTES.ACCOUNT_MESSAGES, labelKey: "account.providerMessages", Icon: MessageCircle, match: (p) => p.startsWith("/account/messages"), badge: "unread" },
     { href: ROUTES.ACCOUNT_INVITATIONS, labelKey: "account.invitations", Icon: Ticket, match: (p) => p.startsWith("/account/invitations") },
+  { title: "Liên hệ & Dịch vụ", items: [
+    { href: ROUTES.ACCOUNT_TOUR_REQUESTS, label: "Tour theo nhu cầu", Icon: Sparkles, match: (p) => p.startsWith("/account/requests") },
+    ...(ROUTES.ACCOUNT_AI_GUIDE ? [{ href: ROUTES.ACCOUNT_AI_GUIDE, label: "Hướng dẫn viên AI", Icon: Sparkles, match: (p) => p.startsWith("/account/ai-guide") }] : []),
+    { href: ROUTES.ACCOUNT_MESSAGES, label: "Tin nhắn với nhà tour", Icon: MessageCircle, match: (p) => p.startsWith("/account/messages"), badge: "unread" },
+    { href: ROUTES.ACCOUNT_INVITATIONS, label: "Lời mời tham gia tour", Icon: Ticket, match: (p) => p.startsWith("/account/invitations") },
   ] },
 ];
 const ALL_ITEMS = ACCOUNT_GROUPS.flatMap((g) => g.items);

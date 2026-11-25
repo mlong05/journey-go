@@ -4,6 +4,7 @@ import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.QuestionType;
 import com.journeygo.modules.tour.entity.TourFormat;
 import com.journeygo.modules.tour.entity.VideoSource;
+import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -27,12 +28,31 @@ public final class TourWizardRequests {
             @Schema(description = "Tên tour — không bắt buộc khi tạo bản nháp (điền ở bước 1, kiểm tra khi gửi duyệt)",
                     example = "Theo chân thợ mộc khám phá kiến trúc gỗ Hội An")
             @Size(max = 80, message = "Tên tour tối đa 80 ký tự")
-            String title
-    ) {}
+            String title,
+
+            @Schema(description = "Quyền xem tour: ALL (mặc định) hoặc SPECIFIC_USER (chỉ khách hàng được chỉ định)")
+            TourVisibility visibility,
+
+            @Schema(description = "Email người dùng duy nhất được xem và mua tour khi visibility = SPECIFIC_USER")
+            @Email(message = "Email người dùng chỉ định không đúng định dạng")
+            @Size(max = 100)
+            String specificUserEmail,
+
+            @Schema(description = "ID yêu cầu tạo tour của khách (nếu tour này được tạo theo yêu cầu)")
+            Long tourRequestId
+    ) {
+        public CreateDraft(String title) {
+            this(title, TourVisibility.ALL, null, null);
+        }
+    }
 
     @Schema(description = "Bước 1 — Thông tin cơ bản")
     public record BasicInfo(
             @Size(max = 80, message = "Tên tour tối đa 80 ký tự") String title,
+            @Schema(description = "Quyền xem tour: ALL hoặc SPECIFIC_USER") TourVisibility visibility,
+            @Schema(description = "Email người dùng chỉ định khi visibility = SPECIFIC_USER")
+            @Email(message = "Email người dùng chỉ định không đúng định dạng") @Size(max = 100) String specificUserEmail,
+            @Schema(description = "ID yêu cầu tạo tour của khách") Long tourRequestId,
             @Schema(description = "DAY_TRIP (trong ngày) hoặc MULTI_DAY (nhiều ngày)") TourFormat tourFormat,
             @Schema(description = "Thời lượng tour trong ngày (phút), ví dụ 270 = 4 giờ 30 phút")
             @Min(value = 1, message = "Thời lượng phải lớn hơn 0") @Max(value = 1439, message = "Tour trong ngày phải dưới 24 giờ")
@@ -60,7 +80,17 @@ public final class TourWizardRequests {
             @Size(max = 5000) String refundPolicy,
             @Schema(description = "Những thông tin cần lưu ý — Liên hệ")
             @Size(max = 2000) String contactInfo
-    ) {}
+    ) {
+        public BasicInfo(String title, TourFormat tourFormat, Integer durationMinutes, Integer durationDays,
+                         Integer durationNights, Long regionId, Long themeId, String description,
+                         List<String> highlights, List<String> images, String coverImageUrl,
+                         List<ItineraryDayItem> itinerary, String priceIncludes, String priceExcludes,
+                         String forceMajeure, String refundPolicy, String contactInfo) {
+            this(title, TourVisibility.ALL, null, null, tourFormat, durationMinutes, durationDays,
+                    durationNights, regionId, themeId, description, highlights, images, coverImageUrl,
+                    itinerary, priceIncludes, priceExcludes, forceMajeure, refundPolicy, contactInfo);
+        }
+    }
 
     @Schema(description = "Một ngày trong lịch trình (dạng chữ)")
     public record ItineraryDayItem(

@@ -344,50 +344,109 @@ export default function TourWizard({ tourId, initialStep }) {
           })}
         </nav>
 
-        {/* Nội dung bước — tự cuộn dọc */}
-        <div ref={contentRef}
-          className="min-w-0 min-h-0 h-full flex flex-col overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-5 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-          <h2 className="text-base font-bold text-slate-900 mb-4">Bước {stepIndex + 1} – {WIZARD_STEPS[stepIndex].label}</h2>
-          {gateNotice && (
-            <p className="mb-4 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-xs font-bold text-rose-700 flex items-center gap-1.5">
-              <AlertCircle size={14} className="shrink-0" />{gateNotice}
-            </p>
-          )}
-          <div key={step} className="jg-page-enter flex-1">
-          {step === "BASIC_INFO" && (
-            <BasicInfoStep key={tour.tourId} {...common} regions={regions} themes={themes} readOnly={contentReadOnly}
-              onSave={(body) => queueSave("BASIC_INFO", body)} />
-          )}
-          {step === "PRICING" && (
-            <PricingStep key={tour.tourId} {...common} readOnly={pricingReadOnly} isLive={isLive}
-              onSave={(body) => queueSave("PRICING", body)} />
-          )}
-          {step === "STOPS" && (
-            <StopsStep key={tour.tourId} {...common} readOnly={contentReadOnly} focus={focusStop} onFlush={flush} onValidate={refreshIssues}
-              onSave={(body, onSaved) => queueSave("STOPS", body, onSaved)} />
-          )}
-          {step === "ITINERARY" && (
-            <ItineraryStep key={tour.tourId} {...common} readOnly={contentReadOnly}
-              onSave={(body) => queueSave("ITINERARY", body)} />
-          )}
-          {step === "SCHEDULE" && (
-            <ScheduleStep key={tour.tourId} {...common} readOnly={pricingReadOnly} isLive={isLive}
-              onSave={(body) => queueSave("SCHEDULE", body)} />
-          )}
-          {step === "REVIEW" && (
-            <ReviewStep key={tour.tourId} {...common} readOnly={contentReadOnly} onEdit={(k) => goTo(k)} onJump={jumpToIssue} onSubmit={handleSubmit} />
-          )}
+        {/* Khung nội dung bước + thanh điều hướng cố định phía dưới */}
+        <div className="min-w-0 min-h-0 h-full flex flex-col rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+          {/* Vùng nội dung cuộn dọc */}
+          <div
+            ref={contentRef}
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
+          >
+            <h2 className="text-base font-bold text-slate-900 mb-4">
+              Bước {stepIndex + 1} – {WIZARD_STEPS[stepIndex].label}
+            </h2>
+            {gateNotice && (
+              <p className="mb-4 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-xs font-bold text-rose-700 flex items-center gap-1.5">
+                <AlertCircle size={14} className="shrink-0" />
+                {gateNotice}
+              </p>
+            )}
+            <div key={step} className="jg-page-enter">
+              {step === "BASIC_INFO" && (
+                <BasicInfoStep
+                  key={tour.tourId}
+                  {...common}
+                  regions={regions}
+                  themes={themes}
+                  readOnly={contentReadOnly}
+                  onSave={(body) => queueSave("BASIC_INFO", body)}
+                />
+              )}
+              {step === "PRICING" && (
+                <PricingStep
+                  key={tour.tourId}
+                  {...common}
+                  readOnly={pricingReadOnly}
+                  isLive={isLive}
+                  onSave={(body) => queueSave("PRICING", body)}
+                />
+              )}
+              {step === "STOPS" && (
+                <StopsStep
+                  key={tour.tourId}
+                  {...common}
+                  readOnly={contentReadOnly}
+                  focus={focusStop}
+                  onFlush={flush}
+                  onValidate={refreshIssues}
+                  onSave={(body, onSaved) => queueSave("STOPS", body, onSaved)}
+                />
+              )}
+              {step === "ITINERARY" && (
+                <ItineraryStep
+                  key={tour.tourId}
+                  {...common}
+                  readOnly={contentReadOnly}
+                  onSave={(body) => queueSave("ITINERARY", body)}
+                />
+              )}
+              {step === "SCHEDULE" && (
+                <ScheduleStep
+                  key={tour.tourId}
+                  {...common}
+                  readOnly={pricingReadOnly}
+                  isLive={isLive}
+                  onSave={(body) => queueSave("SCHEDULE", body)}
+                />
+              )}
+              {step === "REVIEW" && (
+                <ReviewStep
+                  key={tour.tourId}
+                  {...common}
+                  readOnly={contentReadOnly}
+                  onEdit={(k) => goTo(k)}
+                  onJump={jumpToIssue}
+                  onSubmit={handleSubmit}
+                />
+              )}
+            </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between">
-            <button type="button" disabled={stepIndex === 0} onClick={() => goTo(WIZARD_STEPS[stepIndex - 1].key)}
-              className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center gap-1.5 disabled:opacity-40 cursor-pointer">
+          {/* Thanh nút "Quay lại" và "Tiếp tục" - Cố định ở đáy, không bị cuộn theo nội dung */}
+          <div className="shrink-0 px-5 py-3.5 border-t border-slate-100 bg-white flex items-center justify-between z-10">
+            <button
+              type="button"
+              disabled={stepIndex === 0}
+              onClick={() => goTo(WIZARD_STEPS[stepIndex - 1].key)}
+              className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center gap-1.5 disabled:opacity-40 cursor-pointer hover:bg-slate-50 transition"
+            >
               <ArrowLeft size={15} /> Quay lại
             </button>
             {stepIndex < WIZARD_STEPS.length - 1 && (
-              <button type="button" onClick={() => navigate(WIZARD_STEPS[stepIndex + 1].key)} disabled={checking}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-wait">
-                {checking ? <><Loader2 size={15} className="animate-spin" /> Đang kiểm tra…</> : <>Tiếp tục <ArrowRight size={15} /></>}
+              <button
+                type="button"
+                onClick={() => navigate(WIZARD_STEPS[stepIndex + 1].key)}
+                disabled={checking}
+                className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-wait transition"
+              >
+                {checking ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" /> Đang kiểm tra…
+                  </>
+                ) : (
+                  <>
+                    Tiếp tục <ArrowRight size={15} />
+                  </>
+                )}
               </button>
             )}
           </div>

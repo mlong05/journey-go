@@ -4,6 +4,7 @@ import com.journeygo.modules.destination.dto.DestinationResponse;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourDepartureDate;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
+import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import com.journeygo.modules.tour.entity.TourFormat;
 import com.journeygo.modules.tour.entity.TourType;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -53,6 +54,9 @@ public record TourResponse(
         @Schema(description = "Bảng giá theo loại khách (tour 5 bước)") List<TourPriceResponse> prices,
         @Schema(description = "Các ngày khởi hành đã công bố (tour 5 bước)") List<LocalDate> departureDates,
         @Schema(description = "Số chỗ tối đa mỗi slot (tour 5 bước)") Integer maxGuestsPerSlot,
+        @Schema(description = "Quyền xem tour: ALL hoặc SPECIFIC_USER") TourVisibility visibility,
+        @Schema(description = "Email người dùng chỉ định xem và đặt tour") String specificUserEmail,
+        @Schema(description = "ID yêu cầu tạo tour của khách") Long tourRequestId,
         @Schema(description = "Thời gian tạo") Instant createdAt,
         @Schema(description = "Thời gian cập nhật") Instant updatedAt
 ) {
@@ -105,6 +109,9 @@ public record TourResponse(
                         .filter(java.util.Objects::nonNull)
                         .toList())
                 .maxGuestsPerSlot(t.getMaxGuestsPerSlot())
+                .visibility(t.getVisibility())
+                .specificUserEmail(t.getSpecificUserEmail())
+                .tourRequestId(t.getTourRequestId())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
                 .build();
