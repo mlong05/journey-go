@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Pencil, ChevronDown, ChevronUp, CheckCircle2, MapPin, Timer, Film, Clock, CalendarDays, Users, BookOpen, Lock } from "lucide-react";
+import { Pencil, ChevronDown, ChevronUp, CheckCircle2, MapPin, Timer, Film, Clock, CalendarDays, Users, BookOpen, Lock, Sparkles, Globe, Mail } from "lucide-react";
 import NoticeAccordion from "./NoticeAccordion";
 import ItineraryView from "./ItineraryView";
 import StopsOverviewMap, { stopLocation, googleMapsUrl } from "./stops/StopsOverviewMap";
@@ -142,7 +142,18 @@ export default function TourContentView({ tour, onEdit, Block = DefaultBlock, co
     <div className="space-y-4">
       <Section title="1. Tour" step="BASIC_INFO" onEdit={onEdit}>
         <Block anchor={{ step: "BASIC_INFO", field: "title" }} label="Tên, hình thức, khu vực, chủ đề">
-          <h4 className="text-lg font-bold text-slate-900">{tour.title}</h4>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="text-lg font-bold text-slate-900">{tour.title}</h4>
+            {tour.visibility === "SPECIFIC_USER" ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-bold text-teal-800">
+                <Lock size={12} className="text-teal-600" /> Tour riêng cho khách: {tour.specificUserEmail || "Chỉ định"}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                <Globe size={11} /> Công khai
+              </span>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2 mt-1.5 text-xs">
             <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold inline-flex items-center gap-1"><Clock size={12} />{durationText(tour)}</span>
             <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold">Khu vực: {tour.region?.name || "—"}</span>
