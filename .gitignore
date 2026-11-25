@@ -57,3 +57,9 @@ frontend/public/_ref-*
 frontend/.next/
 .next/
 node_modules/
+
+# Log chạy dev server cục bộ (KHÔNG commit)
+frontend/dev.out
+frontend/dev.err
+backend/run.out
+backend/run.err
