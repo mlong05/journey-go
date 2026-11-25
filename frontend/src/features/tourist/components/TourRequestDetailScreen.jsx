@@ -66,18 +66,19 @@ export default function TourRequestDetailScreen({ requestId }) {
   const [cancelling, setCancelling] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
-  const fetchDetail = useCallback(async () => {
+  const fetchDetail = useCallback(() => {
     if (!requestId) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await touristService.tourRequestDetail(requestId);
-      setRequest(res);
-    } catch (err) {
-      setError(err?.message || "Không thể tải thông tin yêu cầu tour.");
-    } finally {
-      setLoading(false);
-    }
+    return touristService.tourRequestDetail(requestId)
+      .then((res) => {
+        setRequest(res);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err?.message || "Không thể tải thông tin yêu cầu tour.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [requestId]);
 
   useEffect(() => {

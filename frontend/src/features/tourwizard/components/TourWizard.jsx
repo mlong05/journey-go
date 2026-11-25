@@ -297,7 +297,7 @@ export default function TourWizard({ tourId, initialStep }) {
   return (
     <div className="flex-1 min-h-0 h-full flex flex-col gap-4">
       {confirmDialog}
-      {submitted && <SubmittedNotice onDone={() => { window.location.assign(AFTER_SUBMIT_HREF); }} />}
+      {submitted && <SubmittedNotice onDone={() => { router.push(AFTER_SUBMIT_HREF); }} />}
       {/* Header */}
       <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
