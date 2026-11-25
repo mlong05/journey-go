@@ -73,7 +73,7 @@ public class TourRequestService {
                 .toRole(Role.CONTENT_PROVIDER)
                 .title("Yêu cầu tạo tour theo nhu cầu mới")
                 .body("Du khách " + requester.getFullName() + " vừa đăng yêu cầu: " + NotificationPublisher.quote(saved.getTitle()))
-                .link("/provider/tour-requests/" + saved.getId())
+                .link("/provider/requests")
                 .ref("TOUR_REQUEST", saved.getId())
                 .publish();
 
@@ -171,7 +171,7 @@ public class TourRequestService {
                 .title("Đối tác đã nhận yêu cầu tạo tour của bạn")
                 .body(provider.getFullName() + " đã nhận yêu cầu "
                         + NotificationPublisher.quote(tr.getTitle()) + " và đang chuẩn bị lịch trình theo yêu cầu của bạn.")
-                .link("/tour-requests/" + tr.getId())
+                .link("/account/requests/" + tr.getId())
                 .ref("TOUR_REQUEST", tr.getId())
                 .publish();
 

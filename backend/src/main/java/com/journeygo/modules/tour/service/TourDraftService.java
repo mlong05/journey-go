@@ -481,7 +481,7 @@ public class TourDraftService {
                             .body("Đối tác " + (tour.getCreatedBy() != null ? tour.getCreatedBy().getFullName() : "nhà tour")
                                     + " đã tạo tour " + NotificationPublisher.quote(tour.getTitle())
                                     + " theo yêu cầu của bạn và đã gửi cho ban kiểm duyệt. Bạn sẽ nhận được thông báo ngay khi tour được duyệt để đặt chỗ!")
-                            .link("/tour-requests")
+                            .link(tour.getTourRequestId() != null ? "/account/requests/" + tour.getTourRequestId() : "/account/requests")
                             .ref("TOUR", tour.getTourId())
                             .publish();
                 });
