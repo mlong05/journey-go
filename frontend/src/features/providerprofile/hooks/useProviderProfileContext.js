@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
+import { redirectToLogin } from "@/services/authRedirect";
 import { getProviderProfileByUserId } from "@/features/providerprofile/services/providerProfileService";
 import { useAuthSession } from "@/hooks";
 
@@ -16,7 +16,7 @@ import { useAuthSession } from "@/hooks";
  * ── Vì sao cần cờ `ready`? ──
  *  `useAuthSession` đọc `localStorage`; ở lần render đầu (hydration) React dùng
  *  `getServerSnapshot()` ⇒ trả `null` cho mọi role. Nếu coi `null` là "chưa đăng
- *  nhập" thì effect sẽ `router.push("/login")` ngay, khiến các trang dùng hook này
+ *  nhập" thì effect sẽ chuyển sang trang đăng nhập ngay, khiến các trang dùng hook này
  *  (Tài chính & Doanh thu) bị đẩy về trang chính ngay khi vừa mở.
  *
  *  `ready` dùng `useSyncExternalStore`: server snapshot = `false`, client snapshot =
@@ -27,7 +27,7 @@ import { useAuthSession } from "@/hooks";
 const subscribeNoop = () => () => {};
 
 export function useProviderProfileContext() {
-  const router = useRouter();
+
   const authData = useAuthSession();
 
   const [providerProfile, setProviderProfile] = useState(null);
@@ -61,14 +61,14 @@ export function useProviderProfileContext() {
     // Chờ đọc xong phiên — tránh redirect nhầm trong lúc hydration.
     if (!ready) return;
     if (!token) {
-      router.push("/login");
+      redirectToLogin("required");
       return;
     }
     // Gọi trong IIFE bất đồng bộ ⇒ không `setState` đồng bộ trong effect.
     (async () => {
       await load();
     })();
-  }, [ready, token, load, router]);
+  }, [ready, token, load]);
 
   return {
     providerProfile,

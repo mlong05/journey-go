@@ -1,6 +1,8 @@
 /// Model cho chat với nhà tour (trước khi mua tour).
 library;
 
+import '../../l10n/locale_controller.dart';
+
 int _asInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
@@ -30,6 +32,12 @@ class ProviderConversationModel {
   final int unreadCount;
   final DateTime? createdAt;
 
+  /// Nhà tour đang mở trang quản lý (máy chủ thấy kết nối thời gian thực) ⇒ "Đang trực tuyến".
+  final bool providerOnline;
+
+  /// Nhà tour thường trả lời sau bao nhiêu phút (trung vị các lần trả lời gần đây); null = chưa đủ dữ liệu.
+  final int? providerReplyMinutes;
+
   const ProviderConversationModel({
     required this.id,
     required this.touristId,
@@ -43,6 +51,8 @@ class ProviderConversationModel {
     this.lastMessageAt,
     this.unreadCount = 0,
     this.createdAt,
+    this.providerOnline = false,
+    this.providerReplyMinutes,
   });
 
   factory ProviderConversationModel.fromJson(Map<String, dynamic> json) =>
@@ -59,13 +69,15 @@ class ProviderConversationModel {
         lastMessageAt: _date(json['lastMessageAt']),
         unreadCount: _asInt(json['unreadCount']),
         createdAt: _date(json['createdAt']),
+        providerOnline: json['providerOnline'] == true,
+        providerReplyMinutes: json['providerReplyMinutes'] == null ? null : _asInt(json['providerReplyMinutes']),
       );
 
   /// Tên hiển thị của đối tác trong hội thoại.
   String get counterpartName =>
       (providerName != null && providerName!.isNotEmpty)
           ? providerName!
-          : (tourTitle ?? 'Nhà tour');
+          : (tourTitle ?? appL10n.chatProviderFallback);
 
   /// Thời điểm sắp xếp — tin nhắn mới nhất lên đầu.
   DateTime? get sortAt => lastMessageAt ?? createdAt;
@@ -84,7 +96,7 @@ class ProviderConversationModel {
     if (at.year == yesterday.year &&
         at.month == yesterday.month &&
         at.day == yesterday.day) {
-      return 'Hôm qua';
+      return appL10n.timeYesterday;
     }
     return '${at.day.toString().padLeft(2, '0')}/${at.month.toString().padLeft(2, '0')}';
   }

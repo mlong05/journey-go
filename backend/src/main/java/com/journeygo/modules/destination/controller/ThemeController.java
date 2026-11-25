@@ -4,11 +4,13 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.destination.dto.ThemeRequest;
 import com.journeygo.modules.destination.dto.ThemeResponse;
 import com.journeygo.modules.destination.service.ThemeService;
+import com.journeygo.modules.tour.service.TourTranslationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,23 +25,30 @@ import java.util.List;
 public class ThemeController {
 
     private final ThemeService themeService;
+    private final TourTranslationService tourTranslationService;
 
     @GetMapping
     @Operation(summary = "Lấy tất cả chủ đề")
     public ResponseEntity<ApiResponse<List<ThemeResponse>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách chủ đề thành công", themeService.getAll()));
+        List<ThemeResponse> list = tourTranslationService.localizeThemes(
+                themeService.getAll(), LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách chủ đề thành công", list));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Lấy chi tiết chủ đề theo ID")
     public ResponseEntity<ApiResponse<ThemeResponse>> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin chủ đề thành công", themeService.getById(id)));
+        ThemeResponse theme = tourTranslationService.localizeTheme(
+                themeService.getById(id), LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin chủ đề thành công", theme));
     }
 
     @GetMapping("/slug/{slug}")
     @Operation(summary = "Lấy chi tiết chủ đề theo slug")
     public ResponseEntity<ApiResponse<ThemeResponse>> getBySlug(@PathVariable String slug) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin chủ đề thành công", themeService.getBySlug(slug)));
+        ThemeResponse theme = tourTranslationService.localizeTheme(
+                themeService.getBySlug(slug), LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin chủ đề thành công", theme));
     }
 
     @PostMapping

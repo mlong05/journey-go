@@ -14,6 +14,7 @@ import '../forum/post_detail_screen.dart';
 import '../refunds_screen.dart';
 import '../rewards/achievements_screen.dart';
 import '../rewards/badges_screen.dart';
+import '../../l10n/locale_controller.dart';
 
 // ── Kiểu hiển thị theo nhóm (backend: NotificationType.Category) ─────────────
 
@@ -21,35 +22,52 @@ class _CategoryStyle {
   final IconData icon;
   final Color color;
   final Color background;
-  final String label;
-  const _CategoryStyle(this.icon, this.color, this.background, this.label);
+  const _CategoryStyle(this.icon, this.color, this.background);
 }
 
 const _styles = {
-  'BOOKING': _CategoryStyle(Icons.confirmation_number_rounded, AppCultureColors.oceanBlue, AppCultureColors.oceanLight, 'Đặt chỗ'),
-  'REFUND': _CategoryStyle(Icons.currency_exchange_rounded, AppCultureColors.amberDark, AppCultureColors.rewardBg, 'Hoàn tiền'),
-  'REWARD': _CategoryStyle(Icons.military_tech_rounded, AppCultureColors.amberDark, AppCultureColors.rewardBg, 'Phần thưởng'),
-  'APPROVED': _CategoryStyle(Icons.verified_rounded, AppCultureColors.jadeDark, AppCultureColors.jadeLight, 'Đã duyệt'),
-  'REJECTED': _CategoryStyle(Icons.error_outline_rounded, AppCultureColors.lacquer500, AppCultureColors.lacquer100, 'Cần xem lại'),
-  'COMMUNITY': _CategoryStyle(Icons.forum_rounded, AppCultureColors.oceanBlue, AppCultureColors.oceanLight, 'Cộng đồng'),
-  'FINANCE': _CategoryStyle(Icons.account_balance_wallet_rounded, AppCultureColors.jadeDark, AppCultureColors.jadeLight, 'Tài chính'),
-  'REVIEW': _CategoryStyle(Icons.fact_check_rounded, AppCultureColors.oceanBlue, AppCultureColors.oceanLight, 'Thẩm định'),
-  'CHAT': _CategoryStyle(Icons.chat_bubble_rounded, AppCultureColors.indigo500, AppCultureColors.indigo100, 'Tin nhắn'),
+  'BOOKING': _CategoryStyle(Icons.confirmation_number_rounded, AppCultureColors.oceanBlue, AppCultureColors.oceanLight),
+  'REFUND': _CategoryStyle(Icons.currency_exchange_rounded, AppCultureColors.amberDark, AppCultureColors.rewardBg),
+  'REWARD': _CategoryStyle(Icons.military_tech_rounded, AppCultureColors.amberDark, AppCultureColors.rewardBg),
+  'APPROVED': _CategoryStyle(Icons.verified_rounded, AppCultureColors.jadeDark, AppCultureColors.jadeLight),
+  'REJECTED': _CategoryStyle(Icons.error_outline_rounded, AppCultureColors.lacquer500, AppCultureColors.lacquer100),
+  'COMMUNITY': _CategoryStyle(Icons.forum_rounded, AppCultureColors.oceanBlue, AppCultureColors.oceanLight),
+  'FINANCE': _CategoryStyle(Icons.account_balance_wallet_rounded, AppCultureColors.jadeDark, AppCultureColors.jadeLight),
+  'REVIEW': _CategoryStyle(Icons.fact_check_rounded, AppCultureColors.oceanBlue, AppCultureColors.oceanLight),
+  'CHAT': _CategoryStyle(Icons.chat_bubble_rounded, AppCultureColors.indigo500, AppCultureColors.indigo100),
 };
 
 const _fallbackStyle =
-    _CategoryStyle(Icons.notifications_rounded, AppCultureColors.jadeDark, AppCultureColors.jadeLight, 'Thông báo');
+    _CategoryStyle(Icons.notifications_rounded, AppCultureColors.jadeDark, AppCultureColors.jadeLight);
+
+/// Nhãn nhóm thông báo theo ngôn ngữ đang chọn.
+String _categoryLabel(String category) {
+  final l10n = appL10n;
+  return switch (category) {
+    'BOOKING' => l10n.notifCatBooking,
+    'REFUND' => l10n.notifCatRefund,
+    'REWARD' => l10n.notifCatReward,
+    'APPROVED' => l10n.notifCatApproved,
+    'REJECTED' => l10n.notifCatRejected,
+    'COMMUNITY' => l10n.notifCatCommunity,
+    'FINANCE' => l10n.notifCatFinance,
+    'REVIEW' => l10n.notifCatReview,
+    'CHAT' => l10n.notifCatChat,
+    _ => l10n.commonNotifications,
+  };
+}
 
 _CategoryStyle _styleOf(String category) => _styles[category] ?? _fallbackStyle;
 
 String _timeAgo(DateTime? t) {
   if (t == null) return '';
   final diff = DateTime.now().difference(t);
-  if (diff.inMinutes < 1) return 'Vừa xong';
-  if (diff.inHours < 1) return '${diff.inMinutes} phút trước';
-  if (diff.inDays < 1) return '${diff.inHours} giờ trước';
-  if (diff.inDays == 1) return 'Hôm qua';
-  if (diff.inDays < 7) return '${diff.inDays} ngày trước';
+  final l10n = appL10n;
+  if (diff.inMinutes < 1) return l10n.timeJustNow;
+  if (diff.inHours < 1) return l10n.timeMinutesAgo(diff.inMinutes);
+  if (diff.inDays < 1) return l10n.timeHoursAgo(diff.inHours);
+  if (diff.inDays == 1) return l10n.timeYesterday;
+  if (diff.inDays < 7) return l10n.timeDaysAgo(diff.inDays);
   return '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}/${t.year}';
 }
 
@@ -248,8 +266,8 @@ class NotificationDialog extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 10, 8, 6),
                 child: Row(
                   children: [
-                    const Text(
-                      'Thông báo',
+                    Text(
+                      context.l10n.commonNotifications,
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
                     ),
                     if (center.unread > 0) ...[
@@ -260,7 +278,7 @@ class NotificationDialog extends StatelessWidget {
                           color: AppCultureColors.lacquer50,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Text('${center.unread} mới',
+                        child: Text(context.l10n.notifNewCount(center.unread),
                             style: const TextStyle(
                                 fontSize: 11.5, fontWeight: FontWeight.w700, color: AppCultureColors.lacquer600)),
                       ),
@@ -270,14 +288,14 @@ class NotificationDialog extends StatelessWidget {
                       TextButton.icon(
                         onPressed: center.markAllRead,
                         icon: const Icon(Icons.done_all_rounded, size: 18),
-                        label: const Text('Đọc tất cả'),
+                        label: Text(context.l10n.notifReadAll),
                         style: TextButton.styleFrom(foregroundColor: AppCultureColors.jadeDark),
                       ),
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(Icons.close_rounded),
                       color: AppCultureColors.textMuted,
-                      tooltip: 'Đóng',
+                      tooltip: context.l10n.commonClose,
                     ),
                   ],
                 ),
@@ -379,7 +397,7 @@ class _NotificationTile extends StatelessWidget {
                     const SizedBox(height: 6),
                     LiveTime(
                       builder: (_) => Text(
-                        '${style.label} · ${_timeAgo(n.createdAt)}',
+                        '${_categoryLabel(n.category)} · ${_timeAgo(n.createdAt)}',
                         style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
                       ),
                     ),
@@ -439,7 +457,7 @@ class _LoadMoreButtonState extends State<_LoadMoreButton> {
         style: TextButton.styleFrom(foregroundColor: AppCultureColors.textMuted),
         child: _busy
             ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-            : const Text('Xem thông báo cũ hơn'),
+            : Text(context.l10n.notifOlder),
       ),
     );
   }
@@ -471,13 +489,13 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Chưa có thông báo',
+          Text(
+            context.l10n.notifEmpty,
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Kết quả thanh toán, hoàn tiền, huy hiệu và bài viết của bạn sẽ hiện ở đây.',
+          Text(
+            context.l10n.notifEmptyHint,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, height: 1.45, color: AppCultureColors.textMuted),
           ),

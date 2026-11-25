@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { ImagePlus, Loader2, Trash2, Star, Link2, Upload, AlertCircle } from "lucide-react";
+import { ImagePlus, Loader2, Trash2, Link2, Upload, AlertCircle } from "lucide-react";
 import { uploadMedia } from "../services/providerTourService";
 import { LIMITS, VIDEO_SOURCES } from "../constants";
 import VideoPreview from "./VideoPreview";
@@ -237,70 +237,62 @@ export function SingleImage({ value, onChange, disabled, label = "Tải ảnh l�
 }
 
 /**
- * Bộ sưu tập ảnh tour: tải nhiều ảnh, bấm ngôi sao để chọn ảnh bìa, xóa từng ảnh.
- * value = string[], cover = string
+ * Ảnh tour (không gồm ảnh bìa): đúng `count` ô (mặc định 5). Ô trống bấm để tải ảnh (chọn được nhiều ảnh
+ * cùng lúc, tự điền vào các ô còn trống); ảnh đã có thì đổi / xóa từng ảnh. value = string[]
  */
-export function ImageGallery({ value = [], cover, onChange, disabled, min = LIMITS.IMAGES_MIN, max = LIMITS.IMAGES_MAX }) {
+export function ImageGallery({ value = [], onChange, disabled, count = LIMITS.IMAGES_MAX }) {
   const ref = useRef(null);
+  const replaceAt = useRef(null);
   const { busy, error, upload } = useUploader("image", LIMITS.IMAGE_MAX_BYTES, isImage);
 
+  const open = (index = null) => { replaceAt.current = index; ref.current?.click(); };
   const pick = async (e) => {
-    const files = Array.from(e.target.files || []).slice(0, Math.max(0, max - value.length));
+    const at = replaceAt.current;
+    const room = at != null ? 1 : Math.max(0, count - value.length);
+    const files = Array.from(e.target.files || []).slice(0, room);
     e.target.value = "";
     const urls = [];
     for (const f of files) {
       const url = await upload(f);
       if (url) urls.push(url);
     }
-    if (urls.length) {
-      const next = [...value, ...urls];
-      onChange(next, cover || next[0]);
-    }
+    if (!urls.length) return;
+    if (at != null) onChange(value.map((u, i) => (i === at ? urls[0] : u)));
+    else onChange([...value, ...urls].slice(0, count));
   };
-
-  const remove = (url) => {
-    const next = value.filter((u) => u !== url);
-    onChange(next, cover === url ? next[0] || "" : cover);
-  };
+  const over = value.length > count;
 
   return (
     <div className="space-y-2">
       <input ref={ref} type="file" multiple accept="image/png,image/jpeg,image/webp" hidden onChange={pick} />
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-        {value.map((url) => {
-          const isCover = url === cover;
-          return (
-            <div key={url} className={`relative aspect-[4/3] rounded-xl overflow-hidden border-2 ${isCover ? "border-amber-400" : "border-transparent"} bg-slate-100 group`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="w-full h-full object-cover" />
-              {isCover && (
-                <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-amber-400 text-[10px] font-bold text-amber-950">Ảnh bìa</span>
-              )}
-              {!disabled && (
-                <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                  <button type="button" title="Chọn làm ảnh bìa" onClick={() => onChange(value, url)}
-                    className="p-1 rounded-md bg-white/95 text-amber-500 shadow-sm cursor-pointer">
-                    <Star size={13} className={isCover ? "fill-amber-400" : ""} />
-                  </button>
-                  <button type="button" title="Xóa ảnh" onClick={() => remove(url)}
-                    className="p-1 rounded-md bg-white/95 text-rose-600 shadow-sm cursor-pointer">
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {!disabled && value.length < max && (
-          <button type="button" onClick={() => ref.current?.click()} disabled={busy}
-            className="aspect-[4/3] rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center gap-1 text-slate-500 text-[11px] font-bold cursor-pointer disabled:opacity-60">
-            {busy ? <Loader2 size={18} className="animate-spin" /> : <ImagePlus size={18} />}
-            {busy ? "Đang tải…" : "Thêm ảnh"}
+        {value.map((url, i) => (
+          <div key={url} className={`relative aspect-[4/3] rounded-xl overflow-hidden border-2 ${i >= count ? "border-rose-400" : "border-transparent"} bg-slate-100 group`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="" className="w-full h-full object-cover" />
+            <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-slate-900/70 text-[10px] font-bold text-white">Ảnh {i + 1}</span>
+            {!disabled && (
+              <div className="absolute bottom-1.5 right-1.5 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                <button type="button" onClick={() => open(i)} disabled={busy}
+                  className="px-1.5 py-1 rounded-md bg-white/95 text-[10px] font-bold text-slate-700 shadow-sm cursor-pointer">Đổi</button>
+                <button type="button" title="Xóa ảnh" onClick={() => onChange(value.filter((u) => u !== url))}
+                  className="p-1 rounded-md bg-white/95 text-rose-600 shadow-sm cursor-pointer">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        {Array.from({ length: Math.max(0, count - value.length) }, (_, k) => (
+          <button key={`empty-${k}`} type="button" onClick={() => open()} disabled={disabled || busy}
+            className="aspect-[4/3] rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center gap-1 text-slate-500 text-[11px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+            {busy && k === 0 ? <Loader2 size={18} className="animate-spin" /> : <ImagePlus size={18} />}
+            {busy && k === 0 ? "Đang tải…" : `Ảnh ${value.length + k + 1}`}
           </button>
-        )}
+        ))}
       </div>
-      <p className={`text-[11px] font-semibold ${value.length >= min ? "text-emerald-600" : "text-slate-500"}`}>
-        {value.length}/{min} ảnh tối thiểu · bấm ngôi sao để chọn ảnh bìa · JPG/PNG/WEBP ≤ 10MB
+      <p className={`text-[11px] font-semibold ${over ? "text-rose-600" : value.length === count ? "text-emerald-600" : "text-slate-500"}`}>
+        {value.length}/{count} ảnh{over ? ` · thừa ${value.length - count} ảnh, hãy xóa bớt (ô viền đỏ)` : ""} · JPG/PNG/WEBP ≤ 10MB
       </p>
       {error && <p className="text-[11px] font-bold text-rose-600">{error}</p>}
     </div>

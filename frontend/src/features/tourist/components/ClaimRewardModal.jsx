@@ -5,12 +5,15 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Award, CheckCircle2, Sparkles, Star, Trophy, X } from "lucide-react";
 import BronzeDrumMotif from "@/components/ui/BronzeDrumMotif";
+import { useI18n, INTL_LOCALE } from "@/i18n";
 
 /**
  * Popup chúc mừng nhận thưởng thành tựu theo phong cách vinh danh Genshin Impact × Di sản Việt Nam.
  */
 export default function ClaimRewardModal({ open, reward, achievement, onClose }) {
   const prefersReduced = useReducedMotion();
+  const { t, locale } = useI18n();
+  const numberLocale = INTL_LOCALE[locale] || "vi-VN";
   const [failedSrc, setFailedSrc] = useState(null);
 
   useEffect(() => {
@@ -22,7 +25,7 @@ export default function ClaimRewardModal({ open, reward, achievement, onClose })
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
-  const title = reward?.achievementName || achievement?.name || "Thành tựu mới";
+  const title = reward?.achievementName || achievement?.name || t("claim.newAchievement");
   const badgeName = reward?.badgeName || achievement?.badgeName;
   const badgeIcon = reward?.badgeIcon || achievement?.badgeIcon;
   const pointsAwarded = Number(reward?.pointsAwarded ?? achievement?.pointsReward ?? 0);
@@ -63,7 +66,7 @@ export default function ClaimRewardModal({ open, reward, achievement, onClose })
             <button
               type="button"
               onClick={onClose}
-              aria-label="Đóng thông báo nhận thưởng"
+              aria-label={t("claim.closeLabel")}
               className="absolute right-4 top-4 z-20 grid h-8 w-8 place-items-center rounded-full bg-white/10 text-teal-100 transition hover:bg-white/20 hover:text-white cursor-pointer"
             >
               <X size={16} />
@@ -120,7 +123,7 @@ export default function ClaimRewardModal({ open, reward, achievement, onClose })
             {/* Nhãn nghi lễ */}
             <div className="relative z-10 mt-1 flex items-center justify-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.2em] text-amber-300">
               <span className="h-px w-6 bg-amber-300/50" />
-              <span>Thành tựu đạt được</span>
+              <span>{t("claim.unlocked")}</span>
               <span className="h-px w-6 bg-amber-300/50" />
             </div>
 
@@ -131,18 +134,18 @@ export default function ClaimRewardModal({ open, reward, achievement, onClose })
             {badgeName && (
               <div className="relative z-10 mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-100">
                 <Award size={14} className="text-amber-300" />
-                <span>Huy hiệu: {badgeName}</span>
+                <span>{t("claim.badge", { name: badgeName })}</span>
               </div>
             )}
 
             {/* Hộp phần thưởng */}
             <div className="relative z-10 mt-5 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
               <p className="text-xs font-semibold uppercase tracking-wider text-teal-100/80">
-                Phần thưởng vừa nhận
+                {t("claim.rewardReceived")}
               </p>
               <div className="mt-1.5 flex items-baseline justify-center gap-1.5">
                 <span className="text-3xl font-black tabular-nums text-amber-300">
-                  +{pointsAwarded.toLocaleString("vi-VN")}
+                  +{pointsAwarded.toLocaleString(numberLocale)}
                 </span>
                 <span className="text-sm font-bold text-amber-200">Journey Points</span>
               </div>
@@ -150,9 +153,9 @@ export default function ClaimRewardModal({ open, reward, achievement, onClose })
                 <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-teal-100/90">
                   <CheckCircle2 size={14} className="text-emerald-300" />
                   <span>
-                    Số dư hiện tại:{" "}
+                    {t("claim.balance")}{" "}
                     <strong className="font-extrabold tabular-nums text-white">
-                      {newBalance.toLocaleString("vi-VN")} JP
+                      {newBalance.toLocaleString(numberLocale)} JP
                     </strong>
                   </span>
                 </p>
@@ -164,7 +167,7 @@ export default function ClaimRewardModal({ open, reward, achievement, onClose })
               onClick={onClose}
               className="relative z-10 mt-6 w-full rounded-2xl bg-[linear-gradient(135deg,#fcd34d,#f59e0b)] px-5 py-3 text-sm font-extrabold text-slate-950 shadow-lg shadow-amber-500/25 transition hover:brightness-105 active:scale-[0.98] cursor-pointer"
             >
-              Tuyệt vời! Tiếp tục khám phá
+              {t("claim.continue")}
             </button>
           </motion.div>
         </motion.div>

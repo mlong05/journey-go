@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/payment_result_service.dart';
 import '../../core/services/pending_payment_guard.dart';
 import '../../core/services/token_storage.dart';
+import '../../l10n/locale_controller.dart';
 import '../booking/booking_detail_screen.dart';
 import 'payment_success_dialog.dart';
 
@@ -147,7 +148,7 @@ class _PendingPaymentHostState extends State<PendingPaymentHost> {
     if (!mounted || !_notified.add(bookingId)) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message.isEmpty ? 'Thanh toán chưa thành công.' : message),
+        content: Text(message.isEmpty ? context.l10n.payNotSuccessful : message),
         behavior: SnackBarBehavior.floating,
       ),
     );

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/gamification_model.dart';
 import 'token_storage.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Lỗi nghiệp vụ từ API gamification, `message` đã là tiếng Việt để hiển thị trực tiếp.
 class GamificationException implements Exception {
@@ -34,13 +35,13 @@ class GamificationService {
   }) async {
     final baseUrl = await TokenStorage.getBaseUrl();
     final uri = Uri.parse('$baseUrl$base$path');
-    final headers = <String, String>{'Accept': 'application/json'};
+    final headers = <String, String>{'Accept': 'application/json', 'Accept-Language': acceptLanguage};
 
     if (auth) {
       final token = await TokenStorage.getAccessToken();
       if (token == null || token.isEmpty) {
-        throw const GamificationException(
-          'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        throw GamificationException(
+          appL10n.sessionExpired,
           statusCode: 401,
         );
       }
@@ -63,27 +64,27 @@ class GamificationService {
       final serverMessage = map['message']?.toString();
       if (response.statusCode == 401) {
         throw GamificationException(
-          'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          appL10n.sessionExpired,
           statusCode: 401,
         );
       }
       throw GamificationException(
         (serverMessage != null && serverMessage.isNotEmpty)
             ? serverMessage
-            : 'Không thể xử lý yêu cầu (mã ${response.statusCode}).',
+            : appL10n.apiRequestFailed('${response.statusCode}'),
         code: map['code']?.toString(),
         statusCode: response.statusCode,
       );
     } on TimeoutException {
-      throw const GamificationException(
-        'Kết nối đến máy chủ quá hạn. Vui lòng thử lại.',
+      throw GamificationException(
+        appL10n.apiTimeout,
       );
     } on SocketException {
-      throw const GamificationException(
-        'Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và địa chỉ API.',
+      throw GamificationException(
+        appL10n.apiUnreachable,
       );
     } on FormatException {
-      throw const GamificationException('Máy chủ trả về dữ liệu không hợp lệ.');
+      throw GamificationException(appL10n.apiInvalidData);
     }
   }
 

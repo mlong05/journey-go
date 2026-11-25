@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/gamification_model.dart';
+import '../../l10n/locale_controller.dart';
 
 /// AppBar dùng chung cho các màn hình điểm thưởng & voucher.
 AppBar buildRewardsAppBar(
@@ -19,7 +20,7 @@ AppBar buildRewardsAppBar(
         color: AppCultureColors.textDark,
       ),
       onPressed: () => Navigator.of(context).maybePop(),
-      tooltip: 'Quay lại',
+      tooltip: MaterialLocalizations.of(context).backButtonTooltip,
     ),
     title: Text(
       title,
@@ -96,7 +97,7 @@ class RewardsMessageView extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('Thử lại'),
+                label: Text(appL10n.commonRetry),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppCultureColors.heritageJade,
                   side: const BorderSide(color: AppCultureColors.heritageJade),
@@ -193,7 +194,7 @@ Future<void> showCopyableCodeDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Đóng'),
+          child: Text(appL10n.commonClose),
         ),
       ],
     ),
@@ -273,7 +274,7 @@ class PointTransactionTile extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Còn ${formatThousands(tx.balanceAfter)}',
+                appL10n.rwBalanceLeft(formatThousands(tx.balanceAfter)),
                 style: const TextStyle(
                   fontSize: 11,
                   color: AppCultureColors.textLight,

@@ -7,6 +7,7 @@
 ///  • `createdAt`, `paymentDeadline`, `paidAt`... là `Instant` ISO-8601 UTC.
 library;
 
+import '../../l10n/locale_controller.dart';
 import '../utils/formatters.dart';
 import 'gamification_model.dart' show formatThousands;
 // Các model Payment được định nghĩa trong `payment_model.dart` nhưng vẫn được
@@ -43,7 +44,7 @@ DateTime? _asLocalDate(dynamic value) {
   return DateTime(parsed.year, parsed.month, parsed.day);
 }
 
-String formatMoney(num value) => '${formatThousands(value)} đ';
+String formatMoney(num value) => appL10n.priceVnd(formatThousands(value));
 
 String formatDateTime(DateTime? value) {
   if (value == null) return '—';
@@ -66,11 +67,11 @@ class BookingStatus {
   static const cancelled = 'CANCELLED';
 
   static String label(String status) => switch (status) {
-    pendingPayment => 'Chờ thanh toán',
-    confirmed => 'Đã xác nhận',
-    completed => 'Đã hoàn thành',
-    expired => 'Hết hạn thanh toán',
-    cancelled => 'Đã hủy',
+    pendingPayment => appL10n.statusPendingPayment,
+    confirmed => appL10n.statusConfirmed,
+    completed => appL10n.statusCompleted,
+    expired => appL10n.statusPaymentExpired,
+    cancelled => appL10n.statusCancelled,
     _ => status,
   };
 }
@@ -83,19 +84,19 @@ class GuestType {
   static const infant = 'INFANT';
 
   static String label(String type) => switch (type) {
-        adult => 'Người lớn',
-        child => 'Trẻ em',
-        toddler => 'Trẻ nhỏ',
-        infant => 'Em bé',
+        adult => appL10n.guestAdult,
+        child => appL10n.guestChild,
+        toddler => appL10n.guestToddler,
+        infant => appL10n.guestInfant,
         _ => type,
       };
 
   /// Khoảng tuổi áp dụng.
   static String ageRange(String type) => switch (type) {
-        adult => 'Từ 12 tuổi',
-        child => '5 – 11 tuổi',
-        toddler => '2 – 4 tuổi',
-        infant => 'Dưới 2 tuổi',
+        adult => appL10n.ageAdult,
+        child => appL10n.ageChild,
+        toddler => appL10n.ageToddler,
+        infant => appL10n.ageInfant,
         _ => '',
       };
 }
@@ -207,10 +208,10 @@ class BookingPassengerModel {
 
   /// Nhãn trạng thái hiển thị cho UI.
   String get invitationLabel => switch (invitationStatus) {
-        'PENDING' => 'Đã gửi lời mời',
-        'ACCEPTED' => 'Đã tham gia',
-        'EXPIRED' => 'Lời mời đã hết hạn',
-        'REVOKED' => 'Lời mời đã hủy',
+        'PENDING' => appL10n.invTagSent,
+        'ACCEPTED' => appL10n.invTagJoined,
+        'EXPIRED' => appL10n.invTagExpired,
+        'REVOKED' => appL10n.invTagRevoked,
         _ => '',
       };
 }
@@ -238,15 +239,20 @@ class PaymentStatus {
       status == superseded;
 
   static String label(String status) => switch (status) {
-    pending => 'Chờ thanh toán',
-    processing => 'Đang xác minh',
-    success => 'Thành công',
-    failed => 'Thất bại',
-    cancelled => 'Khách đã hủy',
-    expired => 'Hết hạn',
-    superseded => 'Đã bị thay thế',
+    pending => appL10n.statusPendingPayment,
+    processing => appL10n.payStatusVerifying,
+    success => appL10n.payStatusSuccess,
+    failed => appL10n.payStatusFailed,
+    cancelled => appL10n.payStatusCustomerCancelled,
+    expired => appL10n.statusExpired,
+    superseded => appL10n.payStatusSuperseded,
     _ => status,
   };
+}
+
+String? _blankToNull(dynamic value) {
+  final s = value?.toString().trim() ?? '';
+  return s.isEmpty ? null : s;
 }
 
 class BookingModel {
@@ -257,9 +263,17 @@ class BookingModel {
   final int tourId;
   final String tourTitle;
 
+  /// Giờ khởi hành, địa điểm tập trung, giờ đón của tour (chữ tự do).
+  final String? departureTime;
+  final String? meetingPoint;
+  final String? pickupInfo;
+
   /// Ngày trải nghiệm — backend trả `LocalDate` (`YYYY-MM-DD`).
   /// Parse thành `DateTime` (không có phần giờ) để các màn hình hiển thị nhất quán.
   final DateTime? experienceDate;
+
+  /// Ngày cuối còn được BẮT ĐẦU hành trình (ngày khởi hành + số ngày tour − 1) — backend tính sẵn.
+  final DateTime? experienceEndDate;
   final num totalAmount;
   final String currency;
   final String status;
@@ -299,7 +313,11 @@ class BookingModel {
     this.touristName,
     required this.tourId,
     required this.tourTitle,
+    this.departureTime,
+    this.meetingPoint,
+    this.pickupInfo,
     this.experienceDate,
+    this.experienceEndDate,
     required this.totalAmount,
     this.currency = 'VND',
     required this.status,
@@ -326,7 +344,11 @@ class BookingModel {
         touristName: json['touristName']?.toString(),
         tourId: _asNum(json['tourId']).toInt(),
         tourTitle: json['tourTitle']?.toString() ?? '',
+        departureTime: _blankToNull(json['departureTime']),
+        meetingPoint: _blankToNull(json['meetingPoint']),
+        pickupInfo: _blankToNull(json['pickupInfo']),
         experienceDate: _asLocalDate(json['experienceDate']),
+        experienceEndDate: _asLocalDate(json['experienceEndDate']),
         totalAmount: _asNum(json['totalAmount']),
         currency: json['currency']?.toString() ?? 'VND',
         status: json['status']?.toString() ?? '',
@@ -487,10 +509,40 @@ class BookingModel {
     return daysUntilExperience < 0 ? 0 : daysUntilExperience;
   }
 
+  /// Ngày cuối được bắt đầu hành trình; backend cũ chưa trả ⇒ coi như tour 1 ngày.
+  DateTime? get lastStartDate => experienceEndDate ?? experienceDate;
+
+  /// Đã qua thời gian tour (sau ngày cuối, giờ Việt Nam) ⇒ KHÔNG bắt đầu hành trình MỚI được nữa.
+  /// Khớp `BookingService.assertJourneyAllowed`. Đơn đã đi xong (COMPLETED) không tính —
+  /// vẫn mở lại để xem hành trình. Hành trình đang dở vẫn tiếp tục được (màn hình tự xét).
+  bool get isExperienceExpired {
+    final end = lastStartDate;
+    if (end == null || isCompleted) return false;
+    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+    final today = DateTime(now.year, now.month, now.day);
+    return today.isAfter(DateTime(end.year, end.month, end.day));
+  }
+
+  /// "25/11" hoặc "25/11 – 27/11" (tour nhiều ngày) — thời gian được bắt đầu trải nghiệm.
+  String get experienceWindowLabel {
+    final start = experienceDate;
+    final end = lastStartDate;
+    if (start == null) return '';
+    String dm(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+    if (end == null || (start.year == end.year && start.month == end.month && start.day == end.day)) {
+      return dm(start);
+    }
+    return '${dm(start)} – ${dm(end)}';
+  }
+
   /// Nhãn nút hành động khi mở tour đã mua:
-  /// "12 ngày nữa lên đường!" khi còn ngày, "Bắt đầu trải nghiệm" khi đã tới ngày.
-  String get startJourneyLabel =>
-      isTourLocked ? '$daysUntilStart ngày nữa lên đường!' : 'Bắt đầu trải nghiệm';
+  /// "12 ngày nữa lên đường!" khi còn ngày, "Bắt đầu trải nghiệm" khi đã tới ngày,
+  /// "Đã quá ngày trải nghiệm" khi đã qua thời gian tour.
+  String get startJourneyLabel => isTourLocked
+      ? appL10n.tripCountdown(daysUntilStart)
+      : isExperienceExpired
+          ? appL10n.tdExperienceExpired
+          : appL10n.tdStartExperience;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -499,9 +551,15 @@ class BookingModel {
         'touristName': touristName,
         'tourId': tourId,
         'tourTitle': tourTitle,
+        'departureTime': departureTime,
+        'meetingPoint': meetingPoint,
+        'pickupInfo': pickupInfo,
         'experienceDate': experienceDate == null
             ? null
             : formatLocalDateString(experienceDate!.toIso8601String()),
+        'experienceEndDate': experienceEndDate == null
+            ? null
+            : formatLocalDateString(experienceEndDate!.toIso8601String()),
         'totalAmount': totalAmount,
         'currency': currency,
         'status': status,

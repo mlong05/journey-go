@@ -29,6 +29,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Loader2, MapPin, TriangleAlert } from "lucide-react";
 import partnerAddressService from "../services/partnerAddressService";
 import { ACCENTS, TextInput, labelCls } from "./PartnerFormKit";
+import { translate } from "@/i18n";
 
 const norm = (s) => partnerAddressService.normalizeForSearch(s).replace(/\s+/g, " ");
 
@@ -78,7 +79,7 @@ function SubLabel({ children, loading, accent = "teal" }) {
  * Không dùng <datalist> vì trình duyệt tự quyết vị trí popup (có thể bật sang ngang)
  * và hiện kèm nhãn phụ. Lọc theo chữ không dấu nhưng chỉ hiển thị tên có dấu.
  */
-function AddressCombobox({ units, display, query, onType, onPick, onBlur, disabled, placeholder, error, accent }) {
+function AddressCombobox({ units, display, query, onType, onPick, onBlur, disabled, placeholder, emptyText, error, accent }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const listRef = useRef(null);
@@ -147,7 +148,7 @@ function AddressCombobox({ units, display, query, onType, onPick, onBlur, disabl
           className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
         >
           {filtered.length === 0 ? (
-            <li className="px-3.5 py-2 text-sm text-slate-400">Không tìm thấy kết quả</li>
+            <li className="px-3.5 py-2 text-sm text-slate-400">{emptyText}</li>
           ) : (
             filtered.map((u, i) => {
               const label = buildLabel(u);
@@ -191,13 +192,15 @@ export default function PartnerAddressFields({
   errors = {},
   disabled = false,
   accent = "teal",
+  t,
 }) {
+  const tr = t || ((key) => translate("vi", key));
   const [provinces, setProvinces] = useState([]);
   const [wards, setWards] = useState([]);
 
   const [provLoading, setProvLoading] = useState(true);
   const [wardLoading, setWardLoading] = useState(false);
-  const [loadError, setLoadError] = useState("");
+  const [loadErrorKey, setLoadErrorKey] = useState("");
 
   // Mã đang chọn (mã, không phải tên)
   const [provinceCode, setProvinceCode] = useState("");
@@ -205,8 +208,8 @@ export default function PartnerAddressFields({
   // Chữ đang gõ (null = hiện tên của mục đã chọn) + lỗi "không có trong danh sách"
   const [provText, setProvText] = useState(null);
   const [wardText, setWardText] = useState(null);
-  const [provPickErr, setProvPickErr] = useState("");
-  const [wardPickErr, setWardPickErr] = useState("");
+  const [provPickErrKey, setProvPickErrKey] = useState("");
+  const [wardPickErrKey, setWardPickErrKey] = useState("");
 
   // ── 1. Tỉnh / Thành phố ───────────────────────────────────────────────────
   useEffect(() => {
@@ -216,7 +219,7 @@ export default function PartnerAddressFields({
       .then((list) => setProvinces(Array.isArray(list) ? list : []))
       .catch((err) => {
         if (err?.name === "AbortError") return;
-        setLoadError("Không thể tải danh sách Tỉnh/Thành. Vui lòng kiểm tra kết nối mạng.");
+        setLoadErrorKey("home.pr.addr.errLoadProvince");
       })
       .finally(() => {
         if (!controller.signal.aborted) setProvLoading(false);
@@ -255,7 +258,7 @@ export default function PartnerAddressFields({
       .catch((err) => {
         if (err?.name === "AbortError") return;
         setWards([]);
-        setLoadError("Không thể tải danh sách Phường/Xã. Vui lòng thử lại.");
+        setLoadErrorKey("home.pr.addr.errLoadWard");
       })
       .finally(() => {
         if (!controller.signal.aborted) setWardLoading(false);
@@ -291,14 +294,14 @@ export default function PartnerAddressFields({
     setProvinceCode(code);
     setWardCode("");
     setWardText(null);
-    setWardPickErr("");
+    setWardPickErrKey("");
     emit({ province: labelOf(provinces, code), ward: "" });
   };
 
   // Gõ vào ô Tỉnh: khớp đúng một tỉnh thì chọn luôn; chưa khớp thì bỏ lựa chọn cũ.
   const typeProvince = (text) => {
     setProvText(text);
-    setProvPickErr("");
+    setProvPickErrKey("");
     const m = findUnit(provinces, text);
     if (m) {
       setProvText(null);
@@ -313,7 +316,7 @@ export default function PartnerAddressFields({
 
   const typeWard = (text) => {
     setWardText(text);
-    setWardPickErr("");
+    setWardPickErrKey("");
     const m = findUnit(wards, text);
     if (m) {
       setWardText(null);
@@ -326,8 +329,8 @@ export default function PartnerAddressFields({
 
   const provDisplay = provText ?? (labelOf(provinces, provinceCode) || value.province || "");
   const wardDisplay = wardText ?? (labelOf(wards, wardCode) || value.ward || "");
-  const provError = provPickErr || errors.province;
-  const wardError = wardPickErr || errors.ward;
+  const provError = (provPickErrKey ? tr(provPickErrKey) : "") || errors.province;
+  const wardError = (wardPickErrKey ? tr(wardPickErrKey) : "") || errors.ward;
 
   const handleWard = (code) => {
     setWardCode(code);
@@ -341,13 +344,13 @@ export default function PartnerAddressFields({
     <div>
       <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
         <MapPin size={13} className={`${ACCENTS[accent]?.text ?? ACCENTS.teal.text}`} />
-        Địa chỉ trụ sở
+        {tr("home.pr.addr.title")}
         <span className="ml-0.5 text-rose-500">*</span>
       </div>
 
-      {loadError && (
+      {loadErrorKey && (
         <p className="mb-2 flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700">
-          <TriangleAlert size={12} /> {loadError}
+          <TriangleAlert size={12} /> {tr(loadErrorKey)}
         </p>
       )}
 
@@ -355,7 +358,7 @@ export default function PartnerAddressFields({
         {/* Tỉnh / Thành phố */}
         <div>
           <SubLabel loading={provLoading} accent={accent}>
-            Tỉnh / Thành phố
+            {tr("home.pr.addr.province")}
           </SubLabel>
           <AddressCombobox
             units={provinces}
@@ -363,14 +366,15 @@ export default function PartnerAddressFields({
             query={provText}
             accent={accent}
             disabled={disabled || provLoading}
-            placeholder={provLoading ? "Đang tải..." : "Gõ để tìm Tỉnh/Thành phố"}
+            placeholder={provLoading ? tr("home.pr.addr.loading") : tr("home.pr.addr.provincePlaceholder")}
+            emptyText={tr("home.pr.addr.noResults")}
             onType={typeProvince}
             onPick={(code) => {
               setProvText(null);
-              setProvPickErr("");
+              setProvPickErrKey("");
               if (code !== provinceCode) handleProvince(code);
             }}
-            onBlur={() => { if (provText && !findUnit(provinces, provText)) setProvPickErr("Chọn Tỉnh/Thành phố trong danh sách gợi ý"); }}
+            onBlur={() => { if (provText && !findUnit(provinces, provText)) setProvPickErrKey("home.pr.addr.errPickProvince"); }}
             error={provError}
           />
           <AddressFieldError>{provError}</AddressFieldError>
@@ -379,7 +383,7 @@ export default function PartnerAddressFields({
         {/* Phường / Xã */}
         <div>
           <SubLabel loading={wardLoading} accent={accent}>
-            Phường / Xã
+            {tr("home.pr.addr.ward")}
           </SubLabel>
           <AddressCombobox
             units={wards}
@@ -387,14 +391,15 @@ export default function PartnerAddressFields({
             query={wardText}
             accent={accent}
             disabled={disabled || !provinceCode || wardLoading}
-            placeholder={!provinceCode ? "Chọn Tỉnh/Thành phố trước" : wardLoading ? "Đang tải..." : "Gõ để tìm Phường/Xã"}
+            placeholder={!provinceCode ? tr("home.pr.addr.wardNeedProvince") : wardLoading ? tr("home.pr.addr.loading") : tr("home.pr.addr.wardPlaceholder")}
+            emptyText={tr("home.pr.addr.noResults")}
             onType={typeWard}
             onPick={(code) => {
               setWardText(null);
-              setWardPickErr("");
+              setWardPickErrKey("");
               if (code !== wardCode) handleWard(code);
             }}
-            onBlur={() => { if (wardText && !findUnit(wards, wardText)) setWardPickErr("Chọn Phường/Xã trong danh sách gợi ý"); }}
+            onBlur={() => { if (wardText && !findUnit(wards, wardText)) setWardPickErrKey("home.pr.addr.errPickWard"); }}
             error={wardError}
           />
           <AddressFieldError>{wardError}</AddressFieldError>

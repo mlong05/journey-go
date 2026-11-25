@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/tour_journey_model.dart';
 import 'map_kit.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Bản đồ nhỏ ở đầu tab "Trải nghiệm" của một trạm: thấy cùng lúc
 /// - vùng check-in của điểm đến (vòng vàng nét đứt),
@@ -55,7 +56,7 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
       : CameraFit.coordinates(coordinates: points, padding: const EdgeInsets.all(42), maxZoom: 18);
 
   void fitAll() {
-    final points = _fitPoints();
+    final points = _fitPoints(withUser: _userNearby);
     final fit = _cameraFit(points);
     if (fit != null) {
       _controller.fitCamera(fit);
@@ -64,14 +65,27 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
     }
   }
 
+  /// Du khách đủ gần để đưa vào khung (xa hơn thì checkpoint bé tí, vô dụng — màn cha hiện dải "Chỉ đường").
+  static const double _fitUserWithinMeters = 1500;
+
+  bool get _userNearby {
+    final user = widget.user;
+    if (user == null) return false;
+    final points = _fitPoints(withUser: false);
+    return points.any((p) => distanceMeters(user, p) <= _fitUserWithinMeters);
+  }
+
+  /// Lần đầu có vị trí du khách (và bản đồ đã sẵn sàng): căn lại để thấy cả du khách khi họ ở gần.
+  void _maybeFitWithUser() {
+    if (!_ready || _fittedWithUser || !_userNearby) return;
+    _fittedWithUser = true;
+    fitAll();
+  }
+
   @override
   void didUpdateWidget(covariant StopCheckpointsMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Lần đầu có vị trí du khách: căn lại để thấy cả du khách.
-    if (_ready && !_fittedWithUser && oldWidget.user == null && widget.user != null) {
-      _fittedWithUser = true;
-      fitAll();
-    }
+    if (widget.user != null) _maybeFitWithUser();
   }
 
   @override
@@ -96,7 +110,11 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
                 initialCameraFit: _cameraFit(points),
                 interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
                 backgroundColor: mapBackground,
-                onMapReady: () => _ready = true,
+                onMapReady: () {
+                  _ready = true;
+                  // Vị trí có thể về trước khi bản đồ sẵn sàng.
+                  _maybeFitWithUser();
+                },
               ),
               children: [
                 ...baseTileLayers(satellite: false),
@@ -147,7 +165,7 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
                         onTap: () => widget.onTapCheckpoint(c),
                         child: Semantics(
                           button: true,
-                          label: 'Hoạt động ${_numberOf(c)}: ${c.name}',
+                          label: appL10n.cmActivity('${_numberOf(c)}', c.name),
                           child: _CheckpointPin(
                             number: _numberOf(c),
                             done: widget.doneTaskIds.contains(c.taskId),
@@ -164,7 +182,7 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
             Positioned(
               right: 10,
               top: 10,
-              child: MapRoundButton(icon: Icons.fit_screen_rounded, tooltip: 'Xem tất cả', onPressed: fitAll),
+              child: MapRoundButton(icon: Icons.fit_screen_rounded, tooltip: appL10n.cmShowAll, onPressed: fitAll),
             ),
             Positioned(
               left: 10,
@@ -177,9 +195,9 @@ class _StopCheckpointsMapState extends State<StopCheckpointsMap> {
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   _legendDot(StopCheckpointsMap.stopColor),
-                  const Text(' Vùng điểm đến   ', style: _legendStyle),
+                  Text(appL10n.cmLegendZone, style: _legendStyle),
                   _legendDot(AppCultureColors.oceanBlue),
-                  const Text(' Hoạt động', style: _legendStyle),
+                  Text(appL10n.cmLegendActivity, style: _legendStyle),
                 ]),
               ),
             ),

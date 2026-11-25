@@ -1,4 +1,4 @@
-import 'gamification_model.dart' show formatThousands;
+import '../../l10n/locale_controller.dart';
 import 'tour_model.dart';
 
 int _asInt(dynamic value) {
@@ -90,7 +90,19 @@ class TourGuestPrice {
         countsTowardSlot: json['countsTowardSlot'] != false,
       );
 
-  String get formattedPrice => alwaysFree || price <= 0 ? 'Miễn phí' : '${formatThousands(price)} đ';
+  String get formattedPrice => alwaysFree ? appL10n.tourPriceFree : formatVndPrice(price);
+
+  /// Nhãn loại khách: tiếng Việt giữ nhãn Admin đặt; ngôn ngữ khác dịch theo [guestType].
+  String localizedLabel(AppLocalizations l10n) {
+    if (l10n.localeName == 'vi' && label.isNotEmpty) return label;
+    return switch (guestType) {
+      'ADULT' => l10n.guestAdult,
+      'CHILD' => l10n.guestChild,
+      'TODDLER' => l10n.guestToddler,
+      'INFANT' => l10n.guestInfant,
+      _ => label,
+    };
+  }
 }
 
 /// Hiện vật tại điểm dừng.
@@ -121,6 +133,7 @@ class StopCulture {
   final String? culturalContent;
   final List<String> culturalImages;
   final List<TourArtifact> artifacts;
+  final List<ThenNowPair> thenNow;
 
   const StopCulture({
     required this.stopId,
@@ -132,6 +145,7 @@ class StopCulture {
     this.culturalContent,
     this.culturalImages = const [],
     this.artifacts = const [],
+    this.thenNow = const [],
   });
 
   factory StopCulture.fromJson(Map<String, dynamic> json) => StopCulture(
@@ -144,9 +158,42 @@ class StopCulture {
         culturalContent: _text(json['culturalContent']),
         culturalImages: _urls(json['culturalImages']),
         artifacts: _maps(json['artifacts']).map(TourArtifact.fromJson).toList(),
+        thenNow: _maps(json['thenNow']).map(ThenNowPair.fromJson).nonNulls.toList(),
       );
 
-  bool get isEmpty => culturalContent == null && culturalImages.isEmpty && artifacts.isEmpty && videoUrl == null;
+  bool get isEmpty =>
+      culturalContent == null && culturalImages.isEmpty && artifacts.isEmpty && videoUrl == null && thenNow.isEmpty;
+}
+
+/// Cặp ảnh "xưa và nay" của điểm dừng (kéo thanh trượt để so sánh).
+class ThenNowPair {
+  final String thenImageUrl;
+  final String nowImageUrl;
+  final String? thenLabel;
+  final String? caption;
+  final String? credit;
+
+  const ThenNowPair({
+    required this.thenImageUrl,
+    required this.nowImageUrl,
+    this.thenLabel,
+    this.caption,
+    this.credit,
+  });
+
+  /// Thiếu một trong hai ảnh thì không so sánh được ⇒ bỏ qua.
+  static ThenNowPair? fromJson(Map<String, dynamic> json) {
+    final then = _url(json['thenImageUrl']);
+    final now = _url(json['nowImageUrl']);
+    if (then == null || now == null) return null;
+    return ThenNowPair(
+      thenImageUrl: then,
+      nowImageUrl: now,
+      thenLabel: _text(json['thenLabel']),
+      caption: _text(json['caption']),
+      credit: _text(json['credit']),
+    );
+  }
 }
 
 /// Hoạt động thực địa tại điểm dừng (tên, thời lượng, điểm).
@@ -158,7 +205,7 @@ class TourActivity {
   const TourActivity({required this.name, this.durationSeconds, this.points = 0});
 
   factory TourActivity.fromJson(Map<String, dynamic> json) => TourActivity(
-        name: _text(json['activityName']) ?? 'Hoạt động thực địa',
+        name: _text(json['activityName']) ?? appL10n.tdActivityFallback,
         durationSeconds: _asIntOrNull(json['durationSeconds']),
         points: _asInt(json['points']),
       );
@@ -169,8 +216,9 @@ class TourActivity {
     if (s == null || s <= 0) return null;
     final m = s ~/ 60;
     final r = s % 60;
-    if (m == 0) return '$r giây';
-    return r == 0 ? '$m phút' : '$m phút $r giây';
+    final l10n = appL10n;
+    if (m == 0) return l10n.durationSeconds(r);
+    return r == 0 ? l10n.durationMinutes(m) : l10n.durationMinutesSeconds(m, r);
   }
 }
 
@@ -305,6 +353,10 @@ class TourDetailModel {
   final List<TourGuestPrice> prices;
   final int? maxGuestsPerSlot;
   final List<DateTime> upcomingDepartureDates;
+  /// Giờ khởi hành, địa điểm tập trung, giờ đón — chữ tự do, dùng chung cho mọi ngày khởi hành.
+  final String? departureTime;
+  final String? meetingPoint;
+  final String? pickupInfo;
   final List<TourStopModel> stops;
   final int taskCount;
   final int totalPoints;
@@ -338,6 +390,9 @@ class TourDetailModel {
     this.prices = const [],
     this.maxGuestsPerSlot,
     this.upcomingDepartureDates = const [],
+    this.departureTime,
+    this.meetingPoint,
+    this.pickupInfo,
     this.stops = const [],
     this.taskCount = 0,
     this.totalPoints = 0,
@@ -380,6 +435,9 @@ class TourDetailModel {
           .map((d) => DateTime.tryParse(d.toString()))
           .whereType<DateTime>()
           .toList(),
+      departureTime: _text(json['departureTime']),
+      meetingPoint: _text(json['meetingPoint']),
+      pickupInfo: _text(json['pickupInfo']),
       stops: stops,
       taskCount: _asInt(json['taskCount']),
       totalPoints: _asInt(json['totalPoints']),
@@ -393,7 +451,9 @@ class TourDetailModel {
         nights: durationNights,
       );
 
-  String get formattedPrice => price <= 0 ? 'Miễn phí' : '${formatThousands(price)} đ';
+  String get formattedPrice => formatVndPrice(price);
+
+  bool get hasDepartureInfo => departureTime != null || meetingPoint != null || pickupInfo != null;
 
   bool get hasPolicies =>
       priceIncludes != null ||

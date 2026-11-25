@@ -20,6 +20,11 @@ spring:
   threads:
     virtual:
       enabled: true
+  # Thông báo lỗi đa ngôn ngữ (vi mặc định, en, ja) — chọn theo header Accept-Language (xem common/i18n/Messages).
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
 
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/journeygo_db}
@@ -56,6 +61,7 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
     validate-on-migrate: true
+    out-of-order: true
     # Không tự động sửa schema lệch — để dev phát hiện sai lệch.
     repair: false
 

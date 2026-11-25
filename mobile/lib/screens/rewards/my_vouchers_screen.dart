@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/gamification_model.dart';
 import '../../core/services/gamification_service.dart';
 import 'rewards_widgets.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Kho voucher của tôi, chia 3 tab: còn dùng, đã dùng, hết hạn.
 class MyVouchersScreen extends StatefulWidget {
@@ -51,8 +52,8 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
     await Clipboard.setData(ClipboardData(text: code));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đã sao chép mã voucher'),
+      SnackBar(
+        content: Text(appL10n.mvCopied),
         behavior: SnackBarBehavior.floating,
         duration: Duration(seconds: 2),
       ),
@@ -77,10 +78,10 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
             icon: const Icon(Icons.arrow_back_ios_new_rounded,
                 size: 18, color: AppCultureColors.textDark),
             onPressed: () => Navigator.of(context).maybePop(),
-            tooltip: 'Quay lại',
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
           ),
-          title: const Text(
-            'Voucher của tôi',
+          title: Text(
+            appL10n.mvTitle,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -93,9 +94,9 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
             indicatorColor: AppCultureColors.heritageJade,
             labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
             tabs: [
-              Tab(text: 'Còn dùng (${usable.length})'),
-              Tab(text: 'Đã dùng (${used.length})'),
-              Tab(text: 'Hết hạn (${expired.length})'),
+              Tab(text: appL10n.mvTabUsable(usable.length)),
+              Tab(text: appL10n.mvTabUsed(used.length)),
+              Tab(text: appL10n.mvTabExpired(expired.length)),
             ],
           ),
         ),
@@ -104,7 +105,7 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
             : _error != null
                 ? RewardsMessageView(
                     icon: Icons.cloud_off_rounded,
-                    title: 'Không tải được kho voucher',
+                    title: appL10n.mvLoadFailed,
                     message: _error,
                     onRetry: _load,
                   )
@@ -112,18 +113,18 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
                     children: [
                       _buildList(
                         usable,
-                        emptyTitle: 'Chưa có voucher nào',
-                        emptyMessage: 'Dùng điểm tích lũy để đổi voucher tại mục Đổi thưởng.',
+                        emptyTitle: appL10n.mvEmptyUsable,
+                        emptyMessage: appL10n.mvEmptyUsableHint,
                       ),
                       _buildList(
                         used,
-                        emptyTitle: 'Chưa dùng voucher nào',
-                        emptyMessage: 'Voucher bạn đã dùng sẽ hiển thị tại đây.',
+                        emptyTitle: appL10n.mvEmptyUsed,
+                        emptyMessage: appL10n.mvEmptyUsedHint,
                       ),
                       _buildList(
                         expired,
-                        emptyTitle: 'Không có voucher hết hạn',
-                        emptyMessage: 'Hãy dùng voucher trước ngày hết hạn nhé.',
+                        emptyTitle: appL10n.mvEmptyExpired,
+                        emptyMessage: appL10n.mvEmptyExpiredHint,
                       ),
                     ],
                   ),
@@ -166,12 +167,12 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
     final Color accent = usable
         ? AppCultureColors.heritageJade
         : (v.isUsed ? AppCultureColors.info : AppCultureColors.textLight);
-    final String statusText = usable ? 'Còn dùng' : (v.isUsed ? 'Đã dùng' : 'Hết hạn');
+    final String statusText = usable ? appL10n.mvStatusUsable : (v.isUsed ? appL10n.mvStatusUsed : appL10n.mvStatusExpired);
 
     final String dateLine = v.isUsed
-        ? 'Đã dùng ${formatDate(v.usedAt)}'
+        ? appL10n.mvUsedOn(formatDate(v.usedAt))
         : (v.expiryDate != null
-            ? '${v.isExpired ? 'Hết hạn' : 'Hạn dùng đến'} ${formatDate(v.expiryDate)}'
+            ? (v.isExpired ? appL10n.mvExpiredOn(formatDate(v.expiryDate)) : appL10n.mvValidUntil(formatDate(v.expiryDate)))
             : '');
 
     return Container(
@@ -236,7 +237,7 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Sao chép mã',
+                  tooltip: appL10n.mvCopyCode,
                   onPressed: usable ? () => _copy(v.userVoucherCode) : null,
                   icon: const Icon(Icons.copy_rounded, size: 18),
                   color: AppCultureColors.heritageJade,
@@ -255,7 +256,7 @@ class _MyVouchersScreenState extends State<MyVouchersScreen> {
                 ),
               ),
               Text(
-                'Đã đổi ${formatThousands(v.pointsSpent)} điểm',
+                appL10n.mvRedeemedFor(formatThousands(v.pointsSpent)),
                 style: const TextStyle(fontSize: 12, color: AppCultureColors.textLight),
               ),
             ],

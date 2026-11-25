@@ -28,7 +28,7 @@ import { formatDateTimeVN } from "@/lib/money";
  */
 const REWARD_META = {
   QUIZ_QUESTION: {
-    label: "Điểm mỗi câu hỏi trắc nghiệm",
+    label: "Điểm mỗi câu đố văn hóa",
     icon: Sparkles,
     accent: "violet",
     exampleItems: 4,
@@ -291,7 +291,7 @@ function RewardSettingRow({ setting, draftPoints, onDraftChange, onSave, saving 
    ========================================================================= */
 
 /**
- * Quản lý điểm thưởng (Admin): điểm mỗi câu quiz và mỗi trải nghiệm thực tế.
+ * Quản lý điểm thưởng (Admin): điểm mỗi câu đố văn hóa và mỗi trải nghiệm thực tế.
  * Đối tác chỉ xem (hiển thị mờ); điểm được chốt vào tour khi Moderator duyệt.
  */
 export default function RewardSettingsCard() {
@@ -380,7 +380,7 @@ export default function RewardSettingsCard() {
               Mức điểm thưởng
             </h2>
             <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-              Đặt điểm cho mỗi câu hỏi trắc nghiệm và mỗi trải nghiệm thực tế
+              Đặt điểm cho mỗi câu đố văn hóa và mỗi trải nghiệm thực tế
               của tour. Đối tác xem điểm khi tạo tour nhưng không sửa được.
             </p>
           </div>

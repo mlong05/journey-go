@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/goong_map_style.dart';
+import '../../l10n/locale_controller.dart';
 
 // Bộ phận dùng chung cho các bản đồ trải nghiệm (hành trình, dẫn đường tới trạm).
 
@@ -84,8 +85,8 @@ class MapAttributionText extends StatelessWidget {
     if (!GoongMapStyle.configured) return const SizedBox.shrink();
     return GestureDetector(
       onTap: () => launchUrl(Uri.parse('https://goong.io'), mode: LaunchMode.externalApplication),
-      child: const Text(
-        'Bản đồ: © Goong',
+      child: Text(
+        appL10n.mapCredit,
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 10.5, color: AppCultureColors.textLight),
       ),
@@ -97,7 +98,8 @@ class MapAttributionText extends StatelessWidget {
 
 /// Hướng la bàn (0° = Bắc, theo chiều kim đồng hồ) đổi sang tiếng Việt.
 String compassLabel(double bearing) {
-  const names = ['Bắc', 'Đông Bắc', 'Đông', 'Đông Nam', 'Nam', 'Tây Nam', 'Tây', 'Tây Bắc'];
+  final l10n = appL10n;
+  final names = [l10n.compassN, l10n.compassNE, l10n.compassE, l10n.compassSE, l10n.compassS, l10n.compassSW, l10n.compassW, l10n.compassNW];
   final normalized = (bearing % 360 + 360) % 360;
   return names[((normalized + 22.5) ~/ 45) % 8];
 }
@@ -106,9 +108,9 @@ String compassLabel(double bearing) {
 String turnHint(double heading, double bearing) {
   final diff = ((bearing - heading + 540) % 360) - 180; // -180..180, dương = lệch sang phải
   final abs = diff.abs();
-  if (abs <= 25) return 'Đi thẳng';
-  if (abs >= 150) return 'Quay lại';
-  return diff > 0 ? 'Rẽ phải' : 'Rẽ trái';
+  if (abs <= 25) return appL10n.turnStraight;
+  if (abs >= 150) return appL10n.turnBack;
+  return diff > 0 ? appL10n.turnRight : appL10n.turnLeft;
 }
 
 /// Góc phương vị từ [from] tới [to] (0..360°).

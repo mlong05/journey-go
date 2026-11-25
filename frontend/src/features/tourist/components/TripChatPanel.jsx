@@ -7,6 +7,7 @@ import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { useChatHistory, CHAT_PAGE_SIZE } from "@/hooks/useChatHistory";
 import { touristService } from "../services/touristService";
 import { ROUTES } from "@/constants/routes";
+import { useT } from "@/i18n";
 import ChatBubble from "@/components/ui/ChatBubble";
 
 /**
@@ -24,6 +25,7 @@ import ChatBubble from "@/components/ui/ChatBubble";
  * `BOOKING_CHAT`); polling chỉ là lưới an toàn khi WebSocket rớt.
  */
 export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) {
+  const t = useT();
   const [open, setOpen] = useState(defaultOpen);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -62,7 +64,6 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
       .catch(() => { if (alive) setConversationId(null); });
     return () => { alive = false; };
   }, [bookingId]);
-
   // Tin nhắn mới ⇒ thêm vào danh sách ngay (không cần chờ poll).
   // Nhận cả hai scope vì kênh đã gộp: `BOOKING_CHAT` (cũ) và `PROVIDER_CHAT` (mới).
   useRealtimeMessages(useCallback((payload) => {
@@ -84,7 +85,7 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
       appendMessage(m);
       setText("");
     } catch (err) {
-      setError(err?.message || "Không gửi được tin nhắn.");
+      setError(err?.message || t("trips.chatErrSend"));
     } finally {
       setBusy(false);
     }
@@ -101,7 +102,7 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
         className="flex w-full cursor-pointer items-center gap-2 px-5 py-4 text-left"
       >
         <MessagesSquare size={17} className="text-teal-700" />
-        <span id={`trip-chat-${bookingId}`} className="font-extrabold text-slate-900">Hỗ trợ trong đơn này</span>
+        <span id={`trip-chat-${bookingId}`} className="font-extrabold text-slate-900">{t("trips.chatTitle")}</span>
         <span className="ml-auto text-slate-400">{open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}</span>
       </button>
 
@@ -109,15 +110,15 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
         <div className="border-t border-slate-100">
           {/* Gợi ý: đây chính là tab "Tin nhắn với nhà tour" — không phải hai kênh riêng. */}
           <p className="px-4 pt-3 text-xs text-slate-500">
-            Đây là cuộc trò chuyện với nhà tour của tour này — cùng với mục
-            <Link href={ROUTES.ACCOUNT_MESSAGES} className="mx-1 font-semibold text-teal-700 hover:underline">Tin nhắn với nhà tour</Link>
-            trong phần Tài khoản.
+            {t("trips.chatHintBefore")}
+            <Link href={ROUTES.ACCOUNT_MESSAGES} className="mx-1 font-semibold text-teal-700 hover:underline">{t("account.providerMessages")}</Link>
+            {t("trips.chatHintAfter")}
             {conversationId != null && (
               <Link
                 href={`${ROUTES.ACCOUNT_MESSAGES}?c=${conversationId}`}
                 className="ml-1 inline-flex items-center gap-0.5 font-semibold text-teal-700 hover:underline"
               >
-                Mở tab này<ExternalLink size={11} />
+                {t("trips.chatOpenTab")}<ExternalLink size={11} />
               </Link>
             )}
           </p>
@@ -129,10 +130,10 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
             aria-live="polite"
           >
             {loading ? (
-              <p className="flex justify-center gap-2 py-8 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />Đang tải…</p>
+              <p className="flex justify-center gap-2 py-8 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />{t("common.loading")}</p>
             ) : messages.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-500">
-                Chưa có tin nhắn. Hãy hỏi nhà tour về giờ đón, trang phục hoặc khiếu nại trong đơn.
+                {t("trips.chatEmpty")}
               </p>
             ) : (
               <>
@@ -147,18 +148,18 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
                     >
                       {loadingMore ? (
                         <>
-                          <Loader2 size={11} className="animate-spin" /> Đang tải lịch sử…
+                          <Loader2 size={11} className="animate-spin" /> {t("merge.chat.loadingHistory")}
                         </>
                       ) : (
                         <>
-                          <ChevronDown size={11} /> Xem tin nhắn cũ hơn
+                          <ChevronDown size={11} /> {t("merge.chat.loadOlder")}
                         </>
                       )}
                     </button>
                   </div>
                 ) : (
                   <p className="pb-1 text-center text-[11px] text-slate-400">
-                    Bạn đã xem hết lịch sử tin nhắn
+                    {t("merge.chat.endOfHistory")}
                   </p>
                 )}
 
@@ -168,13 +169,14 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
                     mine={myId != null && String(m.senderId) === String(myId)}
                     body={m.body}
                     createdAt={m.createdAt}
-                    author={m.senderName ?? "Nhà tour"}
+                    author={m.senderName ?? t("account.msg.tourProvider")}
+                    t={t}
                   />
                 ))}
 
                 {loadingMore && (
                   <p className="flex items-center justify-center gap-2 py-2 text-[11px] text-slate-400">
-                    <Loader2 size={11} className="animate-spin" /> Đang tải tin nhắn cũ…
+                    <Loader2 size={11} className="animate-spin" /> {t("merge.chat.loadingOlder")}
                   </p>
                 )}
               </>
@@ -188,7 +190,7 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
           )}
 
           <form onSubmit={send} className="flex items-end gap-2 border-t border-slate-100 p-3">
-            <label htmlFor={`trip-msg-${bookingId}`} className="sr-only">Tin nhắn hỗ trợ</label>
+            <label htmlFor={`trip-msg-${bookingId}`} className="sr-only">{t("trips.chatInputLabel")}</label>
             <textarea
               id={`trip-msg-${bookingId}`}
               rows={1}
@@ -196,13 +198,13 @@ export default function TripChatPanel({ bookingId, myId, defaultOpen = false }) 
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(e); } }}
-              placeholder="Nhập tin nhắn… (Enter để gửi, Shift+Enter xuống dòng)"
+              placeholder={t("trips.chatPlaceholder")}
               className="max-h-32 min-h-[42px] flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
             />
             <button
               type="submit"
               disabled={busy || !text.trim()}
-              aria-label="Gửi tin nhắn"
+              aria-label={t("trips.chatSendAria")}
               className="grid h-[42px] w-[42px] shrink-0 cursor-pointer place-items-center rounded-xl bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-40"
             >
               {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

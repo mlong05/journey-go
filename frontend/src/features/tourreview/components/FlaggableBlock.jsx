@@ -61,7 +61,7 @@ export default function FlaggableBlock({ anchor, label, children }) {
           <p className="text-[11px] font-bold text-orange-700">Ghi chú cho: {label}</p>
           <LimitedField as="textarea" limit={500} autoFocus rows={2} value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) save(); }}
-            placeholder="Ví dụ: Câu quiz số 2 có hai đáp án đúng"
+            placeholder="Ví dụ: Câu đố số 2 có hai đáp án đúng"
             className="w-full px-2 py-1.5 rounded-md border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400/30" />
           <div className="flex justify-end gap-1.5">
             <button type="button" onClick={() => { setEditing(false); setText(""); }} className="px-2.5 py-1 rounded-md text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Hủy</button>

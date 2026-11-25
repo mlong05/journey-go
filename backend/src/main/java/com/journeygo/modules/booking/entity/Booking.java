@@ -194,6 +194,17 @@ public class Booking {
         this.cancellationReason = reason;
     }
 
+    /**
+     * Ngày cuối cùng du khách còn được BẮT ĐẦU hành trình = ngày khởi hành + số ngày tour − 1
+     * (tour trong ngày ⇒ đúng ngày khởi hành; tour cũ thiếu số ngày ⇒ coi là 1 ngày).
+     * Null khi đơn không có ngày trải nghiệm.
+     */
+    public LocalDate experienceEndDate() {
+        if (experienceDate == null) return null;
+        int days = tour != null ? Math.max(1, tour.getDurationDays()) : 1;
+        return experienceDate.plusDays(days - 1L);
+    }
+
     /** Đánh dấu trải nghiệm đã hoàn thành. */
     public void complete(Instant completedTime) {
         this.status = BookingStatus.COMPLETED;

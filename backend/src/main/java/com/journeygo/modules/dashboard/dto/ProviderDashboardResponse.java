@@ -10,7 +10,15 @@ import java.util.List;
  */
 public record ProviderDashboardResponse(String range, DestinationStats destinations, PeriodCount checkIns,
         PeriodAmount revenue, MissionStats missions, List<DestinationRow> destinationRows,
-        List<ModerationUpdate> moderationUpdates) {
+        List<ModerationUpdate> moderationUpdates, String seriesUnit, List<SeriesPoint> series) {
+
+    /**
+     * Một mốc của biểu đồ diễn biến (seriesUnit = "hour" cho range today, "day" cho week / month).
+     * start = đầu mốc kỳ này; prevStart = mốc tương ứng của kỳ trước (null khi kỳ trước ngắn hơn,
+     * vd. ngày 31 so với tháng trước chỉ có 30 ngày) — khi đó các giá trị prev* cũng là null.
+     */
+    public record SeriesPoint(Instant start, Instant prevStart, BigDecimal revenue, long bookings, long checkIns,
+            BigDecimal prevRevenue, Long prevBookings, Long prevCheckIns) {}
 
     public record DestinationStats(long total, long published, long pending, long rejected, long draft) {}
 

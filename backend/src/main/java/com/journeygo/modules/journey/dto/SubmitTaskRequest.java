@@ -16,6 +16,18 @@ public record SubmitTaskRequest(
         @Schema(description = "Nội dung mã QR quét được tại trạm (thay cho GPS ở nhiệm vụ cần vị trí)")
         String qrValue
 ) {
-    @Schema(description = "Trả lời một câu hỏi: trắc nghiệm gửi answerId, tự luận gửi text")
-    public record QuestionAnswer(Long questionId, Long answerId, String text) {}
+    @Schema(description = "Trả lời một câu hỏi: trắc nghiệm / chọn ảnh gửi answerId, tự luận gửi text, xếp thứ tự gửi answerIds theo thứ tự đã xếp, đoán số gửi numberValue")
+    public record QuestionAnswer(Long questionId, Long answerId, String text, List<Long> answerIds, Integer numberValue,
+                                 @Schema(description = "Nối cột: từng cặp (id mục cột A, key mục cột B)") List<MatchPair> matches) {
+        public QuestionAnswer(Long questionId, Long answerId, String text) {
+            this(questionId, answerId, text, null, null, null);
+        }
+
+        public QuestionAnswer(Long questionId, Long answerId, String text, List<Long> answerIds, Integer numberValue) {
+            this(questionId, answerId, text, answerIds, numberValue, null);
+        }
+    }
+
+    /** Một cặp nối: leftId = id đáp án (cột A), rightKey = key của mục cột B (matchOptions). */
+    public record MatchPair(Long leftId, Integer rightKey) {}
 }

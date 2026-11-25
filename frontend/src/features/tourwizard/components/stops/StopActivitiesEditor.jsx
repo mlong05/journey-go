@@ -5,15 +5,13 @@ import { Plus, Pencil, Trash2, MapPin, Timer, HelpCircle, Footprints, CheckCircl
 import GoongMapPickerModal from "@/features/destination/components/GoongMapPickerModal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Field, TextInput, NumberInput, PointsBadge } from "../FormKit";
-import QuestionEditor, { emptyQuestion } from "./QuestionEditor";
+import QuestionEditor, { emptyQuestion, quizError, quizSummary } from "./QuestionEditor";
 import CheckpointMap from "./CheckpointMap";
 import ExperienceQr, { newExperienceQrToken } from "./ExperienceQr";
 import { LIMITS, checkpointDistanceLevel, formatDistance } from "../../constants";
 
 let keySeq = 0;
 const newKey = () => `a${Date.now().toString(36)}${(keySeq++).toString(36)}`;
-
-const LETTERS = ["A", "B", "C", "D"];
 
 const blankQuiz = () => ({ ...emptyQuestion(), type: "MULTIPLE_CHOICE", _key: newKey() });
 const blankExperience = () => ({
@@ -28,14 +26,6 @@ const blankExperience = () => ({
 });
 
 const hasAcceptedAnswer = (value) => (value || "").split(";").some((s) => s.trim());
-
-/** Lỗi của form câu quiz (trắc nghiệm) — khớp luật backend; null = hợp lệ. */
-function quizError(q) {
-  if (!q.content?.trim()) return "Vui lòng nhập nội dung câu hỏi.";
-  if (q.answers.length !== 4 || q.answers.some((a) => !a.content?.trim())) return "Câu hỏi cần đủ 4 đáp án.";
-  if (q.answers.filter((a) => a.correct).length !== 1) return "Chọn đúng 1 đáp án đúng.";
-  return null;
-}
 
 /** Lỗi của form trải nghiệm thực tế; null = hợp lệ. */
 function experienceError(e) {
@@ -132,7 +122,7 @@ export function CheckpointDistanceNotice({ stop, experience, compact = false }) 
 
 /**
  * Tab "Trải nghiệm" của một điểm đến, 2 khu riêng:
- *  - Câu hỏi (quiz): chỉ trắc nghiệm (4 đáp án, 1 đúng), tối đa 4 câu.
+ *  - Câu đố văn hóa: chọn đáp án, chọn ảnh, xếp thứ tự hoặc đoán số, tối đa 4 câu.
  *  - Trải nghiệm thực tế: hoạt động (checkpoint, bán kính, đếm ngược) + 1 câu hỏi nhập chữ có đáp án đúng, tối đa 5.
  * Ban đầu trống; "Thêm" mở 1 form, "Lưu" thu form thành dòng tóm tắt. Chỉ mở 1 form một lúc.
  * onChange(patch, touchedPaths) cập nhật bản nháp điểm đến; onEditingChange(bool) báo còn form đang mở.
@@ -149,6 +139,8 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
   const formError = editing?.error ?? null;
 
   useEffect(() => { onEditingChange?.(!!editing); }, [editing, onEditingChange]);
+  // Rời khỏi màn (đổi tab, đóng khung) thì form đang soạn không còn ⇒ tắt cờ, tránh kẹt "còn form đang soạn".
+  useEffect(() => () => onEditingChange?.(false), [onEditingChange]);
 
   const quiz = stop.quiz || [];
   const experiences = stop.experiences || [];
@@ -182,7 +174,7 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
     const list = kind === "quiz" ? quiz : experiences;
     const ok = await confirm({
       tone: "danger", icon: "trash",
-      title: kind === "quiz" ? "Xóa câu hỏi này?" : "Xóa trải nghiệm này?",
+      title: kind === "quiz" ? "Xóa câu đố này?" : "Xóa trải nghiệm này?",
       subject: kind === "quiz" ? list[index].content || `Câu ${index + 1}` : list[index].activityName || `Trải nghiệm ${index + 1}`,
       confirmLabel: "Xóa",
     });
@@ -197,10 +189,10 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
   /* ── Form câu quiz ── */
   const quizForm = (label) => (
     <div className="p-3 rounded-xl border-2 border-emerald-200 bg-emerald-50/30 space-y-2.5">
-      <QuestionEditor label={label} value={draft} fixedType="MULTIPLE_CHOICE" points={quizPoints}
+      <QuestionEditor label={label} value={draft} quizTypes points={quizPoints}
         onChange={(q) => setDraft({ ...q })} />
       {formError && <p className="text-[11px] font-bold text-rose-600">{formError}</p>}
-      <FormActions onCancel={() => setEditing(null)} onSave={saveDraft} saveLabel="Lưu câu hỏi" />
+      <FormActions onCancel={() => setEditing(null)} onSave={saveDraft} saveLabel="Lưu câu đố" />
     </div>
   );
 
@@ -262,10 +254,10 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
     <div className="space-y-6">
       {confirmDialog}
 
-      {/* ── Giai đoạn 1: Câu hỏi (quiz) ── */}
+      {/* ── Giai đoạn 1: Câu đố văn hóa ── */}
       <section className="space-y-2.5">
         <h4 className="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5">
-          <HelpCircle size={14} className="text-emerald-600" /> Câu hỏi (quiz) – trắc nghiệm ({quiz.length}/{LIMITS.QUIZ_MAX})
+          <HelpCircle size={14} className="text-emerald-600" /> Câu đố văn hóa ({quiz.length}/{LIMITS.QUIZ_MAX})
         </h4>
         {stopErr("quiz") && <p className="text-[11px] font-bold text-rose-600">{stopErr("quiz")}</p>}
 
@@ -278,10 +270,7 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
               <li key={q._key} className="p-2">{quizForm(`Câu ${i + 1}`)}</li>
             ) : (
               <SummaryRow key={q._key} index={i + 1} title={q.content || "(chưa có nội dung)"}
-                detail={(() => {
-                  const k = q.answers.findIndex((a) => a.correct);
-                  return k >= 0 ? `Đáp án đúng: ${LETTERS[k]}. ${q.answers[k].content}` : "Chưa chọn đáp án đúng";
-                })()}
+                detail={quizSummary(q)}
                 points={quizPoints} pointsLabel="điểm" error={stopErr(`quiz[${i}]`)}
                 disabled={busy} readOnly={readOnly}
                 onEdit={() => startEdit("quiz", i)} onRemove={() => remove("quiz", i)} />
@@ -290,7 +279,7 @@ export default function StopActivitiesEditor({ stop, onChange, readOnly, stopErr
         )}
         {isOpen("quiz", null) && quizForm(`Câu ${quiz.length + 1}`)}
         {!readOnly && !busy && quiz.length < LIMITS.QUIZ_MAX && (
-          <AddButton onClick={() => startAdd("quiz")}>Thêm câu hỏi</AddButton>
+          <AddButton onClick={() => startAdd("quiz")}>Thêm câu đố</AddButton>
         )}
       </section>
 

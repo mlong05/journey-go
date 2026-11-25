@@ -11,6 +11,7 @@ import '../../core/services/journey_service.dart';
 import '../../core/services/tour_service.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
 import 'forum_widgets.dart';
+import '../../l10n/locale_controller.dart';
 
 const int _titleMax = 200;
 const int _contentMax = 5000;
@@ -54,7 +55,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
       _content.text = post.content;
       _remoteImages.addAll(post.imageUrls);
       if (post.destinationId != null) {
-        _destination = ForumOption(post.destinationId!, post.destinationName ?? 'Điểm đến');
+        _destination = ForumOption(post.destinationId!, post.destinationName ?? appL10n.forumDestinationFallback);
       }
       if (post.tourId != null) {
         _tour = ForumOption(post.tourId!, post.tourTitle ?? 'Tour');
@@ -72,7 +73,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
   Future<void> _pickImages() async {
     final remaining = _maxImages - _imageCount;
     if (remaining <= 0) {
-      showForumSnack(context, 'Mỗi bài viết chỉ đính kèm tối đa $_maxImages ảnh.');
+      showForumSnack(context, context.l10n.forumMaxImages(_maxImages));
       return;
     }
     try {
@@ -84,7 +85,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
       if (files.isEmpty || !mounted) return;
       setState(() => _localImages.addAll(files.take(remaining).map((f) => f.path)));
     } catch (_) {
-      if (mounted) showForumSnack(context, 'Không mở được thư viện ảnh. Hãy kiểm tra quyền truy cập.');
+      if (mounted) showForumSnack(context, appL10n.forumGalleryFailed);
     }
   }
 
@@ -93,7 +94,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
   Future<void> _chooseTour() async {
     final picked = await showForumOptionPicker(
       context,
-      title: 'Chọn tour',
+      title: context.l10n.forumChooseTour,
       loader: () async {
         final results = await Future.wait([
           TourService().getPublishedTours(),
@@ -104,7 +105,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
         final mine = tours.where((t) => joined.contains(t.id));
         final others = tours.where((t) => !joined.contains(t.id));
         return [
-          for (final t in mine) ForumOption(t.id, t.title, note: 'Bạn đã tham gia'),
+          for (final t in mine) ForumOption(t.id, t.title, note: appL10n.forumJoinedNote),
           for (final t in others) ForumOption(t.id, t.title),
         ];
       },
@@ -127,8 +128,8 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
   }
 
   String? _validate() {
-    if (_title.text.trim().isEmpty) return 'Vui lòng nhập tiêu đề bài viết.';
-    if (_content.text.trim().isEmpty) return 'Vui lòng nhập nội dung bài viết.';
+    if (_title.text.trim().isEmpty) return context.l10n.forumErrTitle;
+    if (_content.text.trim().isEmpty) return context.l10n.forumErrContent;
     return null;
   }
 
@@ -142,16 +143,16 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
     setState(() {
       _error = null;
       _busy = true;
-      _busyLabel = 'Đang lưu bài viết...';
+      _busyLabel = appL10n.forumSaving;
     });
 
     try {
       final urls = [..._remoteImages];
       for (var i = 0; i < _localImages.length; i++) {
-        if (mounted) setState(() => _busyLabel = 'Đang tải ảnh ${i + 1}/${_localImages.length}...');
+        if (mounted) setState(() => _busyLabel = appL10n.forumUploadingImage(i + 1, _localImages.length));
         urls.add(await ApiClient.uploadImage(_localImages[i]));
       }
-      if (mounted) setState(() => _busyLabel = 'Đang lưu bài viết...');
+      if (mounted) setState(() => _busyLabel = appL10n.forumSaving);
 
       ForumPost saved;
       if (_isEditing) {
@@ -182,8 +183,8 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
         SnackBar(
           content: Text(
             saved.status == 'DRAFT'
-                ? 'Đã lưu bản nháp.'
-                : 'Đã gửi bài viết. Bài sẽ hiển thị sau khi được kiểm duyệt.',
+                ? appL10n.forumDraftSaved
+                : appL10n.forumSubmitted,
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -206,13 +207,13 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
 
     return Scaffold(
       backgroundColor: AppCultureColors.background,
-      appBar: buildRewardsAppBar(context, _isEditing ? 'Chỉnh sửa bài viết' : 'Viết bài mới'),
+      appBar: buildRewardsAppBar(context, _isEditing ? context.l10n.forumEditPost : context.l10n.forumNewPost),
       body: Stack(
         children: [
           ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
-              _label('Tiêu đề'),
+              _label(context.l10n.forumFieldTitle),
               _CountedField(
                 controller: _title,
                 max: _titleMax,
@@ -222,7 +223,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                 weight: FontWeight.w700,
               ),
               const SizedBox(height: 16),
-              _label('Nội dung'),
+              _label(context.l10n.forumFieldContent),
               _CountedField(
                 controller: _content,
                 max: _contentMax,
@@ -231,35 +232,35 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                 onChanged: () => setState(() {}),
               ),
               const SizedBox(height: 16),
-              _label('Tour liên quan'),
+              _label(context.l10n.forumFieldTour),
               _PickerTile(
                 icon: Icons.route_rounded,
-                hint: 'Chọn tour (không bắt buộc)',
+                hint: context.l10n.forumTourOptional,
                 value: _tour?.label,
                 onTap: _isEditing ? null : _chooseTour,
               ),
               // Bài cũ từng gắn điểm đến: vẫn hiện để biết, không chọn mới được nữa
               if (_destination != null) ...[
                 const SizedBox(height: 8),
-                _PickerTile(icon: Icons.place_rounded, hint: 'Điểm đến', value: _destination!.label, onTap: null),
+                _PickerTile(icon: Icons.place_rounded, hint: context.l10n.forumDestinationFallback, value: _destination!.label, onTap: null),
               ],
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
                   _isEditing
-                      ? 'Không thể đổi tour sau khi đã đăng.'
-                      : 'Tour bạn đã tham gia được đưa lên đầu danh sách.',
+                      ? context.l10n.forumTourLocked
+                      : context.l10n.forumTourHint,
                   style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
                 ),
               ),
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Expanded(child: _label('Ảnh ($_imageCount/$_maxImages)')),
+                  Expanded(child: _label(context.l10n.forumPhotos(_imageCount, _maxImages))),
                   TextButton.icon(
                     onPressed: _busy ? null : _pickImages,
                     icon: const Icon(Icons.add_photo_alternate_outlined, size: 20),
-                    label: const Text('Thêm ảnh'),
+                    label: Text(context.l10n.rfAddPhoto),
                   ),
                 ],
               ),
@@ -292,8 +293,8 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                   ),
                 ),
               const SizedBox(height: 12),
-              const Text(
-                'Bài viết sẽ hiển thị trên Diễn đàn sau khi được kiểm duyệt viên phê duyệt.',
+              Text(
+                context.l10n.forumModerationNote,
                 style: TextStyle(fontSize: 12, height: 1.4, color: AppCultureColors.textMuted),
               ),
             ],
@@ -341,7 +342,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: Text(
-                    _isEditing ? 'Lưu thay đổi' : 'Lưu nháp',
+                    _isEditing ? context.l10n.forumSaveChanges : context.l10n.forumSaveDraft,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -352,7 +353,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                   child: FilledButton.icon(
                     onPressed: _busy ? null : () => _save(submit: true),
                     icon: const Icon(Icons.send_rounded, size: 18),
-                    label: const Text('Gửi duyệt', style: TextStyle(fontWeight: FontWeight.w700)),
+                    label: Text(context.l10n.forumSubmitReview, style: const TextStyle(fontWeight: FontWeight.w700)),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppCultureColors.heritageJade,
                       minimumSize: const Size(0, 50),
@@ -393,13 +394,13 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: AppCultureColors.border),
           ),
-          child: const Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.photo_library_outlined, color: AppCultureColors.textLight, size: 30),
               SizedBox(height: 6),
               Text(
-                'Chạm để thêm ảnh từ thư viện',
+                context.l10n.forumAddPhotoHint,
                 style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
               ),
             ],

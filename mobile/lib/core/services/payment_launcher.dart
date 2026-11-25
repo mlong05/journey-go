@@ -31,6 +31,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/payment_model.dart';
 import 'payment_service.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Kết quả theo dõi thanh toán.
 class PaymentWatchResult {
@@ -102,7 +103,7 @@ class PaymentLauncher {
       if (deadlineAt != null && DateTime.now().isAfter(deadlineAt)) {
         return PaymentWatchResult(
           isDeadlineExceeded: true,
-          message: 'Đã hết thời hạn thanh toán.',
+          message: appL10n.payLauncherExpired,
         );
       }
 
@@ -141,8 +142,7 @@ class PaymentLauncher {
         return PaymentWatchResult(
           payment: payment,
           isFinal: true,
-          message: 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
-              'bởi một giao dịch khác.',
+          message: appL10n.paySuperseded,
         );
       }
 

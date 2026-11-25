@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import Script from "next/script";
+import LocaleSync from "@/components/common/LocaleSync";
 import "./globals.css";
 
 /**
@@ -52,6 +54,9 @@ export default function RootLayout({ children }) {
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} font-sans h-full antialiased`}
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <Suspense fallback={null}>
+          <LocaleSync />
+        </Suspense>
         {children}
         <Script
           src="https://accounts.google.com/gsi/client"

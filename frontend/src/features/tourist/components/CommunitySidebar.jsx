@@ -4,22 +4,24 @@
 import { PenLine, TrendingUp, ShieldCheck, Camera, Heart, Ban, Sparkles } from "lucide-react";
 import { getTourPreview } from "../services/touristService";
 import { Avatar } from "./CommunityUI";
+import { useT } from "@/i18n";
 
 /** Thẻ "Chia sẻ chuyến đi của bạn" — bấm vào mở hộp viết bài. */
 export function ShareCard({ user, onCompose }) {
+  const t = useT();
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-3">
-        <Avatar name={user?.fullName || "Bạn"} url={user?.avatarUrl} size={40} />
+        <Avatar name={user?.fullName || t("community.you")} url={user?.avatarUrl} size={40} />
         <button type="button" onClick={onCompose}
           className="flex-1 cursor-pointer rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-left text-sm text-slate-500 transition hover:border-teal-300 hover:bg-white">
-          Bạn vừa đi đâu?
+          {t("community.whereDidYouGo")}
         </button>
       </div>
       <ul className="mt-3 space-y-1.5 text-xs text-slate-500">
-        <li className="flex items-center gap-2"><Sparkles size={13} className="shrink-0 text-amber-500" />Khoảnh khắc đáng nhớ nhất của chuyến đi</li>
-        <li className="flex items-center gap-2"><Camera size={13} className="shrink-0 text-teal-600" />Ảnh thật bạn chụp tại điểm đến</li>
-        <li className="flex items-center gap-2"><PenLine size={13} className="shrink-0 text-orange-500" />Gợi ý cho người sắp đi tour</li>
+        <li className="flex items-center gap-2"><Sparkles size={13} className="shrink-0 text-amber-500" />{t("community.tipMoment")}</li>
+        <li className="flex items-center gap-2"><Camera size={13} className="shrink-0 text-teal-600" />{t("community.tipPhoto")}</li>
+        <li className="flex items-center gap-2"><PenLine size={13} className="shrink-0 text-orange-500" />{t("community.tipAdvice")}</li>
       </ul>
     </section>
   );
@@ -27,10 +29,11 @@ export function ShareCard({ user, onCompose }) {
 
 /** "Tour được nhắc nhiều" — đếm từ các bài đang tải; bấm để lọc bảng tin theo tour. */
 export function TopToursCard({ tours, activeTourId, onPick }) {
+  const tr = useT();
   if (!tours.length) return null;
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-4">
-      <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-900"><TrendingUp size={16} className="text-orange-600" />Tour được nhắc nhiều</h2>
+      <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-900"><TrendingUp size={16} className="text-orange-600" />{tr("community.topTours")}</h2>
       <ul className="mt-3 space-y-1">
         {tours.map((t, i) => {
           const cover = getTourPreview(t.tourId)?.coverImageUrl;
@@ -45,7 +48,7 @@ export function TopToursCard({ tours, activeTourId, onPick }) {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="line-clamp-2 text-sm font-bold leading-snug text-slate-800">{t.title}</span>
-                  <span className="mt-0.5 block text-xs text-slate-500">{t.count} bài viết</span>
+                  <span className="mt-0.5 block text-xs text-slate-500">{tr("community.postCount", { count: t.count })}</span>
                 </span>
               </button>
             </li>
@@ -58,15 +61,16 @@ export function TopToursCard({ tours, activeTourId, onPick }) {
 
 /** Quy tắc cộng đồng ngắn gọn. */
 export function GuidelinesCard() {
+  const t = useT();
   return (
     <section className="rounded-3xl border border-slate-200 bg-gradient-to-b from-teal-50/70 to-white p-4">
-      <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-900"><ShieldCheck size={16} className="text-teal-700" />Quy tắc cộng đồng</h2>
+      <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-900"><ShieldCheck size={16} className="text-teal-700" />{t("community.guidelines")}</h2>
       <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-600">
-        <li className="flex gap-2"><Camera size={14} className="mt-px shrink-0 text-teal-600" />Dùng ảnh thật bạn chụp, không lấy ảnh trên mạng.</li>
-        <li className="flex gap-2"><Heart size={14} className="mt-px shrink-0 text-rose-500" />Tôn trọng người dân, nghệ nhân và các du khách khác.</li>
-        <li className="flex gap-2"><Ban size={14} className="mt-px shrink-0 text-slate-500" />Không quảng cáo, không chia sẻ thông tin cá nhân.</li>
+        <li className="flex gap-2"><Camera size={14} className="mt-px shrink-0 text-teal-600" />{t("community.ruleRealPhotos")}</li>
+        <li className="flex gap-2"><Heart size={14} className="mt-px shrink-0 text-rose-500" />{t("community.ruleRespect")}</li>
+        <li className="flex gap-2"><Ban size={14} className="mt-px shrink-0 text-slate-500" />{t("community.ruleNoAds")}</li>
       </ul>
-      <p className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-[11px] text-slate-500 ring-1 ring-slate-100">Bài viết được kiểm duyệt trước khi hiện trên bảng tin.</p>
+      <p className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-[11px] text-slate-500 ring-1 ring-slate-100">{t("community.moderated")}</p>
     </section>
   );
 }

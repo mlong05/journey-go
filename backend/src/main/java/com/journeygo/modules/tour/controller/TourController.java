@@ -11,6 +11,7 @@ import com.journeygo.modules.tour.dto.TourSlotAvailabilityResponse;
 import com.journeygo.modules.tour.entity.TourFormat;
 import com.journeygo.modules.tour.service.TourAvailabilityService;
 import com.journeygo.modules.tour.service.TourService;
+import com.journeygo.modules.tour.service.TourTranslationService;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -39,6 +41,7 @@ public class TourController {
 
     private final TourService tourService;
     private final TourAvailabilityService tourAvailabilityService;
+    private final TourTranslationService tourTranslationService;
 
     // ── Public endpoints ──────────────────────────────────────────────────────
 
@@ -58,8 +61,10 @@ public class TourController {
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         String email = userPrincipal != null ? userPrincipal.getEmail() : null;
         TourSearchFilter filter = new TourSearchFilter(q, regionId, themeId, format, order);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tour đã xuất bản thành công",
-                tourService.searchPublished(filter, email, pageable)));
+        PageResponse<TourResponse> page = tourService.searchPublished(filter, email, pageable);
+        PageResponse<TourResponse> localized = tourTranslationService.localizePublishedTours(
+                page, LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tour đã xuất bản thành công", localized));
     }
 
     @GetMapping("/{tourId}/public-detail")
@@ -71,8 +76,10 @@ public class TourController {
             @PathVariable Long tourId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         String email = userPrincipal != null ? userPrincipal.getEmail() : null;
-        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tour thành công",
-                tourService.getPublicDetail(tourId, email)));
+        TourPublicDetailResponse detail = tourService.getPublicDetail(tourId, email);
+        TourPublicDetailResponse localized = tourTranslationService.localizePublicDetail(
+                detail, LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tour thành công", localized));
     }
 
     @GetMapping("/departures")

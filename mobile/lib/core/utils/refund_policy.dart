@@ -12,6 +12,8 @@
 ///    Mốc thời gian tính từ 00:00 giờ Việt Nam của ngày trải nghiệm.
 library;
 
+import '../../l10n/locale_controller.dart';
+
 /// Một bậc tỷ lệ hoàn trong bảng chính sách.
 class RefundTierInfo {
   /// Điều kiện hiển thị cho khách.
@@ -44,21 +46,21 @@ String formatRefundRate(double? rate) {
 /// từ cao xuống thấp.
 ///
 /// ⚠️ Nhãn "Hoàn X%" được SINH từ `rate` (không hardcode) ⇒ không thể lệch với
-///    tỷ lệ thực tế.
-final List<RefundTierInfo> kPersonalRefundTiers = [
+///    tỷ lệ thực tế. Dùng getter để luôn cập nhật theo ngôn ngữ hiện tại.
+List<RefundTierInfo> get kPersonalRefundTiers => [
   RefundTierInfo(
-    condition: 'Từ 7 ngày trở lên',
-    label: 'Hoàn ${formatRefundRate(0.8)}',
+    condition: appL10n.rfTier7DaysPlus,
+    label: appL10n.rfRefundRate(formatRefundRate(0.8)),
     rate: 0.8,
   ),
   RefundTierInfo(
-    condition: 'Từ 3 đến 6 ngày (72 giờ – 6 ngày)',
-    label: 'Hoàn ${formatRefundRate(0.5)}',
+    condition: appL10n.rfTier3To6Days,
+    label: appL10n.rfRefundRate(formatRefundRate(0.5)),
     rate: 0.5,
   ),
   RefundTierInfo(
-    condition: 'Dưới 72 giờ (3 ngày)',
-    label: 'Hoàn ${formatRefundRate(0)}',
+    condition: appL10n.rfTierUnder72Hours,
+    label: appL10n.rfRefundRate(formatRefundRate(0)),
     rate: 0,
   ),
 ];

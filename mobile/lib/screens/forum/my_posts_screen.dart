@@ -12,6 +12,7 @@ import '../rewards/rewards_widgets.dart' show RewardsMessageView, RewardsSkeleto
 import 'compose_post_screen.dart';
 import 'forum_widgets.dart';
 import 'post_detail_screen.dart';
+import '../../l10n/locale_controller.dart';
 
 /// "Bài của tôi": mọi bài của người dùng chia theo trạng thái kiểm duyệt.
 class MyPostsScreen extends StatefulWidget {
@@ -34,13 +35,13 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
   String? _error;
   int _page = 0;
 
-  static const _tabs = <({String label, bool Function(ForumPost) match})>[
-    (label: 'Tất cả', match: _all),
-    (label: 'Nháp', match: _isDraft),
-    (label: 'Chờ duyệt', match: _isPending),
-    (label: 'Đã đăng', match: _isPublished),
-    (label: 'Cần sửa', match: _isRevision),
-    (label: 'Bị từ chối', match: _isRejected),
+  static List<({String label, bool Function(ForumPost) match})> get _tabs => [
+    (label: appL10n.listAll, match: _all),
+    (label: appL10n.forumTabDraft, match: _isDraft),
+    (label: appL10n.forumTabPending, match: _isPending),
+    (label: appL10n.forumTabPublished, match: _isPublished),
+    (label: appL10n.forumTabRevision, match: _isRevision),
+    (label: appL10n.forumTabRejected, match: _isRejected),
   ];
 
   static bool _all(ForumPost p) => true;
@@ -157,10 +158,10 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
             icon: const Icon(Icons.arrow_back_ios_new_rounded,
                 size: 18, color: AppCultureColors.textDark),
             onPressed: () => Navigator.of(context).maybePop(),
-            tooltip: 'Quay lại',
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
           ),
-          title: const Text(
-            'Bài của tôi',
+          title: Text(
+            context.l10n.forumMyPosts,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -173,7 +174,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
           backgroundColor: AppCultureColors.heritageJade,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.edit_rounded),
-          label: const Text('Viết bài', style: TextStyle(fontWeight: FontWeight.w600)),
+          label: Text(context.l10n.forumWrite, style: const TextStyle(fontWeight: FontWeight.w600)),
         ),
         body: Column(
           children: [
@@ -190,7 +191,7 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
                   : _error != null
                       ? RewardsMessageView(
                           icon: Icons.cloud_off_rounded,
-                          title: 'Không tải được bài viết',
+                          title: context.l10n.forumPostsLoadFailed,
                           message: _error,
                           onRetry: _load,
                         )
@@ -215,11 +216,11 @@ class _MyPostsScreenState extends State<MyPostsScreen> {
                   height: MediaQuery.of(context).size.height * 0.5,
                   child: RewardsMessageView(
                     icon: Icons.article_outlined,
-                    title: tabLabel == 'Tất cả'
-                        ? 'Bạn chưa có bài viết nào'
-                        : 'Không có bài ở mục "$tabLabel"',
-                    message: tabLabel == 'Tất cả'
-                        ? 'Chia sẻ trải nghiệm chuyến đi để mọi người cùng khám phá.'
+                    title: tabLabel == context.l10n.listAll
+                        ? context.l10n.forumMyEmpty
+                        : context.l10n.forumMyEmptyTab(tabLabel),
+                    message: tabLabel == context.l10n.listAll
+                        ? context.l10n.forumMyEmptyHint
                         : null,
                   ),
                 ),

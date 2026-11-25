@@ -3,6 +3,7 @@ import '../models/experience_model.dart';
 import '../models/tour_detail_model.dart';
 import '../models/tour_model.dart';
 import 'api_client.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Thứ tự sắp xếp danh sách tour (khớp `TourSearchFilter.Order` ở backend).
 enum TourOrder {
@@ -117,7 +118,7 @@ class TourService {
   Future<TourModel> getTourById(int id) async {
     final data = await ApiClient.request('GET', '/tours/$id');
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Không tìm thấy tour.');
+      throw ApiException(appL10n.tourNotFound);
     }
     return TourModel.fromJson(data);
   }
@@ -126,7 +127,7 @@ class TourService {
   Future<TourDetailModel> getPublicDetail(int id) async {
     final data = await ApiClient.request('GET', '/tours/$id/public-detail');
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Không tìm thấy tour.');
+      throw ApiException(appL10n.tourNotFound);
     }
     return TourDetailModel.fromJson(data);
   }

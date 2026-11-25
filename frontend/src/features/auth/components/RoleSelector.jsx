@@ -1,11 +1,13 @@
 "use client";
 
 import React from "react";
+import { useT } from "@/i18n";
 
 /**
  * Bộ chọn nhanh vai trò (Pill Badges) tự động điền tài khoản mẫu
  */
 export default function RoleSelector({ roles, selectedRoleId, onSelectRole }) {
+  const t = useT();
   // Loại bỏ vai trò Khách du lịch theo yêu cầu
   const availableRoles = (roles || []).filter(
     (r) => r.id !== "tourist" && r.roleEnum !== "TOURIST"
@@ -26,7 +28,7 @@ export default function RoleSelector({ roles, selectedRoleId, onSelectRole }) {
                 : "bg-slate-50/80 hover:bg-sky-50/60 text-slate-600 border border-slate-200 hover:border-sky-300 font-medium"
             }`}
           >
-            {r.title}
+            {r.titleKey ? t(r.titleKey) : r.title}
           </button>
         );
       })}

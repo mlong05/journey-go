@@ -7,37 +7,38 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/cultural_content_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/cultural_content_service.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Nhãn, biểu tượng, màu theo loại nội dung (khớp trang quản lý của provider).
 ({String label, IconData icon, Color color}) contentTypeMeta(String type) =>
     switch (type) {
       'AUDIO' => (
-        label: 'Thuyết minh',
+        label: appL10n.ccAudio,
         icon: Icons.headphones_rounded,
         color: AppCultureColors.indigo500,
       ),
       'VIDEO' => (
-        label: 'Video tư liệu',
+        label: appL10n.ccVideo,
         icon: Icons.smart_display_rounded,
         color: AppCultureColors.lacquer500,
       ),
       'STORY' => (
-        label: 'Truyền thuyết',
+        label: appL10n.ccStory,
         icon: Icons.auto_stories_rounded,
         color: AppCultureColors.amberDark,
       ),
       'IMAGE' => (
-        label: 'Hình ảnh',
+        label: appL10n.ccImage,
         icon: Icons.photo_rounded,
         color: AppCultureColors.oceanBlue,
       ),
       '3D_VR' => (
-        label: 'Mô hình 3D / VR',
+        label: appL10n.cc3d,
         icon: Icons.view_in_ar_rounded,
         color: AppCultureColors.indigo500,
       ),
       _ => (
-        label: 'Bài viết di sản',
+        label: appL10n.ccArticle,
         icon: Icons.article_rounded,
         color: AppCultureColors.heritageJade,
       ),
@@ -121,8 +122,8 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
     if (contents.isEmpty) {
       return widget.hideWhenEmpty
           ? const SizedBox.shrink()
-          : const Text(
-              'Điểm đến này chưa có câu chuyện văn hóa được duyệt.',
+          : Text(
+              appL10n.ccNone,
               style: TextStyle(
                 fontSize: 12.5,
                 color: AppCultureColors.textMuted,
@@ -148,7 +149,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Mở khóa ${contents.length} nội dung khi check-in tại điểm đến',
+                    appL10n.ccUnlockOnCheckIn(contents.length),
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -173,8 +174,8 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
     );
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Không mở được bản thuyết minh.'),
+        SnackBar(
+          content: Text(appL10n.ccAudioFailed),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -253,7 +254,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                         icon: const Icon(Icons.headphones_rounded, size: 18),
                         label: Text(
                           audio.durationLabel.isEmpty
-                              ? 'Nghe thuyết minh'
+                              ? appL10n.ccListen
                               : 'Nghe · ${audio.durationLabel}',
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
@@ -274,7 +275,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                           color: AppCultureColors.indigo50,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
@@ -284,7 +285,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                             ),
                             SizedBox(width: 6),
                             Text(
-                              'Có thuyết minh audio',
+                              appL10n.ccHasAudio,
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -315,10 +316,10 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                 Expanded(
                   child: Text(
                     _expanded
-                        ? 'Thu gọn'
+                        ? appL10n.commonShowLess
                         : widget.unlocked
-                        ? 'Xem tất cả ${contents.length} nội dung văn hóa'
-                        : '${contents.length} nội dung văn hóa · mở khóa khi check-in',
+                        ? appL10n.ccSeeAll(contents.length)
+                        : appL10n.ccLockedCount(contents.length),
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
@@ -418,7 +419,7 @@ class _CulturalStoriesSectionState extends State<CulturalStoriesSection> {
                         meta.label,
                         if (c.durationLabel.isNotEmpty) c.durationLabel,
                         if (c.galleryImages.isNotEmpty)
-                          '${c.galleryImages.length} ảnh',
+                          appL10n.scImageCount(c.galleryImages.length),
                       ].join(' · '),
                       style: TextStyle(
                         fontSize: 11.5,
@@ -515,8 +516,8 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
     );
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Không mở được nội dung đa phương tiện.'),
+        SnackBar(
+          content: Text(appL10n.ccMediaFailed),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -703,10 +704,10 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
                     ),
                     label: Text(
                       c.contentType == 'AUDIO'
-                          ? 'Nghe thuyết minh'
+                          ? appL10n.ccListen
                           : c.contentType == 'VIDEO'
-                          ? 'Xem video'
-                          : 'Mở nội dung',
+                          ? appL10n.ccWatchVideo
+                          : appL10n.ccOpen,
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     style: FilledButton.styleFrom(
@@ -742,7 +743,7 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
                   const SizedBox(height: 22),
                   _sectionTitle(
                     Icons.photo_library_rounded,
-                    'Hình ảnh (${gallery.length})',
+                    appL10n.ccGallery(gallery.length),
                   ),
                   const SizedBox(height: 8),
                   // Lưới ảnh 3 cột vừa khít (thay dải vuốt ngang bị cắt ở mép); còn ảnh thì ô cuối "+N"
@@ -758,7 +759,7 @@ class _CulturalContentScreenState extends State<CulturalContentScreen> {
                 ],
                 if (c.contentText.isNotEmpty) ...[
                   const SizedBox(height: 22),
-                  _sectionTitle(Icons.menu_book_rounded, 'Câu chuyện'),
+                  _sectionTitle(Icons.menu_book_rounded, appL10n.jsStory),
                   const SizedBox(height: 8),
                   Text(
                     c.contentText,

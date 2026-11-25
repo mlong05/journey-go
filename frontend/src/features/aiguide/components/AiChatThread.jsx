@@ -14,22 +14,23 @@ import {
   Clock,
   RotateCcw,
 } from "lucide-react";
+import { INTL_LOCALE, translate, useI18n } from "@/i18n";
 import AiMessageContent from "./AiMessageContent";
 
-const STARTER_PROMPTS = [
-  "Lịch sử điểm đến nổi bật tại Việt Nam",
-  "Lưu ý trang phục & ứng xử khi tham quan di tích",
-  "Gợi ý điểm đến văn hóa giàu bản sắc",
-  "Gợi ý tour du lịch di sản nổi bật kèm link đặt tour",
+const STARTER_PROMPT_KEYS = [
+  "aiguide.starter.history",
+  "aiguide.starter.etiquette",
+  "aiguide.starter.culture",
+  "aiguide.starter.tours",
 ];
 
 /**
- * Định dạng thời gian ngắn HH:mm theo locale tiếng Việt.
+ * Định dạng thời gian ngắn HH:mm theo locale hiện tại.
  */
-export function formatMessageTime(iso) {
+export function formatMessageTime(iso, locale = "vi") {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleTimeString("vi-VN", {
+    return new Date(iso).toLocaleTimeString(INTL_LOCALE[locale] || "vi-VN", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -41,13 +42,14 @@ export function formatMessageTime(iso) {
 /**
  * Phân biệt rõ nguồn tin nhắn: AI Hướng dẫn viên vs Nhân sự thật (Admin / Moderator).
  */
-export function resolveSenderMeta(msg) {
+export function resolveSenderMeta(msg, t = null) {
+  const tr = t || ((key) => translate("vi", key));
   const role = String(msg?.role || "").toUpperCase();
   const senderRole = String(msg?.senderRole || "").toUpperCase();
 
   if (role === "HUMAN_AGENT" || senderRole === "ADMIN" || senderRole === "CONTENT_MODERATOR") {
     const isAdmin = senderRole === "ADMIN";
-    const roleLabel = isAdmin ? "Admin" : "Moderator";
+    const roleLabel = isAdmin ? tr("aiguide.role.admin") : tr("aiguide.role.moderator");
     const displayName = msg?.senderName
       ? `${roleLabel} · ${msg.senderName}`
       : roleLabel;
@@ -57,7 +59,7 @@ export function resolveSenderMeta(msg) {
       isAdmin,
       roleLabel,
       displayName,
-      humanBadgeText: "Người thật",
+      humanBadgeText: tr("aiguide.badge.human"),
       bubbleClass: isAdmin
         ? "border border-rose-200 bg-rose-50/75 text-slate-800"
         : "border border-indigo-200 bg-indigo-50/80 text-slate-800",
@@ -74,7 +76,7 @@ export function resolveSenderMeta(msg) {
     isHuman: false,
     isAdmin: false,
     roleLabel: "AI",
-    displayName: msg?.senderName || "AI Hướng dẫn viên",
+    displayName: msg?.senderName || tr("aiguide.role.aiGuide"),
     humanBadgeText: null,
     bubbleClass: "border border-slate-200 bg-white text-slate-800",
     badgeClass: "bg-teal-50 text-teal-800 ring-1 ring-teal-200",
@@ -104,11 +106,16 @@ export default function AiChatThread({
   maxLength = 1000,
   compact = false,
 }) {
-  const bottomRef = useRef(null);
+  const { t, locale } = useI18n();
+  const listRef = useRef(null);
   const [showReturnAiModal, setShowReturnAiModal] = useState(false);
 
+  // ⚠️ Chỉ cuộn KHUNG TIN NHẮN xuống cuối. Không dùng `scrollIntoView`: nó cuộn cả các khung cha
+  // (kể cả trang) ⇒ mở trang Hướng dẫn viên AI là trang bị kéo tụt xuống.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: messages.length ? "smooth" : "auto" });
   }, [messages.length, sending, handoffStatus]);
 
   useEffect(() => {
@@ -127,24 +134,22 @@ export default function AiChatThread({
   const isHumanActive = normalizedHandoff === "HUMAN_ACTIVE";
   const isLiveQueue = isWaitingHuman || isHumanActive;
   const staffRoleLabel = String(assignedStaffRole || "").toUpperCase() === "ADMIN"
-    ? "Admin"
-    : "Moderator";
+    ? t("aiguide.role.admin")
+    : t("aiguide.role.moderator");
 
   const returnModalCopy = isHumanActive
     ? {
-        title: "Kết thúc hỗ trợ trực tiếp?",
-        description:
-          "Bạn có chắc muốn kết thúc cuộc trò chuyện với nhân viên hỗ trợ và quay lại chat với AI không?",
-        primaryLabel: "Tiếp tục chat",
-        confirmLabel: "Kết thúc & quay lại AI",
+        title: t("aiguide.returnModal.activeTitle"),
+        description: t("aiguide.returnModal.activeDesc"),
+        primaryLabel: t("aiguide.returnModal.activePrimary"),
+        confirmLabel: t("aiguide.returnModal.activeConfirm"),
         iconClass: "bg-indigo-100 text-indigo-700",
       }
     : {
-        title: "Hủy yêu cầu hỗ trợ?",
-        description:
-          "Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?",
-        primaryLabel: "Tiếp tục chờ",
-        confirmLabel: "Hủy & quay lại AI",
+        title: t("aiguide.returnModal.waitingTitle"),
+        description: t("aiguide.returnModal.waitingDesc"),
+        primaryLabel: t("aiguide.returnModal.waitingPrimary"),
+        confirmLabel: t("aiguide.returnModal.waitingConfirm"),
         iconClass: "bg-amber-100 text-amber-700",
       };
 
@@ -190,11 +195,15 @@ export default function AiChatThread({
               </span>
               <div className="min-w-0">
                 <p className="truncate font-bold text-indigo-950">
-                  Đang chat với {staffRoleLabel}
-                  {assignedStaffName ? `: ${assignedStaffName}` : ""}
+                  {assignedStaffName
+                    ? t("aiguide.status.chattingWithName", {
+                        role: staffRoleLabel,
+                        name: assignedStaffName,
+                      })
+                    : t("aiguide.status.chattingWith", { role: staffRoleLabel })}
                 </p>
                 <p className="truncate text-[10.5px] font-medium text-indigo-700">
-                  Nhân sự thật đang phản hồi trực tiếp
+                  {t("aiguide.status.humanReplying")}
                 </p>
               </div>
             </>
@@ -205,10 +214,10 @@ export default function AiChatThread({
               </span>
               <div className="min-w-0">
                 <p className="truncate font-bold text-amber-950">
-                  Đang chờ Admin / Moderator tiếp nhận
+                  {t("aiguide.status.waitingStaff")}
                 </p>
                 <p className="truncate text-[10.5px] font-medium text-amber-700">
-                  Bạn vẫn có thể gửi thêm lời nhắn trong lúc chờ
+                  {t("aiguide.status.waitingHint")}
                 </p>
               </div>
             </>
@@ -218,7 +227,7 @@ export default function AiChatThread({
                 <Bot size={13} />
               </span>
               <span className="truncate text-slate-600">
-                Trợ lý AI đang hoạt động
+                {t("aiguide.status.aiActive")}
               </span>
             </>
           )}
@@ -237,7 +246,7 @@ export default function AiChatThread({
                 ) : (
                   <RotateCcw size={12} />
                 )}
-                Quay lại AI
+                {t("aiguide.action.returnToAi")}
               </button>
             )
           : onRequestHumanSupport && (
@@ -252,13 +261,14 @@ export default function AiChatThread({
                 ) : (
                   <Headset size={12} />
                 )}
-                Chat với Moderator/Admin
+                {t("aiguide.action.chatWithStaff")}
               </button>
             )}
       </div>
 
       {/* Khu vực tin nhắn */}
       <div
+        ref={listRef}
         className={`flex-1 overflow-y-auto space-y-3 [scrollbar-width:thin] ${
           compact ? "p-3" : "p-4 sm:p-5"
         }`}
@@ -266,7 +276,7 @@ export default function AiChatThread({
         {loadingMessages ? (
           <div className="flex h-full min-h-[160px] items-center justify-center gap-2 text-xs font-semibold text-slate-500">
             <Loader2 size={16} className="animate-spin text-teal-700" />
-            <span>Đang tải lịch sử hội thoại...</span>
+            <span>{t("aiguide.loading.history")}</span>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -274,25 +284,28 @@ export default function AiChatThread({
               <Sparkles size={20} />
             </div>
             <p className="text-sm font-bold text-slate-800">
-              Xin chào! Tôi là Hướng dẫn viên ảo JourneyGo
+              {t("aiguide.welcome.title")}
             </p>
             <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-500">
-              Hãy hỏi tôi về điểm đến, lịch sử, văn hóa, gợi ý tour hoặc nhấn Chat với Moderator/Admin ở phía trên nếu cần hỗ trợ trực tiếp.
+              {t("aiguide.welcome.subtitle")}
             </p>
             {!isLiveQueue && (
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {STARTER_PROMPTS.map((prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    onClick={() => onSend(prompt)}
-                    disabled={sending}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3 py-1.5 text-xs font-semibold text-teal-800 shadow-2xs transition hover:border-teal-400 hover:bg-teal-50 disabled:opacity-50 cursor-pointer"
-                  >
-                    <Compass size={12} className="shrink-0 text-teal-600" />
-                    <span className="text-left">{prompt}</span>
-                  </button>
-                ))}
+                {STARTER_PROMPT_KEYS.map((key) => {
+                  const prompt = t(key);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => onSend(prompt)}
+                      disabled={sending}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3 py-1.5 text-xs font-semibold text-teal-800 shadow-2xs transition hover:border-teal-400 hover:bg-teal-50 disabled:opacity-50 cursor-pointer"
+                    >
+                      <Compass size={12} className="shrink-0 text-teal-600" />
+                      <span className="text-left">{prompt}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -313,7 +326,7 @@ export default function AiChatThread({
             }
 
             const isUser = role === "USER";
-            const identity = isUser ? null : resolveSenderMeta(msg);
+            const identity = isUser ? null : resolveSenderMeta(msg, t);
 
             return (
               <div
@@ -361,7 +374,9 @@ export default function AiChatThread({
                           }`}
                         >
                           <Sparkles size={10} />
-                          {msg.mode === "TASK_HINT" ? "Gợi ý nhiệm vụ" : "Thuyết minh"}
+                          {msg.mode === "TASK_HINT"
+                            ? t("aiguide.mode.taskHint")
+                            : t("aiguide.mode.guide")}
                         </span>
                       )}
                     </div>
@@ -380,7 +395,7 @@ export default function AiChatThread({
                       <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2">
                         <BookOpen size={11} className="shrink-0 text-slate-400" />
                         <span className="text-[10.5px] font-semibold text-slate-400">
-                          Nguồn:
+                          {t("aiguide.message.sources")}
                         </span>
                         {msg.citations.map((cite) => (
                           <span
@@ -399,7 +414,7 @@ export default function AiChatThread({
                         isUser ? "text-teal-100" : "text-slate-400"
                       }`}
                     >
-                      {formatMessageTime(msg.createdAt)}
+                      {formatMessageTime(msg.createdAt, locale)}
                     </p>
                   )}
                 </div>
@@ -414,14 +429,13 @@ export default function AiChatThread({
               <Loader2 size={14} className="animate-spin text-teal-700" />
               <span>
                 {isLiveQueue
-                  ? "Đang gửi tin nhắn tới nhân viên hỗ trợ..."
-                  : "AI đang tra cứu tri thức di sản..."}
+                  ? t("aiguide.sending.toStaff")
+                  : t("aiguide.sending.aiSearching")}
               </span>
             </div>
           </div>
         )}
 
-        <div ref={bottomRef} />
       </div>
 
       {/* Thông báo lỗi */}
@@ -453,15 +467,15 @@ export default function AiChatThread({
             onKeyDown={handleKeyDown}
             placeholder={
               isLiveQueue
-                ? "Nhập lời nhắn gửi trực tiếp tới Admin / Moderator..."
-                : "Nhập câu hỏi về địa điểm, lịch sử, văn hóa..."
+                ? t("aiguide.input.placeholderStaff")
+                : t("aiguide.input.placeholderAi")
             }
             className="max-h-28 min-h-[38px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-teal-600 focus:bg-white"
           />
           <button
             type="submit"
             disabled={sending || !question.trim()}
-            aria-label="Gửi tin nhắn"
+            aria-label={t("aiguide.action.sendMessage")}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300 cursor-pointer"
           >
             {sending ? (
@@ -473,7 +487,7 @@ export default function AiChatThread({
         </div>
         {question.length >= maxLength - 150 && (
           <p className="mt-1 text-right text-[10.5px] font-semibold text-slate-400">
-            {question.length}/{maxLength} ký tự
+            {t("aiguide.input.charCount", { current: question.length, max: maxLength })}
           </p>
         )}
       </form>

@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { authService } from "@/features/auth/services/authService";
 import { ROUTES } from "@/constants/routes";
 import { STORAGE_KEYS } from "@/constants";
 import { disconnectRealtime } from "@/services/realtimeService";
+import { getLocale, translate } from "@/i18n";
 
-export function useLogout() {
-  const router = useRouter();
+export function useLogout({ redirectTo } = {}) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutModal, setLogoutModal] = useState({
     isOpen: false,
@@ -17,11 +16,12 @@ export function useLogout() {
   });
 
   const performLogout = async () => {
+    const tr = (key) => translate(getLocale(), key);
     setIsLoggingOut(true);
     setLogoutModal({
       isOpen: true,
       status: "loading",
-      message: "Đang kết nối API và kết thúc phiên làm việc...",
+      message: tr("misc.logout.connecting"),
     });
 
     try {
@@ -43,16 +43,14 @@ export function useLogout() {
       setLogoutModal({
         isOpen: true,
         status: "success",
-        message:
-          "Dữ liệu phiên làm việc của bạn đã được bảo vệ an toàn. Hẹn gặp lại bạn trên các hành trình di sản tiếp theo!",
+        message: tr("misc.logout.safeMsg"),
       });
     } catch (err) {
       console.error("[Logout Error]", err);
       setLogoutModal({
         isOpen: true,
         status: "success",
-        message:
-          "Dữ liệu phiên làm việc của bạn đã được bảo vệ an toàn. Hẹn gặp lại bạn trên các hành trình di sản tiếp theo!",
+        message: tr("misc.logout.safeMsg"),
       });
     } finally {
       // 4. Ngắt kết nối chat tức thời (WebSocket) của tài khoản cũ
@@ -60,6 +58,8 @@ export function useLogout() {
 
       // 5. Xóa sạch mọi session và token trong localStorage
       if (typeof window !== "undefined") {
+        // Đánh dấu đang đăng xuất để guard (RequireTourist) không đẩy sang /login trước khi chuyển trang đích.
+        window.__jgLoggingOut = true;
         localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN || "jg_access_token");
         localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN || "jg_refresh_token");
         localStorage.removeItem(STORAGE_KEYS.USER_INFO || "jg_user_info");
@@ -73,10 +73,11 @@ export function useLogout() {
         window.dispatchEvent(new Event("storage"));
       }
 
-      // 6. Tự động điều hướng về trang đăng nhập sau 1s (reload sạch để không vướng state cũ)
+      // 6. Tự động điều hướng sau 1s (reload sạch để không vướng state cũ)
+      const target = redirectTo || ROUTES.LOGIN || "/auth";
       setTimeout(() => {
         if (typeof window !== "undefined") {
-          window.location.href = ROUTES.LOGIN || "/auth";
+          window.location.href = target;
         }
       }, 1000);
     }

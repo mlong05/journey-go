@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
@@ -221,7 +222,7 @@ class _TourListScreenState extends State<TourListScreen> {
         elevation: 0,
         titleSpacing: 0,
         title: Text(
-          widget.title ?? 'Tất cả tour',
+          widget.title ?? context.l10n.homeAllTours,
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
         ),
         bottom: PreferredSize(
@@ -255,7 +256,7 @@ class _TourListScreenState extends State<TourListScreen> {
               textInputAction: TextInputAction.search,
               onChanged: _onQueryChanged,
               decoration: InputDecoration(
-                hintText: 'Tìm tour, vùng miền, chủ đề...',
+                hintText: context.l10n.listSearchHint,
                 hintStyle: const TextStyle(fontSize: 14, color: AppCultureColors.textLight),
                 prefixIcon: const Icon(Icons.search_rounded, color: AppCultureColors.textMuted),
                 suffixIcon: _search.text.isEmpty
@@ -283,7 +284,7 @@ class _TourListScreenState extends State<TourListScreen> {
             backgroundColor: AppCultureColors.heritageJade,
             child: IconButton.filledTonal(
               onPressed: _openFilters,
-              tooltip: 'Bộ lọc',
+              tooltip: context.l10n.listFilter,
               icon: const Icon(Icons.tune_rounded),
               style: IconButton.styleFrom(
                 backgroundColor: AppCultureColors.surfaceSubtle,
@@ -311,7 +312,11 @@ class _TourListScreenState extends State<TourListScreen> {
       child: Wrap(
         runSpacing: 6,
         children: [
-          for (final (value, label) in const [(null, 'Tất cả'), ('DAY_TRIP', 'Trong ngày'), ('MULTI_DAY', 'Nhiều ngày')])
+          for (final (value, label) in [
+            (null, context.l10n.listAll),
+            ('DAY_TRIP', context.l10n.homeCatDayTrip),
+            ('MULTI_DAY', context.l10n.homeCatMultiDay),
+          ])
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ChoiceChip(
@@ -359,7 +364,7 @@ class _TourListScreenState extends State<TourListScreen> {
     if (_error != null) {
       return RewardsMessageView(
         icon: Icons.cloud_off_rounded,
-        title: 'Không tải được danh sách tour',
+        title: context.l10n.homeToursErrorTitle,
         message: _error,
         onRetry: _reload,
       );
@@ -372,10 +377,10 @@ class _TourListScreenState extends State<TourListScreen> {
       final filtered = _filter.activeCount > 0 || (_filter.query?.isNotEmpty ?? false);
       return RewardsMessageView(
         icon: Icons.travel_explore_rounded,
-        title: 'Không tìm thấy tour phù hợp',
+        title: context.l10n.listEmptyTitle,
         message: _owned.isNotEmpty && !filtered
-            ? 'Bạn đã mua tất cả các tour đang hiển thị. Hãy xem mục "Chuyến đi" để trải nghiệm.'
-            : 'Thử bỏ bớt bộ lọc hoặc tìm bằng từ khóa khác.',
+            ? context.l10n.listAllOwned
+            : context.l10n.listEmptyHint,
         onRetry: filtered
             ? () {
                 _search.clear();
@@ -428,8 +433,16 @@ class _FilterSheetState extends State<_FilterSheet> {
   late String? _format = widget.filter.format;
   late TourOrder _order = widget.filter.order;
 
+  String _orderLabel(TourOrder o, AppLocalizations l10n) => switch (o) {
+        TourOrder.newest => l10n.listSortNewest,
+        TourOrder.priceAsc => l10n.listSortPriceAsc,
+        TourOrder.priceDesc => l10n.listSortPriceDesc,
+        TourOrder.departure => l10n.listSortDeparture,
+      };
+
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.8),
@@ -437,11 +450,11 @@ class _FilterSheetState extends State<_FilterSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text(
-                'Bộ lọc',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
+                l10n.listFilter,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
               ),
             ),
             Flexible(
@@ -451,26 +464,26 @@ class _FilterSheetState extends State<_FilterSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _group(
-                      'Sắp xếp',
+                      l10n.listSort,
                       [
                         for (final o in TourOrder.values)
-                          _chip(o.label, _order == o, () => setState(() => _order = o)),
+                          _chip(_orderLabel(o, l10n), _order == o, () => setState(() => _order = o)),
                       ],
                     ),
-                    _group('Hình thức', [
-                      _chip('Tất cả', _format == null, () => setState(() => _format = null)),
-                      _chip('Trong ngày', _format == 'DAY_TRIP', () => setState(() => _format = 'DAY_TRIP')),
-                      _chip('Nhiều ngày', _format == 'MULTI_DAY', () => setState(() => _format = 'MULTI_DAY')),
+                    _group(l10n.listGroupFormat, [
+                      _chip(l10n.listAll, _format == null, () => setState(() => _format = null)),
+                      _chip(l10n.homeCatDayTrip, _format == 'DAY_TRIP', () => setState(() => _format = 'DAY_TRIP')),
+                      _chip(l10n.homeCatMultiDay, _format == 'MULTI_DAY', () => setState(() => _format = 'MULTI_DAY')),
                     ]),
                     if (widget.regions.isNotEmpty)
-                      _group('Vùng miền', [
-                        _chip('Tất cả', _regionId == null, () => setState(() => _regionId = null)),
+                      _group(l10n.listGroupRegion, [
+                        _chip(l10n.listAll, _regionId == null, () => setState(() => _regionId = null)),
                         for (final r in widget.regions)
                           _chip(r.name, _regionId == r.id, () => setState(() => _regionId = r.id)),
                       ]),
                     if (widget.themes.isNotEmpty)
-                      _group('Chủ đề', [
-                        _chip('Tất cả', _themeId == null, () => setState(() => _themeId = null)),
+                      _group(l10n.listGroupTheme, [
+                        _chip(l10n.listAll, _themeId == null, () => setState(() => _themeId = null)),
                         for (final t in widget.themes)
                           _chip(t.name, _themeId == t.id, () => setState(() => _themeId = t.id)),
                       ]),
@@ -494,7 +507,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      child: const Text('Đặt lại'),
+                      child: Text(l10n.listReset),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -515,7 +528,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      child: const Text('Áp dụng', style: TextStyle(fontWeight: FontWeight.w700)),
+                      child: Text(l10n.listApply, style: const TextStyle(fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ],

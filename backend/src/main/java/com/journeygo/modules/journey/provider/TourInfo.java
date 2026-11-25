@@ -84,21 +84,57 @@ public record TourInfo(
             String stationQrToken,
             List<AnswerInfo> answers,
             Integer points,
-            boolean lenientText
+            boolean lenientText,
+            String explanation,
+            NumberSpec number
     ) {
         public QuestionInfo(Long questionId, String content, String questionType, Integer orderIndex,
                             String expectedText, String stationName, BigDecimal stationLatitude,
                             BigDecimal stationLongitude, Integer stationRadiusMeters, String stationQrToken,
                             List<AnswerInfo> answers) {
             this(questionId, content, questionType, orderIndex, expectedText, stationName, stationLatitude,
-                    stationLongitude, stationRadiusMeters, stationQrToken, answers, null, false);
+                    stationLongitude, stationRadiusMeters, stationQrToken, answers, null, false, null);
+        }
+
+        public QuestionInfo(Long questionId, String content, String questionType, Integer orderIndex,
+                            String expectedText, String stationName, BigDecimal stationLatitude,
+                            BigDecimal stationLongitude, Integer stationRadiusMeters, String stationQrToken,
+                            List<AnswerInfo> answers, Integer points, boolean lenientText) {
+            this(questionId, content, questionType, orderIndex, expectedText, stationName, stationLatitude,
+                    stationLongitude, stationRadiusMeters, stationQrToken, answers, points, lenientText, null);
+        }
+
+        public QuestionInfo(Long questionId, String content, String questionType, Integer orderIndex,
+                            String expectedText, String stationName, BigDecimal stationLatitude,
+                            BigDecimal stationLongitude, Integer stationRadiusMeters, String stationQrToken,
+                            List<AnswerInfo> answers, Integer points, boolean lenientText, String explanation) {
+            this(questionId, content, questionType, orderIndex, expectedText, stationName, stationLatitude,
+                    stationLongitude, stationRadiusMeters, stationQrToken, answers, points, lenientText, explanation,
+                    null);
         }
     }
 
+    /** Câu đoán số (NUMBER): khoảng thanh trượt, đáp án đúng, sai số cho phép. */
+    public record NumberSpec(int min, int max, int correct, int tolerance) {}
+
+    /**
+     * @param imageUrl  câu chọn ảnh: ảnh của đáp án; câu nối cột: ảnh kèm cột A
+     * @param matchText câu nối cột: cột B ghép đúng với dòng này
+     */
     public record AnswerInfo(
             Long answerId,
             String content,
             boolean correct,
-            Integer orderIndex
-    ) {}
+            Integer orderIndex,
+            String imageUrl,
+            String matchText
+    ) {
+        public AnswerInfo(Long answerId, String content, boolean correct, Integer orderIndex) {
+            this(answerId, content, correct, orderIndex, null, null);
+        }
+
+        public AnswerInfo(Long answerId, String content, boolean correct, Integer orderIndex, String imageUrl) {
+            this(answerId, content, correct, orderIndex, imageUrl, null);
+        }
+    }
 }

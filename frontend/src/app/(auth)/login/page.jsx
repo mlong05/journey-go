@@ -3,7 +3,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ROUTES } from "@/constants/routes";
+import { ROLE_HOME, resolvePostLoginPath } from "@/services/authRedirect";
+import { useT } from "@/i18n";
 
 const AuthScreen = dynamic(
   () => import("@/features/auth").then((m) => m.AuthScreen),
@@ -29,6 +30,7 @@ function LoadingFallback({ message }) {
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useT();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -37,14 +39,9 @@ export default function LoginPage() {
       if (authRaw) {
         const auth = JSON.parse(authRaw);
         const role = String(auth?.user?.role || auth?.role || "").toUpperCase();
-        if (role === "ADMIN") {
-          router.replace(ROUTES.ADMIN || "/admin");
-          return;
-        } else if (role === "CONTENT_MODERATOR") {
-          router.replace(ROUTES.MODERATOR || "/moderator");
-          return;
-        } else if (role === "CONTENT_PROVIDER") {
-          router.replace(ROUTES.PROVIDER || "/provider");
+        // Đã đăng nhập (admin / moderator / đối tác) ⇒ vào thẳng trang callbackUrl nếu thuộc khu của mình.
+        if (ROLE_HOME[role] && (auth?.token || auth?.accessToken)) {
+          router.replace(resolvePostLoginPath(role));
           return;
         }
       }
@@ -55,7 +52,7 @@ export default function LoginPage() {
   }, [router]);
 
   if (!mounted) {
-    return <LoadingFallback message="Đang tải cổng đăng nhập…" />;
+    return <LoadingFallback message={t("misc.login.loading")} />;
   }
 
   return <AuthScreen initialTab="login" />;

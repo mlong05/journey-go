@@ -8,6 +8,7 @@ import '../common/bright.dart';
 import '../common/heritage_motion.dart';
 import 'badges_screen.dart';
 import 'rewards_widgets.dart';
+import '../../l10n/locale_controller.dart';
 
 class _AchievementCategoryMeta {
   final String key;
@@ -27,50 +28,50 @@ class _AchievementCategoryMeta {
   });
 }
 
-const List<_AchievementCategoryMeta> _categories = [
+List<_AchievementCategoryMeta> get _categories => [
   _AchievementCategoryMeta(
     key: 'TOUR',
-    label: 'Hành trình khám phá',
-    shortLabel: 'Hành trình',
-    description: 'Chinh phục các chuyến đi & vùng đất mới',
-    unit: 'tour',
+    label: appL10n.achCatTour,
+    shortLabel: appL10n.achCatTourShort,
+    description: appL10n.achCatTourDesc,
+    unit: appL10n.achUnitTour,
     icon: Icons.explore_rounded,
   ),
   _AchievementCategoryMeta(
     key: 'CHECKIN',
-    label: 'Dấu chân điểm đến',
-    shortLabel: 'Check-in',
-    description: 'Check-in GPS tại các tọa độ di sản',
-    unit: 'điểm đến',
+    label: appL10n.achCatCheckin,
+    shortLabel: appL10n.achCatCheckinShort,
+    description: appL10n.achCatCheckinDesc,
+    unit: appL10n.achUnitDestination,
     icon: Icons.place_rounded,
   ),
   _AchievementCategoryMeta(
     key: 'CULTURE_QUIZ',
-    label: 'Văn hóa & Tri thức',
-    shortLabel: 'Văn hóa',
-    description: 'Khám phá câu chuyện di sản & giải đố',
-    unit: 'bài',
+    label: appL10n.achCatCulture,
+    shortLabel: appL10n.achCatCultureShort,
+    description: appL10n.achCatCultureDesc,
+    unit: appL10n.achUnitLesson,
     icon: Icons.menu_book_rounded,
   ),
   _AchievementCategoryMeta(
     key: 'EXPERIENCE',
-    label: 'Thử thách trải nghiệm',
-    shortLabel: 'Trải nghiệm',
-    description: 'Vượt qua nhiệm vụ thực tế tại điểm dừng',
-    unit: 'nhiệm vụ',
+    label: appL10n.achCatExperience,
+    shortLabel: appL10n.achCatExperienceShort,
+    description: appL10n.achCatExperienceDesc,
+    unit: appL10n.achUnitMission,
     icon: Icons.auto_awesome_rounded,
   ),
   _AchievementCategoryMeta(
     key: 'STREAK_LOYALTY',
-    label: 'Kiên định & Gắn bó',
-    shortLabel: 'Gắn bó',
-    description: 'Duy trì ngọn lửa đam mê cùng JourneyGo',
-    unit: 'mốc',
+    label: appL10n.achCatStreak,
+    shortLabel: appL10n.achCatStreakShort,
+    description: appL10n.achCatStreakDesc,
+    unit: appL10n.achUnitMilestone,
     icon: Icons.local_fire_department_rounded,
   ),
 ];
 
-final Map<String, _AchievementCategoryMeta> _categoryMap = {
+Map<String, _AchievementCategoryMeta> get _categoryMap => {
   for (final c in _categories) c.key: c,
 };
 
@@ -96,9 +97,9 @@ class _TierStyle {
   });
 }
 
-const Map<String, _TierStyle> _tierStyles = {
+Map<String, _TierStyle> get _tierStyles => {
   'BRONZE': _TierStyle(
-    label: 'Đồng',
+    label: appL10n.achTierBronze,
     pillBg: AppCultureColors.terra50,
     pillBorder: AppCultureColors.terra200,
     pillText: AppCultureColors.terra700,
@@ -107,7 +108,7 @@ const Map<String, _TierStyle> _tierStyles = {
     iconColor: AppCultureColors.terra600,
   ),
   'SILVER': _TierStyle(
-    label: 'Bạc',
+    label: appL10n.achTierSilver,
     pillBg: AppCultureColors.ink50,
     pillBorder: AppCultureColors.ink200,
     pillText: AppCultureColors.ink700,
@@ -116,7 +117,7 @@ const Map<String, _TierStyle> _tierStyles = {
     iconColor: AppCultureColors.ink600,
   ),
   'GOLD': _TierStyle(
-    label: 'Vàng',
+    label: appL10n.achTierGold,
     pillBg: AppCultureColors.brass50,
     pillBorder: AppCultureColors.brass300,
     pillText: AppCultureColors.brass800,
@@ -125,7 +126,7 @@ const Map<String, _TierStyle> _tierStyles = {
     iconColor: AppCultureColors.brass800,
   ),
   'LEGENDARY': _TierStyle(
-    label: 'Huyền thoại',
+    label: appL10n.achTierLegendary,
     pillBg: AppCultureColors.indigo50,
     pillBorder: AppCultureColors.indigo200,
     pillText: AppCultureColors.indigo700,
@@ -147,7 +148,7 @@ String _progressUnitFor(
   _AchievementCategoryMeta category,
 ) {
   if (item.code == 'TEN_THOUSAND_POINTS_EARNED') return 'JP';
-  if (item.code.contains('STREAK')) return 'ngày';
+  if (item.code.contains('STREAK')) return appL10n.achUnitDays;
   return category.unit;
 }
 
@@ -400,11 +401,11 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
       backgroundColor: AppCultureColors.background,
       appBar: buildRewardsAppBar(
         context,
-        'Thành tựu & Huy hiệu',
+        appL10n.achTitle,
         actions: [
           IconButton(
             onPressed: _openBadges,
-            tooltip: 'Bộ sưu tập huy hiệu',
+            tooltip: appL10n.achBadgeCollection,
             icon: const Icon(
               Icons.military_tech_outlined,
               color: AppCultureColors.heritageJade,
@@ -430,7 +431,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             height: MediaQuery.of(context).size.height * 0.65,
             child: RewardsMessageView(
               icon: Icons.cloud_off_rounded,
-              title: 'Không tải được thành tựu',
+              title: appL10n.achLoadFailed,
               message: _error,
               onRetry: _load,
             ),
@@ -502,19 +503,19 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     final filterPills = [
       (
         filter: _AchievementFilter.all,
-        label: 'Tất cả',
+        label: appL10n.listAll,
         count: stats.totalCount,
         dot: false,
       ),
       (
         filter: _AchievementFilter.unlocked,
-        label: 'Đã mở khóa',
+        label: appL10n.achFilterUnlocked,
         count: stats.totalAchieved,
         dot: false,
       ),
       (
         filter: _AchievementFilter.claimable,
-        label: 'Chờ nhận thưởng',
+        label: appL10n.achFilterClaimable,
         count: stats.unclaimedCount,
         dot: stats.unclaimedCount > 0,
       ),
@@ -556,7 +557,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
         children: [
           boxLabel(
             Icons.emoji_events_rounded,
-            'Thành tựu đã đạt',
+            appL10n.achAchieved,
             AppTone.jade,
             trailing: Text(
               '${stats.overallPct}%',
@@ -599,7 +600,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          boxLabel(Icons.auto_awesome_rounded, 'Điểm thành tựu', AppTone.brass),
+          boxLabel(Icons.auto_awesome_rounded, appL10n.achPoints, AppTone.brass),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -618,7 +619,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Đã nhận ${stats.totalClaimed} huy hiệu',
+            appL10n.achBadgesClaimed(stats.totalClaimed),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
@@ -633,7 +634,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          boxLabel(Icons.card_giftcard_rounded, 'Chờ nhận thưởng', hasClaimable ? AppTone.coral : AppTone.jade),
+          boxLabel(Icons.card_giftcard_rounded, appL10n.achFilterClaimable, hasClaimable ? AppTone.coral : AppTone.jade),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -646,15 +647,15 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(color: AppCultureColors.coral, borderRadius: BorderRadius.circular(20)),
-                  child: const Text(
-                    'Chờ nhận',
+                  child: Text(
+                    appL10n.achPending,
                     style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
                   ),
                 )
               else
-                const Flexible(
+                Flexible(
                   child: Text(
-                    'Đã nhận hết',
+                    appL10n.achAllClaimed,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppCultureColors.jadeDark),
@@ -663,8 +664,8 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Hoàn thành để mở khóa',
+          Text(
+            appL10n.achCompleteToUnlock,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
@@ -822,8 +823,8 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
               minimumSize: const Size(0, 32),
               padding: const EdgeInsets.symmetric(horizontal: 8),
             ),
-            child: const Text(
-              'Đóng',
+            child: Text(
+              appL10n.commonClose,
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
             ),
           ),
@@ -979,7 +980,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${st.achieved}/${st.total} thành tựu • ${st.pct}%',
+                          appL10n.achCategoryProgress(st.achieved, st.total, st.pct),
                           style: TextStyle(
                             fontSize: 11.5,
                             color: active ? AppCultureColors.jadeDark : AppCultureColors.textMuted,
@@ -1165,8 +1166,8 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             color: AppCultureColors.textLight,
           ),
           const SizedBox(height: 10),
-          const Text(
-            'Không có thành tựu nào khớp bộ lọc trong danh mục này',
+          Text(
+            appL10n.achNoMatch,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -1175,8 +1176,8 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Thử chuyển sang bộ lọc "Tất cả" hoặc chọn danh mục khác để tiếp tục theo dõi tiến độ.',
+          Text(
+            appL10n.achNoMatchHint,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
@@ -1195,8 +1196,8 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
-                'Xem tất cả trong mục này',
+              child: Text(
+                appL10n.achSeeAllInCategory,
                 style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
               ),
             ),
@@ -1295,8 +1296,8 @@ class _AchievementCard extends StatelessWidget {
                               color: AppCultureColors.brass100,
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Text(
-                              'Sẵn sàng nhận',
+                            child: Text(
+                              appL10n.achReady,
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w800,
@@ -1324,7 +1325,7 @@ class _AchievementCard extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            'Tiến độ: ${formatThousands(item.displayProgress)}/${formatThousands(item.safeTarget)} $unit',
+                            appL10n.achProgress(formatThousands(item.displayProgress), formatThousands(item.safeTarget), unit),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -1486,8 +1487,8 @@ class _AchievementCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text(
-                        'Đang nhận...',
+                      Text(
+                        appL10n.achClaiming,
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
@@ -1501,8 +1502,8 @@ class _AchievementCard extends StatelessWidget {
                         color: Colors.white,
                       ),
                       const SizedBox(width: 6),
-                      const Text(
-                        'Nhận thưởng',
+                      Text(
+                        appL10n.achClaim,
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
@@ -1530,7 +1531,7 @@ class _AchievementCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppCultureColors.jade200),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
@@ -1540,7 +1541,7 @@ class _AchievementCard extends StatelessWidget {
                 ),
                 SizedBox(width: 5),
                 Text(
-                  'Đã nhận',
+                  appL10n.achClaimed,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
@@ -1716,7 +1717,7 @@ Future<void> showClaimRewardDialog(
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'Nhận thưởng thành tựu',
+    barrierLabel: appL10n.achClaimBarrier,
     barrierColor: AppCultureColors.textDark.withValues(alpha: 0.45),
     transitionDuration: const Duration(milliseconds: 260),
     transitionBuilder: (ctx, anim, _, child) {
@@ -1894,10 +1895,10 @@ class _ClaimRewardDialog extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Container(width: 22, height: 1.2, color: AppTone.brass.soft),
-                              const Padding(
+                              Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(
-                                  'THÀNH TỰU ĐẠT ĐƯỢC',
+                                  appL10n.achUnlockedEyebrow,
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w800,
@@ -1937,7 +1938,7 @@ class _ClaimRewardDialog extends StatelessWidget {
                                   const SizedBox(width: 5),
                                   Flexible(
                                     child: Text(
-                                      'Huy hiệu: $badgeName',
+                                      appL10n.achBadgeName(badgeName),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
@@ -1962,8 +1963,8 @@ class _ClaimRewardDialog extends StatelessWidget {
                             ),
                             child: Column(
                               children: [
-                                const Text(
-                                  'PHẦN THƯỞNG VỪA NHẬN',
+                                Text(
+                                  appL10n.achRewardEyebrow,
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w700,
@@ -2008,7 +2009,7 @@ class _ClaimRewardDialog extends StatelessWidget {
                                       const Icon(Icons.check_circle_rounded, size: 15, color: AppCultureColors.success),
                                       const SizedBox(width: 5),
                                       Text(
-                                        'Số dư hiện tại: ${formatThousands(result.newPointBalance)} JP',
+                                        appL10n.achNewBalance(formatThousands(result.newPointBalance)),
                                         style: const TextStyle(
                                           fontSize: 12.5,
                                           fontWeight: FontWeight.w600,
@@ -2030,8 +2031,8 @@ class _ClaimRewardDialog extends StatelessWidget {
                                 minimumSize: const Size.fromHeight(50),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               ),
-                              child: const Text(
-                                'Tuyệt vời! Tiếp tục khám phá',
+                              child: Text(
+                                appL10n.achKeepExploring,
                                 style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
                               ),
                             ),

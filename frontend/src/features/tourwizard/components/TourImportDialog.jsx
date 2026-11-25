@@ -11,7 +11,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 
 const SUMMARY_ITEMS = [
   ["stops", "điểm đến"],
-  ["quizQuestions", "câu quiz"],
+  ["quizQuestions", "câu đố văn hóa"],
   ["experiences", "trải nghiệm"],
   ["artifacts", "cổ vật"],
   ["images", "ảnh"],

@@ -70,6 +70,7 @@ export const ROUTES = {
 
   // ── Khu vực quản trị ──────────────────────────────────────────────────────
   ADMIN: "/admin",
+  ADMIN_BADGE_CONFIG: "/admin/badge-config",
   ADMIN_AI_GUIDE: "/admin/ai-guide",
   ADMIN_FINANCE: "/admin/finance",
   ADMIN_SETTLEMENTS: "/admin/settlements",

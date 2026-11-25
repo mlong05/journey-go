@@ -21,7 +21,7 @@ import {
   Ticket,
   Bot,
 } from "lucide-react";
-import { useAuthSession } from "@/hooks";
+import { useRequireLogin } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
 import { dashboardService } from "@/features/dashboard";
 import { useQueueRefresh } from "@/context/NotificationContext";
@@ -181,7 +181,7 @@ const ADMIN_NAV_ITEMS = [
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const authData = useAuthSession();
+  const authData = useRequireLogin();
   const { performLogout, logoutModal } = useLogout();
 
   // Khóa triệt để thanh cuộn của window/body để loại bỏ hoàn toàn thanh cuộn ngoài cùng của cả trang
@@ -252,6 +252,7 @@ export default function AdminLayout({ children }) {
     pathname?.startsWith("/admin/themes") ||
     pathname?.startsWith("/admin/commission-policies") ||
     pathname?.startsWith("/admin/finance") ||
+    pathname?.startsWith("/admin/badge-config") ||
     pathname?.startsWith("/admin/vouchers") ||
     pathname?.startsWith("/admin/refunds") ||
     pathname?.startsWith("/admin/settlements");

@@ -42,6 +42,7 @@ import com.journeygo.modules.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -893,10 +894,26 @@ public class SettlementService {
 
     @Transactional(readOnly = true)
     public PageResponse<SettlementResponse> getAll(SettlementStatus status, Pageable pageable) {
+        // ⚠️ BỎ sort từ Pageable — thứ tự do truy vấn "PendingFirst" quyết định:
+        // đợt ĐANG CHỜ DUYỆT (DRAFT) luôn nằm trên cùng, các đợt đã xử lý
+        // (đã duyệt / từ chối / hủy) nằm dưới.
+        Pageable unsorted = withoutSort(pageable);
         Page<Settlement> page = (status != null)
-                ? settlementRepository.findByStatus(status, pageable)
-                : settlementRepository.findAll(pageable);
+                ? settlementRepository.findByStatusPendingFirst(status, unsorted)
+                : settlementRepository.findAllPendingFirst(unsorted);
         return PageResponse.from(page, SettlementResponse::fromEntity);
+    }
+
+    /**
+     * Bỏ phần {@code Sort} của Pageable — giữ nguyên số trang / kích thước trang.
+     *
+     * <p>Dùng khi thứ tự đã được quy định sẵn trong câu truy vấn ({@code ORDER BY}).
+     */
+    private Pageable withoutSort(Pageable pageable) {
+        if (pageable == null || pageable.isUnpaged()) {
+            return pageable;
+        }
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

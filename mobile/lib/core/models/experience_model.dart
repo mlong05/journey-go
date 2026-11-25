@@ -1,3 +1,5 @@
+import '../../l10n/locale_controller.dart';
+
 class ExperienceModel {
   final int id;
   final int? destinationId;
@@ -80,7 +82,7 @@ class ExperienceModel {
   ];
 
   static String _formatPrice(double price, String currency) {
-    if (price <= 0) return 'Miễn phí';
+    if (price <= 0) return appL10n.tourPriceFree;
     final intPrice = price.toInt();
     final buffer = StringBuffer();
     final str = intPrice.toString();
@@ -93,16 +95,17 @@ class ExperienceModel {
       }
     }
     final formatted = buffer.toString().split('').reversed.join('');
-    return '$formatted đ';
+    return appL10n.priceVnd(formatted);
   }
 
   static String _formatDuration(int minutes) {
-    if (minutes <= 0) return 'Tự do';
-    if (minutes < 60) return '$minutes phút';
+    final l10n = appL10n;
+    if (minutes <= 0) return l10n.durationFlexible;
+    if (minutes < 60) return l10n.durationMinutes(minutes);
     final hours = minutes ~/ 60;
     final remainingMinutes = minutes % 60;
-    if (remainingMinutes == 0) return '$hours giờ';
-    return '${hours}h ${remainingMinutes}m';
+    if (remainingMinutes == 0) return l10n.durationHours(hours);
+    return l10n.durationHoursMinutes(hours, remainingMinutes);
   }
 
   static List<String> _generateTags(int tasks, int cips) {
@@ -159,7 +162,7 @@ class ExperienceModel {
       destinationId: json['destinationId'] is num
           ? (json['destinationId'] as num).toInt()
           : int.tryParse(json['destinationId']?.toString() ?? ''),
-      title: json['title']?.toString() ?? 'Trải nghiệm Di sản',
+      title: json['title']?.toString() ?? appL10n.expFallbackTitle,
       description: json['description']?.toString() ?? '',
       price: parsedPrice,
       currency: json['currency']?.toString() ?? 'VND',

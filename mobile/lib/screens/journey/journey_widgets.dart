@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Vòng tiến độ tròn có số ở giữa, dùng ở đầu màn hành trình.
 class ProgressRing extends StatelessWidget {
@@ -185,12 +186,12 @@ Future<void> showRewardDialog(
   String? badgeIconUrl,
   int? points,
   IconData icon = Icons.workspace_premium_rounded,
-  String buttonLabel = 'Tuyệt vời',
+  String? buttonLabel,
 }) {
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'Đóng',
+    barrierLabel: appL10n.commonClose,
     barrierColor: Colors.black54,
     transitionDuration: const Duration(milliseconds: 380),
     transitionBuilder: (ctx, anim, _, child) => ScaleTransition(
@@ -254,13 +255,13 @@ Future<void> showRewardDialog(
                 const SizedBox(height: 14),
                 InfoChip(
                   icon: Icons.stars_rounded,
-                  text: '+$points điểm',
+                  text: appL10n.tkPlusPoints(points),
                   background: AppCultureColors.rewardBg,
                   foreground: AppCultureColors.rewardText,
                 ),
               ],
               const SizedBox(height: 20),
-              PrimaryButton(label: buttonLabel, onPressed: () => Navigator.of(ctx).pop()),
+              PrimaryButton(label: buttonLabel ?? appL10n.rwAwesome, onPressed: () => Navigator.of(ctx).pop()),
             ],
           ),
         ),

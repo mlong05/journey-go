@@ -4,6 +4,9 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/ai_guide_model.dart';
 import '../../core/services/ai_guide_service.dart';
 import '../../core/services/api_client.dart';
+import '../../l10n/locale_controller.dart';
+import '../common/ai_mascot.dart';
+import '../common/heritage_motion.dart';
 import '../common/ink.dart';
 import '../tours/tour_detail_opener.dart';
 
@@ -105,20 +108,23 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
   bool get _isHumanActive => _handoffStatus.toUpperCase() == 'HUMAN_ACTIVE';
   bool get _isLiveQueue => _isWaitingHuman || _isHumanActive;
 
-  List<String> get _suggestions => _isTaskHintMode
-      ? const [
-          'Gợi ý hướng quan sát cho tôi',
-          'Tôi nên chú ý chi tiết nào quanh đây?',
-          'Cho tôi một manh mối nhỏ nhé',
-        ]
-      : [
-          if (widget.destinationName != null)
-            'Kể cho tôi về lịch sử của ${widget.destinationName}'
-          else
-            'Giới thiệu nét văn hóa di sản nổi bật',
-          'Kiến trúc nơi đây có điểm gì đặc sắc?',
-          'Cần lưu ý gì khi tham quan điểm này?',
-        ];
+  List<String> _suggestions(BuildContext context) {
+    final l10n = context.l10n;
+    return _isTaskHintMode
+        ? [
+            l10n.aiSuggestHint1,
+            l10n.aiSuggestHint2,
+            l10n.aiSuggestHint3,
+          ]
+        : [
+            if (widget.destinationName != null)
+              l10n.aiSuggestDestHistory(widget.destinationName!)
+            else
+              l10n.aiSuggestHeritage,
+            l10n.aiSuggestArchitecture,
+            l10n.aiSuggestVisitTips,
+          ];
+  }
 
   @override
   void initState() {
@@ -200,7 +206,8 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
         _loading = false;
       });
       _syncPolling();
-      _scrollToBottom();
+      // Mở lại cuộc trò chuyện cũ ⇒ vào thẳng tin nhắn mới nhất (không cuộn từ đầu xuống)
+      _scrollToBottom(animate: false);
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
@@ -211,7 +218,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = 'Không thể khởi tạo phiên trò chuyện AI.';
+          _error = context.l10n.aiErrInit;
           _loading = false;
         });
       }
@@ -257,7 +264,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
       if (mounted) {
         setState(() {
           _handoffLoading = false;
-          _error = 'Không thể gửi yêu cầu trò chuyện với Admin / Moderator.';
+          _error = context.l10n.aiErrRequestHuman;
         });
       }
     }
@@ -292,7 +299,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
       if (mounted) {
         setState(() {
           _handoffLoading = false;
-          _error = 'Không thể chuyển lại về AI Hướng dẫn viên.';
+          _error = context.l10n.aiErrReturnAi;
         });
       }
     }
@@ -304,13 +311,12 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
   }
 
   Future<void> _showReturnToAiDialog() async {
+    final l10n = context.l10n;
     final isHumanActive = _isHumanActive;
-    final title = isHumanActive ? 'Kết thúc hỗ trợ trực tiếp?' : 'Hủy yêu cầu hỗ trợ?';
-    final message = isHumanActive
-        ? 'Bạn có chắc muốn kết thúc cuộc trò chuyện với nhân viên hỗ trợ và quay lại chat với AI không?'
-        : 'Bạn đang trong hàng chờ gặp nhân viên. Quay lại AI sẽ hủy yêu cầu hỗ trợ này. Bạn có chắc không?';
-    final primaryLabel = isHumanActive ? 'Tiếp tục chat' : 'Tiếp tục chờ';
-    final confirmLabel = isHumanActive ? 'Kết thúc & quay lại AI' : 'Hủy & quay lại AI';
+    final title = isHumanActive ? l10n.aiEndHumanTitle : l10n.aiCancelWaitTitle;
+    final message = isHumanActive ? l10n.aiEndHumanBody : l10n.aiCancelWaitBody;
+    final primaryLabel = isHumanActive ? l10n.aiKeepChatting : l10n.aiKeepWaiting;
+    final confirmLabel = isHumanActive ? l10n.aiEndAndReturnAi : l10n.aiCancelAndReturnAi;
     final iconData = isHumanActive ? Icons.support_agent_rounded : Icons.hourglass_top_rounded;
     final iconColor = isHumanActive ? AppCultureColors.oceanBlue : AppCultureColors.warning;
 
@@ -377,7 +383,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
               FilledButton(
                 onPressed: submitting ? null : () => Navigator.of(ctx).pop(),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppCultureColors.heritageJade,
+                  backgroundColor: AiPalette.indigo,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -393,17 +399,29 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
     );
   }
 
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients) {
-        _scrollCtrl.animateTo(
-          _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOut,
-        );
+  /// Luôn đưa tin nhắn mới nhất xuống đáy màn hình.
+  /// Chờ 2 khung hình: câu trả lời dài / ảnh / bàn phím làm `maxScrollExtent` đổi sau lần dựng đầu.
+  /// Ở rất xa (mở lịch sử dài) thì nhảy thẳng, gần thì cuộn mượt.
+  void _scrollToBottom({bool animate = true}) {
+    void go() {
+      if (!mounted || !_scrollCtrl.hasClients) return;
+      final pos = _scrollCtrl.position;
+      final target = pos.maxScrollExtent;
+      if (!animate || (target - pos.pixels).abs() > 2000) {
+        _scrollCtrl.jumpTo(target);
+      } else {
+        _scrollCtrl.animateTo(target, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
       }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      go();
+      WidgetsBinding.instance.addPostFrameCallback((_) => go());
     });
   }
+
+  /// Bàn phím bật lên ⇒ giữ tin nhắn cuối ngay trên ô nhập.
+  double _lastInset = 0;
 
   Future<void> _send([String? presetQuestion]) async {
     final text = (presetQuestion ?? _inputCtrl.text).trim();
@@ -452,7 +470,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
               sessionId: reply.sessionId,
               role: 'ASSISTANT',
               content: reply.answer,
-              senderName: 'AI Hướng dẫn viên',
+              senderName: context.l10n.aiSenderName,
               senderRole: 'AI',
               createdAt: reply.createdAt ?? DateTime.now(),
               citations: reply.citations,
@@ -483,7 +501,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _error = 'Không thể kết nối tới Hướng dẫn viên AI. Vui lòng thử lại.';
+        _error = context.l10n.aiErrSend;
       });
     }
   }
@@ -512,8 +530,10 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    if (bottomInset > _lastInset && _messages.isNotEmpty) _scrollToBottom(animate: false);
+    _lastInset = bottomInset;
     return Scaffold(
-      backgroundColor: AppInk.paper,
+      backgroundColor: const Color(0xFFF7F7FB),
       appBar: _buildHeader(),
       body: Column(
         children: [
@@ -521,7 +541,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
           Expanded(
             child: _loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: AppCultureColors.heritageJade),
+                    child: CircularProgressIndicator(color: AiPalette.indigo),
                   )
                 : _messages.isEmpty
                     ? _buildEmptyState()
@@ -565,6 +585,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
   }
 
   PreferredSizeWidget _buildHeader() {
+    final l10n = context.l10n;
     return AppBar(
       backgroundColor: AppCultureColors.surface,
       surfaceTintColor: Colors.transparent,
@@ -574,32 +595,25 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
       leading: widget.isSheet
           ? IconButton(
               icon: const Icon(Icons.close_rounded),
-              tooltip: 'Đóng',
+              tooltip: l10n.commonClose,
               onPressed: () => Navigator.of(context).pop(),
             )
           : null,
+      bottom: const PreferredSize(
+        preferredSize: Size.fromHeight(1),
+        child: Divider(height: 1, thickness: 1, color: AiPalette.line),
+      ),
       title: Row(
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: _isTaskHintMode ? AppCultureColors.rewardBg : AppCultureColors.jadeLight,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              size: 18,
-              color: _isTaskHintMode ? AppCultureColors.gold : AppCultureColors.heritageJade,
-            ),
-          ),
+          // Linh vật AI (cùng nút AI ở trang chủ) — chuyển động nhẹ
+          const AiMascot(size: 36),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isTaskHintMode ? 'Trợ lý gợi ý AI' : 'Hướng dẫn viên AI',
+                  _isTaskHintMode ? l10n.aiHeaderHintTitle : l10n.aiHeaderGuideTitle,
                   style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700),
                 ),
                 Text(
@@ -613,12 +627,12 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
       ),
       actions: [
         IconButton(
-          tooltip: 'Lịch sử phiên trò chuyện',
+          tooltip: l10n.aiHistoryTooltip,
           icon: const Icon(Icons.history_rounded, size: 21),
           onPressed: _loading ? null : _showSessionHistory,
         ),
         IconButton(
-          tooltip: 'Cuộc trò chuyện mới',
+          tooltip: l10n.aiNewChatTooltip,
           icon: const Icon(Icons.add_comment_outlined, size: 20),
           onPressed: _loading || _sending ? null : () => _initSession(forceNew: true),
         ),
@@ -627,6 +641,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
   }
 
   Widget _buildContextBanner() {
+    final l10n = context.l10n;
     final Color bg;
     final Color fg;
     final Color border;
@@ -642,28 +657,24 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
       fg = AppCultureColors.oceanBlue;
       border = AppCultureColors.oceanBlue.withValues(alpha: 0.25);
       leadingIcon = Icons.support_agent_rounded;
-      title = staffName.isNotEmpty ? 'Đang chat với $roleLabel: $staffName' : 'Đang chat với $roleLabel';
-      subtitle = 'Nhân sự thật đang hỗ trợ trực tiếp';
+      title = staffName.isNotEmpty ? l10n.aiChattingWithStaff(roleLabel, staffName) : l10n.aiChattingWithRole(roleLabel);
+      subtitle = l10n.aiHumanSubtitle;
     } else if (_isWaitingHuman) {
       bg = AppCultureColors.warningLight;
       fg = AppCultureColors.warning;
       border = AppCultureColors.rewardBorder;
       leadingIcon = Icons.hourglass_top_rounded;
-      title = 'Đang chờ Admin / Moderator tiếp nhận';
-      subtitle = 'Bạn vẫn có thể nhắn tin trong lúc chờ hỗ trợ';
+      title = l10n.aiWaitingTitle;
+      subtitle = l10n.aiWaitingSubtitle;
     } else {
-      bg = _isTaskHintMode ? AppCultureColors.rewardBg : AppCultureColors.jadeLight;
-      fg = _isTaskHintMode ? AppCultureColors.rewardText : AppCultureColors.heritageJade;
-      border = _isTaskHintMode
-          ? AppCultureColors.rewardBorder
-          : AppCultureColors.heritageJade.withValues(alpha: 0.25);
+      bg = _isTaskHintMode ? AppCultureColors.rewardBg : AiPalette.softer;
+      fg = _isTaskHintMode ? AppCultureColors.rewardText : AiPalette.indigo;
+      border = _isTaskHintMode ? AppCultureColors.rewardBorder : AiPalette.line;
       leadingIcon = _isTaskHintMode ? Icons.lightbulb_rounded : Icons.location_on_rounded;
       title = _isTaskHintMode
-          ? (widget.taskName ?? 'Nhiệm vụ trải nghiệm')
-          : (widget.destinationName ?? 'Hỏi đáp di sản & hỗ trợ');
-      subtitle = _isTaskHintMode
-          ? 'Chế độ gợi ý thông minh · Không tiết lộ đáp án'
-          : 'Thuyết minh viên ảo dựa trên dữ liệu đã kiểm duyệt';
+          ? (widget.taskName ?? l10n.aiDefaultTaskName)
+          : (widget.destinationName ?? l10n.aiDefaultDestName);
+      subtitle = _isTaskHintMode ? l10n.aiHintBannerSubtitle : l10n.aiGuideBannerSubtitle;
     }
 
     return Container(
@@ -719,7 +730,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.restart_alt_rounded, size: 15),
-              label: const Text('Quay lại AI', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+              label: Text(l10n.aiReturnToAiBtn, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
             )
           else
             OutlinedButton.icon(
@@ -740,7 +751,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.support_agent_rounded, size: 15),
-              label: const Text('Chat Mod/Admin', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+              label: Text(l10n.aiChatHumanBtn, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
             ),
         ],
       ),
@@ -748,61 +759,63 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
   }
 
   Widget _buildEmptyState() {
+    final l10n = context.l10n;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 16),
       children: [
-        Center(
-          child: Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: _isTaskHintMode ? AppCultureColors.rewardBg : AppCultureColors.jadeLight,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              size: 28,
-              color: _isTaskHintMode ? AppCultureColors.gold : AppCultureColors.heritageJade,
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 8),
+        const Center(child: AiMascot(size: 76, pulseRing: true)),
+        const SizedBox(height: 22),
         Text(
-          _isTaskHintMode
-              ? 'Cần manh mối cho thử thách?'
-              : 'Xin chào! Tôi có thể giúp gì cho bạn?',
+          _isTaskHintMode ? l10n.aiEmptyHintTitle : l10n.aiEmptyGuideTitle,
           textAlign: TextAlign.center,
           style: AppType.display(size: 19),
         ),
         const SizedBox(height: 6),
         Text(
-          _isTaskHintMode
-              ? 'Hãy hỏi tôi để nhận gợi ý quan sát hiện trường. Tôi sẽ dẫn dắt bạn tự tìm ra đáp án!'
-              : 'Đặt câu hỏi về lịch sử, câu chuyện văn hóa, kiến trúc hoặc gợi ý khám phá tại điểm dừng.',
+          _isTaskHintMode ? l10n.aiEmptyHintBody : l10n.aiEmptyGuideBody,
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 13, height: 1.5, color: AppCultureColors.textMuted),
         ),
         const SizedBox(height: 20),
         if (!_isLiveQueue)
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: _suggestions
-                .map(
-                  (q) => ActionChip(
-                    backgroundColor: AppCultureColors.surface,
-                    side: const BorderSide(color: AppCultureColors.border),
-                    label: Text(
-                      q,
-                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
+          // Gợi ý câu hỏi: thẻ trắng viền chàm, nhấn thu nhỏ nhẹ + gợn sóng
+          for (final q in _suggestions(context))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Pressable(
+                onTap: () => _send(q),
+                child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AiPalette.line),
+                        boxShadow: [
+                          BoxShadow(color: AiPalette.indigo.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(color: AiPalette.soft, borderRadius: BorderRadius.circular(9)),
+                            child: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AiPalette.indigo),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              q,
+                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AiPalette.ink),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_rounded, size: 18, color: AiPalette.violet),
+                        ],
+                      ),
                     ),
-                    avatar: const Icon(Icons.auto_awesome_rounded, size: 15, color: AppCultureColors.heritageJade),
-                    onPressed: () => _send(q),
-                  ),
-                )
-                .toList(),
-          ),
+              ),
+            ),
       ],
     );
   }
@@ -842,12 +855,12 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
         ? AppCultureColors.lacquerLight
         : isHuman
             ? AppCultureColors.oceanLight
-            : AppCultureColors.jadeLight;
+            : AiPalette.soft;
     final Color avatarFg = isAdmin
         ? AppCultureColors.lacquer
         : isHuman
             ? AppCultureColors.oceanBlue
-            : AppCultureColors.heritageJade;
+            : AiPalette.indigo;
     final IconData avatarIcon = isAdmin
         ? Icons.verified_user_rounded
         : isHuman
@@ -867,7 +880,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
 
     final String senderLabel = isHuman
         ? '${isAdmin ? 'Admin' : 'Moderator'}${msg.senderName?.trim().isNotEmpty == true ? ' · ${msg.senderName!.trim()}' : ''}'
-        : (msg.senderName?.trim().isNotEmpty == true ? msg.senderName!.trim() : 'AI Hướng dẫn viên');
+        : (msg.senderName?.trim().isNotEmpty == true ? msg.senderName!.trim() : context.l10n.aiSenderName);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -876,22 +889,44 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
-            Container(
-              width: 28,
-              height: 28,
-              margin: const EdgeInsets.only(top: 2, right: 8),
-              decoration: BoxDecoration(
-                color: avatarBg,
-                borderRadius: BorderRadius.circular(9),
+            // AI: linh vật đứng yên (đỡ rối mắt khi nhiều tin nhắn); Moderator/Admin: biểu tượng riêng
+            if (!isHuman)
+              const Padding(
+                padding: EdgeInsets.only(top: 2, right: 8),
+                child: AiMascot(size: 30, animated: false),
+              )
+            else
+              Container(
+                width: 30,
+                height: 30,
+                margin: const EdgeInsets.only(top: 2, right: 8),
+                decoration: BoxDecoration(
+                  color: avatarBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(avatarIcon, size: 16, color: avatarFg),
               ),
-              child: Icon(avatarIcon, size: 15, color: avatarFg),
-            ),
           ],
           Flexible(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               decoration: BoxDecoration(
-                color: isUser ? AppCultureColors.heritageJade : incomingBubbleBg,
+                color: isUser ? null : incomingBubbleBg,
+                // Tin của du khách: nền chàm → tím (đồng bộ màu thương hiệu AI)
+                gradient: isUser
+                    ? const LinearGradient(
+                        colors: [AiPalette.indigo, AiPalette.violet],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                boxShadow: [
+                  BoxShadow(
+                    color: (isUser ? AiPalette.indigo : AiPalette.ink).withValues(alpha: isUser ? 0.18 : 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
@@ -940,7 +975,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                               border: Border.all(color: incomingBorderColor),
                             ),
                             child: Text(
-                              'NGƯỜI THẬT',
+                              context.l10n.aiHumanBadge,
                               style: TextStyle(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w800,
@@ -969,7 +1004,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                       children: parsed.tourLinks
                           .map(
                             (ref) => Material(
-                              color: AppCultureColors.jadeLight.withValues(alpha: 0.65),
+                              color: AiPalette.softer,
                               borderRadius: BorderRadius.circular(10),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(10),
@@ -979,16 +1014,16 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: AppCultureColors.heritageJade.withValues(alpha: 0.35),
+                                      color: AiPalette.indigo.withValues(alpha: 0.35),
                                     ),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       const Icon(
-                                        Icons.explore_rounded,
+                                        Icons.travel_explore_rounded,
                                         size: 14,
-                                        color: AppCultureColors.heritageJade,
+                                        color: AiPalette.indigo,
                                       ),
                                       const SizedBox(width: 5),
                                       Flexible(
@@ -999,7 +1034,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                                           style: const TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,
-                                            color: AppCultureColors.heritageJade,
+                                            color: AiPalette.indigo,
                                           ),
                                         ),
                                       ),
@@ -1007,7 +1042,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                                       const Icon(
                                         Icons.arrow_forward_ios_rounded,
                                         size: 11,
-                                        color: AppCultureColors.heritageJade,
+                                        color: AiPalette.indigo,
                                       ),
                                     ],
                                   ),
@@ -1069,37 +1104,25 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: AppCultureColors.jadeLight,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: const Icon(Icons.auto_awesome_rounded, size: 15, color: AppCultureColors.heritageJade),
+          // Đang soạn: linh vật chuyển động + ba chấm nhảy
+          const Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: AiMascot(size: 30),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
-              color: AppCultureColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppCultureColors.border),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AiPalette.line),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppCultureColors.heritageJade,
-                  ),
-                ),
-                const SizedBox(width: 8),
+                const AiTypingDots(),
+                const SizedBox(width: 10),
                 Text(
-                  _isLiveQueue ? 'Đang gửi tin nhắn...' : 'AI đang suy nghĩ...',
+                  _isLiveQueue ? context.l10n.aiSendingMessage : context.l10n.aiThinking,
                   style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted, fontWeight: FontWeight.w600),
                 ),
               ],
@@ -1115,7 +1138,7 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
       padding: EdgeInsets.fromLTRB(12, 8, 12, (widget.isSheet ? 12 : 16) + bottomInset),
       decoration: const BoxDecoration(
         color: AppCultureColors.surface,
-        border: Border(top: BorderSide(color: AppCultureColors.border)),
+        border: Border(top: BorderSide(color: AiPalette.line)),
       ),
       child: SafeArea(
         top: false,
@@ -1133,41 +1156,52 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
                 decoration: InputDecoration(
                   counterText: '',
                   hintText: _isLiveQueue
-                      ? 'Nhắn tin trực tiếp tới Admin / Moderator...'
+                      ? context.l10n.aiInputHintHuman
                       : _isTaskHintMode
-                          ? 'Hỏi gợi ý cho nhiệm vụ...'
-                          : 'Hỏi về lịch sử, kiến trúc điểm đến...',
+                          ? context.l10n.aiInputHintTask
+                          : context.l10n.aiInputHintGuide,
                   hintStyle: const TextStyle(fontSize: 13.5, color: AppCultureColors.textLight),
                   filled: true,
-                  fillColor: AppCultureColors.background,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  fillColor: const Color(0xFFF7F7FB),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: AppCultureColors.border),
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: const BorderSide(color: AiPalette.line),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: AppCultureColors.border),
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: const BorderSide(color: AiPalette.line),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: AppCultureColors.heritageJade),
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: const BorderSide(color: AiPalette.indigo, width: 1.5),
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 8),
-            SizedBox(
-              width: 44,
-              height: 44,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  backgroundColor: AppCultureColors.heritageJade,
-                  shape: const CircleBorder(),
+            // Nút gửi: tròn chàm → tím, nhấn thu nhỏ; đang gửi thì mờ đi
+            Pressable(
+              onTap: _sending ? null : () => _send(),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: _sending ? 0.45 : 1,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [AiPalette.indigo, AiPalette.violet],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: AiPalette.indigo.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: const Icon(Icons.send_rounded, size: 20, color: Colors.white),
                 ),
-                onPressed: _sending ? null : () => _send(),
-                child: const Icon(Icons.send_rounded, size: 19, color: Colors.white),
               ),
             ),
           ],
@@ -1225,6 +1259,7 @@ class _SessionHistorySheetState extends State<_SessionHistorySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
@@ -1234,7 +1269,7 @@ class _SessionHistorySheetState extends State<_SessionHistorySheet> {
           children: [
             Row(
               children: [
-                Text('Lịch sử trò chuyện AI', style: AppType.display(size: 18)),
+                Text(l10n.aiHistoryTitle, style: AppType.display(size: 18)),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close_rounded),
@@ -1246,13 +1281,13 @@ class _SessionHistorySheetState extends State<_SessionHistorySheet> {
             if (_loading)
               const Padding(
                 padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator(color: AppCultureColors.heritageJade)),
+                child: Center(child: CircularProgressIndicator(color: AiPalette.indigo)),
               )
             else if (_sessions.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
-                  child: Text('Chưa có phiên trò chuyện nào.', style: TextStyle(color: AppCultureColors.textMuted)),
+                  child: Text(l10n.aiHistoryEmpty, style: const TextStyle(color: AppCultureColors.textMuted)),
                 ),
               )
             else
@@ -1265,25 +1300,32 @@ class _SessionHistorySheetState extends State<_SessionHistorySheet> {
                   itemBuilder: (_, i) {
                     final s = _sessions[i];
                     final active = s.id == widget.currentSessionId;
+                    final statusLabel = s.isWaitingHuman
+                        ? l10n.aiStatusWaiting
+                        : s.isHumanActive
+                            ? l10n.aiStatusLive
+                            : 'AI Guide';
                     return ListTile(
                       selected: active,
-                      selectedTileColor: AppCultureColors.jadeLight.withValues(alpha: 0.45),
+                      selectedTileColor: AiPalette.soft.withValues(alpha: 0.45),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       leading: Icon(
                         Icons.chat_bubble_outline_rounded,
                         size: 20,
-                        color: active ? AppCultureColors.heritageJade : AppCultureColors.textMuted,
+                        color: active ? AiPalette.indigo : AppCultureColors.textMuted,
                       ),
                       title: Text(
                         s.lastMessagePreview?.isNotEmpty == true
                             ? s.lastMessagePreview!
-                            : (s.currentDestinationId != null ? 'Điểm đến #${s.currentDestinationId}' : 'Hỏi đáp chung'),
+                            : (s.currentDestinationId != null
+                                ? l10n.aiDestinationFallback(s.currentDestinationId!)
+                                : l10n.aiGeneralQa),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        '${s.isWaitingHuman ? 'Đang chờ Mod/Admin' : s.isHumanActive ? 'Chat trực tiếp' : 'AI Guide'} · ${s.messageCount} tin nhắn',
+                        l10n.aiSessionSubtitle(statusLabel, s.messageCount),
                         style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
                       ),
                       trailing: IconButton(
@@ -1330,7 +1372,7 @@ _ParsedAiMessage _parseAiMessage(String raw) {
     final label = (m.group(1) ?? '').trim();
     final tourId = int.tryParse(m.group(2) ?? '');
     if (tourId != null) {
-      final cleanLabel = label.isEmpty ? 'Xem tour #$tourId' : label;
+      final cleanLabel = label.isEmpty ? appL10n.aiViewTour(tourId) : label;
       linksById.putIfAbsent(tourId, () => _TourLinkRef(tourId: tourId, label: cleanLabel));
       return cleanLabel;
     }
@@ -1340,7 +1382,7 @@ _ParsedAiMessage _parseAiMessage(String raw) {
   text = text.replaceAllMapped(RegExp(r'/tours/(\d+)'), (m) {
     final tourId = int.tryParse(m.group(1) ?? '');
     if (tourId != null) {
-      linksById.putIfAbsent(tourId, () => _TourLinkRef(tourId: tourId, label: 'Xem tour #$tourId'));
+      linksById.putIfAbsent(tourId, () => _TourLinkRef(tourId: tourId, label: appL10n.aiViewTour(tourId)));
       return 'Tour #$tourId';
     }
     return m.group(0) ?? '';

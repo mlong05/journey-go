@@ -12,13 +12,16 @@
 import { formatDateTimeVN } from "@/lib/money";
 
 /**
- * @param {Object}  props
- * @param {boolean} props.mine      tin này do NGƯỜI ĐANG ĐĂNG NHẬP gửi hay không.
- * @param {string}  props.body      nội dung tin nhắn.
- * @param {string}  props.createdAt thời điểm gửi (ISO).
- * @param {string}  props.author    tên người gửi (hiện dưới tin của đối tác).
+ * @param {Object}   props
+ * @param {boolean}  props.mine      tin này do NGƯỜI ĐANG ĐĂNG NHẬP gửi hay không.
+ * @param {string}   props.body      nội dung tin nhắn.
+ * @param {string}   props.createdAt thời điểm gửi (ISO).
+ * @param {string}   props.author    tên người gửi (hiện dưới tin của đối tác).
+ * @param {Function} [props.t]       hàm dịch (từ `useT()`); không truyền ⇒ giữ tiếng Việt cho dashboard.
  */
-export default function ChatBubble({ mine = false, body, createdAt, author }) {
+export default function ChatBubble({ mine = false, body, createdAt, author, t }) {
+  const youLabel = t ? t("community.you") : "Bạn";
+  const fallbackAuthor = t ? t("merge.chat.customerFallback") : "Khách hàng";
   return (
     <li className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
       <div
@@ -31,7 +34,7 @@ export default function ChatBubble({ mine = false, body, createdAt, author }) {
         {body}
       </div>
       <p className="mt-0.5 px-1 text-[10px] text-slate-400">
-        {mine ? "Bạn" : author || "Khách hàng"} · {formatDateTimeVN(createdAt)}
+        {mine ? youLabel : author || fallbackAuthor} · {formatDateTimeVN(createdAt)}
       </p>
     </li>
   );

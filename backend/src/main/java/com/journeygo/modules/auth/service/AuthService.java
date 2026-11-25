@@ -338,7 +338,7 @@ public class AuthService {
                 throw new AppException(ErrorCode.VALIDATION_ERROR, "Vui lòng nhập mật khẩu hiện tại");
             }
             if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
-                throw new AppException(ErrorCode.INVALID_CREDENTIALS, "Mật khẩu hiện tại không chính xác");
+                throw new AppException(ErrorCode.WRONG_CURRENT_PASSWORD);
             }
             if (passwordEncoder.matches(request.newPassword(), user.getPassword())) {
                 throw new AppException(ErrorCode.SAME_OLD_PASSWORD);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/models/refund_model.dart';
 import '../../core/models/tour_journey_model.dart';
@@ -210,7 +211,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   /// Mở hành trình — nhưng nếu ngày trải nghiệm còn ở tương lai thì mở màn CHI TIẾT
   /// TOUR (không vào hành trình vì backend đang khoá tour tới ngày đó).
   void _startExperience(BookingModel b) {
-    if (b.isTourLocked) {
+    // Đã qua thời gian tour ⇒ cũng mở chi tiết tour: thanh dưới báo "Đã quá ngày trải nghiệm",
+    // hoặc "Tiếp tục" nếu khách đã bắt đầu hành trình trong hạn.
+    if (b.isTourLocked || b.isExperienceExpired) {
       openTourDetailScreen(context, tourId: b.tourId, bookedBooking: b);
       return;
     }
@@ -241,6 +244,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     // Trước đây nhóm này là "phần còn lại" ⇒ lẫn cả đơn `PENDING_PAYMENT` quá
     // hạn ⇒ hiển thị sai (như "đã thanh toán" / cho truy cập trải nghiệm).
     final closed = all.where((b) => _isClosed(b)).toList();
+    final l10n = context.l10n;
 
     return DefaultTabController(
       length: 8,
@@ -250,8 +254,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           backgroundColor: Colors.white,
           elevation: 0,
           centerTitle: true,
-          title: const Text('Đơn đặt tour',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
+          title: Text(l10n.mbTitle,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
           iconTheme: const IconThemeData(color: AppCultureColors.textDark),
         ),
         body: _loading
@@ -261,14 +265,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   // 8 nhóm đơn dạng chip tự xuống hàng — thay thanh tab cuộn ngang bị cắt ở mép
                   TabChipWrap(
                     labels: [
-                      'Tất cả (${all.length})',
-                      'Đã mua (${purchased.length})',
-                      'Chờ thanh toán (${pending.length})',
-                      'Đang trải nghiệm (${experiencing.length})',
-                      'Đã hoàn thành (${completed.length})',
-                      'Đang hoàn tiền (${refunding.length})',
-                      'Đã hoàn tiền (${refunded.length})',
-                      'Đã hủy/Hết hạn (${closed.length})',
+                      l10n.mbTabAll(all.length),
+                      l10n.mbTabPurchased(purchased.length),
+                      l10n.mbTabPending(pending.length),
+                      l10n.mbTabExperiencing(experiencing.length),
+                      l10n.mbTabCompleted(completed.length),
+                      l10n.mbTabRefunding(refunding.length),
+                      l10n.mbTabRefunded(refunded.length),
+                      l10n.mbTabClosed(closed.length),
                     ],
                   ),
                   const Divider(height: 1),
@@ -282,14 +286,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   Expanded(
                     child: TabBarView(
                       children: [
-                        _list(all, 'Chưa có đơn nào.', _ticketTile),
-                        _list(purchased, 'Chưa có đơn nào đã thanh toán.', _ticketTile),
-                        _list(pending, 'Không có đơn nào đang chờ thanh toán.', _pendingTile),
-                        _list(experiencing, 'Không có chuyến nào đang diễn ra.', _ticketTile),
-                        _list(completed, 'Chưa có đơn nào đã hoàn thành.', _ticketTile),
-                        _list(refunding, 'Không có đơn nào đang hoàn tiền.', _ticketTile),
-                        _list(refunded, 'Chưa có đơn nào đã hoàn tiền xong.', _ticketTile),
-                        _list(closed, 'Không có đơn nào đã hủy hoặc hết hạn.', _closedTile),
+                        _list(all, l10n.mbEmptyAll, _ticketTile),
+                        _list(purchased, l10n.mbEmptyPurchased, _ticketTile),
+                        _list(pending, l10n.mbEmptyPending, _pendingTile),
+                        _list(experiencing, l10n.mbEmptyExperiencing, _ticketTile),
+                        _list(completed, l10n.mbEmptyCompleted, _ticketTile),
+                        _list(refunding, l10n.mbEmptyRefunding, _ticketTile),
+                        _list(refunded, l10n.mbEmptyRefunded, _ticketTile),
+                        _list(closed, l10n.mbEmptyClosed, _closedTile),
                       ],
                     ),
                   ),
@@ -369,7 +373,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             const SizedBox(height: 4),
             Text(b.tourTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            Text('Ngày ${formatDay(b.experienceDate)} · ${formatMoney(b.totalAmount)}',
+            Text(context.l10n.pendingBannerDetail(formatDay(b.experienceDate), formatMoney(b.totalAmount)),
                 style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
             const SizedBox(height: 10),
             Row(
@@ -389,7 +393,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                                   ? Icons.event_busy_rounded
                                   : b.isTourLocked
                                       ? Icons.schedule_rounded
-                                      : Icons.explore_rounded,
+                                      : b.isExperienceExpired
+                                          ? Icons.event_busy_rounded
+                                          : Icons.explore_rounded,
                       size: 18,
                     ),
                     label: Text(
@@ -419,7 +425,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                     side: const BorderSide(color: AppCultureColors.border),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: const Text('Chi tiết', style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: Text(context.l10n.mbDetails, style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ],
             ),
@@ -437,9 +443,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () => _rebook(b),
                   icon: const Icon(Icons.replay_rounded, size: 17),
-                  label: const Text(
-                    'Đặt lại tour',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  label: Text(
+                    context.l10n.mbRebook,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppCultureColors.heritageJade,
@@ -458,12 +464,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   /// Nhãn nút hành động — thay ".. ngày nữa lên đường" khi đơn đang/có hoàn tiền.
   String _actionLabel(BookingModel b, bool refunding, bool resolved) {
-    if (refunding) return 'Đang trong quá trình hoàn tiền';
-    if (resolved) return 'Đã xử lý hoàn tiền';
+    final l10n = context.l10n;
+    if (refunding) return l10n.tdRefundProcessingTitle;
+    if (resolved) return l10n.tdRefundDoneTitle;
     // ⚠️ Đơn đã hủy/hết hạn ⇒ KHÔNG mở được hành trình ⇒ nhãn phải nói đúng
     // sự thật, không hiện "Vào trải nghiệm" (gây hiểu nhầm đã mua thành công).
-    if (_isClosed(b)) return b.isCancelled ? 'Đơn đã hủy' : 'Đơn đã hết hạn';
-    return b.isTourLocked ? '${b.daysUntilStart} ngày nữa lên đường!' : 'Vào trải nghiệm';
+    if (_isClosed(b)) return b.isCancelled ? l10n.mbBookingCancelled : l10n.mbBookingExpired;
+    if (b.isTourLocked) return l10n.tripCountdown(b.daysUntilStart);
+    return b.isExperienceExpired ? l10n.tdExperienceExpired : l10n.mbEnterExperience;
   }
 
   /// Tile cho đơn ĐÃ HỦY / HẾT HẠN.
@@ -479,6 +487,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     final cancelled = b.isCancelled;
     final paidButClosed = _isClosedButPaid(b);
     final reason = (b.cancellationReason ?? '').trim();
+    final l10n = context.l10n;
 
     return _tile(
       child: Column(
@@ -496,7 +505,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  cancelled ? 'Đã hủy' : 'Hết hạn thanh toán',
+                  cancelled ? l10n.statusCancelled : l10n.statusPaymentExpired,
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -516,13 +525,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Ngày ${formatDay(b.experienceDate)} · ${formatMoney(b.totalAmount)}',
+            l10n.pendingBannerDetail(formatDay(b.experienceDate), formatMoney(b.totalAmount)),
             style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
           ),
           if (reason.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              'Lý do: $reason',
+              l10n.mbReason(reason),
               style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
             ),
           ],
@@ -544,8 +553,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Khoản tiền đã được ghi nhận nhưng chỗ đã được trả lại. '
-                      'Vui lòng liên hệ hỗ trợ để được hoàn tiền.',
+                      l10n.mbPaidButClosed,
                       style: const TextStyle(
                         fontSize: 11.5,
                         height: 1.35,
@@ -563,9 +571,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             child: OutlinedButton.icon(
               onPressed: () => _openDetail(b),
               icon: const Icon(Icons.receipt_long_rounded, size: 17),
-              label: const Text(
-                'Xem chi tiết đơn',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              label: Text(
+                l10n.mbViewDetails,
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppCultureColors.jadeDark,
@@ -593,13 +601,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             const SizedBox(height: 4),
             Text('${formatDay(b.experienceDate)} · ${formatMoney(b.totalAmount)}',
                 style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
-            Text('Hạn thanh toán: ${formatDateTime(b.paymentDeadline)}',
+            Text(context.l10n.mbPaymentDeadline(formatDateTime(b.paymentDeadline)),
                 style: const TextStyle(fontSize: 12, color: AppCultureColors.amberDark)),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => _openCheckout(b),
               style: FilledButton.styleFrom(backgroundColor: AppCultureColors.heritageJade),
-              child: const Text('Thanh toán tiếp'),
+              child: Text(context.l10n.tdContinuePayment),
             ),
           ],
         ),

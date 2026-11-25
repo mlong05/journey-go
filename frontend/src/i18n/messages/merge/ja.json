@@ -1,0 +1,15 @@
+{
+  "merge.nav.aiGuide": "AIツアーガイド",
+  "merge.chat.loadingHistory": "履歴を読み込み中…",
+  "merge.chat.loadOlder": "以前のメッセージを見る",
+  "merge.chat.endOfHistory": "メッセージ履歴をすべて表示しました",
+  "merge.chat.loadingOlder": "以前のメッセージを読み込み中…",
+  "merge.chat.customerFallback": "お客様",
+  "merge.refund.tierEarly": "出発の7日以上前",
+  "merge.refund.tierMid": "3〜6日前（72時間〜6日前）",
+  "merge.refund.tierLate": "72時間（3日）未満",
+  "merge.refund.rateLabel": "{rate}返金",
+  "merge.refund.guideRatesDesc": "7日以上前のキャンセル：80%返金。3〜6日前（72時間〜6日前）のキャンセル：50%返金。72時間（3日）未満：返金不可。プラットフォームまたはツアー提供者の過失：管理者確認後に100%返金。",
+  "merge.trips.rebookThisTour": "このツアーを再予約",
+  "merge.trips.unitTrip": "件のツアー"
+}

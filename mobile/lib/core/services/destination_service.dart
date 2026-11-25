@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_constants.dart';
 import '../models/destination_model.dart';
 import 'token_storage.dart';
+import '../../l10n/locale_controller.dart';
 
 class DestinationService {
   static final DestinationService _instance = DestinationService._internal();
@@ -22,6 +23,7 @@ class DestinationService {
 
     final headers = <String, String>{
       'Accept': 'application/json',
+      'Accept-Language': acceptLanguage,
     };
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
@@ -90,6 +92,7 @@ class DestinationService {
 
     final headers = <String, String>{
       'Accept': 'application/json',
+      'Accept-Language': acceptLanguage,
     };
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
@@ -130,7 +133,7 @@ class DestinationService {
     }
 
     throw Exception(
-      'Không thể tải chi tiết điểm đến #$id. Vui lòng kiểm tra kết nối và thử lại.',
+      appL10n.destLoadFailed('$id'),
     );
   }
 
