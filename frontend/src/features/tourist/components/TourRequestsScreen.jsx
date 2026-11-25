@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Sparkles,
@@ -57,24 +57,25 @@ export default function TourRequestsScreen() {
   const [page, setPage] = useState(0);
   const [error, setError] = useState(null);
 
-  const fetchRequests = async (p = 0) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await touristService.myTourRequests({ page: p, size: 10 });
-      setRequests(res?.content || []);
-      setTotal(res?.totalElements || 0);
-      setPage(p);
-    } catch (err) {
-      setError(err?.message || "Không thể tải danh sách yêu cầu tour.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchRequests = useCallback((p = 0) => {
+    return touristService.myTourRequests({ page: p, size: 10 })
+      .then((res) => {
+        setRequests(res?.content || []);
+        setTotal(res?.totalElements || 0);
+        setPage(p);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err?.message || "Không thể tải danh sách yêu cầu tour.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     fetchRequests(0);
-  }, []);
+  }, [fetchRequests]);
 
   return (
     <AccountLayout>

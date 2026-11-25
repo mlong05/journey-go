@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -66,24 +66,24 @@ export default function TourRequestDetailScreen({ requestId }) {
   const [cancelling, setCancelling] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
-  const fetchDetail = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await touristService.tourRequestDetail(requestId);
-      setRequest(res);
-    } catch (err) {
-      setError(err?.message || "Không thể tải thông tin yêu cầu tour.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchDetail = useCallback(() => {
+    if (!requestId) return;
+    return touristService.tourRequestDetail(requestId)
+      .then((res) => {
+        setRequest(res);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err?.message || "Không thể tải thông tin yêu cầu tour.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [requestId]);
 
   useEffect(() => {
-    if (requestId) {
-      fetchDetail();
-    }
-  }, [requestId]);
+    fetchDetail();
+  }, [fetchDetail]);
 
   const handleCancel = async () => {
     try {
