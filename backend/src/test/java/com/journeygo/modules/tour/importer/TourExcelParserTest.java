@@ -3,6 +3,7 @@ package com.journeygo.modules.tour.importer;
 import com.journeygo.modules.tour.dto.wizard.TourWizardRequests;
 import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.TourFormat;
+import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import com.journeygo.modules.tour.importer.dto.TourImportIssue;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -53,6 +54,9 @@ class TourExcelParserTest {
             assertTrue(r.errors.isEmpty(), () -> "Không mong có lỗi: " + r.errors);
             TourWizardRequests.BasicInfo basic = r.basicInfo;
             assertEquals("Theo chân thợ mộc khám phá kiến trúc gỗ Hội An", r.title);
+            assertEquals(TourVisibility.ALL, basic.visibility());
+            assertNull(basic.specificUserEmail());
+            assertNull(basic.tourRequestId());
             assertEquals(TourFormat.DAY_TRIP, basic.tourFormat());
             assertEquals(270, basic.durationMinutes());
             assertEquals(1L, basic.regionId());
@@ -168,6 +172,49 @@ class TourExcelParserTest {
                     "Số đêm không được lớn hơn số ngày")), r.errors);
             // Tour nhiều ngày giữ toàn bộ lịch trình, không cảnh báo
             assertTrue(r.warnings.isEmpty());
+        }
+    }
+
+    @Test
+    @DisplayName("Tour riêng theo yêu cầu: đọc quyền xem, email khách chỉ định và mã yêu cầu")
+    void customizeTourFields() throws IOException {
+        try (XSSFWorkbook wb = template(true)) {
+            Sheet general = wb.getSheet(SHEET_GENERAL);
+            set(general, generalRow(Field.VISIBILITY), 1, VISIBILITY_SPECIFIC);
+            set(general, generalRow(Field.SPECIFIC_USER_EMAIL), 1, "guest@example.com");
+            set(general, generalRow(Field.TOUR_REQUEST_ID), 1, "123");
+
+            TourExcelParser.Result r = parse(wb);
+            assertTrue(r.errors.isEmpty(), () -> "Không mong có lỗi: " + r.errors);
+            assertEquals(TourVisibility.SPECIFIC_USER, r.basicInfo.visibility());
+            assertEquals("guest@example.com", r.basicInfo.specificUserEmail());
+            assertEquals(123L, r.basicInfo.tourRequestId());
+            assertEquals("SPECIFIC_USER", r.summary().visibility());
+            assertEquals("guest@example.com", r.summary().specificUserEmail());
+            assertEquals(123L, r.summary().tourRequestId());
+        }
+
+        try (XSSFWorkbook wb = template(true)) {
+            Sheet general = wb.getSheet(SHEET_GENERAL);
+            set(general, generalRow(Field.VISIBILITY), 1, VISIBILITY_SPECIFIC);
+
+            TourExcelParser.Result r = parse(wb);
+            assertTrue(r.errors.contains(new TourImportIssue(SHEET_GENERAL,
+                    generalRow(Field.SPECIFIC_USER_EMAIL) + 1,
+                    Field.SPECIFIC_USER_EMAIL.label,
+                    "Vui lòng nhập email khách chỉ định khi chọn \"" + VISIBILITY_SPECIFIC + "\"")), r.errors::toString);
+        }
+
+        try (XSSFWorkbook wb = template(true)) {
+            Sheet general = wb.getSheet(SHEET_GENERAL);
+            set(general, generalRow(Field.VISIBILITY), 1, VISIBILITY_ALL);
+            set(general, generalRow(Field.TOUR_REQUEST_ID), 1, "55");
+
+            TourExcelParser.Result r = parse(wb);
+            assertTrue(r.errors.contains(new TourImportIssue(SHEET_GENERAL,
+                    generalRow(Field.VISIBILITY) + 1,
+                    Field.VISIBILITY.label,
+                    "Tour tạo từ yêu cầu riêng của khách bắt buộc giữ chế độ \"" + VISIBILITY_SPECIFIC + "\"")), r.errors::toString);
         }
     }
 

@@ -124,10 +124,10 @@ final class TourImportTemplateBuilder {
                 "1. Mỗi file là 1 tour. Sau khi nhập, hệ thống tạo một BẢN NHÁP — bạn mở lại trong màn hình tạo tour để kiểm tra, "
                         + "bổ sung ảnh (nếu thiếu) rồi bấm Gửi duyệt như bình thường.",
                 "2. KHÔNG đổi tên sheet, KHÔNG đổi tên / thêm / xóa cột, KHÔNG xóa dòng tiêu đề. Dòng trống sẽ được bỏ qua.",
-                "3. Các ô có danh sách thả xuống: Hình thức, Khu vực, Chủ đề, Loại khách, Có / Không, Đáp án đúng.",
+                "3. Các ô có danh sách thả xuống: Quyền xem tour, Hình thức, Khu vực, Chủ đề, Loại khách, Có / Không, Đáp án đúng.",
                 "",
                 "CÁC SHEET",
-                "• " + SHEET_GENERAL + ": tên, hình thức, thời lượng, khu vực, chủ đề, mô tả, điểm nổi bật, số chỗ, các chính sách.",
+                "• " + SHEET_GENERAL + ": tên, quyền xem tour (Công khai / Tour riêng), email khách chỉ định, mã yêu cầu tour, hình thức, thời lượng, khu vực, chủ đề, mô tả, điểm nổi bật, số chỗ, các chính sách.",
                 "• " + SHEET_IMAGES + ": mỗi dòng 1 đường dẫn ảnh https: 1 ảnh bìa (đánh \"Có\" ở cột Ảnh bìa; bỏ trống = dòng đầu tiên) + đúng 5 ảnh tour.",
                 "• " + SHEET_PRICES + ": giá cho từng loại khách. Em bé luôn miễn phí.",
                 "• " + SHEET_ITINERARY + ": mỗi dòng 1 ngày, theo thứ tự 1, 2, 3… Tour trong ngày chỉ cần 1 dòng.",
@@ -180,6 +180,7 @@ final class TourImportTemplateBuilder {
             cell(row, 2, field.note, noteStyle);
             int r = row.getRowNum();
             switch (field) {
+                case VISIBILITY -> explicitDropdown(sheet, r, r, 1, VISIBILITY_ALL, VISIBILITY_SPECIFIC);
                 case FORMAT -> explicitDropdown(sheet, r, r, 1, FORMAT_DAY_TRIP, FORMAT_MULTI_DAY);
                 case REGION -> listDropdown(sheet, r, 1, 0, regions.size());
                 case THEME -> listDropdown(sheet, r, 1, 1, themes.size());
@@ -346,6 +347,7 @@ final class TourImportTemplateBuilder {
     private String sampleValue(Field field) {
         return switch (field) {
             case TITLE -> "Theo chân thợ mộc khám phá kiến trúc gỗ Hội An";
+            case VISIBILITY -> VISIBILITY_ALL;
             case FORMAT -> FORMAT_DAY_TRIP;
             case DURATION_HOURS -> "4";
             case DURATION_MINUTES -> "30";

@@ -126,6 +126,24 @@ class TourImportServiceTest {
     }
 
     @Test
+    @DisplayName("Email khách chỉ định sai định dạng được đổi về đúng ô")
+    void invalidSpecificUserEmailMappedToCell() throws IOException {
+        TourImportResult result = service.importTour(sampleFile(wb -> {
+            var general = wb.getSheet(SHEET_GENERAL);
+            general.getRow(GENERAL_FIRST_ROW + Field.VISIBILITY.ordinal()).createCell(1).setCellValue(VISIBILITY_SPECIFIC);
+            general.getRow(GENERAL_FIRST_ROW + Field.SPECIFIC_USER_EMAIL.ordinal()).createCell(1).setCellValue("not-an-email");
+        }), USER);
+
+        assertFalse(result.valid());
+        assertTrue(result.errors().contains(new TourImportIssue(
+                SHEET_GENERAL,
+                GENERAL_FIRST_ROW + Field.SPECIFIC_USER_EMAIL.ordinal() + 1,
+                Field.SPECIFIC_USER_EMAIL.label,
+                "Email người dùng chỉ định không đúng định dạng")), result.errors()::toString);
+        verifyNoInteractions(draftService);
+    }
+
+    @Test
     @DisplayName("Lỗi nghiệp vụ của service → rollback, trả lỗi chung")
     void serviceErrorRollsBack() throws IOException {
         when(draftService.create(any(), eq(USER)))
