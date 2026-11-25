@@ -31,7 +31,7 @@ public class TourRequestController {
     private final TourRequestService tourRequestService;
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('TOURIST')")
     @Operation(summary = "Đăng yêu cầu tạo tour riêng theo nhu cầu",
             description = "Du khách đăng bài mô tả các yêu cầu về điểm đến, thời gian, ngân sách, số lượng khách...")
     public ResponseEntity<ApiResponse<TourRequestResponse>> create(
