@@ -4,6 +4,7 @@ import com.journeygo.modules.tour.dto.wizard.TourWizardRequests;
 import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.TourFormat;
 import com.journeygo.modules.tour.entity.VideoSource;
+import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import com.journeygo.modules.tour.importer.TourImportLayout.Field;
 import com.journeygo.modules.tour.importer.dto.TourImportIssue;
 import com.journeygo.modules.tour.importer.dto.TourImportResult;
@@ -53,6 +54,9 @@ final class TourExcelParser {
             return new TourImportResult.Summary(
                     title,
                     basicInfo.tourFormat() == null ? null : basicInfo.tourFormat().name(),
+                    basicInfo.visibility() == null ? null : basicInfo.visibility().name(),
+                    basicInfo.specificUserEmail(),
+                    basicInfo.tourRequestId(),
                     size(basicInfo.images()),
                     size(basicInfo.highlights()),
                     pricing == null ? 0 : size(pricing.prices()),
@@ -133,6 +137,39 @@ final class TourExcelParser {
             if (titleError != null) fieldError(fieldRows, Field.TITLE, titleError);
         }
 
+        TourVisibility parsedVisibility = readVisibility(general, fieldRows);
+        String specificUserEmail = readText(general, fieldRows, Field.SPECIFIC_USER_EMAIL, "basic.specificUserEmail");
+        Long tourRequestId = readLong(general, fieldRows, Field.TOUR_REQUEST_ID, "basic.tourRequestId");
+        if (tourRequestId != null && tourRequestId <= 0) {
+            fieldError(fieldRows, Field.TOUR_REQUEST_ID, "Mã yêu cầu tour phải là số nguyên dương");
+        }
+
+        TourVisibility visibility;
+        if (tourRequestId != null) {
+            if (parsedVisibility == TourVisibility.ALL) {
+                fieldError(fieldRows, Field.VISIBILITY,
+                        "Tour tạo từ yêu cầu riêng của khách bắt buộc giữ chế độ \"" + VISIBILITY_SPECIFIC + "\"");
+            }
+            visibility = TourVisibility.SPECIFIC_USER;
+        } else if (parsedVisibility == TourVisibility.SPECIFIC_USER) {
+            visibility = TourVisibility.SPECIFIC_USER;
+            if (specificUserEmail == null) {
+                fieldError(fieldRows, Field.SPECIFIC_USER_EMAIL,
+                        "Vui lòng nhập email khách chỉ định khi chọn \"" + VISIBILITY_SPECIFIC + "\"");
+            }
+        } else {
+            if (parsedVisibility == null && specificUserEmail != null) {
+                fieldError(fieldRows, Field.VISIBILITY,
+                        "Đã nhập Email khách chỉ định — vui lòng chọn Quyền xem tour là \"" + VISIBILITY_SPECIFIC + "\"");
+            } else if (parsedVisibility == TourVisibility.ALL && specificUserEmail != null) {
+                result.warnings.add(issue(SHEET_GENERAL, fieldRows.get(Field.SPECIFIC_USER_EMAIL),
+                        Field.SPECIFIC_USER_EMAIL.label,
+                        "Tour ở chế độ \"" + VISIBILITY_ALL + "\" — Email khách chỉ định sẽ bị bỏ qua"));
+                specificUserEmail = null;
+            }
+            visibility = TourVisibility.ALL;
+        }
+
         Integer durationMinutes = null, durationDays = null, durationNights = null;
         if (format == TourFormat.DAY_TRIP) {
             durationMinutes = readDayTripMinutes(general, fieldRows);
@@ -146,6 +183,9 @@ final class TourExcelParser {
 
         result.basicInfo = new TourWizardRequests.BasicInfo(
                 result.title,
+                visibility,
+                specificUserEmail,
+                tourRequestId,
                 format,
                 durationMinutes,
                 durationDays,
@@ -217,6 +257,28 @@ final class TourExcelParser {
     private Integer readInteger(Sheet sheet, Map<Field, Integer> rows, Field field, String path) {
         locate(rows, field, path);
         return toInteger(valueCell(sheet, rows, field), SHEET_GENERAL, rows.get(field), field.label);
+    }
+
+    private Long readLong(Sheet sheet, Map<Field, Integer> rows, Field field, String path) {
+        locate(rows, field, path);
+        return toLong(valueCell(sheet, rows, field), SHEET_GENERAL, rows.get(field), field.label);
+    }
+
+    private TourVisibility readVisibility(Sheet sheet, Map<Field, Integer> rows) {
+        locate(rows, Field.VISIBILITY, "basic.visibility");
+        String value = cellText(valueCell(sheet, rows, Field.VISIBILITY));
+        if (value == null) return null;
+        String key = normalize(value);
+        if (key.equals(normalize(VISIBILITY_ALL)) || key.equals("công khai (tất cả)") || key.equals("all")) {
+            return TourVisibility.ALL;
+        }
+        if (key.equals(normalize(VISIBILITY_SPECIFIC)) || key.equals("tour riêng theo yêu cầu")
+                || key.equals("specific_user") || key.equals("specific user")) {
+            return TourVisibility.SPECIFIC_USER;
+        }
+        fieldError(rows, Field.VISIBILITY,
+                "Quyền xem tour phải là \"" + VISIBILITY_ALL + "\" hoặc \"" + VISIBILITY_SPECIFIC + "\"");
+        return null;
     }
 
     private TourFormat readFormat(Sheet sheet, Map<Field, Integer> rows) {
@@ -617,6 +679,17 @@ final class TourExcelParser {
         if (value == null) return null;
         try {
             return value.stripTrailingZeros().intValueExact();
+        } catch (ArithmeticException e) {
+            result.errors.add(issue(sheet, r, column, "Phải là số nguyên"));
+            return null;
+        }
+    }
+
+    private Long toLong(Cell cell, String sheet, Integer r, String column) {
+        BigDecimal value = toNumber(cell, false, sheet, r, column);
+        if (value == null) return null;
+        try {
+            return value.stripTrailingZeros().longValueExact();
         } catch (ArithmeticException e) {
             result.errors.add(issue(sheet, r, column, "Phải là số nguyên"));
             return null;

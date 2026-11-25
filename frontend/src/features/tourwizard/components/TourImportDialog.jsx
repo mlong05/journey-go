@@ -216,6 +216,12 @@ export default function TourImportDialog({ open, onClose, onCreated }) {
                   </p>
                   {summary && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
+                      {summary.visibility === "SPECIFIC_USER" && (
+                        <span className="px-2 py-0.5 rounded-md bg-teal-100 border border-teal-200 text-[11px] font-bold text-teal-800">
+                          Tour riêng{summary.specificUserEmail ? `: ${summary.specificUserEmail}` : ""}
+                          {summary.tourRequestId ? ` · Yêu cầu #${summary.tourRequestId}` : ""}
+                        </span>
+                      )}
                       {SUMMARY_ITEMS.map(([key, label]) => (
                         <span key={key} className="px-2 py-0.5 rounded-md bg-white border border-emerald-100 text-[11px] font-semibold text-slate-700 tabular-nums">
                           {summary[key] ?? 0} {label}
